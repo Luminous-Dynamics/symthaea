@@ -28,7 +28,10 @@ pub struct ThermodynamicInput {
     // From consciousness phase
     pub unified_psi: f64,
     pub coherence: f32,
+    /// Last PE value is retained for continuity when no comparison is available.
     pub prediction_error: f32,
+    /// Whether prediction_error is a fresh, comparable observation this cycle.
+    pub prediction_error_valid: bool,
     pub attention_sensitivity: f32,
 
     // From substrate/metabolism
@@ -67,6 +70,7 @@ impl Default for ThermodynamicInput {
             unified_psi: 0.0,
             coherence: 0.0,
             prediction_error: 0.0,
+            prediction_error_valid: false,
             attention_sensitivity: 0.0,
             energy_per_cycle: 0.0,
             total_energy_spent: 0.0,
@@ -180,11 +184,11 @@ impl ThermodynamicIntegration {
                 .update_hfe(input.hfe_total, input.hfe_complexity, input.hfe_accuracy);
         }
 
-        self.state.update_energy(
+        self.state.update_energy_with_evidence(
             input.energy_per_cycle,
             input.total_energy_spent,
             input.metabolic_stress,
-            input.prediction_error,
+            input.prediction_error_valid.then_some(input.prediction_error),
         );
 
         // ═══════════════════════════════════════════════════════════════════
@@ -216,11 +220,11 @@ impl ThermodynamicIntegration {
         // ═══════════════════════════════════════════════════════════════════
 
         let info_processed = input.coherence as f64 * input.unified_psi;
-        self.bridge.compute(
+        self.bridge.compute_with_evidence(
             input.attention_sensitivity as f64,
             info_processed,
             input.coherence as f64,
-            input.prediction_error as f64,
+            input.prediction_error_valid.then_some(input.prediction_error as f64),
             self.state.effective_temperature,
             self.state.entropy_production_rate,
             self.state.order_parameter,
@@ -301,7 +305,9 @@ impl ThermodynamicIntegration {
         } else {
             0.0
         };
-        if budget_fraction > thresholds::THERMO_LANDAUER_MEMORY_PRESSURE_THRESHOLD {
+        if input.prediction_error_valid
+            && budget_fraction > thresholds::THERMO_LANDAUER_MEMORY_PRESSURE_THRESHOLD
+        {
             feedback.memory_consolidation_suppressed = true;
         }
 
@@ -392,6 +398,7 @@ mod tests {
             unified_psi: 0.6,
             coherence: 0.7,
             prediction_error: 0.3,
+            prediction_error_valid: true,
             attention_sensitivity: 0.5,
             // Energy budget in effective consciousness units (same scale as
             // k_eff=0.01 Landauer costs, not physical joules).
@@ -491,6 +498,53 @@ mod tests {
         let fb = ti.run_cycle(&input);
         // Landauer cost should dominate energy budget
         assert!(fb.memory_consolidation_suppressed);
+    }
+
+    #[test]
+    fn invalid_pe_does_not_trigger_landauer_memory_pressure() {
+        let mut ti = ThermodynamicIntegration::default();
+        let mut input = default_input();
+        input.prediction_error = 10.0;
+        input.prediction_error_valid = false;
+        input.energy_per_cycle = 1e-15;
+
+        let fb = ti.run_cycle(&input);
+
+        assert_eq!(ti.bridge.memory_landauer_cost, 0.0);
+        assert!(!fb.memory_consolidation_suppressed);
+    }
+
+    #[test]
+    fn invalid_pe_payload_is_counterfactually_inert() {
+        let payloads = [1.0_f32, -1.0, 0.75, f32::NAN, f32::INFINITY];
+        let mut baseline_input = default_input();
+        baseline_input.prediction_error = 0.0;
+        baseline_input.prediction_error_valid = false;
+
+        let mut baseline = ThermodynamicIntegration::default();
+        let baseline_feedback = baseline.run_cycle(&baseline_input);
+
+        for payload in payloads {
+            let mut input = baseline_input.clone();
+            input.prediction_error = payload;
+
+            let mut candidate = ThermodynamicIntegration::default();
+            let feedback = candidate.run_cycle(&input);
+
+            assert_eq!(candidate.bridge.memory_landauer_cost, baseline.bridge.memory_landauer_cost);
+            assert_eq!(candidate.bridge.prigogine_violated, baseline.bridge.prigogine_violated);
+            assert_eq!(
+                candidate.bridge.england_exploration_boost,
+                baseline.bridge.england_exploration_boost
+            );
+            assert_eq!(feedback.lr_factor, baseline_feedback.lr_factor);
+            assert_eq!(feedback.exploration_factor, baseline_feedback.exploration_factor);
+            assert_eq!(
+                feedback.memory_consolidation_suppressed,
+                baseline_feedback.memory_consolidation_suppressed
+            );
+            assert_eq!(feedback.insight_detected, baseline_feedback.insight_detected);
+        }
     }
 
     #[test]

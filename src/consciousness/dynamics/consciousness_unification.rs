@@ -571,12 +571,37 @@ impl EmotionalBridge {
         social_cooperation_rate: f32,
         peer_valence: f32,
     ) {
-        // Base affect from cognitive signals (matches AffectiveBridge::evaluate_from_signals)
-        let mut valence = ((0.5 - prediction_error) + moral_score * 0.3).clamp(-1.0, 1.0);
+        self.update_from_somatic_signals_with_evidence(
+            Some(prediction_error),
+            surprise_triggered,
+            consciousness_proxy,
+            moral_score,
+            social_trust,
+            social_cooperation_rate,
+            peer_valence,
+        );
+    }
+
+    /// Update affect while retaining whether the current PE is a measured observation.
+    /// Moral, consciousness, and social channels still act when PE is unavailable.
+    pub fn update_from_somatic_signals_with_evidence(
+        &mut self,
+        prediction_error: Option<f32>,
+        surprise_triggered: bool,
+        consciousness_proxy: f64,
+        moral_score: f32,
+        social_trust: f32,
+        social_cooperation_rate: f32,
+        peer_valence: f32,
+    ) {
+        let prediction_error = prediction_error.filter(|value| value.is_finite());
+        // Missing PE contributes a neutral base term, not a compatibility sentinel.
+        let pe_for_affect = prediction_error.unwrap_or(0.5);
+        let mut valence = ((0.5 - pe_for_affect) + moral_score * 0.3).clamp(-1.0, 1.0);
         let mut arousal = (0.3
             + if surprise_triggered { 0.3 } else { 0.0 }
             + (consciousness_proxy * 0.4) as f32
-            + (prediction_error * 0.3).min(0.3))
+            + prediction_error.map(|pe| (pe * 0.3).min(0.3)).unwrap_or(0.0))
         .clamp(0.0, 1.0);
         let mut dominance = ((consciousness_proxy * 0.6) as f32 - 0.3).clamp(-1.0, 1.0);
 

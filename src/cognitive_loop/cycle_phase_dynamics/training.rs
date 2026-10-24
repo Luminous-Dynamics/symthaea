@@ -44,6 +44,12 @@ impl CognitiveLoopService {
         fep_surprise: f32,
         fep_pragmatic_value: f32,
     ) -> super::TrainingPostResult {
+        let prediction_error_valid = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64)
+            .is_some()
+            && prediction_error.is_finite();
         let neuromod_threshold =
             perception.encoding.effective_threshold * self.neuromod.bath.threshold_gate();
 
@@ -51,7 +57,8 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
         let consciousness_awake =
             self.carryover.history.consciousness_level > 0.0 || self.stats.total_cycles < 20;
-        let (learning_occurred, training_loss) = if prediction_error > neuromod_threshold
+        let (learning_occurred, training_loss) = if prediction_error_valid
+            && prediction_error > neuromod_threshold
             && !self.behavior.adaptive_behavior.pause_learning
             && !self.training_frozen
             && !self.carryover.quality.narrative_veto_active
@@ -191,13 +198,16 @@ impl CognitiveLoopService {
         };
         module_timings.core_training = _t_core.elapsed().as_micros() as u64;
 
-        // #13: Report learning activity to glutamate channel
+        // #13: Report PE-derived learning activity only when the PE comparison
+        // is genuine. Fatigue telemetry remains available on every cycle.
         {
-            let is_night =
-                self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            self.neuromod
-                .bath
-                .report_learning(effective_lr, prediction_error, is_night);
+            if prediction_error_valid {
+                let is_night = self.biorhythm_mgr.rhythm.phase
+                    == crate::chronobiology::CircadianPhase::Night;
+                self.neuromod
+                    .bath
+                    .report_learning(effective_lr, prediction_error, is_night);
+            }
             let fatigue = self.neuromod.bath.learning_fatigue_factor();
             if fatigue < 1.0 {
                 self.scale_lr_pri("glutamate_fatigue", fatigue, Priority::Homeostatic);
@@ -215,16 +225,21 @@ impl CognitiveLoopService {
             }
         }
 
-        // 12. Update statistics
-        self.update_stats(prediction_error, cycle_start.elapsed());
+        // 12. Update cycle telemetry, while retaining only valid PE in error statistics.
+        self.update_stats_with_evidence(
+            prediction_error_valid.then_some(prediction_error),
+            cycle_start.elapsed(),
+        );
 
         self.stats.ltc_consciousness = self.temporal_network.state_diversity();
 
-        let consciousness_resize_factor = 1.0
-            + (self.carryover.history.consciousness_level as f32 - CONSCIOUSNESS_RESIZE_CENTER)
-                * CONSCIOUSNESS_RESIZE_SCALE;
-        self.temporal_network
-            .maybe_resize(prediction_error * consciousness_resize_factor);
+        if prediction_error_valid {
+            let consciousness_resize_factor = 1.0
+                + (self.carryover.history.consciousness_level as f32 - CONSCIOUSNESS_RESIZE_CENTER)
+                    * CONSCIOUSNESS_RESIZE_SCALE;
+            self.temporal_network
+                .maybe_resize(prediction_error * consciousness_resize_factor);
+        }
 
         self.stats.temporal_coherence = coherence;
         self.stats.effective_learning_rate = effective_lr;
@@ -385,12 +400,18 @@ impl CognitiveLoopService {
         };
         let pp_learning_threshold = self.config.learning_threshold;
 
-        let cycle_reward = self.compute_reward_signal(prediction_error, pp_learning_threshold);
+        let cycle_reward = if prediction_error_valid {
+            self.compute_reward_signal(prediction_error, pp_learning_threshold)
+        } else {
+            0.0
+        };
 
         let cycle_learning_result = CycleLearningResult {
             reward: cycle_reward,
             strategy_used: selected_strategy,
-            successful: prediction_error < pp_learning_threshold && pp_in_flow,
+            successful: prediction_error_valid
+                && prediction_error < pp_learning_threshold
+                && pp_in_flow,
             prediction_error,
             coherence,
         };
@@ -418,6 +439,7 @@ impl CognitiveLoopService {
 
             let episodic_ctx = helpers::EpisodicLearningContext {
                 prediction_error,
+                prediction_error_valid,
                 in_flow: pp_in_flow,
                 input,
                 compressed_state: &perception.encoding.compressed_state,
@@ -440,7 +462,7 @@ impl CognitiveLoopService {
                         semantic_hdc,
                         &perception.encoding.compressed_state,
                         output,
-                        prediction_error,
+                        prediction_error_valid.then_some(prediction_error),
                         pp_total_cycles,
                     )
                 };
@@ -453,7 +475,7 @@ impl CognitiveLoopService {
                         fep_learning_signal,
                         closed_learning_loop,
                         &episodic_ctx,
-                        cycle_learning_result,
+                        prediction_error_valid.then_some(cycle_learning_result),
                     )
                 };
                 #[cfg(feature = "parallel")]

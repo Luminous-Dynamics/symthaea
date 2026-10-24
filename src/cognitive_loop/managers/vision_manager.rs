@@ -151,7 +151,13 @@ impl CognitiveSubsystem for VisionManager {
         // Combine compressed state variance with prediction error for visual surprise.
         // P6-A: Imagination surprise amplifies the signal — when reality violates
         // the mental model, surprise is boosted by up to 30%.
-        let base_surprise = state_variance * 0.4 + snapshot.prediction_error * 0.6;
+        let base_surprise = if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            state_variance * 0.4 + prediction_error * 0.6
+        } else {
+            // Still process observable state variance, but don't substitute the
+            // PE compatibility sentinel for sensory surprise.
+            state_variance
+        };
         let imagination_boost = self.imagination_surprise * 0.3;
         let visual_surprise = (base_surprise + imagination_boost).min(1.0);
 
@@ -269,6 +275,7 @@ mod tests {
     fn snapshot_with_state_and_pe(state_val: f32, pe: f32) -> CycleSnapshot {
         let mut snap = CycleSnapshot::default();
         snap.prediction_error = pe;
+        snap.prediction_error_valid = 1;
         // Fill compressed state with a known value for controlled variance
         for s in snap.compressed_state.iter_mut() {
             *s = state_val;
@@ -311,6 +318,7 @@ mod tests {
         // Use non-uniform state to add variance contribution.
         let mut snap = CycleSnapshot::default();
         snap.prediction_error = 1.0;
+        snap.prediction_error_valid = 1;
         // Create high variance: half zeros, half ones
         for (i, s) in snap.compressed_state.iter_mut().enumerate() {
             *s = if i % 2 == 0 { 0.0 } else { 1.0 };
@@ -352,6 +360,21 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_pe_does_not_masquerade_as_visual_surprise() {
+        let mut manager = VisionManager::default();
+        let mut snapshot = CycleSnapshot::default();
+        snapshot.prediction_error = 1.0;
+        snapshot.prediction_error_valid = 0;
+        snapshot.compressed_state = [0.0; crate::cognitive_loop::subsystem_trait::SNAPSHOT_STATE_DIM];
+
+        let _ = manager.process(&snapshot);
+
+        // A uniform state has no variance, and the invalid PE sentinel must
+        // not create visual surprise on its own.
+        assert_eq!(manager.visual_pe_ema, 0.0);
+    }
+
+    #[test]
     fn test_checkpoint_roundtrip() {
         let vm = VisionManager {
             surprise_threshold: 0.45,
@@ -385,6 +408,7 @@ mod tests {
             let mut vm = VisionManager::default();
             let mut snap = CycleSnapshot::default();
             snap.prediction_error = pe;
+            snap.prediction_error_valid = 1;
             for s in snap.compressed_state.iter_mut() { *s = state_val; }
             let output = vm.process(&snap);
             prop_assert!(output.exploration_delta.abs() < 1.0,
@@ -398,7 +422,7 @@ mod tests {
             pe in 0.0f32..1.0
         ) {
             let mut vm = VisionManager::default();
-            let snap = CycleSnapshot { prediction_error: pe, ..Default::default() };
+            let snap = CycleSnapshot { prediction_error: pe, prediction_error_valid: 1, ..Default::default() };
             for _ in 0..100 {
                 vm.process(&snap);
             }
@@ -413,7 +437,7 @@ mod tests {
             pe in 0.0f32..1.0
         ) {
             let mut vm = VisionManager::default();
-            let snap = CycleSnapshot { prediction_error: pe, ..Default::default() };
+            let snap = CycleSnapshot { prediction_error: pe, prediction_error_valid: 1, ..Default::default() };
             for _ in 0..50 {
                 vm.process(&snap);
             }

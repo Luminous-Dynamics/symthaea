@@ -179,9 +179,9 @@ impl Default for ThermodynamicPhysicsBridge {
 }
 
 impl ThermodynamicPhysicsBridge {
-    /// Compute all physics bridge metrics for this cycle.
+    /// Compute all physics bridge metrics for this cycle with a measured PE.
     ///
-    /// Called after all three thermodynamic modules have written to the unified state.
+    /// Compatibility wrapper for callers that already possess a valid comparison.
     pub(crate) fn compute(
         &mut self,
         attention_sensitivity: f64,
@@ -196,6 +196,40 @@ impl ThermodynamicPhysicsBridge {
         hfe_total: f64,
         regime: &crate::consciousness::dissipative_consciousness::ThermodynamicRegime,
     ) {
+        self.compute_with_evidence(
+            attention_sensitivity,
+            information_processed,
+            coherence,
+            Some(prediction_error),
+            effective_temperature,
+            entropy_production_rate,
+            order_parameter,
+            energy_per_cycle,
+            prev_order_parameter,
+            hfe_total,
+            regime,
+        );
+    }
+
+    /// Compute physics metrics while admitting PE-derived quantities only when
+    /// a current, comparable finite observation exists. The remaining physics
+    /// terms (energy, order, entropy, coherence) continue to update independently.
+    pub(crate) fn compute_with_evidence(
+        &mut self,
+        attention_sensitivity: f64,
+        information_processed: f64,
+        coherence: f64,
+        prediction_error: Option<f64>,
+        effective_temperature: f64,
+        entropy_production_rate: f64,
+        order_parameter: f64,
+        energy_per_cycle: f64,
+        prev_order_parameter: f64,
+        hfe_total: f64,
+        regime: &crate::consciousness::dissipative_consciousness::ThermodynamicRegime,
+    ) {
+        let prediction_error = prediction_error.filter(|value| value.is_finite());
+
         // ═══════════════════════════════════════════════════════════════════
         // Maxwell's Demon as Attention (Szilard 1929)
         // ═══════════════════════════════════════════════════════════════════
@@ -214,11 +248,13 @@ impl ThermodynamicPhysicsBridge {
         // ═══════════════════════════════════════════════════════════════════
         // Landauer Limit for Memory (Landauer 1961)
         // ═══════════════════════════════════════════════════════════════════
-        // Memory consolidation writes bits. Minimum cost = bits * k_B_eff * T * ln(2).
-        // Use prediction_error as proxy for bits needing consolidation
-        // (high error = more to learn = more bits to write).
-        let bits_to_consolidate = prediction_error.abs() as f64 * 10.0; // Scale factor
-        self.memory_landauer_cost = bits_to_consolidate * k_eff * t_eff * ln2;
+        // Only an admitted PE measurement can change the estimated write cost.
+        // Missing PE leaves the last cost available for display, but it is not
+        // recomputed as a fresh observation every manager interval.
+        if let Some(prediction_error) = prediction_error {
+            let bits_to_consolidate = prediction_error.abs() * 10.0;
+            self.memory_landauer_cost = bits_to_consolidate * k_eff * t_eff * ln2;
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // Carnot Efficiency (Carnot 1824)
@@ -335,13 +371,14 @@ impl ThermodynamicPhysicsBridge {
             let order_delta = order_parameter - self.prev_order_parameter;
             let high_entropy = entropy_production_rate > 0.15;
             let order_growing = order_delta > 0.01;
-            let prediction_error_decreasing = prediction_error < 0.3;
             let at_edge = matches!(
                 regime,
                 ThermodynamicRegime::EdgeOfChaos | ThermodynamicRegime::FarFromEquilibrium
             );
-            self.england_exploration_boost =
-                high_entropy && order_growing && prediction_error_decreasing && at_edge;
+            // A missing PE cannot count as "prediction error decreasing".
+            self.england_exploration_boost = prediction_error.is_some_and(|pe| {
+                high_entropy && order_growing && pe < 0.3 && at_edge
+            });
         }
         #[cfg(not(feature = "england_dissipation"))]
         {
@@ -355,14 +392,13 @@ impl ThermodynamicPhysicsBridge {
         // Epistemic Free Energy (arXiv 2601.17607)
         // ═══════════════════════════════════════════════════════════════════
         #[cfg(feature = "epistemic")]
-        {
-            // Use prediction_error as a proxy for belief_delta: high PE means
-            // the model's beliefs shifted significantly this cycle.
-            let belief_delta = prediction_error as f64;
+        if let Some(prediction_error) = prediction_error {
+            // Use an admitted PE as a proxy for belief_delta: high PE means the
+            // model's beliefs shifted significantly this cycle.
             self.compute_epistemic_thermodynamics(
                 effective_temperature,
                 entropy_production_rate,
-                belief_delta,
+                prediction_error,
             );
         }
     }
@@ -570,6 +606,59 @@ mod tests {
         );
         assert!(b.memory_landauer_cost > 0.0);
         assert!(b.memory_landauer_cost.is_finite());
+    }
+
+    #[test]
+    fn invalid_pe_does_not_create_or_recompute_landauer_cost() {
+        let mut b = make_bridge();
+        b.compute_with_evidence(
+            0.5,
+            50.0,
+            0.5,
+            Some(0.4),
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
+        let admitted_cost = b.memory_landauer_cost;
+        assert!(admitted_cost > 0.0);
+
+        // Reusing the numeric PE while marking this cycle invalid must not
+        // recompute the Landauer estimate as if it were a fresh observation.
+        b.compute_with_evidence(
+            0.5,
+            50.0,
+            0.5,
+            None,
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
+        assert_eq!(b.memory_landauer_cost, admitted_cost);
+
+        let mut cold = make_bridge();
+        cold.compute_with_evidence(
+            0.5,
+            50.0,
+            0.5,
+            Some(f64::NAN),
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
+        assert_eq!(cold.memory_landauer_cost, 0.0);
     }
 
     #[test]

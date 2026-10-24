@@ -94,6 +94,7 @@ pub struct CycleSnapshot {
 
     /// Prediction error from last cycle (cosine distance between predicted
     /// and actual CfC state). Higher = more surprise.
+    /// Check `prediction_error_valid` before interpreting the numeric error.
     pub prediction_error: f32,
 
     /// Conversation coherence (0.0–1.0). Smoothed EMA of semantic similarity
@@ -186,10 +187,15 @@ pub struct CycleSnapshot {
     /// Last visual prediction accuracy.
     pub vision_accuracy: f32,
 
-    // ── Padding for alignment ───────────────────────────────────────────
+    // The final three bytes were reserved for ABI stability. Reuse one byte
+    // for PE validity so all existing field offsets and the total struct size
+    // remain unchanged across the repr(C) / WASM boundary.
+    /// Whether prediction_error is a genuine, comparable finite observation.
+    pub prediction_error_valid: u8,
+
     /// Reserved for future fields. Ensures struct size is stable across
     /// versions for WASM ABI compatibility.
-    pub _reserved: [u8; 3],
+    pub _reserved: [u8; 2],
 }
 
 impl Default for CycleSnapshot {
@@ -222,7 +228,8 @@ impl Default for CycleSnapshot {
             vision_free_energy: 0.0,
             vision_complexity: 0.0,
             vision_accuracy: 1.0,
-            _reserved: [0; 3],
+            prediction_error_valid: 0,
+            _reserved: [0; 2],
         }
     }
 }
@@ -248,6 +255,22 @@ impl CycleSnapshot {
     #[inline]
     pub fn budget_exceeded(&self) -> bool {
         self.attention_budget_exceeded != 0
+    }
+
+    /// Read prediction error only when the ABI validity byte is canonical
+    /// and the measurement is finite. This is the sole safe accessor for
+    /// consumers of the legacy repr(C) snapshot fields.
+    ///
+    /// The snapshot layout intentionally remains unchanged for WASM/FFI
+    /// compatibility; consumers should use this method instead of reading
+    /// `prediction_error` and `prediction_error_valid` independently.
+    #[inline]
+    pub fn prediction_error_sample(&self) -> Option<f32> {
+        if self.prediction_error_valid == 1 && self.prediction_error.is_finite() {
+            Some(self.prediction_error)
+        } else {
+            None
+        }
     }
 }
 
@@ -707,6 +730,7 @@ impl CycleSnapshot {
         prediction_confidence: f64,
         fep_lr_boost: f64,
         prediction_error: f32,
+        prediction_error_valid: bool,
         coherence: f32,
         unified_psi: f64,
         phi_attention_weight: f32,
@@ -764,7 +788,8 @@ impl CycleSnapshot {
             vision_free_energy: quality_metrics.last_vision_free_energy,
             vision_complexity: quality_metrics.last_vision_complexity,
             vision_accuracy: quality_metrics.last_vision_accuracy,
-            _reserved: [0; 3],
+            prediction_error_valid: u8::from(prediction_error_valid),
+            _reserved: [0; 2],
         }
     }
 }
@@ -918,6 +943,31 @@ mod tests {
         let size = std::mem::size_of::<SubsystemOutput>();
         assert!(size > 0);
         eprintln!("SubsystemOutput size: {} bytes", size);
+    }
+
+    #[test]
+    fn prediction_error_sample_fails_closed_on_invalid_flag_or_value() {
+        for payload in [0.0, 1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut snapshot = CycleSnapshot::default();
+            snapshot.prediction_error = payload;
+            snapshot.prediction_error_valid = 0;
+            assert_eq!(snapshot.prediction_error_sample(), None);
+        }
+
+        for flag in [2, u8::MAX] {
+            let mut snapshot = CycleSnapshot::default();
+            snapshot.prediction_error = 0.25;
+            snapshot.prediction_error_valid = flag;
+            assert_eq!(snapshot.prediction_error_sample(), None);
+        }
+
+        let mut valid = CycleSnapshot::default();
+        valid.prediction_error = 0.25;
+        valid.prediction_error_valid = 1;
+        assert_eq!(valid.prediction_error_sample(), Some(0.25));
+
+        valid.prediction_error = f32::NAN;
+        assert_eq!(valid.prediction_error_sample(), None);
     }
 
     /// Verify CycleSnapshot alignment is suitable for WASM.
@@ -1134,7 +1184,9 @@ mod tests {
         fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
             self.fire_count += 1;
             SubsystemOutput {
-                confidence_delta: snapshot.prediction_error as f64 * 0.01,
+                confidence_delta: snapshot
+                    .prediction_error_sample()
+                    .map_or(0.0, |prediction_error| prediction_error as f64 * 0.01),
                 ..SubsystemOutput::NEUTRAL
             }
         }
@@ -1150,6 +1202,7 @@ mod tests {
 
         let snapshot = CycleSnapshot {
             prediction_error: 0.5,
+            prediction_error_valid: 1,
             ..CycleSnapshot::default()
         };
 
@@ -1315,6 +1368,7 @@ mod tests {
         let mut health = SubsystemHealthTracker::new();
         let snapshot = CycleSnapshot {
             prediction_error: 1.0,
+            prediction_error_valid: 1,
             ..CycleSnapshot::default()
         };
 

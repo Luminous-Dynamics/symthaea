@@ -17,6 +17,7 @@ use super::phase_results::{
     PerceptionPhaseResult,
 };
 use super::{CognitiveLoopService, CycleResult, ModuleTimings};
+use super::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
 
 impl CognitiveLoopService {
     /// Perception phase: safety checks, thalamic routing, moral evaluation,
@@ -344,14 +345,51 @@ impl CognitiveLoopService {
         // PHASE 1.1: Surprise and Exploration
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_error = encoding_res.prediction_error;
-        let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&encoding_res.compressed_state);
+        let observation_cycle = self.stats.total_cycles as u64;
+        let degeneracy = self.encoder.last_prediction_degeneracy();
+        let (evidence_status, evidence_value) = match degeneracy {
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine
+                if prediction_error.is_finite() =>
+            {
+                (PredictionEvidenceStatus::Valid, Some(prediction_error))
+            }
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine
+            | symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::NonFinitePrediction => {
+                (PredictionEvidenceStatus::NonFiniteInput, None)
+            }
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::NoPrediction => {
+                (PredictionEvidenceStatus::NoPriorPrediction, None)
+            }
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::ZeroPrediction => {
+                (PredictionEvidenceStatus::ZeroNormPrediction, None)
+            }
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::StalePrediction => {
+                (PredictionEvidenceStatus::StaleOrOutOfOrder, None)
+            }
+        };
+        let prediction_evidence = PredictionErrorEvidence::from_comparison(
+            evidence_status,
+            evidence_value,
+            self.encoder.last_compared_prediction_cycle(),
+            observation_cycle,
+        );
+        let prediction_error_valid =
+            prediction_evidence.value_for_observation(observation_cycle).is_some();
+
+        let _t_surprise = Instant::now();
+        let (surprise_triggered, exploration_action) = self.run_surprise_exploration(
+            &encoding_res.compressed_state,
+            &prediction_evidence,
+            observation_cycle,
+        );
+        module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.2: Urgency Phase
         // ═══════════════════════════════════════════════════════════════════════
         let urgency_result = self.compute_urgency_and_error_pattern(
-            prediction_error,
+            &prediction_evidence,
+            observation_cycle,
             surprise_triggered,
             encoding_res.effective_threshold,
         );
@@ -537,7 +575,7 @@ impl CognitiveLoopService {
                 error_pattern: urgency_result.error_pattern,
                 predicted_urgency: urgency_result.predicted_urgency,
                 prediction_coherence_urgency_bias: urgency_result.prediction_coherence_urgency_bias,
-                prediction_error,
+                prediction_evidence: prediction_evidence.clone(),
                 error_slope: urgency_result.error_slope,
                 oscillation_ratio: urgency_result.oscillation_ratio,
             },

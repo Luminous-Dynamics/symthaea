@@ -49,6 +49,10 @@ pub struct ExperienceRecord {
 
     // ===== Principled Signals at this moment =====
     pub prediction_error: f32,
+    /// Whether prediction_error came from a comparable current observation.
+    /// Old serialized records default to false so sentinel values are not promoted.
+    #[serde(default)]
+    pub prediction_error_valid: bool,
     pub uncertainty: f32,
     pub coherence: f32,
     pub confidence: f32,
@@ -79,6 +83,7 @@ impl ExperienceRecord {
             context_hash: String::new(),
             user_id: None,
             prediction_error: 0.5,
+            prediction_error_valid: false,
             uncertainty: 0.5,
             coherence: 0.5,
             confidence: 0.5,
@@ -103,6 +108,7 @@ impl ExperienceRecord {
             context_hash: String::new(),
             user_id: None,
             prediction_error: signals.prediction_error,
+            prediction_error_valid: signals.prediction_error_valid,
             uncertainty: signals.uncertainty,
             coherence: signals.coherence,
             confidence: signals.confidence,
@@ -163,8 +169,12 @@ impl ExperienceRecord {
 
     /// Compute learning value (how valuable for learning)
     pub fn learning_value(&self) -> f32 {
-        // High prediction error + has outcome = valuable for learning
-        let surprise_value = self.prediction_error * 0.3;
+        // A stored compatibility sentinel is not a learning signal.
+        let surprise_value = if self.prediction_error_valid {
+            self.prediction_error * 0.3
+        } else {
+            0.0
+        };
         let outcome_value = if self.outcome.is_some() { 0.4 } else { 0.0 };
         let recency_value = 1.0 / (1.0 + (self.age_seconds() as f32 / 86400.0)); // Decay over days
 
@@ -544,6 +554,31 @@ mod tests {
         let mem =
             ExperienceRecord::new("test-002", "test").with_outcome(ExperienceOutcome::success());
         assert!(mem.was_successful());
+    }
+
+    #[test]
+    fn invalid_prediction_error_is_not_learning_value() {
+        let invalid = PrincipledSignals {
+            prediction_error: 1.0,
+            prediction_error_valid: false,
+            ..Default::default()
+        };
+        let valid = PrincipledSignals {
+            prediction_error: 1.0,
+            prediction_error_valid: true,
+            ..Default::default()
+        };
+
+        let invalid_record = ExperienceRecord::from_signals("invalid", "cold-start", &invalid);
+        let valid_record = ExperienceRecord::from_signals("valid", "observed", &valid);
+
+        assert!(!invalid_record.prediction_error_valid);
+        assert!(valid_record.prediction_error_valid);
+        assert!(
+            valid_record.learning_value() > invalid_record.learning_value(),
+            "valid PE should contribute to learning value; invalid sentinel must not"
+        );
+        assert!(!ExperienceRecord::new("new", "unobserved").prediction_error_valid);
     }
 
     #[test]

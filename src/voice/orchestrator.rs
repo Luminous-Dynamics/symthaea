@@ -108,10 +108,10 @@ impl VoiceOrchestrator {
         cycle_result: &CycleResult,
     ) -> Vec<f32> {
         // 1. Update the voice bridge with CfC output
-        self.voice_bridge.update(
+        self.voice_bridge.update_with_evidence(
             &cycle_result.output,
             1.0, // tau (default; could be extracted from CfC state)
-            cycle_result.prediction_error,
+            cycle_result.prediction_error_valid.then_some(cycle_result.prediction_error),
             HashMap::new(),
             cycle_result.detected_primitives.clone(),
         );
@@ -174,11 +174,35 @@ impl VoiceOrchestrator {
         rate_multiplier: f32,
         pause_multiplier: f32,
     ) -> (Vec<f32>, crate::voice::voice_feedback::VoiceOutputMetrics) {
+        self.thought_to_speech_paced_with_evidence(
+            broca_text,
+            cfc_output,
+            tau,
+            Some(prediction_error),
+            detected_primitives,
+            rate_multiplier,
+            pause_multiplier,
+        )
+    }
+
+    /// Evidence-aware variant for cycle integrations where the compatibility PE
+    /// may be a sentinel. Speech still uses observed CfC state and detected primitives.
+    #[allow(clippy::too_many_arguments)]
+    pub fn thought_to_speech_paced_with_evidence(
+        &mut self,
+        broca_text: &str,
+        cfc_output: &[f32],
+        tau: f32,
+        prediction_error: Option<f32>,
+        detected_primitives: Vec<String>,
+        rate_multiplier: f32,
+        pause_multiplier: f32,
+    ) -> (Vec<f32>, crate::voice::voice_feedback::VoiceOutputMetrics) {
         use crate::voice::voice_feedback::VoiceOutputMetrics;
 
         // 1. Update bridge with CfC state (tau guards against unset factors)
         let tau = if tau > 0.0 { tau } else { 1.0 };
-        self.voice_bridge.update(
+        self.voice_bridge.update_with_evidence(
             cfc_output,
             tau,
             prediction_error,

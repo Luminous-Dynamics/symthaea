@@ -247,7 +247,10 @@ pub fn extract_snapshot(
 ) -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: metadata.consciousness.consciousness_level,
-        prediction_error: metadata.fep.fep_surprise as f32,
+        // FEP surprise is not, by itself, proof of a comparable PE observation.
+        // This metadata-only adapter has no source-cycle validity, so fail closed.
+        prediction_error: 0.0,
+        prediction_error_valid: false,
         living_mind_vitality: metadata.living_mind_vitality,
         living_mind_coherence: metadata.living_mind_coherence,
         dopamine: neuromod.dopamine_effective,
@@ -299,7 +302,8 @@ pub(crate) fn snapshot_from_cycle(
 
     CognitiveSnapshot {
         consciousness_level: cs.unified_psi,
-        prediction_error: cs.prediction_error,
+        prediction_error: cs.prediction_error_sample().unwrap_or(0.0),
+        prediction_error_valid: cs.prediction_error_sample().is_some(),
         living_mind_vitality: cs.dissipative_health,
         living_mind_coherence: cs.coherence as f64,
         dopamine: bath.dopamine.effective(),
@@ -369,6 +373,22 @@ mod tests {
         assert!(t.generated);
         assert!((0.0..=1.0).contains(&t.aesthetic_ema));
         assert_eq!(t.aesthetic_ema, mgr.aesthetic_ema());
+    }
+
+    #[test]
+    fn snapshot_from_cycle_does_not_promote_invalid_pe_to_canvas_evidence() {
+        let bath = crate::cognitive_loop::neuromodulators::NeuromodulatorBath::default();
+        let mut invalid = crate::cognitive_loop::subsystem_trait::CycleSnapshot::default();
+        invalid.prediction_error = 1.0;
+        invalid.prediction_error_valid = 0;
+        let missing = snapshot_from_cycle(&invalid, &bath);
+        assert_eq!(missing.prediction_error_sample(), None);
+
+        let mut valid = invalid;
+        valid.prediction_error = 0.25;
+        valid.prediction_error_valid = 1;
+        let measured = snapshot_from_cycle(&valid, &bath);
+        assert_eq!(measured.prediction_error_sample(), Some(0.25));
     }
 
     #[test]

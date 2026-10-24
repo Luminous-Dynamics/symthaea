@@ -306,7 +306,13 @@ impl CognitiveLoopService {
         surprise_thresh: f64,
         module_timings: &mut super::super::ModuleTimings,
     ) -> EpisodicReplayResult {
-        let prediction_error = state.prediction_error;
+        let prediction_error_sample = state
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        // Replay uses only a value bound to this observation cycle. Invalid or
+        // stale evidence contributes no numeric outcome to the episode.
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
         let coherence = state.coherence;
         let compressed_state = state.compressed_state;
         let output = state.output;
@@ -323,7 +329,9 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
             let avg_err = self.stats.avg_prediction_error;
-            let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
+            let error_spike = prediction_error_valid
+                && avg_err > 0.01
+                && prediction_error > avg_err * 2.0;
             let semantic_miss = self.memory.memory_consol.semantic_memory.stats().semantic_misses > 0
                 && memory_context_boost == 0.0 // no episodic memories recalled this cycle
                 && self.stats.total_cycles > 10;
@@ -357,7 +365,7 @@ impl CognitiveLoopService {
                 symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.to_vec());
             let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(output.to_vec());
 
-            let episode = crate::memory::episodic_replay::Episode::with_metadata(
+            let mut episode = crate::memory::episodic_replay::Episode::with_metadata(
                 input_hv,
                 output_hv,
                 current_phi,
@@ -365,9 +373,15 @@ impl CognitiveLoopService {
                 prediction_error,
                 self.unification_engine.emotional.state().valence as f32,
                 coherence_summary.coherence,
-            )
-            .with_dopamine(self.neuromod.bath.dopamine.effective())
-            .with_bath_state(self.neuromod.bath.state_vector());
+            );
+            // Episode state/action can still be useful when PE is absent, but
+            // don't persist the compatibility sentinel as a measured outcome.
+            if !prediction_error_valid {
+                episode.prediction_error = None;
+            }
+            let episode = episode
+                .with_dopamine(self.neuromod.bath.dopamine.effective())
+                .with_bath_state(self.neuromod.bath.state_vector());
 
             // Attach semantic embedding for content-based retrieval
             #[cfg(feature = "semantic-encoder")]
@@ -390,12 +404,12 @@ impl CognitiveLoopService {
             #[cfg(feature = "semantic-encoder")]
             if let Some(ref emb) = state.semantic_embedding {
                 let similar = replay.retrieve_by_embedding_similarity(emb, 3);
-                if !similar.is_empty() {
-                    let avg_pe: f32 = similar
-                        .iter()
-                        .filter_map(|(ep, _)| ep.prediction_error)
-                        .sum::<f32>()
-                        / similar.len().max(1) as f32;
+                let valid_pes: Vec<f32> = similar
+                    .iter()
+                    .filter_map(|(ep, _)| ep.prediction_error.filter(|pe| pe.is_finite()))
+                    .collect();
+                if !valid_pes.is_empty() {
+                    let avg_pe = valid_pes.iter().sum::<f32>() / valid_pes.len() as f32;
                     if avg_pe < self.stats.avg_prediction_error * 0.5 {
                         self.prediction_confidence = (self.prediction_confidence + 0.02).min(1.0);
                     }
@@ -407,7 +421,9 @@ impl CognitiveLoopService {
                 // Science: Mnih et al. (2015) — prioritized experience replay:
                 // high surprise = high learning potential → replay more episodes
                 let base_batch = replay.batch_size();
-                let surprise_batch_boost = if fep_surprise > surprise_thresh {
+                let surprise_batch_boost = if prediction_error_valid
+                    && fep_surprise > surprise_thresh
+                {
                     // High surprise → up to 2x batch size
                     let boost_factor =
                         ((fep_surprise - surprise_thresh) / surprise_thresh).min(1.0) as f32;

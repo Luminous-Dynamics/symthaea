@@ -171,24 +171,26 @@ impl CognitiveLoopService {
         // 7. Feed prediction back to encoder: deferred to after last &prediction use
 
         // 8. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
-            } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+        // Keep the legacy numeric fallback for CycleResult compatibility, but
+        // preserve validity separately so missing/mismatched/non-finite evidence
+        // is excluded from learning statistics and replay.
+        let observation_cycle = self.stats.total_cycles as u64;
+        let prediction_evidence = Self::compute_prediction_error_evidence(
+            &compressed_state,
+            self.last_prediction.as_deref(),
+            self.last_prediction_cycle,
+            observation_cycle,
+        );
+        let prediction_error_sample =
+            prediction_evidence.value_for_observation(observation_cycle);
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
 
         // 9. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience_with_evidence(
+            &compressed_state,
+            &prediction,
+            prediction_error_sample,
+        );
 
         // 7 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -210,13 +212,16 @@ impl CognitiveLoopService {
             }
         }
 
-        // 11. Update error history — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
-            self.error_history.pop_front();
+        // 11. Update error history only for valid finite comparisons. A fallback
+        // numeric value of 0.0 is retained only for the legacy CycleResult field.
+        if let Some(valid_error) = prediction_error_sample {
+            if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(valid_error);
+            self.stats.avg_prediction_error =
+                self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
         }
-        self.error_history.push_back(prediction_error);
-        self.stats.avg_prediction_error =
-            self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
@@ -231,9 +236,18 @@ impl CognitiveLoopService {
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
+        let mut metadata = super::CycleMetadata::default();
+        metadata.prediction_evidence = Some(
+            super::types::PredictionEvidenceTelemetry::from_evidence(
+                &prediction_evidence,
+                observation_cycle,
+            ),
+        );
+
         Ok(CycleResult {
             output,
             prediction_error,
+            prediction_error_valid: prediction_error_sample.is_some(),
             peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
@@ -246,7 +260,7 @@ impl CognitiveLoopService {
             recall_similarity: None,
             recall_matched_timestamp: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
-            metadata: super::CycleMetadata::default(),
+            metadata,
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
             language_output: None,
@@ -323,24 +337,26 @@ impl CognitiveLoopService {
         // 5. Feed prediction back to encoder: deferred to after last &prediction use
 
         // 6. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
-            } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+        // Keep the legacy numeric fallback for CycleResult compatibility, but
+        // preserve validity separately so missing/mismatched/non-finite evidence
+        // is excluded from learning statistics and replay.
+        let observation_cycle = self.stats.total_cycles as u64;
+        let prediction_evidence = Self::compute_prediction_error_evidence(
+            &compressed_state,
+            self.last_prediction.as_deref(),
+            self.last_prediction_cycle,
+            observation_cycle,
+        );
+        let prediction_error_sample =
+            prediction_evidence.value_for_observation(observation_cycle);
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
 
         // 7. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience_with_evidence(
+            &compressed_state,
+            &prediction,
+            prediction_error_sample,
+        );
 
         // 5 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -360,7 +376,9 @@ impl CognitiveLoopService {
             * self.carryover.learning.adaptive_threshold_scale as f32;
 
         // 9. Learn if error is significant
-        let (learning_occurred, training_loss) = if prediction_error > effective_threshold {
+        let (learning_occurred, training_loss) = if prediction_error_sample.is_some()
+            && prediction_error > effective_threshold
+        {
             self.stats.learning_cycles += 1;
             if let Some(ref prev_state) = self.last_state {
                 // Build arrays from iterators — avoids 3 unnecessary Vec clones
@@ -389,8 +407,11 @@ impl CognitiveLoopService {
             (false, None)
         };
 
-        // 10. Update statistics
-        self.update_stats(prediction_error, cycle_start.elapsed());
+        // 10. Update prediction-error statistics only for valid evidence. Other
+        // cycle metrics continue to update independently of the PE comparison.
+        if let Some(valid_error) = prediction_error_sample {
+            self.update_stats(valid_error, cycle_start.elapsed());
+        }
         self.stats.temporal_coherence = coherence;
 
         // 10b. Modality-agnostic consciousness computation.
@@ -440,14 +461,36 @@ impl CognitiveLoopService {
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
+                prediction_error_valid: prediction_error_sample.is_some(),
                 urgency,
             };
             self.push_psi_attestation(record);
         }
 
+        let mut metadata = super::CycleMetadata {
+            urgency,
+            actual_effective_lr: if learning_occurred {
+                self.config.cfc_config.learning_rate
+            } else {
+                0.0
+            },
+            consciousness: super::types::telemetry::ConsciousnessLevelMetrics {
+                consciousness_level,
+                ..Default::default()
+            },
+            ..super::CycleMetadata::default()
+        };
+        metadata.prediction_evidence = Some(
+            super::types::PredictionEvidenceTelemetry::from_evidence(
+                &prediction_evidence,
+                observation_cycle,
+            ),
+        );
+
         super::CycleResult {
             output,
             prediction_error,
+            prediction_error_valid: prediction_error_sample.is_some(),
             peak_attention: 0.0,
             detected_primitives: Vec::new(),
             learning_occurred,
@@ -459,19 +502,7 @@ impl CognitiveLoopService {
             recall_similarity: None,
             recall_matched_timestamp: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
-            metadata: super::CycleMetadata {
-                urgency,
-                actual_effective_lr: if learning_occurred {
-                    self.config.cfc_config.learning_rate
-                } else {
-                    0.0
-                },
-                consciousness: super::types::telemetry::ConsciousnessLevelMetrics {
-                    consciousness_level,
-                    ..Default::default()
-                },
-                ..super::CycleMetadata::default()
-            },
+            metadata,
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(hdv),
             language_output: None,
@@ -553,32 +584,108 @@ impl CognitiveLoopService {
         }
     }
 
-    pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
-        // Update last experience with next_state
-        // Own the taken value (not `ref`) so we can move it into Experience without cloning
-        if let Some(last_state) = self.last_state.take() {
-            if let Some(last_pred) = self.last_prediction.take() {
-                // Calculate importance based on error
-                let importance = error + EXPERIENCE_BASE_IMPORTANCE;
+    /// Compute typed embedding prediction evidence for this observation cycle.
+    /// Failure modes remain distinct instead of collapsing to `None`, which used
+    /// to lose the difference between a cold start, malformed input, and a bad
+    /// numerical comparison.
+    fn compute_prediction_error_evidence(
+        current: &[f32],
+        previous: Option<&[f32]>,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> super::types::PredictionErrorEvidence {
+        use super::types::PredictionEvidenceStatus as Status;
 
-                let exp = Experience {
-                    state: last_state, // move, not clone
-                    prediction: last_pred,
-                    next_state: Some(state.to_vec()),
-                    error,
-                    importance,
-                };
-
-                if self.buffer.len() >= self.config.buffer_size {
-                    self.buffer.pop_front();
-                }
-                self.buffer.push_back(exp);
+        let (status, value) = match previous {
+            None => (Status::NoPriorPrediction, None),
+            Some(previous) if current.is_empty() || previous.is_empty() => {
+                (Status::EmptyObservation, None)
             }
+            Some(_) if prediction_cycle != observation_cycle.checked_sub(1) => {
+                (Status::StaleOrOutOfOrder, None)
+            }
+            Some(previous) if current.len() != previous.len() => {
+                (Status::DimensionMismatch, None)
+            }
+            Some(previous)
+                if current
+                    .iter()
+                    .chain(previous.iter())
+                    .any(|value| !value.is_finite()) =>
+            {
+                (Status::NonFiniteInput, None)
+            }
+            Some(previous) => {
+                let error = current
+                    .iter()
+                    .zip(previous.iter())
+                    .map(|(current, previous)| (current - previous).powi(2))
+                    .sum::<f32>()
+                    / current.len() as f32;
+                if error.is_finite() {
+                    (Status::Valid, Some(error))
+                } else {
+                    (Status::NonFiniteInput, None)
+                }
+            }
+        };
+
+        super::types::PredictionErrorEvidence::from_comparison(
+            status,
+            value,
+            prediction_cycle,
+            observation_cycle,
+        )
+    }
+
+    pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
+        // Preserve the legacy helper contract for embedding paths. Callers with
+        // explicit validity should use create_experience_with_evidence instead.
+        self.create_experience_with_evidence(state, prediction, Some(error));
+    }
+
+    /// Complete the previous transition only when its prediction-error evidence
+    /// is valid. An invalid/missing PE must not become a high-importance replay
+    /// sample just because its compatibility sentinel is numerically large.
+    ///
+    /// Regardless of admission, advance the state/prediction window so one bad
+    /// comparison does not stall future learning or cause stale transitions to
+    /// be paired with later observations.
+    pub(super) fn create_experience_with_evidence(
+        &mut self,
+        state: &[f32],
+        prediction: &[f32],
+        evidence_error: Option<f32>,
+    ) {
+        let previous_state = self.last_state.take();
+        let previous_prediction = self.last_prediction.take();
+
+        if let (Some(last_state), Some(last_pred), Some(error)) = (
+            previous_state,
+            previous_prediction,
+            evidence_error.filter(|value| value.is_finite()),
+        ) {
+            // Calculate importance only from a finite, admitted observation.
+            let importance = error + EXPERIENCE_BASE_IMPORTANCE;
+            let exp = Experience {
+                state: last_state,
+                prediction: last_pred,
+                next_state: Some(state.to_vec()),
+                error,
+                importance,
+            };
+
+            if self.buffer.len() >= self.config.buffer_size {
+                self.buffer.pop_front();
+            }
+            self.buffer.push_back(exp);
         }
 
-        // Store current state for next cycle
+        // Always roll the window forward, even when the prior transition was
+        // deliberately excluded from replay due to invalid prediction evidence.
         self.last_state = Some(state.to_vec());
         self.last_prediction = Some(prediction.to_vec());
+        self.last_prediction_cycle = Some(self.stats.total_cycles as u64);
     }
 
     /// Copy `last_state` into the reusable `training_state_buf` without
@@ -602,19 +709,31 @@ impl CognitiveLoopService {
     }
 
     pub(super) fn update_stats(&mut self, error: f32, cycle_time: Duration) {
-        // EMA for error
-        let alpha = ERROR_EMA_ALPHA;
-        self.stats.avg_prediction_error =
-            self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
-        self.stats.avg_prediction_error_sq =
-            self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
+        self.update_stats_with_evidence(Some(error), cycle_time);
+    }
 
-        // Error trend — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
-            self.error_history.pop_front();
+    /// Update cycle-wide telemetry while admitting prediction-error statistics
+    /// only when a genuine finite comparison exists.
+    pub(super) fn update_stats_with_evidence(
+        &mut self,
+        error_evidence: Option<f32>,
+        cycle_time: Duration,
+    ) {
+        if let Some(error) = error_evidence.filter(|value| value.is_finite()) {
+            // EMA for prediction error
+            let alpha = ERROR_EMA_ALPHA;
+            self.stats.avg_prediction_error =
+                self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
+            self.stats.avg_prediction_error_sq =
+                self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
+
+            // Error trend — capacity bound: 100 elements, evict before push
+            if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(error);
+            self.stats.error_trend = self.compute_error_trend();
         }
-        self.error_history.push_back(error);
-        self.stats.error_trend = self.compute_error_trend();
 
         // Attention stats from encoder
         let encoder_stats = self.encoder.stats();
@@ -899,6 +1018,7 @@ impl CognitiveLoopService {
     /// Reset all learning state
     pub fn reset(&mut self) {
         self.encoder.reset_attention();
+        self.encoder.clear_prediction();
         // Reset CfC state by injecting zeros
         let zeros = Array1::from_vec(vec![0.0f32; self.config.cfc_config.input_dim]);
         let _ = self.temporal_network.inject(&zeros);
@@ -907,6 +1027,7 @@ impl CognitiveLoopService {
         self.last_state = None;
         self.training_state_buf = None;
         self.last_prediction = None;
+        self.last_prediction_cycle = None;
         self.stats = LoopStats::default();
         self.start_time = Instant::now();
         self.language_comm.reset();
@@ -977,5 +1098,171 @@ impl CognitiveLoopService {
         {
             self.support.reset();
         }
+    }
+}
+
+#[cfg(test)]
+mod prediction_evidence_replay_tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    #[test]
+    fn invalid_prediction_evidence_skips_replay_but_advances_window() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+
+        service.create_experience_with_evidence(&[0.1, 0.2], &[0.3, 0.4], None);
+        assert_eq!(service.buffer.len(), 0);
+
+        // A second state completes a transition, but there is no trustworthy PE.
+        // It must not enter replay or linger as the source of a later transition.
+        service.create_experience_with_evidence(&[0.2, 0.3], &[0.4, 0.5], None);
+        assert_eq!(service.buffer.len(), 0);
+        assert_eq!(service.last_state.as_deref(), Some(&[0.2, 0.3][..]));
+
+        // The next valid observation admits only the immediately preceding state.
+        service.create_experience_with_evidence(&[0.3, 0.4], &[0.5, 0.6], Some(0.25));
+        assert_eq!(service.buffer.len(), 1);
+        assert_eq!(service.buffer.front().map(|item| item.error), Some(0.25));
+        assert_eq!(service.last_state.as_deref(), Some(&[0.3, 0.4][..]));
+    }
+
+    #[test]
+    fn preencoded_hv_cycle_reports_missing_prediction_provenance() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        let hv = symthaea_core::hdc::ContinuousHV::from_vec(vec![0.1; 16_384]);
+
+        let result = service.cycle_with_hv(&hv);
+
+        assert!(!result.prediction_error_valid);
+        let evidence = result
+            .metadata
+            .prediction_evidence
+            .as_ref()
+            .expect("pre-encoded HV path must expose typed PE telemetry");
+        assert_eq!(
+            evidence.status,
+            crate::cognitive_loop::types::PredictionEvidenceStatus::NoPriorPrediction
+        );
+        assert_eq!(evidence.observation_cycle, service.stats.total_cycles as u64);
+    }
+
+    #[test]
+    fn embedding_prediction_error_reports_specific_evidence_status() {
+        use crate::cognitive_loop::types::PredictionEvidenceStatus as Status;
+
+        let cold_start =
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1], None, None, 7);
+        assert_eq!(cold_start.status(), Status::NoPriorPrediction);
+        assert_eq!(cold_start.value_for_observation(7), None);
+
+        let stale =
+            CognitiveLoopService::compute_prediction_error_evidence(
+                &[0.1],
+                Some(&[0.1]),
+                Some(5),
+                7,
+            );
+        assert_eq!(stale.status(), Status::StaleOrOutOfOrder);
+        assert_eq!(stale.value_for_observation(7), None);
+
+        let empty = CognitiveLoopService::compute_prediction_error_evidence(
+            &[],
+            Some(&[]),
+            Some(6),
+            7,
+        );
+        assert_eq!(empty.status(), Status::EmptyObservation);
+        assert_eq!(empty.value_for_observation(7), None);
+
+        let mismatch =
+            CognitiveLoopService::compute_prediction_error_evidence(
+                &[0.1, 0.2],
+                Some(&[0.1]),
+                Some(6),
+                7,
+            );
+        assert_eq!(mismatch.status(), Status::DimensionMismatch);
+        assert_eq!(mismatch.value_for_observation(7), None);
+
+        let non_finite =
+            CognitiveLoopService::compute_prediction_error_evidence(
+                &[f32::NAN],
+                Some(&[0.0]),
+                Some(6),
+                7,
+            );
+        assert_eq!(non_finite.status(), Status::NonFiniteInput);
+        assert_eq!(non_finite.value_for_observation(7), None);
+
+        let identical = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.1, 0.2],
+            Some(&[0.1, 0.2]),
+            Some(6),
+            7,
+        );
+        assert_eq!(identical.status(), Status::Valid);
+        assert_eq!(identical.value_for_observation(7), Some(0.0));
+
+        let mismatch_error = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.1, 0.2],
+            Some(&[0.2, 0.3]),
+            Some(6),
+            7,
+        );
+        let error = mismatch_error
+            .value_for_observation(7)
+            .expect("finite, equal-dimensional states should yield comparable evidence");
+        assert_eq!(mismatch_error.status(), Status::Valid);
+        assert!((error - 0.01).abs() < 1e-6, "unexpected MSE: {error}");
+    }
+
+    #[test]
+    fn prediction_window_rejects_a_sample_that_crossed_a_skipped_cycle() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 5;
+        service.last_state = Some(vec![0.1, 0.2]);
+        service.last_prediction = Some(vec![0.2, 0.3]);
+        service.last_prediction_cycle = Some(3);
+
+        let stale = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.3, 0.4],
+            service.last_prediction.as_deref(),
+            service.last_prediction_cycle,
+            5,
+        );
+        assert_eq!(
+            stale.status(),
+            crate::cognitive_loop::types::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(stale.value_for_observation(5), None);
+
+        // The excluded transition still advances the prediction window.
+        service.create_experience_with_evidence(&[0.3, 0.4], &[0.4, 0.5], None);
+        assert_eq!(service.last_prediction_cycle, Some(5));
+        let recovered = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.4, 0.5],
+            service.last_prediction.as_deref(),
+            service.last_prediction_cycle,
+            6,
+        );
+        assert_eq!(
+            recovered.status(),
+            crate::cognitive_loop::types::PredictionEvidenceStatus::Valid
+        );
+        assert_eq!(recovered.value_for_observation(6), Some(0.0));
+    }
+
+    #[test]
+    fn non_finite_prediction_error_is_not_admitted_to_replay() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+
+        service.create_experience_with_evidence(&[0.1], &[0.2], None);
+        service.create_experience_with_evidence(&[0.2], &[0.3], Some(f32::NAN));
+
+        assert_eq!(service.buffer.len(), 0);
+        assert_eq!(service.last_state.as_deref(), Some(&[0.2][..]));
     }
 }

@@ -22,6 +22,7 @@ use symthaea_neuroevolution::{
 
 use crate::cognitive_loop::subsystem_trait::{CycleSnapshot, SubsystemOutput};
 use crate::cognitive_loop::thresholds;
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Manager interval (co-prime with other managers).
 pub const NEUROEVOLUTION_MANAGER_INTERVAL: usize = 71;
@@ -85,6 +86,8 @@ pub struct NeuroevolutionManager {
     /// Accumulated observations between manager runs.
     accumulated_psi: Vec<f64>,
     accumulated_prediction_error: Vec<f32>,
+    /// Prevents duplicate or out-of-order PE samples entering fitness history.
+    prediction_error_cursor: PredictionEvidenceCursor,
     accumulated_confidence: Vec<f64>,
     /// Latest champion topology suggestion.
     champion: ChampionSuggestion,
@@ -120,6 +123,7 @@ impl NeuroevolutionManager {
             initialized: false,
             accumulated_psi: Vec::new(),
             accumulated_prediction_error: Vec::new(),
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
             accumulated_confidence: Vec::new(),
             champion: ChampionSuggestion::default(),
             pending_mutations: Vec::new(),
@@ -155,8 +159,12 @@ impl NeuroevolutionManager {
 
         // Accumulate observations every cycle
         self.accumulated_psi.push(snapshot.unified_psi);
-        self.accumulated_prediction_error
-            .push(snapshot.prediction_error);
+        if let Some(prediction_error) = self
+            .prediction_error_cursor
+            .admit(snapshot.cycle_number, snapshot.prediction_error_sample())
+        {
+            self.accumulated_prediction_error.push(prediction_error);
+        }
         self.accumulated_confidence
             .push(snapshot.prediction_confidence);
 
@@ -294,6 +302,7 @@ mod tests {
         let mut snap = CycleSnapshot::default();
         snap.unified_psi = 0.5;
         snap.prediction_error = 0.3;
+        snap.prediction_error_valid = 1;
         snap.prediction_confidence = 0.6;
         snap
     }
@@ -303,6 +312,37 @@ mod tests {
         let mgr = NeuroevolutionManager::new();
         assert_eq!(mgr.interval, NEUROEVOLUTION_MANAGER_INTERVAL);
         assert!(!mgr.initialized);
+    }
+
+    #[test]
+    fn duplicate_or_out_of_order_pe_cycle_is_not_admitted_twice() {
+        let mut manager = NeuroevolutionManager::new();
+        let mut snapshot = test_snapshot();
+        snapshot.cycle_number = 42;
+
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3]);
+
+        manager.process(&snapshot);
+        assert_eq!(
+            manager.accumulated_prediction_error,
+            vec![0.3],
+            "reprocessing the same observation must not duplicate PE evidence"
+        );
+
+        snapshot.cycle_number = 41;
+        snapshot.prediction_error = 0.9;
+        manager.process(&snapshot);
+        assert_eq!(
+            manager.accumulated_prediction_error,
+            vec![0.3],
+            "out-of-order evidence must not enter the evolution fitness stream"
+        );
+
+        snapshot.cycle_number = 43;
+        snapshot.prediction_error = 0.6;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3, 0.6]);
     }
 
     #[test]

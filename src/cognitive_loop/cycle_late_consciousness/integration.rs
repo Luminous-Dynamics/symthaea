@@ -484,6 +484,8 @@ impl CognitiveLoopService {
         {
             // Persistent discontinuity: aggressive recovery
             self.last_prediction = None; // invalidate stale predictions
+            self.last_prediction_cycle = None;
+            self.encoder.clear_prediction();
             self.scale_lr(
                 "persistent_discontinuity",
                 crate::cognitive_loop::thresholds::TEMPORAL_DISCONTINUITY_PERSISTENT_LR_BOOST,

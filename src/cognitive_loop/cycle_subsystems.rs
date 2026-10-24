@@ -56,7 +56,11 @@ impl CognitiveLoopService {
         let hv16_cached = *state.hv16_cached;
         let unified_psi = state.unified_psi;
         let coherence = state.coherence;
-        let prediction_error = state.prediction_error;
+        let prediction_error_sample = state
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
         let phi_attention_weight = state.phi_attention_weight;
         let _compressed_state = state.compressed_state;
 
@@ -229,7 +233,8 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.primitive_tier.differentiable_consciousness {
-                if self.stats.total_cycles % (47 * interval_mult) == 0
+                if prediction_error_valid
+                    && self.stats.total_cycles % (47 * interval_mult) == 0
                     && self.stats.total_cycles > 0
                 {
                     use crate::consciousness::consciousness_equation_v2::{
@@ -287,7 +292,9 @@ impl CognitiveLoopService {
         let (affect_cons_valence, affect_cons_arousal) =
             if let Some(ref mut ac) = self.primitive_tier.affective_consciousness {
                 ac.decay(0.05);
-                if self.stats.total_cycles % (11 * interval_mult) == 0 {
+                if prediction_error_valid
+                    && self.stats.total_cycles % (11 * interval_mult) == 0
+                {
                     // Blend with previous-cycle valence for affective momentum.
                     // Damasio (1999): somatic markers persist; emotion has inertia.
                     let raw_valence = 1.0 - 2.0 * prediction_error;
@@ -798,6 +805,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+    use crate::cognitive_loop::types::PredictionErrorEvidence;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
@@ -813,7 +821,8 @@ mod tests {
         super::super::CycleState {
             compressed_state,
             output,
-            prediction_error: 0.2,
+            prediction_evidence: PredictionErrorEvidence::valid(0.2, None, 1)
+                .expect("finite fixture evidence"),
             coherence: 0.5,
             unified_psi: 0.3,
             phi_attention_weight: 0.5,
@@ -861,6 +870,8 @@ mod tests {
             "budget test",
             CycleUrgency::Normal,
         );
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(46), 47)
+            .expect("finite fixture evidence");
         state.attention_budget_exceeded = true;
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
@@ -876,7 +887,9 @@ mod tests {
         let compressed = vec![0.0f32; 64];
         let output = vec![0.0f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(42);
-        let state = make_cycle_state(&compressed, &output, &hv, "cruise", CycleUrgency::Cruise);
+        let mut state = make_cycle_state(&compressed, &output, &hv, "cruise", CycleUrgency::Cruise);
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(93), 94)
+            .expect("finite fixture evidence");
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
         let metrics = s.run_advanced_subsystems(&state, &primitives, &mut timings);
@@ -894,6 +907,8 @@ mod tests {
         let hv = symthaea_core::hdc::BinaryHV::random(42);
         let mut state =
             make_cycle_state(&compressed, &output, &hv, "combined", CycleUrgency::Cruise);
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(187), 188)
+            .expect("finite fixture evidence");
         state.attention_budget_exceeded = true;
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
@@ -945,13 +960,15 @@ mod tests {
         let compressed = vec![0.0f32; 64];
         let output = vec![0.0f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(42);
-        let state = make_cycle_state(
+        let mut state = make_cycle_state(
             &compressed,
             &output,
             &hv,
             "debug this code function",
             CycleUrgency::Normal,
         );
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(10), 11)
+            .expect("finite fixture evidence");
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
         let m = s.run_advanced_subsystems(&state, &primitives, &mut timings);

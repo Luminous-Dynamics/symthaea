@@ -82,7 +82,11 @@ impl CognitiveLoopService {
         let hv16_cached = *state.hv16_cached;
         let unified_psi = state.unified_psi;
         let coherence = state.coherence;
-        let prediction_error = state.prediction_error;
+        let prediction_error_sample = state
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
         let phi_attention_weight = state.phi_attention_weight;
         let compressed_state = state.compressed_state;
         let input = state.input;
@@ -206,6 +210,7 @@ impl CognitiveLoopService {
                 hv16_cached,
                 branch_a_recent_hvs,
                 prediction_error,
+                prediction_error_valid,
                 coherence,
                 unified_psi,
                 total_cycles,
@@ -227,6 +232,7 @@ impl CognitiveLoopService {
                 branch_b_theory_calibrator,
                 coherence,
                 prediction_error,
+                prediction_error_valid,
                 unified_psi,
                 snap_prediction_confidence,
                 total_cycles,
@@ -1238,6 +1244,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+    use crate::cognitive_loop::types::PredictionErrorEvidence;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
@@ -1252,7 +1259,8 @@ mod tests {
         super::super::CycleState {
             compressed_state,
             output,
-            prediction_error: 0.2,
+            prediction_evidence: PredictionErrorEvidence::valid(0.2, None, 1)
+                .expect("finite fixture evidence"),
             coherence: 0.5,
             unified_psi: 0.3,
             phi_attention_weight: 0.5,
@@ -1332,7 +1340,8 @@ mod tests {
         let mut state = make_cycle_state(&compressed, &output, &hv, "zero psi");
         state.unified_psi = 0.0;
         state.coherence = 0.0;
-        state.prediction_error = 0.0;
+        state.prediction_evidence =
+            PredictionErrorEvidence::valid(0.0, None, 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
         let m = s.compute_consciousness_metrics(&state, &mut timings);
         assert!(m.primitive_psi.is_finite());
@@ -1347,7 +1356,8 @@ mod tests {
         let output = vec![0.5f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(7);
         let mut state = make_cycle_state(&compressed, &output, &hv, "high error");
-        state.prediction_error = 1.0;
+        state.prediction_evidence =
+            PredictionErrorEvidence::valid(1.0, Some(0), 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
         let m = s.compute_consciousness_metrics(&state, &mut timings);
         assert!(m.dissipative_health.is_finite());
@@ -1465,7 +1475,13 @@ mod tests {
         let hv = symthaea_core::hdc::BinaryHV::random(42);
         for cycle in 1..=5 {
             s.stats.total_cycles = cycle;
-            let state = make_cycle_state(&compressed, &output, &hv, "stable input");
+            let mut state = make_cycle_state(&compressed, &output, &hv, "stable input");
+            state.prediction_evidence = PredictionErrorEvidence::valid(
+                0.2,
+                cycle.checked_sub(1).map(|previous| previous as u64),
+                cycle as u64,
+            )
+            .expect("finite cycle evidence");
             let mut timings = super::super::ModuleTimings::default();
             let m = s.compute_consciousness_metrics(&state, &mut timings);
             assert!(

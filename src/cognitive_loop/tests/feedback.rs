@@ -854,13 +854,37 @@ fn test_psi_attestation_sign_message_deterministic() {
         cycle_id: 42,
         captured_at_us: 1708000000000000,
         prediction_error: 0.05,
+        prediction_error_valid: true,
         urgency: CycleUrgency::Normal,
     };
     let msg1 = record.sign_message("did:key:z6MkTest");
     let msg2 = record.sign_message("did:key:z6MkTest");
     assert_eq!(msg1, msg2, "sign_message should be deterministic");
-    let expected = b"symthaea-phi-attestation:v1:did:key:z6MkTest:0.654321:42:1708000000000000";
+    let expected = b"symthaea-phi-attestation:v2:did:key:z6MkTest:0.654321:42:1708000000000000:0.05:true:Normal";
     assert_eq!(msg1, expected.to_vec());
+}
+
+#[test]
+fn test_psi_attestation_signature_binds_prediction_error_provenance() {
+    let base = PsiAttestationRecord {
+        psi: 0.5,
+        cycle_id: 12,
+        captured_at_us: 1234,
+        prediction_error: 1.0,
+        prediction_error_valid: false,
+        urgency: CycleUrgency::Normal,
+    };
+    let mut changed_validity = base.clone();
+    changed_validity.prediction_error_valid = true;
+    let mut changed_pe = base.clone();
+    changed_pe.prediction_error = 0.7;
+    let mut changed_urgency = base.clone();
+    changed_urgency.urgency = CycleUrgency::Critical;
+
+    let msg = base.sign_message("did:key:z6MkTest");
+    assert_ne!(msg, changed_validity.sign_message("did:key:z6MkTest"));
+    assert_ne!(msg, changed_pe.sign_message("did:key:z6MkTest"));
+    assert_ne!(msg, changed_urgency.sign_message("did:key:z6MkTest"));
 }
 
 #[test]

@@ -122,7 +122,7 @@ impl NeuralCanvas {
         let dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
 
         // Encode key dimensions as level-coded HVs, then bundle
-        let channels: Vec<(f32, &str)> = vec![
+        let mut channels: Vec<(f32, &str)> = vec![
             (snapshot.consciousness_level as f32, "consciousness"),
             (snapshot.valence, "valence"),
             (snapshot.arousal, "arousal"),
@@ -132,8 +132,10 @@ impl NeuralCanvas {
             (snapshot.harmony_activations[0], "harmony_0"),
             (snapshot.harmony_activations[3], "harmony_3"), // InfinitePlay
             (snapshot.harmony_activations[7], "harmony_7"), // SacredStillness
-            (snapshot.prediction_error, "prediction_error"),
         ];
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            channels.push((prediction_error, "prediction_error"));
+        }
 
         let mut result = ContinuousHV::zero(dim);
         for (value, label) in &channels {
@@ -326,9 +328,27 @@ mod tests {
             noradrenaline: 0.4,
             harmony_activations: [0.5, 0.6, 0.4, 0.7, 0.3, 0.5, 0.8, 0.2],
             prediction_error: 0.1,
+            prediction_error_valid: true,
             thought_vector: vec![0.3, -0.2],
             ..CognitiveSnapshot::dormant()
         }
+    }
+
+    #[test]
+    fn invalid_prediction_error_does_not_change_neural_canvas_encoding() {
+        let genesis = test_genesis();
+        let mut low = CognitiveSnapshot::dormant();
+        low.prediction_error = 0.0;
+        low.prediction_error_valid = false;
+        let mut sentinel = low.clone();
+        sentinel.prediction_error = 1.0;
+
+        let low_hv = NeuralCanvas::encode_snapshot(&low, &genesis);
+        let sentinel_hv = NeuralCanvas::encode_snapshot(&sentinel, &genesis);
+        assert_eq!(
+            low_hv.values, sentinel_hv.values,
+            "invalid PE payload must be omitted from neural canvas HDC encoding"
+        );
     }
 
     #[test]

@@ -183,12 +183,30 @@ impl UnifiedThermodynamicState {
     }
 
     /// Update energy budget fields from SubstrateManager + MetabolismManager.
+    /// Compatibility wrapper for callers with an admitted cognitive-load value.
     pub(crate) fn update_energy(
         &mut self,
         energy_per_cycle: f64,
         total_spent: f64,
         metabolic: f32,
         cognitive_load: f32,
+    ) {
+        self.update_energy_with_evidence(
+            energy_per_cycle,
+            total_spent,
+            metabolic,
+            Some(cognitive_load),
+        );
+    }
+
+    /// Update energy telemetry every cycle, but only charge PE-derived cognitive
+    /// load against the ledger when a finite observation was actually admitted.
+    pub(crate) fn update_energy_with_evidence(
+        &mut self,
+        energy_per_cycle: f64,
+        total_spent: f64,
+        metabolic: f32,
+        cognitive_load: Option<f32>,
     ) {
         self.energy_per_cycle = energy_per_cycle;
         self.total_energy_spent = total_spent;
@@ -198,9 +216,9 @@ impl UnifiedThermodynamicState {
             self.metabolic_stress
         };
 
-        // Deduct cognitive load from ledger (mapping load 1.0 to 1 Joule)
-        if cognitive_load > 0.0 {
-            self.ledger.deduct(cognitive_load as f64);
+        if let Some(load) = cognitive_load.filter(|value| value.is_finite() && *value > 0.0) {
+            // Deduct cognitive load from ledger (mapping load 1.0 to 1 Joule).
+            self.ledger.deduct(load as f64);
         }
     }
 }

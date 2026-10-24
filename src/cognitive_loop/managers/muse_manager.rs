@@ -394,7 +394,11 @@ impl MuseManager {
             arousal: snapshot.arousal,
             valence: snapshot.valence,
             consciousness_level: snapshot.unified_psi as f32,
-            prediction_error: snapshot.prediction_error,
+            // The synthesizer has no validity channel of its own. Hold the
+            // last admitted PE rather than sonifying the missing-comparison sentinel.
+            prediction_error: snapshot
+                .prediction_error_sample()
+                .unwrap_or(self.last_musical_state.prediction_error),
         }
     }
 
@@ -634,6 +638,7 @@ mod tests {
             arousal: 0.4,
             valence: 0.0,
             prediction_error: 0.1,
+            prediction_error_valid: 1,
             harmonic_coherence: 0.5,
             compressed_state: {
                 let mut s = [0.0f32; 256];
@@ -813,6 +818,22 @@ mod tests {
         assert!(telem.tempo_bpm > 0.0);
         assert!(telem.allostatic_active);
         assert_eq!(telem.safety_level, SAFETY_YELLOW);
+    }
+
+    #[test]
+    fn invalid_snapshot_pe_holds_last_admitted_musical_pe() {
+        let mut manager = MuseManager::new();
+        let mut valid = default_snapshot();
+        valid.prediction_error = 0.37;
+        valid.prediction_error_valid = 1;
+        manager.last_musical_state = manager.map_snapshot_to_musical_state(&valid);
+
+        let mut invalid = default_snapshot();
+        invalid.prediction_error = 1.0;
+        invalid.prediction_error_valid = 0;
+        let state = manager.map_snapshot_to_musical_state(&invalid);
+
+        assert_eq!(state.prediction_error, 0.37);
     }
 
     #[test]

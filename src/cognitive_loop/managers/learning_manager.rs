@@ -188,22 +188,27 @@ impl CognitiveSubsystem for LearningManager {
         let mut output = SubsystemOutput::NEUTRAL;
 
         // ── 1. Surprise tracking ──────────────────────────────────────────
-        let surprise = snapshot.prediction_error;
-        self.push_surprise(surprise);
+        let prediction_error_sample = snapshot.prediction_error_sample();
+        let prediction_error_valid = prediction_error_sample.is_some();
+        let surprise = prediction_error_sample.unwrap_or(0.0);
+        if prediction_error_valid {
+            self.push_surprise(surprise);
+        }
         let mean_surprise = self.mean_surprise();
 
         // ── 2. Plasticity dynamics (BCM metaplasticity) ───────────────────
-        // High surprise → increase plasticity (learn more)
-        // Low surprise → decrease plasticity (stabilize)
-        let plasticity_drive = if mean_surprise > thresholds::LEARNING_PLASTICITY_HIGH_SURPRISE {
-            Self::PLASTICITY_RATE // increase plasticity
-        } else if mean_surprise < thresholds::LEARNING_PLASTICITY_LOW_SURPRISE {
-            -Self::PLASTICITY_RATE * 0.5 // decrease plasticity (slower)
-        } else {
-            0.0 // neutral zone
-        };
-        self.plasticity = (self.plasticity + plasticity_drive)
-            .clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY_VAL);
+        // A missing comparison must not be recorded as maximum or zero surprise.
+        if prediction_error_valid {
+            let plasticity_drive = if mean_surprise > thresholds::LEARNING_PLASTICITY_HIGH_SURPRISE {
+                Self::PLASTICITY_RATE
+            } else if mean_surprise < thresholds::LEARNING_PLASTICITY_LOW_SURPRISE {
+                -Self::PLASTICITY_RATE * 0.5
+            } else {
+                0.0
+            };
+            self.plasticity = (self.plasticity + plasticity_drive)
+                .clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY_VAL);
+        }
 
         // Plasticity → LR modulation
         // High plasticity = higher learning rate
@@ -235,16 +240,15 @@ impl CognitiveSubsystem for LearningManager {
         }
 
         // ── 4. Error trend → adaptive response ───────────────────────────
-        if self.error_trend > 0.05 {
-            // Errors increasing → need more exploration
-            output.exploration_delta +=
-                self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
-            // Also boost plasticity to learn from errors
-            output.lr_modulation *= thresholds::LEARNING_ERROR_TREND_LR_BOOST;
-        } else if self.error_trend < -0.05 {
-            // Errors decreasing → stabilize (things are working)
-            output.confidence_delta +=
-                (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
+        if prediction_error_valid {
+            if self.error_trend > 0.05 {
+                output.exploration_delta +=
+                    self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
+                output.lr_modulation *= thresholds::LEARNING_ERROR_TREND_LR_BOOST;
+            } else if self.error_trend < -0.05 {
+                output.confidence_delta +=
+                    (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
+            }
         }
 
         // ── 5. Dissipative health → learning gate ─────────────────────────
@@ -310,6 +314,7 @@ mod tests {
     fn snapshot(pe: f32, arousal: f32, diss_health: f32) -> CycleSnapshot {
         CycleSnapshot {
             prediction_error: pe,
+            prediction_error_valid: 1,
             arousal,
             dissipative_health: diss_health as f64,
             prediction_confidence: 0.5,
@@ -404,6 +409,19 @@ mod tests {
             "Low health should dampen learning: {}",
             output.lr_modulation
         );
+    }
+
+    #[test]
+    fn test_invalid_pe_does_not_enter_surprise_history_or_change_plasticity() {
+        let mut manager = LearningManager::default();
+        let initial_plasticity = manager.plasticity;
+        let mut snapshot = snapshot(1.0, 0.5, 0.8);
+        snapshot.prediction_error_valid = 0;
+
+        let _ = manager.process(&snapshot);
+
+        assert_eq!(manager.surprise_count, 0);
+        assert_eq!(manager.plasticity, initial_plasticity);
     }
 
     #[test]

@@ -103,8 +103,11 @@ pub struct SafetyAssessment {
     pub raw_level: SafetyLevel,
     /// Consciousness level at time of assessment.
     pub consciousness_level: f32,
-    /// Prediction error at time of assessment.
+    /// Numeric PE payload at assessment time; interpret only when valid below.
     pub prediction_error: f32,
+    /// Whether PE was a trustworthy current observation (false for compatibility sentinels).
+    #[serde(default)]
+    pub prediction_error_valid: bool,
     /// Temporal coherence at time of assessment.
     pub temporal_coherence: f32,
     /// Reasons for the current safety level.
@@ -145,11 +148,25 @@ impl SafetyAgent {
 
     /// Assess a full consciousness snapshot.
     pub fn assess_snapshot(&mut self, snapshot: &ConsciousnessSnapshot) -> SafetyAssessment {
-        self.assess(SafetyMetrics::from_snapshot(snapshot))
+        self.assess_with_evidence(
+            SafetyMetrics::from_snapshot(snapshot),
+            snapshot.predictions_trustworthy,
+        )
     }
 
-    /// Assess safety from extracted metrics.
+    /// Compatibility entry point for callers that provide an explicit PE measurement.
     pub fn assess(&mut self, metrics: SafetyMetrics) -> SafetyAssessment {
+        self.assess_with_evidence(metrics, true)
+    }
+
+    /// Assess safety while preserving whether the PE is a current, trustworthy
+    /// observation. Other safety metrics remain active when PE is unavailable.
+    pub fn assess_with_evidence(
+        &mut self,
+        metrics: SafetyMetrics,
+        prediction_error_valid: bool,
+    ) -> SafetyAssessment {
+        let prediction_error_valid = prediction_error_valid && metrics.prediction_error.is_finite();
         let mut reasons = Vec::new();
 
         // Base level from consciousness
@@ -177,7 +194,9 @@ impl SafetyAgent {
 
         let mut level = base_level;
 
-        if metrics.prediction_error > self.config.prediction_error_threshold {
+        if prediction_error_valid
+            && metrics.prediction_error > self.config.prediction_error_threshold
+        {
             reasons.push(format!(
                 "prediction_error {:.3} > threshold {:.3}",
                 metrics.prediction_error, self.config.prediction_error_threshold
@@ -231,6 +250,7 @@ impl SafetyAgent {
             cycle: metrics.cycle,
             consciousness_level: metrics.consciousness_level,
             prediction_error: metrics.prediction_error,
+            prediction_error_valid,
             temporal_coherence: metrics.temporal_coherence,
             level,
             raw_level,

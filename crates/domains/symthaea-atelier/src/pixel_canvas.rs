@@ -254,7 +254,7 @@ impl NeuralPainter {
     /// Encode cognitive snapshot to input HV.
     pub fn encode_snapshot(snapshot: &CognitiveSnapshot, genesis: &GenesisSeed) -> ContinuousHV {
         let dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
-        let channels: Vec<(f32, &str)> = vec![
+        let mut channels: Vec<(f32, &str)> = vec![
             (snapshot.consciousness_level as f32, "psi"),
             (snapshot.valence, "valence"),
             (snapshot.arousal, "arousal"),
@@ -265,8 +265,10 @@ impl NeuralPainter {
             (snapshot.harmony_activations[1], "h_flourish"),
             (snapshot.harmony_activations[3], "h_play"),
             (snapshot.harmony_activations[7], "h_stillness"),
-            (snapshot.prediction_error, "pe"),
         ];
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            channels.push((prediction_error, "pe"));
+        }
 
         let mut result = ContinuousHV::zero(dim);
         for (value, label) in &channels {
@@ -548,6 +550,23 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_change_pixel_canvas_encoding() {
+        let genesis = GenesisSeed::from_phrase("pixel-canvas-invalid-pe-boundary");
+        let mut low = CognitiveSnapshot::dormant();
+        low.prediction_error = 0.0;
+        low.prediction_error_valid = false;
+        let mut sentinel = low.clone();
+        sentinel.prediction_error = 1.0;
+
+        let low_hv = NeuralPainter::encode_snapshot(&low, &genesis);
+        let sentinel_hv = NeuralPainter::encode_snapshot(&sentinel, &genesis);
+        assert_eq!(
+            low_hv.values, sentinel_hv.values,
+            "invalid PE payload must be omitted from pixel canvas HDC encoding"
+        );
+    }
+
+    #[test]
     fn neural_painter_creates_art() {
         let genesis = GenesisSeed::from_phrase("test-painter");
         let mut painter = NeuralPainter::new(&genesis);
@@ -560,6 +579,7 @@ mod tests {
             valence: 0.3,
             arousal: 0.5,
             prediction_error: 0.1,
+            prediction_error_valid: true,
             ..CognitiveSnapshot::dormant()
         };
 

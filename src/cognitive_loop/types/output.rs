@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::prediction_evidence::PredictionErrorEvidence;
 use super::scheduling::CycleUrgency;
 use super::telemetry::CycleMetadata;
 
@@ -18,15 +19,41 @@ pub struct PsiAttestationRecord {
     pub psi: f64,
     pub cycle_id: u64,
     pub captured_at_us: u64,
+    /// Compatibility numeric payload; interpret only when prediction_error_valid is true.
     pub prediction_error: f32,
+    /// Whether PE is a genuine finite comparison for this cycle.
+    #[serde(default)]
+    pub prediction_error_valid: bool,
     pub urgency: CycleUrgency,
 }
 
 impl PsiAttestationRecord {
+    /// Adapt the legacy payload into typed evidence. The observation cycle is
+    /// taken from the signed record; callers must provide prediction provenance
+    /// when known rather than inferring it from the numeric payload.
+    pub fn prediction_evidence(
+        &self,
+        prediction_cycle: Option<u64>,
+    ) -> PredictionErrorEvidence {
+        PredictionErrorEvidence::from_compatibility_fields(
+            self.prediction_error,
+            self.prediction_error_valid,
+            prediction_cycle,
+            self.cycle_id,
+        )
+    }
+
+    /// Canonical signing payload, versioned because PE provenance is now signed.
     pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
-            "symthaea-phi-attestation:v1:{}:{}:{}:{}",
-            agent_did, self.psi, self.cycle_id, self.captured_at_us
+            "symthaea-phi-attestation:v2:{}:{}:{}:{}:{}:{}:{:?}",
+            agent_did,
+            self.psi,
+            self.cycle_id,
+            self.captured_at_us,
+            self.prediction_error,
+            self.prediction_error_valid,
+            self.urgency
         )
         .into_bytes()
     }
@@ -36,7 +63,10 @@ impl PsiAttestationRecord {
 #[derive(Debug, Clone)]
 pub struct CycleResult {
     pub output: Vec<f32>,
+    /// Numeric PE payload may be a compatibility sentinel when validity is false.
     pub prediction_error: f32,
+    /// Whether PE is a genuine finite comparison for this cycle.
+    pub prediction_error_valid: bool,
     pub peak_attention: f32,
     pub detected_primitives: Vec<String>,
     pub learning_occurred: bool,
@@ -78,6 +108,26 @@ pub struct CycleResult {
     /// Mental movie generated from geodesic mental simulation, if requested.
     #[cfg(feature = "vision-manifold")]
     pub mental_movie: Option<MentalMovie>,
+}
+
+impl CycleResult {
+    /// Adapt compatibility PE fields into typed, observation-bound evidence.
+    ///
+    /// Cycle identifiers are explicit inputs because legacy CycleResult does
+    /// not own authoritative prediction provenance. Use the actual source
+    /// cycle when known; do not synthesize one from the current number.
+    pub fn prediction_evidence_at(
+        &self,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> PredictionErrorEvidence {
+        PredictionErrorEvidence::from_compatibility_fields(
+            self.prediction_error,
+            self.prediction_error_valid,
+            prediction_cycle,
+            observation_cycle,
+        )
+    }
 }
 
 /// Mental movie generated from geodesic mental simulation.

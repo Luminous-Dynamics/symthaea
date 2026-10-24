@@ -6,6 +6,7 @@
 // CycleUrgency moved to the symthaea-cognitive-types crate (2026-07-12) — a pure
 // data type referenced by CycleMetadata and 50+ call sites across the crate.
 pub use symthaea_cognitive_types::CycleUrgency;
+use super::prediction_evidence::PredictionErrorEvidence;
 
 /// Read-only snapshot of shared cycle state, passed to extracted phase functions
 /// to replace loose multi-parameter signatures.
@@ -13,7 +14,9 @@ pub use symthaea_cognitive_types::CycleUrgency;
 pub(crate) struct CycleState<'a> {
     pub compressed_state: &'a [f32],
     pub output: &'a [f32],
-    pub prediction_error: f32,
+    /// Explicit status, finite value (when usable), and cycle provenance.
+    /// This is the sole PE contract passed to downstream cognitive phases.
+    pub prediction_evidence: PredictionErrorEvidence,
     pub coherence: f32,
     pub unified_psi: f64,
     pub phi_attention_weight: f32,

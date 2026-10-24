@@ -18,6 +18,7 @@ mod monitors;
 /// Contains read-only values computed by earlier cycle phases.
 pub(super) struct LateConsciousnessContext<'a> {
     pub prediction_error: f32,
+    pub prediction_error_valid: bool,
     pub coherence: f32,
     pub unified_psi: f64,
     pub hv16_cached: symthaea_core::hdc::BinaryHV,
@@ -100,6 +101,7 @@ mod tests {
     ) -> LateConsciousnessContext<'a> {
         LateConsciousnessContext {
             prediction_error: 0.1,
+            prediction_error_valid: true,
             coherence: 0.5,
             unified_psi: 0.3,
             hv16_cached: symthaea_core::hdc::BinaryHV::random(42),

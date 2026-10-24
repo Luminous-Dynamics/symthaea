@@ -444,6 +444,8 @@ pub struct CognitiveLoopService {
 
     /// Last prediction (for experience)
     last_prediction: Option<Vec<f32>>,
+    /// Cognitive cycle that produced last_prediction, used to reject stale PE comparisons.
+    last_prediction_cycle: Option<u64>,
 
     /// Start time for cycles/second calculation
     start_time: Instant,

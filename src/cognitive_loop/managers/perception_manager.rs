@@ -183,18 +183,20 @@ impl CognitiveSubsystem for PerceptionManager {
 
         // ── 4. Vigilance mode ─────────────────────────────────────────────
         // Enter vigilant mode on low coherence + high prediction error
-        let should_be_vigilant = coherence < PERCEPTION_VIGILANCE_COHERENCE
-            && snapshot.prediction_error > PERCEPTION_VIGILANCE_PE;
-        if should_be_vigilant && !self.vigilant {
-            self.vigilant = true;
-            self.attention_sensitivity = (self.attention_sensitivity
-                * thresholds::PERCEPTION_VIGILANCE_AMPLIFY)
-                .min(PERCEPTION_SENSITIVITY_MAX);
-        } else if !should_be_vigilant && self.vigilant {
-            self.vigilant = false;
-            self.attention_sensitivity = (self.attention_sensitivity
-                * thresholds::PERCEPTION_VIGILANCE_RECOVERY)
-                .max(PERCEPTION_SENSITIVITY_MIN);
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            let should_be_vigilant = coherence < PERCEPTION_VIGILANCE_COHERENCE
+                && prediction_error > PERCEPTION_VIGILANCE_PE;
+            if should_be_vigilant && !self.vigilant {
+                self.vigilant = true;
+                self.attention_sensitivity = (self.attention_sensitivity
+                    * thresholds::PERCEPTION_VIGILANCE_AMPLIFY)
+                    .min(PERCEPTION_SENSITIVITY_MAX);
+            } else if !should_be_vigilant && self.vigilant {
+                self.vigilant = false;
+                self.attention_sensitivity = (self.attention_sensitivity
+                    * thresholds::PERCEPTION_VIGILANCE_RECOVERY)
+                    .max(PERCEPTION_SENSITIVITY_MIN);
+            }
         }
 
         // ── 5. Phenomenal binding → confidence modulation ─────────────────
@@ -257,6 +259,7 @@ mod tests {
         CycleSnapshot {
             coherence,
             prediction_error: pe,
+            prediction_error_valid: 1,
             arousal,
             attention_budget_exceeded: u8::from(budget_exceeded),
             prediction_confidence: 0.5,
@@ -369,6 +372,20 @@ mod tests {
             "Sensitivity should increase in vigilance: {}",
             pm.attention_sensitivity
         );
+    }
+
+    #[test]
+    fn test_invalid_pe_does_not_clear_existing_vigilance() {
+        let mut manager = PerceptionManager::default();
+        manager.vigilant = true;
+        let initial_sensitivity = manager.attention_sensitivity;
+        let mut snapshot = snapshot(0.9, 0.0, 0.5, false);
+        snapshot.prediction_error_valid = 0;
+
+        let _ = manager.process(&snapshot);
+
+        assert!(manager.vigilant);
+        assert_eq!(manager.attention_sensitivity, initial_sensitivity);
     }
 
     #[test]

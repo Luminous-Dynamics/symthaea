@@ -1440,7 +1440,8 @@ pub(crate) fn snapshot_from_cycle(
 
     CognitiveSnapshot {
         consciousness_level: cs.unified_psi,
-        prediction_error: cs.prediction_error,
+        prediction_error: cs.prediction_error_sample().unwrap_or(0.0),
+        prediction_error_valid: cs.prediction_error_sample().is_some(),
         living_mind_vitality: cs.dissipative_health,
         living_mind_coherence: cs.coherence as f64,
         dopamine: bath.dopamine.effective(),
@@ -1486,7 +1487,8 @@ fn snapshot_to_musical_state(snap: &CognitiveSnapshot) -> MusicalState {
         arousal: blended_arousal,
         valence: va.valence, // use VA-calibrated valence for scale building
         consciousness_level: snap.consciousness_level as f32,
-        prediction_error: snap.prediction_error,
+        // Missing PE is not a low-surprise observation for the generator.
+        prediction_error: snap.prediction_error_sample().unwrap_or(0.0),
     }
 }
 

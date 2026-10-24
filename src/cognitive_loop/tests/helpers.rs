@@ -9,6 +9,16 @@
 //! FEP active inference, cross-modal binding, and parallel post-processing.
 
 use super::super::*;
+use crate::cognitive_loop::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
+
+fn missing_pe_evidence(observation_cycle: u64) -> PredictionErrorEvidence {
+    PredictionErrorEvidence::invalid(
+        PredictionEvidenceStatus::NoPriorPrediction,
+        None,
+        observation_cycle,
+    )
+    .expect("NoPriorPrediction is an invalid evidence status")
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Phase 1: Safety precheck, cognitive depth, negation, learning rate
@@ -172,9 +182,62 @@ fn test_run_surprise_exploration_no_bridge() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Default config has no surprise bridge
     let compressed = vec![0.3f32; 128];
-    let (triggered, action) = service.run_surprise_exploration(&compressed);
+    let observation_cycle = service.stats.total_cycles as u64;
+    let evidence = missing_pe_evidence(observation_cycle);
+    let (triggered, action) =
+        service.run_surprise_exploration(&compressed, &evidence, observation_cycle);
     assert!(!triggered, "No surprise bridge → no trigger");
     assert!(action.is_none(), "No surprise bridge → no action");
+}
+
+#[test]
+#[allow(clippy::field_reassign_with_default)]
+fn test_invalid_pe_does_not_trigger_surprise_or_exploration() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_surprise_exploration = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let compressed = vec![0.5f32; 128];
+    service.last_state = Some(compressed.clone());
+    service.last_prediction = Some(vec![0.0f32; 128]);
+    let initial_urge = service.behavior.curiosity_drive.exploration_urge;
+
+    let observation_cycle = service.stats.total_cycles as u64;
+    let evidence = missing_pe_evidence(observation_cycle);
+    let (triggered, action) =
+        service.run_surprise_exploration(&compressed, &evidence, observation_cycle);
+
+    assert!(!triggered, "invalid PE must not become surprise");
+    assert!(action.is_none(), "invalid PE must not generate a perturbation");
+    assert_eq!(
+        service.behavior.curiosity_drive.exploration_urge,
+        initial_urge,
+        "invalid PE must not change the exploration drive"
+    );
+}
+
+#[test]
+#[allow(clippy::field_reassign_with_default)]
+fn stale_pe_evidence_does_not_trigger_surprise_or_exploration() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_surprise_exploration = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let compressed = vec![0.5f32; 128];
+    service.last_state = Some(compressed.clone());
+    service.last_prediction = Some(vec![0.0f32; 128]);
+    let initial_urge = service.behavior.curiosity_drive.exploration_urge;
+
+    // The measurement belongs to a different observation cycle; it must not
+    // be replayed as a fresh surprise just because the value is large.
+    let stale = PredictionErrorEvidence::valid(1.0, Some(1), 2).unwrap();
+    let (triggered, action) = service.run_surprise_exploration(&compressed, &stale, 1);
+
+    assert!(!triggered, "stale evidence must not become surprise");
+    assert!(action.is_none(), "stale evidence must not create an action");
+    assert_eq!(
+        service.behavior.curiosity_drive.exploration_urge,
+        initial_urge,
+        "stale evidence must not change the exploration drive"
+    );
 }
 
 #[test]
@@ -187,7 +250,10 @@ fn test_run_surprise_exploration_with_bridge() {
     let compressed = vec![0.5f32; 128];
     service.last_state = Some(compressed.clone());
     service.last_prediction = Some(vec![0.0f32; 128]); // large mismatch
-    let (triggered, action) = service.run_surprise_exploration(&compressed);
+    let observation_cycle = service.stats.total_cycles as u64;
+    let evidence = PredictionErrorEvidence::valid(0.9, None, observation_cycle).unwrap();
+    let (triggered, action) =
+        service.run_surprise_exploration(&compressed, &evidence, observation_cycle);
     // We can't guarantee triggering (threshold-dependent), but verify no panic
     // and that action is coherent with triggered
     if triggered {
@@ -401,7 +467,7 @@ fn test_parallel_semantic_causal_no_panic() {
         semantic_hdc,
         &compressed,
         &output,
-        0.5,
+        Some(0.5),
         10,
     );
     // Success: parallel execution completed without panic
@@ -414,6 +480,7 @@ fn test_episodic_learning_context_construction() {
     let prims = vec!["awareness".to_string()];
     let ctx = super::super::helpers::EpisodicLearningContext {
         prediction_error: 0.3,
+        prediction_error_valid: true,
         in_flow: true,
         input: "test input",
         compressed_state: &compressed,

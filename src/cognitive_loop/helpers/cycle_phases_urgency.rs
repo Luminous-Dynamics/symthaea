@@ -5,6 +5,7 @@
 
 use super::super::CognitiveLoopService;
 use super::cycle_phases::{ParameterOptimizationResult, UrgencyResult};
+use super::super::types::PredictionErrorEvidence;
 
 impl CognitiveLoopService {
     /// Autonomous Hyper-Parameter Optimization (The Meta-Forge).
@@ -76,29 +77,43 @@ impl CognitiveLoopService {
     /// `self.neuromod.bath`.
     pub(in crate::cognitive_loop) fn compute_urgency_and_error_pattern(
         &mut self,
-        prediction_error: f32,
+        prediction_evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
         surprise_triggered: bool,
         effective_threshold: f32,
     ) -> UrgencyResult {
-        // Track consecutive low-error cycles for Cruise eligibility
-        if prediction_error < effective_threshold {
-            self.carryover.urgency.consecutive_low_error = self
-                .carryover
-                .urgency
-                .consecutive_low_error
-                .saturating_add(1);
-        } else {
-            self.carryover.urgency.consecutive_low_error = 0;
+        let prediction_error_sample =
+            prediction_evidence.value_for_observation(observation_cycle);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        // Invalid evidence contributes no fresh number. When an independent
+        // surprise channel is active, use the last valid aggregate as context.
+        let prediction_error =
+            prediction_error_sample.unwrap_or(self.stats.avg_prediction_error);
+        // Missing/corrupted comparisons are not low- or high-error observations.
+        // In particular, do not reset or advance the low-error streak without evidence.
+        if prediction_error_valid {
+            if prediction_error < effective_threshold {
+                self.carryover.urgency.consecutive_low_error = self
+                    .carryover
+                    .urgency
+                    .consecutive_low_error
+                    .saturating_add(1);
+            } else {
+                self.carryover.urgency.consecutive_low_error = 0;
+            }
         }
 
-        // Use smoothed error for urgency to prevent jitter from single-cycle noise spikes.
-        // Science: Dynamical systems — threshold-based switching needs hysteresis to prevent
-        // oscillation. EMA smoothing damps transient spikes; prev_urgency adds hysteresis.
-        let smoothed_urgency_error = if self.stats.total_cycles > 5 {
-            // Blend instantaneous (70%) with running average (30%) for responsiveness + smoothing
-            prediction_error * 0.7 + self.stats.avg_prediction_error * 0.3
+        // Smooth only genuine PE measurements. On an invalid cycle, retain the
+        // last valid aggregate for diagnostics; current urgency is held below
+        // unless an independent surprise/coherence signal justifies a change.
+        let smoothed_urgency_error = if prediction_error_valid {
+            if self.stats.total_cycles > 5 {
+                prediction_error * 0.7 + self.stats.avg_prediction_error * 0.3
+            } else {
+                prediction_error
+            }
         } else {
-            prediction_error // Use raw error during bootstrap
+            self.stats.avg_prediction_error
         };
 
         // Hysteresis: require stronger signal to LEAVE current urgency level
@@ -186,12 +201,18 @@ impl CognitiveLoopService {
         };
         let hysteresis_threshold =
             base_hysteresis * pattern_mod * coherence_mod * transition_cost_mod * consolidation_mod;
-        let error_urgency = super::super::CycleUrgency::from_state(
-            smoothed_urgency_error,
-            hysteresis_threshold,
-            surprise_triggered,
-            self.carryover.urgency.consecutive_low_error,
-        );
+        let error_urgency = if prediction_error_valid || surprise_triggered {
+            super::super::CycleUrgency::from_state(
+                smoothed_urgency_error,
+                hysteresis_threshold,
+                surprise_triggered,
+                self.carryover.urgency.consecutive_low_error,
+            )
+        } else {
+            // No PE means no PE-driven urgency transition. Other independent
+            // controls below (e.g. sustained coherence failure) remain active.
+            self.carryover.urgency.urgency
+        };
 
         // Session 15 Item 2: Early warning at 5+ consecutive low-coherence cycles.
         // Mild exploration boost + confidence dampening before the hard Critical at 10.
@@ -214,10 +235,10 @@ impl CognitiveLoopService {
         // space), not a genuine model failure. This prevents the "high consciousness but
         // stuck in Critical" trap observed in watch telemetry.
         let consciousness_level = self.carryover.history.consciousness_level;
-        let error_urgency = if self.carryover.urgency.consecutive_low_coherence
+        let forced_critical_by_low_coherence = self.carryover.urgency.consecutive_low_coherence
             > super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD
-            && consciousness_level < 0.5
-        {
+            && consciousness_level < 0.5;
+        let error_urgency = if forced_critical_by_low_coherence {
             self.adjust_exploration(
                 "sustained_low_coherence",
                 super::super::thresholds::LOW_COHERENCE_EXPLORATION_BOOST,
@@ -227,34 +248,41 @@ impl CognitiveLoopService {
             error_urgency
         };
 
-        // Compose CognitiveDepth with error-based urgency:
-        // Reflex → cap at Cruise (skip heavy subsystems for familiar inputs)
-        // DeepThought → floor at Normal (force full processing for novel/high-stakes)
-        // Cortical → use error-based urgency as-is
-        let raw_urgency = match self.cognitive_depth {
-            super::super::CognitiveDepth::Reflex => match error_urgency {
-                super::super::CycleUrgency::Critical => super::super::CycleUrgency::Normal,
-                _ => super::super::CycleUrgency::Cruise,
-            },
-            super::super::CognitiveDepth::DeepThought => match error_urgency {
-                super::super::CycleUrgency::Cruise => super::super::CycleUrgency::Normal,
-                _ => error_urgency,
-            },
-            super::super::CognitiveDepth::Cortical => error_urgency,
+        // Compose CognitiveDepth with error-based urgency. Without valid PE
+        // and without an independent surprise or coherence emergency, hold the
+        // current mode instead of reinterpreting the sentinel through depth caps.
+        let raw_urgency = if !prediction_error_valid
+            && !surprise_triggered
+            && !forced_critical_by_low_coherence
+        {
+            self.carryover.urgency.urgency
+        } else {
+            match self.cognitive_depth {
+                super::super::CognitiveDepth::Reflex => match error_urgency {
+                    super::super::CycleUrgency::Critical => super::super::CycleUrgency::Normal,
+                    _ => super::super::CycleUrgency::Cruise,
+                },
+                super::super::CognitiveDepth::DeepThought => match error_urgency {
+                    super::super::CycleUrgency::Cruise => super::super::CycleUrgency::Normal,
+                    _ => error_urgency,
+                },
+                super::super::CognitiveDepth::Cortical => error_urgency,
+            }
         };
 
         // ── Phase 17: Cross-temporal error pattern learning ──────────────
         // Science: Rao & Ballard (1999) — hierarchical predictive coding tracks error
         // trajectories across time, not just instantaneous snapshots.
         // Maintain rolling window of prediction errors, classify pattern.
-        let error_history = &mut self.carryover.history.error_history;
-        while error_history.len() >= 16 {
-            error_history.pop_front();
-        }
-        error_history.push_back(prediction_error);
-
         let (error_pattern, predicted_urgency, error_slope, oscillation_ratio) =
-            if error_history.len() >= 4 {
+            if prediction_error_valid {
+                let error_history = &mut self.carryover.history.error_history;
+                while error_history.len() >= 16 {
+                    error_history.pop_front();
+                }
+                error_history.push_back(prediction_error);
+
+                if error_history.len() >= 4 {
                 let len = error_history.len();
                 // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
                 let newest = error_history[len - 1];
@@ -302,8 +330,11 @@ impl CognitiveLoopService {
                     _ => "Normal",
                 };
                 (pattern, predicted, slope, oscillation_ratio)
+                } else {
+                    ("Warmup", "Normal", 0.0, 0.0)
+                }
             } else {
-                ("Warmup", "Normal", 0.0, 0.0)
+                ("Missing", "Normal", 0.0, 0.0)
             };
 
         // #9: Error trend → DA baseline modulation (Schultz 2016)
@@ -354,8 +385,8 @@ impl CognitiveLoopService {
 
         // Track mode transition cost: PE spike in the cycle immediately after a transition.
         // Kelso (1995): attractor transitions incur transient processing costs.
-        if self.carryover.urgency.mode_stability_counter == 1 {
-            // Just settled into new mode — measure transition cost as current PE
+        if prediction_error_valid && self.carryover.urgency.mode_stability_counter == 1 {
+            // Just settled into new mode — measure transition cost from a valid PE.
             let cost = prediction_error.max(0.0);
             self.stats.avg_transition_cost = self.stats.avg_transition_cost * 0.8 + cost * 0.2;
         }
@@ -456,5 +487,92 @@ impl CognitiveLoopService {
             error_slope,
             oscillation_ratio,
         }
+    }
+}
+
+#[cfg(test)]
+mod prediction_evidence_urgency_tests {
+    use crate::cognitive_loop::types::{
+        PredictionErrorEvidence, PredictionEvidenceStatus,
+    };
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    #[test]
+    fn stale_evidence_does_not_advance_urgency_history_or_low_error_streak() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 10;
+        service.stats.avg_prediction_error = 0.2;
+        service.carryover.urgency.consecutive_low_error = 4;
+        service
+            .carryover
+            .history
+            .error_history
+            .extend([0.2, 0.25, 0.3]);
+        let history_before: Vec<f32> = service
+            .carryover
+            .history
+            .error_history
+            .iter()
+            .copied()
+            .collect();
+
+        // The measurement is valid for cycle 9, but cycle 10 is being evaluated.
+        let stale = PredictionErrorEvidence::valid(0.0, Some(8), 9).unwrap();
+        service.compute_urgency_and_error_pattern(&stale, 10, false, 0.5);
+
+        let history_after: Vec<f32> = service
+            .carryover
+            .history
+            .error_history
+            .iter()
+            .copied()
+            .collect();
+        assert_eq!(history_after, history_before);
+        assert_eq!(service.carryover.urgency.consecutive_low_error, 4);
+        assert_eq!(service.stats.avg_prediction_error, 0.2);
+    }
+
+    #[test]
+    fn current_valid_evidence_is_admitted_once_by_urgency() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 10;
+        service.carryover.urgency.consecutive_low_error = 2;
+        let evidence = PredictionErrorEvidence::valid(0.1, Some(9), 10).unwrap();
+
+        service.compute_urgency_and_error_pattern(&evidence, 10, false, 0.5);
+
+        assert_eq!(
+            service
+                .carryover
+                .history
+                .error_history
+                .iter()
+                .copied()
+                .filter(|value| (*value - 0.1).abs() < f32::EPSILON)
+                .count(),
+            1
+        );
+        assert_eq!(service.carryover.urgency.consecutive_low_error, 3);
+    }
+
+    #[test]
+    fn missing_evidence_does_not_become_a_low_error_observation() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 10;
+        service.carryover.urgency.consecutive_low_error = 3;
+        let evidence = PredictionErrorEvidence::invalid(
+            PredictionEvidenceStatus::NoPriorPrediction,
+            None,
+            10,
+        )
+        .expect("NoPriorPrediction is an invalid status");
+
+        service.compute_urgency_and_error_pattern(&evidence, 10, false, 0.5);
+
+        assert!(service.carryover.history.error_history.is_empty());
+        assert_eq!(service.carryover.urgency.consecutive_low_error, 3);
     }
 }

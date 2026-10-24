@@ -179,6 +179,12 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> FeedbackPhaseResult {
         let prediction_error = dynamics.core.prediction_error;
+        let prediction_error_valid = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64)
+            .is_some()
+            && prediction_error.is_finite();
         let coherence = dynamics.core.coherence;
         let unified_psi = dynamics.core.unified_psi;
 
@@ -188,7 +194,7 @@ impl CognitiveLoopService {
         let cycle_state = CycleState {
             compressed_state: &perception.encoding.compressed_state,
             output: &dynamics.core.output,
-            prediction_error,
+            prediction_evidence: perception.urgency.prediction_evidence.clone(),
             coherence,
             unified_psi,
             phi_attention_weight: perception.encoding.phi_attention_weight,
@@ -799,6 +805,8 @@ impl CognitiveLoopService {
 
         let late_ctx = LateConsciousnessContext {
             prediction_error,
+            prediction_error_valid: prediction_error_valid
+                && prediction_error.is_finite(),
             coherence,
             unified_psi,
             hv16_cached: perception.encoding.hv16_cached,
@@ -1134,7 +1142,10 @@ impl CognitiveLoopService {
         // ── Knowledge Engine: PE → ontology learning rate ────────────────
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
         if let Some(ref mut km) = self.memory.knowledge_manager {
-            km.set_ontology_lr_from_pe(prediction_error as f32);
+            if prediction_error_valid && prediction_error.is_finite() {
+                km.set_ontology_lr_from_pe(prediction_error as f32);
+            }
+            // This separate coherence/Phi pathway remains active without a PE.
             km.modulate_lr_from_consciousness(self.stats.unified_psi as f64);
         }
 
@@ -1503,7 +1514,16 @@ impl CognitiveLoopService {
         }
 
         // ── Track 4b: Cross-module agreement metric ─────────────────────────
-        let fep_confidence = (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32;
+        // Missing PE must not make zeroed/stale FEP surprise look like
+        // perfect model confidence. Neutralize only this confidence component;
+        // coherence, resonator, moral and MCTS evidence remain active.
+        let fep_confidence = if prediction_error_valid
+            && dynamics.fep.fep_surprise.is_finite()
+        {
+            (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32
+        } else {
+            0.5
+        };
         let resonator_confidence = dynamics.resonator.resonator_best_sim;
         let moral_confidence = self
             .last_moral_judgment()

@@ -669,14 +669,13 @@ impl CognitiveSubsystem for TherapeuticManager {
         ));
 
         // ── 6b. Shadow dynamics — observability mode ────────────────────────
-        // Track prediction error accumulation in emotionally charged,
-        // unintegrated content (Jung → Friston mapping).
-        // NO interventions or Broca modifications — telemetry only.
-        {
+        // Prediction-error-based shadow telemetry is admitted only on a genuine
+        // comparison. Narrative and affect processing above remain independent.
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
             let narrative_integration = self.narrative.coherence;
             let mut shadow_telemetry = self.shadow_detector.process(
                 snapshot.cycle_number,
-                snapshot.prediction_error,
+                prediction_error,
                 snapshot.valence,
                 snapshot.arousal,
                 &fragment_text,
@@ -826,6 +825,7 @@ mod tests {
             valence,
             arousal,
             prediction_error: 0.1,
+            prediction_error_valid: 1,
             coherence: 0.5,
             prediction_confidence: 0.5,
             unified_psi: 0.5,
@@ -839,6 +839,7 @@ mod tests {
             prediction_confidence: 0.5,
             fep_lr_boost: 1.0,
             prediction_error: 0.1,
+            prediction_error_valid: 1,
             coherence: 0.5,
             unified_psi: 0.5,
             phi_attention_weight: 1.0,
@@ -856,7 +857,13 @@ mod tests {
             holographic_unity: 0.0,
             gradient_magnitude: 0.0,
             epistemic_confidence: 0.5,
-            _reserved: [0; 12],
+            moral_score: 0.0,
+            active_external_requests: 0,
+            vision_hdc_dim: 16384,
+            vision_free_energy: 0.0,
+            vision_complexity: 0.0,
+            vision_accuracy: 1.0,
+            _reserved: [0; 2],
         }
     }
 
@@ -866,6 +873,24 @@ mod tests {
         assert_eq!(manager.name(), "therapeutic_manager");
         assert_eq!(manager.interval(), 11);
         assert!(!manager.crisis_active);
+    }
+
+    #[test]
+    fn invalid_prediction_error_does_not_update_shadow_telemetry() {
+        let mut manager = TherapeuticManager::new();
+        let before = manager.last_shadow_telemetry.clone();
+        let mut snapshot = make_snapshot(-0.8, 0.7, 1);
+        snapshot.prediction_error = 1.0;
+        snapshot.prediction_error_valid = 0;
+
+        manager.process(&snapshot);
+
+        // PE-specific telemetry remains unchanged; affect/narrative processing can
+        // still continue independently of the unavailable comparison.
+        assert_eq!(
+            manager.last_shadow_telemetry.shadow_fragment_count,
+            before.shadow_fragment_count
+        );
     }
 
     #[test]

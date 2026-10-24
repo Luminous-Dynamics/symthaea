@@ -38,6 +38,18 @@ impl CognitiveLoopService {
         feedback: &mut FeedbackPhaseResult,
         mut module_timings: super::ModuleTimings,
     ) -> CycleResult {
+        let observation_cycle = self.stats.total_cycles as u64;
+        let prediction_error_sample = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(observation_cycle);
+        let prediction_error_valid =
+            prediction_error_sample.is_some() && dynamics.core.prediction_error.is_finite();
+        // Keep a numeric fallback for legacy diagnostics, but all PE-driven
+        // behavior below is gated by the typed sample above.
+        let prediction_error =
+            prediction_error_sample.unwrap_or(perception.encoding.encoding_result.prediction_error);
+
         let thalamic_depth_score = match self.cognitive_depth {
             super::CognitiveDepth::DeepThought => super::thresholds::DEPTH_SCORE_DEEP_THOUGHT,
             super::CognitiveDepth::Cortical => super::thresholds::DEPTH_SCORE_CORTICAL,
@@ -125,11 +137,13 @@ impl CognitiveLoopService {
                     .take(32)
                     .copied()
                     .collect();
-                dream.record_consolidation_event(
-                    &perception.encoding.compressed_state,
-                    action,
-                    perception.urgency.prediction_error,
-                );
+                if prediction_error_valid {
+                    dream.record_consolidation_event(
+                        &perception.encoding.compressed_state,
+                        action,
+                        prediction_error,
+                    );
+                }
             }
         }
 
@@ -544,6 +558,7 @@ impl CognitiveLoopService {
                 cfc_output: output.clone(),
                 tau: fep_tau * phi_tau,
                 prediction_error: dynamics.core.prediction_error,
+                prediction_error_valid,
                 detected_primitives: perception
                     .encoding
                     .encoding_result
@@ -555,9 +570,32 @@ impl CognitiveLoopService {
             });
         }
 
+        metadata.prediction_evidence = Some(super::types::PredictionEvidenceTelemetry::from_evidence(
+            &perception.urgency.prediction_evidence,
+            observation_cycle,
+        ));
+
+        // Close the HDC↔LTC loop for the next cycle: this prediction is tagged
+        // with its producer cycle, and encode_at() rejects it after a skipped
+        // or out-of-order observation. Never feed an incompatible shape.
+        if !dynamics.core.prediction.is_empty()
+            && dynamics.core.prediction.len() == self.config.cfc_config.input_dim
+        {
+            self.encoder.set_prediction_at(
+                dynamics.core.prediction.clone(),
+                observation_cycle,
+            );
+            self.encoder.set_first_horizon_prediction(
+                dynamics.core.prediction_first_horizon.clone(),
+            );
+        } else {
+            self.encoder.clear_prediction();
+        }
+
         CycleResult {
             output,
             prediction_error: dynamics.core.prediction_error,
+            prediction_error_valid,
             peak_attention: perception.encoding.encoding_result.peak_attention,
             detected_primitives: mem::take(
                 &mut perception.encoding.encoding_result.detected_primitives,
@@ -671,6 +709,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+    use crate::cognitive_loop::types::PredictionEvidenceStatus;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
@@ -682,6 +721,33 @@ mod tests {
         let result = svc.cycle("metadata check");
         assert!(result.metadata.cycle_duration_us > 0);
         assert!(!result.metadata.selected_strategy.is_empty());
+
+        let evidence = result
+            .metadata
+            .prediction_evidence
+            .as_ref()
+            .expect("cycle telemetry must expose PE provenance");
+        assert_eq!(evidence.observation_cycle, svc.stats.total_cycles as u64);
+        assert_eq!(
+            evidence.status == PredictionEvidenceStatus::Valid,
+            result.prediction_error_valid,
+            "typed evidence status must agree with the public validity bit"
+        );
+    }
+
+    #[test]
+    fn output_metadata_preserves_cold_start_missingness_reason() {
+        let mut svc = make_service();
+        let result = svc.cycle("cold-start evidence telemetry regression");
+
+        assert!(!result.prediction_error_valid);
+        let evidence = result
+            .metadata
+            .prediction_evidence
+            .as_ref()
+            .expect("cycle telemetry must expose evidence provenance");
+        assert_eq!(evidence.status, PredictionEvidenceStatus::NoPriorPrediction);
+        assert_eq!(evidence.observation_cycle, svc.stats.total_cycles as u64);
     }
 
     #[test]

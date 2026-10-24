@@ -214,6 +214,12 @@ impl ExperienceBus {
     /// - Low coherence → boost Coherence ("Does this hang together?")
     /// - High uncertainty → boost Play ("What haven't I tried?")
     pub fn update_wisdom_from_signals(&mut self) {
+        // The numeric PE can be held from an earlier valid observation for UI
+        // continuity. Do not replay it as a fresh wisdom update when the current
+        // cycle has no comparable prediction evidence.
+        if !self.current_signals.prediction_error_valid {
+            return;
+        }
         self.wisdom.update_from_experience(
             self.current_signals.prediction_error,
             self.current_signals.uncertainty,
@@ -400,6 +406,7 @@ impl ExperienceBus {
 
         PrincipledSignals {
             prediction_error,
+            prediction_error_valid: !similar_experiences.is_empty(),
             uncertainty,
             coherence,
             confidence,
@@ -479,10 +486,11 @@ impl ExperienceBus {
             rules_applied.push("R1: uncertainty > 0.6 → CLARIFY".to_string());
         }
 
-        // Rule 2: High prediction error → PROBE
-        if signals.prediction_error > 0.5 {
+        // Rule 2: High valid prediction error → PROBE. A retained sentinel is
+        // diagnostic continuity, not current evidence of a surprising observation.
+        if signals.prediction_error_valid && signals.prediction_error > 0.5 {
             primitives.push("PROBE".to_string());
-            rules_applied.push("R2: prediction_error > 0.5 → PROBE".to_string());
+            rules_applied.push("R2: valid prediction_error > 0.5 → PROBE".to_string());
         }
 
         // Rule 3: Low coherence → RESTRUCTURE
@@ -737,7 +745,31 @@ mod tests {
         let similar = bus.retrieve_similar_experiences(&hdv);
         let signals = bus.compute_signals(&hdv, &similar);
 
-        assert_eq!(signals.prediction_error, 1.0); // No similar = high surprise
+        assert_eq!(signals.prediction_error, 1.0); // Compatibility diagnostic retained
+        assert!(!signals.prediction_error_valid);
+    }
+
+    #[test]
+    fn invalid_prediction_error_does_not_select_probe_primitive() {
+        let mut bus = ExperienceBus::with_defaults();
+        bus.current_signals = PrincipledSignals {
+            prediction_error: 1.0,
+            prediction_error_valid: false,
+            uncertainty: 0.2,
+            coherence: 0.8,
+            confidence: 0.8,
+            salience: 0.2,
+            phi_monitor: 0.0,
+        };
+
+        let (invalid_primitives, invalid_rules) = bus.select_primitives_principled();
+        assert!(!invalid_primitives.contains(&"PROBE".to_string()));
+        assert!(!invalid_rules.iter().any(|rule| rule.contains("prediction_error")));
+
+        bus.current_signals.prediction_error_valid = true;
+        let (valid_primitives, valid_rules) = bus.select_primitives_principled();
+        assert!(valid_primitives.contains(&"PROBE".to_string()));
+        assert!(valid_rules.iter().any(|rule| rule.contains("valid prediction_error")));
     }
 
     #[test]
@@ -831,11 +863,29 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_update_wisdom() {
+        let mut bus = ExperienceBus::with_defaults();
+        let before = bus.harmonic_weight_snapshot();
+
+        bus.current_signals.prediction_error = 1.0;
+        bus.current_signals.prediction_error_valid = false;
+        bus.current_signals.uncertainty = 0.7;
+        bus.current_signals.coherence = 0.3;
+
+        bus.update_wisdom_from_signals();
+
+        let after = bus.harmonic_weight_snapshot();
+        assert_eq!(before.weight_for("QUESTION"), after.weight_for("QUESTION"));
+        assert_eq!(before.weight_for("LEARN"), after.weight_for("LEARN"));
+    }
+
+    #[test]
     fn test_wisdom_updates_affect_snapshot() {
         let mut bus = ExperienceBus::with_defaults();
 
-        // Simulate high prediction error experience
+        // Simulate a high prediction-error observation with explicit evidence provenance.
         bus.current_signals.prediction_error = 0.9;
+        bus.current_signals.prediction_error_valid = true;
         bus.current_signals.uncertainty = 0.7;
         bus.current_signals.coherence = 0.3;
 

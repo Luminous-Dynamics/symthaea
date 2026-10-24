@@ -90,7 +90,7 @@ impl HybridController {
 
     fn encode_snapshot(snapshot: &CognitiveSnapshot, genesis: &GenesisSeed) -> ContinuousHV {
         let dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
-        let channels: Vec<(f32, &str)> = vec![
+        let mut channels: Vec<(f32, &str)> = vec![
             (snapshot.consciousness_level as f32, "psi"),
             (snapshot.valence, "valence"),
             (snapshot.arousal, "arousal"),
@@ -100,8 +100,10 @@ impl HybridController {
             (snapshot.harmony_activations[0], "h0"),
             (snapshot.harmony_activations[3], "h3"),
             (snapshot.harmony_activations[7], "h7"),
-            (snapshot.prediction_error, "pe"),
         ];
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            channels.push((prediction_error, "pe"));
+        }
         let mut result = ContinuousHV::zero(dim);
         for (value, label) in &channels {
             result = result.add(&genesis.hv(label, dim).scale(*value));
@@ -274,9 +276,27 @@ mod tests {
             noradrenaline: 0.4,
             harmony_activations: [0.5, 0.6, 0.4, 0.7, 0.3, 0.5, 0.8, 0.2],
             prediction_error: 0.1,
+            prediction_error_valid: true,
             thought_vector: vec![0.3, -0.2, 0.5, 0.1],
             ..CognitiveSnapshot::dormant()
         }
+    }
+
+    #[test]
+    fn invalid_prediction_error_does_not_change_hybrid_encoding() {
+        let genesis = GenesisSeed::from_phrase("hybrid-invalid-pe-boundary");
+        let mut low = CognitiveSnapshot::dormant();
+        low.prediction_error = 0.0;
+        low.prediction_error_valid = false;
+        let mut sentinel = low.clone();
+        sentinel.prediction_error = 1.0;
+
+        let low_hv = HybridController::encode_snapshot(&low, &genesis);
+        let sentinel_hv = HybridController::encode_snapshot(&sentinel, &genesis);
+        assert_eq!(
+            low_hv.values, sentinel_hv.values,
+            "invalid PE payload must be omitted from hybrid HDC encoding"
+        );
     }
 
     #[test]

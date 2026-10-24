@@ -24,6 +24,8 @@ use super::super::{
 /// Context for the episodic/learning parallel branch (read-only values).
 pub(in crate::cognitive_loop) struct EpisodicLearningContext<'a> {
     pub prediction_error: f32,
+    /// Whether this cycle's PE is a genuine finite comparison.
+    pub prediction_error_valid: bool,
     pub in_flow: bool,
     pub input: &'a str,
     pub compressed_state: &'a [f32],
@@ -76,16 +78,22 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
     semantic_hdc: Vec<f32>,
     compressed_state: &[f32],
     output: &[f32],
-    prediction_error: f32,
+    prediction_error: Option<f32>,
     total_cycles: usize,
 ) -> Option<crate::memory::semantic_memory::SemanticEntry> {
-    // Semantic memory: store HDC vector + prediction error for future similarity lookup
-    let evicted = semantic_memory.store_with_timestamp(
-        semantic_hdc,
-        prediction_error,
-        None,
-        total_cycles as u64,
-    );
+    // Semantic memory stores PE as an outcome label, so don't persist a
+    // missing/corrupted comparison as a numeric result. Causal recording below
+    // is independent of PE validity and continues.
+    let evicted = if let Some(valid_error) = prediction_error.filter(|value| value.is_finite()) {
+        semantic_memory.store_with_timestamp(
+            semantic_hdc,
+            valid_error,
+            None,
+            total_cycles as u64,
+        )
+    } else {
+        None
+    };
 
     // Causal enhancement: track (input, output) pairs and discover structure
     if let Some(enhancer) = causal_enhancer {
@@ -121,14 +129,15 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     fep_learning_signal: &mut f32,
     closed_learning_loop: &mut ClosedLearningLoop,
     ctx: &EpisodicLearningContext<'_>,
-    cycle_learning_result: CycleLearningResult,
+    cycle_learning_result: Option<CycleLearningResult>,
 ) -> f32 {
     // Episodic memory: encode significant experiences.
     // IIT gate: consciousness (Phi) is necessary for memory formation
     // (Tononi & Koch 2015). Require minimum Phi for consolidation.
     let phi_sufficient = ctx.phi > super::super::thresholds::PHI_EPISODIC_CONSOLIDATION_MIN;
     if phi_sufficient
-        && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN
+        && ((ctx.prediction_error_valid
+            && ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN)
             || ctx.in_flow)
     {
         let hdv_sample: Vec<f32> =
@@ -156,7 +165,8 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     if let Some(res_mem) = resonator_memory {
         let res_dim_ok = ctx.compressed_state.len() == res_mem.resonator.config.dim;
         if res_dim_ok
-            && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN
+            && ((ctx.prediction_error_valid
+                && ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN)
                 || ctx.in_flow)
         {
             // Quantize valence -> nearest band
@@ -231,11 +241,14 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
 
     *prev_primitive_state = Some(prim_state);
 
-    // Closed learning loop: update Q-values, modulated by FEP learning signal.
-    // Friston (2010): plasticity scales with expected information gain.
-    let plasticity =
-        1.0 + *fep_learning_signal * super::super::thresholds::FEP_PLASTICITY_SCALING_FACTOR; // [-1,1] → [0.5, 1.5]
-    closed_learning_loop.update_with_plasticity(cycle_learning_result, plasticity);
+    // Closed learning loop: update Q-values only when outcome/PE evidence was
+    // admitted by the caller. Primitive-belief updates above have their own
+    // state comparison and remain independent of the encoder PE.
+    if let Some(cycle_learning_result) = cycle_learning_result {
+        let plasticity =
+            1.0 + *fep_learning_signal * super::super::thresholds::FEP_PLASTICITY_SCALING_FACTOR;
+        closed_learning_loop.update_with_plasticity(cycle_learning_result, plasticity);
+    }
 
     // Return the memory context boost for deferred application via adjust_confidence
     ctx.memory_context_boost
@@ -325,6 +338,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     hv16_cached: BinaryHV,
     recent_hvs: &mut std::collections::VecDeque<BinaryHV>,
     prediction_error: f32,
+    prediction_error_valid: bool,
     coherence: f32,
     unified_psi: f64,
     total_cycles: usize,
@@ -376,14 +390,22 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     let t = Instant::now();
     let (dissipative_health, dissipative_regime, dissipative_entropy_rate, new_dissipative) =
         if let Some(dc) = dissipative_consciousness {
-            let energy = prediction_error as f64;
-            let info = coherence as f64 * unified_psi;
-            dc.update(unified_psi, energy, info, coherence as f64);
+            // Here PE is used as the "energy" input, so state transitions must
+            // wait for a valid finite comparison. Other branches still process
+            // coherence, Phi and other independently observed signals.
+            let admitted_pe = prediction_error_valid && prediction_error.is_finite();
+            if admitted_pe {
+                let energy = prediction_error as f64;
+                let info = coherence as f64 * unified_psi;
+                dc.update(unified_psi, energy, info, coherence as f64);
+            }
             let health = dc.health_score();
 
-            // Deferred feedback from recommend_action()
-            use crate::consciousness::dissipative_consciousness::DissipativeAction;
-            match dc.recommend_action() {
+            // Deferred feedback is PE-coupled here: don't replay the last known
+            // recommendation as if it came from a fresh invalid observation.
+            if admitted_pe {
+                use crate::consciousness::dissipative_consciousness::DissipativeAction;
+                match dc.recommend_action() {
                 DissipativeAction::Maintain { .. } => {
                     deferred.push(DeferredFeedback::AdjustConfidence(
                         "dissipative_maintain",
@@ -420,8 +442,9 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
                         -0.005,
                     ));
                 }
-                DissipativeAction::IncreaseIntegration { .. } => {
-                    deferred.push(DeferredFeedback::ScaleLr("dissipative_integration", 1.03));
+                    DissipativeAction::IncreaseIntegration { .. } => {
+                        deferred.push(DeferredFeedback::ScaleLr("dissipative_integration", 1.03));
+                    }
                 }
             }
 
@@ -429,7 +452,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
                 health,
                 dc.current_regime().as_str().into(),
                 dc.entropy_production_rate,
-                Some(health),
+                admitted_pe.then_some(health),
             )
         } else {
             (0.0, String::new(), 0.0, None)
@@ -512,6 +535,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
     theory_calibrator: &Option<crate::consciousness::epistemic_conflict::TheoryCalibrator>,
     coherence: f32,
     prediction_error: f32,
+    prediction_error_valid: bool,
     unified_psi: f64,
     prediction_confidence: f64,
     total_cycles: usize,
@@ -533,10 +557,12 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
             if total_cycles % 11 == 0 {
                 use crate::consciousness::harmonics::FiduciaryHarmonic;
                 field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
-                field.set_level(
-                    FiduciaryHarmonic::EvolutionaryProgression,
-                    (prediction_error as f64 * 2.0).clamp(0.0, 1.0),
-                );
+                if prediction_error_valid && prediction_error.is_finite() {
+                    field.set_level(
+                        FiduciaryHarmonic::EvolutionaryProgression,
+                        (prediction_error as f64 * 2.0).clamp(0.0, 1.0),
+                    );
+                }
                 field.set_level(FiduciaryHarmonic::IntegralWisdom, prediction_confidence);
                 field.set_level(
                     FiduciaryHarmonic::PanSentientFlourishing,

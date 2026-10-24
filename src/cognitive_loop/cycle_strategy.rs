@@ -53,20 +53,12 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) compressed_state: Vec<f32>,
     pub(crate) soul_alignment: f32,
     pub(crate) phi_attention_weight: f32,
-    pub(crate) surprise_triggered: bool,
-    pub(crate) exploration_action: Option<String>,
     pub(crate) memo_threshold: f32,
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
     pub(crate) effective_threshold: f32,
-    pub(crate) urgency: super::CycleUrgency,
-    pub(crate) error_pattern: &'static str,
-    pub(crate) predicted_urgency: &'static str,
-    pub(crate) prediction_coherence_urgency_bias: f32,
     pub(crate) prediction_error: f32,
     pub(crate) temporal_binding_strength: f32,
-    pub(crate) error_slope: f32,
-    pub(crate) oscillation_ratio: f32,
 }
 
 impl CognitiveLoopService {
@@ -275,11 +267,9 @@ impl CognitiveLoopService {
     /// - BinaryHV cache (real_hv_to_hv16)
     /// - Soul alignment evaluation (Eight Harmonies)
     /// - Phi-guided attention gating
-    /// - Surprise-driven exploration
     /// - Codebook diversity → memoization threshold adaptation
     /// - Input similarity memoization (Tulving & Schacter 1990)
     /// - Unified Ethics Engine evaluation
-    /// - Adaptive learning threshold + urgency computation
     pub(super) fn run_encoding_and_preprocessing(
         &mut self,
         input: &str,
@@ -287,8 +277,10 @@ impl CognitiveLoopService {
     ) -> EncodingPhaseResult {
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
-        let mut encoding_result = self.encoder.encode(input);
+        let mut encoding_result = self.encoder.encode_at(input, self.stats.total_cycles as u64);
         let prediction_error = encoding_result.prediction_error;
+        let prediction_error_valid = self.encoder.last_prediction_degeneracy()
+            == symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine;
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
         // Surface degenerate prediction errors: PE=1.0 from an empty/zero-norm
@@ -481,9 +473,9 @@ impl CognitiveLoopService {
         };
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 1.1 Surprise-Driven Exploration
+        // 1.1–1.2 Perception-owned exploration and urgency updates run in
+        // cycle_phase_perception.rs exactly once after encoding is finalized.
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
         let compressed_state: Vec<f32> = {
             let raw: Vec<f32> = self
                 .encoder
@@ -496,7 +488,7 @@ impl CognitiveLoopService {
             // amplify dimensions that differ most from last prediction.
             // Feldman & Friston (2010): precision-weighted prediction errors
             // gate information flow at the dimension level.
-            if prediction_error > SURPRISE_PE_THRESHOLD {
+            if prediction_error_valid && prediction_error > SURPRISE_PE_THRESHOLD {
                 if let Some(ref last_pred) = self.last_prediction {
                     if last_pred.len() == raw.len() {
                         let pred_slice = last_pred.as_slice();
@@ -571,10 +563,6 @@ impl CognitiveLoopService {
         } else {
             compressed_state
         };
-
-        let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&compressed_state);
-        module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
@@ -890,31 +878,16 @@ impl CognitiveLoopService {
             self.stats.value_gate_applied_count += 1;
         }
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // 1.2 Adaptive Learning Threshold + Urgency
-        // ═══════════════════════════════════════════════════════════════════════
-        // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
-        let confidence_scale = (1.0
-            + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
-                * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
-        let exploration_scale = (1.0
-            - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
-                * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
+        // Urgency and surprise are stateful perception outputs; the perception
+        // orchestrator owns their single update per cycle.
         let effective_threshold = self.config.learning_threshold
             * self.carryover.learning.adaptive_threshold_scale as f32
-            * confidence_scale
-            * exploration_scale;
-        let urgency_result = self.compute_urgency_and_error_pattern(
-            prediction_error,
-            surprise_triggered,
-            effective_threshold,
-        );
-        let urgency = urgency_result.urgency;
-        let error_pattern = urgency_result.error_pattern;
-        let predicted_urgency = urgency_result.predicted_urgency;
-        let prediction_coherence_urgency_bias = urgency_result.prediction_coherence_urgency_bias;
-        let error_slope = urgency_result.error_slope;
-        let oscillation_ratio = urgency_result.oscillation_ratio;
+            * (1.0
+                + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
+                    * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32
+            * (1.0
+                - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
+                    * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
 
         EncodingPhaseResult {
             encoding_result,
@@ -922,20 +895,12 @@ impl CognitiveLoopService {
             compressed_state,
             soul_alignment,
             phi_attention_weight,
-            surprise_triggered,
-            exploration_action,
             memo_threshold,
             input_similarity,
             input_memoized,
             effective_threshold,
-            urgency,
-            error_pattern,
-            predicted_urgency,
-            prediction_coherence_urgency_bias,
             prediction_error,
             temporal_binding_strength,
-            error_slope,
-            oscillation_ratio,
         }
     }
 }
@@ -1090,4 +1055,103 @@ mod tests {
         let result = svc.run_strategy_selection(false);
         assert!(!result.social_strategy_bias);
     }
+
+    #[test]
+    fn text_cycle_feeds_back_prediction_with_exact_source_cycle() {
+        let mut svc = make_service();
+        let first = svc.cycle("close the HDC LTC prediction loop");
+        assert_eq!(
+            svc.encoder.prediction_cycle(),
+            Some(svc.stats.total_cycles as u64),
+            "output phase must tag the prediction with its producer cycle"
+        );
+        assert!(!first.prediction_error_valid, "cold start has no prior prediction");
+
+        let second = svc.cycle("observe after one valid prediction step");
+        assert_eq!(
+            svc.encoder.last_compared_prediction_cycle(),
+            Some((svc.stats.total_cycles - 1) as u64),
+            "encoder must compare against the immediately preceding cycle only"
+        );
+        assert_eq!(
+            second
+                .metadata
+                .prediction_evidence
+                .as_ref()
+                .expect("typed PE telemetry")
+                .observation_cycle,
+            svc.stats.total_cycles as u64
+        );
+        assert_eq!(
+            svc.encoder.prediction_cycle(),
+            Some(svc.stats.total_cycles as u64),
+            "the new prediction must be tagged for the next cycle"
+        );
+    }
+
+    #[test]
+    fn service_reset_clears_encoder_prediction_provenance() {
+        let mut svc = make_service();
+        let _ = svc.cycle("seed prediction before reset");
+        assert_eq!(svc.encoder.prediction_cycle(), Some(svc.stats.total_cycles as u64));
+
+        svc.reset();
+
+        assert_eq!(svc.encoder.prediction_cycle(), None);
+        assert_eq!(svc.encoder.last_compared_prediction_cycle(), None);
+        let after_reset = svc.cycle("first observation after reset");
+        assert!(!after_reset.prediction_error_valid);
+        assert_eq!(
+            after_reset
+                .metadata
+                .prediction_evidence
+                .as_ref()
+                .expect("typed PE telemetry")
+                .status,
+            crate::cognitive_loop::types::PredictionEvidenceStatus::NoPriorPrediction
+        );
+    }
+
+    #[test]
+    fn invalid_prediction_sentinels_do_not_enter_cycle_evidence_histories() {
+        let mut svc = make_service();
+
+        // Cold start has no prior prediction. Its public PE stays compatible,
+        // but it must not enter stateful histories or replay as an observation.
+        let first = svc.cycle("invalid PE bootstrap regression");
+        assert_eq!(first.prediction_error, 1.0);
+        assert!(!first.prediction_error_valid);
+        assert!(svc.carryover.history.error_history.is_empty());
+        assert!(svc.error_history.is_empty());
+        assert_eq!(svc.stats.avg_prediction_error, 0.0);
+        assert!(svc.buffer.is_empty());
+
+        // Force an explicitly present zero-norm prediction on the next cycle.
+        svc.encoder.set_prediction_at(
+            vec![0.0; svc.config.cfc_config.input_dim],
+            svc.stats.total_cycles as u64,
+        );
+        let second = svc.cycle("invalid PE zero norm regression");
+        assert_eq!(second.prediction_error, 1.0);
+        assert!(!second.prediction_error_valid);
+        assert!(svc.carryover.history.error_history.is_empty());
+        assert!(svc.error_history.is_empty());
+        assert_eq!(svc.stats.avg_prediction_error, 0.0);
+        assert!(svc.buffer.is_empty());
+    }
+
+    #[test]
+    fn urgency_error_history_advances_once_per_cognitive_cycle() {
+        let mut svc = make_service();
+        assert!(svc.carryover.history.error_history.is_empty());
+
+        let _ = svc.cycle("single perception update regression");
+
+        assert_eq!(
+            svc.carryover.history.error_history.len(),
+            1,
+            "encoding must not update urgency history before the perception phase owns it"
+        );
+    }
+
 }
