@@ -8,6 +8,12 @@
 
 use core::fmt;
 
+/// Maximum oscillator-step cells retained by the in-memory trajectory trace.
+///
+/// This explicit ceiling bounds trace memory; use a future streaming sink for
+/// larger workloads rather than silently allocating an unbounded history.
+pub const MAX_PHOTONIC_TRAJECTORY_CELLS: usize = 1_000_000;
+
 /// Validated numerical parameters for the phase-quadrature update.
 ///
 /// Couplings use a symmetric row-major matrix with an exactly zero diagonal.
@@ -145,6 +151,15 @@ pub enum PhotonicDynamicsError {
         /// Element index.
         index: usize,
     },
+    /// Requested trajectory exceeds the bounded in-memory trace budget.
+    TrajectoryLimitExceeded {
+        /// Requested round-trip count.
+        steps: usize,
+        /// Number of oscillators in the configured model.
+        vertex_count: usize,
+        /// Maximum permitted product of steps and oscillators.
+        maximum_cells: usize,
+    },
     /// Schedule time is negative, non-finite, or cannot be normalized safely.
     InvalidScheduleTime {
         /// Supplied time value.
@@ -208,6 +223,14 @@ impl fmt::Display for PhotonicDynamicsError {
             Self::NonFiniteState { name, index } => {
                 write!(f, "{name}[{index}] is non-finite")
             }
+            Self::TrajectoryLimitExceeded {
+                steps,
+                vertex_count,
+                maximum_cells,
+            } => write!(
+                f,
+                "trajectory request {steps} x {vertex_count} exceeds the {maximum_cells}-cell trace limit"
+            ),
             Self::InvalidScheduleTime { value } => {
                 write!(f, "schedule time {value} must be finite, non-negative, and safely normalizable")
             }
@@ -516,6 +539,20 @@ impl PhotonicDynamicsConfig {
         steps: usize,
     ) -> Result<Vec<QuadratureStep>, PhotonicDynamicsError> {
         self.validate_state(initial_state)?;
+        let trajectory_cells = steps.checked_mul(self.vertex_count).ok_or(
+            PhotonicDynamicsError::TrajectoryLimitExceeded {
+                steps,
+                vertex_count: self.vertex_count,
+                maximum_cells: MAX_PHOTONIC_TRAJECTORY_CELLS,
+            },
+        )?;
+        if trajectory_cells > MAX_PHOTONIC_TRAJECTORY_CELLS {
+            return Err(PhotonicDynamicsError::TrajectoryLimitExceeded {
+                steps,
+                vertex_count: self.vertex_count,
+                maximum_cells: MAX_PHOTONIC_TRAJECTORY_CELLS,
+            });
+        }
         let mut state = initial_state.clone();
         let mut trace = Vec::with_capacity(steps);
 
@@ -718,6 +755,17 @@ mod tests {
         assert!(trace[3].transition_coefficient > trace[2].transition_coefficient);
         assert_eq!(trace[0].next_state.previous_x, initial.x);
         assert_eq!(trace[1].next_state.previous_x, trace[0].next_state.x);
+    }
+
+    #[test]
+    fn trajectory_refuses_unbounded_trace_allocation() {
+        let model = two_spin_config();
+        let initial = state(&[0.0, 1.0], &[0.0, 2.0], &[0.0, 0.0], &[0.0, 0.0]);
+        let steps = MAX_PHOTONIC_TRAJECTORY_CELLS / model.vertex_count() + 1;
+        assert!(matches!(
+            model.run_trajectory(&initial, &TransitionSchedule::PureXy, steps),
+            Err(PhotonicDynamicsError::TrajectoryLimitExceeded { .. })
+        ));
     }
 
     #[test]
