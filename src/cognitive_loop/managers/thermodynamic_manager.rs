@@ -148,9 +148,10 @@ impl CognitiveSubsystem for ThermodynamicManager {
         self.input.coherence = snapshot.coherence;
         // Hold the last admitted PE rather than converting a missing comparison
         // into either a maximum-energy event or an invented zero observation.
-        let prediction_error_sample = self
-            .prediction_error_cursor
-            .admit(snapshot.cycle_number, snapshot.prediction_error_sample());
+        let prediction_error_sample = self.prediction_error_cursor.admit_evidence(
+            &snapshot.prediction_error_evidence(),
+            snapshot.cycle_number,
+        );
         if let Some(prediction_error) = prediction_error_sample {
             self.input.prediction_error = prediction_error;
         }
@@ -242,6 +243,70 @@ mod tests {
         manager.process(&snapshot);
         assert!(manager.input.prediction_error_valid);
         assert_eq!(manager.input.prediction_error, 0.6);
+    }
+
+    #[test]
+    fn typed_invalid_and_non_finite_evidence_preserve_last_numeric_value_without_charging_it() {
+        let mut manager = ThermodynamicManager::default();
+        let mut snapshot = CycleSnapshot::default();
+        snapshot.cycle_number = 50;
+        snapshot.prediction_error = 0.4;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        assert!(manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.4);
+
+        // Noncanonical validity flag is observed but is not a PE admission.
+        snapshot.cycle_number = 51;
+        snapshot.prediction_error = 0.9;
+        snapshot.prediction_error_valid = 2;
+        manager.process(&snapshot);
+        assert!(!manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.4);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(51)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(50)
+        );
+
+        // A same-cycle finite retry can recover.
+        snapshot.prediction_error = 0.6;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        assert!(manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.6);
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(51)
+        );
+
+        // A non-finite payload marked valid is also rejected without replacing
+        // the retained diagnostic number or being charged as a fresh sample.
+        snapshot.cycle_number = 52;
+        snapshot.prediction_error = f32::NAN;
+        manager.process(&snapshot);
+        assert!(!manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.6);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(52)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(51)
+        );
+
+        snapshot.prediction_error = 0.7;
+        manager.process(&snapshot);
+        assert!(manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.7);
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(52)
+        );
     }
 
     #[test]
