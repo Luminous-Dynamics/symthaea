@@ -69,7 +69,8 @@ pub struct ArmObservation {
     pub adaptation_cost_units: f64,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ArmUtilityMetrics {
     pub name: String,
     pub version: String,
@@ -91,7 +92,8 @@ pub struct ArmUtilityMetrics {
     pub total_adaptation_cost_units: f64,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct CounterfactualUtilityScore {
     pub metric_version: String,
     pub canonical_input_sha256: String,
