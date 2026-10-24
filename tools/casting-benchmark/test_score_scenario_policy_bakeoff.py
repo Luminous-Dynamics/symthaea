@@ -37,6 +37,16 @@ class ScenarioPolicyReplayScorerTests(unittest.TestCase):
             design_count=75,
             bootstrap_samples=100,
         )
+        cls.custom_cost_result = run_policy_sweep(
+            scenario_ids=("smooth_stationary",),
+            dimensions=(2,),
+            severities=(1.0,),
+            seeds=(17,),
+            cost_budget=400,
+            fidelity_costs={"low": 1, "medium": 10, "high": 50},
+            design_count=75,
+            bootstrap_samples=100,
+        )
         cls.source_hashes = {"test/source.py": "a" * 64}
         cls.input_hash = "b" * 64
 
@@ -138,6 +148,31 @@ class ScenarioPolicyReplayScorerTests(unittest.TestCase):
         result["cost_budget"] = ["200"]
         _, errors = self._score(result)
         self.assertTrue(any("top-level cost_budget must be a positive integer" in error for error in errors))
+
+    def test_custom_cost_schedule_replays_adaptive_allocation(self) -> None:
+        receipt, errors = self._score(self.custom_cost_result)
+        self.assertEqual(errors, [])
+        self.assertEqual(receipt["run_count"], 5)
+        adaptive = next(row for row in receipt["scored_runs"] if row["policy"] == "adaptive_budget")
+        self.assertEqual(adaptive["fidelity_evaluations"], {"low": 75, "medium": 8, "high": 4})
+        self.assertEqual(adaptive["cost_spent"], 355)
+        self.assertEqual(adaptive["unused_cost"], 45)
+
+    def test_boolean_count_value_is_not_accepted_as_integer(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["paired_runs"][0]["fidelity_evaluations"]["low"] = True
+        _, errors = self._score(result)
+        self.assertTrue(any("must map low/medium/high to non-negative integers" in error
+                            for error in errors))
+
+    def test_underbudget_adaptive_trace_is_rejected_without_crashing(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["cost_budget"] = 1
+        for row in result["paired_runs"]:
+            row["cost_budget"] = 1
+        _, errors = self._score(result)
+        self.assertTrue(any("budget overrun" in error or "policy call template cannot be satisfied" in error
+                            for error in errors))
 
     def test_unknown_run_fields_fail_closed(self) -> None:
         result = copy.deepcopy(self.result)
