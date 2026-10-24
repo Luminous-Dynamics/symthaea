@@ -89,6 +89,18 @@ class BaselineLockValidatorTests(unittest.TestCase):
         manifest["method_pins"][0]["source_blob_sha1"] = "bad"
         self.assertTrue(any("source_blob_sha1" in error for error in validate_lock(manifest)))
 
+    def test_method_pin_must_match_candidate_release(self) -> None:
+        manifest = load_manifest()
+        manifest["method_pins"][0]["source_commit"] = "e" * 40
+        self.assertTrue(any("source_commit must match candidate_release.source_commit" in error
+                            for error in validate_lock(manifest)))
+
+    def test_unlocked_source_pin_cannot_claim_execution_eligibility(self) -> None:
+        manifest = load_manifest()
+        manifest["method_pins"][0]["execution_eligible"] = True
+        self.assertTrue(any("cannot be execution-eligible while its environment is unlocked" in error
+                            for error in validate_lock(manifest)))
+
     def test_unknown_keys_fail_closed(self) -> None:
         manifest = load_manifest()
         manifest["trust_me"] = True
