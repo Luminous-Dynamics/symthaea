@@ -255,8 +255,13 @@ def _validate_and_score_run(
         if not _finite_number(evaluation["constraint_margin"]):
             errors.append(f"{row_label} constraint_margin must be finite")
             continue
-        if isinstance(evaluation["cost_units"], bool) or not isinstance(evaluation["cost_units"], int) or evaluation["cost_units"] != fidelity_costs[fidelity]:
+        if (
+            isinstance(evaluation["cost_units"], bool)
+            or not isinstance(evaluation["cost_units"], int)
+            or evaluation["cost_units"] != fidelity_costs[fidelity]
+        ):
             errors.append(f"{row_label} cost_units does not match the locked fidelity cost")
+            continue
         key = (candidate_id, fidelity)
         if key in seen:
             errors.append(f"duplicate candidate/fidelity evaluation: {key}")
