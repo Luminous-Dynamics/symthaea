@@ -868,12 +868,12 @@ mod tests {
         let plan = solve_exact(&scenario).unwrap();
         let report = VerificationReport {
             status: VerificationStatus::Rejected,
-            violations: vec!["stale \\"revision\\"\\nblocked".into()],
+            violations: vec!["stale \"revision\"\nblocked".into()],
             recomputed_cost: None,
         };
         let manifest = RunManifest::from_run(&scenario, 0, &plan, &report);
         let json = manifest.to_json();
-        assert!(json.contains("\\\\\\"revision\\\\\\\""));
-        assert!(json.contains("\\\\n"));
+        assert!(json.contains("\\\"revision\\\""));
+        assert!(json.contains("\\n"));
     }
 }
