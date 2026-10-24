@@ -1090,16 +1090,16 @@ fn confidence_derived_predictive_ambiguity_abstains_when_calibration_is_insuffic
     assert!((current_risk - 15.5128).abs() <= EPSILON);
 
     let expected_worst_future = [15.5348512, 15.7774144, 15.6010048];
-    for class_index in 0..3 {
+    for (class_index, expected_worst) in expected_worst_future.iter().enumerate() {
         let outcome_risks = future_policy_risks_by_calibration_outcome(
             counts, class_index, PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
-        ).expect("valid candidate class");
+        )
+        .expect("valid candidate class");
         let worst_future = worst_case_predictive_future_risk(outcome_risks, regions[class_index])
             .expect("nonempty confidence-derived predictive region");
         assert!(
-            (worst_future - expected_worst_future[class_index]).abs() <= EPSILON,
-            "class {class_index}: expected {}, got {worst_future}",
-            expected_worst_future[class_index]
+            (worst_future - expected_worst).abs() <= EPSILON,
+            "class {class_index}: expected {expected_worst}, got {worst_future}"
         );
         assert!(
             worst_future >= current_risk,
