@@ -1,11 +1,11 @@
 schema=morphology-class-conditional-robust-evidence-request/v1.0
 parent_request_sha256=4f68fc455cebdff3c6e11d1a0e6292f6f119a89715345b983bc26704e8924312
 purpose=derive-a-simultaneous-class-conditional-confusion-matrix-region-and-bound-deployed-policy-risk
-claim_ceiling=finite-synthetic-reference-oracle-under-IID-class-conditional-calibration;no-distribution-shift-guarantee;no-real-sensor-validation
+claim_ceiling=finite-synthetic-reference-oracle-under-IID-class-conditional-calibration;Wilson-coverage-is-approximate;no-distribution-shift-guarantee;no-real-sensor-validation
 
 calibration_model=within-each-known-ground-truth-class-independent-identically-distributed-categorical-outcomes
 cell_intervals=two-sided-Wilson-marginal-binomial
-familywise_coverage_target=0.95
+nominal_familywise_coverage_target=0.95
 multiplicity=Bonferroni-over-nine-confusion-matrix-cells
 normal_quantile=2.772921294608662
 rounding=outward-to-integer-per-mille-bounds
@@ -55,5 +55,5 @@ invalid-confusion-matrix-row-sum=reject
 non-finite-or-negative-acquisition-cost=reject
 impossible-assumed-observation=use-safe-hold
 
-interpretation-limit=Bonferroni-Wilson-cell-intervals-provide-at-least-95-percent-simultaneous-coverage-under-the-stated-IID-model;the-confidence-region-does-not-cover-distribution-shift-or-dependent-calibration-samples
+interpretation-limit=nominal-Bonferroni-Wilson-simultaneous-region;Wilson-coverage-is-approximate-in-finite-samples-and-does-not-guarantee-at-least-95-percent-for-every-n;the-region-does-not-cover-distribution-shift-or-dependent-calibration-samples
 industry-comparison=report-policy-regret-coverage-and-cost-on-shared-held-out-scenarios;no-SOTA-claim-from-this-synthetic-fixture
