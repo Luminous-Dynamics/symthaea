@@ -38,7 +38,7 @@ struct PredictionErrorEvidence {
 }
 ```
 
-The typed migration layer now exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. Prediction-cycle provenance remains optional during migration, and this layer does not yet force every PE consumer to accept the new type. Remaining enforcement goals are:
+The typed migration layer exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. The shared `CycleState` now carries only typed PE evidence—its parallel numeric/boolean fields have been removed—and urgency, surprise exploration, episodic replay, dream consolidation, subsystem feedback, and consciousness feedback consume evidence bound to the current observation cycle. `CycleMetadata.prediction_evidence` exposes status and cycle provenance without raw input vectors. Some interfaces outside this shared phase boundary still use compatibility fields and remain migration targets. Remaining enforcement goals are:
 
 - Only `Valid` may expose a PE value to learning, confidence, surprise, safety assessment, replay, or thermodynamic PE consumers.
 - Missing PE never means zero error, maximum error, or “repeat the last value as a fresh sample.”
@@ -98,7 +98,7 @@ For stream-learning experiments also report per-step task performance, forward/b
 
 ### Typed-contract regression checks
 
-The new typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Keep these separate from the 12 core PEV scenarios so a passing type-contract test cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
+The typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Consumer-focused tests cover stale and missing evidence in urgency and surprise paths; existing replay invariance cases remain part of the broader integration contract. An output test also checks that public telemetry status agrees with the compatibility validity bit and records the observation cycle. Keep these separate from the 12 core PEV scenarios so passing type-contract tests cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
 
 ## 5. Experimental protocol
 
@@ -121,7 +121,7 @@ Continual Learning Bench evaluates sequential related tasks and reports both tas
 
 A 2026 ICLR study, *Forget Forgetting*, also reports that in a regime with abundant replay memory but limited GPU time, the central tension may shift from memory efficiency to plasticity; simple replay can beat more complicated approaches at lower GPU cost. That cautions against assuming that more subsystems or more sophisticated memory automatically outperform a simple baseline: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/17fc58b1ba92abbb72c5f457e140d851-Abstract-Conference.html).
 
-For systems performance, MLPerf Training measures time to a defined quality target and documents run-to-run variation, rather than treating an isolated throughput number as a complete comparison: [MLPerf Training](https://mlcommons.org/benchmarks/training/).
+For systems performance, MLPerf Training measures time to a defined quality target and documents run-to-run variation, rather than treating an isolated throughput number as a complete comparison: [MLPerf Training](https://mlcommons.org/benchmarks/training/). The September 2026 v6.1 LLM post-training benchmark applies this to an agentic software-engineering workload, reporting wall-clock time to a fixed pass@4 target; it is a model for time-to-quality accounting, not a direct target for this evidence-integrity patch: [MLPerf Training v6.1 post-training announcement](https://mlcommons.org/2026/09/mlperf-training-llm-post-training/).
 
 ## 7. Acceptance policy
 
