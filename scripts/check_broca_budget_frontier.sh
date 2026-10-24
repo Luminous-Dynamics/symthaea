@@ -117,10 +117,10 @@ if ! jq -s -e \
   | if any($rows[]; (.regret | is_num | not) or (.net_utility | is_num | not) or (.oracle_net_utility | is_num | not) or .regret < -0.000001 or (.oracle_net_utility - .net_utility) < -0.000001) then error("invalid oracle regret/net-utility relation") else . end
   | if any($rows[]; (.synthetic_query_score | is_num | not) or .synthetic_query_score < 0 or .synthetic_query_score > 1 or (.load_bearing_coverage | is_num | not) or .load_bearing_coverage < 0 or .load_bearing_coverage > 1) then error("synthetic score/coverage outside [0,1]") else . end
   | if any($rows[]; (.stored_candidates | type) != "number" or .stored_candidates < 0 or .stored_candidates > $run.candidate_count or (.bad_promoted | type) != "number" or .bad_promoted < 0) then error("invalid candidate-count metric") else . end
-  | if any($rows[] | select(.policy == "oracle_diagnostic"); (.regret | close_to_zero)) | not then error("oracle diagnostic regret is nonzero") else . end
-  | if any($rows[] | select(.policy == "no_memory"); .used_tokens == 0 and .stored_candidates == 0 and (.net_utility | close_to_zero) and (.task_utility | close_to_zero) | not) then error("no_memory arm is not an empty-memory zero-utility control") else . end
-  | if any($rows[] | select(.policy == "always_raw" and .budget_tokens == 8192); .used_tokens == $run.raw_token_demand and .stored_candidates == $run.candidate_count | not) then error("raw-fit upper-budget control did not retain all raw candidates") else . end
-  | if any($rows[] | select(.policy == "promote_everything" and .budget_tokens == 8192); .bad_promoted > 0 | not) then error("promote_everything anti-control did not expose unsafe promotion") else . end
+  | if any($rows[] | select(.policy == "oracle_diagnostic"); ((.regret | close_to_zero) | not)) then error("oracle diagnostic regret is nonzero") else . end
+  | if any($rows[] | select(.policy == "no_memory"); (.used_tokens != 0 or .stored_candidates != 0 or ((.net_utility | close_to_zero) | not) or ((.task_utility | close_to_zero) | not))) then error("no_memory arm is not an empty-memory zero-utility control") else . end
+  | if any($rows[] | select(.policy == "always_raw" and .budget_tokens == 8192); (.used_tokens != $run.raw_token_demand or .stored_candidates != $run.candidate_count)) then error("raw-fit upper-budget control did not retain all raw candidates") else . end
+  | if any($rows[] | select(.policy == "promote_everything" and .budget_tokens == 8192); .bad_promoted <= 0) then error("promote_everything anti-control did not expose unsafe promotion") else . end
   | true
 ' "$REPORT" >/dev/null; then
   echo "FAIL: JSONL frontier integrity or policy/budget invariants did not pass" >&2
