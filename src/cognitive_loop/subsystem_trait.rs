@@ -4,6 +4,8 @@
 // Scaffolded for upcoming wiring — callers not yet connected
 #![allow(dead_code)]
 
+use super::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
+
 //! # CognitiveSubsystem Trait — WASM-Ready Subsystem Interface
 //!
 //! Universal interface for cognitive subsystems within the cognitive loop.
@@ -257,20 +259,35 @@ impl CycleSnapshot {
         self.attention_budget_exceeded != 0
     }
 
-    /// Read prediction error only when the ABI validity byte is canonical
-    /// and the measurement is finite. This is the sole safe accessor for
-    /// consumers of the legacy repr(C) snapshot fields.
+    /// Convert the legacy ABI fields into typed evidence at the subsystem boundary.
     ///
-    /// The snapshot layout intentionally remains unchanged for WASM/FFI
-    /// compatibility; consumers should use this method instead of reading
-    /// `prediction_error` and `prediction_error_valid` independently.
+    /// The repr(C) layout remains unchanged. Since the ABI carries no source-cycle
+    /// field, this adapter records the observation cycle and leaves prediction-cycle
+    /// provenance unknown; upstream typed paths should retain richer provenance.
+    /// Non-canonical validity bytes and non-finite values remain explicitly invalid.
+    #[inline]
+    pub fn prediction_error_evidence(&self) -> PredictionErrorEvidence {
+        let status = match self.prediction_error_valid {
+            1 if self.prediction_error.is_finite() => PredictionEvidenceStatus::Valid,
+            1 => PredictionEvidenceStatus::NonFiniteInput,
+            _ => PredictionEvidenceStatus::InvalidValidityFlag,
+        };
+        PredictionErrorEvidence::from_comparison(
+            status,
+            Some(self.prediction_error),
+            None,
+            self.cycle_number,
+        )
+    }
+
+    /// Compatibility accessor for callers that still require an `Option<f32>`.
+    ///
+    /// New PE-dependent consumers should prefer `prediction_error_evidence()` so
+    /// status and observation provenance travel with the measurement.
     #[inline]
     pub fn prediction_error_sample(&self) -> Option<f32> {
-        if self.prediction_error_valid == 1 && self.prediction_error.is_finite() {
-            Some(self.prediction_error)
-        } else {
-            None
-        }
+        self.prediction_error_evidence()
+            .value_for_observation(self.cycle_number)
     }
 }
 
@@ -1378,5 +1395,47 @@ mod tests {
         assert!((output.confidence_delta - 0.01).abs() < 1e-10);
         assert_eq!(sub.fire_count, 1);
         assert!(!health.is_faulted("mock"));
+    }
+}
+
+
+#[cfg(test)]
+mod typed_prediction_evidence_snapshot_tests {
+    use super::{CycleSnapshot, PredictionEvidenceStatus};
+
+    #[test]
+    fn snapshot_boundary_preserves_invalidity_and_cycle_provenance() {
+        let mut snapshot = CycleSnapshot::default();
+        snapshot.cycle_number = 24;
+        snapshot.prediction_error = 0.75;
+        snapshot.prediction_error_valid = 1;
+
+        let valid = snapshot.prediction_error_evidence();
+        assert_eq!(valid.status(), PredictionEvidenceStatus::Valid);
+        assert_eq!(valid.observation_cycle(), 24);
+        assert_eq!(valid.prediction_cycle(), None);
+        assert_eq!(valid.value_for_observation(24), Some(0.75));
+        assert_eq!(valid.value_for_observation(25), None);
+
+        for invalid_flag in [0, 2, 255] {
+            snapshot.prediction_error_valid = invalid_flag;
+            let evidence = snapshot.prediction_error_evidence();
+            assert_eq!(evidence.status(), PredictionEvidenceStatus::InvalidValidityFlag);
+            assert_eq!(evidence.value_for_observation(24), None);
+        }
+    }
+
+    #[test]
+    fn snapshot_boundary_rejects_non_finite_even_when_flag_is_valid() {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut snapshot = CycleSnapshot::default();
+            snapshot.cycle_number = 8;
+            snapshot.prediction_error = value;
+            snapshot.prediction_error_valid = 1;
+
+            let evidence = snapshot.prediction_error_evidence();
+            assert_eq!(evidence.status(), PredictionEvidenceStatus::NonFiniteInput);
+            assert_eq!(evidence.value_for_observation(8), None);
+        }
     }
 }
