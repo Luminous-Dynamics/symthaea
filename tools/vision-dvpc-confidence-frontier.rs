@@ -473,13 +473,13 @@ fn classify(receipt: &Receipt, bands: &Bands) -> Vec<Classified> {
         certified_dominators.sort();
         possible_dominators.sort();
         let (status, reason, dominated_by) = if let Some(first) = certified_dominators.first() {
-            ("CERTIFIED_DOMINATED", "SIMULTANEOUS_UTILITY_BANDS_AND_RESOURCES_ESTABLISH_DOMINANCE", first.clone())
-        } else if let Some(first) = equivalent_predecessor {
-            ("DUPLICATE_EQUIVALENT", "IDENTICAL_INTERVALS_AND_RESOURCE_VALUES;LEXICOGRAPHIC_REPRESENTATIVE_RETAINED", first)
+            ("BAND_DOMINATED", "SIMULTANEOUS_UTILITY_BANDS_AND_RESOURCES_ESTABLISH_DOMINANCE", first.clone())
         } else if !possible_dominators.is_empty() {
             ("UNRESOLVED", "POTENTIAL_DOMINATOR_CANNOT_BE_CONFIRMED_OR_EXCLUDED_FROM_INTERVALS", possible_dominators.join(";"))
+        } else if let Some(first) = equivalent_predecessor {
+            ("DUPLICATE_EQUIVALENT", "IDENTICAL_INTERVALS_AND_RESOURCE_VALUES;LEXICOGRAPHIC_REPRESENTATIVE_RETAINED", first)
         } else {
-            ("CERTIFIED_NONDOMINATED", "NO_ELIGIBLE_POINT_CAN_DOMINATE_UNDER_SUPPLIED_SIMULTANEOUS_BANDS", "-".to_owned())
+            ("BAND_NONDOMINATED", "NO_ELIGIBLE_POINT_CAN_DOMINATE_UNDER_SUPPLIED_SIMULTANEOUS_BANDS", "-".to_owned())
         };
         output.push(Classified { point: point.clone(), band, status, reason, dominated_by });
     }
@@ -531,8 +531,8 @@ fn analyze(
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tfamilywise_simultaneous\ttrue");
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tinterval_procedure_verified_here\tfalse");
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tupstream_safety_certificate_verified_here\tfalse");
-    let _ = writeln!(output, "CONFIDENCE_FRONTIER\tcertified_nondominated_count\t{}", status_count("CERTIFIED_NONDOMINATED"));
-    let _ = writeln!(output, "CONFIDENCE_FRONTIER\tcertified_dominated_count\t{}", status_count("CERTIFIED_DOMINATED"));
+    let _ = writeln!(output, "CONFIDENCE_FRONTIER\tband_nondominated_count\t{}", status_count("BAND_NONDOMINATED"));
+    let _ = writeln!(output, "CONFIDENCE_FRONTIER\tband_dominated_count\t{}", status_count("BAND_DOMINATED"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tunresolved_count\t{}", status_count("UNRESOLVED"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tduplicate_equivalent_count\t{}", status_count("DUPLICATE_EQUIVALENT"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tinfeasible_count\t{}", status_count("INFEASIBLE"));
@@ -605,29 +605,30 @@ mod tests {
         let frontier = specs.iter().filter(|s| s.status == "FEASIBLE_FRONTIER").count();
         let sweep_sha = SHA_A;
         let mut out = String::new();
-        for (k, v) in [
-            ("format", RECEIPT_VERSION),
-            ("status", PARETO_STATUS),
-            ("experiment_id", "synthetic-dvpc-018"),
-            ("dataset_id", "synthetic"),
-            ("dataset_revision", "fixture-v1"),
-            ("split", "test"),
-            ("utility_spec_sha256", SHA_A),
-            ("bundle_lock_sha256", SHA_B),
-            ("paired_unit_set_sha256", SHA_C),
-            ("sweep_input_sha256", sweep_sha),
-            ("policy_count", &policies.len().to_string()),
-            ("budget_point_count", &budgets.len().to_string()),
-            ("independent_clusters", "10"),
-            ("eligible_runs", &feasible.to_string()),
-            ("infeasible_runs", &infeasible.to_string()),
-            ("frontier_runs", &frontier.to_string()),
-            ("frontier_objectives", "MAXIMIZE_UTILITY_DELTA;MINIMIZE_ACTUAL_LATENCY;MINIMIZE_ACTUAL_ENERGY"),
-            ("scalarized_score", "NONE"),
-            ("upstream_risk_certificate_verified_here", "false"),
-            ("performance_claim", "NONE"),
-        ] {
-            let _ = writeln!(out, "PARETO\t{k}\t{v}");
+        let meta_rows: Vec<(String, String)> = vec![
+            ("format".to_owned(), RECEIPT_VERSION.to_owned()),
+            ("status".to_owned(), PARETO_STATUS.to_owned()),
+            ("experiment_id".to_owned(), "synthetic-dvpc-018".to_owned()),
+            ("dataset_id".to_owned(), "synthetic".to_owned()),
+            ("dataset_revision".to_owned(), "fixture-v1".to_owned()),
+            ("split".to_owned(), "test".to_owned()),
+            ("utility_spec_sha256".to_owned(), SHA_A.to_owned()),
+            ("bundle_lock_sha256".to_owned(), SHA_B.to_owned()),
+            ("paired_unit_set_sha256".to_owned(), SHA_C.to_owned()),
+            ("sweep_input_sha256".to_owned(), SHA_A.to_owned()),
+            ("policy_count".to_owned(), policies.len().to_string()),
+            ("budget_point_count".to_owned(), budgets.len().to_string()),
+            ("independent_clusters".to_owned(), "10".to_owned()),
+            ("eligible_runs".to_owned(), feasible.to_string()),
+            ("infeasible_runs".to_owned(), infeasible.to_string()),
+            ("frontier_runs".to_owned(), frontier.to_string()),
+            ("frontier_objectives".to_owned(), "MAXIMIZE_UTILITY_DELTA;MINIMIZE_ACTUAL_LATENCY;MINIMIZE_ACTUAL_ENERGY".to_owned()),
+            ("scalarized_score".to_owned(), "NONE".to_owned()),
+            ("upstream_risk_certificate_verified_here".to_owned(), "false".to_owned()),
+            ("performance_claim".to_owned(), "NONE".to_owned()),
+        ];
+        for (k, v) in meta_rows {
+            let _ = writeln!(out, "PARETO\\t{k}\\t{v}");
         }
         out.push_str("RESULT_HEADER\tbudget_point_id\tpolicy_id\tstatus\tutility_delta_vs_all_cheap\tactual_all_in_latency_us\tactual_all_in_energy_uj\tlatency_budget_us\tenergy_budget_uj\tallocator_latency_us\tallocator_energy_uj\treasons\tdominated_by\n");
         for s in specs {
@@ -639,24 +640,25 @@ mod tests {
     fn bands(pareto: &str, specs: &[(&str, &str, f64, f64)], simultaneous: &str) -> String {
         let pareto_sha = sha256_hex(pareto.as_bytes());
         let mut out = String::new();
-        for (k, v) in [
-            ("format", "VIS-DVPC-CONFIDENCE-BANDS-001-v1"),
-            ("experiment_id", "synthetic-dvpc-018"),
-            ("dataset_id", "synthetic"),
-            ("dataset_revision", "fixture-v1"),
-            ("split", "test"),
-            ("utility_spec_sha256", SHA_A),
-            ("bundle_lock_sha256", SHA_B),
-            ("paired_unit_set_sha256", SHA_C),
-            ("source_sweep_sha256", SHA_A),
-            ("source_pareto_receipt_sha256", &pareto_sha),
-            ("inference_receipt_sha256", SHA_C),
-            ("confidence_level", "0.95"),
-            ("familywise_simultaneous", simultaneous),
-            ("coverage_scope", "ALL_POLICY_BUDGET_POINTS"),
-            ("point_count", &specs.len().to_string()),
-        ] {
-            let _ = writeln!(out, "META\t{k}\t{v}");
+        let meta_rows: Vec<(String, String)> = vec![
+            ("format".to_owned(), "VIS-DVPC-CONFIDENCE-BANDS-001-v1".to_owned()),
+            ("experiment_id".to_owned(), "synthetic-dvpc-018".to_owned()),
+            ("dataset_id".to_owned(), "synthetic".to_owned()),
+            ("dataset_revision".to_owned(), "fixture-v1".to_owned()),
+            ("split".to_owned(), "test".to_owned()),
+            ("utility_spec_sha256".to_owned(), SHA_A.to_owned()),
+            ("bundle_lock_sha256".to_owned(), SHA_B.to_owned()),
+            ("paired_unit_set_sha256".to_owned(), SHA_C.to_owned()),
+            ("source_sweep_sha256".to_owned(), SHA_A.to_owned()),
+            ("source_pareto_receipt_sha256".to_owned(), pareto_sha),
+            ("inference_receipt_sha256".to_owned(), SHA_C.to_owned()),
+            ("confidence_level".to_owned(), "0.95".to_owned()),
+            ("familywise_simultaneous".to_owned(), simultaneous.to_owned()),
+            ("coverage_scope".to_owned(), "ALL_POLICY_BUDGET_POINTS".to_owned()),
+            ("point_count".to_owned(), specs.len().to_string()),
+        ];
+        for (k, v) in meta_rows {
+            let _ = writeln!(out, "META\\t{k}\\t{v}");
         }
         out.push_str("BAND_HEADER\tbudget_point_id\tpolicy_id\tutility_lcb\tutility_ucb\n");
         for (budget, policy, lower, upper) in specs {
