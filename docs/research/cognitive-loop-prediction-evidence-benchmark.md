@@ -1,6 +1,6 @@
 # Cognitive-loop prediction-evidence benchmark (PEV-1)
 
-**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 12-case consumer-level protocol remains outstanding.
+**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 13-case consumer-level protocol remains outstanding.
 
 ## 1. Research claim
 
@@ -28,6 +28,7 @@ enum PredictionEvidenceStatus {
     NonFiniteInput,
     StaleOrOutOfOrder,
     SourceUnavailable,
+    NotEvaluated,
 }
 
 struct PredictionErrorEvidence {
@@ -38,7 +39,7 @@ struct PredictionErrorEvidence {
 }
 ```
 
-The typed migration layer exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. The shared `CycleState` now carries only typed PE evidence—its parallel numeric/boolean fields have been removed—and urgency, surprise exploration, episodic replay, dream consolidation, subsystem feedback, and consciousness feedback consume evidence bound to the current observation cycle. `CycleMetadata.prediction_evidence` exposes status and cycle provenance without raw input vectors. Some interfaces outside this shared phase boundary still use compatibility fields and remain migration targets. Remaining enforcement goals are:
+The typed migration layer exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. The shared `CycleState` now carries only typed PE evidence—its parallel numeric/boolean fields have been removed—and urgency, surprise exploration, episodic replay, dream consolidation, subsystem feedback, and consciousness feedback consume evidence bound to the current observation cycle. Main text, embedding, pre-encoded-HV, and safety-precheck result paths now expose `CycleMetadata.prediction_evidence` with status and cycle provenance, without raw input vectors. `NotEvaluated` distinguishes a cycle intentionally gated before comparison from a source that failed to provide evidence. Some interfaces outside this shared phase boundary still use compatibility fields and remain migration targets. Remaining enforcement goals are:
 
 - Only `Valid` may expose a PE value to learning, confidence, surprise, safety assessment, replay, or thermodynamic PE consumers.
 - Missing PE never means zero error, maximum error, or “repeat the last value as a fresh sample.”
@@ -68,6 +69,7 @@ Each scenario should be replayed against the same initial state and deterministi
 | PEV-10 | Invalid PE after a queued plan/action | Do not evaluate its PE-based outcome yet; do not lose a pending outcome solely because the current observation is missing |
 | PEV-11 | Snapshot, serialization, or old record with missing validity field | Default conservatively to invalid; preserve ABI layout where promised and verify old-data migration |
 | PEV-12 | Long stream with task shifts and distractors | No false PE-driven reinforcement, forgetting, confidence inflation, or reactivation caused by an invalid sentinel |
+| PEV-13 | Cycle preempted before a prediction comparison (e.g., safety gate) | Report `NotEvaluated`; do not fabricate zero/high PE; preserve the independent preemption/safety decision |
 
 Where a subsystem is independent of PE, the expected result is not “no change to the entire system.” The invariant applies only to the PE-derived component; coherence, energy, explicit reward, sensory variance, and other valid signals remain eligible to change state.
 
