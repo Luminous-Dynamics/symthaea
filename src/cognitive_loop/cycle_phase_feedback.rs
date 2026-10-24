@@ -179,6 +179,12 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> FeedbackPhaseResult {
         let prediction_error = dynamics.core.prediction_error;
+        let prediction_error_valid = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64)
+            .is_some()
+            && prediction_error.is_finite();
         let coherence = dynamics.core.coherence;
         let unified_psi = dynamics.core.unified_psi;
 
@@ -799,7 +805,7 @@ impl CognitiveLoopService {
 
         let late_ctx = LateConsciousnessContext {
             prediction_error,
-            prediction_error_valid: perception.urgency.prediction_error_valid
+            prediction_error_valid: prediction_error_valid
                 && prediction_error.is_finite(),
             coherence,
             unified_psi,
@@ -1136,7 +1142,7 @@ impl CognitiveLoopService {
         // ── Knowledge Engine: PE → ontology learning rate ────────────────
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
         if let Some(ref mut km) = self.memory.knowledge_manager {
-            if perception.urgency.prediction_error_valid && prediction_error.is_finite() {
+            if prediction_error_valid && prediction_error.is_finite() {
                 km.set_ontology_lr_from_pe(prediction_error as f32);
             }
             // This separate coherence/Phi pathway remains active without a PE.
@@ -1511,7 +1517,7 @@ impl CognitiveLoopService {
         // Missing PE must not make zeroed/stale FEP surprise look like
         // perfect model confidence. Neutralize only this confidence component;
         // coherence, resonator, moral and MCTS evidence remain active.
-        let fep_confidence = if perception.urgency.prediction_error_valid
+        let fep_confidence = if prediction_error_valid
             && dynamics.fep.fep_surprise.is_finite()
         {
             (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32
