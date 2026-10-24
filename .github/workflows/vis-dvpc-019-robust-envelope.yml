@@ -1,0 +1,41 @@
+name: VIS-DVPC-019 robust operational envelope
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-robust-envelope.rs"
+      - "docs/research/VIS_DVPC_019_ROBUST_OPERATIONAL_ENVELOPE_V1.md"
+      - ".github/workflows/vis-dvpc-019-robust-envelope.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-robust-envelope.rs"
+      - "docs/research/VIS_DVPC_019_ROBUST_OPERATIONAL_ENVELOPE_V1.md"
+      - ".github/workflows/vis-dvpc-019-robust-envelope.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Compile and run robust-envelope tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-robust-envelope.rs -o /tmp/vis-dvpc-019-tests
+          /tmp/vis-dvpc-019-tests
+
+      - name: Build standalone analyzer
+        run: rustc --edition=2024 -O tools/vision-dvpc-robust-envelope.rs -o /tmp/vis-dvpc-019
+
+      - name: Check formatting after executable tests
+        if: always()
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-robust-envelope.rs
