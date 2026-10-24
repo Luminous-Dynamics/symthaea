@@ -131,6 +131,7 @@ jobs:
           cargo run --locked -p xtask -- score-counterfactual-adaptation-utility --input benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json --out "$RUNNER_TEMP/adaptation-utility.json"
           jq -e '
             .metric_version == "counterfactual-adaptation-utility-v2" and
+            .comparison_track == "valid-pe-only" and
             .dataset_id == "synthetic-fixture-not-measured" and
             .no_adapt.cycle_count == 4 and
             .detector_triggered.cycle_count == 4 and
@@ -163,6 +164,7 @@ jobs:
           cargo run --locked -p xtask -- score-counterfactual-adaptation-utility --input benchmarks/cognitive-loop-evidence/synthetic-counterfactual-no-impact.json --out "$RUNNER_TEMP/no-impact-adaptation-utility.json"
           jq -e '
             .metric_version == "counterfactual-adaptation-utility-v2" and
+            .comparison_track == "valid-pe-only" and
             .dataset_id == "synthetic-no-impact-fixture-not-measured" and
             .scenario_id == "nuisance-shift-no-task-impact-adaptation-harms" and
             .no_adapt.mean_task_loss == .oracle_timed.mean_task_loss and
