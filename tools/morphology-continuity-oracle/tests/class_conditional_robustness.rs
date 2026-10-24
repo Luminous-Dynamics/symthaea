@@ -505,6 +505,50 @@ fn robust_net_value_over_prior_uncertainty(
     ))
 }
 
+/// Baseline: sample the class with the largest sum of cell-interval widths.
+/// Ties deterministically keep the lowest class index.
+fn select_by_interval_width(counts: [[u64; 3]; 3]) -> Option<(usize, u32)> {
+    let mut best: Option<(usize, u32)> = None;
+    for (class_index, row) in counts.iter().enumerate() {
+        let total = row.iter().try_fold(0_u64, |sum, count| sum.checked_add(*count))?;
+        if total == 0 {
+            return None;
+        }
+        let mut width = 0_u32;
+        for count in row {
+            let interval = clopper_pearson_cell_interval(*count, total)?;
+            width = width.checked_add(u32::from(interval.upper - interval.lower))?;
+        }
+        if best.is_none_or(|(_, best_width)| width > best_width) {
+            best = Some((class_index, width));
+        }
+    }
+    best
+}
+
+/// Baseline: sample the class with the highest observed rate of errors under the assumed
+/// dominant outcome (chair -> outcome 0; table/stool -> outcome 1). Ties keep the first class.
+fn select_by_observed_task_error(counts: [[u64; 3]; 3]) -> Option<(usize, f64)> {
+    let mut best: Option<(usize, f64)> = None;
+    for (class_index, row) in counts.iter().enumerate() {
+        let total = row.iter().try_fold(0_u64, |sum, count| sum.checked_add(*count))?;
+        if total == 0 {
+            return None;
+        }
+        let dominant_outcome = if class_index == 0 { 0 } else { 1 };
+        let errors = row
+            .iter()
+            .enumerate()
+            .filter(|(outcome_index, _)| *outcome_index != dominant_outcome)
+            .try_fold(0_u64, |sum, (_, count)| sum.checked_add(*count))?;
+        let error_rate = errors as f64 / total as f64;
+        if best.is_none_or(|(_, best_rate)| error_rate > best_rate + EPSILON) {
+            best = Some((class_index, error_rate));
+        }
+    }
+    best
+}
+
 fn worst_policy_risk_from_counts(
     counts: [[u64; 3]; 3],
     weights: [u64; 3],
@@ -932,6 +976,52 @@ fn active_calibration_allocation_targets_the_class_with_highest_marginal_decisio
     ).expect("a positive-value next sample exists");
     assert_eq!(unequal_costs.0, 2, "lower stool-label cost changes the optimal acquisition");
     assert!((unequal_costs.1 - 0.40704).abs() <= EPSILON);
+}
+
+#[test]
+fn decision_value_allocation_beats_width_and_error_count_baselines_in_frozen_case() {
+    let counts = [[18, 2, 0], [1, 19, 0], [1, 19, 0]];
+    let width_baseline = select_by_interval_width(counts).expect("valid row intervals");
+    assert_eq!(width_baseline, (0, 1_071));
+
+    let error_baseline = select_by_observed_task_error(counts).expect("valid error rates");
+    assert_eq!(error_baseline.0, 0);
+    assert!((error_baseline.1 - 0.1).abs() <= EPSILON);
+
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed model");
+    let initial_risk = worst_policy_risk_from_counts(
+        counts,
+        PRIOR_WEIGHTS,
+        &DECISION_LOSSES,
+        actions,
+    )
+    .expect("valid confidence region");
+    assert!((initial_risk - 15.6808).abs() <= EPSILON);
+    let robust_selector = select_next_calibration_class(
+        counts,
+        assumed_sensor(),
+        PRIOR_WEIGHTS,
+        &DECISION_LOSSES,
+        actions,
+        [1.0, 1.0, 1.0],
+    )
+    .expect("positive expected value exists");
+    assert_eq!(robust_selector.0, 1);
+    assert!((robust_selector.1 - 0.30528).abs() <= EPSILON);
+
+    let chair_future = expected_risk_after_one_calibration_sample(
+        counts, 0, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid chair sample");
+    let table_future = expected_risk_after_one_calibration_sample(
+        counts, 1, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid table sample");
+    let stool_future = expected_risk_after_one_calibration_sample(
+        counts, 2, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid stool sample");
+    assert!((chair_future - 15.6496).abs() <= EPSILON);
+    assert!((table_future - 15.37552).abs() <= EPSILON);
+    assert!((stool_future - 15.57904).abs() <= EPSILON);
 }
 
 #[test]
