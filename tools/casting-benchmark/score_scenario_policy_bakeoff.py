@@ -195,7 +195,7 @@ def _validate_and_score_run(
     severity = run["severity"]
     seed = run["seed"]
     policy = run["policy"]
-    if scenario_id not in allowed_scenarios or scenario_id not in SUPPORTED_SCENARIOS:
+    if not isinstance(scenario_id, str) or scenario_id not in allowed_scenarios or scenario_id not in SUPPORTED_SCENARIOS:
         errors.append(f"unsupported scenario_id: {scenario_id!r}")
     if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension not in allowed_dimensions or dimension not in SUPPORTED_DIMENSIONS:
         errors.append(f"unsupported dimension: {dimension!r}")
@@ -203,10 +203,10 @@ def _validate_and_score_run(
         errors.append(f"unregistered severity: {severity!r}")
     if isinstance(seed, bool) or not isinstance(seed, int) or seed not in allowed_seeds:
         errors.append(f"unregistered seed: {seed!r}")
-    if policy not in allowed_policies:
+    if not isinstance(policy, str) or policy not in allowed_policies:
         errors.append(f"unregistered policy: {policy!r}")
-    if run["design_count"] < 75:
-        errors.append("design_count must be at least 75")
+    if isinstance(run["design_count"], bool) or not isinstance(run["design_count"], int) or run["design_count"] < 75:
+        errors.append("design_count must be an integer at least 75")
     if run["cost_budget"] != cost_budget:
         errors.append("run cost_budget differs from top-level budget")
     if run["fidelity_costs"] != fidelity_costs:
@@ -246,7 +246,7 @@ def _validate_and_score_run(
         if isinstance(candidate_id, bool) or not isinstance(candidate_id, int) or candidate_id not in world.candidate_ids:
             errors.append(f"{row_label} has invalid candidate_id {candidate_id!r}")
             continue
-        if fidelity not in counts:
+        if not isinstance(fidelity, str) or fidelity not in counts:
             errors.append(f"{row_label} has unsupported fidelity {fidelity!r}")
             continue
         if not isinstance(evaluation["objectives"], list) or len(evaluation["objectives"]) != 2 or not all(_finite_number(v) for v in evaluation["objectives"]):
@@ -255,7 +255,7 @@ def _validate_and_score_run(
         if not _finite_number(evaluation["constraint_margin"]):
             errors.append(f"{row_label} constraint_margin must be finite")
             continue
-        if evaluation["cost_units"] != fidelity_costs[fidelity]:
+        if isinstance(evaluation["cost_units"], bool) or not isinstance(evaluation["cost_units"], int) or evaluation["cost_units"] != fidelity_costs[fidelity]:
             errors.append(f"{row_label} cost_units does not match the locked fidelity cost")
         key = (candidate_id, fidelity)
         if key in seen:
@@ -395,20 +395,36 @@ def score_document(
     severities = document["severities"]
     seeds = document["seeds"]
     policies = document["policies"]
-    if not isinstance(scenarios, list) or not scenarios or len(set(scenarios)) != len(scenarios):
-        errors.append("scenario_ids must be a non-empty unique list")
+    if (
+        not isinstance(scenarios, list) or not scenarios
+        or any(not isinstance(value, str) or not value for value in scenarios)
+        or len(set(scenarios)) != len(scenarios)
+    ):
+        errors.append("scenario_ids must be a non-empty unique list of strings")
         scenarios = []
     if set(scenarios) - set(scenario_manifest.get("default_sweep", {}).get("scenarios", [])):
         errors.append("scenario_ids contains scenarios absent from the locked manifest")
-    if not isinstance(dimensions, list) or not dimensions or len(set(dimensions)) != len(dimensions):
-        errors.append("dimensions must be a non-empty unique list")
+    if (
+        not isinstance(dimensions, list) or not dimensions
+        or any(isinstance(value, bool) or not isinstance(value, int) for value in dimensions)
+        or len(set(dimensions)) != len(dimensions)
+    ):
+        errors.append("dimensions must be a non-empty unique integer list")
         dimensions = []
     if set(dimensions) - set(scenario_manifest.get("design_space", {}).get("dimensions_supported", [])):
         errors.append("dimensions contains values absent from the locked manifest")
-    if not isinstance(severities, list) or not severities or any(not _finite_number(v) or v < 0 for v in severities) or len(set(severities)) != len(severities):
+    if (
+        not isinstance(severities, list) or not severities
+        or any(not _finite_number(v) or v < 0 for v in severities)
+        or len(set(severities)) != len(severities)
+    ):
         errors.append("severities must be non-empty, unique, finite non-negative values")
         severities = []
-    if not isinstance(seeds, list) or not seeds or any(isinstance(v, bool) or not isinstance(v, int) for v in seeds) or len(set(seeds)) != len(seeds):
+    if (
+        not isinstance(seeds, list) or not seeds
+        or any(isinstance(v, bool) or not isinstance(v, int) for v in seeds)
+        or len(set(seeds)) != len(seeds)
+    ):
         errors.append("seeds must be a non-empty unique integer list")
         seeds = []
     required_policies = [item["id"] for item in policy_manifest.get("policies", [])]
