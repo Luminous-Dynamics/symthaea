@@ -24,12 +24,12 @@
       "repository": "Luminous-Dynamics/symthaea",
       "pull_request": 8324,
       "branch": "research/qcomp-portfolio-001a-mis-verifier-current",
-      "inspected_commit": "3ced24ce2768f480b8b8945560eebeffcece5eaf",
+      "inspected_commit": "988ef2766170d6242d9aa2d99362cd7cc1020379",
       "generator_path": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs",
       "generator_blob_sha1": "a51cb79f336233bf9b5e823fa05cf664402dd897",
       "cli_path": "crates/domains/symthaea-quantum-comp/src/bin/qcomp_rrg_generate.rs",
-      "cli_blob_sha1": "da95584daa14f7b6513e5b1aecc7a3ae9048759c",
-      "note": "This is the corrected source pin after static review fixed the stub-limit test to isolate the stub ceiling below the vertex ceiling. The Rust implementation remains uncompiled/unexecuted in this environment."
+      "cli_blob_sha1": "bf9c5de13dca0b4e117263cbf3dfe87b2bbb7482",
+      "note": "Source pin updated after the CLI began recording the configured max_attempts in DIMACS comments. The Rust implementation is not compiled or executed in this authoring environment."
     }
   },
   "motivation": {
