@@ -528,6 +528,91 @@ fn exact_coverage_qualification_catches_rare_event_undercoverage() {
 }
 
 #[test]
+fn exact_coverage_grid_qualifies_rare_and_asymmetric_probability_matrices() {
+    let cases: [(&str, [[f64; 3]; 3], [f64; 3]); 4] = [
+        (
+            "nominal-sparse",
+            [
+                [0.95, 0.05, 0.0],
+                [0.05, 0.95, 0.0],
+                [0.05, 0.95, 0.0],
+            ],
+            [0.996_918, 0.999_012, 0.997_734],
+        ),
+        (
+            "asymmetric-sparse",
+            [
+                [0.95, 0.05, 0.0],
+                [0.15, 0.85, 0.0],
+                [0.20, 0.80, 0.0],
+            ],
+            [0.996_727, 0.995_752, 0.993_215],
+        ),
+        (
+            "balanced-dense",
+            [
+                [0.70, 0.20, 0.10],
+                [0.10, 0.70, 0.20],
+                [0.20, 0.10, 0.70],
+            ],
+            [0.989_228, 0.980_770, 0.974_754],
+        ),
+        (
+            "rare-class-event",
+            [
+                [0.99, 0.009, 0.001],
+                [0.005, 0.99, 0.005],
+                [0.001, 0.009, 0.99],
+            ],
+            [0.997_500, 0.996_676, 0.995_195],
+        ),
+    ];
+    let sample_sizes = [10_u64, 20, 50];
+
+    for (name, truth, expected_by_sample_size) in cases {
+        for (index, trials_per_class) in sample_sizes.iter().enumerate() {
+            let actual = exact_matrix_coverage(
+                *trials_per_class,
+                truth,
+                clopper_pearson_cell_interval,
+            );
+            let expected = expected_by_sample_size[index];
+            assert!(
+                (actual - expected).abs() < 1.0e-5,
+                "{name} at {trials_per_class} trials/class: expected {expected}, got {actual}"
+            );
+            assert!(
+                actual >= 0.95,
+                "{name} at {trials_per_class} trials/class under-covered: {actual}"
+            );
+        }
+    }
+
+    let rare_event = [
+        [0.99, 0.009, 0.001],
+        [0.005, 0.99, 0.005],
+        [0.001, 0.009, 0.99],
+    ];
+    let expected_wilson_coverage = [0.739_700, 0.918_596, 0.840_230];
+    for (index, trials_per_class) in sample_sizes.iter().enumerate() {
+        let actual = exact_matrix_coverage(
+            *trials_per_class,
+            rare_event,
+            wilson_cell_interval_negative_control,
+        );
+        let expected = expected_wilson_coverage[index];
+        assert!(
+            (actual - expected).abs() < 1.0e-5,
+            "Wilson negative control at {trials_per_class} trials/class: expected {expected}, got {actual}"
+        );
+        assert!(
+            actual < 0.95,
+            "Wilson negative control must expose rare-event undercoverage: {actual}"
+        );
+    }
+}
+
+#[test]
 fn class_conditional_intervals_are_simultaneous_and_outward_rounded() {
     let intervals = confusion_intervals(nominal_counts(1_000)).expect("valid counts");
     assert_eq!(
