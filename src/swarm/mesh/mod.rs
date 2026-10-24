@@ -83,8 +83,8 @@ pub use dual_layer::{
     BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,
 };
 pub use lora_fragment::{
-    FLAG_FEC, FragmentAssembler, HEADER_SIZE, LORA_MTU, LoRaFragment, PAYLOAD_SIZE, crc16_ccitt,
-    fragment,
+    FLAG_FEC, FragmentAssembler, FragmentEncodeError, HEADER_SIZE, LORA_MTU, LoRaFragment,
+    PAYLOAD_SIZE, crc16_ccitt, fragment,
 };
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
 pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
