@@ -1,0 +1,681 @@
+{
+  "schema": "EPF-010-negative",
+  "encoding_version": 1,
+  "vectors": [
+    {
+      "name": "duplicate-selected",
+      "expected_failure": "DuplicateSelectedIdentity",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x",
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7335180d35edc3f76a14d688ac820818d4e6f8944ad51bbb5003b039bcf5ecf2",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "duplicate-representation-binding",
+      "expected_failure": "DuplicateRepresentationBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ],
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "b8d4dc20f4e783ae6a8798fdf3b8fec1df932ffee73f926bc796c72ac65e9e96",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "duplicate-exclusion",
+      "expected_failure": "DuplicateExclusion",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [
+          {
+            "canonical_identity": "claim:new",
+            "reason": "PostFrontier"
+          },
+          {
+            "canonical_identity": "claim:new",
+            "reason": "PostFrontier"
+          }
+        ],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7dbda13e7ed2a4bfaf25d931b185cea513f2d6fd9883d1ec007decccbc299cfe",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "swapped-identity-binding",
+      "expected_failure": "UnselectedRepresentationIdentity",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:other",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7f805f9843163532c1375b780beef8595bbd2ed6ae096bf9f17c65dfde1bae04",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "altered-profile-stale-digest",
+      "expected_failure": "DigestMismatch",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [
+          "retrieval-profile:v2"
+        ],
+        "receipt_digest": "92a0bf38c92232d607dd7a4576b80c717f3df0b53c91afaea1e1226f9693304a",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "altered-canonical-bytes",
+      "expected_failure": "CanonicalBytesMismatch",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "canonical_bytes_hex_override": "6570697374656d69632d72657472696576616c2d726563656970743a763100000100000003663a3100000001780000000a0000000100000007636c61696d3a780000000100000007636c61696d3a7800000040326437313136343262373236623034343031363237636139666261633332663563383533306662313930336363346462303232353837313739323161343838310000000000000000000000000001",
+        "receipt_digest": "7335180d35edc3f76a14d688ac820818d4e6f8944ad51bbb5003b039bcf5ecf2",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "duplicate-profile-version",
+      "expected_failure": "DuplicateRetrievalProfileVersion",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [
+          "algorithm:v1",
+          "algorithm:v1"
+        ],
+        "receipt_digest": "b916f587f20ba98c13af9e8bdd543e818b86a1294e25cdfeb15142875e2a0046",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "empty-profile-version",
+      "expected_failure": "EmptyRetrievalProfileVersion",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [
+          ""
+        ],
+        "receipt_digest": "79334f968d77e9c8b4b2b1171a1d3bb36e0dbbaa2c256a0370385e78fc6891fd",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "whitespace-only-profile-version",
+      "expected_failure": "WhitespaceOnlyRetrievalProfileVersion",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [
+          " \t\n"
+        ],
+        "receipt_digest": "d13a71319f88cf882d77b741919880b164a155162a032df6d310699fb41fcbe8",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "duplicate-projection-identity-binding",
+      "expected_failure": "DuplicateProjectionIdentityBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "57f1ea94cdc9028fde9732ec9917b38b4528478b3e4cfafc28a49cb64f4e490b",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ],
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "unselected-projection-identity-binding",
+      "expected_failure": "UnselectedProjectionIdentity",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "58f532d19635b7389e9255f644d28997ca20b34330a7fbc08a664332f258c463",
+        "selected_projection_identity_digests": [
+          [
+            "claim:other",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "empty-projection-identity-digest",
+      "expected_failure": "EmptyProjectionIdentityDigest",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "f8761ba27ac101388ac9082e0e8266c95717e188fede168cc157a09c2cb245b0",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "name": "missing-representation-binding",
+      "expected_failure": "MissingRepresentationBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7e416f99bd3148764c24963612b21705b718e06da8b13303d93ec588af675e91",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "missing-projection-identity-binding",
+      "expected_failure": "MissingProjectionIdentityBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "5d8ce6c92bfb0c558ef28e388a442c8b3e99e2cf3b98e67e41fe9be466eedb00",
+        "selected_projection_identity_digests": []
+      }
+    },
+    {
+      "name": "binding-count-mismatch",
+      "expected_failure": "BindingCountMismatch",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ],
+          [
+            "claim:x",
+            "extra-representation-digest"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "e48a116de7fc85f8373381b5e428f28855fbc34400218eb6d214d257a93a9b45",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "historical-missing-frontier",
+      "expected_failure": "InvalidRequest(MissingHistoricalFrontier)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": null,
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "2653645c68f80c7b0a2e6df7ba318f142523d07feddebe201a56574481333a57",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "empty-selected-identity",
+      "expected_failure": "InvalidSelectedIdentity(Empty)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          ""
+        ],
+        "selected_representation_digests": [
+          [
+            "",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "1fc33274c82ddd167d6466e7a02c945882906b4c35d089424e173c5a0232f6d3",
+        "selected_projection_identity_digests": [
+          [
+            "",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "whitespace-only-selected-identity",
+      "expected_failure": "InvalidSelectedIdentity(WhitespaceOnly)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          " \t\n"
+        ],
+        "selected_representation_digests": [
+          [
+            " \t\n",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7c913aaa05141da2196782e293874dfb1763592552306fd58256f01948ee18bd",
+        "selected_projection_identity_digests": [
+          [
+            " \t\n",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "control-character-selected-identity",
+      "expected_failure": "InvalidSelectedIdentity(ControlCharacter)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:\ninvalid"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:\ninvalid",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "d20d0e3f0adcafd34cc72bfc2a8db8ea5b7211a2dd0da7cd167ea674e9955b80",
+        "selected_projection_identity_digests": [
+          [
+            "claim:\ninvalid",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "empty-excluded-identity",
+      "expected_failure": "InvalidExcludedIdentity(Empty)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [
+          {
+            "canonical_identity": "",
+            "reason": "PostFrontier"
+          }
+        ],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ],
+        "receipt_digest": "02aaf59c07dcafd0627a0679b6b674c53020a2456b4408c433013da4cc7feb8c"
+      }
+    },
+    {
+      "name": "whitespace-only-excluded-identity",
+      "expected_failure": "InvalidExcludedIdentity(WhitespaceOnly)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [
+          {
+            "canonical_identity": " \t\n",
+            "reason": "PostFrontier"
+          }
+        ],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ],
+        "receipt_digest": "660397d0d890294e51932ce20a0c0ec8b5a8ede34c60073e5b70191e3acaf252"
+      }
+    },
+    {
+      "name": "control-character-excluded-identity",
+      "expected_failure": "InvalidExcludedIdentity(ControlCharacter)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [
+          {
+            "canonical_identity": "claim:\ninvalid",
+            "reason": "PostFrontier"
+          }
+        ],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ],
+        "receipt_digest": "0aad0c5ace1517cd3c206216f51d569536034b9d11715d0e5b5f2aa1155919b9"
+      }
+    }
+  ]
+}
