@@ -80,6 +80,14 @@ Controls:
 
 The canonical generator now includes a deterministic Rust test over 5,000 seeds at N=6, degree 3. It checks that the no-triangle K3,3 class occurs within ±0.04 of the exact 1/7 reference. The exact class counts were independently derived by enumerating all 32,768 labelled simple graphs on six vertices. A separate JavaScript translation of the generation algorithm sampled 100,000 graphs and observed 14,277 K3,3 versus 14,286 expected, but this is a small-N gross-bias diagnostic, not a proof of generator quality. The Rust test remains uncompiled/unexecuted because the authoring environment lacks cargo/rustc.
 
+## Classical restart-budget preflight
+
+A post-hoc quality-versus-budget analysis of the 70 graph / 16-restart JavaScript preflight is now recorded in [QCOMP-RRG-BUDGET-CURVE-001](QCOMP-RRG-BUDGET-CURVE-001.md), with machine-readable output in [the JSON record](QCOMP-RRG-BUDGET-CURVE-001.json). It computes the expected best objective over every size-k subset of the 16 observed restart results for k = 1, 2, 4, 8, 16, then uses a graph-level stratified bootstrap that preserves each N stratum's sample size.
+
+On this exploratory cohort, randomized tie-break expected-best deltas against one deterministic greedy run are 0.125, 0.688, 1.120, 1.467, and 1.771 vertices for budgets 1, 2, 4, 8, and 16. The corresponding 95% stratified graph-bootstrap intervals are approximately [-0.171, 0.415], [0.387, 0.980], [0.822, 1.413], [1.169, 1.767], and [1.457, 2.086]. These are post-hoc descriptive estimates on the finite preflight data, not controlled runtime comparisons. They show why best-of-16 should never be presented as a one-run algorithmic gain.
+
+This is still JavaScript-reference evidence, not Rust execution or a quantum comparison. No runtime was recorded, so restart count is only a budget proxy. Confirmatory work still needs the Rust generator/runner to reproduce the frozen inputs and must compare against Marino–Kirkpatrick and a strong eligible classical heuristic under a disclosed equal all-in budget.
+
 ## Validation boundary
 
 The generator, DIMACS export binary, structured failure receipt path, and Rust unit tests are authored in the verifier workstream. They have not been compiled or executed here because cargo/rustc are unavailable. The JavaScript preflight is not execution of the Rust generator; exact Rust-to-JS graph-byte parity remains an explicit release gate. There is no generated file artifact, measured runtime, hardware execution, paper reproduction, SOTA result, or quantum advantage claim in this contribution.
