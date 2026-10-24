@@ -11,6 +11,7 @@ on:
     branches: ["main"]
     paths:
       - "tools/vision-dvpc-sequential-fidelity.rs"
+      - "tests/fixtures/vision-dvpc-017-smoke.tsv"
       - "docs/research/VIS_DVPC_017_SEQUENTIAL_MULTIFIDELITY_V1.md"
       - ".github/workflows/vis-dvpc-017-sequential-fidelity.yml"
 
