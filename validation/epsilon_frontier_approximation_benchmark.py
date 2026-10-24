@@ -221,6 +221,7 @@ def self_test():
     by = {(r["learner_prior"],r["horizon"],r["epsilon_bits"]):r for r in result["rows"]}
     for learner in ("uniform", "chain_biased"):
         for horizon in (1,2):
+            exact_row = by[(learner,horizon,0.0)]
             approx_row = by[(learner,horizon,0.025)]
             assert approx_row["worst_case_optimality_gap_bits"] >= -1e-9
             if horizon == 1:
