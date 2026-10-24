@@ -66,6 +66,13 @@ pub struct MotifReturnEvidence {
 
 impl MotifReturnEvidence {
     pub fn meets_threshold(&self, threshold: f32) -> bool {
+        // Restoration is a temporal lineage claim: pairwise similarity cannot
+        // prove that a motif was eroded and later recovered. Fail closed until
+        // the evidence contract carries an independently verifiable history.
+        if self.expected_transformation == ReturnTransformation::Restored {
+            return false;
+        }
+
         let uniform_scaling_required = matches!(
             self.expected_transformation,
             ReturnTransformation::Augmented | ReturnTransformation::Diminished
@@ -81,7 +88,9 @@ impl MotifReturnEvidence {
             ReturnTransformation::Fragmented => {
                 self.target_note_count >= 3 && self.target_note_count < self.source_note_count
             }
-            ReturnTransformation::Restored => true,
+            // Retained as an explicit fail-closed arm if this contract is
+            // later refactored to avoid the early temporal-lineage guard.
+            ReturnTransformation::Restored => false,
         };
         self.aligned_note_count >= 2
             && length_compatible
@@ -666,6 +675,25 @@ mod tests {
             compare_melodic_sequences(&source, &longer_target, ReturnTransformation::Transposed);
         assert!(evidence.overall_similarity > 0.75);
         assert!(!evidence.meets_threshold(0.75));
+    }
+
+    #[test]
+    fn restored_pairwise_similarity_never_satisfies_threshold_without_lineage() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::quarter()),
+            note(65, 2, Duration::quarter()),
+            note(64, 3, Duration::quarter()),
+        ];
+        let evidence =
+            compare_melodic_sequences(&source, &source, ReturnTransformation::Restored);
+
+        assert!(
+            evidence.overall_similarity >= 0.99,
+            "fixture should isolate the lineage rule from pairwise similarity"
+        );
+        assert!(!evidence.meets_threshold(0.0));
+        assert!(!evidence.meets_threshold(0.99));
     }
 
     #[test]
