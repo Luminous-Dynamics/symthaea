@@ -374,10 +374,13 @@ fn counts(candidates: &[Candidate]) -> CandidateCounts {
             .iter()
             .filter(|c| c.source_split != c.target_split)
             .count(),
-        train_test_pairs: candidates.iter().filter(|c| {
-            (c.source_split == "train" && c.target_split == "test")
-                || (c.source_split == "test" && c.target_split == "train")
-        }).count(),
+        train_test_pairs: candidates
+            .iter()
+            .filter(|c| {
+                (c.source_split == "train" && c.target_split == "test")
+                    || (c.source_split == "test" && c.target_split == "train")
+            })
+            .count(),
     }
 }
 
