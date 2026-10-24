@@ -1915,6 +1915,23 @@ impl Symthaea {
                 let current_code = Self::extract_code_block(&generation.text);
                 verified_code = current_code.clone();
 
+                if !crate::language::code_executor::CodeExecutor::supports_language(&lang) {
+                    let message = format!(
+                        "UNSUPPORTED_EXECUTION_LANGUAGE: no compiler/runtime adapter is registered for '{}'; code was not compiled or run and cannot be marked verified.",
+                        lang
+                    );
+                    if let Some(ref mut ctx) = thought.code_context {
+                        ctx.notes.push(message.clone());
+                        ctx.syntactically_valid = None;
+                    }
+                    tracing::warn!(
+                        target: "symthaea::code",
+                        language = %lang,
+                        "Code generation stopped because the requested language has no execution adapter"
+                    );
+                    break;
+                }
+
                 if let Some(parsed) = Self::parse_code_for_verification(&lang, &current_code) {
                     let verifier = crate::language::code_verifier::CodeVerifier::new(
                         crate::hdc::code_encoder::CodeHDEncoder::new(self.hdc_dim),
@@ -1986,20 +2003,9 @@ impl Symthaea {
                     continue;
                 }
 
-                let has_inline_tests = current_code.contains("#[test]");
                 let mut executor = crate::language::code_executor::CodeExecutor::new();
-                let exec_result = match lang.as_str() {
-                    "rust" if has_inline_tests => {
-                        executor.execute_rust_with_inline_tests(&current_code)
-                    }
-                    "rust" if pregenerated_tests.is_some() => {
-                        executor.execute_rust(&current_code, pregenerated_tests.as_deref())
-                    }
-                    "rust" => executor.execute_rust(&current_code, None),
-                    "python" => executor.execute_python(&current_code),
-                    "nix" => executor.evaluate_nix(&current_code),
-                    _ => executor.execute_rust(&current_code, None),
-                };
+                let exec_result =
+                    executor.execute_language(&lang, &current_code, pregenerated_tests.as_deref());
 
                 let surprise = exec_result.to_surprise();
                 if surprise > 0.0 || exec_result.tests_failed > 0 {
