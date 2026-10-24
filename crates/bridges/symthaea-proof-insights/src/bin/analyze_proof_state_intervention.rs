@@ -710,7 +710,9 @@ fn validate_semantic_gate(
     let mut reviewer_ids = BTreeSet::new();
     let mut reviewer_decisions = Vec::with_capacity(reviewer_rows.len());
     for (index, reviewer) in reviewer_rows.iter().enumerate() {
-        let reviewer_context = format!("{gate_context}.statement_correspondence.reviewers[{index}]");
+        let reviewer_context = format!(
+            "{gate_context}.statement_correspondence.reviewers[{index}]"
+        );
         let reviewer_id = string(reviewer, "reviewer_id", &reviewer_context)?;
         if reviewer_id.trim().is_empty() {
             bail!("{context}: semantic-gate reviewer ID must not be blank");
@@ -1088,7 +1090,11 @@ fn compute_metrics(
     }).collect();
     metrics.insert(
         "exact_target_solve_rate_on_assigned_rows".into(),
-        metric_json(estimate(qualified_target_success, bootstrap_replicates, seed.wrapping_add(20))),
+        metric_json(estimate(
+            qualified_target_success,
+            bootstrap_replicates,
+            seed.wrapping_add(20),
+        )),
     );
 
     let coverage = selected.iter().map(|row| Point {
@@ -1724,8 +1730,16 @@ mod tests {
             "statement_correspondence": {
                 "status": "matches_intended_claim",
                 "reviewers": [
-                    {"reviewer_id":"reviewer-a","decision":"matches_intended_claim","evidence_sha256":"6".repeat(64)},
-                    {"reviewer_id":"reviewer-b","decision":"matches_intended_claim","evidence_sha256":"7".repeat(64)}
+                    {
+                        "reviewer_id": "reviewer-a",
+                        "decision": "matches_intended_claim",
+                        "evidence_sha256": "6".repeat(64)
+                    },
+                    {
+                        "reviewer_id": "reviewer-b",
+                        "decision": "matches_intended_claim",
+                        "evidence_sha256": "7".repeat(64)
+                    }
                 ],
                 "receipt_sha256": "1".repeat(64)
             },
@@ -1816,7 +1830,11 @@ mod tests {
         let target_digest = "d".repeat(64);
         let make_execution = |gate: Value| json!({
             "status": "executed",
-            "model": {"model_id":"test-model","model_version":"test-version","config_sha256":"a".repeat(64)},
+            "model": {
+                "model_id": "test-model",
+                "model_version": "test-version",
+                "config_sha256": "a".repeat(64)
+            },
             "applicability_judgment": "eligible",
             "decision": "apply_original_move",
             "original_move_applied": true,
@@ -1825,15 +1843,33 @@ mod tests {
             "checker_result": "checked_success",
             "proof_sha256": "b".repeat(64),
             "run_receipt_sha256": "c".repeat(64),
-            "budget_caps": {"model_calls":2,"input_tokens":16,"output_tokens":8,"wall_time_ms":100,"cost_microusd":10},
-            "resource_usage": {"model_calls":1,"input_tokens":8,"output_tokens":3,"wall_time_ms":12,"cost_microusd":4}
+            "budget_caps": {
+                "model_calls": 2,
+                "input_tokens": 16,
+                "output_tokens": 8,
+                "wall_time_ms": 100,
+                "cost_microusd": 10
+            },
+            "resource_usage": {
+                "model_calls": 1,
+                "input_tokens": 8,
+                "output_tokens": 3,
+                "wall_time_ms": 12,
+                "cost_microusd": 4
+            }
         });
         let wrong = make_execution(passing_semantic_gate(&"e".repeat(64)));
         let error = parse_execution(&wrong, "test-execution", "reviewed_benchmark", &target_digest)
             .expect_err("semantic gate bound to the wrong target must fail closed");
-        assert!(error.to_string().contains("semantic gate is bound to a different target statement"));
+        assert!(
+            error
+                .to_string()
+                .contains("semantic gate is bound to a different target statement")
+        );
         let valid = make_execution(passing_semantic_gate(&target_digest));
-        assert!(parse_execution(&valid, "test-execution", "reviewed_benchmark", &target_digest).is_ok());
+        assert!(
+            parse_execution(&valid, "test-execution", "reviewed_benchmark", &target_digest).is_ok()
+        );
     }
 
     #[test]
@@ -1853,7 +1889,11 @@ mod tests {
         gate["statement_correspondence"]["reviewers"].as_array_mut().unwrap().pop();
         let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
             .expect_err("one review cannot qualify the semantic gate");
-        assert!(error.to_string().contains("statement-correspondence status contradicts individual reviewer decisions"));
+        assert!(
+            error
+                .to_string()
+                .contains("statement-correspondence status contradicts individual reviewer decisions")
+        );
     }
 
     #[test]
