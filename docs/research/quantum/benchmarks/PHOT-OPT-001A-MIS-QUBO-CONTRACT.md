@@ -12,9 +12,9 @@ The first implementation should be unweighted MIS. Weighted MIS is admitted only
 
 ## 2. Canonical problem
 
-Input graph: (G=(V,E)), with vertices canonically indexed (0,ldots,n-1), unique undirected edges ((u,v)) where (u<v), no loops, and no duplicate edges.
+Input graph: \(G=(V,E)\), with vertices canonically indexed \(0,\ldots,n-1\), unique undirected edges \((u,v)\) where \(u<v\), no loops, and no duplicate edges.
 
-Binary variable (x_i\in\{0,1\}) indicates whether vertex (i) is selected. For non-negative weights (w_i), maximum-weight independent set is
+Binary variable \(x_i\in\{0,1\}\) indicates whether vertex \(i\) is selected. For non-negative weights \(w_i\), maximum-weight independent set is
 
 \[
 \max_x\quad \sum_{i\in V} w_i x_i
@@ -22,7 +22,7 @@ Binary variable (x_i\in\{0,1\}) indicates whether vertex (i) is selected. For no
 x_u+x_v\le 1\quad\forall (u,v)\in E.
 \]
 
-For unweighted MIS set \\(w_i=1\\). The independent-set verifier—not the energy function—remains authoritative about feasibility.
+For unweighted MIS set \(w_i=1\). The independent-set verifier—not the energy function—remains authoritative about feasibility.
 
 ## 3. Canonical QUBO energy and penalty proof
 
@@ -35,15 +35,15 @@ E_{Q}(x)=-\sum_i w_i x_i
 
 Each undirected edge appears exactly once in the edge-list sum. The objective constant/offset is zero in this convention.
 
-For unweighted MIS, \\(A>1\\) is sufficient for every global minimum to be feasible. More generally, for finite non-negative weights, (A>\max_i w_i) is sufficient:
+For unweighted MIS, \(A>1\) is sufficient for every global minimum to be feasible. More generally, for finite non-negative weights, \(A>\max_i w_i\) is sufficient:
 
-If a candidate is infeasible, at least one selected vertex (i) has (k\ge1) selected neighbors. Removing (i) changes its energy by
+If a candidate is infeasible, at least one selected vertex \(i\) has \(k\ge1\) selected neighbors. Removing \(i\) changes its energy by
 
 \[
 \Delta E_Q=w_i-Ak<0.
 \]
 
-Therefore an infeasible assignment cannot be a global minimizer. For non-negative integer weights, (A=1+\max_i w_i) is a convenient exact choice. For floating weights, the representable margin above the largest weight must be explicit and tested; do not assume an arbitrarily small epsilon survives coefficient scaling or hardware quantization.
+Therefore an infeasible assignment cannot be a global minimizer. For non-negative integer weights, \(A=1+\max_i w_i\) is a convenient exact choice. For floating weights, the representable margin above the largest weight must be explicit and tested; do not assume an arbitrarily small epsilon survives coefficient scaling or hardware quantization.
 
 This is a mathematical bound for the stated ideal binary objective, **not** a promise that an analog device or finite-precision solver will return a feasible assignment.
 
@@ -51,15 +51,15 @@ This is a mathematical bound for the stated ideal binary objective, **not** a pr
 
 Different libraries use different matrix conventions. Define the canonical edge-list objective above first, then test any serializer against its own documented convention:
 
-- Upper-triangular energy \(\sum_i Q_{ii}x_i+\sum_{i<j}Q_{ij}x_ix_j\): (Q_{ii}=-w_i), and (Q_{ij}=A) for an edge.
-- Symmetric matrix energy \(x^TQx\): (Q_{ii}=-w_i); for each edge, set (Q_{ij}=Q_{ji}=A/2). Using (A) in *both* symmetric positions doubles the penalty and is a mapping bug.
+- Upper-triangular energy \(\sum_i Q_{ii}x_i+\sum_{i<j}Q_{ij}x_ix_j\): \(Q_{ii}=-w_i\), and \(Q_{ij}=A\) for an edge.
+- Symmetric matrix energy \(x^TQx\): \(Q_{ii}=-w_i\); for each edge, set \(Q_{ij}=Q_{ji}=A/2\). Using \(A\) in *both* symmetric positions doubles the penalty and is a mapping bug.
 - Any constant offset must be carried explicitly and must not affect the decoded argmin.
 
 The serialized manifest must state the exact energy convention and offset. Do not infer a convention from a field named merely `Q`, `matrix`, `bias`, or `coupler`.
 
 ## 4. Ising / spin convention
 
-For spins (s_i\in\{-1,+1\}), define (x_i=(1+s_i)/2) and minimize
+For spins \(s_i\in\{-1,+1\}\), define \(x_i=(1+s_i)/2\) and minimize
 
 \[
 E_I(s)=C+\sum_i h_i s_i+\sum_{(i,j)\in E}J_{ij}s_i s_j,
@@ -81,22 +81,22 @@ A positive global scale \(\alpha>0\) preserves the ideal ordering of configurati
 
 ## 5. Hand-checkable fixtures
 
-Use \\(A=2\\) for unweighted examples unless otherwise stated. The cardinality is independently measured from the decoded bit vector and rechecked by the graph verifier. Energies below use the canonical minimization convention above.
+Use \(A=2\) for unweighted examples unless otherwise stated. The cardinality is independently measured from the decoded bit vector and rechecked by the graph verifier. Energies below use the canonical minimization convention above.
 
 | Graph | Vertices / edges | MIS cardinality | Minimum energy |
 |---|---:|---:|---:|
-| Empty graph on 3 vertices | \\(n=3,m=0\\) | 3 | -3 |
-| One edge \\(K_2\\) | \\(n=2,m=1\\) | 1 | -1 |
-| Path \\(P_3\\) | \\(n=3,m=2\\) | 2 | -2 |
-| Triangle \\(K_3\\) | \\(n=3,m=3\\) | 1 | -1 |
-| One edge plus one isolated vertex | \\(n=3,m=1\\) | 2 | -2 |
-| Weighted single edge, weights \\((3,1)\\) | \\(n=2,m=1,A=4\\) | max weight 3 | -3 |
+| Empty graph on 3 vertices | \(n=3,m=0\) | 3 | -3 |
+| One edge \(K_2\) | \(n=2,m=1\) | 1 | -1 |
+| Path \(P_3\) | \(n=3,m=2\) | 2 | -2 |
+| Triangle \(K_3\) | \(n=3,m=3\) | 1 | -1 |
+| One edge plus one isolated vertex | \(n=3,m=1\) | 2 | -2 |
+| Weighted single edge, weights \((3,1)\) | \(n=2,m=1,A=4\) | max weight 3 | -3 |
 
-There may be multiple minimizers (for example, either endpoint of (K_2)); tests compare the set of admissible minimizers/objective values, not an arbitrarily selected vertex ordering.
+There may be multiple minimizers (for example, either endpoint of \(K_2\)); tests compare the set of admissible minimizers/objective values, not an arbitrarily selected vertex ordering.
 
 ### Deliberately bad-penalty negative control
 
-For \\(K_2\\) with unweighted objective and \\(A=0.5\\), selecting both endpoints has energy \(-2+0.5=-1.5\), lower than either feasible singleton at \\(-1\\). This fixture proves the test harness detects a penalty that is too small. Its expected behavior is to flag the configuration as an invalid MIS and flag the penalty contract as violated—not to silently repair the canonical mapping or count the invalid set as success.
+For \(K_2\) with unweighted objective and \(A=0.5\), selecting both endpoints has energy \(-2+0.5=-1.5\), lower than either feasible singleton at \(-1\). This fixture proves the test harness detects a penalty that is too small. Its expected behavior is to flag the configuration as an invalid MIS and flag the penalty contract as violated—not to silently repair the canonical mapping or count the invalid set as success.
 
 ## 6. Required independent checks
 
