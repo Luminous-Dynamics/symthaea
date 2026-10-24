@@ -18,8 +18,6 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "tools/vleb/evidence-receipt.schema.json"
-DIGEST = "a" * 64
-
 
 def valid_pass_receipt() -> dict[str, object]:
     """Small positive control exercising every required pass gate."""
@@ -123,13 +121,13 @@ def valid_pass_receipt() -> dict[str, object]:
         "verifier": {
             "verifier_id": "vleb-schema-test",
             "verifier_version": "test-1",
-            "verifier_binary_sha256": digest("8"),
+            "verifier_binary_sha256": digest("a"),
             "receipt_recomputed": True,
             "required_test_coverage": 1,
             "environment_match": "match",
             "verdict": "pass",
             "reason_codes": [],
-            "auditor_output_sha256": digest("9"),
+            "auditor_output_sha256": digest("b"),
         },
         "outcome": "pass",
         "unresolved_reasons": [],
