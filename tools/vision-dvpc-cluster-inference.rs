@@ -234,6 +234,12 @@ fn parse_config(meta: &BTreeMap<String, String>) -> Result<Config, String> {
     if !familywise_confidence.is_finite() || !(0.5..1.0).contains(&familywise_confidence) {
         return Err(invalid("familywise_confidence must be finite and in [0.5, 1)"));
     }
+    let per_tail = (1.0 - familywise_confidence) / (2.0 * family_size as f64);
+    if (bootstrap_replicates as f64 * per_tail < 20.0) {
+        return Err(invalid(
+            "bootstrap_replicates provides fewer than 20 resamples in a Bonferroni-adjusted tail; increase the precommitted replicate count",
+        ));
+    }
     Ok(Config {
         family_size,
         seed,
@@ -723,7 +729,7 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
     #[test]
     fn family_size_must_match_predeclared_comparisons() {
         let broken = fixture().replace("META\tcomparison_family_size\t2", "META\tcomparison_family_size\t3");
-        assert!(analyze(&broken, LOCK).unwrap_err().contains("pre-registered family size"));
+        assert!(analyze(&broken, LOCK).unwrap_err().contains("preregistered family size"));
     }
 
     #[test]
