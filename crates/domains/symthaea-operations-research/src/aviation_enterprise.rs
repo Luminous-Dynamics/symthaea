@@ -566,6 +566,7 @@ pub struct RunManifest {
     pub method_id: String,
     pub seed: u64,
     pub declared_plan_cost: Option<u64>,
+    pub recomputed_cost: Option<u64>,
     pub verifier_status: VerificationStatus,
     pub violation_count: usize,
     pub violations: Vec<String>,
@@ -591,6 +592,7 @@ impl RunManifest {
             method_id: "bounded-exact-enumerator-v1".into(),
             seed,
             declared_plan_cost: Some(plan.total_cost),
+            recomputed_cost: verification.recomputed_cost,
             verifier_status: verification.status,
             violation_count: verification.violations.len(),
             violations: verification.violations.clone(),
@@ -612,9 +614,13 @@ impl RunManifest {
             .declared_plan_cost
             .map(|cost| cost.to_string())
             .unwrap_or_else(|| "null".into());
+        let recomputed_cost_json = self
+            .recomputed_cost
+            .map(|cost| cost.to_string())
+            .unwrap_or_else(|| "null".into());
 
         format!(
-            "{{\"schema_version\":{},\"benchmark_id\":{},\"scenario_id\":{},\"configuration_revision\":{},\"input_digest\":{},\"method_id\":{},\"seed\":{},\"declared_plan_cost\":{},\"verifier_status\":{},\"violation_count\":{},\"violations\":[{}],\"assigned_flight_count\":{},\"cancelled_flight_count\":{},\"synthetic\":{}}}",
+            "{{\"schema_version\":{},\"benchmark_id\":{},\"scenario_id\":{},\"configuration_revision\":{},\"input_digest\":{},\"method_id\":{},\"seed\":{},\"declared_plan_cost\":{},\"recomputed_cost\":{},\"verifier_status\":{},\"violation_count\":{},\"violations\":[{}],\"assigned_flight_count\":{},\"cancelled_flight_count\":{},\"synthetic\":{}}}",
             json_quote(&self.schema_version),
             json_quote(&self.benchmark_id),
             json_quote(&self.scenario_id),
@@ -623,7 +629,8 @@ impl RunManifest {
             json_quote(&self.method_id),
             self.seed,
             cost_json,
-            json_quote(verification_status_name(self.verifier_status)),
+            recomputed_cost_json,
+            json_quote(verification_status_name(self.verifier_status))
             self.violation_count,
             violations_json,
             self.assigned_flight_count,
@@ -884,6 +891,7 @@ mod tests {
         let json = manifest.to_json();
         assert!(json.contains("\"verifier_status\":\"verified\""));
         assert!(json.contains("\"declared_plan_cost\":40"));
+        assert!(json.contains("\"recomputed_cost\":40"));
         assert!(json.contains("\"cancelled_flight_count\":0"));
         assert!(json.contains("\"seed\":7"));
     }
