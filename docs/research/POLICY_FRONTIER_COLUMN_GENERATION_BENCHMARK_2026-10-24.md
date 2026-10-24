@@ -28,7 +28,7 @@ The candidate true-prior identity is fixed for the episode and hidden from the p
 
 - Local result JSON: 36 rows, 74,511 bytes, SHA-256 `e48554121720fc480aeeed5f63cf7144e51d2fe8fdbee57731105bd21d9476f7`.
 - The executed local benchmark source had SHA-256 `08371649907d5a3252036789a7f774f3f01b9ff57143467c0001d15c3d116409` and computed Git blob `1f2656c5f49a375043ffe42155df11952a27217a`.
-- The committed branch implementation is Git blob `cb4a18d01e003df29ee1ea9453a47090253b34b4`. It is a compacted rendition, **not byte-identical** to the source used to generate the result JSON. The committed test file is byte-identical to the locally tested test source (Git blob `e99ce5c1c5a994c4646e190470a8fdb156371e49`).
+- The committed branch implementation is Git blob `98cb554d3a474cb3c6c398049845519f211508bd`. It is a slightly revised rendition, **not byte-identical** to the source used to generate the result JSON. The committed test file is byte-identical to the locally tested test source (Git blob `e99ce5c1c5a994c4646e190470a8fdb156371e49`).
 - Local Python 3.13.5 regression: 78/78 tests passed across nine modules. NumPy 2.3.5 / SciPy 1.17.0 are research-only. The local runtime had no checkout; the fixed-prior helper was reconstructed from the displayed source and was not byte-identical to repository blob `438301f07649d7ffebca6690990a4909ea28e054`. Therefore these tests validate the algorithmic prototype, **not exact-head integration**.
 - No external causal-discovery suite was executed. No remote CI pass, SOTA result, novelty claim, or general scaling guarantee is claimed.
 
