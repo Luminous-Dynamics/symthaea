@@ -123,7 +123,7 @@ impl CognitiveSubsystem for MemoryManager {
         // Prediction error generates encoding demand → pressure builds
         if let Some(pe) = self
             .prediction_error_cursor
-            .admit(snapshot.cycle_number, snapshot.prediction_error_sample())
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number)
         {
             self.consolidation_pressure += pe * Self::PRESSURE_BUILD_RATE;
         }
