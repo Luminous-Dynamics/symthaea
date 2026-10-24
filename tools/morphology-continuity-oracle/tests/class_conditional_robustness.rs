@@ -376,6 +376,157 @@ fn assumed_sensor() -> [[u16; 3]; 3] {
     [[950, 50, 0], [50, 950, 0], [50, 950, 0]]
 }
 
+fn wilson_cell_interval_negative_control(successes: u64, total: u64) -> Option<Interval> {
+    if total == 0 || successes > total {
+        return None;
+    }
+    let z: f64 = 2.772_921_294_608_662;
+    let n = total as f64;
+    let proportion = successes as f64 / n;
+    let z_squared = z * z;
+    let denominator = 1.0 + z_squared / n;
+    let center = (proportion + z_squared / (2.0 * n)) / denominator;
+    let half_width = z
+        * (proportion * (1.0 - proportion) / n + z_squared / (4.0 * n * n)).sqrt()
+        / denominator;
+    let lower = (center - half_width).clamp(0.0, 1.0);
+    let upper = (center + half_width).clamp(0.0, 1.0);
+    Some(Interval {
+        lower: ((lower * f64::from(PROBABILITY_SCALE) - 1.0e-9).floor().max(0.0) as u16)
+            .min(PROBABILITY_SCALE),
+        upper: ((upper * f64::from(PROBABILITY_SCALE) + 1.0e-9).ceil().max(0.0) as u16)
+            .min(PROBABILITY_SCALE),
+    })
+}
+
+fn multinomial_mass(total: u64, counts: [u64; 3], truth: [f64; 3]) -> f64 {
+    if counts
+        .iter()
+        .zip(truth.iter())
+        .any(|(count, probability)| *count > 0 && *probability == 0.0)
+    {
+        return 0.0;
+    }
+    let mut log_probability = log_gamma(total as f64 + 1.0);
+    for (count, probability) in counts.iter().zip(truth.iter()) {
+        log_probability -= log_gamma(*count as f64 + 1.0);
+        if *count > 0 {
+            log_probability += *count as f64 * probability.ln();
+        }
+    }
+    log_probability.exp()
+}
+
+/// Exact finite multinomial enumeration for one row of the confusion matrix.
+fn exact_row_coverage(
+    total: u64,
+    truth: [f64; 3],
+    interval_method: fn(u64, u64) -> Option<Interval>,
+) -> f64 {
+    let mut covered_mass = 0.0;
+    let mut total_mass = 0.0;
+    for first in 0..=total {
+        for second in 0..=(total - first) {
+            let third = total - first - second;
+            let counts = [first, second, third];
+            let mass = multinomial_mass(total, counts, truth);
+            total_mass += mass;
+            let intervals = [
+                interval_method(first, total).expect("valid first-cell count"),
+                interval_method(second, total).expect("valid second-cell count"),
+                interval_method(third, total).expect("valid third-cell count"),
+            ];
+            if truth.iter().zip(intervals.iter()).all(|(probability, interval)| {
+                *probability * f64::from(PROBABILITY_SCALE) + 1.0e-9
+                    >= f64::from(interval.lower)
+                    && *probability * f64::from(PROBABILITY_SCALE) - 1.0e-9
+                        <= f64::from(interval.upper)
+            }) {
+                covered_mass += mass;
+            }
+        }
+    }
+    assert!((total_mass - 1.0).abs() < 1.0e-10, "multinomial mass must sum to one");
+    covered_mass
+}
+
+fn exact_matrix_coverage(
+    trials_per_class: u64,
+    truth: [[f64; 3]; 3],
+    interval_method: fn(u64, u64) -> Option<Interval>,
+) -> f64 {
+    truth
+        .iter()
+        .map(|row| exact_row_coverage(trials_per_class, *row, interval_method))
+        .product()
+}
+
+#[test]
+fn exact_coverage_qualification_catches_rare_event_undercoverage() {
+    let cases = [
+        (
+            "nominal-sparse",
+            [
+                [0.95, 0.05, 0.0],
+                [0.05, 0.95, 0.0],
+                [0.05, 0.95, 0.0],
+            ],
+            0.999_012,
+        ),
+        (
+            "asymmetric-sparse",
+            [
+                [0.95, 0.05, 0.0],
+                [0.15, 0.85, 0.0],
+                [0.20, 0.80, 0.0],
+            ],
+            0.995_752,
+        ),
+        (
+            "balanced-dense",
+            [
+                [0.70, 0.20, 0.10],
+                [0.10, 0.70, 0.20],
+                [0.20, 0.10, 0.70],
+            ],
+            0.980_770,
+        ),
+        (
+            "rare-class-event",
+            [
+                [0.99, 0.009, 0.001],
+                [0.005, 0.99, 0.005],
+                [0.001, 0.009, 0.99],
+            ],
+            0.996_676,
+        ),
+    ];
+
+    for (name, truth, expected_coverage) in cases {
+        let actual = exact_matrix_coverage(20, truth, clopper_pearson_cell_interval);
+        assert!(
+            (actual - expected_coverage).abs() < 1.0e-5,
+            "{name}: expected exact-enumeration coverage {expected_coverage}, got {actual}"
+        );
+        assert!(
+            actual >= 0.95,
+            "{name}: Bonferroni-Clopper-Pearson region under-covered: {actual}"
+        );
+    }
+
+    let rare_event = [
+        [0.99, 0.009, 0.001],
+        [0.005, 0.99, 0.005],
+        [0.001, 0.009, 0.99],
+    ];
+    let wilson_coverage =
+        exact_matrix_coverage(20, rare_event, wilson_cell_interval_negative_control);
+    assert!(
+        wilson_coverage < 0.95,
+        "negative control must reproduce Wilson undercoverage at rare-event boundary, got {wilson_coverage}"
+    );
+}
+
 #[test]
 fn class_conditional_intervals_are_simultaneous_and_outward_rounded() {
     let intervals = confusion_intervals(nominal_counts(1_000)).expect("valid counts");
