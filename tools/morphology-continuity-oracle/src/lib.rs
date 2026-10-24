@@ -107,8 +107,14 @@ pub fn canonical_templates() -> Vec<Template> {
     chair.insert(Cell3::new(0, 1, 4));
 
     vec![
-        Template { id: "chair", cells: chair },
-        Template { id: "table", cells: table },
+        Template {
+            id: "chair",
+            cells: chair,
+        },
+        Template {
+            id: "table",
+            cells: table,
+        },
     ]
 }
 
@@ -225,7 +231,7 @@ pub fn evaluate_episode(
 mod tests {
     use super::*;
 
-    fn shape(templates: &[Template], id: &str) -> &Shape {
+    fn shape<'a>(templates: &'a [Template], id: &str) -> &'a Shape {
         &template(templates, id).expect("canonical template").cells
     }
 
@@ -245,8 +251,14 @@ mod tests {
     fn intact_shapes_are_distinct_and_exactly_classifiable() {
         let templates = canonical_templates();
         assert_ne!(shape(&templates, "chair"), shape(&templates, "table"));
-        assert_eq!(classify_exact(shape(&templates, "chair"), &templates), vec!["chair"]);
-        assert_eq!(classify_exact(shape(&templates, "table"), &templates), vec!["table"]);
+        assert_eq!(
+            classify_exact(shape(&templates, "chair"), &templates),
+            vec!["chair"]
+        );
+        assert_eq!(
+            classify_exact(shape(&templates, "table"), &templates),
+            vec!["table"]
+        );
     }
 
     #[test]
@@ -261,8 +273,13 @@ mod tests {
     fn no_memory_abstains_when_two_histories_are_compatible() {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
-        let report =
-            evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Missing);
+        let report = evaluate_episode(
+            "chair",
+            &observation,
+            &templates,
+            4,
+            TargetEvidence::Missing,
+        );
         assert_eq!(report.compatible_histories, vec!["chair", "table"]);
         assert_eq!(report.disposition, Disposition::AbstainAmbiguousHistory);
         assert_eq!(report.evidence_matches_ground_truth, None);
@@ -281,8 +298,17 @@ mod tests {
         );
         assert_eq!(report.disposition, Disposition::TargetAvailable);
         assert_eq!(report.evidence_matches_ground_truth, Some(true));
-        assert_eq!(report.target_conditioned_oracle.expect("oracle").iou_ppm, 1_000_000);
-        assert_eq!(report.observed_vs_target.expect("target metrics").missing_from_observation, 4);
+        assert_eq!(
+            report.target_conditioned_oracle.expect("oracle").iou_ppm,
+            1_000_000
+        );
+        assert_eq!(
+            report
+                .observed_vs_target
+                .expect("target metrics")
+                .missing_from_observation,
+            4
+        );
     }
 
     #[test]
@@ -298,8 +324,17 @@ mod tests {
         );
         assert_eq!(report.disposition, Disposition::TargetAvailable);
         assert_eq!(report.evidence_matches_ground_truth, Some(false));
-        assert_eq!(report.target_conditioned_oracle.expect("table oracle").iou_ppm, 1_000_000);
-        assert_eq!(report.observed_vs_target.expect("chair metrics").iou_ppm, 809_523);
+        assert_eq!(
+            report
+                .target_conditioned_oracle
+                .expect("table oracle")
+                .iou_ppm,
+            1_000_000
+        );
+        assert_eq!(
+            report.observed_vs_target.expect("chair metrics").iou_ppm,
+            809_523
+        );
     }
 
     #[test]
@@ -313,7 +348,10 @@ mod tests {
             4,
             TargetEvidence::Claimed("spaceship"),
         );
-        assert_eq!(invalid.disposition, Disposition::AbstainInvalidTargetEvidence);
+        assert_eq!(
+            invalid.disposition,
+            Disposition::AbstainInvalidTargetEvidence
+        );
         assert_eq!(invalid.evidence_matches_ground_truth, Some(false));
         let small_budget = evaluate_episode(
             "chair",
@@ -322,7 +360,10 @@ mod tests {
             2,
             TargetEvidence::Claimed("chair"),
         );
-        assert_eq!(small_budget.disposition, Disposition::AbstainTargetNotCompatible);
+        assert_eq!(
+            small_budget.disposition,
+            Disposition::AbstainTargetNotCompatible
+        );
     }
 
     #[test]
@@ -330,13 +371,25 @@ mod tests {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
         assert_eq!(
-            evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Corrupted)
-                .disposition,
+            evaluate_episode(
+                "chair",
+                &observation,
+                &templates,
+                4,
+                TargetEvidence::Corrupted
+            )
+            .disposition,
             Disposition::AbstainAmbiguousHistory
         );
         assert_eq!(
-            evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Conflicting)
-                .disposition,
+            evaluate_episode(
+                "chair",
+                &observation,
+                &templates,
+                4,
+                TargetEvidence::Conflicting
+            )
+            .disposition,
             Disposition::AbstainAmbiguousHistory
         );
     }

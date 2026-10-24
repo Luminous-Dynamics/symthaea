@@ -181,10 +181,12 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
     for job, block in jobs.items():
         if not has_runner_allocation(block):
             continue
-        runner_jobs += 1
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+        # Count only runner jobs that can be admitted for a pull request.
+        # Push/manual-only jobs do not need PR draft gates or ready_for_review.
+        runner_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
@@ -308,7 +310,7 @@ jobs:
     assert pr is not None
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
-    assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+    assert validate_generic(Path("manual.yml"), manual, pr) == (0, 0)
 
 
 def main() -> int:
