@@ -12,6 +12,7 @@
   "claim_guards": [
     "Detector accuracy is not evidence of adaptation utility.",
     "An arm-reported stream digest is not proof that a shared replay actually delivered the same exogenous events.",
+    "A confirmatory adaptation score must bind to a raw replay receipt that the scorer revalidates; digest linkage is not proof of honest runner execution.",
     "Oracle-timed adaptation is diagnostic only and is never a deployable comparator.",
     "Passing coverage gates is not evidence of state-of-the-art superiority.",
     "Synthetic fixtures validate execution contracts, not scientific hypotheses.",
@@ -159,6 +160,25 @@
     "verification_evidence_sha256_on_every_verify_action",
     "comparison_track"
   ],
+  "score_receipt_binding": {
+    "cli_flag": "--receipt",
+    "required_identity_matches": [
+      "score.dataset_id equals receipt.dataset_id",
+      "score.stream_id equals receipt.stream_id",
+      "score.seed equals receipt.environment_seed",
+      "score.shared_stream_sha256 equals receipt.event_ledger_sha256",
+      "each of the five score arm repository_head_sha values equals the corresponding receipt arm",
+      "each of the five score arm configuration_digest values equals the corresponding receipt arm"
+    ],
+    "score_provenance_fields": [
+      "source_replay_receipt_sha256",
+      "source_replay_receipt_validation_sha256",
+      "source_replay_run_id",
+      "source_replay_run_kind"
+    ],
+    "confirmatory_rule": "compare-cognitive-adaptation-panel emits primary_comparison only when all 2800 expected cells exist and every scored record has receipt-link fields with source_replay_run_kind=replay; synthetic-not-measured records suppress the comparison",
+    "limitation": "The panel validates score digests and declared receipt linkage but does not re-execute the replay driver or prove that it executed honestly; retain raw receipts and independently audit the runner."
+  },
   "replay_fail_closed_conditions": [
     "Missing, duplicated, reordered, early, or altered exogenous event",
     "Any deployable arm can access oracle-only fields",
