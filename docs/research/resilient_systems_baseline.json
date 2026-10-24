@@ -1,0 +1,1234 @@
+{
+  "schema_version": "1.0.0",
+  "as_of": "2026-10-16",
+  "status": "illustrative_screening_not_validated",
+  "purpose": "Shared starting assumptions for the resilient-systems feasibility portfolio. Values below are scenario assumptions, not certified requirements.",
+  "common_metrics": [
+    "essential_service_deficit_by_service_and_time",
+    "probability_and_duration_below_service_floor",
+    "time_to_first_service_floor_violation",
+    "time_to_recover",
+    "median_and_95th_percentile_loss_and_recovery",
+    "lifecycle_cost_energy_emissions_and_material_throughput",
+    "repair_labour_and_spare_parts_burden",
+    "critical_dependencies_and_substitution_lead_time",
+    "evidence_quality_and_validation_scale"
+  ],
+  "settlement_100_people_730_days": {
+    "population": 100,
+    "duration_days": 730,
+    "person_days": 73000,
+    "food": {
+      "daily_kcal_per_person_scenario": {
+        "minimum": 2300,
+        "maximum": 3035,
+        "status": "planning_range",
+        "note": "The upper value is drawn from a specific NASA crew habitability requirement context, not a universal human requirement.",
+        "source": "https://www.nasa.gov/reference/7-0-habitability-functions-vol-2/"
+      },
+      "total_kcal_over_period": {
+        "minimum": 167900000,
+        "maximum": 221555000
+      },
+      "edible_food_energy_density_kcal_per_kg_assumption": {
+        "minimum": 3000,
+        "maximum": 4000
+      },
+      "derived_edible_mass_tonnes_screening_range": {
+        "minimum_approx": 42,
+        "maximum_approx": 74
+      },
+      "excluded": [
+        "packaging",
+        "spoilage_and_reserve",
+        "processing_and_cooking",
+        "dietary_diversity_and_medical_diets",
+        "micronutrient_provisioning",
+        "agricultural_equipment_and_inputs"
+      ]
+    },
+    "electricity": {
+      "unit": "kWh_per_person_day",
+      "scenarios": [
+        {
+          "kwh_per_person_day": 5,
+          "site_mwh_per_day": 0.5,
+          "site_mwh_over_730_days": 365
+        },
+        {
+          "kwh_per_person_day": 10,
+          "site_mwh_per_day": 1,
+          "site_mwh_over_730_days": 730
+        },
+        {
+          "kwh_per_person_day": 20,
+          "site_mwh_per_day": 2,
+          "site_mwh_over_730_days": 1460
+        }
+      ],
+      "status": "illustrative_demand_scenarios_not_a_standard",
+      "excluded": [
+        "separate_thermal_energy_balance",
+        "hourly_peak_power_sizing",
+        "conversion_losses",
+        "reserve_margin",
+        "battery_aging_and_temperature_derating",
+        "industrial_process_loads_unless_explicitly_added"
+      ]
+    },
+    "water": {
+      "unit": "litres_per_person_day_gross_throughput",
+      "scenarios": [
+        {
+          "litres_per_person_day": 50,
+          "site_m3_per_day": 5,
+          "gross_m3_over_730_days": 3650
+        },
+        {
+          "litres_per_person_day": 100,
+          "site_m3_per_day": 10,
+          "gross_m3_over_730_days": 7300
+        }
+      ],
+      "illustrative_recovery_fraction": 0.9,
+      "idealized_makeup_m3_over_730_days": {
+        "minimum": 365,
+        "maximum": 730
+      },
+      "note": "The idealized makeup range assumes 90% recovery of the entire modeled water throughput. It is not a settlement design guarantee; rejects, leakage, contamination, irrigation and process losses, cleaning, and quality requirements require explicit balances.",
+      "source_context": "NASA reports approximately 90% recovery in its space-station water recovery system; do not transfer the value uncritically.",
+      "source": "https://www.nasa.gov/reference/environmental-control-and-life-support-systems-eclss/"
+    }
+  },
+  "transport_comparison": {
+    "comparison_boundary": "same cargo, origin-destination, deadline, safety/service level, pickup, handling, transshipment, return leg, and outage scenarios",
+    "modes_to_compare": [
+      "rail",
+      "inland_or_coastal_water",
+      "road_freight",
+      "conventional_aviation",
+      "helium_or_hot_air_airship_where_fit",
+      "vacuum_airship_as_speculative_high_risk_branch",
+      "hybrid_multimodal_chains"
+    ],
+    "required_outputs": [
+      "door_to_door_cost_per_tonne",
+      "energy_and_lifecycle_ghg_per_tonne_kilometre",
+      "delivery_time_distribution",
+      "deadline_reliability",
+      "serviceable_payload_fraction",
+      "fleet_utilization_and_deadheading",
+      "weather_and_handling_downtime",
+      "infrastructure_and_maintenance_burden"
+    ],
+    "rule": "Do not rank modes using cruise energy or nominal payload alone."
+  },
+  "self_repairing_structures": {
+    "comparison_arms": [
+      "baseline_inspection_and_maintenance",
+      "redundancy_and_modular_replacement",
+      "sensing_plus_repair_access",
+      "combined_architecture_with_self_healing_material"
+    ],
+    "required_evidence": [
+      "damage_detection_probability_by_type_and_location",
+      "false_negative_and_false_alarm_rates",
+      "residual_capacity_before_repair",
+      "verified_property_recovery_after_repair",
+      "repeatability_over_damage_repair_cycles",
+      "added_mass_energy_consumables_and_maintenance"
+    ],
+    "safety_rule": "Do not credit recovered load capacity or pressure integrity without representative tests of that specific property."
+  },
+  "lunar_industry": {
+    "candidate_first_services": [
+      "robotic_site_preparation_and_regolith_movement",
+      "qualified_noncritical_local_repair_parts_and_tooling",
+      "oxygen_or_other_resource_extraction",
+      "regolith_derived_construction_feedstock"
+    ],
+    "required_break_even": [
+      "lifetime_delivered_plant_mass_and_support",
+      "power_generation_storage_and_distribution",
+      "spares_consumables_and_maintenance",
+      "usable_yield_reject_rate_and_quality",
+      "missions_served_and_product_demand",
+      "imported_mass_cost_and_risk_avoided"
+    ],
+    "rule": "Terrestrial simulant demonstration is not lunar qualification; a local commodity is not free merely because feedstock is local."
+  },
+  "community_microfactory": {
+    "pilot_catalog_size_range": [
+      50,
+      100
+    ],
+    "initial_parts_selected_after_screening": 10,
+    "part_tiers": {
+      "tier_1": "non-safety-critical jigs, covers, fixtures, spacers and low-consequence fit/function replacements",
+      "tier_2": "mechanical/electrical parts requiring documented strength, heat, chemical, dimensional or electrical tests",
+      "tier_3": "safety-critical or process-qualified parts that must not be treated as equivalent without formal qualification"
+    },
+    "required_outputs": [
+      "time_to_repair_and_stockout_losses_avoided",
+      "full_lifecycle_cost",
+      "quality_escape_rate_and_rework",
+      "power_feedstock_and_operator_dependency",
+      "machine_utilization",
+      "process_and_inspection_traceability"
+    ]
+  },
+  "supply_network": {
+    "horizon_months": 24,
+    "scenarios": [
+      "random_single_node_outage",
+      "targeted_high_centrality_or_high_throughput_node_loss",
+      "sole_qualified_source_loss",
+      "correlated_regional_supplier_loss",
+      "shared_power_or_communications_failure",
+      "demand_underload_and_overload",
+      "shipping_interruption_plus_low_inventory",
+      "repair_skill_or_crew_unavailability"
+    ],
+    "required_model_layers": [
+      "physical_supply",
+      "transport_and_logistics",
+      "energy",
+      "communications_and_software",
+      "skills_and_maintenance",
+      "qualification_and_compliance"
+    ],
+    "rule": "Nominal supplier count is not true redundancy when suppliers share upstream dependencies."
+  },
+  "minimum_viable_civilization": {
+    "capability_floors": [
+      "safe_water_and_sanitation",
+      "sufficient_diverse_nutrition",
+      "safe_shelter_and_thermal_conditions",
+      "essential_energy",
+      "basic_healthcare_and_medicine_continuity",
+      "communications_education_and_knowledge",
+      "repair_manufacturing_tools_and_skills",
+      "logistics_and_external_support",
+      "legitimate_governance_accountability_and_rights",
+      "ecological_limits_and_fair_distribution"
+    ],
+    "optimization": "Pareto_frontier_not_single_weighted_resilience_score",
+    "rule": "Aggregate service averages may not conceal a subgroup falling below a required capability floor."
+  },
+  "proposed_stress_tests": {
+    "settlement_power_outage_days": [
+      3,
+      14,
+      30
+    ],
+    "network_study_horizon_months": 24,
+    "negative_controls": [
+      "remove_the_supposed_redundant_source",
+      "introduce_a_shared_upstream_dependency",
+      "set_repair_time_to_infinity",
+      "reduce_a_critical_part_quality_below_acceptance",
+      "apply_a_correlated_regional_shock"
+    ]
+  },
+  "benchmark_protocol": {
+    "status": "proposed_acceptance_gates_not_published_standards",
+    "levels": {
+      "B0_schema_fail_closed": "Reject 100% of explicitly enumerated malformed-input fixtures.",
+      "B1_deterministic_reference_fixtures": "Identical inputs reproduce identical reports; sufficient-capacity nominal fixture has zero deficit.",
+      "B2_metamorphic_and_negative_controls": [
+        "single independent source loss preserves declared service floor when residual capacity is sufficient",
+        "common-mode source loss removes redundancy credit",
+        "slower restoration does not reduce cumulative deficit",
+        "more severe capacity loss does not improve cumulative deficit",
+        "more nominal capacity does not worsen fulfillment",
+        "unknown dependency and dependency cycle fail closed",
+        "service input order does not change per-service results",
+        "recovery beyond horizon remains unknown"
+      ],
+      "B3_observed_trace_calibration": "At least 3 observed outage/recovery traces; at least 1 held-out event/window; compare with a simple baseline; pre-register domain-specific error tolerances.",
+      "B4_intervention_comparison": "Compare against a declared reference configuration; report Pareto trade-offs and test common-mode dependencies.",
+      "B5_decision_grade": "Independent domain review, traceable data, uncertainty, representative validation, and domain-specific approval."
+    },
+    "scenario_catalog": [
+      {
+        "id": "RS-01",
+        "name": "nominal_sufficient_capacity",
+        "expected": "zero_unmet_service"
+      },
+      {
+        "id": "RS-02",
+        "name": "deliberate_undersizing",
+        "expected": "deficit_without_outage"
+      },
+      {
+        "id": "RS-03",
+        "name": "single_independent_source_loss",
+        "expected": "floor_holds_if_residual_capacity_is_sufficient"
+      },
+      {
+        "id": "RS-04",
+        "name": "common_mode_source_loss",
+        "expected": "deficit_when_no_substitute_exists"
+      },
+      {
+        "id": "RS-05",
+        "name": "upstream_power_loss",
+        "expected": "declared_dependents_degrade"
+      },
+      {
+        "id": "RS-06",
+        "name": "slow_vs_fast_recovery",
+        "expected": "slower_recovery_does_not_improve_total_deficit"
+      },
+      {
+        "id": "RS-07",
+        "name": "mild_vs_severe_loss",
+        "expected": "more_severe_loss_does_not_improve_total_deficit"
+      },
+      {
+        "id": "RS-08",
+        "name": "simultaneous_disruptions",
+        "expected": "each_disruption_is_accounted_for"
+      },
+      {
+        "id": "RS-09",
+        "name": "unknown_dependency",
+        "expected": "explicit_validation_error"
+      },
+      {
+        "id": "RS-10",
+        "name": "dependency_cycle",
+        "expected": "explicit_validation_error"
+      },
+      {
+        "id": "RS-11",
+        "name": "invalid_numeric_inputs",
+        "expected": "explicit_validation_error"
+      },
+      {
+        "id": "RS-12",
+        "name": "input_order_permutation",
+        "expected": "same_per_service_results"
+      },
+      {
+        "id": "RS-13",
+        "name": "recovery_after_horizon",
+        "expected": "recovery_remains_unknown"
+      },
+      {
+        "id": "RS-14",
+        "name": "temporary_rebound_then_rebreach",
+        "expected": "stable_recovery_after_final_violation"
+      }
+    ],
+    "local_validation_status": {
+      "rust_tests_executed": false,
+      "reason": "Local tool environment did not provide cargo or rustc.",
+      "do_not_claim": [
+        "compiled",
+        "tests_passed",
+        "workflow_passed",
+        "field_validated"
+      ],
+      "continuity_tests_authored": 20,
+      "resource_tests_authored": 18,
+      "repair_scheduling_tests_authored": 17,
+      "robust_repair_evaluation_tests_authored": 10,
+      "total_rust_tests_authored": 115,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8, independent schedule certificate verifier 14. None have been compiled or executed in the current environment.",
+      "rolling_horizon_repair_tests_authored": 11,
+      "repair_policy_comparison_tests_authored": 6,
+      "exact_oracle_tests_authored": 11,
+      "multi_crew_oracle_tests_authored": 8,
+      "certificate_verifier_tests_authored": 14
+    },
+    "performance_targets": {
+      "status": "proposed_unmeasured_targets",
+      "reference_case": {
+        "services": 100,
+        "dependency_edges_max": 200,
+        "disruption_records": 20,
+        "time_steps": 730,
+        "target_p95_runtime_ms": 100,
+        "build_profile": "release"
+      },
+      "batch_case": {
+        "scenario_count": 1000,
+        "target_runtime_seconds": 60
+      },
+      "large_case": {
+        "services": 1000,
+        "dependency_edges_max": 2000,
+        "time_steps": 730,
+        "target_single_run_seconds": 2
+      },
+      "requirements": [
+        "record_cpu_os_rustc_version_build_profile_commit_and_configuration_digest",
+        "preserve_per_service_traces",
+        "no_semantic_or_time_resolution_reduction_to_meet_performance_target",
+        "measure_on_documented_reference_host_before_adopting_as_release_gate"
+      ],
+      "resource_constrained_case": {
+        "status": "proposed_unmeasured_target",
+        "services": 100,
+        "resources": 20,
+        "service_resource_requirements_max": 500,
+        "dependency_edges_max": 200,
+        "time_steps": 730,
+        "target_single_scenario_ms": 250,
+        "target_1000_scenarios_seconds": 120,
+        "large_case": {
+          "services": 1000,
+          "service_resource_requirements": 2000,
+          "time_steps": 730,
+          "target_single_scenario_seconds": 5
+        },
+        "requirements": [
+          "benchmark_on_a_documented_reference_host",
+          "report_per_service_and_per_resource_traces",
+          "do_not_sacrifice_validation_or_resolution_to_meet_speed_targets"
+        ]
+      }
+    }
+  },
+  "resource_constrained_screening": {
+    "status": "research_abstraction_not_calibrated",
+    "model": {
+      "service_fields": [
+        "demand",
+        "capacity",
+        "priority",
+        "dependencies",
+        "resource_requirements_per_delivered_unit"
+      ],
+      "resource_fields": [
+        "initial_stock",
+        "storage_capacity",
+        "replenishment_per_step"
+      ],
+      "disruption": "resource supply disruption scales replenishment; initial stock remains available",
+      "allocation": "dependency-safe deterministic order, priority then stable identifier when choices are independent",
+      "outputs": [
+        "per_service_delivered_output",
+        "per_service_fulfillment",
+        "per_service_unmet_demand",
+        "resource_inventory",
+        "actual_replenishment",
+        "resource_consumption",
+        "service_floor_violations",
+        "stable_recovery"
+      ],
+      "limitations": [
+        "no stochastic failure probability",
+        "no repair crews or queues",
+        "no substitute resource conversion or switching delay",
+        "no spatial or physical process laws",
+        "priority policy can starve lower-priority services",
+        "unlike service units must not be summed without justified normalization"
+      ]
+    },
+    "tests_authored": 18,
+    "tests_executed": false,
+    "reference_fixtures": [
+      {
+        "id": "RC-01",
+        "name": "stock_conservation",
+        "expected": "inventory in range [0, storage_capacity]"
+      },
+      {
+        "id": "RC-02",
+        "name": "consumption_conservation",
+        "expected": "consumption equals delivered output times use rate and does not exceed available stock"
+      },
+      {
+        "id": "RC-03",
+        "name": "finite_stockout",
+        "expected": "required service becomes resource-limited when stock runs out and replenishment is zero"
+      },
+      {
+        "id": "RC-04",
+        "name": "supply_interruption",
+        "expected": "event affects replenishment, not stored inventory"
+      },
+      {
+        "id": "RC-05",
+        "name": "dependency_resource_bottleneck",
+        "expected": "upstream service and finite material constraints compose"
+      },
+      {
+        "id": "RC-06",
+        "name": "explicit_priority_and_stable_tiebreak",
+        "expected": "deterministic declared allocation; inspect starvation by service"
+      },
+      {
+        "id": "RC-07",
+        "name": "storage_bound",
+        "expected": "replenishment above storage cap is curtailed"
+      },
+      {
+        "id": "RC-08",
+        "name": "qualified_resource_substitution_future",
+        "expected": "no substitute credit before conversion, quality and switching delay are modeled"
+      }
+    ],
+    "research_sources": [
+      "https://doi.org/10.1038/s41598-025-99974-x",
+      "https://www.nature.com/articles/s41598-026-63123-9",
+      "https://doi.org/10.1016/j.cie.2026.112063"
+    ]
+  },
+  "repair_crew_scheduling": {
+    "status": "deterministic_heuristic_not_optimal_or_calibrated",
+    "policies": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step"
+    ],
+    "job_fields": [
+      "required_skill",
+      "duration_steps",
+      "priority",
+      "recovered_service_value_per_step",
+      "outage_start_step",
+      "prerequisite_jobs",
+      "finite_spare_parts"
+    ],
+    "crew_fields": [
+      "skills",
+      "available_from_step"
+    ],
+    "outputs": [
+      "crew_assignment",
+      "start_and_finish_steps",
+      "weighted_service_unit_steps_lost_within_horizon",
+      "jobs_completed_within_horizon",
+      "remaining_spares"
+    ],
+    "assumptions": [
+      "deterministic_repair_durations",
+      "no_crew_travel_or_access_time",
+      "parts_reserved_when_schedule_is_constructed",
+      "each repair's outage starts at its declared step",
+      "caller_weighted_service_value_is_not_an_ethical_objective"
+    ],
+    "limitations": [
+      "not_globally_optimal",
+      "no_uncertain_repair_durations",
+      "no_crew_routing_or_transport_power_interdependency",
+      "no_shared_tool_or_shift_calendar_model",
+      "no_policy_fairness_guarantee"
+    ],
+    "tests_authored": 17,
+    "tests_executed": false,
+    "reference_cases": [
+      {
+        "id": "RCREW-01",
+        "expected": "only crews with required skill can receive a job"
+      },
+      {
+        "id": "RCREW-02",
+        "expected": "no overlapping jobs per crew"
+      },
+      {
+        "id": "RCREW-03",
+        "expected": "prerequisite finish no later than dependent start"
+      },
+      {
+        "id": "RCREW-04",
+        "expected": "reserved parts do not exceed declared stock"
+      },
+      {
+        "id": "RCREW-05",
+        "expected": "unfinished repairs at horizon do not claim restoration"
+      },
+      {
+        "id": "RCREW-06",
+        "expected": "same input and policy yield same schedule"
+      },
+      {
+        "id": "RCREW-07",
+        "expected": "disclosed synthetic fixture allows policy objective comparison"
+      },
+      {
+        "id": "RCREW-08",
+        "expected": "infeasible prerequisites, skills and spares fail explicitly"
+      },
+      {
+        "id": "RCREW-09",
+        "expected": "prefer_less_flexible_qualified_crew_when_assigning_an_otherwise_tied_job_to_preserve_versatile_crew_capacity"
+      }
+    ],
+    "proposed_optimization_target": {
+      "status": "aspirational_unmeasured",
+      "tiny_case_max_jobs": 8,
+      "target_within_10_percent_of_exact_optimum_fraction": 0.95,
+      "must_use_independent_exhaustive_oracle": true,
+      "must_publish_fixture_corpus": true,
+      "synthetic_policy_witness": {
+        "priority_first_weighted_loss": 1110,
+        "weighted_recovery_weighted_loss": 111,
+        "relative_reduction_percent": 90,
+        "status": "independent_arithmetic_only_not_empirical_and_not_Rust_test_execution"
+      }
+    },
+    "research_sources": [
+      "https://doi.org/10.1111/risa.70220",
+      "https://doi.org/10.1080/10286608.2025.2602872",
+      "https://doi.org/10.1016/j.cor.2025.107379"
+    ],
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_case": {
+        "jobs": 100,
+        "crews": 20,
+        "part_types": 50,
+        "precedence_edges": 200,
+        "target_p95_ms": 250
+      },
+      "stress_case": {
+        "jobs": 1000,
+        "crews": 100,
+        "target_seconds": 10
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "retain_full_traces_and_validation"
+      ]
+    },
+    "exact_oracle": {
+      "status": "test_only_tiny_reference_oracle_authored_unexecuted",
+      "scope": "single_crew_no_prerequisites_no_spare_parts",
+      "enumeration": "all job permutations",
+      "reference_fixture_jobs": 2,
+      "weighted_policy_loss": 111,
+      "exact_optimum_loss": 111,
+      "is_rust_test_executed": false
+    },
+    "heuristics": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step",
+      "least_flexible_qualified_crew_as_assignment_tiebreak"
+    ]
+  },
+  "robust_repair_evaluation": {
+    "status": "out_of_sample_scenario_evaluation_not_calibrated",
+    "policies": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step"
+    ],
+    "information_contract": "initial dispatch order and crew assignments are selected from nominal durations only and remain fixed during duration-scenario replay",
+    "per_scenario_retiming": "realized duration changes finish times; crew availability and prerequisite finish times delay later work",
+    "metrics": [
+      "scenario_weighted_expected_loss",
+      "worst_case_loss",
+      "upper_tail_cvar",
+      "per_scenario_schedule_and_loss",
+      "jobs_completed_within_horizon"
+    ],
+    "scenario_weight_semantics": "weights must sum to 1 but are not probabilities without empirical support",
+    "tests_authored": 10,
+    "tests_executed": false,
+    "limitations": [
+      "no calibrated duration distribution",
+      "no stochastic scenario generation or reduction",
+      "no travel/access uncertainty",
+      "no online or rolling-horizon replanning",
+      "initial dispatch order and crew assignments are frozen",
+      "CVaR reflects the supplied scenario weights and set only",
+      "the paired comparison harness reports deterministic scenario deltas but does not yet estimate statistical confidence intervals"
+    ],
+    "reference_cases": [
+      {
+        "id": "DUR-01",
+        "expected": "nominal decision order and crew assignment do not vary across realized duration scenarios"
+      },
+      {
+        "id": "DUR-02",
+        "expected": "rare slow repair raises worst-case and upper-tail CVaR loss"
+      },
+      {
+        "id": "DUR-03",
+        "expected": "longer realized repair cannot reduce its fixed-plan loss"
+      },
+      {
+        "id": "DUR-04",
+        "expected": "slower prerequisite delays dependent restoration"
+      },
+      {
+        "id": "DUR-05",
+        "expected": "weights and duration records fail closed when invalid/incomplete"
+      },
+      {
+        "id": "DUR-06",
+        "expected": "identical input reproduces identical risk report"
+      },
+      {
+        "id": "DUR-07",
+        "expected": "expected, worst-case, CVaR and scenario traces remain jointly available"
+      },
+      {
+        "id": "DUR-08",
+        "expected": "initial_crew_available_from_step_is_preserved_during_scenario_replay"
+      }
+    ],
+    "research_sources": [
+      "https://doi.org/10.1016/0360-8352(96)00119-2",
+      "https://doi.org/10.1016/j.ejor.2021.04.025",
+      "https://doi.org/10.1016/j.cor.2025.107379"
+    ],
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_case": {
+        "jobs": 100,
+        "crews": 20,
+        "duration_scenarios": 20,
+        "target_p95_seconds": 1
+      },
+      "stress_case": {
+        "jobs": 500,
+        "crews": 50,
+        "duration_scenarios": 100,
+        "target_seconds": 15
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "preserve_per_scenario_schedule_traces"
+      ]
+    }
+  },
+  "rolling_horizon_repair": {
+    "status": "event_triggered_deterministic_dispatch_not_calibrated",
+    "information_contract": "pending-job ranking uses nominal duration only; realized duration is consulted only after dispatch to schedule the completion event; decisions log completed jobs, eligible jobs, available crews and choice",
+    "policies": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step"
+    ],
+    "modeled_state": [
+      "pending_active_complete_job_state",
+      "outage_release_time",
+      "completed_prerequisites",
+      "available_qualified_crews",
+      "finite_spare_stock",
+      "realized_finish_events"
+    ],
+    "outputs": [
+      "event_time_decision_trace",
+      "eligible_job_ids_at_decision",
+      "completed_jobs_observed",
+      "available_crews_observed",
+      "dispatch_order_and_assignment",
+      "per_repair_weighted_loss",
+      "total_weighted_service_unit_steps_lost",
+      "jobs_in_progress_at_horizon",
+      "jobs_not_started",
+      "remaining_spare_stock"
+    ],
+    "assumptions": [
+      "nominal_duration_is_available_for_ranking",
+      "realized_duration_hidden_until_job_dispatch",
+      "spare_parts_consumed_when_job_starts",
+      "no crew travel or road access time",
+      "no replenishment",
+      "jobs are non-preemptive"
+    ],
+    "limitations": [
+      "not calibrated against operational traces",
+      "no crew routing or travel time",
+      "no shift calendars or crew fatigue",
+      "no supply replenishment or substitutions",
+      "no partially completed repair state",
+      "no stochastic duration model or justified scenario probabilities",
+      "policy does not optimize distributional fairness",
+      "paired harness is implemented as a separate module; empirical calibration and statistical uncertainty estimates remain absent"
+    ],
+    "tests_authored": 11,
+    "tests_executed": false,
+    "reference_cases": [
+      {
+        "id": "RH-01",
+        "expected": "same observable state and different unrealized outcomes yield the same current action"
+      },
+      {
+        "id": "RH-02",
+        "expected": "newly eligible high-priority job can move ahead of pending work after observed delay"
+      },
+      {
+        "id": "RH-03",
+        "expected": "dependent repair waits until prerequisite completion is observed"
+      },
+      {
+        "id": "RH-04",
+        "expected": "skill eligibility and crew exclusivity hold"
+      },
+      {
+        "id": "RH-05",
+        "expected": "finite spares are consumed on dispatch and never become negative"
+      },
+      {
+        "id": "RH-06",
+        "expected": "work never starts before outage release or crew availability"
+      },
+      {
+        "id": "RH-07",
+        "expected": "horizon completion and in-progress work are distinguished"
+      },
+      {
+        "id": "RH-08",
+        "expected": "identical inputs reproduce identical decision traces"
+      },
+      {
+        "id": "RH-09",
+        "expected": "adaptive and fixed policies are compared on paired realized-duration cases"
+      },
+      {
+        "id": "RH-10",
+        "expected": "both adaptive wins and losses are retained in published cases"
+      }
+    ],
+    "synthetic_witness": {
+      "fixed_dispatch_order": [
+        "A",
+        "C",
+        "B"
+      ],
+      "adaptive_dispatch_order": [
+        "A",
+        "B",
+        "C"
+      ],
+      "fixed_order_realized_loss": 922,
+      "adaptive_realized_loss": 724,
+      "relative_reduction_percent": 21.475054466230937,
+      "status": "single_synthetic_fixture_not_empirical"
+    },
+    "research_sources": [
+      "https://arxiv.org/abs/2404.03197",
+      "https://doi.org/10.1111/mice.12435"
+    ],
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_batch": {
+        "jobs": 100,
+        "crews": 20,
+        "duration_scenarios": 20,
+        "target_total_seconds": 1
+      },
+      "stress_batch": {
+        "jobs": 500,
+        "crews": 50,
+        "duration_scenarios": 100,
+        "target_total_seconds": 15
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "paired_policy_inputs",
+        "retain_per_scenario_decision_traces",
+        "measure_tail_risk_and_per_case_deltas"
+      ]
+    }
+  },
+  "repair_policy_comparison": {
+    "status": "paired_fixed_vs_adaptive_evaluation_not_calibrated",
+    "inputs": "same nominal jobs, crews, spare inventory, horizon, repair policy, duration scenarios and scenario weights for each paired comparison",
+    "fixed_baseline": "existing robust_repair_evaluation nominal-plan schedule with fixed dispatch order and crew assignment replayed under realized durations",
+    "adaptive_baseline": "rolling_horizon_repair event-driven dispatch using only observed completions, released outages, ready crews and remaining stock",
+    "metrics": [
+      "fixed_expected_loss",
+      "adaptive_expected_loss",
+      "expected_loss_delta_adaptive_minus_fixed",
+      "relative_expected_loss_reduction_when_defined",
+      "fixed_and_adaptive_worst_case_loss",
+      "fixed_and_adaptive_upper_tail_cvar",
+      "per_scenario_loss_delta",
+      "improved_worsened_tied_scenario_counts",
+      "scenario_weight_mass_of_improved_and_worsened_cases",
+      "per_scenario_fixed_schedule_and_adaptive_decision_trace"
+    ],
+    "tests_authored": 6,
+    "tests_executed": false,
+    "limitations": [
+      "no statistical bootstrap or confidence intervals",
+      "no empirical scenario-probability calibration",
+      "no field-data holdout corpus yet",
+      "adaptive policy is a heuristic, not an optimal solver",
+      "scenario weights are descriptive absent empirical support"
+    ],
+    "reference_cases": [
+      {
+        "id": "PC-01",
+        "expected": "fixed and adaptive records use the same scenario identity, weight and realization"
+      },
+      {
+        "id": "PC-02",
+        "expected": "every per-case delta and weighted expected delta matches its definition"
+      },
+      {
+        "id": "PC-03",
+        "expected": "expected, worst-case and CVaR losses are reported for both approaches"
+      },
+      {
+        "id": "PC-04",
+        "expected": "wins, ties and regressions are retained with traces"
+      },
+      {
+        "id": "PC-05",
+        "expected": "identical inputs yield identical comparison report"
+      },
+      {
+        "id": "PC-06",
+        "expected": "fixed nominal plan is not weakened to create an adaptive win"
+      }
+    ],
+    "synthetic_witness": {
+      "policy": "priority_first",
+      "scenario_id": "delay-A",
+      "fixed_plan_loss": 922,
+      "rolling_horizon_loss": 724,
+      "loss_delta_adaptive_minus_fixed": -198,
+      "relative_expected_loss_reduction": 0.21475054466230933,
+      "status": "single_designed_scenario_not_empirical"
+    },
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_batch": {
+        "jobs": 100,
+        "crews": 20,
+        "scenarios": 20,
+        "target_total_seconds": 1
+      },
+      "stress_batch": {
+        "jobs": 500,
+        "crews": 50,
+        "scenarios": 100,
+        "target_total_seconds": 15
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "paired_identical_scenarios",
+        "retain_full_case_traces",
+        "measure_worst_case_and_cvar"
+      ]
+    }
+  },
+  "repair_small_instance_oracle": {
+    "status": "exhaustive_exact_oracle_narrow_scope_not_executed",
+    "source_module": "crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs",
+    "fixture_corpus": "docs/research/repair_scheduling_oracle_corpus.json",
+    "objective": "sum(recovered_service_value_per_step * completion_step)",
+    "scope": [
+      "1 to 8 jobs",
+      "one hypothetical crew qualified for every job",
+      "all outage_start_step = 0",
+      "no precedence dependencies",
+      "no spare-part requirements",
+      "positive integer durations",
+      "positive finite caller-supplied service values"
+    ],
+    "exact_permutations_by_job_count": {
+      "1": 1,
+      "2": 2,
+      "3": 6,
+      "4": 24,
+      "5": 120,
+      "6": 720,
+      "7": 5040,
+      "8": 40320
+    },
+    "tests_authored": 11,
+    "tests_executed": false,
+    "reference_fixtures": [
+      {
+        "id": "ORACLE-01",
+        "expected_order": [
+          "fast_high",
+          "slow_low"
+        ],
+        "expected_objective": 111,
+        "permutations": 2
+      },
+      {
+        "id": "ORACLE-02",
+        "expected_order": [
+          "B",
+          "C",
+          "A"
+        ],
+        "expected_objective": 28,
+        "permutations": 6
+      },
+      {
+        "id": "ORACLE-03",
+        "expected_order": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "expected_objective": 113,
+        "permutations": 24
+      },
+      {
+        "id": "ORACLE-04",
+        "expected_order": [
+          "a",
+          "z"
+        ],
+        "expected_objective": 14,
+        "permutations": 2
+      },
+      {
+        "id": "ORACLE-05",
+        "expected_order": [
+          "only"
+        ],
+        "expected_objective": 15,
+        "permutations": 1
+      },
+      {
+        "id": "ORACLE-06",
+        "expected_objective": 406,
+        "permutations": 40320,
+        "expected_order": [
+          "b",
+          "f",
+          "d",
+          "h",
+          "c",
+          "g",
+          "e",
+          "a"
+        ],
+        "verification": "independent_exhaustive_JavaScript_arithmetic_Rust_test_unexecuted"
+      }
+    ],
+    "limitations": [
+      "not multi-crew",
+      "no precedence or spare constraints",
+      "no travel or access times",
+      "no uncertainty",
+      "no horizon truncation",
+      "not calibrated and not executed in current tool environment"
+    ],
+    "research_sources": [
+      "https://doi.org/10.1287/trsc.2023.0227",
+      "https://doi.org/10.1016/j.cor.2020.104935",
+      "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/",
+      "https://doi.org/10.1016/j.orl.2013.08.001"
+    ],
+    "policy_gap_evaluator": {
+      "function": "evaluate_repair_policies_against_exact_optimum",
+      "policies": [
+        "priority_first",
+        "shortest_job_first",
+        "weighted_recovery_per_step"
+      ],
+      "outputs": [
+        "exact_optimum",
+        "policy_schedule_order",
+        "policy_weighted_completion_loss",
+        "absolute_optimality_gap",
+        "relative_optimality_gap"
+      ],
+      "reference_witness": {
+        "id": "ORACLE-01",
+        "priority_first_loss": 1110,
+        "priority_first_absolute_gap": 999,
+        "priority_first_relative_gap": 9,
+        "shortest_job_first_loss": 111,
+        "weighted_recovery_loss": 111
+      }
+    },
+    "classical_baseline_note": "For this single-machine weighted-completion objective, nonincreasing service-value/duration (Smith WSPT rule) is already optimal. The oracle verifies implementation and measures alternative heuristics; it is not novel general scheduling."
+  },
+  "multi_crew_repair_oracle": {
+    "status": "exact_tiny_multi_crew_oracle_not_executed",
+    "source_module": "crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs",
+    "fixture_corpus": "docs/research/multi_crew_repair_oracle_corpus.json",
+    "maximum_jobs": 6,
+    "maximum_crews": 3,
+    "objective": "sum(recovered_service_value_per_step * completion_step)",
+    "constraints": [
+      "one required skill per job",
+      "qualified crew only",
+      "crew exclusivity",
+      "acyclic precedence dependencies",
+      "all outage_start_step = 0",
+      "all crew available_from_step = 0",
+      "no spare parts"
+    ],
+    "outputs": [
+      "canonical_exact_schedule",
+      "minimum_weighted_completion_loss",
+      "complete_dispatch_sequences_evaluated",
+      "priority_first_loss_and_gap",
+      "shortest_job_first_loss_and_gap",
+      "weighted_recovery_loss_and_gap"
+    ],
+    "tests_authored": 8,
+    "tests_executed": false,
+    "reference_fixtures": [
+      {
+        "id": "MC-01",
+        "expected_loss": 41,
+        "expected_schedule": [
+          [
+            "c",
+            "crew-x",
+            0,
+            2
+          ],
+          [
+            "b",
+            "crew-y",
+            0,
+            3
+          ],
+          [
+            "a",
+            "crew-x",
+            2,
+            6
+          ]
+        ],
+        "complete_dispatch_sequences_evaluated": 6
+      },
+      {
+        "id": "MC-02",
+        "expected_loss": 52,
+        "expected_schedule": [
+          [
+            "power",
+            "electrician",
+            0,
+            2
+          ],
+          [
+            "pump",
+            "mechanic",
+            2,
+            5
+          ]
+        ],
+        "complete_dispatch_sequences_evaluated": 1
+      },
+      {
+        "id": "MC-03",
+        "expected_loss": 42,
+        "expected_schedule": [
+          [
+            "sensor",
+            "electrician",
+            0,
+            2
+          ],
+          [
+            "valve",
+            "versatile",
+            0,
+            2
+          ],
+          [
+            "relay",
+            "electrician",
+            2,
+            5
+          ]
+        ],
+        "complete_dispatch_sequences_evaluated": 24
+      }
+    ],
+    "limitations": [
+      "tiny oracle bounds only",
+      "no spare inventory constraints",
+      "no crew travel/access or shifts",
+      "no uncertainty or rolling-horizon feedback",
+      "not field-validated",
+      "Rust tests authored but not executed"
+    ],
+    "research_sources": [
+      "https://doi.org/10.1016/j.ejor.2022.05.049",
+      "https://doi.org/10.1016/j.asoc.2022.109253",
+      "https://doi.org/10.1016/j.cie.2020.107004"
+    ]
+  },
+  "repair_schedule_certificate": {
+    "status": "independent_feasibility_and_objective_verifier_not_executed",
+    "source_module": "crates/domains/symthaea-engineering/src/repair_schedule_certificate.rs",
+    "accepted_claim": "schedule_feasibility_and_objective_arithmetic_only",
+    "does_not_prove": "global_optimality",
+    "scope": [
+      "all outage_start_step = 0",
+      "all crew available_from_step = 0",
+      "positive integer durations",
+      "one required skill per job",
+      "no spare-part requirements"
+    ],
+    "checks": [
+      "exact job coverage",
+      "unique scheduled job IDs",
+      "known job and crew IDs",
+      "selected crew has required skill",
+      "scheduled duration matches input duration",
+      "no overlapping jobs per crew",
+      "all prerequisites finish before dependent starts",
+      "supported input assumptions",
+      "independently recomputed weighted completion loss"
+    ],
+    "negative_controls": [
+      "missing job",
+      "duplicate job assignment",
+      "unknown scheduled job",
+      "unqualified crew",
+      "overlapping jobs",
+      "precedence violation",
+      "duration mismatch",
+      "false objective",
+      "unsupported spare parts",
+      "late crew availability",
+      "nonfinite service weight or objective",
+      "unknown and duplicate dependencies"
+    ],
+    "tests_authored": 14,
+    "tests_executed": false,
+    "mutation_campaign_target": 10000,
+    "performance_status": "not_measured",
+    "limitations": [
+      "certificate does not establish optimality",
+      "does not validate parts, travel/access, shifts, release times, uncertainty or real-world operational safety",
+      "Rust tests authored but not executed"
+    ],
+    "research_sources": [
+      "https://doi.org/10.1016/j.ejor.2022.05.049",
+      "https://doi.org/10.1016/j.asoc.2022.109253",
+      "https://github.com/MarioVanhoucke/MSLIB-Multi-Skilled-Resource-Constrained-Project-Library",
+      "https://github.com/imopse/imopse"
+    ],
+    "external_benchmark_plan": {
+      "primary_candidate": "MSLIB",
+      "primary_source": "https://github.com/MarioVanhoucke/MSLIB-Multi-Skilled-Resource-Constrained-Project-Library",
+      "release_source": "https://github.com/MarioVanhoucke/MSLIB-Multi-Skilled-Resource-Constrained-Project-Library/releases",
+      "secondary_candidate": "iMOPSE",
+      "secondary_source": "https://github.com/imopse/imopse",
+      "secondary_reference": "https://doi.org/10.1016/j.asoc.2022.109253",
+      "status": "research_selected_adapter_not_implemented",
+      "required_controls": [
+        "preserve_upstream_instance_ids",
+        "record_release_and_file_checksums",
+        "document_every_mapping_and_exclusion",
+        "separate_tuning_and_holdout_instances",
+        "report_benchmark_native_objectives_separately_from_weighted_completion_loss",
+        "only compute best_known_gap when objective_and_constraints_match"
+      ]
+    },
+    "mutation_campaign_test": "deterministic_mutation_campaign_rejects_all_10000_invalid_certificates",
+    "mutation_campaign_cases_authored": 10000,
+    "mutation_campaign_executed": false
+  }
+}

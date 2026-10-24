@@ -1,0 +1,243 @@
+{
+  "schema_version": "1.0.0",
+  "status": "tiny_exact_multi_crew_correctness_corpus_not_field_data",
+  "source_module": "crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs",
+  "scope": {
+    "maximum_jobs": 6,
+    "maximum_crews": 3,
+    "objective": "minimize sum(job.recovered_service_value_per_step * completion_step)",
+    "crews": "each job must match at least one crew skill; a crew processes at most one job at a time",
+    "precedence": "directed acyclic dependencies; dependent job can start after every prerequisite finishes",
+    "start_times": "all outage_start_step and crew available_from_step equal zero",
+    "excluded": [
+      "spare-part constraints",
+      "crew travel/access",
+      "preemption",
+      "replenishment",
+      "uncertain duration",
+      "partial repair",
+      "horizon truncation"
+    ],
+    "enumeration": "recursively enumerate every precedence-ready job choice and every qualified-crew assignment, placing selected work at the earliest start allowed by prior assignments",
+    "interpretation": "complete dispatch-sequence count can count the same final schedule through more than one serial-generation sequence; it is not a count of distinct schedules"
+  },
+  "fixtures": [
+    {
+      "id": "MC-01",
+      "title": "Skill-constrained parallel dispatch",
+      "jobs": [
+        {
+          "id": "a",
+          "required_skill": "x",
+          "duration_steps": 4,
+          "priority": 0,
+          "recovered_service_value_per_step": 1,
+          "depends_on": []
+        },
+        {
+          "id": "b",
+          "required_skill": "y",
+          "duration_steps": 3,
+          "priority": 1,
+          "recovered_service_value_per_step": 5,
+          "depends_on": []
+        },
+        {
+          "id": "c",
+          "required_skill": "x",
+          "duration_steps": 2,
+          "priority": 2,
+          "recovered_service_value_per_step": 10,
+          "depends_on": []
+        }
+      ],
+      "crews": [
+        {
+          "id": "crew-x",
+          "skills": [
+            "x"
+          ],
+          "available_from_step": 0
+        },
+        {
+          "id": "crew-y",
+          "skills": [
+            "y"
+          ],
+          "available_from_step": 0
+        }
+      ],
+      "expected": {
+        "minimum_weighted_completion_loss": 41,
+        "optimal_schedule": [
+          {
+            "job_id": "c",
+            "crew_id": "crew-x",
+            "start_step": 0,
+            "finish_step": 2
+          },
+          {
+            "job_id": "b",
+            "crew_id": "crew-y",
+            "start_step": 0,
+            "finish_step": 3
+          },
+          {
+            "job_id": "a",
+            "crew_id": "crew-x",
+            "start_step": 2,
+            "finish_step": 6
+          }
+        ],
+        "complete_dispatch_sequences_evaluated": 6
+      },
+      "purpose": "Proves concurrent crews and a same-skill bottleneck are handled jointly."
+    },
+    {
+      "id": "MC-02",
+      "title": "Cross-crew prerequisite",
+      "jobs": [
+        {
+          "id": "power",
+          "required_skill": "electric",
+          "duration_steps": 2,
+          "priority": 0,
+          "recovered_service_value_per_step": 1,
+          "depends_on": []
+        },
+        {
+          "id": "pump",
+          "required_skill": "mechanical",
+          "duration_steps": 3,
+          "priority": 1,
+          "recovered_service_value_per_step": 10,
+          "depends_on": [
+            "power"
+          ]
+        }
+      ],
+      "crews": [
+        {
+          "id": "electrician",
+          "skills": [
+            "electric"
+          ],
+          "available_from_step": 0
+        },
+        {
+          "id": "mechanic",
+          "skills": [
+            "mechanical"
+          ],
+          "available_from_step": 0
+        }
+      ],
+      "expected": {
+        "minimum_weighted_completion_loss": 52,
+        "optimal_schedule": [
+          {
+            "job_id": "power",
+            "crew_id": "electrician",
+            "start_step": 0,
+            "finish_step": 2
+          },
+          {
+            "job_id": "pump",
+            "crew_id": "mechanic",
+            "start_step": 2,
+            "finish_step": 5
+          }
+        ],
+        "complete_dispatch_sequences_evaluated": 1
+      },
+      "purpose": "Prevents a dependent repair from starting until a different crew's prerequisite is complete."
+    },
+    {
+      "id": "MC-03",
+      "title": "Preserve a multi-skilled crew for a unique skill",
+      "jobs": [
+        {
+          "id": "relay",
+          "required_skill": "electrical",
+          "duration_steps": 3,
+          "priority": 0,
+          "recovered_service_value_per_step": 2,
+          "depends_on": []
+        },
+        {
+          "id": "sensor",
+          "required_skill": "electrical",
+          "duration_steps": 2,
+          "priority": 1,
+          "recovered_service_value_per_step": 7,
+          "depends_on": []
+        },
+        {
+          "id": "valve",
+          "required_skill": "plumbing",
+          "duration_steps": 2,
+          "priority": 2,
+          "recovered_service_value_per_step": 9,
+          "depends_on": []
+        }
+      ],
+      "crews": [
+        {
+          "id": "electrician",
+          "skills": [
+            "electrical"
+          ],
+          "available_from_step": 0
+        },
+        {
+          "id": "versatile",
+          "skills": [
+            "electrical",
+            "plumbing"
+          ],
+          "available_from_step": 0
+        }
+      ],
+      "expected": {
+        "minimum_weighted_completion_loss": 42,
+        "optimal_schedule": [
+          {
+            "job_id": "sensor",
+            "crew_id": "electrician",
+            "start_step": 0,
+            "finish_step": 2
+          },
+          {
+            "job_id": "valve",
+            "crew_id": "versatile",
+            "start_step": 0,
+            "finish_step": 2
+          },
+          {
+            "job_id": "relay",
+            "crew_id": "electrician",
+            "start_step": 2,
+            "finish_step": 5
+          }
+        ],
+        "complete_dispatch_sequences_evaluated": 24
+      },
+      "purpose": "Shows why crew skills are a global scheduling resource, not merely a per-job validity check."
+    }
+  ],
+  "acceptance": {
+    "oracle_correctness": "hand-checked objective and schedule fixtures must match exact output",
+    "skill_safety": "no job assigned to a crew lacking the required skill",
+    "precedence": "every dependent start is at or after every prerequisite finish",
+    "crew_exclusivity": "no crew has overlapping repairs",
+    "objective_integrity": "sum of service weight multiplied by completion step equals reported loss",
+    "determinism": "canonical optimum is unchanged when job or crew input order is permuted",
+    "heuristic_gaps": "compare priority-first, shortest-job-first and weighted-recovery policies against exact minimum; reject a negative gap beyond numeric tolerance",
+    "holdout": "these are fixed correctness fixtures, not a statistical holdout or field-validation dataset"
+  },
+  "research_sources": [
+    "https://doi.org/10.1016/j.ejor.2022.05.049",
+    "https://doi.org/10.1016/j.asoc.2022.109253",
+    "https://doi.org/10.1016/j.cie.2020.107004"
+  ]
+}

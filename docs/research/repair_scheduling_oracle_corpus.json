@@ -1,0 +1,289 @@
+{
+  "schema_version": "1.0.0",
+  "status": "published_tiny_exact_oracle_correctness_corpus_with_independent_arithmetic_reference",
+  "objective": "minimize sum(job.recovered_service_value_per_step * completion_step)",
+  "scope": {
+    "maximum_jobs": 8,
+    "crew_model": "one crew qualified for every job",
+    "outage_start_step": 0,
+    "dependencies": [],
+    "spare_parts": [],
+    "preemption": false,
+    "repair_durations": "deterministic positive integer time steps",
+    "horizon": "must exceed or equal the latest completion; horizon truncation is not part of the exact objective",
+    "weights": "caller-defined positive service weights; not an ethically complete objective",
+    "tie_break": "lexicographically smallest job-ID sequence among objectives equal within 1e-9",
+    "classical_baseline_note": "For this single-machine weighted-completion objective, nonincreasing service-value/duration (Smith WSPT rule) is already optimal; the oracle verifies implementation and measures alternative heuristics, not novelty."
+  },
+  "fixtures": [
+    {
+      "id": "ORACLE-01",
+      "title": "Two-job priority counterexample",
+      "jobs": [
+        {
+          "id": "slow_low",
+          "required_skill": "general",
+          "duration_steps": 10,
+          "priority": 0,
+          "recovered_service_value_per_step": 1
+        },
+        {
+          "id": "fast_high",
+          "required_skill": "general",
+          "duration_steps": 1,
+          "priority": 1,
+          "recovered_service_value_per_step": 100
+        }
+      ],
+      "expected": {
+        "feasible_permutations": 2,
+        "optimal_order": [
+          "fast_high",
+          "slow_low"
+        ],
+        "minimum_weighted_completion_loss": 111
+      },
+      "notes": "Priority-first yields 1110; weighted-recovery scheduling matches the exact optimum. This is a deliberate objective illustration.",
+      "expected_policy_results": [
+        {
+          "policy": "priority_first",
+          "weighted_completion_loss": 1110,
+          "absolute_gap": 999,
+          "relative_gap": 9
+        },
+        {
+          "policy": "shortest_job_first",
+          "weighted_completion_loss": 111,
+          "absolute_gap": 0,
+          "relative_gap": 0
+        },
+        {
+          "policy": "weighted_recovery_per_step",
+          "weighted_completion_loss": 111,
+          "absolute_gap": 0,
+          "relative_gap": 0
+        }
+      ]
+    },
+    {
+      "id": "ORACLE-02",
+      "title": "Three-job weighted completion fixture",
+      "jobs": [
+        {
+          "id": "A",
+          "required_skill": "general",
+          "duration_steps": 3,
+          "priority": 2,
+          "recovered_service_value_per_step": 1
+        },
+        {
+          "id": "B",
+          "required_skill": "general",
+          "duration_steps": 1,
+          "priority": 0,
+          "recovered_service_value_per_step": 10
+        },
+        {
+          "id": "C",
+          "required_skill": "general",
+          "duration_steps": 2,
+          "priority": 1,
+          "recovered_service_value_per_step": 4
+        }
+      ],
+      "expected": {
+        "feasible_permutations": 6,
+        "optimal_order": [
+          "B",
+          "C",
+          "A"
+        ],
+        "minimum_weighted_completion_loss": 28
+      }
+    },
+    {
+      "id": "ORACLE-03",
+      "title": "Four-job policy-quality fixture",
+      "jobs": [
+        {
+          "id": "A",
+          "required_skill": "general",
+          "duration_steps": 2,
+          "priority": 3,
+          "recovered_service_value_per_step": 8
+        },
+        {
+          "id": "B",
+          "required_skill": "general",
+          "duration_steps": 3,
+          "priority": 2,
+          "recovered_service_value_per_step": 9
+        },
+        {
+          "id": "C",
+          "required_skill": "general",
+          "duration_steps": 1,
+          "priority": 1,
+          "recovered_service_value_per_step": 2
+        },
+        {
+          "id": "D",
+          "required_skill": "general",
+          "duration_steps": 4,
+          "priority": 0,
+          "recovered_service_value_per_step": 4
+        }
+      ],
+      "expected": {
+        "feasible_permutations": 24,
+        "optimal_order": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "minimum_weighted_completion_loss": 113
+      }
+    },
+    {
+      "id": "ORACLE-04",
+      "title": "Equal-ratio deterministic tie-break",
+      "jobs": [
+        {
+          "id": "z",
+          "required_skill": "general",
+          "duration_steps": 2,
+          "priority": 0,
+          "recovered_service_value_per_step": 1
+        },
+        {
+          "id": "a",
+          "required_skill": "general",
+          "duration_steps": 4,
+          "priority": 1,
+          "recovered_service_value_per_step": 2
+        }
+      ],
+      "expected": {
+        "feasible_permutations": 2,
+        "optimal_order": [
+          "a",
+          "z"
+        ],
+        "minimum_weighted_completion_loss": 14
+      },
+      "notes": "Both orders have the same mathematical objective; the stated ID tie-break makes the output deterministic."
+    },
+    {
+      "id": "ORACLE-05",
+      "title": "Single-job boundary case",
+      "jobs": [
+        {
+          "id": "only",
+          "required_skill": "general",
+          "duration_steps": 3,
+          "priority": 0,
+          "recovered_service_value_per_step": 5
+        }
+      ],
+      "expected": {
+        "feasible_permutations": 1,
+        "optimal_order": [
+          "only"
+        ],
+        "minimum_weighted_completion_loss": 15
+      }
+    },
+    {
+      "id": "ORACLE-06",
+      "title": "Maximum supported exhaustive search",
+      "jobs": [
+        {
+          "id": "a",
+          "required_skill": "general",
+          "duration_steps": 8,
+          "priority": 0,
+          "recovered_service_value_per_step": 1
+        },
+        {
+          "id": "b",
+          "required_skill": "general",
+          "duration_steps": 1,
+          "priority": 1,
+          "recovered_service_value_per_step": 40
+        },
+        {
+          "id": "c",
+          "required_skill": "general",
+          "duration_steps": 3,
+          "priority": 2,
+          "recovered_service_value_per_step": 8
+        },
+        {
+          "id": "d",
+          "required_skill": "general",
+          "duration_steps": 2,
+          "priority": 3,
+          "recovered_service_value_per_step": 13
+        },
+        {
+          "id": "e",
+          "required_skill": "general",
+          "duration_steps": 5,
+          "priority": 4,
+          "recovered_service_value_per_step": 3
+        },
+        {
+          "id": "f",
+          "required_skill": "general",
+          "duration_steps": 1,
+          "priority": 5,
+          "recovered_service_value_per_step": 9
+        },
+        {
+          "id": "g",
+          "required_skill": "general",
+          "duration_steps": 4,
+          "priority": 6,
+          "recovered_service_value_per_step": 6
+        },
+        {
+          "id": "h",
+          "required_skill": "general",
+          "duration_steps": 2,
+          "priority": 7,
+          "recovered_service_value_per_step": 11
+        }
+      ],
+      "expected": {
+        "feasible_permutations": 40320,
+        "optimal_order": [
+          "b",
+          "f",
+          "d",
+          "h",
+          "c",
+          "g",
+          "e",
+          "a"
+        ],
+        "minimum_weighted_completion_loss": 406
+      },
+      "notes": "Expected objective and order were independently checked by exhaustive JavaScript enumeration of all 40,320 permutations; the Rust oracle test remains authored but unexecuted here."
+    }
+  ],
+  "acceptance": {
+    "objective_arithmetic": "independently hand-check ORACLE-01 through ORACLE-05",
+    "exactness": "enumerate every permutation for every instance; do not report heuristic result as exact",
+    "determinism": "same fixture and code revision yield identical objective and lexicographic tie-break",
+    "scope": "reject precedence, spare parts, nonzero outage release, duplicate identifiers, invalid values and more than eight jobs",
+    "split_policy": "these hand-built cases are correctness fixtures, not a statistical holdout or evidence of field performance",
+    "heuristic_gap_reporting": "for each fixture report the three policy losses, absolute gap and relative gap against exact optimum"
+  },
+  "research_sources": [
+    "https://doi.org/10.1287/trsc.2023.0227",
+    "https://doi.org/10.1016/j.cor.2020.104935",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/",
+    "https://doi.org/10.1016/j.orl.2013.08.001"
+  ]
+}
