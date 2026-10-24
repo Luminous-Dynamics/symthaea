@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/power-planning-report.schema.json",
+  "title": "PITB Simulation-Based Power Planning Report v0",
+  "description": "A reproducible sensitivity-analysis report for planning a paired, family-clustered experiment. This report is not model evaluation or evidence that the configured assumptions describe the real benchmark.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_kind",
+    "configuration",
+    "generative_model",
+    "results",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.power-planning-report.v0"
+    },
+    "report_kind": {
+      "const": "simulation_based_power_planning_not_model_evaluation"
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_rate",
+        "expected_gain_input",
+        "minimum_observed_gain_gate",
+        "icc",
+        "cluster_count",
+        "cluster_sizes",
+        "total_targets_per_simulated_study",
+        "simulations",
+        "seed",
+        "confidence_level"
+      ],
+      "properties": {
+        "baseline_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "expected_gain_input": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "minimum_observed_gain_gate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "icc": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "cluster_count": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "cluster_sizes": {
+          "type": "array",
+          "minItems": 20,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "total_targets_per_simulated_study": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "simulations": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confidence_level": {
+          "const": 0.95
+        }
+      }
+    },
+    "generative_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cluster_difficulty",
+        "treatment_probability",
+        "within_cluster_outcomes",
+        "pairing",
+        "interval",
+        "gate"
+      ],
+      "properties": {
+        "cluster_difficulty": {
+          "enum": [
+            "fixed_baseline_probability",
+            "beta_binomial_shared_family_difficulty"
+          ]
+        },
+        "treatment_probability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "within_cluster_outcomes": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pairing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gate": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimated_gate_power",
+        "estimated_gate_power_wilson_95",
+        "gate_passes",
+        "valid_interval_trials",
+        "degenerate_interval_trials",
+        "mean_observed_gain",
+        "mean_generated_marginal_gain",
+        "mean_interval_bounds_over_valid_trials"
+      ],
+      "properties": {
+        "estimated_gate_power": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "estimated_gate_power_wilson_95": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "upper"],
+          "properties": {
+            "lower": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "upper": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "gate_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_interval_trials": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "degenerate_interval_trials": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean_observed_gain": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "mean_generated_marginal_gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_interval_bounds_over_valid_trials": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "upper"],
+          "properties": {
+            "lower": {
+              "type": ["number", "null"],
+              "minimum": -1,
+              "maximum": 1
+            },
+            "upper": {
+              "type": ["number", "null"],
+              "minimum": -1,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
