@@ -23,6 +23,37 @@ pub struct PhotonicDynamicsConfig {
     saturation_pulse_energy: f64,
 }
 
+/// A predeclared coefficient schedule for the Ising-to-XY gain crossover.
+///
+/// Time is supplied in physical model units and normalized internally by the
+/// configured round-trip step. Adaptive switch times use normalized round-trip
+/// units, matching the Heaviside schedule parameterization in the source paper.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TransitionSchedule {
+    /// Phase-insensitive XY-like gain for the entire trajectory (c(t)=0).
+    PureXy,
+    /// Phase-sensitive Ising-like gain for the entire trajectory (c(t)=1).
+    PureIsing,
+    /// The published monotone envelope c(t)=tanh(rate * t / delta_t).
+    MonotoneTanh {
+        /// Positive finite transition rate epsilon.
+        rate: f64,
+    },
+    /// Tanh envelope interrupted by an even-length list of switching times.
+    ///
+    /// Each switch toggles between the XY regime (coefficient 0) and the
+    /// Ising envelope (coefficient tanh(rate * t / delta_t)). The switch times
+    /// are dimensionless round-trip indices, must be finite/non-negative and
+    /// strictly increasing, and must occur in pairs so the trajectory returns
+    /// to the original schedule state by the end of the list.
+    AdaptiveTanh {
+        /// Positive finite transition rate epsilon.
+        rate: f64,
+        /// Ordered normalized round-trip switching times theta_p.
+        switch_times: Vec<f64>,
+    },
+}
+
 /// Current and previous in-phase/out-of-phase amplitudes.
 ///
 /// The previous vectors represent the state at the prior round trip. They must
@@ -112,6 +143,26 @@ pub enum PhotonicDynamicsError {
         /// Element index.
         index: usize,
     },
+    /// Schedule time is negative, non-finite, or cannot be normalized safely.
+    InvalidScheduleTime {
+        /// Supplied time value.
+        value: f64,
+    },
+    /// Schedule rate must be positive and finite.
+    InvalidScheduleRate {
+        /// Supplied transition rate.
+        value: f64,
+    },
+    /// Adaptive schedule requires an even number of switching times.
+    OddSwitchCount {
+        /// Number of supplied switching times.
+        count: usize,
+    },
+    /// Adaptive switching times are negative, non-finite, or not strictly increasing.
+    InvalidSwitchTime {
+        /// Index of the offending switching time.
+        index: usize,
+    },
     /// An intermediate value or output is non-finite.
     NumericOverflow {
         /// Stage that produced the non-finite value.
@@ -155,6 +206,18 @@ impl fmt::Display for PhotonicDynamicsError {
             Self::NonFiniteState { name, index } => {
                 write!(f, "{name}[{index}] is non-finite")
             }
+            Self::InvalidScheduleTime { value } => {
+                write!(f, "schedule time {value} must be finite, non-negative, and safely normalizable")
+            }
+            Self::InvalidScheduleRate { value } => {
+                write!(f, "schedule rate {value} must be positive and finite")
+            }
+            Self::OddSwitchCount { count } => {
+                write!(f, "adaptive schedule requires an even number of switch times, got {count}")
+            }
+            Self::InvalidSwitchTime { index } => {
+                write!(f, "adaptive schedule has an invalid or out-of-order switch time at index {index}")
+            }
             Self::NumericOverflow { stage, vertex } => {
                 write!(f, "non-finite value during {stage} at vertex {vertex}")
             }
@@ -163,6 +226,90 @@ impl fmt::Display for PhotonicDynamicsError {
 }
 
 impl std::error::Error for PhotonicDynamicsError {}
+
+impl TransitionSchedule {
+    /// Evaluate the Ising coefficient c(t) at the supplied physical time.
+    ///
+    /// `delta_t` is the round-trip step. The adaptive schedule follows the
+    /// source paper's piecewise Heaviside construction: the tanh envelope is
+    /// multiplied by 1 before an even number of switches and by 0 between an
+    /// odd number of switches. No parameter tuning occurs in this function.
+    pub fn coefficient(
+        &self,
+        time: f64,
+        delta_t: f64,
+    ) -> Result<f64, PhotonicDynamicsError> {
+        if !time.is_finite() || time < 0.0 || !delta_t.is_finite() || delta_t <= 0.0 {
+            return Err(PhotonicDynamicsError::InvalidScheduleTime { value: time });
+        }
+        let normalized_time = time / delta_t;
+        if !normalized_time.is_finite() {
+            return Err(PhotonicDynamicsError::InvalidScheduleTime { value: time });
+        }
+
+        match self {
+            Self::PureXy => Ok(0.0),
+            Self::PureIsing => Ok(1.0),
+            Self::MonotoneTanh { rate } => {
+                Self::check_rate(*rate)?;
+                Self::tanh_envelope(*rate, normalized_time, time)
+            }
+            Self::AdaptiveTanh { rate, switch_times } => {
+                Self::check_rate(*rate)?;
+                if switch_times.len() % 2 != 0 {
+                    return Err(PhotonicDynamicsError::OddSwitchCount {
+                        count: switch_times.len(),
+                    });
+                }
+                for (index, &switch_time) in switch_times.iter().enumerate() {
+                    if !switch_time.is_finite()
+                        || switch_time < 0.0
+                        || (index > 0 && switch_times[index - 1] >= switch_time)
+                    {
+                        return Err(PhotonicDynamicsError::InvalidSwitchTime { index });
+                    }
+                }
+                let switches_elapsed = switch_times
+                    .iter()
+                    .filter(|&&switch_time| normalized_time >= switch_time)
+                    .count();
+                if switches_elapsed % 2 == 1 {
+                    Ok(0.0)
+                } else {
+                    Self::tanh_envelope(*rate, normalized_time, time)
+                }
+            }
+        }
+    }
+
+    fn check_rate(rate: f64) -> Result<(), PhotonicDynamicsError> {
+        if !rate.is_finite() || rate <= 0.0 {
+            return Err(PhotonicDynamicsError::InvalidScheduleRate { value: rate });
+        }
+        Ok(())
+    }
+
+    fn tanh_envelope(
+        rate: f64,
+        normalized_time: f64,
+        original_time: f64,
+    ) -> Result<f64, PhotonicDynamicsError> {
+        let argument = rate * normalized_time;
+        if !argument.is_finite() {
+            return Err(PhotonicDynamicsError::InvalidScheduleTime {
+                value: original_time,
+            });
+        }
+        let coefficient = argument.tanh();
+        if coefficient.is_finite() && (0.0..=1.0).contains(&coefficient) {
+            Ok(coefficient)
+        } else {
+            Err(PhotonicDynamicsError::InvalidScheduleTime {
+                value: original_time,
+            })
+        }
+    }
+}
 
 impl PhotonicDynamicsConfig {
     /// Construct a validated model from a symmetric coupling matrix.
@@ -480,6 +627,59 @@ mod tests {
         assert!(matches!(
             PhotonicDynamicsConfig::new(vec![vec![0.0]], 0.1, -0.1, 4.0, 1.0),
             Err(PhotonicDynamicsError::InvalidParameter { .. })
+        ));
+    }
+
+    #[test]
+    fn monotone_schedule_matches_tanh_envelope_and_respects_limits() {
+        let schedule = TransitionSchedule::MonotoneTanh { rate: 0.5 };
+        assert_eq!(schedule.coefficient(0.0, 0.1).expect("time zero"), 0.0);
+        let one_step = schedule.coefficient(0.1, 0.1).expect("first round trip");
+        assert!((one_step - 0.5_f64.tanh()).abs() < 1e-12);
+        let late = schedule.coefficient(100.0, 0.1).expect("late time");
+        assert!((0.0..=1.0).contains(&late));
+        assert!(late > one_step);
+    }
+
+    #[test]
+    fn adaptive_schedule_returns_to_xy_between_switch_pairs() {
+        let schedule = TransitionSchedule::AdaptiveTanh {
+            rate: 0.5,
+            switch_times: vec![2.0, 4.0],
+        };
+        let first = schedule.coefficient(0.1, 0.1).expect("before first switch");
+        assert!(first > 0.0);
+        assert_eq!(schedule.coefficient(0.2, 0.1).expect("at first switch"), 0.0);
+        assert_eq!(schedule.coefficient(0.3, 0.1).expect("inside XY return"), 0.0);
+        let after_second = schedule.coefficient(0.4, 0.1).expect("at second switch");
+        assert!((after_second - 0.5_f64.tanh()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn schedule_rejects_invalid_rates_switches_and_time() {
+        assert!(matches!(
+            TransitionSchedule::MonotoneTanh { rate: 0.0 }.coefficient(0.1, 0.1),
+            Err(PhotonicDynamicsError::InvalidScheduleRate { .. })
+        ));
+        assert!(matches!(
+            TransitionSchedule::AdaptiveTanh {
+                rate: 0.5,
+                switch_times: vec![1.0],
+            }
+            .coefficient(0.1, 0.1),
+            Err(PhotonicDynamicsError::OddSwitchCount { .. })
+        ));
+        assert!(matches!(
+            TransitionSchedule::AdaptiveTanh {
+                rate: 0.5,
+                switch_times: vec![2.0, 1.0],
+            }
+            .coefficient(0.1, 0.1),
+            Err(PhotonicDynamicsError::InvalidSwitchTime { .. })
+        ));
+        assert!(matches!(
+            TransitionSchedule::PureXy.coefficient(-0.1, 0.1),
+            Err(PhotonicDynamicsError::InvalidScheduleTime { .. })
         ));
     }
 
