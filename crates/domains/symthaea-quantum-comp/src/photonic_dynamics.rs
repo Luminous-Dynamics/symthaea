@@ -8,9 +8,12 @@
 
 use core::fmt;
 
+/// Maximum round trips retained by the in-memory trajectory trace.
+pub const MAX_PHOTONIC_TRAJECTORY_STEPS: usize = 100_000;
+
 /// Maximum oscillator-step cells retained by the in-memory trajectory trace.
 ///
-/// This explicit ceiling bounds trace memory; use a future streaming sink for
+/// These explicit ceilings bound trace memory; use a future streaming sink for
 /// larger workloads rather than silently allocating an unbounded history.
 pub const MAX_PHOTONIC_TRAJECTORY_CELLS: usize = 1_000_000;
 
@@ -157,6 +160,8 @@ pub enum PhotonicDynamicsError {
         steps: usize,
         /// Number of oscillators in the configured model.
         vertex_count: usize,
+        /// Maximum permitted round-trip count.
+        maximum_steps: usize,
         /// Maximum permitted product of steps and oscillators.
         maximum_cells: usize,
     },
@@ -226,10 +231,11 @@ impl fmt::Display for PhotonicDynamicsError {
             Self::TrajectoryLimitExceeded {
                 steps,
                 vertex_count,
+                maximum_steps,
                 maximum_cells,
             } => write!(
                 f,
-                "trajectory request {steps} x {vertex_count} exceeds the {maximum_cells}-cell trace limit"
+                "trajectory request {steps} x {vertex_count} exceeds limits ({maximum_steps} steps, {maximum_cells} step-cells)"
             ),
             Self::InvalidScheduleTime { value } => {
                 write!(f, "schedule time {value} must be finite, non-negative, and safely normalizable")
@@ -543,13 +549,17 @@ impl PhotonicDynamicsConfig {
             PhotonicDynamicsError::TrajectoryLimitExceeded {
                 steps,
                 vertex_count: self.vertex_count,
+                maximum_steps: MAX_PHOTONIC_TRAJECTORY_STEPS,
                 maximum_cells: MAX_PHOTONIC_TRAJECTORY_CELLS,
             },
         )?;
-        if trajectory_cells > MAX_PHOTONIC_TRAJECTORY_CELLS {
+        if steps > MAX_PHOTONIC_TRAJECTORY_STEPS
+            || trajectory_cells > MAX_PHOTONIC_TRAJECTORY_CELLS
+        {
             return Err(PhotonicDynamicsError::TrajectoryLimitExceeded {
                 steps,
                 vertex_count: self.vertex_count,
+                maximum_steps: MAX_PHOTONIC_TRAJECTORY_STEPS,
                 maximum_cells: MAX_PHOTONIC_TRAJECTORY_CELLS,
             });
         }
