@@ -148,12 +148,14 @@ struct RegradeSummary {
     unresolved_in_either_grade_count: usize,
     fully_resolved_in_both_count: usize,
     disagreement_count: usize,
-    primary_false_positive_fraction: Option<f64>,
-    primary_false_negative_fraction: Option<f64>,
+    primary_false_positive_fraction_lower: Option<f64>,
+    primary_false_positive_fraction_upper: Option<f64>,
+    primary_false_negative_fraction_lower: Option<f64>,
+    primary_false_negative_fraction_upper: Option<f64>,
     primary_pass_rate_full_denominator: f64,
     regrade_pass_rate_full_denominator: f64,
     double_verified_pass_rate_full_denominator: f64,
-    strict_pass_at_1: Option<f64>,
+    strict_double_verified_pass_rate: Option<f64>,
     lockable: bool,
 }
 
@@ -528,15 +530,19 @@ fn build_report(
         unresolved_in_either_grade_count: 0,
         fully_resolved_in_both_count: 0,
         disagreement_count: 0,
-        primary_false_positive_fraction: None,
-        primary_false_negative_fraction: None,
+        primary_false_positive_fraction_lower: None,
+        primary_false_positive_fraction_upper: None,
+        primary_false_negative_fraction_lower: None,
+        primary_false_negative_fraction_upper: None,
         primary_pass_rate_full_denominator: 0.0,
         regrade_pass_rate_full_denominator: 0.0,
         double_verified_pass_rate_full_denominator: 0.0,
-        strict_pass_at_1: None,
+        strict_double_verified_pass_rate: None,
         lockable: false,
     };
     let mut comparisons = Vec::with_capacity(summary.assigned_task_count);
+    let mut primary_pass_regrade_unresolved_count = 0usize;
+    let mut primary_unresolved_regrade_pass_count = 0usize;
 
     for (instance_id, primary_task) in &primary.tasks {
         let regrade_task = regrade.tasks.get(instance_id)
@@ -551,6 +557,12 @@ fn build_report(
             Outcome::Pass => summary.regrade_pass_count += 1,
             Outcome::Fail => summary.regrade_fail_count += 1,
             Outcome::Unresolved => summary.regrade_unresolved_count += 1,
+        }
+        if primary_task.outcome == Outcome::Pass && regrade_task.outcome == Outcome::Unresolved {
+            primary_pass_regrade_unresolved_count += 1;
+        }
+        if primary_task.outcome == Outcome::Unresolved && regrade_task.outcome == Outcome::Pass {
+            primary_unresolved_regrade_pass_count += 1;
         }
         let relation = classify(primary_task.outcome, regrade_task.outcome);
         match relation {
@@ -596,16 +608,24 @@ fn build_report(
     summary.unresolved_in_either_grade_count = summary.assigned_task_count
         - summary.fully_resolved_in_both_count;
     if summary.primary_pass_count > 0 {
-        summary.primary_false_positive_fraction =
+        summary.primary_false_positive_fraction_lower =
             Some(summary.primary_only_pass_count as f64 / summary.primary_pass_count as f64);
+        summary.primary_false_positive_fraction_upper = Some(
+            (summary.primary_only_pass_count + primary_pass_regrade_unresolved_count) as f64
+                / summary.primary_pass_count as f64,
+        );
     }
     if summary.regrade_pass_count > 0 {
-        summary.primary_false_negative_fraction =
+        summary.primary_false_negative_fraction_lower =
             Some(summary.regrade_only_pass_count as f64 / summary.regrade_pass_count as f64);
+        summary.primary_false_negative_fraction_upper = Some(
+            (summary.regrade_only_pass_count + primary_unresolved_regrade_pass_count) as f64
+                / summary.regrade_pass_count as f64,
+        );
     }
     summary.lockable = summary.unresolved_in_either_grade_count == 0;
     if summary.lockable {
-        summary.strict_pass_at_1 =
+        summary.strict_double_verified_pass_rate =
             Some(summary.concordant_pass_count as f64 / summary.assigned_task_count as f64);
     }
 
@@ -1123,11 +1143,11 @@ mod tests {
         assert_eq!(result.summary.primary_only_pass_count, 1);
         assert_eq!(result.summary.disagreement_count, 1);
         assert_eq!(result.summary.double_verified_pass_rate_full_denominator, 0.5);
-        assert_eq!(result.summary.strict_pass_at_1, Some(0.5));
+        assert_eq!(result.summary.strict_double_verified_pass_rate, Some(0.5));
     }
 
     #[test]
-    fn unresolved_in_either_grade_withholds_strict_pass_at_1() {
+    fn unresolved_in_either_grade_withholds_strict_double_verified_rate() {
         let primary = loaded(report(vec![
             task("task-a", Outcome::Pass, "1", "2", "3"),
             task("task-b", Outcome::Unresolved, "4", "5", "6"),
@@ -1139,6 +1159,25 @@ mod tests {
         let result = build_report(&primary, &regrade, &"a".repeat(64)).unwrap();
         assert_eq!(result.summary.unresolved_in_either_grade_count, 1);
         assert_eq!(result.summary.strict_pass_at_1, None);
+    }
+
+    #[test]
+    fn unresolved_grades_widen_false_positive_and_false_negative_sensitivity_bounds() {
+        let primary = loaded(report(vec![
+            task("task-a", Outcome::Pass, "1", "2", "3"),
+            task("task-b", Outcome::Pass, "4", "5", "6"),
+            task("task-c", Outcome::Unresolved, "7", "8", "9"),
+        ]), &"1".repeat(64));
+        let regrade = loaded(report(vec![
+            task("task-a", Outcome::Fail, "1", "a", "b"),
+            task("task-b", Outcome::Unresolved, "4", "c", "d"),
+            task("task-c", Outcome::Pass, "7", "e", "f"),
+        ]), &"2".repeat(64));
+        let result = build_report(&primary, &regrade, &"a".repeat(64)).unwrap();
+        assert_eq!(result.summary.primary_false_positive_fraction_lower, Some(0.5));
+        assert_eq!(result.summary.primary_false_positive_fraction_upper, Some(1.0));
+        assert_eq!(result.summary.primary_false_negative_fraction_lower, Some(0.0));
+        assert_eq!(result.summary.primary_false_negative_fraction_upper, Some(1.0));
     }
 
     #[test]
