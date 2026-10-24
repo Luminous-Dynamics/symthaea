@@ -115,7 +115,16 @@ fn stopwords() -> BTreeSet<&'static str> {
 }
 
 fn path_token_set(path: &str, token_re: &Regex, stop: &BTreeSet<&str>) -> BTreeSet<String> {
-    let normalized = path.replace(['/', '\\', '-', '_', '.', '(', ')'], " ");
+    let normalized: String = path
+        .chars()
+        .map(|ch| {
+            if matches!(ch, '/' | '\\' | '-' | '_' | '.' | '(' | ')') {
+                ' '
+            } else {
+                ch
+            }
+        })
+        .collect();
     token_re
         .find_iter(&normalized.to_lowercase())
         .map(|m| m.as_str().to_owned())
@@ -272,13 +281,18 @@ fn load_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)> {
     Ok((digest, families, counts))
 }
 
-fn matching_paths(family: &Family, shared_tokens: &BTreeSet<String>) -> Vec<String> {
+fn matching_paths(
+    family: &Family,
+    shared_tokens: &BTreeSet<String>,
+    token_re: &Regex,
+) -> Vec<String> {
     family
         .paths
         .iter()
         .filter(|path| {
-            let normalized = path.to_lowercase();
-            shared_tokens.iter().any(|token| normalized.contains(token))
+            token_re
+                .find_iter(&path.to_lowercase())
+                .any(|token| shared_tokens.contains(token.as_str()))
         })
         .cloned()
         .collect()
@@ -292,6 +306,7 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
         }
     }
 
+    let token_re = Regex::new(r"(?u)[\p{L}]{3,}").expect("static path-token regex");
     let mut candidates = Vec::new();
     for left in 0..families.len() {
         for right in (left + 1)..families.len() {
@@ -326,8 +341,8 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
                 continue;
             }
 
-            let source_matching_paths = matching_paths(a, &rare);
-            let target_matching_paths = matching_paths(b, &rare);
+            let source_matching_paths = matching_paths(a, &rare, &token_re);
+            let target_matching_paths = matching_paths(b, &rare, &token_re);
             if source_matching_paths.is_empty() || target_matching_paths.is_empty() {
                 continue;
             }
