@@ -188,26 +188,13 @@ impl CognitiveSubsystem for MemoryManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        // Keep the first nine bytes compatible with legacy checkpoints.
-        // PEVC v2 stores both the highest observed cycle (even when its evidence
-        // was invalid) and the highest admitted cycle, preserving same-cycle
-        // retry semantics while blocking delayed/out-of-order samples after restore.
-        let mut data = Vec::with_capacity(32);
+        // Keep the first nine bytes compatible with legacy checkpoints. The
+        // shared PEVC v2 codec owns extension serialization for all consumers.
+        let mut data = Vec::with_capacity(9 + 23);
         data.extend_from_slice(&self.consolidation_pressure.to_le_bytes());
         data.extend_from_slice(&self.cycles_since_consolidation.to_le_bytes());
         data.push(self.consolidation_active as u8);
-        data.extend_from_slice(b"PEVC");
-        data.push(2); // extension version
-        let observed_cycle = self
-            .prediction_error_cursor
-            .last_observed_observation_cycle();
-        data.push(u8::from(observed_cycle.is_some()));
-        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
-        let admitted_cycle = self
-            .prediction_error_cursor
-            .last_admitted_observation_cycle();
-        data.push(u8::from(admitted_cycle.is_some()));
-        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
+        data.extend_from_slice(&self.prediction_error_cursor.encode_checkpoint_extension_v2());
         data
     }
 
@@ -219,12 +206,11 @@ impl CognitiveSubsystem for MemoryManager {
             ));
         }
 
-        // Validate the optional extension before mutating manager state. Old
-        // nine-byte checkpoints contain no cursor and reset it. PEVC v1 only
-        // recorded admitted cycles, so use that known floor for both watermarks;
-        // PEVC v2 preserves invalid-but-observed cycles separately.
-        let (restored_observed_cycle, restored_admitted_cycle) = match data.len() {
-            9 => (None, None),
+        // Validate the cursor extension before mutating manager state. Legacy
+        // nine-byte checkpoints have no cursor. PEVC v1 recorded only the last
+        // admitted cycle, so migrate that known floor into both watermarks.
+        let restored_cursor = match data.len() {
+            9 => PredictionEvidenceCursor::default(),
             23 => {
                 if &data[9..13] != b"PEVC" {
                     return Err("MemoryManager: invalid PE cursor checkpoint magic".to_string());
@@ -244,72 +230,21 @@ impl CognitiveSubsystem for MemoryManager {
                         .try_into()
                         .map_err(|_| "MemoryManager: corrupt PE cursor checkpoint bytes".to_string())?,
                 );
-                match has_cycle {
-                    1 => (Some(cycle), Some(cycle)),
-                    0 if cycle == 0 => (None, None),
+                let cycle = match has_cycle {
+                    1 => Some(cycle),
+                    0 if cycle == 0 => None,
                     0 => {
                         return Err(
                             "MemoryManager: absent PE cursor must encode cycle zero".to_string()
                         );
                     }
                     _ => unreachable!("presence flag was checked above"),
-                }
-            }
-            32 => {
-                if &data[9..13] != b"PEVC" {
-                    return Err("MemoryManager: invalid PE cursor checkpoint magic".to_string());
-                }
-                if data[13] != 2 {
-                    return Err(format!(
-                        "MemoryManager: unsupported PE cursor checkpoint version {}",
-                        data[13]
-                    ));
-                }
-                let has_observed = data[14];
-                let observed = u64::from_le_bytes(
-                    data[15..23]
-                        .try_into()
-                        .map_err(|_| "MemoryManager: corrupt observed-cycle bytes".to_string())?,
-                );
-                let has_admitted = data[23];
-                let admitted = u64::from_le_bytes(
-                    data[24..32]
-                        .try_into()
-                        .map_err(|_| "MemoryManager: corrupt admitted-cycle bytes".to_string())?,
-                );
-                if has_observed > 1 || has_admitted > 1 {
-                    return Err("MemoryManager: invalid PE cursor presence flag".to_string());
-                }
-                let observed = match has_observed {
-                    1 => Some(observed),
-                    0 if observed == 0 => None,
-                    0 => {
-                        return Err(
-                            "MemoryManager: absent observed cycle must encode zero".to_string()
-                        );
-                    }
-                    _ => unreachable!("presence flag was checked above"),
                 };
-                let admitted = match has_admitted {
-                    1 => Some(admitted),
-                    0 if admitted == 0 => None,
-                    0 => {
-                        return Err(
-                            "MemoryManager: absent admitted cycle must encode zero".to_string()
-                        );
-                    }
-                    _ => unreachable!("presence flag was checked above"),
-                };
-                if admitted.is_some_and(|cycle| {
-                    observed.is_none_or(|observed_cycle| cycle > observed_cycle)
-                }) {
-                    return Err(
-                        "MemoryManager: admitted PE cycle exceeds observed high-water mark"
-                            .to_string(),
-                    );
-                }
-                (observed, admitted)
+                let mut cursor = PredictionEvidenceCursor::default();
+                cursor.restore_cycles(cycle, cycle);
+                cursor
             }
+            32 => PredictionEvidenceCursor::decode_checkpoint_extension_v2(&data[9..32])?,
             _ => unreachable!("checkpoint length was validated above"),
         };
 
@@ -324,8 +259,7 @@ impl CognitiveSubsystem for MemoryManager {
                 .map_err(|_| "MemoryManager: corrupt checkpoint bytes [4..8]".to_string())?,
         );
         self.consolidation_active = data[8] != 0;
-        self.prediction_error_cursor
-            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
+        self.prediction_error_cursor = restored_cursor;
         Ok(())
     }
 }
