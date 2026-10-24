@@ -1,6 +1,6 @@
 # Cognitive-loop prediction-evidence benchmark (PEV-1)
 
-**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 13-case consumer-level protocol remains outstanding.
+**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 14-case consumer-level protocol remains outstanding.
 
 ## 1. Research claim
 
@@ -39,7 +39,7 @@ struct PredictionErrorEvidence {
 }
 ```
 
-The typed migration layer exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. The shared `CycleState` now carries only typed PE evidence—its parallel numeric/boolean fields have been removed—and urgency, surprise exploration, episodic replay, dream consolidation, subsystem feedback, and consciousness feedback consume evidence bound to the current observation cycle. Main text, embedding, pre-encoded-HV, and safety-precheck result paths now expose `CycleMetadata.prediction_evidence` with status and cycle provenance, without raw input vectors. `NotEvaluated` distinguishes a cycle intentionally gated before comparison from a source that failed to provide evidence. Some interfaces outside this shared phase boundary still use compatibility fields and remain migration targets. Remaining enforcement goals are:
+The typed migration layer exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. The shared `CycleState` now carries only typed PE evidence—its parallel numeric/boolean fields have been removed—and urgency, surprise exploration, episodic replay, dream consolidation, subsystem feedback, and consciousness feedback consume evidence bound to the current observation cycle. The core HDC encoder now records prediction source cycles, the main text path feeds the CfC prediction back at output time, and `encode_at` rejects predictions not produced by the immediately preceding cycle before PE can train attention/history. The embedding/HV path similarly tracks the producer cycle and advances its state window after rejection. Main text, embedding, pre-encoded-HV, and safety-precheck result paths expose `CycleMetadata.prediction_evidence` with status and cycle provenance, without raw input vectors. `NotEvaluated` distinguishes a cycle intentionally gated before comparison from a source that failed to provide evidence. Some interfaces outside this shared phase boundary still use compatibility fields and remain migration targets. Remaining enforcement goals are:
 
 - Only `Valid` may expose a PE value to learning, confidence, surprise, safety assessment, replay, or thermodynamic PE consumers.
 - Missing PE never means zero error, maximum error, or “repeat the last value as a fresh sample.”
@@ -70,6 +70,7 @@ Each scenario should be replayed against the same initial state and deterministi
 | PEV-11 | Snapshot, serialization, or old record with missing validity field | Default conservatively to invalid; preserve ABI layout where promised and verify old-data migration |
 | PEV-12 | Long stream with task shifts and distractors | No false PE-driven reinforcement, forgetting, confidence inflation, or reactivation caused by an invalid sentinel |
 | PEV-13 | Cycle preempted before a prediction comparison (e.g., safety gate) | Report `NotEvaluated`; do not fabricate zero/high PE; preserve the independent preemption/safety decision |
+| PEV-14 | Prediction reused after a skipped/out-of-order cycle | Classify as `StaleOrOutOfOrder`; do not update encoder attention/PE history; preserve source and observation cycle IDs; recover on the next valid fresh prediction |
 
 Where a subsystem is independent of PE, the expected result is not “no change to the entire system.” The invariant applies only to the PE-derived component; coherence, energy, explicit reward, sensory variance, and other valid signals remain eligible to change state.
 
@@ -100,7 +101,7 @@ For stream-learning experiments also report per-step task performance, forward/b
 
 ### Typed-contract regression checks
 
-The typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Consumer-focused tests cover stale and missing evidence in urgency and surprise paths; existing replay invariance cases remain part of the broader integration contract. An output test also checks that public telemetry status agrees with the compatibility validity bit and records the observation cycle. Keep these separate from the 13 core PEV scenarios so passing type-contract tests cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
+The typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Consumer-focused tests cover stale and missing evidence in urgency and surprise paths, plus the encoder's consecutive-cycle acceptance, skipped-cycle rejection, and non-finite prediction rejection before PE/attention statistics. The main text-loop test verifies source-cycle handoff, and an output test checks that public telemetry agrees with the compatibility validity bit and records the observation cycle. Keep these separate from the 14 core PEV scenarios so passing type-contract tests cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
 
 ## 5. Experimental protocol
 
