@@ -233,7 +233,7 @@ fn parse_confidence(text:&str)->Result<ConfidenceReceipt,String>{
         meta["familywise_simultaneous"]!="true" {return Err(invalid("confidence receipt format or non-claim contract mismatch"));}
     if !matches!(meta["split"].as_str(),"test"|"private_test"){return Err(invalid("confidence split must be test or private_test"));}
     let utility_conf=f64_field(&meta["confidence_level"],"confidence_level",0)?;
-    if !(0.0..1.0).contains(&utility_conf){return Err(invalid("utility confidence_level must be in (0,1)"));}
+    if utility_conf<=0.0||utility_conf>=1.0{return Err(invalid("utility confidence_level must be in (0,1)"));}
     for k in ["bundle_lock_sha256","paired_unit_set_sha256","sweep_input_sha256","pareto_receipt_sha256","confidence_bands_sha256","inference_receipt_sha256"]{validate_sha(&meta[k],k)?;}
     let mut seen=BTreeSet::new();
     for p in &points{if !seen.insert(p.key.clone()){return Err(invalid(format!("duplicate confidence point {}",p.key.label())));}}
@@ -279,7 +279,7 @@ fn parse_envelopes(text:&str,conf:&ConfidenceReceipt,conf_sha:&str,expected_infe
     if meta["format"]!="VIS-DVPC-OP-ENVELOPE-001-v1"||meta["familywise_simultaneous"]!="true"||
        meta["coverage_scope"]!="ALL_POLICY_BUDGET_SAFETY_METRICS"{return Err(invalid("envelope must declare family-wise simultaneous coverage over all policy-budget safety metrics"));}
     let c:f64=f64_field(&meta["confidence_level"],"envelope confidence_level",0)?;
-    if !(0.0..1.0).contains(&c){return Err(invalid("envelope confidence level must be in (0,1)"));}
+    if c<=0.0||c>=1.0{return Err(invalid("envelope confidence level must be in (0,1)"));}
     let utility_c:f64=f64_field(&conf.meta["confidence_level"],"utility confidence_level",0)?;
     // Conservative union bound: P(both families cover) >= c_utility + c_envelope - 1.
     if utility_c+c-1.0+1e-12<0.95{return Err(invalid("combined utility/envelope coverage lower bound is below 0.95; use jointly calibrated bands or allocate alpha so the union bound reaches 95%"));}
@@ -518,5 +518,45 @@ mod tests {
         let s=one("BAND_NONDOMINATED","FEASIBLE_FRONTIER");let c=confidence(&s);let e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
         let mut changed=c.clone();changed.push_str(" ");assert!(analyze(changed.as_bytes(),&sha256_hex(c.as_bytes()),e.as_bytes(),&sha256_hex(e.as_bytes()),C).unwrap_err().contains("pinned digest"));
     }
+    #[test] fn robust_bounds_certify_dominance(){
+        let s=vec![
+            S{budget:"p1",policy:"candidate",status:"BAND_NONDOMINATED",upstream:"FEASIBLE_FRONTIER",utility:0.8,ulo:0.75,uhi:0.85,lat:40,en:20,latbudget:100,enbudget:100},
+            S{budget:"p1",policy:"baseline",status:"UNRESOLVED",upstream:"FEASIBLE_FRONTIER",utility:0.3,ulo:0.2,uhi:0.4,lat:40,en:20,latbudget:100,enbudget:100},
+        ];
+        let c=confidence(&s);let e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
+        let out=run(&c,&e).unwrap();
+        assert!(out.contains("ROBUST_RESULT\\tp1\\tcandidate\\tROBUST_FEASIBLE_FRONTIER"));
+        assert!(out.contains("ROBUST_RESULT\\tp1\\tbaseline\\tROBUST_FEASIBLE_DOMINATED"));
+    }
+    #[test] fn energy_interval_crossing_ceiling_is_unresolved(){
+        let s=one("BAND_NONDOMINATED","FEASIBLE_FRONTIER");let c=confidence(&s);
+        let mut e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
+        e=e.replace("10\\t12","90\\t120");
+        assert!(run(&c,&e).unwrap().contains("ENERGY_INTERVAL_CROSSES_BUDGET"));
+    }
+    #[test] fn cvar_limit_definitely_exceeded_is_infeasible(){
+        let s=one("BAND_NONDOMINATED","FEASIBLE_FRONTIER");let c=confidence(&s);
+        let mut e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
+        e=e.replace("0.05\\t0.08","0.30\\t0.40");
+        assert!(run(&c,&e).unwrap().contains("CVAR95_LIMIT_EXCEEDED"));
+    }
+    #[test] fn safety_count_interval_crossing_gate_is_unresolved(){
+        let s=one("BAND_NONDOMINATED","FEASIBLE_FRONTIER");let c=confidence(&s);
+        let mut e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
+        e=e.replace("0\\t0\\ttrue\\tCERTIFIED","0\\t1\\ttrue\\tCERTIFIED");
+        assert!(run(&c,&e).unwrap().contains("SAFETY_COUNT_INTERVAL_CROSSES_LIMIT"));
+    }
+    #[test] fn resource_measurement_upper_bound_controls_frontier(){
+        let s=vec![
+            S{budget:"p1",policy:"better-utility",status:"BAND_NONDOMINATED",upstream:"FEASIBLE_FRONTIER",utility:0.8,ulo:0.7,uhi:0.9,lat:40,en:20,latbudget:100,enbudget:100},
+            S{budget:"p1",policy:"worse-utility",status:"UNRESOLVED",upstream:"FEASIBLE_FRONTIER",utility:0.4,ulo:0.3,uhi:0.5,lat:40,en:20,latbudget:100,enbudget:100},
+        ];
+        let c=confidence(&s);let mut e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
+        // The second point's resource UCB is worse, so utility alone cannot establish dominance.
+        e=e.replace("ENVELOPE\\tp1\\tworse-utility\\t30\\t50\\t10\\t12","ENVELOPE\\tp1\\tworse-utility\\t90\\t110\\t10\\t12");
+        let out=run(&c,&e).unwrap();
+        assert!(out.contains("ROBUST_RESULT\\tp1\\tworse-utility\\tROBUST_UNRESOLVED_FEASIBILITY"));
+    }
+
     #[test] fn sha256_known_vector(){assert_eq!(sha256_hex(b"abc"),"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");}
 }
