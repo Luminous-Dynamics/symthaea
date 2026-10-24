@@ -74,6 +74,8 @@ pub struct QuadratureState {
 /// One numerical update and diagnostic values from the exact step just evaluated.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QuadratureStep {
+    /// Transition coefficient used for this update.
+    pub transition_coefficient: f64,
     /// New state; old current state is copied into the previous-state fields.
     pub next_state: QuadratureState,
     /// Per-oscillator phase-sensitive gain coefficient (g_x(t)).
@@ -483,6 +485,7 @@ impl PhotonicDynamicsConfig {
         }
 
         Ok(QuadratureStep {
+            transition_coefficient: transition,
             next_state: QuadratureState {
                 previous_x: state.x.clone(),
                 previous_p: state.p.clone(),
@@ -493,6 +496,40 @@ impl PhotonicDynamicsConfig {
             gain_p,
             feedback_norm_squared,
         })
+    }
+
+    /// Run a deterministic numerical trajectory under a predeclared transition schedule.
+    ///
+    /// Returns one full diagnostic report per step. This intentionally exposes
+    /// all intermediate states and per-oscillator gains for auditability; callers
+    /// benchmarking large systems should account for trace storage and may later
+    /// add a streaming sink without changing the update equations.
+    ///
+    /// `steps` is the number of round trips. The schedule is evaluated at
+    /// `time = step_index * delta_t`, with the first update at time zero.
+    /// The caller must choose initial state, schedule, and stopping horizon
+    /// before confirmatory comparisons.
+    pub fn run_trajectory(
+        &self,
+        initial_state: &QuadratureState,
+        schedule: &TransitionSchedule,
+        steps: usize,
+    ) -> Result<Vec<QuadratureStep>, PhotonicDynamicsError> {
+        self.validate_state(initial_state)?;
+        let mut state = initial_state.clone();
+        let mut trace = Vec::with_capacity(steps);
+
+        for step_index in 0..steps {
+            let time = step_index as f64 * self.delta_t;
+            if !time.is_finite() {
+                return Err(PhotonicDynamicsError::InvalidScheduleTime { value: time });
+            }
+            let transition = schedule.coefficient(time, self.delta_t)?;
+            let report = self.step(&state, transition)?;
+            state = report.next_state.clone();
+            trace.push(report);
+        }
+        Ok(trace)
     }
 
     fn validate_state(
@@ -659,6 +696,43 @@ mod tests {
         assert_eq!(schedule.coefficient(0.3, 0.1).expect("inside XY return"), 0.0);
         let after_second = schedule.coefficient(0.4, 0.1).expect("at second switch");
         assert!((after_second - 2.0_f64.tanh()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn trajectory_records_schedule_and_advances_history_each_round_trip() {
+        let model =
+            PhotonicDynamicsConfig::new(vec![vec![0.0]], 0.1, 0.0, 4.0, 1.0)
+                .expect("valid one-spin configuration");
+        let initial = state(&[0.0], &[0.0], &[0.0], &[0.0]);
+        let trace = model
+            .run_trajectory(
+                &initial,
+                &TransitionSchedule::MonotoneTanh { rate: 1.0 },
+                4,
+            )
+            .expect("finite short trajectory");
+        assert_eq!(trace.len(), 4);
+        assert_eq!(trace[0].transition_coefficient, 0.0);
+        assert!((trace[1].transition_coefficient - 1.0_f64.tanh()).abs() < 1e-12);
+        assert!(trace[2].transition_coefficient > trace[1].transition_coefficient);
+        assert!(trace[3].transition_coefficient > trace[2].transition_coefficient);
+        assert_eq!(trace[0].next_state.previous_x, initial.x);
+        assert_eq!(trace[1].next_state.previous_x, trace[0].next_state.x);
+    }
+
+    #[test]
+    fn zero_step_trajectory_returns_empty_trace_after_input_validation() {
+        let model = two_spin_config();
+        let initial = state(&[0.0, 1.0], &[0.0, 2.0], &[0.0, 0.0], &[0.0, 0.0]);
+        assert!(model
+            .run_trajectory(&initial, &TransitionSchedule::PureXy, 0)
+            .expect("zero steps is valid")
+            .is_empty());
+        let invalid = state(&[0.0], &[0.0], &[0.0], &[0.0]);
+        assert!(matches!(
+            model.run_trajectory(&invalid, &TransitionSchedule::PureXy, 0),
+            Err(PhotonicDynamicsError::StateLengthMismatch { .. })
+        ));
     }
 
     #[test]
