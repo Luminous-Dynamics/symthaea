@@ -450,6 +450,10 @@ def score_document(
     _check_metric(document, "run_count", expected_run_count, errors)
     _check_metric(document, "summary_count", expected_summary_count, errors)
     _check_metric(document, "paired_comparison_count", expected_comparison_count, errors)
+    if not isinstance(document["summaries"], list) or len(document["summaries"]) != expected_summary_count:
+        errors.append("summaries list length does not match the registered design; receipt summaries are rebuilt from raw runs")
+    if not isinstance(document["paired_comparisons_vs_high_only"], list) or len(document["paired_comparisons_vs_high_only"]) != expected_comparison_count:
+        errors.append("paired comparisons list length does not match the registered design; receipt comparisons are rebuilt from raw runs")
     if not isinstance(document["paired_runs"], list) or len(document["paired_runs"]) != expected_run_count:
         errors.append("paired_runs length does not match the registered design")
         runs = document["paired_runs"] if isinstance(document["paired_runs"], list) else []
