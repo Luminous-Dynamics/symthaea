@@ -1893,7 +1893,8 @@ impl CognitiveLoopService {
         let mem_bind = self.phase_dynamics_memory_binding(
             perception,
             urgency,
-            prediction_error,
+            &perception.urgency.prediction_evidence,
+            self.stats.total_cycles as u64,
             module_timings,
         );
         let memory_context_boost = mem_bind.memory_context_boost;
