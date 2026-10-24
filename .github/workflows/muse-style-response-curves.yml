@@ -1,0 +1,403 @@
+name: Muse Style Response Curves
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-music-theory/src/grammar.rs"
+      - "crates/domains/symthaea-music-theory/src/fingerprint.rs"
+      - "crates/domains/symthaea-music-theory/src/composer.rs"
+      - "crates/domains/symthaea-music-theory/src/score.rs"
+      - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
+      - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.toml"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-style-response-curves.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-music-theory/src/grammar.rs"
+      - "crates/domains/symthaea-music-theory/src/fingerprint.rs"
+      - "crates/domains/symthaea-music-theory/src/composer.rs"
+      - "crates/domains/symthaea-music-theory/src/score.rs"
+      - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
+      - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.toml"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-style-response-curves.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-style-response-curves-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  routed-response-curves:
+    name: Generate fixed-grid routed response curves
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install the repository Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Compile and test the response-curve protocol
+        run: cargo test -p symthaea-music-theory --example style_control_response_curves
+
+      - name: Run all routed style/control response curves
+        run: |
+          mkdir -p artifacts/muse-style-response-curves
+          MUSE_STYLE_RESPONSE_JSON_OUT=artifacts/muse-style-response-curves/response-curves.json \
+            cargo run -p symthaea-music-theory --example style_control_response_curves \
+            > /tmp/muse-style-response-curves-stdout.json
+
+      - name: Bind the report to source and artifact digests
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          output_dir = Path("artifacts/muse-style-response-curves")
+          report_path = output_dir / "response-curves.json"
+          report_bytes = report_path.read_bytes()
+          report = json.loads(report_bytes)
+          source_paths = [
+              "crates/domains/symthaea-music-theory/src/style.rs",
+              "crates/domains/symthaea-music-theory/src/grammar.rs",
+              "crates/domains/symthaea-music-theory/src/fingerprint.rs",
+              "crates/domains/symthaea-music-theory/src/composer.rs",
+              "crates/domains/symthaea-music-theory/src/score.rs",
+              "crates/domains/symthaea-music-theory/examples/diversity_census.rs",
+              "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
+              ".github/workflows/muse-style-response-curves.yml",
+              "Cargo.toml",
+              "crates/domains/symthaea-music-theory/Cargo.toml",
+              "Cargo.lock",
+          ]
+          blob_digests = {
+              path: subprocess.check_output(
+                  ["git", "hash-object", path], text=True
+              ).strip()
+              for path in source_paths
+          }
+          curves_without_observed_change = [
+              {
+                  "style": profile["style"],
+                  "control": curve["control"],
+                  "baseline_seed": curve["baseline_seed"],
+              }
+              for profile in report["profiles"]
+              for curve in profile["curves"]
+              if curve["observed_changes_from_baseline"][
+                  "no_observed_change_at_tested_points"
+              ]
+          ]
+          receipt = {
+              "schema": "muse-style-response-run-receipt-v1",
+              "tested_checkout_sha": subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"], text=True
+              ).strip(),
+              "github_event_sha": os.environ["GITHUB_SHA"],
+              "pull_request_head_sha": json.loads(
+                  Path(os.environ["GITHUB_EVENT_PATH"]).read_text()
+              ).get("pull_request", {}).get("head", {}).get("sha"),
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "report_path": report_path.as_posix(),
+              "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
+              "source_git_blob_sha": blob_digests,
+              "engine_package_version": report["engine_package_version"],
+              "rustc_version": subprocess.check_output(["rustc", "-Vv"], text=True),
+              "cargo_version": subprocess.check_output(["cargo", "-V"], text=True).strip(),
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "runner_arch": os.environ.get("RUNNER_ARCH"),
+              "protocol": report["protocol"],
+              "curves_without_observed_change_at_tested_points": curves_without_observed_change,
+              "measurement_scope": report["measurement_scope"],
+              "interpretation": (
+                  "Symbolic response evidence only. This receipt does not establish "
+                  "rendering success, perceptual distinctness, quality, or authenticity."
+              ),
+          }
+          receipt_path = output_dir / "run-receipt.json"
+          receipt_path.write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          with summary.open("a", encoding="utf-8") as stream:
+              stream.write("# Muse routed style-control response curves\n\n")
+              stream.write(
+                  f"- Tested checkout SHA: `{receipt['tested_checkout_sha']}`\n"
+              )
+              stream.write(
+                  f"- PR head SHA: `{receipt['pull_request_head_sha'] or 'push event'}`\n"
+              )
+              stream.write(f"- Styles: {report['protocol']['style_count']}\n")
+              stream.write(f"- Curves: {report['protocol']['curve_count']}\n")
+              stream.write(f"- Control points: {report['protocol']['point_count']}\n")
+              stream.write(
+                  "- Curves with no observed change at tested points: "
+                  f"{len(curves_without_observed_change)} / {report['protocol']['curve_count']}\n"
+              )
+              if curves_without_observed_change:
+                  stream.write("## Curves with no observed output change\n\n")
+                  stream.write("These are triage signals, not automatic failures.\n\n")
+                  stream.write("| Style | Control | Baseline seed |\n|---|---|---:|\n")
+                  for item in curves_without_observed_change:
+                      stream.write(
+                          f"| {item['style']} | {item['control']} | {item['baseline_seed']} |\n"
+                      )
+                  stream.write("\n")
+              stream.write("## Tonic target fidelity and candidate invariance by style\n\n")
+              stream.write(
+                  "Tonic target fidelity is an explicit requested-versus-realized pitch-class match. "
+                  "Invariant-layer deviations are diagnostic only; valence, arousal, and energy "
+                  "target checks are summarized separately below.\n\n"
+              )
+              stream.write("| Style | Requested tonic matched | Candidate invariant-layer deviations |\n")
+              stream.write("|---|---:|---|\n")
+              for profile in report["profiles"]:
+                  tonic_curves = [
+                      curve for curve in profile["curves"] if curve["control"] == "tonic"
+                  ]
+                  target_rows = [
+                      curve["control_target_evaluation"]["target_fidelity"]
+                      for curve in tonic_curves
+                  ]
+                  tested = sum(row.get("tested_point_count", 0) for row in target_rows)
+                  matched = sum(row.get("matching_point_count", 0) for row in target_rows)
+                  target_text = (
+                      f"{matched}/{tested} requested tonics matched"
+                      if tested else "not predeclared"
+                  )
+                  invariance_rows = [
+                      curve["control_target_evaluation"]["non_target_invariance"]
+                      for curve in tonic_curves
+                  ]
+                  nonbaseline = sum(row.get("nonbaseline_point_count", 0) for row in invariance_rows)
+                  violating_points = sum(
+                      row.get("points_with_candidate_invariance_violations", 0)
+                      for row in invariance_rows
+                  )
+                  layer_deltas = sum(len(row.get("violations", [])) for row in invariance_rows)
+                  invariance_text = (
+                      f"{violating_points}/{nonbaseline} non-baseline points; "
+                      f"{layer_deltas} layer deltas"
+                  ) if nonbaseline else "not predeclared"
+                  stream.write(
+                      f"| {profile['style']} | {target_text} | {invariance_text} |\n"
+                  )
+              stream.write("\n")
+
+              stream.write("## Valence, arousal, and phrase-model targets by style\n\n")
+              stream.write(
+                  "| Style | Valence target | Arousal tempo target | Energy phrase-model target |\n"
+              )
+              stream.write("|---|---|---|---|\n")
+              for profile in report["profiles"]:
+                  by_control = {}
+                  for curve in profile["curves"]:
+                      by_control.setdefault(curve["control"], []).append(
+                          curve["control_target_evaluation"]["target_fidelity"]
+                      )
+
+                  def target_summary(rows):
+                      statuses = {row.get("status", "missing") for row in rows}
+                      if statuses != {"measured"}:
+                          return ", ".join(sorted(statuses)) or "missing"
+                      matched = sum(row.get("matching_point_count", 0) for row in rows)
+                      scored = sum(
+                          row.get("scored_point_count", row.get("tested_point_count", 0))
+                          for row in rows
+                      )
+                      neutral_unscored = sum(
+                          row.get("unscored_neutral_point_count", 0) for row in rows
+                      )
+                      suffix = (
+                          f"; {neutral_unscored} neutral unscored"
+                          if neutral_unscored else ""
+                      )
+                      return f"{matched}/{scored} scored points matched{suffix}"
+
+                  valence_text = target_summary(by_control.get("valence", []))
+                  energy_text = target_summary(by_control.get("energy", []))
+                  arousal_rows = by_control.get("arousal", [])
+                  arousal_text = target_summary(arousal_rows)
+                  if arousal_rows and all(row.get("status") == "measured" for row in arousal_rows):
+                      max_error = max(
+                          row.get("max_absolute_error_bpm", float("inf"))
+                          for row in arousal_rows
+                      )
+                      arousal_text += f"; max error {max_error:.4f} BPM"
+                  stream.write(
+                      "| {} | {} | {} | {} |\n".format(
+                          profile["style"], valence_text, arousal_text, energy_text
+                      )
+                  )
+              stream.write("\n")
+
+              stream.write("## Rank-based response shape by style/control\n\n")
+              stream.write(
+                  "Per-seed Spearman rho ranges are descriptive association measures, not target-fidelity or quality scores. "
+                  "Only numeric control axes are summarized; tonic and seed are deliberately non-ordinal.\n\n"
+              )
+              stream.write(
+                  "| Style | Control | Tempo rho range | Duration rho range | Note-count rho range | Mean-velocity rho range |\n"
+              )
+              stream.write("|---|---|---|---|---|---|\n")
+              for profile in report["profiles"]:
+                  for control in ["valence", "arousal", "energy", "bars"]:
+                      matching_curves = [
+                          curve for curve in profile["curves"]
+                          if curve["control"] == control
+                      ]
+
+                      def rank_summary(key):
+                          rows = [
+                              curve.get("response_rank", {}).get(key, {})
+                              for curve in matching_curves
+                          ]
+                          measured = [
+                              row["rho"] for row in rows
+                              if row.get("status") == "measured"
+                              and isinstance(row.get("rho"), (int, float))
+                          ]
+                          flat = sum(row.get("status") == "constant_output" for row in rows)
+                          if not measured:
+                              return f"0/4 measured; flat {flat}"
+                          return (
+                              f"{len(measured)}/4; {min(measured):+.2f}..{max(measured):+.2f}; "
+                              f"flat {flat}"
+                          )
+
+                      stream.write(
+                          f"| {profile['style']} | {control} | "
+                          f"{rank_summary('tempo_bpm_vs_control')} | "
+                          f"{rank_summary('total_duration_beats_vs_control')} | "
+                          f"{rank_summary('score_note_count_vs_control')} | "
+                          f"{rank_summary('mean_velocity_vs_control')} |\n"
+                      )
+              stream.write("\n")
+
+              stream.write("## Candidate non-target invariance by style/control\n\n")
+              stream.write(
+                  "Channel-level candidates are reported as measured diagnostics, not quality scores. "
+                  "The tonic sweep's structural-layer diagnostics remain in the section above; this "
+                  "table covers the other controls. Seed identity coverage is reported separately below.\n\n"
+              )
+              stream.write(
+                  "| Style | Control | Channel | Curves with data | Curves with deviations | Point-level deviations |\n"
+              )
+              stream.write("|---|---|---|---:|---:|---:|\n")
+              for profile in report["profiles"]:
+                  for control in ["valence", "arousal", "energy", "bars", "seed"]:
+                      matching_curves = [
+                          curve for curve in profile["curves"]
+                          if curve["control"] == control
+                      ]
+                      by_channel = {}
+                      for curve in matching_curves:
+                          invariance = curve["control_target_evaluation"].get(
+                              "non_target_invariance", {}
+                          )
+                          for channel in invariance.get("checked_channels", []):
+                              by_channel.setdefault(channel["channel"], []).append(channel)
+                      for channel_name in sorted(by_channel):
+                          rows = by_channel[channel_name]
+                          deviating_curves = sum(
+                              row.get("changed_point_count", 0) > 0 for row in rows
+                          )
+                          point_deviations = sum(
+                              row.get("changed_point_count", 0) for row in rows
+                          )
+                          stream.write(
+                              f"| {profile['style']} | {control} | {channel_name} | "
+                              f"{len(rows)}/4 | {deviating_curves}/{len(rows)} | "
+                              f"{point_deviations} |\n"
+                          )
+              stream.write("\n")
+
+              stream.write("## Seed robustness by style/control\n\n")
+              stream.write(
+                  "| Style | Control | Seeds with any observed change | "
+                  "Observed/expected records | Coverage complete | "
+                  "Unchanged seeds | Seed identity anomalies |\n"
+              )
+              stream.write("|---|---|---:|---|---|---|---|\n")
+              for profile in report["profiles"]:
+                  for summary_row in profile["seed_robustness_summary"]:
+                      unchanged = ", ".join(
+                          str(seed)
+                          for seed in summary_row["seeds_with_no_observed_change"]
+                      ) or "none"
+                      anomalies = []
+                      if summary_row["missing_seed_ids"]:
+                          anomalies.append(
+                              "missing: " + ", ".join(
+                                  str(seed) for seed in summary_row["missing_seed_ids"]
+                              )
+                          )
+                      if summary_row["unexpected_seed_ids"]:
+                          anomalies.append(
+                              "unexpected: " + ", ".join(
+                                  str(seed) for seed in summary_row["unexpected_seed_ids"]
+                              )
+                          )
+                      if summary_row["duplicate_seed_record_count"]:
+                          anomalies.append(
+                              f"duplicate records: {summary_row['duplicate_seed_record_count']}"
+                          )
+                      if summary_row["invalid_seed_record_count"]:
+                          anomalies.append(
+                              f"invalid identities: {summary_row['invalid_seed_record_count']}"
+                          )
+                      anomaly_text = "; ".join(anomalies) or "none"
+                      stream.write(
+                          f"| {profile['style']} | {summary_row['control']} | "
+                          f"{summary_row['seeds_with_any_observed_change']} | "
+                          f"{summary_row['seed_count']}/{summary_row['expected_seed_count']} | "
+                          f"{summary_row['coverage_complete']} | {unchanged} | "
+                          f"{anomaly_text} |\n"
+                      )
+              stream.write("\n")
+              stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
+              stream.write("## Source blob digests\n\n")
+              stream.write("| Source | Git blob SHA |\n|---|---|\n")
+              for path, digest in blob_digests.items():
+                  stream.write(f"| `{path}` | `{digest}` |\n")
+              stream.write(
+                  "\n> Symbolic, deterministic measurements only; no audio, "
+                  "listener, distinctness, or cultural-authenticity claim is made.\n"
+              )
+          print(f"Wrote response receipt {receipt_path}")
+
+      - name: Upload reproducible response-curve evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: muse-style-response-curves-${{ github.sha }}
+          path: artifacts/muse-style-response-curves/
+          if-no-files-found: error
+          retention-days: 30

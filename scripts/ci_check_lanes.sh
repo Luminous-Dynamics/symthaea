@@ -27,7 +27,7 @@ run_lane() {
         python-research)
             echo "== python-research =="
             nix develop .#python-research -c /run/current-system/sw/bin/zsh -lc \
-                'uv run --no-sync pytest tests/python -q && uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py tests/python'
+                'uv run --no-sync pytest tests/python -q && uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py scripts/muse_style_coverage.py scripts/muse_style_capability_inventory.py tests/python'
             ;;
         coding-validation)
             echo "== coding-validation =="

@@ -1,0 +1,105 @@
+{
+  "schema": "muse-choro-approved-input-manifest-v1",
+  "manifest_id": "CHORO-APPROVED-INPUTS-001",
+  "scope": {
+    "purpose": "Rights-reviewed empirical evaluation of the declared Choro research hypotheses; model training is not implied.",
+    "requested_uses": [
+      "empirical_analysis"
+    ],
+    "commercial_use": null,
+    "jurisdictions": [],
+    "planned_outputs": [
+      "aggregate_metrics"
+    ],
+    "retention_policy": "Specify before any source retrieval; do not retain source files beyond the approved scope.",
+    "analysis_plan": {
+      "plan_id": "CHORO-EMPIRICAL-ANALYSIS-PLAN-TEMPLATE-001",
+      "path": "crates/domains/symthaea-muse/CHORO_PRE_REGISTERED_ANALYSIS_PLAN_V1.json",
+      "sha256": null,
+      "registered_on": null,
+      "registration_record_url": null
+    }
+  },
+  "required_rights_dimensions": [
+    "underlying_composition",
+    "score_edition_or_arrangement",
+    "scan_or_digital_file",
+    "third_party_materials"
+  ],
+  "sources": [],
+  "limitations": [
+    "An empty source list is intentionally blocked and authorizes no acquisition, transcription, analysis, training, publication, or redistribution.",
+    "Catalogue labels are leads, not legal determinations; review each exact artifact for the requested use and jurisdiction.",
+    "The gate checks recorded evidence and scope consistency. It does not provide legal advice or independently determine copyright status."
+  ],
+  "source_entry_contract": {
+    "required_fields": [
+      "intake_source_id",
+      "source_record_url",
+      "source_file_url",
+      "artifact_path",
+      "artifact_sha256",
+      "artifact_bytes",
+      "retrieved_on",
+      "selected_work_ids",
+      "selection_basis",
+      "rights_review"
+    ],
+    "rights_review_required_fields": [
+      "decision",
+      "reviewer_id",
+      "reviewed_on",
+      "review_evidence_url",
+      "license_or_basis_url",
+      "attribution_text",
+      "reviewed_artifact_sha256",
+      "reviewed_scope_sha256",
+      "permitted_uses",
+      "jurisdictions",
+      "commercial_use_allowed",
+      "rights_dimensions"
+    ],
+    "required_rights_layers": [
+      "underlying_composition",
+      "score_edition_or_arrangement",
+      "scan_or_digital_file",
+      "third_party_materials"
+    ],
+    "selection_rule": "Name exact work or movement identifiers within each artifact; collections must not be treated as a single undifferentiated work. State the predeclared selection basis.",
+    "review_scope_digest": "rights_review.reviewed_scope_sha256 is SHA-256 over canonical JSON computed by scripts/muse_choro_input_manifest.py::review_scope_sha256. It binds the source record, exact source artifact, selected work/movement IDs, selection basis, four rights layers, declared use/commercial/jurisdiction/output/retention scope, and the exact frozen analysis-plan ID/path/SHA-256/registration date/registration URL. Any change invalidates the review-scope digest.",
+    "scope_analysis_plan_required_fields": [
+      "plan_id",
+      "path",
+      "sha256",
+      "registered_on",
+      "registration_record_url"
+    ],
+    "analysis_plan_contract": "For any non-empty source list, scope.analysis_plan must identify an exact repository-relative JSON plan whose on-disk SHA-256 matches the manifest. The plan file must use schema muse-choro-preregistered-analysis-plan-v1 and top-level status registered; set pre_registration.status=registered and hypotheses_frozen/null_models_frozen/thresholds_frozen=true; and provide an ISO registered_on date plus HTTPS registration_record_url identical to manifest values. Its design must include source_version_pin, study_question and authorized_source_bindings that exactly match all source IDs, record/file URLs, relative artifact paths, artifact SHA-256 values, byte counts and selected work/movement IDs in the approved input manifest; non-empty inclusion_criteria, exclusion_criteria, primary_outcomes and sensitivity_analyses; at least one hypothesis with unique id, statement, primary_test, unit_of_analysis and falsification_rule; at least one null model with unique id, description, preserved_properties, randomization_or_permutation and unit_of_resampling; explicit effect_size_rule, uncertainty_rule and decision_rule; and multiplicity_correction, missing_data_policy, split_strategy and deviation_policy. Boolean freeze flags alone are insufficient. Rights-review scope digests bind this exact plan identity/content digest; rights review and independent approval must not predate plan registration. This checker validates bytes and recorded fields, not scientific adequacy or the truth of an external registration. The checked-in analysis-plan template is intentionally not registered and cannot authorize analysis.",
+    "concrete_design_required_fields": [
+      "source_version_pin",
+      "study_question",
+      "inclusion_criteria",
+      "exclusion_criteria",
+      "hypotheses[].id",
+      "hypotheses[].statement",
+      "hypotheses[].primary_test",
+      "hypotheses[].unit_of_analysis",
+      "hypotheses[].falsification_rule",
+      "null_models[].id",
+      "null_models[].description",
+      "null_models[].preserved_properties",
+      "null_models[].randomization_or_permutation",
+      "null_models[].unit_of_resampling",
+      "primary_outcomes",
+      "sensitivity_analyses",
+      "effect_and_uncertainty_thresholds.effect_size_rule",
+      "effect_and_uncertainty_thresholds.uncertainty_rule",
+      "effect_and_uncertainty_thresholds.decision_rule",
+      "multiplicity_correction",
+      "missing_data_policy",
+      "split_strategy",
+      "deviation_policy",
+      "authorized_source_bindings[]"
+    ]
+  }
+}

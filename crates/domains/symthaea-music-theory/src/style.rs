@@ -300,22 +300,22 @@ impl Style {
     /// `contrapuntal_foundry.rs`'s compatible-styles list).
     ///
     /// `AfroCuban`/`Minimalism`/`HindustaniInspired` are the three
-    /// "flagship" styles [`crate::grammar::compose_with_grammar_plan`]
-    /// routes to dedicated new engines
-    /// ([`crate::groove_cycle`]/[`crate::process_grammar`]/
-    /// [`crate::modal_arc`]) instead of the shared period pipeline — a real
-    /// behavior upgrade for those three, not just a label. Every other
-    /// style maps to a family whose `compose_with_grammar_plan` arm falls
-    /// through to the existing [`crate::composer::compose_with_spec_and_form`]
-    /// pipeline, so this mapping is behavior-preserving for all 25 other
-    /// styles. `RenaissancePolyphony` is contrapuntal in spirit (equal-voice
-    /// imitative entries) but is deliberately NOT mapped to
-    /// `GrammarFamily::Contrapuntal` — that arm's dispatch is hardcoded to
-    /// `crate::fugue::realize_fugue`, so mapping it there would silently
-    /// reroute Renaissance's own realizer through the fugue engine. Giving
+    /// "flagship" styles that route to dedicated groove-cycle, additive-process,
+    /// and raga-modal engines. They are not the only non-fallback dispatches:
+    /// `Fugue`, `Blues`, and `JazzBallad` additionally route to the dedicated
+    /// contrapuntal, call-response, and jazz-chorus engines. `PeriodSentence`
+    /// has its own named plan but uses the common
+    /// `compose_with_spec_and_form_and_grammar` pipeline. The remaining
+    /// families (`GroundVariation`, `StrophicSong`, `AmbientTextural`,
+    /// `DramaticAdaptive`, and `Developmental`) currently fall through the
+    /// compatibility branch; a family label alone is not proof of a dedicated
+    /// grammar engine. `RenaissancePolyphony` is contrapuntal in spirit
+    /// (equal-voice imitative entries) but is deliberately NOT mapped to
+    /// `GrammarFamily::Contrapuntal` — that arm calls
+    /// `crate::fugue::realize_fugue`, so mapping Renaissance there would
+    /// silently route its own realizer through the fugue engine. Giving
     /// Renaissance (and Sonata/ProgFolk, similarly parked under
-    /// `Developmental`) their own dedicated dispatch arms is real follow-up
-    /// work, not attempted here.
+    /// `Developmental`) dedicated dispatch arms remains follow-up work.
     pub fn grammar_family(self) -> crate::grammar::GrammarFamily {
         use crate::grammar::GrammarFamily::*;
         match self {
