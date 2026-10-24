@@ -485,7 +485,7 @@ mod tests {
             "0.15".to_owned(),
             "0.10".to_owned(),
             "0.05".to_owned(),
-            std::iter::repeat("2").take(MIN_CLUSTERS).collect::<Vec<_>>().join(","),
+            vec!["2"; MIN_CLUSTERS].join(","),
             "1000".to_owned(),
             "123".to_owned(),
             "power.json".to_owned(),
