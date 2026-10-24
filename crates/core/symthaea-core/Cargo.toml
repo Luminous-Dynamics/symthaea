@@ -144,6 +144,10 @@ name = "hdc_ordered_early_abandon"
 harness = false
 
 [[bench]]
+name = "hdc_compositional_workload"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
