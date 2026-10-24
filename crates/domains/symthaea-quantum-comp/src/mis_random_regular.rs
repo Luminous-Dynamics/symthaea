@@ -150,15 +150,18 @@ pub fn generate_mis_random_regular(
         return Ok((graph, MisRandomRegularReport { config, attempts: 1, edge_count: 0 }));
     }
 
-    let mut stubs = Vec::with_capacity(stub_count);
+    let mut canonical_stubs = Vec::with_capacity(stub_count);
     for vertex in 0..config.vertex_count {
-        for _ in 0..config.degree { stubs.push(vertex); }
+        for _ in 0..config.degree { canonical_stubs.push(vertex); }
     }
     let mut rng = XorShift64::new(config.seed);
     for attempt in 1..=config.max_attempts {
-        // Shuffle in place between attempts. A Fisher-Yates permutation remains uniform
-        // from any prior permutation; this also matches the seed-stream semantics of the
-        // cohort preflight so generated graph bytes can be compared exactly.
+        // Every retry starts from the same canonical stub multiset, then consumes the
+        // next segment of the seeded PRNG stream for a fresh Fisher-Yates permutation.
+        // This is the seed-stream contract used by QCOMP-RRG-CLASSICAL-PREFLIGHT-001.
+        // Re-shuffling a failed permutation is distributionally reasonable but does
+        // not produce identical graph bytes for the same cross-language seed fixture.
+        let mut stubs = canonical_stubs.clone();
         for index in (1..stubs.len()).rev() {
             let swap_with = sample_below(&mut rng, index + 1);
             stubs.swap(index, swap_with);
