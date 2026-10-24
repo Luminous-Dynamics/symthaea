@@ -170,3 +170,24 @@ This module is deliberately a policy boundary, not a cryptographic implementatio
 3. Add a deterministic benchmark corpus that includes bit-identical observations with different external identity labels; verify that score-only input yields CandidateOnly/Abstain, never ExactIdentityVerified.
 4. Only after the API is stable, adapt one real caller behind an opt-in path and measure false acceptance, abstention/coverage and latency against its existing policy.
 5. Add receipt serialization and bind the decision to policy, corpus/index digest and source revision before production adoption.
+
+
+## 11. Corpus-size-aware false-accept calibration (DSE-008)
+
+A second statistical pitfall is selection over a corpus. If a single random candidate has null exceedance probability p, then under the independent-candidate assumption the chance that at least one of N candidates exceeds the threshold is:
+
+`P(any false accept) = 1 - (1 - p)^N`
+
+For illustration, a one-sided per-comparison tail probability of 0.00135 gives about a 75% chance of at least one exceedance among 1,000 independent candidates. This is a mathematical illustration, not a measured Symthaea error rate. The existing StatisticalRetriever also applies a separate raw-similarity floor, so this calculation is not a claim that its default setup has this rate.
+
+The retrieval contract prototype now includes two numeric helpers:
+- `familywise_false_accept_probability(p, N)`
+- `per_candidate_rate_for_familywise_target(alpha, N)`
+
+Both reject invalid numeric inputs, and tests cover corpus-size amplification and round-trip calculation. They are diagnostic primitives under an independent-null model; they do not estimate score tails, handle candidate correlation, or replace held-out maximum-score calibration.
+
+Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8647
+
+Next benchmark sweep: N = 1, 16, 256, 1,024, 4,096, 16,384 and 65,536+; random and clustered/correlated corpora; shared components, duplicates and hard negatives; multi-seed independent test partitions. Calibrate on one partition, freeze the threshold, and evaluate the maximum score over the complete held-out corpus. Report empirical maximum-score quantiles, false accepts/rejects, selective risk versus coverage and confidence bounds.
+
+Important: pairwise z-scores are not cryptographic proof or public reproducibility. Multiple-comparison adjustments are only a theoretical starting point when candidates are correlated or the deployment distribution shifts.
