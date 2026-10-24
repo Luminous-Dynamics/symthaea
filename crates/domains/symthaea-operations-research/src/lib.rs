@@ -14,6 +14,9 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
+//!   with a separately implemented plan verifier and negative controls. This is
+//!   not dispatch, maintenance-release, or airworthiness authority.
 //!
 //! ## Example
 //!
@@ -23,6 +26,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod aviation_enterprise;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
