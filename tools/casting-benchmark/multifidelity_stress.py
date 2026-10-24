@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import statistics
 from dataclasses import asdict, dataclass
 from typing import Iterable
 
@@ -488,14 +489,102 @@ def run_suite(seed: int = 17, cost_budget: int = DEFAULT_COST_BUDGET, grid_size:
     }
 
 
+
+def _percentile(values: list[float], q: float) -> float:
+    if not values or not 0.0 <= q <= 1.0:
+        raise ValueError("percentile requires non-empty values and q in [0,1]")
+    ordered = sorted(values)
+    location = (len(ordered) - 1) * q
+    lower = int(math.floor(location))
+    upper = int(math.ceil(location))
+    if lower == upper:
+        return ordered[lower]
+    fraction = location - lower
+    return ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
+
+
+def run_sweep(
+    seeds: Iterable[int] = (17, 23, 29, 31, 37, 41, 43, 47, 53, 59),
+    severities: Iterable[float] = (0.0, 0.5, 1.0, 1.5, 2.0),
+    cost_budget: int = DEFAULT_COST_BUDGET,
+    grid_size: int = DEFAULT_GRID_SIZE,
+) -> dict:
+    """Paired seed x severity sweep; all policies see the same deterministic candidate pool."""
+    seed_values = tuple(seeds)
+    severity_values = tuple(float(v) for v in severities)
+    if not seed_values or len(set(seed_values)) != len(seed_values):
+        raise ValueError("sweep seeds must be non-empty and unique")
+    if not severity_values or any(not math.isfinite(v) or v < 0.0 for v in severity_values):
+        raise ValueError("sweep severities must be non-empty finite non-negative values")
+    _validate_run_configuration(cost_budget, grid_size, max(severity_values))
+
+    runs: list[dict] = []
+    for severity in severity_values:
+        for seed in seed_values:
+            suite = run_suite(seed=seed, cost_budget=cost_budget, grid_size=grid_size, severity=severity)
+            runs.extend(suite["policy_results"])
+
+    summaries = []
+    for severity in severity_values:
+        for policy in POLICIES:
+            group = [
+                row for row in runs
+                if row["severity"] == severity and row["policy"] == policy
+            ]
+            quality = [float(row["normalized_hypervolume_fraction"]) for row in group]
+            promotion_rates = [
+                float(row["false_promotion_rate"])
+                for row in group if row["false_promotion_rate"] is not None
+            ]
+            summaries.append({
+                "policy": policy,
+                "severity": severity,
+                "seed_count": len(group),
+                "median_normalized_hypervolume_fraction": statistics.median(quality),
+                "q25_normalized_hypervolume_fraction": _percentile(quality, 0.25),
+                "q75_normalized_hypervolume_fraction": _percentile(quality, 0.75),
+                "mean_false_promotion_rate": (
+                    statistics.fmean(promotion_rates) if promotion_rates else None
+                ),
+                "total_cost_units_mean": statistics.fmean(float(row["cost_spent"]) for row in group),
+                "mean_high_fidelity_calls": statistics.fmean(
+                    float(row["high_fidelity_call_count"]) for row in group
+                ),
+            })
+
+    return {
+        "benchmark_id": "CASTING-MF-STRESS-001",
+        "synthetic_fixture_only": True,
+        "cost_budget": cost_budget,
+        "grid_size": grid_size,
+        "seeds": list(seed_values),
+        "severities": list(severity_values),
+        "summary_by_policy_and_severity": summaries,
+        "paired_runs": runs,
+        "warning": (
+            "Synthetic finite-pool stress test only. Policy comparisons are descriptive until "
+            "repeated-seed uncertainty analysis and locked MF-HVKG/MOMF baselines are included."
+        ),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--cost-budget", type=int, default=DEFAULT_COST_BUDGET)
     parser.add_argument("--grid-size", type=int, default=DEFAULT_GRID_SIZE)
     parser.add_argument("--severity", type=float, default=1.0)
+    parser.add_argument("--sweep-seeds", type=str, default=None,
+                        help="comma-separated paired seeds; enables severity sweep")
+    parser.add_argument("--sweep-severities", type=str, default="0,0.5,1,1.5,2",
+                        help="comma-separated non-negative discrepancy severity values")
     args = parser.parse_args()
-    result = run_suite(args.seed, args.cost_budget, args.grid_size, args.severity)
+    if args.sweep_seeds is not None:
+        seeds = [int(value.strip()) for value in args.sweep_seeds.split(",") if value.strip()]
+        severities = [float(value.strip()) for value in args.sweep_severities.split(",") if value.strip()]
+        result = run_sweep(seeds, severities, args.cost_budget, args.grid_size)
+    else:
+        result = run_suite(args.seed, args.cost_budget, args.grid_size, args.severity)
     print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
     return 0
 
