@@ -550,6 +550,115 @@ fn recompute_cost_independently(
     Some(total)
 }
 
+/// Machine-readable run record for a synthetic benchmark execution.
+///
+/// The input digest is supplied by the outer harness; this struct does not hash,
+/// sign, or authenticate the run. Its JSON is an audit artifact, not an authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunManifest {
+    pub schema_version: String,
+    pub benchmark_id: String,
+    pub scenario_id: String,
+    pub configuration_revision: String,
+    pub input_digest: String,
+    pub method_id: String,
+    pub seed: u64,
+    pub declared_plan_cost: Option<u64>,
+    pub verifier_status: VerificationStatus,
+    pub violation_count: usize,
+    pub violations: Vec<String>,
+    pub assigned_flight_count: usize,
+    pub cancelled_flight_count: usize,
+    pub synthetic: bool,
+}
+
+impl RunManifest {
+    /// Record plan and verifier outputs without upgrading their claim level.
+    pub fn from_run(
+        scenario: &Scenario,
+        seed: u64,
+        plan: &Plan,
+        verification: &VerificationReport,
+    ) -> Self {
+        Self {
+            schema_version: "AECB-001-run-v1".into(),
+            benchmark_id: "AECB-001".into(),
+            scenario_id: scenario.id.clone(),
+            configuration_revision: scenario.configuration_revision.clone(),
+            input_digest: scenario.input_digest.clone(),
+            method_id: "bounded-exact-enumerator-v1".into(),
+            seed,
+            declared_plan_cost: Some(plan.total_cost),
+            verifier_status: verification.status,
+            violation_count: verification.violations.len(),
+            violations: verification.violations.clone(),
+            assigned_flight_count: plan.assignments.iter().filter(|a| a.aircraft_id.is_some()).count(),
+            cancelled_flight_count: plan.assignments.iter().filter(|a| a.aircraft_id.is_none()).count(),
+            synthetic: true,
+        }
+    }
+
+    /// Emit compact JSON using a local string escaper and no serialization dependency.
+    pub fn to_json(&self) -> String {
+        let violations_json = self
+            .violations
+            .iter()
+            .map(|v| json_quote(v))
+            .collect::<Vec<_>>()
+            .join(",");
+        let cost_json = self
+            .declared_plan_cost
+            .map(|cost| cost.to_string())
+            .unwrap_or_else(|| "null".into());
+
+        format!(
+            "{{\"schema_version\":{},\"benchmark_id\":{},\"scenario_id\":{},\"configuration_revision\":{},\"input_digest\":{},\"method_id\":{},\"seed\":{},\"declared_plan_cost\":{},\"verifier_status\":{},\"violation_count\":{},\"violations\":[{}],\"assigned_flight_count\":{},\"cancelled_flight_count\":{},\"synthetic\":{}}}",
+            json_quote(&self.schema_version),
+            json_quote(&self.benchmark_id),
+            json_quote(&self.scenario_id),
+            json_quote(&self.configuration_revision),
+            json_quote(&self.input_digest),
+            json_quote(&self.method_id),
+            self.seed,
+            cost_json,
+            json_quote(verification_status_name(self.verifier_status)),
+            self.violation_count,
+            violations_json,
+            self.assigned_flight_count,
+            self.cancelled_flight_count,
+            self.synthetic,
+        )
+    }
+}
+
+fn verification_status_name(status: VerificationStatus) -> &'static str {
+    match status {
+        VerificationStatus::Verified => "verified",
+        VerificationStatus::Rejected => "rejected",
+        VerificationStatus::Indeterminate => "indeterminate",
+    }
+}
+
+fn json_quote(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len() + 2);
+    escaped.push('"');
+    for character in value.chars() {
+        match character {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            control if control <= '\u{001f}' => {
+                escaped.push_str(&format!("\\u{:04x}", control as u32));
+            }
+            other => escaped.push(other),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
 /// Canonical tiny fixture. A healthy aircraft can cover one of two concurrent
 /// flights. A second needs a component; factory production plus maintenance costs
 /// less than cancelling the uncovered flight. This is not an airline cost model.
@@ -738,5 +847,33 @@ mod tests {
         let report = verify_plan(&scenario, &plan);
         assert_eq!(report.status, VerificationStatus::Rejected);
         assert!(report.violations.iter().any(|v| v.contains("input digest")));
+    }
+
+    #[test]
+    fn run_manifest_records_verified_result_and_objective() {
+        let scenario = reference_scenario();
+        let plan = solve_exact(&scenario).unwrap();
+        let report = verify_plan(&scenario, &plan);
+        let manifest = RunManifest::from_run(&scenario, 7, &plan, &report);
+        let json = manifest.to_json();
+        assert!(json.contains("\"verifier_status\":\"verified\""));
+        assert!(json.contains("\"declared_plan_cost\":40"));
+        assert!(json.contains("\"cancelled_flight_count\":0"));
+        assert!(json.contains("\"seed\":7"));
+    }
+
+    #[test]
+    fn manifest_json_escapes_control_characters() {
+        let scenario = reference_scenario();
+        let plan = solve_exact(&scenario).unwrap();
+        let report = VerificationReport {
+            status: VerificationStatus::Rejected,
+            violations: vec!["stale \\"revision\\"\\nblocked".into()],
+            recomputed_cost: None,
+        };
+        let manifest = RunManifest::from_run(&scenario, 0, &plan, &report);
+        let json = manifest.to_json();
+        assert!(json.contains("\\\\\\"revision\\\\\\\""));
+        assert!(json.contains("\\\\n"));
     }
 }
