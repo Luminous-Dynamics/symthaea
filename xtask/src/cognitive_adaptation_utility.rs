@@ -115,16 +115,26 @@ pub struct CounterfactualUtilityScore {
     pub detector_post_shift_task_loss_improvement_vs_no_adapt: f64,
     /// Positive means detector-triggered adaptation has more post-shift loss than oracle timing.
     pub detector_post_shift_task_loss_regret_vs_oracle_timed: f64,
+    /// Positive means benefit-gated adaptation lowers post-shift loss relative to no adaptation.
+    pub detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt: f64,
+    /// Positive means staged adaptation lowers post-shift loss relative to no adaptation.
+    pub staged_post_shift_task_loss_improvement_vs_no_adapt: f64,
     /// Positive means staged verification lowers post-shift loss relative to detector-triggered adaptation.
     pub staged_post_shift_task_loss_improvement_vs_detector_triggered: f64,
     /// Positive means staged verification has more post-shift loss than oracle timing.
     pub staged_post_shift_task_loss_regret_vs_oracle_timed: f64,
     /// Positive means the detector policy costs more resources than no adaptation.
     pub detector_adaptation_cost_delta_vs_no_adapt: f64,
+    /// Positive means benefit-gated adaptation costs more resources than no adaptation.
+    pub detector_benefit_gated_adaptation_cost_delta_vs_no_adapt: f64,
+    /// Positive means staged verification costs more resources than no adaptation.
+    pub staged_adaptation_cost_delta_vs_no_adapt: f64,
     /// Positive means staged verification costs more resources than detector-triggered adaptation.
     pub staged_adaptation_cost_delta_vs_detector_triggered: f64,
     /// True when staged verification is no better on post-shift loss and costs more than detector-triggered.
     pub staged_dominated_by_detector_triggered: bool,
+    /// True when no adaptation is no worse on whole-stream loss and uses strictly fewer resources than benefit-gated policy.
+    pub detector_benefit_gated_dominated_by_no_adapt: bool,
     /// True when no adaptation is no worse on whole-stream loss and uses strictly fewer resources than staged policy.
     pub staged_dominated_by_no_adapt: bool,
     /// True when no adaptation is no worse on task loss and uses strictly fewer resources.
@@ -230,14 +240,26 @@ pub fn score_counterfactual_utility(
         no_adapt.post_shift_mean_task_loss - detector_triggered.post_shift_mean_task_loss;
     let post_shift_regret =
         detector_triggered.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
+    let benefit_gated_post_shift_improvement =
+        no_adapt.post_shift_mean_task_loss - detector_benefit_gated.post_shift_mean_task_loss;
+    let staged_post_shift_improvement_vs_no_adapt =
+        no_adapt.post_shift_mean_task_loss - staged_verify_rollback.post_shift_mean_task_loss;
     let staged_post_shift_improvement =
         detector_triggered.post_shift_mean_task_loss - staged_verify_rollback.post_shift_mean_task_loss;
     let staged_post_shift_regret =
         staged_verify_rollback.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
     let cost_delta =
         detector_triggered.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
+    let benefit_gated_cost_delta =
+        detector_benefit_gated.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
+    let staged_cost_delta_vs_no_adapt =
+        staged_verify_rollback.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
     let staged_cost_delta =
         staged_verify_rollback.total_adaptation_cost_units - detector_triggered.total_adaptation_cost_units;
+    let benefit_gated_dominated_by_no_adapt =
+        detector_benefit_gated.mean_task_loss >= no_adapt.mean_task_loss
+            && detector_benefit_gated.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units;
     let staged_dominated_by_detector_triggered =
         staged_verify_rollback.post_shift_mean_task_loss
             >= detector_triggered.post_shift_mean_task_loss
@@ -256,9 +278,13 @@ pub fn score_counterfactual_utility(
             && regret.is_finite()
             && post_shift_improvement.is_finite()
             && post_shift_regret.is_finite()
+            && benefit_gated_post_shift_improvement.is_finite()
+            && staged_post_shift_improvement_vs_no_adapt.is_finite()
             && staged_post_shift_improvement.is_finite()
             && staged_post_shift_regret.is_finite()
             && cost_delta.is_finite()
+            && benefit_gated_cost_delta.is_finite()
+            && staged_cost_delta_vs_no_adapt.is_finite()
             && staged_cost_delta.is_finite(),
         "counterfactual metric calculation overflowed"
     );
@@ -297,11 +323,16 @@ pub fn score_counterfactual_utility(
         detector_task_loss_regret_vs_oracle_timed: regret,
         detector_post_shift_task_loss_improvement_vs_no_adapt: post_shift_improvement,
         detector_post_shift_task_loss_regret_vs_oracle_timed: post_shift_regret,
+        detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt: benefit_gated_post_shift_improvement,
+        staged_post_shift_task_loss_improvement_vs_no_adapt: staged_post_shift_improvement_vs_no_adapt,
         staged_post_shift_task_loss_improvement_vs_detector_triggered: staged_post_shift_improvement,
         staged_post_shift_task_loss_regret_vs_oracle_timed: staged_post_shift_regret,
         detector_adaptation_cost_delta_vs_no_adapt: cost_delta,
+        detector_benefit_gated_adaptation_cost_delta_vs_no_adapt: benefit_gated_cost_delta,
+        staged_adaptation_cost_delta_vs_no_adapt: staged_cost_delta_vs_no_adapt,
         staged_adaptation_cost_delta_vs_detector_triggered: staged_cost_delta,
         staged_dominated_by_detector_triggered,
+        detector_benefit_gated_dominated_by_no_adapt: benefit_gated_dominated_by_no_adapt,
         staged_dominated_by_no_adapt,
         detector_dominated_by_no_adapt,
         adaptation_cost_units_per_task_loss_unit_reduced,
