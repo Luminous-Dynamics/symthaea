@@ -32,6 +32,9 @@ jobs:
         with:
           components: rustfmt
 
+      - name: Format standalone source in the CI workspace
+        run: rustfmt --edition 2024 tools/vision-dvpc-acquisition-bench.rs
+
       - name: Run unit tests
         run: |
           rustc --edition=2024 --test tools/vision-dvpc-acquisition-bench.rs -o /tmp/vis-dvpc-020-tests
@@ -51,6 +54,3 @@ jobs:
           /tmp/vis-dvpc-020 tests/fixtures/vision-dvpc-020-actions.tsv "$actions_sha" tests/fixtures/vision-dvpc-020-oracle.tsv "$oracle_sha" highest-uncertainty > /tmp/dvpc-020-uncertainty.tsv
           grep -q 'credited_regret_reduction_sum[[:space:]]0.000000000000' /tmp/dvpc-020-uncertainty.tsv
 
-      - name: Check formatting after executable tests
-        if: always()
-        run: rustfmt --edition 2024 --check tools/vision-dvpc-acquisition-bench.rs
