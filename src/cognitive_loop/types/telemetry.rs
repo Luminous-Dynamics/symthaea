@@ -480,6 +480,11 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub substrate: super::SubstrateTelemetry,
 
+    // ── Viability Fabric Telemetry ───────────────────────────────────────
+    /// Typed viability/homeostasis state captured from the organism integration layer.
+    #[serde(flatten, default)]
+    pub viability: super::super::viability_fabric::ViabilityTelemetry,
+
     // ── JEPA telemetry ──────────────────────────────────────────────────
     /// JEPA latent prediction error (cosine loss, 0.0 = perfect). Feature: `jepa`.
     pub jepa_latent_pe: f32,

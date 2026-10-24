@@ -36,6 +36,36 @@ impl CognitiveLoopService {
         /// Get current thermodynamic load (0.0 to 1.0)
         pub fn thermodynamic_load(&self) -> f32 { self.thermodynamic_load }
 
+        /// Read-only viability state. The current integration is observational.
+        pub fn viability_state(&self) -> &super::super::viability_fabric::ViabilityState {
+            self.fep.viability_fabric.state()
+        }
+
+        /// Current homeostatic regulation recommendation.
+        ///
+        /// This is a control recommendation only; it is not equivalent to a consciousness score.
+        pub fn viability_regulation(
+            &self,
+        ) -> super::super::viability_fabric::RegulationDecision {
+            self.fep.viability_fabric
+                .regulation_decision(super::super::viability_fabric::RegulationThresholds::default())
+        }
+
+        /// Enable the opt-in viability modulation of the existing temporal planning depth.
+        pub fn enable_viability_horizon_modulation(&mut self) {
+            self.fep.enable_viability_horizon_modulation();
+        }
+
+        /// Whether viability modulation of temporal planning depth is enabled.
+        pub fn viability_horizon_modulation_enabled(&self) -> bool {
+            self.fep.viability_horizon_modulation_enabled()
+        }
+
+        /// Applied viability multiplier for the existing temporal planning-depth factor.
+        pub fn viability_planning_horizon_scale(&self) -> f64 {
+            self.fep.viability_planning_horizon_scale()
+        }
+
         /// Get the configuration used to create this service.
         pub fn config(&self) -> &super::super::CognitiveLoopConfig { &self.config }
 

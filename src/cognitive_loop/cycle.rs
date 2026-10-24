@@ -38,6 +38,17 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+
+        // Viability Fabric is observational at this stage: record canonical internal
+        // signals without changing the cognitive policy.
+        let viability_cycle = self.stats.total_cycles as u64;
+        self.fep.viability_fabric.refresh_viability(
+            viability_cycle,
+            self.thermodynamic_load as f64,
+            self.stats.avg_prediction_error as f64,
+            self.prediction_confidence,
+        );
+
         self.substrate_manager.tick_energy(&self.config);
         // Feed substrate energy data to ThermodynamicManager
         self.thermodynamic_mgr.set_energy(
@@ -1602,4 +1613,16 @@ mod tests {
         let r = s.cycle("final check");
         assert!(r.prediction_error.is_finite());
     }
+    #[test]
+    fn viability_telemetry_is_exposed_after_cycle() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        let result = service.cycle("viability telemetry check");
+        assert!(result.metadata.viability.viability_cycle > 0);
+        assert!(result.metadata.viability.viability_pressure.is_finite());
+        assert!(result.metadata.viability.viability_world_prediction_error.is_finite());
+        assert!(result.metadata.viability.viability_model_uncertainty.is_finite());
+        assert!(!result.metadata.viability.viability_resource_mode.is_empty());
+    }
+
+
 }
