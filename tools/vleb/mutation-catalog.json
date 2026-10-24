@@ -1,0 +1,207 @@
+{
+  "schema_version": "vleb-mutation-catalog-v1",
+  "task_id": "vleb-ledger-reconcile-0001",
+  "purpose": "Pre-registered negative controls for the synthetic ledger contract. Catalog entries are planned probes, not evidence that a candidate mutant has already been built, compiled, or killed by the verifier.",
+  "accounting_rules": {
+    "kill": "A mutant is killed only when the locked oracle rejects its semantically incorrect behavior.",
+    "excluded": "Compile failures do not count as semantic kills. Equivalent mutants are excluded from the kill-rate denominator only after review; uncertain/equivalent/unrun cases remain separately reported.",
+    "primary_score": "Mutation results are verifier-quality metrics and do not enter task pass@1 directly."
+  },
+  "mutations": [
+    {
+      "mutation_id": "VLEB-LDG-001",
+      "mutation_class": "duplicate_processing",
+      "target": "tools/vleb/ledger-reconcile/src/lib.rs",
+      "transformation": "Apply every exact duplicate row as a fresh financial transaction instead of idempotently ignoring it.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.normal_exact_output",
+        "ledger.exact_duplicate_idempotency",
+        "ledger.duplicate_multiplicity_idempotent"
+      ],
+      "oracle_observation": "Credits/debits and unique transaction counts diverge from the locked expected output."
+    },
+    {
+      "mutation_id": "VLEB-LDG-002",
+      "mutation_class": "other_semantic",
+      "target": "duplicate transaction ID handling",
+      "transformation": "Treat duplicate transaction IDs as equivalent whenever the amount matches, even if account or side differs.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.conflicting_duplicate_rejected"
+      ],
+      "oracle_observation": "Conflicting account/side reuse must be rejected."
+    },
+    {
+      "mutation_id": "VLEB-LDG-003",
+      "mutation_class": "rounding_or_truncation",
+      "target": "amount parser",
+      "transformation": "Parse amounts through floating point and truncate, thereby accepting a token such as 1.9 as 1.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.amount_token_canonical",
+        "ledger.invalid_amount_fails_closed"
+      ],
+      "oracle_observation": "Non-digit amount tokens must be rejected rather than rounded or truncated."
+    },
+    {
+      "mutation_id": "VLEB-LDG-004",
+      "mutation_class": "rounding_or_truncation",
+      "target": "checked aggregate arithmetic",
+      "transformation": "Replace checked additions with wrapping or unchecked additions.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.overflow_fails_closed"
+      ],
+      "oracle_observation": "A sum above u64::MAX must return an error, never a wrapped total."
+    },
+    {
+      "mutation_id": "VLEB-LDG-005",
+      "mutation_class": "missing_side_effect",
+      "target": "CLI output path",
+      "transformation": "Stream account/total output as rows are processed, before the entire input has validated.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.conflict_has_no_partial_effect"
+      ],
+      "oracle_observation": "A late invalid row or conflicting duplicate must fail with empty stdout."
+    },
+    {
+      "mutation_id": "VLEB-LDG-006",
+      "mutation_class": "record_layout",
+      "target": "CSV row parser",
+      "transformation": "Skip the last field or silently accept a row with fewer/more than four fields.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.invalid_amount_fails_closed",
+        "ledger.malformed_csv_rejected"
+      ],
+      "oracle_observation": "Malformed row shapes must be rejected before any report is emitted."
+    },
+    {
+      "mutation_id": "VLEB-LDG-007",
+      "mutation_class": "other_semantic",
+      "target": "side handling",
+      "transformation": "Swap CREDIT and DEBIT aggregation paths.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.account_totals",
+        "ledger.global_totals",
+        "ledger.normal_exact_output"
+      ],
+      "oracle_observation": "Account and global credit/debit totals must match the golden contract."
+    },
+    {
+      "mutation_id": "VLEB-LDG-008",
+      "mutation_class": "other_semantic",
+      "target": "account report ordering",
+      "transformation": "Emit account totals in first-seen or HashMap iteration order instead of deterministic lexical order.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.transaction_order_invariant",
+        "ledger.generated_differential_reducer"
+      ],
+      "oracle_observation": "Reordering input rows must not change canonical output or account ordering."
+    },
+    {
+      "mutation_id": "VLEB-LDG-009",
+      "mutation_class": "other_semantic",
+      "target": "amount validation",
+      "transformation": "Accept zero-valued transactions as valid and count them in the report.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.invalid_amount_fails_closed"
+      ],
+      "oracle_observation": "Zero and negative amounts must fail closed."
+    },
+    {
+      "mutation_id": "VLEB-LDG-010",
+      "mutation_class": "other_semantic",
+      "target": "integer token grammar",
+      "transformation": "Accept signs, whitespace, decimal points, exponent notation, or non-ASCII digits in amount tokens.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.amount_token_canonical"
+      ],
+      "oracle_observation": "Only ASCII digit tokens representing positive unsigned integers are accepted."
+    },
+    {
+      "mutation_id": "VLEB-LDG-011",
+      "mutation_class": "other_semantic",
+      "target": "CSV quoting state machine",
+      "transformation": "Accept unterminated quotes or characters immediately following a closed quoted field.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.malformed_csv_rejected"
+      ],
+      "oracle_observation": "Malformed quoting must produce an error without a report."
+    },
+    {
+      "mutation_id": "VLEB-LDG-012",
+      "mutation_class": "other_semantic",
+      "target": "CSV line endings",
+      "transformation": "Treat a bare carriage return as a valid row ending or split CRLF into an extra record.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.malformed_csv_rejected",
+        "ledger.transaction_order_invariant"
+      ],
+      "oracle_observation": "CRLF is supported; bare CR is rejected; result remains stable with/without a final line ending."
+    },
+    {
+      "mutation_id": "VLEB-LDG-013",
+      "mutation_class": "regression_guard_drop",
+      "target": "golden contract",
+      "transformation": "Remove or weaken one required account/global-total assertion while retaining the happy-path compile.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.account_totals",
+        "ledger.global_totals"
+      ],
+      "oracle_observation": "Task admission requires a locked oracle independent of candidate changes."
+    },
+    {
+      "mutation_id": "VLEB-EVD-001",
+      "mutation_class": "evidence_tampering",
+      "target": "evidence receipt",
+      "transformation": "Change a raw-log hash or candidate patch hash without changing the referenced artifact.",
+      "expected_compilable": null,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [],
+      "oracle_observation": "Independent auditor recomputes artifact hashes and rejects the mismatch."
+    },
+    {
+      "mutation_id": "VLEB-EVD-002",
+      "mutation_class": "environment_mismatch",
+      "target": "runtime evidence",
+      "transformation": "Report a pass with a missing/changed checkout HEAD, unknown platform, or network-enabled runtime when offline mode is required.",
+      "expected_compilable": null,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [],
+      "oracle_observation": "Environment mismatch makes the attempt unresolved/ineligible, not a pass."
+    },
+    {
+      "mutation_id": "VLEB-EVD-003",
+      "mutation_class": "evidence_tampering",
+      "target": "test-result inventory",
+      "transformation": "Drop a required test result or mark a skipped test as passed without corresponding execution evidence.",
+      "expected_compilable": null,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [],
+      "oracle_observation": "Required test inventory and each raw command/test receipt must reconcile; incomplete evidence suppresses the score."
+    }
+  ]
+}
