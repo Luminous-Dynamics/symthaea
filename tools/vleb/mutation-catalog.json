@@ -20,7 +20,8 @@
         "ledger.exact_duplicate_idempotency",
         "ledger.duplicate_multiplicity_idempotent"
       ],
-      "oracle_observation": "Credits/debits and unique transaction counts diverge from the locked expected output."
+      "oracle_observation": "Credits/debits and unique transaction counts diverge from the locked expected output.",
+      "expected_killer_test": "repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity"
     },
     {
       "mutation_id": "VLEB-LDG-002",
@@ -32,7 +33,8 @@
       "required_test_ids": [
         "ledger.conflicting_duplicate_rejected"
       ],
-      "oracle_observation": "Conflicting account/side reuse must be rejected."
+      "oracle_observation": "Conflicting account/side reuse must be rejected.",
+      "expected_killer_test": "conflicting_transaction_id_is_rejected"
     },
     {
       "mutation_id": "VLEB-LDG-003",
@@ -57,7 +59,8 @@
       "required_test_ids": [
         "ledger.overflow_fails_closed"
       ],
-      "oracle_observation": "A sum above u64::MAX must return an error, never a wrapped total."
+      "oracle_observation": "A sum above u64::MAX must return an error, never a wrapped total.",
+      "expected_killer_test": "arithmetic_overflow_is_rejected"
     },
     {
       "mutation_id": "VLEB-LDG-005",
@@ -96,7 +99,8 @@
         "ledger.global_totals",
         "ledger.normal_exact_output"
       ],
-      "oracle_observation": "Account and global credit/debit totals must match the golden contract."
+      "oracle_observation": "Account and global credit/debit totals must match the golden contract.",
+      "expected_killer_test": "deterministic_generated_ledgers_match_independent_reference_reducer"
     },
     {
       "mutation_id": "VLEB-LDG-008",
@@ -216,5 +220,15 @@
       ],
       "oracle_observation": "Adding/removing one final LF must not change totals or the canonical report."
     }
-  ]
+  ],
+  "active_campaign": {
+    "version": "vleb-ledger-mutants-v1",
+    "required_mutation_ids": [
+      "VLEB-LDG-001",
+      "VLEB-LDG-002",
+      "VLEB-LDG-004",
+      "VLEB-LDG-007"
+    ],
+    "rule": "A semantic kill requires the preregistered target unit test to fail after the mutant compiles; compile failures and unrelated test failures are unresolved."
+  }
 }
