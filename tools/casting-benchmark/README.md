@@ -139,7 +139,7 @@ This verifier calculates Git blob SHA-1 over the exact file bytes and checks the
 Tests for the lock validator:
 
 ```sh
-python3 -m unittest tools/casting-benchmark/test_validate_baseline_lock.py tools/casting-benchmark/test_verify_baseline_source_tree.py -v
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_*baseline*.py' -v
 ```
 
 Use the test discovery command in the main section to run all benchmark test modules.
