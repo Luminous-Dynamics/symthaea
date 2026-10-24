@@ -80,7 +80,9 @@
         "dimension",
         "objective_count",
         "objective_direction",
-        "objective_evaluator_sha256"
+        "objective_evaluator_sha256",
+        "ideal_point",
+        "reference_point"
       ],
       "properties": {
         "id": {
@@ -112,6 +114,22 @@
         },
         "objective_evaluator_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "ideal_point": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number"
+          },
+          "description": "Frozen coordinate-wise lower bounds used to normalize the hypervolume; same for every algorithm on this suite instance."
+        },
+        "reference_point": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number"
+          },
+          "description": "Frozen hypervolume reference point; same for every algorithm on this suite instance."
         }
       }
     },
@@ -374,7 +392,9 @@
       "additionalProperties": false,
       "required": [
         "raw_trace_sha256",
-        "result_sha256"
+        "result_sha256",
+        "trace_schema_sha256",
+        "scorer_sha256"
       ],
       "properties": {
         "raw_trace_sha256": {
@@ -392,6 +412,12 @@
               "type": "null"
             }
           ]
+        },
+        "trace_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scorer_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
