@@ -24,6 +24,7 @@ SEED="${SEED:-17}"
 CANDIDATES="${CANDIDATES:-120}"
 OUT_DIR="${OUT_DIR:-$ROOT/artifacts/broca-consolidation-budget}"
 mkdir -p "$OUT_DIR"
+OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 
 if [[ ! "$SEED" =~ ^[0-9]+$ ]]; then
   echo "FAIL: SEED must be an unsigned integer" >&2
