@@ -293,6 +293,8 @@
     "numeric_tolerance_absolute": 1e-9,
     "scorer_file": "tools/casting-benchmark/score_trace.py",
     "trace_schema_file": "docs/research/CASTING_BENCHMARK_TRACE.schema.json",
-    "receipt_schema_file": "docs/research/CASTING_BENCHMARK_RECEIPT.schema.json"
+    "receipt_schema_file": "docs/research/CASTING_BENCHMARK_RECEIPT.schema.json",
+    "analysis_lock_file": "docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json",
+    "rule": "undefined Run receipts must bind both protocol_sha256 and analysis_lock_sha256 to the exact checked-out files; the scorer rejects run-specific bounds that differ from the frozen suite contract."
   }
 }
