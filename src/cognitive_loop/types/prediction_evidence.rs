@@ -141,6 +141,14 @@ impl PredictionEvidenceCursor {
         self.last_admitted_observation_cycle
     }
 
+    /// Restore the cursor from a validated consumer checkpoint.
+    ///
+    /// This is crate-visible so checkpoint owners can preserve exactly-once
+    /// admission across restarts without exposing the cursor's representation.
+    pub(crate) fn restore_last_admitted_observation_cycle(&mut self, cycle: Option<u64>) {
+        self.last_admitted_observation_cycle = cycle;
+    }
+
     /// Reset explicitly when starting a new independent stream/session.
     #[inline]
     pub fn reset(&mut self) {
