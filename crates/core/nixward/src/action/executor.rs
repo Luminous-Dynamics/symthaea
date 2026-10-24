@@ -962,6 +962,7 @@ mod tests {
             replay,
             ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
         ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
@@ -1012,6 +1013,7 @@ mod tests {
             result,
             ExecutionResult::Blocked { ref reason, .. } if reason.contains("differ from the permit")
         ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
@@ -1059,6 +1061,7 @@ mod tests {
             result,
             ExecutionResult::Blocked { ref reason, .. } if reason.contains("separately audited")
         ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
