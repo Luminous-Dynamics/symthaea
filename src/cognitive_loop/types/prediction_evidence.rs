@@ -115,13 +115,61 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
 /// Independent non-PE inputs are not governed by this cursor.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PredictionEvidenceCursor {
+    /// Highest observation cycle seen, including cycles whose evidence was invalid.
+    last_observed_observation_cycle: Option<u64>,
+    /// Highest observation cycle admitted to a PE-dependent consumer.
     last_admitted_observation_cycle: Option<u64>,
 }
 
 impl PredictionEvidenceCursor {
-    /// Admit a finite PE sample only if its observation cycle is newer than
-    /// every previously admitted PE sample for this consumer.
+    /// Record that an observation cycle has been seen, even if its evidence is invalid.
+    ///
+    /// Equal-cycle retries are permitted; older observations are rejected. Tracking
+    /// the observed high-water mark separately from successful admission prevents a
+    /// delayed valid sample from slipping in after a newer invalid observation.
+    fn observe_cycle(&mut self, observation_cycle: u64) -> bool {
+        if self
+            .last_observed_observation_cycle
+            .is_some_and(|last_cycle| observation_cycle < last_cycle)
+        {
+            return false;
+        }
+        self.last_observed_observation_cycle = Some(observation_cycle);
+        true
+    }
+
+    /// Admit a finite PE sample only if its observation cycle has not gone backwards.
+    ///
+    /// Invalid/missing evidence advances the observed high-water mark but not the
+    /// admitted cursor; a valid retry for that exact cycle remains possible.
     pub fn admit(
+        &mut self,
+        observation_cycle: u64,
+        sample: Option<f32>,
+    ) -> Option<f32> {
+        if !self.observe_cycle(observation_cycle) {
+            return None;
+        }
+        self.admit_after_observation(observation_cycle, sample)
+    }
+
+    /// Admit typed evidence only when it is valid for the requested observation.
+    ///
+    /// Observe the requested cycle before checking validity, so stale cycles remain
+    /// blocked even when the latest observation carries no usable PE value.
+    pub fn admit_evidence(
+        &mut self,
+        evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
+    ) -> Option<f32> {
+        if !self.observe_cycle(observation_cycle) {
+            return None;
+        }
+        let value = evidence.value_for_observation(observation_cycle)?;
+        self.admit_after_observation(observation_cycle, Some(value))
+    }
+
+    fn admit_after_observation(
         &mut self,
         observation_cycle: u64,
         sample: Option<f32>,
@@ -137,19 +185,10 @@ impl PredictionEvidenceCursor {
         Some(value)
     }
 
-    /// Admit typed evidence only when it is valid for the requested observation.
-    ///
-    /// This is the preferred consumer API: callers cannot accidentally pass a
-    /// sentinel or a sample whose embedded observation cycle differs from the
-    /// consumer's requested cycle. The cursor still enforces monotonic,
-    /// exactly-once admission after the evidence contract is satisfied.
-    pub fn admit_evidence(
-        &mut self,
-        evidence: &PredictionErrorEvidence,
-        observation_cycle: u64,
-    ) -> Option<f32> {
-        let value = evidence.value_for_observation(observation_cycle)?;
-        self.admit(observation_cycle, Some(value))
+    /// Highest observation cycle seen, including invalid/missing evidence.
+    #[inline]
+    pub fn last_observed_observation_cycle(&self) -> Option<u64> {
+        self.last_observed_observation_cycle
     }
 
     /// Highest observation cycle whose PE sample was admitted.
@@ -162,13 +201,19 @@ impl PredictionEvidenceCursor {
     ///
     /// This is crate-visible so checkpoint owners can preserve exactly-once
     /// admission across restarts without exposing the cursor's representation.
-    pub(crate) fn restore_last_admitted_observation_cycle(&mut self, cycle: Option<u64>) {
-        self.last_admitted_observation_cycle = cycle;
+    pub(crate) fn restore_cycles(
+        &mut self,
+        observed_cycle: Option<u64>,
+        admitted_cycle: Option<u64>,
+    ) {
+        self.last_observed_observation_cycle = observed_cycle;
+        self.last_admitted_observation_cycle = admitted_cycle;
     }
 
     /// Reset explicitly when starting a new independent stream/session.
     #[inline]
     pub fn reset(&mut self) {
+        self.last_observed_observation_cycle = None;
         self.last_admitted_observation_cycle = None;
     }
 }
@@ -371,6 +416,51 @@ mod tests {
         assert_eq!(cursor.admit_evidence(&valid, 12), Some(0.4));
         assert_eq!(cursor.admit_evidence(&valid, 12), None);
         assert_eq!(cursor.last_admitted_observation_cycle(), Some(12));
+    }
+
+    #[test]
+    fn invalid_newer_observation_blocks_delayed_older_sample_but_allows_retry() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        assert_eq!(cursor.admit(10, Some(0.1)), Some(0.1));
+
+        // Cycle 12 is observed but lacks a usable PE value.
+        assert_eq!(cursor.admit(12, None), None);
+        assert_eq!(cursor.last_observed_observation_cycle(), Some(12));
+        assert_eq!(cursor.last_admitted_observation_cycle(), Some(10));
+
+        // A valid but delayed cycle 11 must not be admitted.
+        assert_eq!(cursor.admit(11, Some(0.2)), None);
+        assert_eq!(cursor.last_observed_observation_cycle(), Some(12));
+        assert_eq!(cursor.last_admitted_observation_cycle(), Some(10));
+
+        // A valid retry for the currently observed cycle remains admissible once.
+        assert_eq!(cursor.admit(12, Some(0.3)), Some(0.3));
+        assert_eq!(cursor.admit(12, Some(0.4)), None);
+        assert_eq!(cursor.last_admitted_observation_cycle(), Some(12));
+    }
+
+    #[test]
+    fn typed_invalid_evidence_advances_observed_not_admitted_cursor() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        let invalid = PredictionErrorEvidence::invalid(
+            PredictionEvidenceStatus::SourceUnavailable,
+            None,
+            20,
+        )
+        .unwrap();
+        assert_eq!(cursor.admit_evidence(&invalid, 20), None);
+        assert_eq!(cursor.last_observed_observation_cycle(), Some(20));
+        assert_eq!(cursor.last_admitted_observation_cycle(), None);
+
+        let delayed = PredictionErrorEvidence::valid(0.4, None, 19).unwrap();
+        assert_eq!(cursor.admit_evidence(&delayed, 19), None);
+
+        let retry = PredictionErrorEvidence::valid(0.5, None, 20).unwrap();
+        assert_eq!(cursor.admit_evidence(&retry, 20), Some(0.5));
     }
 
     #[test]
