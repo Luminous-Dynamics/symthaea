@@ -157,6 +157,58 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate deterministic cluster-power planning report and negative control
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cluster_sizes="2,3,1,4,2,2,3,1,4,2,3,1,2,4,1,3,2,2,4,1"
+          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 "$cluster_sizes" 1000 12345 "$RUNNER_TEMP/pitb-power-a.json"
+          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 "$cluster_sizes" 1000 12345 "$RUNNER_TEMP/pitb-power-b.json"
+          cmp "$RUNNER_TEMP/pitb-power-a.json" "$RUNNER_TEMP/pitb-power-b.json"
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$RUNNER_TEMP/pitb-power-a.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/power-planning-report.schema.json" <<'PY'
+          import copy
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          report_path, schema_path = map(Path, sys.argv[1:])
+          report = json.loads(report_path.read_text())
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(report)
+
+          config = report["configuration"]
+          results = report["results"]
+          if config["cluster_count"] != 20 or len(config["cluster_sizes"]) != 20:
+              raise SystemExit("power planning fixture must use 20 independent clusters")
+          if config["total_targets_per_simulated_study"] != sum(config["cluster_sizes"]):
+              raise SystemExit("power report target count does not reconcile with cluster sizes")
+          if results["gate_passes"] + results["degenerate_interval_trials"] > config["simulations"]:
+              raise SystemExit("power report trial counts exceed requested simulations")
+          if results["valid_interval_trials"] + results["degenerate_interval_trials"] != config["simulations"]:
+              raise SystemExit("power report does not account for every simulated interval")
+          if report["report_kind"] != "simulation_based_power_planning_not_model_evaluation":
+              raise SystemExit("planner output must never be labeled as model evaluation")
+
+          bad = copy.deepcopy(report)
+          bad["results"]["estimated_gate_power"] = 1.01
+          try:
+              validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("schema accepted a power estimate outside [0, 1]")
+          print(
+              "PITB_POWER_PLANNING_SCHEMA_PASS: "
+              f"clusters={config['cluster_count']} "
+              f"targets={config['total_targets_per_simulated_study']} "
+              f"simulations={config['simulations']} "
+              f"power={results['estimated_gate_power']:.4f}; deterministic and explicitly non-empirical"
+          )
+          PY
       - name: Validate cross-family leakage quarantine audit and negative controls
         shell: bash
         run: |
