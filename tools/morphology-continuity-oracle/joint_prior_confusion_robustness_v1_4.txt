@@ -20,6 +20,7 @@ decision.safe-hold.loss=4,4,4
 assumed_matrix=chair:950,50,0;table:50,950,0;stool:50,950,0
 nominal_expected_post-measurement-loss=3.64
 acquisition_cost=0.1
+max-supported-calibration-trials-per-class=1000000
 
 case.broad_prior.baseline_robust_loss=4.0
 case.broad_prior.worst_policy_loss=7.08
@@ -40,5 +41,6 @@ case.joint_uncertainty.disposition=abstain
 decision_contract=baseline-action-is-chosen-before-the-unknown-prior-is-revealed
 forbidden_oracle=do-not-let-baseline-action-adapt-to-true-prior
 invalid-prior-bounds=fail-closed
+invalid-trials-over-limit=fail-closed
 nonfinite-or-negative-cost=fail-closed
 industry-comparison=report-decision-regret-cost-coverage-and-abstention-on-shared-held-out-prior-and-matrix-shifts
