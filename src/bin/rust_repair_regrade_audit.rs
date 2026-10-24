@@ -51,7 +51,6 @@ struct ScoreReport {
     format_version: u32,
     protocol_id: String,
     task_manifest_sha256: String,
-    task_manifest_file_sha256: String,
     candidate_jsonl_sha256: String,
     predictions_sha256: String,
     task_count: usize,
@@ -64,14 +63,28 @@ struct ScoreReport {
     tasks: Vec<ScoreTask>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct ManifestTask {
     instance_id: String,
+    candidate_row_sha256: String,
+    repo: String,
+    base_commit: String,
     repo_head_sha: String,
     runtime_platform: String,
+    docker_image: String,
+    problem_statement_sha256: String,
+    gold_patch_sha256: String,
+    test_patch_sha256: String,
+    validation_status_sha256: String,
+    baseline_validation_log_sha256: String,
+    gold_validation_log_sha256: String,
+    runtime_evidence_sha256: String,
     container_image_id: String,
     network_mode: String,
     workspace_clean: bool,
+    container_ids: Vec<String>,
+    fail_to_pass_count: usize,
+    pass_to_pass_count: usize,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -99,7 +112,6 @@ struct Cli {
     regrade_report: PathBuf,
     expected_regrade_report_sha256: String,
     task_manifest: PathBuf,
-    expected_task_manifest_file_sha256: String,
     expected_task_manifest_sha256: String,
     report_out: PathBuf,
 }
@@ -422,7 +434,6 @@ fn build_report(
     primary: &LoadedReport,
     regrade: &LoadedReport,
     expected_task_manifest_sha256: &str,
-    task_manifest_file_sha256: &str,
 ) -> Result<RegradeAuditReport, String> {
     if primary.canonical_path == regrade.canonical_path || primary.sha256 == regrade.sha256 {
         return Err("primary and regrade must be distinct, independently pinned report artifacts".to_string());
@@ -551,7 +562,6 @@ fn build_report(
         format_version: REPORT_VERSION,
         protocol_id: "symthaea-rust-regrade-audit-v1".to_string(),
         task_manifest_sha256: expected_task_manifest_sha256.to_ascii_lowercase(),
-        task_manifest_file_sha256: task_manifest_file_sha256.to_ascii_lowercase(),
         candidate_jsonl_sha256: primary.report.candidate_jsonl_sha256.clone(),
         predictions_sha256: primary.report.predictions_sha256.clone(),
         primary_report_sha256: primary.sha256.clone(),
@@ -570,8 +580,7 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
             "Usage: rust-repair-regrade-audit ",
             "--primary-report PATH --expected-primary-report-sha256 HEX ",
             "--regrade-report PATH --expected-regrade-report-sha256 HEX ",
-            "--task-manifest PATH --expected-task-manifest-file-sha256 HEX ",
-            "--expected-task-manifest-sha256 HEX --report-out PATH"
+            "--task-manifest PATH --expected-task-manifest-sha256 HEX --report-out PATH"
         ));
         return Ok(None);
     }
@@ -599,7 +608,6 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         "--regrade-report",
         "--expected-regrade-report-sha256",
         "--task-manifest",
-        "--expected-task-manifest-file-sha256",
         "--expected-task-manifest-sha256",
         "--report-out",
     ];
@@ -624,7 +632,6 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         regrade_report: PathBuf::from(values.get("--regrade-report").expect("required argument")),
         expected_regrade_report_sha256: required_digest("--expected-regrade-report-sha256")?,
         task_manifest: PathBuf::from(values.get("--task-manifest").expect("required argument")),
-        expected_task_manifest_file_sha256: required_digest("--expected-task-manifest-file-sha256")?,
         expected_task_manifest_sha256: required_digest("--expected-task-manifest-sha256")?,
         report_out: PathBuf::from(values.get("--report-out").expect("required argument")),
     }))
