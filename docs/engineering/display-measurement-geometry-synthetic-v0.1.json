@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "0.1.0",
+  "record_id": "GEOM-SYNTH-001",
+  "record_state": "SYNTHETIC_DESIGN_SCREEN_ONLY",
+  "claim_ceiling": "GEOMETRIC_SETUP_SCREEN_ONLY_NOT_PHYSICAL_QUALIFICATION",
+  "physical_validation": "NOT_PERFORMED",
+  "geometry": {
+    "distance_mm": 1000,
+    "horizontal_fov_deg": 10,
+    "vertical_fov_deg": 5,
+    "distance_standard_uncertainty_mm": 1,
+    "horizontal_fov_standard_uncertainty_deg": 0.1,
+    "vertical_fov_standard_uncertainty_deg": 0.1,
+    "coverage_factor": 2,
+    "uniform_patch_width_mm": 200,
+    "uniform_patch_height_mm": 100,
+    "centering_uncertainty_mm": 1,
+    "edge_guard_mm": 2
+  }
+}

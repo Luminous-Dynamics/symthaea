@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/open-display-reference-platform.schema.json",
+  "title": "Open Display Reference Hardware platform manifest",
+  "description": "Schema for architecture/parts openness and benchmark hypotheses; passing this schema does not validate physical hardware or measurement claims.",
+  "$comment": "Cross-record uniqueness and source_module_id closure require a semantic verifier in addition to this structural schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "title",
+    "status",
+    "physical_validation",
+    "scope",
+    "safety_boundary",
+    "license_policy",
+    "modules",
+    "measurement_channels",
+    "benchmarks",
+    "gates",
+    "references"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "manifest_id": {
+      "type": "string",
+      "const": "ODRH-001"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["SPECIFICATION_ONLY", "DESIGN_IN_PROGRESS", "BUILD_READY_REVIEW", "BUILT_UNQUALIFIED", "QUALIFIED"]
+    },
+    "physical_validation": {
+      "type": "string",
+      "enum": ["NOT_PERFORMED", "IN_PROGRESS", "MEASURED_UNQUALIFIED", "INDEPENDENTLY_REVIEWED"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v0_target", "out_of_scope_v0", "claim_ceiling"],
+      "properties": {
+        "v0_target": {"type": "string", "minLength": 1},
+        "out_of_scope_v0": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "claim_ceiling": {"type": "string", "minLength": 1}
+      }
+    },
+    "safety_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["custom_electronics_scope", "mains_measurement", "external_supply_policy", "interlock_policy", "status"],
+      "properties": {
+        "custom_electronics_scope": {"type": "string", "enum": ["LOW_VOLTAGE_ONLY"]},
+        "mains_measurement": {"type": "string", "enum": ["OUT_OF_SCOPE_FOR_CUSTOM_BOARD"]},
+        "external_supply_policy": {"type": "string", "minLength": 1},
+        "interlock_policy": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "enum": ["PROPOSED", "REVIEW_REQUIRED", "ACCEPTED"]}
+      }
+    },
+    "license_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hardware_design", "software_firmware", "documentation", "datasets", "oshwa_certification"],
+      "properties": {
+        "hardware_design": {"$ref": "#/$defs/licenseEntry"},
+        "software_firmware": {"$ref": "#/$defs/licenseEntry"},
+        "documentation": {"$ref": "#/$defs/licenseEntry"},
+        "datasets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spdx_id", "status", "note"],
+          "properties": {
+            "spdx_id": {"type": ["string", "null"]},
+            "status": {"type": "string", "enum": ["PROPOSED", "PER_DATASET_REVIEW", "ACCEPTED", "BLOCKED"]},
+            "note": {"type": "string", "minLength": 1}
+          }
+        },
+        "oshwa_certification": {"type": "string", "enum": ["NOT_CLAIMED", "REVIEW_PLANNED", "CERTIFIED"]}
+      }
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/module"}
+    },
+    "measurement_channels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/measurementChannel"}
+    },
+    "benchmarks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/benchmark"}
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/gate"}
+    },
+    "references": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/reference"}
+    }
+  },
+  "$defs": {
+    "licenseEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spdx_id", "status"],
+      "properties": {
+        "spdx_id": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "enum": ["PROPOSED", "UNREVIEWED", "ACCEPTED", "BLOCKED"]},
+        "note": {"type": "string", "minLength": 1}
+      }
+    },
+    "opennessClass": {
+      "type": "string",
+      "enum": [
+        "PROJECT_CONTROLLED_OPEN",
+        "THIRD_PARTY_OPEN",
+        "THIRD_PARTY_DOCUMENTED",
+        "THIRD_PARTY_RESTRICTED",
+        "NOT_SELECTED"
+      ]
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "role",
+        "current_openness_class",
+        "target_openness_class",
+        "module_status",
+        "selection_requirements",
+        "design_source",
+        "datasheet_or_interface_source",
+        "license_status",
+        "lifecycle_check_date",
+        "substitute_policy"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ODRH-[A-Z0-9-]+$"},
+        "name": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1},
+        "current_openness_class": {"$ref": "#/$defs/opennessClass"},
+        "target_openness_class": {"$ref": "#/$defs/opennessClass"},
+        "module_status": {
+          "type": "string",
+          "enum": ["NOT_SELECTED", "NOT_DESIGNED", "NOT_IMPLEMENTED", "EXTERNAL_REFERENCE_DUT", "DESIGN_IN_PROGRESS", "BUILD_READY_REVIEW", "BUILT_UNQUALIFIED", "QUALIFIED"]
+        },
+        "selection_requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "design_source": {"type": ["string", "null"], "format": "uri"},
+        "datasheet_or_interface_source": {"type": ["string", "null"], "format": "uri"},
+        "license_status": {
+          "type": "string",
+          "enum": ["NOT_RELEASED", "UNREVIEWED", "REVIEW_REQUIRED", "OPEN_VERIFIED", "RESTRICTED", "NOT_APPLICABLE"]
+        },
+        "lifecycle_check_date": {"type": ["string", "null"], "format": "date"},
+        "substitute_policy": {"type": "string", "minLength": 1},
+        "design_parameters": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "value", "unit", "status", "notes"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+              "value": {"type": "number"},
+              "unit": {"type": "string", "minLength": 1},
+              "status": {"type": "string", "enum": ["EXAMPLE_ONLY", "GEOMETRY_REVIEWED", "FIT_VERIFIED"]},
+              "notes": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "measurementChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "metric", "unit", "source_module_id", "status", "calibration_required", "raw_samples_required", "claim_limit"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ODRH-MEAS-[A-Z0-9-]+$"},
+        "metric": {"type": "string", "minLength": 1},
+        "unit": {"type": "string", "minLength": 1},
+        "source_module_id": {"type": "string", "pattern": "^ODRH-[A-Z0-9-]+$"},
+        "status": {"type": "string", "enum": ["NOT_IMPLEMENTED", "READY_FOR_REVIEW", "MEASURED_UNQUALIFIED", "QUALIFIED"]},
+        "calibration_required": {"type": "boolean"},
+        "raw_samples_required": {"type": "boolean"},
+        "claim_limit": {"type": "string", "minLength": 1}
+      }
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "metric", "target_operator", "target_value", "target_unit", "target_class", "baseline_required", "status", "evidence_status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ODRH-[A-Z0-9-]+$"},
+        "metric": {"type": "string", "minLength": 1},
+        "target_operator": {"type": "string", "enum": ["EQ", "LE", "GE"]},
+        "target_value": {"type": "number"},
+        "target_unit": {"type": "string", "minLength": 1},
+        "target_class": {"type": "string", "enum": ["integrity_gate", "research_hypothesis"]},
+        "baseline_required": {"type": "boolean"},
+        "status": {"type": "string", "enum": ["PROPOSED", "FROZEN", "SUPERSEDED", "BLOCKED"]},
+        "evidence_status": {"type": "string", "enum": ["NOT_MEASURED", "SYNTHETIC_ONLY", "MEASURED_UNQUALIFIED", "INDEPENDENTLY_REVIEWED"]}
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ODRH-G[0-9]+$"},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "enum": ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "PASSED_WITH_EVIDENCE"]}
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "url", "purpose"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^SRC-[A-Z0-9-]+$"},
+        "title": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "format": "uri"},
+        "purpose": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

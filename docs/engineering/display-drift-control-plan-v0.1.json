@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "0.1.0",
+  "plan_id": "ODRH-DRIFT-PLAN-SYNTHETIC-001",
+  "record_state": "SYNTHETIC_TEST_ONLY",
+  "claim_ceiling": "SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION",
+  "measurand": "synthetic check-standard response",
+  "unit": "arbitrary_units",
+  "run_start_seconds": 0,
+  "run_end_seconds": 100,
+  "nominal_value": 10,
+  "guard_half_width": 1,
+  "controls": [
+    {
+      "control_id": "CONTROL-PRE",
+      "time_seconds": 10,
+      "value": 10
+    },
+    {
+      "control_id": "CONTROL-EXCURSION",
+      "time_seconds": 50,
+      "value": 12
+    },
+    {
+      "control_id": "CONTROL-POST",
+      "time_seconds": 80,
+      "value": 10
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "SAMPLE-EARLY",
+      "time_seconds": 5
+    },
+    {
+      "observation_id": "SAMPLE-AFFECTED",
+      "time_seconds": 60
+    },
+    {
+      "observation_id": "SAMPLE-LATE",
+      "time_seconds": 90
+    }
+  ],
+  "maximum_control_gap_seconds": 40
+}

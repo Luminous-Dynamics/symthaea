@@ -1,0 +1,461 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "0.1.0",
+  "manifest_id": "ODRH-001",
+  "title": "Open Display Reference Hardware",
+  "status": "SPECIFICATION_ONLY",
+  "physical_validation": "NOT_PERFORMED",
+  "scope": {
+    "v0_target": "Desk/lab-scale display characterization rig around a replaceable complete commercial monitor",
+    "out_of_scope_v0": [
+      "Custom mains-voltage electronics",
+      "Custom HDMI/DisplayPort/eDP/MIPI high-speed PHY",
+      "Claims of an open commercial display panel or controller",
+      "Micro-LED, OLEDoS, or high-resolution TFT fabrication",
+      "Optical certification without suitable instrument calibration"
+    ],
+    "claim_ceiling": "Architecture specification only; no physical prototype, build-ready BOM, performance result, or qualification is claimed."
+  },
+  "safety_boundary": {
+    "custom_electronics_scope": "LOW_VOLTAGE_ONLY",
+    "mains_measurement": "OUT_OF_SCOPE_FOR_CUSTOM_BOARD",
+    "external_supply_policy": "Use a certified external supply appropriate to the selected device.",
+    "interlock_policy": "No physical system may be promoted to build-ready until electrical review and safe measurement topology are documented.",
+    "status": "PROPOSED"
+  },
+  "license_policy": {
+    "hardware_design": {
+      "spdx_id": "CERN-OHL-S-2.0",
+      "status": "PROPOSED",
+      "note": "Confirm before first hardware design release; third-party files retain their original license."
+    },
+    "software_firmware": {
+      "spdx_id": "Apache-2.0",
+      "status": "PROPOSED"
+    },
+    "documentation": {
+      "spdx_id": "CC-BY-4.0",
+      "status": "PROPOSED"
+    },
+    "datasets": {
+      "spdx_id": null,
+      "status": "PER_DATASET_REVIEW",
+      "note": "Select based on provenance, instrument terms, participant/privacy conditions, and third-party rights."
+    },
+    "oshwa_certification": "NOT_CLAIMED"
+  },
+  "modules": [
+    {
+      "id": "ODRH-HOST-001",
+      "name": "Test-pattern host and signal source",
+      "role": "Generate a deterministic, revisioned workload and deliver it through an available video output.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "THIRD_PARTY_DOCUMENTED",
+      "module_status": "NOT_SELECTED",
+      "selection_requirements": [
+        "Record host GPU, driver, OS, output mode, signal format and timing path.",
+        "Pin exact pattern and workload identities.",
+        "Do not treat render time as end-to-end display latency."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "UNREVIEWED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "Record equivalent supported output modes and requalify workload timing."
+    },
+    {
+      "id": "ODRH-DUT-001",
+      "name": "Display under test",
+      "role": "Replaceable complete monitor for V0; a panel/controller module is a later stage.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "THIRD_PARTY_DOCUMENTED",
+      "module_status": "NOT_SELECTED",
+      "selection_requirements": [
+        "Exact manufacturer, model, hardware revision and firmware if available.",
+        "Supported modes, input settings, OSD state, warm-up and image APL.",
+        "Document whether power is measured at external DC input or AC wall input."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "UNREVIEWED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "Any substitute becomes a new device configuration and needs a matched baseline."
+    },
+    {
+      "id": "ODRH-FIXTURE-001",
+      "name": "Mechanical carrier, datum and sensor fixture",
+      "role": "Set repeatable display position, sensor location and measurement geometry.",
+      "current_openness_class": "PROJECT_CONTROLLED_OPEN",
+      "target_openness_class": "PROJECT_CONTROLLED_OPEN",
+      "module_status": "DESIGN_IN_PROGRESS",
+      "selection_requirements": [
+        "A parametric OpenSCAD sensor interface plate has been published under CERN-OHL-S-2.0.",
+        "Publish native CAD plus derived manufacturing exports only after rendering and dimensional review.",
+        "Document datums, actual sensor mounting dimensions, fasteners, process tolerances, and assembly.",
+        "Provide an independent geometry/fit check before build qualification."
+      ],
+      "design_source": "https://github.com/Luminous-Dynamics/symthaea/blob/research/odrh-001-open-display-hardware-2026-10-18/hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
+      "datasheet_or_interface_source": null,
+      "license_status": "OPEN_VERIFIED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "Use common fasteners and printable/machinable parts where the measured tolerance permits.",
+      "design_parameters": [
+        {
+          "name": "plate_width_mm",
+          "value": 80,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Matches current native CAD default; not fit-validated."
+        },
+        {
+          "name": "plate_height_mm",
+          "value": 80,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Matches current native CAD default; not fit-validated."
+        },
+        {
+          "name": "plate_thickness_mm",
+          "value": 5,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Matches current native CAD default; structural suitability not evaluated."
+        },
+        {
+          "name": "sensor_aperture_d_mm",
+          "value": 20,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Datum aperture only; not an optical acceptance aperture."
+        },
+        {
+          "name": "mount_hole_d_mm",
+          "value": 3.4,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Nominal M3 clearance; fastener choice not reviewed."
+        },
+        {
+          "name": "mount_pitch_x_mm",
+          "value": 25,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder mounting grid; actual sensor PCB is not selected."
+        },
+        {
+          "name": "mount_pitch_z_mm",
+          "value": 25,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder mounting grid; actual sensor PCB is not selected."
+        },
+        {
+          "name": "bracket_slot_width_mm",
+          "value": 5.5,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Nominal M5 clearance; bracket is not selected."
+        },
+        {
+          "name": "bracket_slot_length_mm",
+          "value": 18,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder adjustment length; fit not reviewed."
+        },
+        {
+          "name": "bracket_slot_x_mm",
+          "value": 28.5,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder slot offset; fit not reviewed."
+        }
+      ]
+    },
+    {
+      "id": "ODRH-POWER-001",
+      "name": "Input power measurement",
+      "role": "Capture energy under a declared accounting boundary.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "THIRD_PARTY_DOCUMENTED",
+      "module_status": "NOT_SELECTED",
+      "selection_requirements": [
+        "Power range, uncertainty/accuracy statement, sample rate and raw export.",
+        "Calibration status and timestamp.",
+        "Declared DC input or AC wall boundary; never compare different boundaries without normalization."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "UNREVIEWED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "Meter substitutions require matched readings and a documented uncertainty comparison."
+    },
+    {
+      "id": "ODRH-THERMAL-001",
+      "name": "Temperature observation",
+      "role": "Record relevant ambient and device temperatures without asserting thermal imaging capability.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "THIRD_PARTY_DOCUMENTED",
+      "module_status": "NOT_SELECTED",
+      "selection_requirements": [
+        "Sensor type, location/contact, range, time response and calibration status.",
+        "Explicit distinction between ambient, enclosure, heatsink and panel-surface temperatures."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "UNREVIEWED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "Substitutions must preserve placement and response assumptions or declare a new test setup."
+    },
+    {
+      "id": "ODRH-OPTICS-001",
+      "name": "Optical instrument and mount",
+      "role": "Measure only the optical quantities supported by the chosen calibrated instrument and geometry.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "THIRD_PARTY_DOCUMENTED",
+      "module_status": "NOT_SELECTED",
+      "selection_requirements": [
+        "Instrument identity, calibration record, uncertainty, spectral/photometric capability, ROI and geometry.",
+        "Camera-only evidence must not assert absolute luminance or color accuracy without an appropriate validated calibration model.",
+        "Unsupported metrics remain NOT_EVALUATED."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "UNREVIEWED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "A different instrument or lens changes the measurement profile and requires revalidation."
+    },
+    {
+      "id": "ODRH-CAPTURE-001",
+      "name": "Capture, reducer and canonical report",
+      "role": "Retain raw observations and produce deterministic derived metrics and explicit metric-level statuses.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "PROJECT_CONTROLLED_OPEN",
+      "module_status": "NOT_IMPLEMENTED",
+      "selection_requirements": [
+        "Rust-first implementation and pinned toolchain.",
+        "Raw artifacts retained and hashed; derived values can be independently recomputed.",
+        "Reject invalid timestamps, missing samples, unknown units, zero denominators and stale/mismatched calibration."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "NOT_RELEASED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "Alternative reducer must pass an independent known-answer corpus and hostile negatives."
+    },
+    {
+      "id": "ODRH-EVIDENCE-001",
+      "name": "Design revision and evidence link",
+      "role": "Bind as-designed/as-built identity, calibration, inspection, repair, raw artifacts and release disposition.",
+      "current_openness_class": "NOT_SELECTED",
+      "target_openness_class": "PROJECT_CONTROLLED_OPEN",
+      "module_status": "NOT_IMPLEMENTED",
+      "selection_requirements": [
+        "Reuse existing Mycelix evidence semantics and manufacturing route/accounting identity.",
+        "A receipt must never promote a simulation to physical qualification.",
+        "Preserve failed runs, exclusions, repairs and retests."
+      ],
+      "design_source": null,
+      "datasheet_or_interface_source": null,
+      "license_status": "NOT_RELEASED",
+      "lifecycle_check_date": null,
+      "substitute_policy": "No duplicate generic evidence format; extend existing profile only where justified."
+    }
+  ],
+  "measurement_channels": [
+    {
+      "id": "ODRH-MEAS-POWER-001",
+      "metric": "input_power_and_energy",
+      "unit": "W_and_J",
+      "source_module_id": "ODRH-POWER-001",
+      "status": "NOT_IMPLEMENTED",
+      "calibration_required": true,
+      "raw_samples_required": true,
+      "claim_limit": "Must specify energy accounting boundary, sampling interval, gaps, integration rule and uncertainty."
+    },
+    {
+      "id": "ODRH-MEAS-TEMP-001",
+      "metric": "temperature",
+      "unit": "degC",
+      "source_module_id": "ODRH-THERMAL-001",
+      "status": "NOT_IMPLEMENTED",
+      "calibration_required": true,
+      "raw_samples_required": true,
+      "claim_limit": "Sensor placement and response must be documented; do not infer internal panel temperature from ambient."
+    },
+    {
+      "id": "ODRH-MEAS-OPTICAL-001",
+      "metric": "optical_metric_supported_by_instrument",
+      "unit": "instrument_specific",
+      "source_module_id": "ODRH-OPTICS-001",
+      "status": "NOT_IMPLEMENTED",
+      "calibration_required": true,
+      "raw_samples_required": true,
+      "claim_limit": "No universal optical metric is enabled until instrument, calibration and geometry are selected."
+    },
+    {
+      "id": "ODRH-MEAS-TIMING-001",
+      "metric": "output_timing_and_display_latency",
+      "unit": "ms",
+      "source_module_id": "ODRH-HOST-001",
+      "status": "NOT_IMPLEMENTED",
+      "calibration_required": false,
+      "raw_samples_required": true,
+      "claim_limit": "Separate GPU render time, present timing, scanout and measured end-to-end response."
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "ODRH-G0-EDITABLE-SOURCE",
+      "metric": "project_controlled_design_files_editable_and_published_pct",
+      "target_operator": "EQ",
+      "target_value": 100,
+      "target_unit": "percent",
+      "target_class": "integrity_gate",
+      "baseline_required": false,
+      "status": "PROPOSED",
+      "evidence_status": "NOT_MEASURED"
+    },
+    {
+      "id": "ODRH-G0-OPENNESS-COVERAGE",
+      "metric": "BOM_lines_with_identity_and_openness_classification_pct",
+      "target_operator": "EQ",
+      "target_value": 100,
+      "target_unit": "percent",
+      "target_class": "integrity_gate",
+      "baseline_required": false,
+      "status": "PROPOSED",
+      "evidence_status": "NOT_MEASURED"
+    },
+    {
+      "id": "ODRH-G2-REPAIR-TIME",
+      "metric": "repair_or_replacement_time_reduction",
+      "target_operator": "GE",
+      "target_value": 30,
+      "target_unit": "percent",
+      "target_class": "research_hypothesis",
+      "baseline_required": true,
+      "status": "PROPOSED",
+      "evidence_status": "NOT_MEASURED"
+    },
+    {
+      "id": "ODRH-G3-COST-OR-ENERGY",
+      "metric": "cost_per_calibrated_good_module_or_energy_per_successful_task_reduction",
+      "target_operator": "GE",
+      "target_value": 10,
+      "target_unit": "percent",
+      "target_class": "research_hypothesis",
+      "baseline_required": true,
+      "status": "PROPOSED",
+      "evidence_status": "NOT_MEASURED"
+    }
+  ],
+  "gates": [
+    {
+      "id": "ODRH-G0",
+      "name": "Open-design integrity and component boundary",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "ODRH-G1",
+      "name": "Reproducible metrology and workload validity",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "ODRH-G2",
+      "name": "Replacement, repair and lifecycle evidence",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "ODRH-G3",
+      "name": "Quality-constrained lifecycle optimization",
+      "status": "NOT_STARTED"
+    }
+  ],
+  "references": [
+    {
+      "id": "SRC-OSHWA-DEF",
+      "title": "Open Source Hardware Definition",
+      "url": "https://oshwa.org/definition/",
+      "purpose": "Scope, modification freedom and editable source principle"
+    },
+    {
+      "id": "SRC-OSHWA-HW",
+      "title": "OSHWA hardware licensing guidance",
+      "url": "https://certification.oshwa.org/process/hardware.html",
+      "purpose": "Licenses and distinguishing project-controlled from third-party hardware"
+    },
+    {
+      "id": "SRC-OSHWA-DOC",
+      "title": "OSHWA documentation guidance",
+      "url": "https://certification.oshwa.org/process/documentation.html",
+      "purpose": "Editable files, BOM, instructions and source documentation"
+    },
+    {
+      "id": "SRC-VIS-MFG-001",
+      "title": "Display manufacturing route profiles and economics",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/8012",
+      "purpose": "Reuse existing route, yield, repair and cost accounting ownership"
+    },
+    {
+      "id": "SRC-ANTMICRO-LED-PANEL",
+      "title": "Antmicro Programmable LED Panel Board",
+      "url": "https://github.com/antmicro/programmable-led-panel",
+      "purpose": "Public KiCad 9.x 10x14 independently controllable LED reference board with RP2040 or iCE40 control and an external trigger; candidate for synchronized latency fixtures after build/part review."
+    },
+    {
+      "id": "SRC-FRAMEPROBE",
+      "title": "frameprobe end-to-end display latency reference",
+      "url": "https://github.com/frameprobe/frameprobe",
+      "purpose": "Existing photodiode and RP2040 latency measurement design used as an architecture and test-method reference; review exact hardware/software licenses, parts, sampling limits and independent calibration before any reuse."
+    },
+    {
+      "id": "SRC-COLORHUG2-ARCHIVE",
+      "title": "ColorHug2 archived hardware design",
+      "url": "https://github.com/hughski/colorhug2-hardware",
+      "purpose": "Historical open colorimeter schematics and board design useful as a reference; archived repository is not evidence of current instrument availability, calibration, or active maintenance."
+    },
+    {
+      "id": "SRC-TI-INA226",
+      "title": "Texas Instruments INA226 documentation",
+      "url": "https://www.ti.com/product/INA226",
+      "purpose": "Primary source for current/voltage monitor electrical limits, conversion timing, filtering and shunt design; any implementation still requires range selection and calibration against a suitable reference."
+    },
+    {
+      "id": "SRC-PGENERATOR-PLUS",
+      "title": "PGenerator+ display pattern generator",
+      "url": "https://github.com/BigShoots/PGenerator-Plus",
+      "purpose": "Active third-party reference for HDMI SDR/HDR pattern generation and meter-driven validation; verify its dependency, language, supported hardware, licenses and output behavior before choosing interop."
+    },
+    {
+      "id": "SRC-ICDM-IDMS-V13",
+      "title": "International Committee for Display Metrology — IDMS",
+      "url": "https://www.sid.org/Standards/ICDM/ICDM",
+      "purpose": "Use the applicable current IDMS display measurement method as the standards-aligned starting point; report edition and adaptations, without reproducing or replacing the standard."
+    },
+    {
+      "id": "SRC-NIST-MPC-DRIFT",
+      "title": "NIST Measurement Process Characterization handbook — drift",
+      "url": "https://www.itl.nist.gov/div898/handbook/mpc/section4/mpc453.htm",
+      "purpose": "Research anchor for check-standard/control-chart monitoring of slow measurement-response changes. The current ODRH v0.1 algorithm uses fixed guard-band screening only and does not implement these statistical models."
+    },
+    {
+      "id": "SRC-NIST-MPC-DRIFT-BIAS",
+      "title": "NIST Measurement Process Characterization handbook — instrument drift bias",
+      "url": "https://itl.nist.gov/div898/handbook/mpc/section3/mpc3312.htm",
+      "purpose": "Reference for drift effects and the assumptions behind particular drift-elimination designs; ODRH does not presume linear drift or equally spaced correction is valid."
+    },
+    {
+      "id": "SRC-IEC-62087-7",
+      "title": "IEC 62087-7:2018 — methods of measurement for power consumption, computer monitors",
+      "url": "https://webstore.iec.ch/en/publication/27420",
+      "purpose": "Applicable standards reference for mains-powered computer-monitor power measurements within its stated scope; the project protocol records method edition and deviations without reproducing or claiming compliance."
+    },
+    {
+      "id": "SRC-NIST-MPC-HANDBOOK",
+      "title": "NIST/SEMATECH Measurement Process Characterization handbook",
+      "url": "https://www.itl.nist.gov/div898/handbook/mpc/mpc.htm",
+      "purpose": "Reference for check standards, measurement-process stability, repeatability/reproducibility and uncertainty; ODRH control screening remains a limited synthetic method, not a replacement for statistical procedures."
+    }
+  ]
+}

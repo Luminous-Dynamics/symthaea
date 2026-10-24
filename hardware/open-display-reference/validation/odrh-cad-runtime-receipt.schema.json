@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json",
+  "title": "ODRH generated CAD execution receipt",
+  "description": "Runtime proof of declared CAD export checks only; no physical fit, manufacturing tolerance, optical validity, safety, or metrology qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "validation_id",
+    "claim_boundary",
+    "source",
+    "tool",
+    "execution",
+    "outputs",
+    "negative_controls",
+    "physical_validation"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "validation_id": {
+      "type": "string",
+      "const": "ODRH-CAD-RUN-001"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "const": "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "const": "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version_output"],
+      "properties": {
+        "name": {"type": "string", "const": "OpenSCAD"},
+        "version_output": {"type": "string", "minLength": 1}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit_sha",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "workflow_run_url"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "workflow_run_id": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "workflow_run_attempt": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "workflow_run_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "sha256", "expected_bounds_mm"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["odrh-default.stl", "odrh-alternate.stl"]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "expected_bounds_mm": {
+            "type": "array",
+            "prefixItems": [
+              {"type": "number", "exclusiveMinimum": 0},
+              {"type": "number", "exclusiveMinimum": 0},
+              {"type": "number", "exclusiveMinimum": 0}
+            ],
+            "items": false,
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "override": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["plate_width_mm", "plate_height_mm"],
+            "properties": {
+              "plate_width_mm": {"type": "number", "exclusiveMinimum": 0},
+              "plate_height_mm": {"type": "number", "exclusiveMinimum": 0}
+            }
+          }
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["parameter", "override", "expected_failure"],
+        "properties": {
+          "parameter": {
+            "type": "string",
+            "enum": [
+              "sensor_aperture_d_mm",
+              "mount_pitch_x_mm",
+              "plate_thickness_mm"
+            ]
+          },
+          "override": {"type": "number"},
+          "expected_failure": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "physical_validation": {
+      "type": "string",
+      "const": "NOT_PERFORMED"
+    }
+  }
+}

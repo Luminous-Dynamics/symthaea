@@ -1,0 +1,17 @@
+[package]
+name = "open-display-platform-verify"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Draft 2020-12 schema and fail-closed semantic verifier for the open display reference platform"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+publish = false
+
+[dependencies]
+jsonschema = { version = "=0.59.0", default-features = false }
+serde_json = "=1.0.154"
+sha2 = "=0.11.1"
+
+[workspace]
+resolver = "3"

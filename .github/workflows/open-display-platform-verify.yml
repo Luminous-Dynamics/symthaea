@@ -1,0 +1,313 @@
+name: Open Display Platform Verifier
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "tools/open-display-platform-verify/**"
+      - "hardware/open-display-reference/**"
+      - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
+      - "docs/engineering/DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md"
+      - "docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md"
+      - "docs/engineering/display-energy-trace-synthetic-v0.1.json"
+      - "docs/engineering/display-energy-trace.schema.json"
+      - "docs/engineering/display-measurement-geometry-synthetic-v0.1.json"
+      - "docs/engineering/display-measurement-geometry.schema.json"
+      - "tools/open-display-platform-verify/src/geometry.rs"
+      - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
+      - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
+      - "docs/engineering/display-measurement-run-template-v0.1.json"
+      - "docs/engineering/display-measurement-run.schema.json"
+      - "docs/engineering/display-drift-control-plan-v0.1.json"
+      - "docs/engineering/display-drift-control-plan.schema.json"
+      - "docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md"
+      - "docs/engineering/open-display-reference-platform-v0.1.json"
+      - "tools/open-display-platform-verify/src/drift_control.rs"
+      - "docs/engineering/open-display-reference-platform.schema.json"
+      - ".github/workflows/open-display-platform-verify.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/open-display-platform-verify/**"
+      - "hardware/open-display-reference/**"
+      - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
+      - "docs/engineering/DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md"
+      - "docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md"
+      - "docs/engineering/display-energy-trace-synthetic-v0.1.json"
+      - "docs/engineering/display-energy-trace.schema.json"
+      - "docs/engineering/display-measurement-geometry-synthetic-v0.1.json"
+      - "docs/engineering/display-measurement-geometry.schema.json"
+      - "tools/open-display-platform-verify/src/geometry.rs"
+      - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
+      - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
+      - "docs/engineering/display-measurement-run-template-v0.1.json"
+      - "docs/engineering/display-measurement-run.schema.json"
+      - "docs/engineering/display-drift-control-plan-v0.1.json"
+      - "docs/engineering/display-drift-control-plan.schema.json"
+      - "docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md"
+      - "docs/engineering/open-display-reference-platform-v0.1.json"
+      - "tools/open-display-platform-verify/src/drift_control.rs"
+      - "docs/engineering/open-display-reference-platform.schema.json"
+      - ".github/workflows/open-display-platform-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-display-platform-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Validate open display platform manifest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # actions/checkout v4.2.2 pinned to an immutable commit.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Prepare reproducibility bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          mkdir -p "$artifact_dir"
+          cp hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad "$artifact_dir/"
+          cp hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json "$artifact_dir/"
+          cp hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json "$artifact_dir/"
+          cp hardware/open-display-reference/LICENSE "$artifact_dir/"
+          cp hardware/open-display-reference/README.md "$artifact_dir/"
+          cp docs/engineering/open-display-reference-platform-v0.1.json "$artifact_dir/"
+          cp docs/engineering/open-display-reference-platform.schema.json "$artifact_dir/"
+          cp docs/engineering/display-measurement-run-template-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-measurement-run.schema.json "$artifact_dir/"
+          cp docs/engineering/display-drift-control-plan-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-drift-control-plan.schema.json "$artifact_dir/"
+          cp docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md "$artifact_dir/"
+          cp docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md "$artifact_dir/"
+          cp docs/engineering/DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md "$artifact_dir/"
+          cp docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md "$artifact_dir/"
+          cp docs/engineering/display-energy-trace-synthetic-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-energy-trace.schema.json "$artifact_dir/"
+          cp tools/open-display-platform-verify/src/energy.rs "$artifact_dir/"
+          cp tools/open-display-platform-verify/src/geometry.rs "$artifact_dir/"
+          cp docs/engineering/display-measurement-geometry-synthetic-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-measurement-geometry.schema.json "$artifact_dir/"
+          sha256sum "$artifact_dir"/* > "$artifact_dir/input-sha256sums.txt"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy --component rustfmt
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Install OpenSCAD for native CAD validation
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y openscad xvfb
+          openscad --version
+          command -v xvfb-run
+
+      - name: Export default and alternate sensor-plate geometry
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          openscad --version > "$artifact_dir/openscad-version.txt" 2>&1
+          if ! openscad -o "$artifact_dir/odrh-default.stl" "$cad" \
+            > "$artifact_dir/odrh-default-render.log" 2>&1; then
+            cat "$artifact_dir/odrh-default-render.log"
+            exit 1
+          fi
+          if ! openscad -D 'plate_width_mm=100' -D 'plate_height_mm=60' \
+            -o "$artifact_dir/odrh-alternate.stl" "$cad" \
+            > "$artifact_dir/odrh-alternate-render.log" 2>&1; then
+            cat "$artifact_dir/odrh-alternate-render.log"
+            exit 1
+          fi
+          sha256sum "$artifact_dir/odrh-default.stl" "$artifact_dir/odrh-alternate.stl" \
+            | tee "$artifact_dir/mesh-sha256sums.txt"
+
+      - name: Render non-qualifying source preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          preview="$artifact_dir/odrh-sensor-plate-preview.png"
+          log="$artifact_dir/odrh-preview-render.log"
+          if ! xvfb-run -a openscad --imgsize=1200,900 --viewall --autocenter \
+            --projection=o -o "$preview" "$cad" > "$log" 2>&1; then
+            cat "$log"
+            exit 1
+          fi
+          file "$preview" | tee "$artifact_dir/odrh-preview-file-info.txt"
+          grep -F "PNG image data, 1200 x 900" "$artifact_dir/odrh-preview-file-info.txt"
+          sha256sum "$preview" | tee "$artifact_dir/preview-sha256sums.txt"
+          # This rendering is a source-review aid, not physical validation.
+
+      - name: Check exported mesh bounds and parameter rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_bounds() {
+            local file="$1" expected_x="$2" expected_y="$3" expected_z="$4"
+            awk -v ex="$expected_x" -v ey="$expected_y" -v ez="$expected_z" '
+              function abs(x) { return x < 0 ? -x : x }
+              $1 == "vertex" {
+                x = $2 + 0; y = $3 + 0; z = $4 + 0
+                if (!seen) {
+                  minx=maxx=x; miny=maxy=y; minz=maxz=z; seen=1
+                }
+                if (x < minx) minx=x; if (x > maxx) maxx=x
+                if (y < miny) miny=y; if (y > maxy) maxy=y
+                if (z < minz) minz=z; if (z > maxz) maxz=z
+              }
+              END {
+                if (!seen) { print "STL contains no vertices"; exit 2 }
+                dx=maxx-minx; dy=maxy-miny; dz=maxz-minz
+                printf "Observed extents: %.3f x %.3f x %.3f mm\n", dx, dy, dz
+                if (abs(dx-ex) > 0.02 || abs(dy-ey) > 0.02 || abs(dz-ez) > 0.02) exit 1
+              }
+            ' "$file"
+          }
+          check_bounds "target/odrh-validation/odrh-default.stl" 80 5 80 \
+            | tee "target/odrh-validation/default-bounds.txt"
+          check_bounds "target/odrh-validation/odrh-alternate.stl" 100 5 60 \
+            | tee "target/odrh-validation/alternate-bounds.txt"
+
+          receipt="hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json"
+          cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          expected_source_sha="$(jq -r '.source_revision.sha256' "$receipt")"
+          actual_source_sha="$(sha256sum "$cad" | awk '{print $1}')"
+          test "$actual_source_sha" = "$expected_source_sha"
+
+          expected_tool_version="$(jq -r '.tool.version' "$receipt")"
+          actual_tool_version="$(openscad --version 2>&1 | sed -n 's/^OpenSCAD version //p')"
+          test "$actual_tool_version" = "$expected_tool_version"
+
+          check_triangle_count() {
+            local file="$1" check_id="$2"
+            local expected actual
+            expected="$(jq -r --arg id "$check_id" \
+              '.checks[] | select(.id == $id) | .triangle_count' "$receipt")"
+            actual="$(grep -cE '^[[:space:]]*facet normal' "$file")"
+            echo "$check_id expected triangles=$expected observed triangles=$actual"
+            test "$actual" = "$expected"
+          }
+          check_triangle_count "target/odrh-validation/odrh-default.stl" "ODRH-CAD-DEFAULT-EXPORT"
+          check_triangle_count "target/odrh-validation/odrh-alternate.stl" "ODRH-CAD-ALTERNATE-DIMENSIONS"
+
+          if openscad -D 'sensor_aperture_d_mm=100' \
+            -o "target/odrh-validation/odrh-invalid.stl" "$cad" \
+            > "target/odrh-validation/odrh-invalid-aperture.log" 2>&1; then
+            echo "Oversized aperture override unexpectedly rendered"
+            exit 1
+          fi
+          grep -F "Sensor aperture overlaps the diagonal mounting-hole envelope" \
+            "target/odrh-validation/odrh-invalid-aperture.log"
+
+          if openscad -D 'mount_pitch_x_mm=100' \
+            -o "target/odrh-validation/odrh-invalid-pitch.stl" "$cad" \
+            > "target/odrh-validation/odrh-invalid-pitch.log" 2>&1; then
+            echo "Invalid mount-pitch override unexpectedly rendered"
+            exit 1
+          fi
+          grep -F "Horizontal mounting-hole grid violates edge margin" \
+            "target/odrh-validation/odrh-invalid-pitch.log"
+
+          if openscad -D 'plate_thickness_mm=0.5' \
+            -o "target/odrh-validation/odrh-invalid-thickness.stl" "$cad" \
+            > "target/odrh-validation/odrh-invalid-thickness.log" 2>&1; then
+            echo "Invalid plate-thickness override unexpectedly rendered"
+            exit 1
+          fi
+          grep -F "Counterbore depth must be smaller than plate thickness" \
+            "target/odrh-validation/odrh-invalid-thickness.log"
+
+      - name: Write run-bound geometry receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          source_hash="$(sha256sum hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad | awk '{print $1}')"
+          default_hash="$(sha256sum "$artifact_dir/odrh-default.stl" | awk '{print $1}')"
+          alternate_hash="$(sha256sum "$artifact_dir/odrh-alternate.stl" | awk '{print $1}')"
+          tool_version="$(cat "$artifact_dir/openscad-version.txt")"
+          jq -n \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg source_hash "$source_hash" \
+            --arg tool_version "$tool_version" \
+            --arg default_hash "$default_hash" \
+            --arg alternate_hash "$alternate_hash" \
+            '{
+              schema_version: "0.1.0",
+              validation_id: "ODRH-CAD-RUN-001",
+              claim_boundary: "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED",
+              source: {
+                path: "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
+                sha256: $source_hash
+              },
+              tool: {name: "OpenSCAD", version_output: $tool_version},
+              execution: {
+                repository: $repo,
+                commit_sha: $commit,
+                workflow_run_id: $run_id,
+                workflow_run_attempt: $run_attempt,
+                workflow_run_url: $run_url
+              },
+              outputs: [
+                {name: "default.stl", sha256: $default_hash, expected_bounds_mm: [80, 5, 80]},
+                {name: "alternate.stl", sha256: $alternate_hash, override: {plate_width_mm: 100, plate_height_mm: 60}, expected_bounds_mm: [100, 5, 60]}
+              ],
+              negative_controls: [
+                {parameter: "sensor_aperture_d_mm", override: 100, expected_failure: "Sensor aperture overlaps the diagonal mounting-hole envelope"},
+                {parameter: "mount_pitch_x_mm", override: 100, expected_failure: "Horizontal mounting-hole grid violates edge margin"},
+                {parameter: "plate_thickness_mm", override: 0.5, expected_failure: "Counterbore depth must be smaller than plate thickness"}
+              ],
+              physical_validation: "NOT_PERFORMED"
+            }' > "$artifact_dir/odrh-cad-runtime-receipt.json"
+          sha256sum "$artifact_dir"/* > "$artifact_dir/final-artifact-sha256sums.txt"
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/open-display-platform-verify/Cargo.toml -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/open-display-platform-verify/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run unit and mutation tests
+        run: cargo test --manifest-path tools/open-display-platform-verify/Cargo.toml
+
+      - name: Verify repository, CAD receipt, drift, energy and geometry screens
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
+            --cad-receipt target/odrh-validation/odrh-cad-runtime-receipt.json \
+            --cad-receipt-schema hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json \
+            --drift-plan docs/engineering/display-drift-control-plan-v0.1.json \
+            --drift-schema docs/engineering/display-drift-control-plan.schema.json \
+            --energy-trace docs/engineering/display-energy-trace-synthetic-v0.1.json \
+            --energy-schema docs/engineering/display-energy-trace.schema.json \
+            --geometry-record docs/engineering/display-measurement-geometry-synthetic-v0.1.json \
+            --geometry-schema docs/engineering/display-measurement-geometry.schema.json \
+            | tee target/odrh-validation/verification-report.json
+          sha256sum target/odrh-validation/verification-report.json \
+            >> target/odrh-validation/final-artifact-sha256sums.txt
+
+      - name: Upload reproducible CAD and validation artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: odrh-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/odrh-validation/
+          if-no-files-found: warn
+          retention-days: 14

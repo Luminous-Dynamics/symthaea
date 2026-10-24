@@ -1,0 +1,130 @@
+{
+  "schema_version": "0.1.0",
+  "validation_id": "ODRH-CAD-CHECK-001",
+  "source_path": "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
+  "source_revision": {
+    "git_blob_sha1": "3875786acca8f71d64880b839486b9163a3a6cb5",
+    "sha256": "7e5145a7417900f1b106f053b44632e54fd187e74a843ce2f94d9936455527f7"
+  },
+  "tool": {
+    "name": "OpenSCAD",
+    "version": "2021.01",
+    "environment": "github-hosted-runner-ubuntu-24.04",
+    "validation_scope": "native CAD parse, CSG render/export and per-run STL hashes; bounds and parameter negatives are asserted by CI. STL bytes are retained as run provenance, not assumed byte-identical across OpenSCAD build environments."
+  },
+  "default_configuration": {
+    "plate_width_mm": 80,
+    "plate_height_mm": 80,
+    "plate_thickness_mm": 5,
+    "sensor_aperture_d_mm": 20,
+    "mount_hole_d_mm": 3.4,
+    "mount_pitch_x_mm": 25,
+    "mount_pitch_z_mm": 25,
+    "mount_counterbore_d_mm": 6.2,
+    "mount_counterbore_depth_mm": 1.6,
+    "bracket_slot_width_mm": 5.5,
+    "bracket_slot_length_mm": 18,
+    "bracket_slot_x_mm": 28.5,
+    "edge_margin_mm": 6
+  },
+  "checks": [
+    {
+      "id": "ODRH-CAD-DEFAULT-EXPORT",
+      "status": "PASS",
+      "detail": "OpenSCAD successfully generated a 3D STL from the default design with the illustrative sensor outline disabled by default.",
+      "output_format": "ASCII STL",
+      "output_sha256": "9a3dbcb80ab7f48a0e7c3a21dc5810420bf79a4c01c2a292057f2c639c16fced",
+      "triangle_count": 2872
+    },
+    {
+      "id": "ODRH-CAD-DEFAULT-BOUNDS",
+      "status": "PASS",
+      "expected_extents_mm": [
+        80,
+        5,
+        80
+      ],
+      "observed_extents_mm": [
+        80,
+        5,
+        80
+      ],
+      "absolute_tolerance_mm": 0.02,
+      "detail": "Bounding box computed from exported mesh vertex coordinates."
+    },
+    {
+      "id": "ODRH-CAD-ALTERNATE-DIMENSIONS",
+      "status": "PASS",
+      "override": {
+        "plate_width_mm": 100,
+        "plate_height_mm": 60
+      },
+      "expected_extents_mm": [
+        100,
+        5,
+        60
+      ],
+      "observed_extents_mm": [
+        100,
+        5,
+        60
+      ],
+      "absolute_tolerance_mm": 0.02,
+      "output_sha256": "038bf5e49019acbceb1b6477fee02a87ebb05277eeb0748289f8cf96ad6ee764",
+      "triangle_count": 2872,
+      "detail": "A second dimensional configuration rendered successfully and exported bounds matching its overridden parameters."
+    },
+    {
+      "id": "ODRH-CAD-NEGATIVE-APERTURE-ASSERTION",
+      "status": "PASS",
+      "override": {
+        "sensor_aperture_d_mm": 100
+      },
+      "expected": "Reject invalid aperture-to-mounting-hole clearance.",
+      "observed": "OpenSCAD exited nonzero and emitted the assertion 'Sensor aperture overlaps the diagonal mounting-hole envelope'.",
+      "exit_code": 1
+    },
+    {
+      "id": "ODRH-CAD-NEGATIVE-MOUNT-PITCH",
+      "status": "PASS",
+      "override": {
+        "mount_pitch_x_mm": 100
+      },
+      "expected": "Reject mounting-hole grid beyond declared edge margin.",
+      "observed": "OpenSCAD exited nonzero and emitted the assertion 'Horizontal mounting-hole grid violates edge margin'.",
+      "exit_code": 1
+    },
+    {
+      "id": "ODRH-CAD-NEGATIVE-PLATE-THICKNESS",
+      "status": "PASS",
+      "override": {
+        "plate_thickness_mm": 0.5
+      },
+      "expected": "Reject a counterbore deeper than plate thickness.",
+      "observed": "OpenSCAD exited nonzero and emitted the assertion 'Counterbore depth must be smaller than plate thickness'.",
+      "exit_code": 1
+    }
+  ],
+  "claim_boundaries": {
+    "native_source_rendered": true,
+    "mesh_extents_checked": true,
+    "parameter_assertion_negative_control_checked": true,
+    "physical_print_performed": false,
+    "sensor_or_bracket_fit_checked": false,
+    "mechanical_strength_or_load_qualified": false,
+    "dimensional_accuracy_of_printed_part_measured": false,
+    "optical_or_metrology_performance_validated": false,
+    "physical_validation": "NOT_PERFORMED",
+    "overall_disposition": "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED",
+    "preview_rendered": false
+  },
+  "execution": {
+    "workflow_run_id": 39147889097,
+    "workflow_run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/39147889097",
+    "tested_commit_sha": "c417ef92a60309c7f4647b524c4f00a6fd91bfd1",
+    "scope_note": "Default and alternate STL export, mesh bounds, triangle-count parity, and three parameter-negative controls completed in the CAD-specific workflow steps. The overall workflow later failed at cargo fmt. The referenced run did not render a PNG preview. This receipt covers only the listed CAD-specific checks and does not indicate overall workflow PASS."
+  },
+  "correction_notes": [
+    "Corrective receipt revision: removed ODRH-CAD-PREVIEW-DEFAULT because the linked workflow run 39147889097 did not include a preview-render step. Preview remains NOT_EVALUATED; do not use the previously associated preview hash or dimensions as evidence from that run."
+  ]
+}

@@ -1,0 +1,701 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/display-measurement-run.schema.json",
+  "title": "ODRH display measurement run record",
+  "description": "Raw-artifact-linked run record. Schema validity is not physical qualification or instrument calibration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "title",
+    "record_state",
+    "physical_validation",
+    "protocol",
+    "device_under_test",
+    "setup",
+    "instruments",
+    "observations",
+    "raw_artifacts",
+    "exclusions",
+    "review",
+    "acquired_at"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^ODRH-RUN-[A-Z0-9-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_state": {
+      "type": "string",
+      "enum": [
+        "PLAN_ONLY",
+        "ABORTED",
+        "ACQUIRED_UNQUALIFIED",
+        "INDEPENDENTLY_REVIEWED"
+      ]
+    },
+    "physical_validation": {
+      "type": "string",
+      "enum": [
+        "NOT_PERFORMED",
+        "MEASURED_UNQUALIFIED",
+        "INDEPENDENTLY_REVIEWED"
+      ]
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "revision"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "const": "ODRH-MET-001"
+        },
+        "revision": {
+          "type": "string",
+          "const": "0.1.0"
+        }
+      }
+    },
+    "device_under_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "manufacturer",
+        "model",
+        "hardware_revision",
+        "firmware",
+        "display_profile_digest"
+      ],
+      "properties": {
+        "device_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manufacturer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hardware_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "firmware": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "display_profile_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_id",
+        "output_mode",
+        "resolution",
+        "refresh_rate_hz",
+        "signal_format",
+        "osd_profile_digest",
+        "pattern_sequence_digest",
+        "measurement_geometry_digest",
+        "ambient_temperature_c"
+      ],
+      "properties": {
+        "host_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resolution": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "width_px",
+            "height_px"
+          ],
+          "properties": {
+            "width_px": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height_px": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "refresh_rate_hz": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "signal_format": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "osd_profile_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pattern_sequence_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "measurement_geometry_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "ambient_temperature_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "instruments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "instrument_id",
+          "instrument_class",
+          "manufacturer",
+          "model",
+          "serial_or_stable_id",
+          "calibration_state",
+          "calibration_record_digest",
+          "calibration_valid_through",
+          "supported_measurands"
+        ],
+        "properties": {
+          "instrument_id": {
+            "type": "string",
+            "pattern": "^ODRH-RUN-INS-[A-Z0-9-]+$"
+          },
+          "instrument_class": {
+            "type": "string",
+            "enum": [
+              "POWER_METER",
+              "PHOTODIODE_CHAIN",
+              "COLORIMETER",
+              "SPECTRORADIOMETER",
+              "TEMPERATURE_SENSOR",
+              "CAMERA",
+              "OTHER"
+            ]
+          },
+          "manufacturer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serial_or_stable_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "calibration_state": {
+            "type": "string",
+            "enum": [
+              "NOT_SELECTED",
+              "UNKNOWN",
+              "VALID",
+              "STALE",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "calibration_record_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_valid_through": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "supported_measurands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "measurand",
+                "unit"
+              ],
+              "properties": {
+                "measurand": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "uniqueItems": true,
+            "description": "Machine-readable measurand/unit pairs supported by the instrument capability profile."
+          },
+          "calibration_record_artifact_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^ODRH-ART-[A-Z0-9-]+$",
+            "description": "Raw artifact ID of the calibration record when that evidence is retained."
+          },
+          "capability_profile_artifact_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^ODRH-ART-[A-Z0-9-]+$",
+            "description": "Raw artifact ID for the instrument's declared range/response capability profile."
+          },
+          "capability_profile_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 of the exact capability-profile artifact."
+          },
+          "capability_profile_status": {
+            "type": "string",
+            "enum": [
+              "UNASSESSED",
+              "DECLARED_UNREVIEWED",
+              "INDEPENDENTLY_REVIEWED",
+              "INADEQUATE"
+            ],
+            "description": "Review state of capability-profile evidence, not a certificate of measurement accuracy."
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "measurand",
+          "unit",
+          "status",
+          "value",
+          "expanded_uncertainty",
+          "minimum_decision_effect",
+          "decision_capability",
+          "instrument_ids",
+          "method_id",
+          "method_revision",
+          "raw_artifact_ids",
+          "notes",
+          "uncertainty_budget"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "pattern": "^ODRH-OBS-[A-Z0-9-]+$"
+          },
+          "measurand": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_EVALUATED",
+              "MEASURED_UNQUALIFIED",
+              "INDEPENDENTLY_REVIEWED"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "expanded_uncertainty": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "minimum_decision_effect": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "decision_capability": {
+            "type": "string",
+            "enum": [
+              "NOT_EVALUATED",
+              "CAPABLE",
+              "INADEQUATE"
+            ]
+          },
+          "instrument_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^ODRH-RUN-INS-[A-Z0-9-]+$"
+            },
+            "uniqueItems": true
+          },
+          "method_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "raw_artifact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^ODRH-ART-[A-Z0-9-]+$"
+            },
+            "uniqueItems": true
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uncertainty_budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "method",
+              "terms",
+              "covariance_terms",
+              "combined_standard_uncertainty",
+              "coverage_factor",
+              "expanded_uncertainty",
+              "notes"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_EVALUATED",
+                  "CALCULATED_UNREVIEWED",
+                  "INDEPENDENTLY_REVIEWED"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "NOT_EVALUATED",
+                  "LINEARIZED_COVARIANCE",
+                  "MONTE_CARLO",
+                  "CONSERVATIVE_BOUND",
+                  "EXTERNAL_ANALYSIS"
+                ]
+              },
+              "terms": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "term_id",
+                    "label",
+                    "standard_uncertainty",
+                    "sensitivity_coefficient",
+                    "notes"
+                  ],
+                  "properties": {
+                    "term_id": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "standard_uncertainty": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "sensitivity_coefficient": {
+                      "type": "number"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "covariance_terms": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "term_a_id",
+                    "term_b_id",
+                    "covariance_contribution",
+                    "notes"
+                  ],
+                  "properties": {
+                    "term_a_id": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+                    },
+                    "term_b_id": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+                    },
+                    "covariance_contribution": {
+                      "type": "number"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "combined_standard_uncertainty": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "coverage_factor": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "expanded_uncertainty": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "notes": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "raw_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "sha256",
+          "media_type",
+          "storage_uri",
+          "byte_length",
+          "role"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "pattern": "^ODRH-ART-[A-Z0-9-]+$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "storage_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "byte_length": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "POWER_TRACE",
+              "OPTICAL_TRACE",
+              "TEMPERATURE_TRACE",
+              "PATTERN_IDENTITY",
+              "INSTRUMENT_CALIBRATION",
+              "SETUP_PHOTO",
+              "OTHER",
+              "INSTRUMENT_CAPABILITY_PROFILE"
+            ]
+          }
+        }
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "exclusion_id",
+          "observation_id",
+          "reason",
+          "authority"
+        ],
+        "properties": {
+          "exclusion_id": {
+            "type": "string",
+            "pattern": "^ODRH-EXCL-[A-Z0-9-]+$"
+          },
+          "observation_id": {
+            "type": "string",
+            "pattern": "^ODRH-OBS-[A-Z0-9-]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "review": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "review_method",
+        "reviewed_at",
+        "decision"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "ACCEPTED_WITH_LIMITS",
+            "REJECTED",
+            "NEEDS_MORE_EVIDENCE"
+          ]
+        }
+      }
+    },
+    "acquired_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

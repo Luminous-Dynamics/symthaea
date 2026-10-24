@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/display-drift-control-plan.schema.json",
+  "title": "ODRH synthetic drift-control screening plan",
+  "description": "Synthetic-only contract for testing conservative fixed-guard-band control screening; not a physical measurement or calibrated control chart.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "plan_id",
+    "record_state",
+    "claim_ceiling",
+    "measurand",
+    "unit",
+    "run_start_seconds",
+    "run_end_seconds",
+    "nominal_value",
+    "guard_half_width",
+    "controls",
+    "observations",
+    "maximum_control_gap_seconds"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^ODRH-DRIFT-PLAN-[A-Z0-9-]+$"
+    },
+    "record_state": {
+      "type": "string",
+      "const": "SYNTHETIC_TEST_ONLY"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "const": "SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION"
+    },
+    "measurand": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_start_seconds": {
+      "type": "number"
+    },
+    "run_end_seconds": {
+      "type": "number"
+    },
+    "nominal_value": {
+      "type": "number"
+    },
+    "guard_half_width": {
+      "type": "number",
+      "minimum": 0
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "control_id",
+          "time_seconds",
+          "value"
+        ],
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9-]+$"
+          },
+          "time_seconds": {
+            "type": "number"
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "time_seconds"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9-]+$"
+          },
+          "time_seconds": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "maximum_control_gap_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Predeclared maximum allowed gap between scheduled control slots, including run edges. The verifier checks the schedule only; it does not select or validate a physically adequate cadence."
+    }
+  }
+}
