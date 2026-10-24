@@ -126,3 +126,9 @@ The frontier analyzer is deliberately **descriptive only**: `confirmatory_decisi
 - **family-leakage-edges.schema.json** and **family-leakage-report.schema.json** define a secondary, non-destructive audit for cross-family dependencies. The Rust analyzer recomputes the frozen assignment, binds the edge inventory to its partition digest, joins confirmed and unresolved hard-leakage edges into connected components, and reports conservative quarantine counts.
 - **fixtures/family-leakage-edges.synthetic.json** contains deliberately invented negative/control relationships for CI only. It is not an actual dependency inventory and must not be treated as evidence about those families.
 - The real relationship inventory has not yet been independently curated. Its status is incomplete; therefore, the system cannot certify the frozen test split as leakage-free. The audit preserves the original split and does not turn metadata checks into mathematical evidence.
+
+### Title-only candidate discovery
+
+`discover_family_leakage_candidates` is a deterministic first-pass triage tool. It reads only the frozen family titles, normalizes away markup, downweights common tokens using document frequency, and emits candidates with shared-token explanations, a Jaccard score, a rarity score and an evidence digest. It is run twice in CI and the exact outputs must match.
+
+The output schema is `family-leakage-candidate-discovery.schema.json`. Candidate rows are always marked `title_similarity_only` and `unreviewed`. They are not converted automatically into hard leakage edges, do not change the split, and must not be counted as dependency or contamination findings. This screen is intended to prioritize expert review; it can both miss real dependencies and surface unrelated theorems with overlapping words.
