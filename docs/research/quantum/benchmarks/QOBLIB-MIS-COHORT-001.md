@@ -136,6 +136,12 @@ For every arm, freeze the original graph digest, reduction operators/order, kern
 
 For both tracks, keep development choices separate from confirmatory graph families. The public QOBLIB train/validation/test split is only a visible family-leakage control, not a blinded test set. Newly generated seeds and independent graph families are needed for an actual held-out generalization claim.
 
+## Independent source-format preflight (2026-10-24)
+
+I independently inspected the full contents of 41 graph files from the pinned instance cohort (all files whose sizes were at most 1,000,000 bytes, as reported in the source tree). A separate JavaScript preflight checked the DIMACS header, declared-vs-observed edge-record count, one-based endpoint range, self-loops, duplicate undirected edges, and unrecognized records. All 41 checked files passed those checks. The tiny anchors `farm` (17 vertices / 39 edges) and `chesapeake` (39 / 170) were separately confirmed; exhaustive subset enumeration on `farm` found MIS cardinality 10.
+
+**Scope limit:** the connected GitHub file reader could not return the nine larger source files because its content-response limit rejects them (including C4000-5, keller6 and frb100-40). Their tree IDs and byte sizes are pinned, but this ad hoc preflight did not inspect their contents. This is neither a run of the new Rust parser nor a validation of the complete 50-file corpus. The strict Rust parser's tests and the full cohort need executable local validation after a Rust toolchain is available.
+
 ## Next executable gates
 
 1. Add a strict DIMACS parser test suite for comments, duplicate edges, self-loops, malformed headers, count mismatch, out-of-range vertices, and the large C4000 file.
