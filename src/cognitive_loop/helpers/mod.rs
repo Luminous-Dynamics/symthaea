@@ -175,7 +175,7 @@ impl CognitiveLoopService {
         // preserve validity separately so missing/mismatched/non-finite evidence
         // is excluded from learning statistics and replay.
         let observation_cycle = self.stats.total_cycles as u64;
-        let prediction_evidence = Self::compute_prediction_error_sample(
+        let prediction_evidence = Self::compute_prediction_error_evidence(
             &compressed_state,
             self.last_prediction.as_deref(),
             observation_cycle,
@@ -340,7 +340,7 @@ impl CognitiveLoopService {
         // preserve validity separately so missing/mismatched/non-finite evidence
         // is excluded from learning statistics and replay.
         let observation_cycle = self.stats.total_cycles as u64;
-        let prediction_evidence = Self::compute_prediction_error_sample(
+        let prediction_evidence = Self::compute_prediction_error_evidence(
             &compressed_state,
             self.last_prediction.as_deref(),
             observation_cycle,
