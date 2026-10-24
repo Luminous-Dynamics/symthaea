@@ -105,6 +105,49 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
     }
 }
 
+/// Per-consumer monotonic cursor for exactly-once PE admission.
+///
+/// Each PE-dependent consumer owns its own cursor. A missing or non-finite
+/// sample does not advance the cursor, so a valid retry for that observation
+/// can still be admitted. A duplicate or out-of-order observation is rejected.
+/// Independent non-PE inputs are not governed by this cursor.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PredictionEvidenceCursor {
+    last_admitted_observation_cycle: Option<u64>,
+}
+
+impl PredictionEvidenceCursor {
+    /// Admit a finite PE sample only if its observation cycle is newer than
+    /// every previously admitted PE sample for this consumer.
+    pub fn admit(
+        &mut self,
+        observation_cycle: u64,
+        sample: Option<f32>,
+    ) -> Option<f32> {
+        let value = sample.filter(|value| value.is_finite())?;
+        if self
+            .last_admitted_observation_cycle
+            .is_some_and(|last_cycle| observation_cycle <= last_cycle)
+        {
+            return None;
+        }
+        self.last_admitted_observation_cycle = Some(observation_cycle);
+        Some(value)
+    }
+
+    /// Highest observation cycle whose PE sample was admitted.
+    #[inline]
+    pub fn last_admitted_observation_cycle(&self) -> Option<u64> {
+        self.last_admitted_observation_cycle
+    }
+
+    /// Reset explicitly when starting a new independent stream/session.
+    #[inline]
+    pub fn reset(&mut self) {
+        self.last_admitted_observation_cycle = None;
+    }
+}
+
 impl PredictionErrorEvidence {
     /// Construct evidence from an explicit status and optional measurement.
     ///
@@ -269,6 +312,40 @@ impl PredictionErrorEvidence {
 #[cfg(test)]
 mod tests {
     use super::{PredictionErrorEvidence, PredictionEvidenceStatus};
+
+    #[test]
+    fn prediction_evidence_cursor_admits_each_cycle_once() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        assert_eq!(cursor.admit(10, Some(0.3)), Some(0.3));
+        assert_eq!(cursor.admit(10, Some(0.9)), None);
+        assert_eq!(cursor.admit(9, Some(0.8)), None);
+        assert_eq!(cursor.admit(11, Some(0.6)), Some(0.6));
+        assert_eq!(cursor.last_admitted_observation_cycle(), Some(11));
+    }
+
+    #[test]
+    fn missing_evidence_does_not_advance_idempotency_cursor() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        assert_eq!(cursor.admit(5, None), None);
+        assert_eq!(cursor.admit(5, Some(f32::NAN)), None);
+        assert_eq!(cursor.last_admitted_observation_cycle(), None);
+        assert_eq!(cursor.admit(5, Some(0.4)), Some(0.4));
+    }
+
+    #[test]
+    fn prediction_evidence_cursor_resets_only_explicitly() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        assert_eq!(cursor.admit(100, Some(0.2)), Some(0.2));
+        assert_eq!(cursor.admit(1, Some(0.3)), None);
+        cursor.reset();
+        assert_eq!(cursor.admit(1, Some(0.3)), Some(0.3));
+    }
 
     #[test]
     fn invalid_compatibility_payload_never_becomes_a_value() {
