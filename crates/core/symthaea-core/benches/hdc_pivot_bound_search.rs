@@ -254,6 +254,26 @@ fn verify_correctness() {
     assert_eq!(exact_argmin(&q, &ties), (0, 0));
     let actual = pivot_exact_argmin::<true>(&q, &ties, &tie_index);
     assert_eq!((actual.0, actual.1), (0, 0));
+
+    // A non-identical equal-distance tie that forces the best-bound seed to be
+    // candidate 2. Candidate 1 has LB == best distance, but its lower ID must
+    // prevent pruning so it can replace candidate 2 under the public tie rule.
+    let zero = BinaryHV::zero();
+    let mut pivot = BinaryHV::zero();
+    for bit in 0..5 {
+        pivot.0[bit / 8] |= 1u8 << (bit % 8);
+    }
+    let mut candidate_one = BinaryHV::zero();
+    candidate_one.0[0] |= 1u8 << 5;
+    candidate_one.0[0] |= 1u8 << 6;
+    let mut candidate_two = BinaryHV::zero();
+    candidate_two.0[0] |= 1u8;
+    candidate_two.0[0] |= 1u8 << 5;
+    let tie_candidates = vec![pivot, candidate_one, candidate_two];
+    let tie_index = PivotIndex::build(&tie_candidates, &[0]);
+    assert_eq!(exact_argmin(&zero, &tie_candidates), (1, 2));
+    let actual = pivot_exact_argmin::<true>(&zero, &tie_candidates, &tie_index);
+    assert_eq!((actual.0, actual.1), (1, 2));
 }
 
 fn bench_pivot_exact_search(c: &mut Criterion) {
