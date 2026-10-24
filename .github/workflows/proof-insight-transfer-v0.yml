@@ -138,6 +138,9 @@ jobs:
           cargo run --locked --bin discover_family_leakage_candidates -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$RUNNER_TEMP/family-leakage-candidates-a.json"
           cargo run --locked --bin discover_family_leakage_candidates -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$RUNNER_TEMP/family-leakage-candidates-b.json"
           cmp "$RUNNER_TEMP/family-leakage-candidates-a.json" "$RUNNER_TEMP/family-leakage-candidates-b.json"
+          cargo run --locked --bin discover_artifact_path_candidates -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$RUNNER_TEMP/family-artifact-path-candidates-a.json"
+          cargo run --locked --bin discover_artifact_path_candidates -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$RUNNER_TEMP/family-artifact-path-candidates-b.json"
+          cmp "$RUNNER_TEMP/family-artifact-path-candidates-a.json" "$RUNNER_TEMP/family-artifact-path-candidates-b.json"
       - name: Run strict Clippy
         shell: bash
         run: |
@@ -169,12 +172,15 @@ jobs:
           edge_schema = json.loads((root / "family-leakage-edges.schema.json").read_text())
           report_schema = json.loads((root / "family-leakage-report.schema.json").read_text())
           candidate_schema = json.loads((root / "family-leakage-candidate-discovery.schema.json").read_text())
+          path_schema = json.loads((root / "family-artifact-path-candidate-discovery.schema.json").read_text())
           Draft202012Validator.check_schema(edge_schema)
           Draft202012Validator.check_schema(report_schema)
           Draft202012Validator.check_schema(candidate_schema)
+          Draft202012Validator.check_schema(path_schema)
           edge_validator = Draft202012Validator(edge_schema, format_checker=FormatChecker())
           report_validator = Draft202012Validator(report_schema, format_checker=FormatChecker())
           candidate_validator = Draft202012Validator(candidate_schema, format_checker=FormatChecker())
+          path_validator = Draft202012Validator(path_schema, format_checker=FormatChecker())
           candidate_path = Path(os.environ["RUNNER_TEMP"]) / "family-leakage-candidates-a.json"
           candidates = json.loads(candidate_path.read_text())
           candidate_validator.validate(candidates)
@@ -191,6 +197,22 @@ jobs:
               raise ValueError("title similarity was incorrectly upgraded to a reviewed leakage decision")
           if any(not row["shared_tokens"] or not row["rare_shared_tokens"] for row in pairs):
               raise ValueError("candidate lacks a traceable shared-token explanation")
+          path_candidate_path = Path(os.environ["RUNNER_TEMP"]) / "family-artifact-path-candidates-a.json"
+          path_candidates = json.loads(path_candidate_path.read_text())
+          path_validator.validate(path_candidates)
+          path_pairs = path_candidates["candidates"]
+          if len(path_pairs) != path_candidates["counts"]["candidate_pairs"]:
+              raise ValueError("artifact-path candidate count does not match candidate rows")
+          if sum(row["source_split"] != row["target_split"] for row in path_pairs) != path_candidates["counts"]["cross_split_pairs"]:
+              raise ValueError("artifact-path cross-split candidate count does not reconcile")
+          if sum({row["source_split"], row["target_split"]} == {"train", "test"} for row in path_pairs) != path_candidates["counts"]["train_test_pairs"]:
+              raise ValueError("artifact-path train/test candidate count does not reconcile")
+          if len({(row["source_family_id"], row["target_family_id"]) for row in path_pairs}) != len(path_pairs):
+              raise ValueError("duplicate artifact-path candidate family pairs")
+          if any(row["candidate_relation"] != "artifact_path_similarity_only" or row["candidate_status"] != "unreviewed" for row in path_pairs):
+              raise ValueError("artifact-path similarity was incorrectly upgraded to a reviewed leakage decision")
+          if any(not row["source_matching_paths"] or not row["target_matching_paths"] or not row["shared_path_tokens"] or not row["rare_shared_path_tokens"] for row in path_pairs):
+              raise ValueError("artifact-path candidate lacks traceable path/token evidence")
 
           fixture = json.loads((root / "fixtures/family-leakage-edges.synthetic.json").read_text())
           edge_validator.validate(fixture)
@@ -253,7 +275,7 @@ jobs:
           else:
               raise ValueError("report schema allowed an incomplete inventory to claim no cross-split leakage")
 
-          print("PITB_FAMILY_LEAKAGE_SCHEMA_PASS: " + str(len(pairs)) + " deterministic title candidates; incomplete inventory fail-closed; synthetic quarantine controls verified")
+          print("PITB_FAMILY_LEAKAGE_SCHEMA_PASS: " + str(len(pairs)) + " title candidates, " + str(len(path_pairs)) + " artifact-path candidates; both deterministic; incomplete inventory fail-closed; synthetic quarantine controls verified")
           PY
 
       - name: Validate counterfactual mutation qualification schema and controls
