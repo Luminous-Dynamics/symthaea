@@ -149,6 +149,16 @@ pub fn interpolate_snapshots(
         thought_vector.push(lerp_f32(a.thought_vector[i], b.thought_vector[i]));
     }
 
+    // Prediction error is interpolated only when both endpoints contain
+    // valid evidence; missingness must not become a synthetic low-error sample.
+    let prediction_error_sample = match (
+        a.prediction_error_sample(),
+        b.prediction_error_sample(),
+    ) {
+        (Some(a_error), Some(b_error)) => Some(lerp_f32(a_error, b_error)),
+        _ => None,
+    };
+
     // Interpolate Betti numbers (round to nearest integer)
     let betti_0 = (a.betti_0 as f32 + (b.betti_0 as f32 - a.betti_0 as f32) * s).round() as usize;
     let betti_1 = (a.betti_1 as f32 + (b.betti_1 as f32 - a.betti_1 as f32) * s).round() as usize;
@@ -156,7 +166,8 @@ pub fn interpolate_snapshots(
 
     CognitiveSnapshot {
         consciousness_level: lerp_f64(a.consciousness_level, b.consciousness_level),
-        prediction_error: lerp_f32(a.prediction_error, b.prediction_error),
+        prediction_error: prediction_error_sample.unwrap_or(0.0),
+        prediction_error_valid: prediction_error_sample.is_some(),
         living_mind_vitality: lerp_f64(a.living_mind_vitality, b.living_mind_vitality),
         living_mind_coherence: lerp_f64(a.living_mind_coherence, b.living_mind_coherence),
         dopamine: lerp_f32(a.dopamine, b.dopamine),
