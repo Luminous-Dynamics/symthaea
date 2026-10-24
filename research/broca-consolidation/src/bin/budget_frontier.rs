@@ -291,6 +291,13 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     if !valid_sha(&sha) { return Err("--source-sha must be 40 hexadecimal characters".to_string()); }
     if !(30..=1000).contains(&candidates) { return Err("--candidates must be in 30..=1000".to_string()); }
 
+    for args in [&["diff", "--quiet"][..], &["diff", "--cached", "--quiet"][..]] {
+        let check = Command::new("git").args(args).status()
+            .map_err(|e| format!("cannot run git diff check: {e}"))?;
+        if !check.success() {
+            return Err("refusing to run with tracked working-tree changes; commit or revert them first".to_string());
+        }
+    }
     let actual = Command::new("git").args(["rev-parse", "HEAD"]).output()
         .map_err(|e| format!("cannot run git rev-parse HEAD: {e}"))?;
     if !actual.status.success() { return Err("git rev-parse HEAD failed".to_string()); }
