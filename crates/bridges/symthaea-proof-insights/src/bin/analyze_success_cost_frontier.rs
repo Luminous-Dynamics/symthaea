@@ -836,7 +836,11 @@ fn bootstrap_paired_delta(
             estimates.push(delta_sum as f64 / target_count as f64);
         }
     }
-    percentile_interval(estimates)
+    let interval = percentile_interval(estimates)?;
+    // A zero-width bootstrap interval carries no empirical resolution. Keep this
+    // fail-closed so the power planner and the confirmatory scorekeeper share
+    // the same behavior for degenerate resamples.
+    (interval[1] - interval[0] > f64::EPSILON).then_some(interval)
 }
 
 fn percentile_interval(mut samples: Vec<f64>) -> Option<[f64; 2]> {
@@ -1044,6 +1048,17 @@ mod tests {
             bootstrap_paired_delta(&groups, 1_000, 99)
         );
         assert!(bootstrap_paired_delta(&groups, 1_000, 99).is_some());
+    }
+
+    #[test]
+    fn paired_bootstrap_suppresses_degenerate_interval() {
+        let groups = BTreeMap::from([
+            ("a".to_owned(), (2i64, 2usize)),
+            ("b".to_owned(), (3i64, 3usize)),
+            ("c".to_owned(), (1i64, 1usize)),
+        ]);
+        // Every target has the same paired delta, so all resamples are identical.
+        assert_eq!(bootstrap_paired_delta(&groups, 1_000, 99), None);
     }
 
     #[test]
