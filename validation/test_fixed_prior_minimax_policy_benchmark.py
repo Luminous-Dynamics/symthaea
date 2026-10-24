@@ -44,7 +44,7 @@ class FixedPriorMinimaxFrontierTests(unittest.TestCase):
         self.assertEqual(len(result["rows"]), 20)
         self.assertTrue(all(math.isfinite(r["selected_policy_cross_entropy_bits"]) for r in result["rows"]))
 
-    def test_horizon_two_frontier_dominates_deterministic_baseline_worst_case(self):
+    def test_horizon_two_frontier_minimizes_worst_case_against_baselines(self):
         result = run_benchmark(2, ("uniform", "high_spill_biased"),
                                ("uniform", "chain_biased"), ("joint",))
         rows = result["rows"]
@@ -52,11 +52,11 @@ class FixedPriorMinimaxFrontierTests(unittest.TestCase):
             for horizon in (1, 2):
                 subset = [r for r in rows if r["learner_prior"] == learner and r["horizon"] == horizon]
                 robust = next(r for r in subset if r["policy"] == "fixed_prior_minimax_frontier")
-                for baseline in ("robust_minimax_one_step", "greedy_joint", "round_robin"):
+                for baseline in ("robust_minimax_one_step", "greedy_joint", "round_robin", "random_uniform"):
                     vals = [r["selected_policy_cross_entropy_bits"] for r in subset if r["policy"] == baseline]
                     self.assertLessEqual(robust["worst_case_cross_entropy_bits"], max(vals) + 1e-8)
 
-    def test_frontier_does_not_use_true_prior_as_policy_input(self):
+    def test_frontier_does_not_accept_true_prior_as_an_action_input(self):
         _, _, best, _ = make_frontier_solver("joint", ("uniform", "high_spill_biased"))
         p = tuple(build_prior("uniform"))
         self.assertEqual(best(p, 2), best(p, 2))
