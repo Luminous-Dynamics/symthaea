@@ -146,6 +146,15 @@ pub struct CounterfactualUtilityScore {
     pub detector_dominated_by_no_adapt: bool,
     /// Resource units spent per total task-loss unit reduced; absent when there is no gain.
     pub adaptation_cost_units_per_task_loss_unit_reduced: Option<f64>,
+    /// Provenance fields are populated only when the scorer is invoked with a validated replay receipt.
+    #[serde(default)]
+    pub source_replay_receipt_sha256: Option<String>,
+    #[serde(default)]
+    pub source_replay_receipt_validation_sha256: Option<String>,
+    #[serde(default)]
+    pub source_replay_run_id: Option<String>,
+    #[serde(default)]
+    pub source_replay_run_kind: Option<String>,
     pub interpretation_guard: String,
 }
 
@@ -155,6 +164,66 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<CounterfactualUtilityScore> 
     let input: CounterfactualUtilityInput = serde_json::from_slice(&bytes)
         .with_context(|| format!("parsing counterfactual utility input {}", path.display()))?;
     score_counterfactual_utility(input)
+}
+
+/// Score outcomes and bind the result to a replay receipt that is independently revalidated here.
+pub fn evaluate_file_with_receipt(
+    input_path: &Path,
+    receipt_path: &Path,
+) -> anyhow::Result<CounterfactualUtilityScore> {
+    let mut score = evaluate_file(input_path)?;
+    let bytes = fs::read(receipt_path)
+        .with_context(|| format!("reading replay receipt {}", receipt_path.display()))?;
+    let receipt: crate::cognitive_replay_receipt::ReplayReceipt =
+        serde_json::from_slice(&bytes)
+            .with_context(|| format!("parsing replay receipt {}", receipt_path.display()))?;
+    bind_replay_receipt(&mut score, receipt)?;
+    Ok(score)
+}
+
+/// Verify the raw receipt and its identity/configuration join before recording its digests.
+/// The resulting digest commits to both the score and the validated receipt linkage.
+fn bind_replay_receipt(
+    score: &mut CounterfactualUtilityScore,
+    receipt: crate::cognitive_replay_receipt::ReplayReceipt,
+) -> anyhow::Result<()> {
+    let validation = crate::cognitive_replay_receipt::validate_receipt(receipt.clone())?;
+    ensure!(score.dataset_id == receipt.dataset_id,
+        "replay receipt dataset_id differs from adaptation score");
+    ensure!(score.stream_id == receipt.stream_id,
+        "replay receipt stream_id differs from adaptation score");
+    ensure!(score.seed == receipt.environment_seed,
+        "replay receipt environment_seed differs from adaptation score seed");
+    ensure!(score.shared_stream_sha256 == receipt.event_ledger_sha256,
+        "replay receipt event_ledger_sha256 differs from the scored shared stream digest");
+
+    let receipt_arms: std::collections::BTreeMap<&str, &crate::cognitive_replay_receipt::ReplayArm> =
+        receipt.arms.iter().map(|arm| (arm.arm_id.as_str(), arm)).collect();
+    for arm in [
+        &score.no_adapt,
+        &score.detector_triggered,
+        &score.detector_benefit_gated,
+        &score.staged_verify_rollback,
+        &score.oracle_timed,
+    ] {
+        let source = receipt_arms.get(arm.name.as_str())
+            .with_context(|| format!("validated replay receipt is missing arm {}", arm.name))?;
+        ensure!(arm.repository_head_sha == source.repository_head_sha,
+            "replay receipt policy revision differs for arm {}", arm.name);
+        ensure!(arm.configuration_digest == source.configuration_digest,
+            "replay receipt policy configuration differs for arm {}", arm.name);
+        ensure!(arm.exogenous_stream_sha256 == receipt.event_ledger_sha256,
+            "scored stream digest differs from the validated event ledger for arm {}", arm.name);
+    }
+
+    score.source_replay_receipt_sha256 = Some(validation.canonical_receipt_sha256);
+    score.source_replay_receipt_validation_sha256 = Some(
+        validation.result_sha256.context("receipt validator omitted result_sha256")?
+    );
+    score.source_replay_run_id = Some(receipt.run_id);
+    score.source_replay_run_kind = Some(receipt.run_kind);
+    score.result_sha256 = Some(result_digest(score)?);
+    Ok(())
 }
 
 pub fn score_counterfactual_utility(
@@ -347,7 +416,11 @@ pub fn score_counterfactual_utility(
         staged_dominated_by_no_adapt,
         detector_dominated_by_no_adapt,
         adaptation_cost_units_per_task_loss_unit_reduced,
-        interpretation_guard: "Counterfactual task-loss and resource-cost results only; oracle-timed is a ground-truth-timing reference, not a deployable detector. Shared-stream digest and paired arms do not by themselves prove identical hidden state or implementation correctness. Do not collapse metrics into a composite score without a preregistered cost conversion.".to_owned(),
+        source_replay_receipt_sha256: None,
+        source_replay_receipt_validation_sha256: None,
+        source_replay_run_id: None,
+        source_replay_run_kind: None,
+        interpretation_guard: "Counterfactual task-loss and resource-cost results only; oracle-timed is a ground-truth-timing reference, not a deployable detector. Shared-stream digest and paired arms do not by themselves prove identical hidden state or implementation correctness. Receipt linkage checks artifact identity and consistency, not honest execution. Do not collapse metrics into a composite score without a preregistered cost conversion.".to_owned(),
     };
     result.result_sha256 = Some(result_digest(&result)?);
     Ok(result)
