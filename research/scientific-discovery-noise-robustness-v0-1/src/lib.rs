@@ -259,8 +259,8 @@ impl DeterministicRng {
 
     /// A representable number strictly between zero and one.
     fn unit(&mut self) -> f64 {
-        let bits = self.next_u64() >> 11;
-        (bits as f64 + 0.5) / ((1_u64 << 53) as f64)
+        let bits = self.next_u64() >> 12;
+        (bits as f64 + 1.0) / (((1_u64 << 52) + 1) as f64)
     }
 
     fn standard_normal(&mut self) -> f64 {
@@ -327,18 +327,18 @@ impl NoiseProcess {
             NoiseModel::StudentTHeavyTail {
                 scale,
                 degrees_of_freedom,
-            } => self.sample_student_t(*degrees_of_freedom) * scale,
+            } => Self::sample_student_t(&mut self.rng, *degrees_of_freedom) * *scale,
             NoiseModel::ContaminationOutliers {
                 sigma,
                 contamination_probability,
                 outlier_scale,
             } => {
                 let multiplier = if self.rng.unit() < *contamination_probability {
-                    outlier_scale
+                    *outlier_scale
                 } else {
-                    &1.0
+                    1.0
                 };
-                self.rng.standard_normal() * sigma * multiplier
+                self.rng.standard_normal() * *sigma * multiplier
             }
             NoiseModel::Ar1Residuals {
                 stationary_sigma,
@@ -346,10 +346,10 @@ impl NoiseProcess {
             } => {
                 let previous = match self.previous_ar_residual {
                     Some(value) => value,
-                    None => self.rng.standard_normal() * stationary_sigma,
+                    None => self.rng.standard_normal() * *stationary_sigma,
                 };
-                let innovation_scale = stationary_sigma * (1.0 - phi * phi).sqrt();
-                let current = phi * previous + innovation_scale * self.rng.standard_normal();
+                let innovation_scale = *stationary_sigma * (1.0 - *phi * *phi).sqrt();
+                let current = *phi * previous + innovation_scale * self.rng.standard_normal();
                 self.previous_ar_residual = Some(current);
                 current
             }
@@ -362,7 +362,7 @@ impl NoiseProcess {
                 if self.rng.unit() < *missing_probability {
                     return Ok(Observation::Missing);
                 }
-                let raw = latent_mean + sigma * self.rng.standard_normal();
+                let raw = latent_mean + *sigma * self.rng.standard_normal();
                 if !raw.is_finite() {
                     return Err(NoiseError::NonFiniteOutput);
                 }
@@ -388,7 +388,7 @@ impl NoiseProcess {
                 } else {
                     sigma_after
                 };
-                self.rng.standard_normal() * scale
+                self.rng.standard_normal() * *scale
             }
         };
 
@@ -399,11 +399,11 @@ impl NoiseProcess {
         Ok(Observation::Observed(observed))
     }
 
-    fn sample_student_t(&mut self, degrees_of_freedom: u16) -> f64 {
-        let numerator = self.rng.standard_normal();
+    fn sample_student_t(rng: &mut DeterministicRng, degrees_of_freedom: u16) -> f64 {
+        let numerator = rng.standard_normal();
         let mut chi_square = 0.0;
         for _ in 0..degrees_of_freedom {
-            let draw = self.rng.standard_normal();
+            let draw = rng.standard_normal();
             chi_square += draw * draw;
         }
         let denominator = (chi_square / f64::from(degrees_of_freedom))
@@ -606,8 +606,10 @@ mod tests {
             process.observe(f64::NAN, 0.0, 0).unwrap_err(),
             NoiseError::NonFiniteInput
         );
+        let mut overflow =
+            NoiseProcess::new(NoiseModel::GaussianHomoscedastic { sigma: f64::MAX }, 123).unwrap();
         assert_eq!(
-            process.observe(f64::MAX, 0.0, 1).unwrap_err(),
+            overflow.observe(f64::MAX, 0.0, 1).unwrap_err(),
             NoiseError::NonFiniteOutput
         );
     }
