@@ -10,7 +10,9 @@
 const PROBABILITY_SCALE: u16 = 1_000;
 const FAMILYWISE_ALPHA: f64 = 0.05;
 const SIMULTANEOUS_CELL_TAIL_ALPHA: f64 = FAMILYWISE_ALPHA / 18.0;
-const MAX_EXACT_F64_INTEGER: u64 = (1_u64 << 53) - 1;
+// Bound inversion and exact-enumeration runtime; larger samples require a separately
+// qualified asymptotic or high-precision implementation rather than unbounded loops.
+const MAX_SUPPORTED_TRIALS_PER_CLASS: u64 = 1_000_000;
 const EPSILON: f64 = 1.0e-9;
 const PRIOR_WEIGHTS: [u64; 3] = [6, 3, 1];
 const DECISION_LOSSES: [[u32; 3]; 2] = [[0, 100, 100], [4, 4, 4]];
@@ -123,7 +125,7 @@ fn binomial_lower_tail(total: u64, successes: u64, probability: f64) -> f64 {
 /// The endpoints are found by inverting exact binomial tail probabilities. Outward per-mille
 /// rounding expands rather than narrows the interval, preserving its coverage guarantee.
 fn clopper_pearson_cell_interval(successes: u64, total: u64) -> Option<Interval> {
-    if total == 0 || successes > total || total > MAX_EXACT_F64_INTEGER {
+    if total == 0 || successes > total || total > MAX_SUPPORTED_TRIALS_PER_CLASS {
         return None;
     }
 
@@ -206,7 +208,7 @@ fn confusion_intervals(counts: [[u64; 3]; 3]) -> Option<[[Interval; 3]; 3]> {
     let mut regions = [[empty; 3]; 3];
     for (class_index, row) in counts.iter().enumerate() {
         let total = row.iter().try_fold(0_u64, |sum, count| sum.checked_add(*count))?;
-        if total == 0 || total > MAX_EXACT_F64_INTEGER {
+        if total == 0 || total > MAX_SUPPORTED_TRIALS_PER_CLASS {
             return None;
         }
         for (outcome_index, count) in row.iter().enumerate() {
@@ -516,7 +518,7 @@ fn assumed_sensor() -> [[u16; 3]; 3] {
 }
 
 fn wilson_cell_interval_negative_control(successes: u64, total: u64) -> Option<Interval> {
-    if total == 0 || successes > total {
+    if total == 0 || successes > total || total > MAX_SUPPORTED_TRIALS_PER_CLASS {
         return None;
     }
     let z: f64 = 2.772_921_294_608_662;
@@ -1039,6 +1041,8 @@ fn malformed_counts_assumptions_and_costs_fail_closed() {
         confusion_intervals([[u64::MAX, 1, 0], [1, 1, 1], [1, 1, 1]]),
         None
     );
+    assert_eq!(clopper_pearson_cell_interval(1, 1_000_001), None);
+    assert_eq!(wilson_cell_interval_negative_control(1, 1_000_001), None);
     let malformed_assumed = [[900, 50, 0], [50, 950, 0], [50, 950, 0]];
     assert_eq!(
         robust_net_value(
