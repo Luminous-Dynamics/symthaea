@@ -457,7 +457,7 @@ impl AllInBudgetLedger {
         for (decision_id, record) in &self.decisions {
             let _ = writeln!(
                 out,
-                "DECISION\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "DECISION\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 decision_id,
                 record.decision_state.label(),
                 record.action_state.label(),
