@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "manifest_id": "H1-FIT-REPEATABILITY-PLAN-001",
+  "data_status": "planned",
+  "created_at": "2026-10-17T16:35:00Z",
+  "product": {
+    "kind": "headphone",
+    "brand": "Luminous Dynamics",
+    "model": "H1 reference headphone planned prototype",
+    "hardware_revision": "not-built",
+    "condition": "not_yet_built"
+  },
+  "build": {
+    "build_id": "H1-PLAN-001",
+    "source_revision": "not-built"
+  },
+  "protocol": {
+    "protocol_id": "H1-FIT-REPEATABILITY-DRAFT",
+    "version": "0.1.0",
+    "measurement_type": "headphone_fit_sensitivity",
+    "declared_standards": [
+      "IEC 60268-7:2025 (reference only; no compliance claim)"
+    ],
+    "settings": {
+      "target": "freeze before confirmatory testing",
+      "captures_per_channel": "pilot plan; determine final count after fixture repeatability pilot",
+      "output_rule": "retain individual captures and fit labels; do not average distinct seal states into one curve"
+    }
+  },
+  "decision": {
+    "disposition": "not_evaluated",
+    "explanation": "Planning example only; no hardware or measurement data is represented."
+  },
+  "limitations": [
+    "Planning template only: no prototype has been built or measured.",
+    "Fixture, instrumentation, calibration and final acceptance thresholds remain to be selected or frozen.",
+    "No standards compliance or competitive superiority claim is made."
+  ]
+}
