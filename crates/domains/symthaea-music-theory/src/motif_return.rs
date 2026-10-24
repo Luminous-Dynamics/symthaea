@@ -836,8 +836,11 @@ mod tests {
             // Negative 9: a longer target that embeds the source is not a
             // fragment of the shorter source (wrong direction).
             let mut longer_target = Vec::with_capacity(length + 1);
-            longer_target.push(note(50, -1, Duration::quarter()));
-            longer_target.extend(source.iter().copied());
+            longer_target.push(note(50, 0, Duration::quarter()));
+            longer_target.extend(source.iter().enumerate().map(|(index, mut event)| {
+                event.onset = Duration::new(index as i64 + 1, 1);
+                event
+            }));
             let wrong_direction = compare_melodic_sequences(
                 &source,
                 &longer_target,
