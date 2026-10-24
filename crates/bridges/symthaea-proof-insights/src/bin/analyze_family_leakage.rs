@@ -349,9 +349,13 @@ fn analyze(doc: &Value, inv: &Inventory) -> Result<Report> {
             _ => {}
         }
         if edge.assessment_status != "dismissed" {
-            adjacency.entry(edge.source_family_id.clone()).or_default()
+            adjacency
+                .entry(edge.source_family_id.clone())
+                .or_default()
                 .insert(edge.target_family_id.clone());
-            adjacency.entry(edge.target_family_id.clone()).or_default()
+            adjacency
+                .entry(edge.target_family_id.clone())
+                .or_default()
                 .insert(edge.source_family_id.clone());
         }
     }
@@ -380,24 +384,32 @@ fn analyze(doc: &Value, inv: &Inventory) -> Result<Report> {
             }
         }
 
-        let split_names: BTreeSet<String> =
-            ids.iter().map(|id| splits[id].clone()).collect();
+        let split_names: BTreeSet<String> = ids.iter().map(|id| splits[id].clone()).collect();
         if split_names.len() < 2 {
             continue;
         }
-        let related: Vec<&Edge> = inv.edges.iter().filter(|edge| {
-            hard_relation(&edge.relation_kind)
-                && edge.assessment_status != "dismissed"
-                && ids.contains(&edge.source_family_id)
-                && ids.contains(&edge.target_family_id)
-        }).collect();
-        let edge_ids: BTreeSet<String> = related.iter().map(|edge| edge.edge_id.clone()).collect();
-        let confirmed: BTreeSet<String> = related.iter()
+        let related: Vec<&Edge> = inv
+            .edges
+            .iter()
+            .filter(|edge| {
+                hard_relation(&edge.relation_kind)
+                    && edge.assessment_status != "dismissed"
+                    && ids.contains(&edge.source_family_id)
+                    && ids.contains(&edge.target_family_id)
+            })
+            .collect();
+        let edge_ids: BTreeSet<String> =
+            related.iter().map(|edge| edge.edge_id.clone()).collect();
+        let confirmed: BTreeSet<String> = related
+            .iter()
             .filter(|edge| edge.assessment_status == "confirmed")
-            .map(|edge| edge.edge_id.clone()).collect();
-        let unresolved: BTreeSet<String> = related.iter()
+            .map(|edge| edge.edge_id.clone())
+            .collect();
+        let unresolved: BTreeSet<String> = related
+            .iter()
             .filter(|edge| edge.assessment_status == "unresolved")
-            .map(|edge| edge.edge_id.clone()).collect();
+            .map(|edge| edge.edge_id.clone())
+            .collect();
         for id in &ids {
             quarantine.entry(id.clone()).or_default().extend(edge_ids.iter().cloned());
         }
@@ -419,11 +431,14 @@ fn analyze(doc: &Value, inv: &Inventory) -> Result<Report> {
         validation: original.validation.saturating_sub(removed.validation),
         test: original.test.saturating_sub(removed.test),
     };
-    let quarantined_families = quarantine_ids.iter().map(|id| QuarantinedFamily {
-        family_id: id.clone(),
-        split: splits[id].clone(),
-        reason_edge_ids: quarantine[id].iter().cloned().collect(),
-    }).collect();
+    let quarantined_families = quarantine_ids
+        .iter()
+        .map(|id| QuarantinedFamily {
+            family_id: id.clone(),
+            split: splits[id].clone(),
+            reason_edge_ids: quarantine[id].iter().cloned().collect(),
+        })
+        .collect();
 
     let status = if inv.coverage_status == "incomplete" {
         "not_certified_incomplete_inventory"
@@ -456,10 +471,12 @@ fn main() -> Result<()> {
     }
     let split: Value = serde_json::from_slice(
         &fs::read(&args[0]).with_context(|| format!("cannot read {}", args[0]))?,
-    ).context("split manifest is not valid JSON")?;
+    )
+    .context("split manifest is not valid JSON")?;
     let inventory: Inventory = serde_json::from_slice(
         &fs::read(&args[1]).with_context(|| format!("cannot read {}", args[1]))?,
-    ).context("relationship inventory is not valid JSON or violates the strict Rust shape")?;
+    )
+    .context("relationship inventory is not valid JSON or violates the strict Rust shape")?;
     let report = analyze(&split, &inventory)?;
     fs::write(&args[2], serde_json::to_vec_pretty(&report)?)
         .with_context(|| format!("cannot write {}", args[2]))?;
