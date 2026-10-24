@@ -40,6 +40,8 @@ pub struct MemoryManager {
     /// Cycles since last consolidation
     cycles_since_consolidation: u32,
     /// Exactly-once admission cursor for PE-driven pressure.
+    /// Restore this cursor only with the same monotonic cycle-number namespace;
+    /// a fresh cognitive session must begin with a fresh manager/cursor.
     prediction_error_cursor: PredictionEvidenceCursor,
 }
 
@@ -186,20 +188,67 @@ impl CognitiveSubsystem for MemoryManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(32);
+        // Keep the first nine bytes compatible with legacy checkpoints.
+        // The extension preserves idempotency within the same logical cycle
+        // namespace. A fresh session must start from a fresh manager/cursor.
+        let mut data = Vec::with_capacity(23);
         data.extend_from_slice(&self.consolidation_pressure.to_le_bytes());
         data.extend_from_slice(&self.cycles_since_consolidation.to_le_bytes());
         data.push(self.consolidation_active as u8);
+        data.extend_from_slice(b"PEVC");
+        data.push(1); // extension version
+        let last_cycle = self
+            .prediction_error_cursor
+            .last_admitted_observation_cycle();
+        data.push(u8::from(last_cycle.is_some()));
+        data.extend_from_slice(&last_cycle.unwrap_or_default().to_le_bytes());
         data
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
-        if data.len() < 9 {
+        if data.len() != 9 && data.len() != 23 {
             return Err(format!(
-                "MemoryManager checkpoint too short: {} < 9",
+                "MemoryManager checkpoint has unsupported length: {}",
                 data.len()
             ));
         }
+
+        // Validate the optional extension before mutating manager state. Old
+        // nine-byte checkpoints contain no cursor, so restore fails closed by
+        // resetting the cursor rather than retaining state from this instance.
+        let restored_cursor = if data.len() == 9 {
+            None
+        } else {
+            if &data[9..13] != b"PEVC" {
+                return Err("MemoryManager: invalid PE cursor checkpoint magic".to_string());
+            }
+            if data[13] != 1 {
+                return Err(format!(
+                    "MemoryManager: unsupported PE cursor checkpoint version {}",
+                    data[13]
+                ));
+            }
+            let has_cycle = data[14];
+            if has_cycle > 1 {
+                return Err("MemoryManager: invalid PE cursor presence flag".to_string());
+            }
+            let cycle = u64::from_le_bytes(
+                data[15..23]
+                    .try_into()
+                    .map_err(|_| "MemoryManager: corrupt PE cursor checkpoint bytes".to_string())?,
+            );
+            match has_cycle {
+                1 => Some(cycle),
+                0 if cycle == 0 => None,
+                0 => {
+                    return Err(
+                        "MemoryManager: absent PE cursor must encode cycle zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            }
+        };
+
         self.consolidation_pressure = f32::from_le_bytes(
             data[0..4]
                 .try_into()
@@ -211,6 +260,8 @@ impl CognitiveSubsystem for MemoryManager {
                 .map_err(|_| "MemoryManager: corrupt checkpoint bytes [4..8]".to_string())?,
         );
         self.consolidation_active = data[8] != 0;
+        self.prediction_error_cursor
+            .restore_last_admitted_observation_cycle(restored_cursor);
         Ok(())
     }
 }
@@ -376,5 +427,90 @@ mod tests {
         assert!((mm2.consolidation_pressure - 0.65).abs() < 1e-6);
         assert_eq!(mm2.cycles_since_consolidation, 42);
         assert!(mm2.consolidation_active);
+    }
+
+    #[test]
+    fn checkpoint_roundtrip_preserves_prediction_error_idempotency() {
+        let mut original = MemoryManager::default();
+        let valid = CycleSnapshot {
+            cycle_number: 77,
+            prediction_error: 0.8,
+            prediction_error_valid: 1,
+            ..Default::default()
+        };
+        original.process(&valid);
+        let data = original.checkpoint();
+
+        let mut restored = MemoryManager::default();
+        restored.restore(&data).unwrap();
+        assert_eq!(
+            restored
+                .prediction_error_cursor
+                .last_admitted_observation_cycle(),
+            Some(77)
+        );
+
+        let mut control = MemoryManager::default();
+        control.restore(&data).unwrap();
+        let mut invalid_retry = valid;
+        invalid_retry.prediction_error_valid = 0;
+
+        // Replaying an already-admitted observation must have the same PE
+        // effect as a missing sample; both still receive ordinary pressure decay.
+        restored.process(&valid);
+        control.process(&invalid_retry);
+        assert_eq!(
+            restored.consolidation_pressure(),
+            control.consolidation_pressure()
+        );
+
+        let next = CycleSnapshot {
+            cycle_number: 78,
+            prediction_error: 0.4,
+            prediction_error_valid: 1,
+            ..Default::default()
+        };
+        restored.process(&next);
+        control.process(&next);
+        assert_eq!(
+            restored.consolidation_pressure(),
+            control.consolidation_pressure()
+        );
+    }
+
+    #[test]
+    fn legacy_checkpoint_resets_unavailable_prediction_error_cursor() {
+        let mut original = MemoryManager::default();
+        let valid = CycleSnapshot {
+            cycle_number: 19,
+            prediction_error: 0.5,
+            prediction_error_valid: 1,
+            ..Default::default()
+        };
+        original.process(&valid);
+        let checkpoint = original.checkpoint();
+        let legacy = checkpoint[..9].to_vec();
+
+        let mut restored = MemoryManager::default();
+        assert_eq!(
+            restored.prediction_error_cursor.admit(999, Some(0.9)),
+            Some(0.9)
+        );
+        restored.restore(&legacy).unwrap();
+
+        assert_eq!(
+            restored
+                .prediction_error_cursor
+                .last_admitted_observation_cycle(),
+            None
+        );
+    }
+
+    #[test]
+    fn malformed_prediction_error_checkpoint_extension_is_rejected() {
+        let mut manager = MemoryManager::default();
+        let mut checkpoint = manager.checkpoint();
+        checkpoint[9] = b'X';
+        assert!(manager.restore(&checkpoint).is_err());
     }
 }
