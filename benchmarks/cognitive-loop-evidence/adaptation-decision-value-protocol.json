@@ -6,7 +6,8 @@
   "depends_on": {
     "benchmark_manifest": "benchmarks/cognitive-loop-evidence/scenarios.json",
     "design_document": "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md",
-    "counterfactual_summary_command": "score-counterfactual-adaptation-utility"
+    "counterfactual_summary_command": "score-counterfactual-adaptation-utility",
+    "panel_aggregation_command": "compare-cognitive-adaptation-panel"
   },
   "claim_guards": [
     "Detector accuracy is not evidence of adaptation utility.",
@@ -356,5 +357,40 @@
       "rule": "Each scored five-arm panel declares exactly one track. Never pool or directly compare scores from different access tracks in one confirmatory effect.",
       "validation": "Unknown tracks fail closed."
     }
+  },
+  "panel_aggregation": {
+    "command": "compare-cognitive-adaptation-panel",
+    "input_artifact": "array of counterfactual-adaptation-utility-v2 result records",
+    "complete_grid": {
+      "dataset_count": 7,
+      "seeds_per_dataset": 50,
+      "registered_scenario_ids": [
+        "class-prior-abrupt",
+        "class-prior-gradual",
+        "label-swap-abrupt",
+        "label-swap-gradual",
+        "feature-permutation-abrupt",
+        "feature-permutation-gradual",
+        "feature-filtering-abrupt",
+        "feature-filtering-gradual"
+      ],
+      "expected_cell_count": 2800,
+      "uniqueness_key": [
+        "dataset_id",
+        "seed",
+        "scenario_id"
+      ]
+    },
+    "integrity_checks": [
+      "Recompute every scored-record result_sha256 before using its values.",
+      "Require matching comparison_track, metric ID, and loss unit across all records.",
+      "Require the same source revision and version for each policy arm across the panel.",
+      "Permit per-dataset tuned configuration digests but require configuration stability across seeds/scenarios within each dataset.",
+      "Recompute the staged-versus-detector post-shift effect from the arm outcomes.",
+      "Reject duplicate or out-of-grid records."
+    ],
+    "incomplete_panel_behavior": "List missing dataset × seed × scenario cells, set complete_coverage_gate_pass=false, and emit primary_comparison=null. Do not calculate or display a confirmatory effect/interval for incomplete coverage.",
+    "complete_panel_behavior": "Call the existing hierarchical paired bootstrap with dataset resampling first, then seed resampling while preserving each seed's scenario block. Orient lower post-shift task loss as positive effect for the staged candidate.",
+    "caveat": "This aggregates scored summaries and verifies their declared integrity; it does not prove the underlying replay ran honestly or that summaries came from causal execution."
   }
 }
