@@ -26,6 +26,8 @@ pub struct CounterfactualUtilityInput {
     pub evaluation_windows: EvaluationWindows,
     pub no_adapt: CounterfactualArm,
     pub detector_triggered: CounterfactualArm,
+    pub detector_benefit_gated: CounterfactualArm,
+    pub staged_verify_rollback: CounterfactualArm,
     pub oracle_timed: CounterfactualArm,
 }
 
@@ -102,6 +104,8 @@ pub struct CounterfactualUtilityScore {
     pub task_loss_unit: String,
     pub no_adapt: ArmUtilityMetrics,
     pub detector_triggered: ArmUtilityMetrics,
+    pub detector_benefit_gated: ArmUtilityMetrics,
+    pub staged_verify_rollback: ArmUtilityMetrics,
     pub oracle_timed: ArmUtilityMetrics,
     /// Positive means detector-triggered adaptation lowers task loss vs no adaptation.
     pub detector_task_loss_improvement_vs_no_adapt: f64,
@@ -111,8 +115,18 @@ pub struct CounterfactualUtilityScore {
     pub detector_post_shift_task_loss_improvement_vs_no_adapt: f64,
     /// Positive means detector-triggered adaptation has more post-shift loss than oracle timing.
     pub detector_post_shift_task_loss_regret_vs_oracle_timed: f64,
+    /// Positive means staged verification lowers post-shift loss relative to detector-triggered adaptation.
+    pub staged_post_shift_task_loss_improvement_vs_detector_triggered: f64,
+    /// Positive means staged verification has more post-shift loss than oracle timing.
+    pub staged_post_shift_task_loss_regret_vs_oracle_timed: f64,
     /// Positive means the detector policy costs more resources than no adaptation.
     pub detector_adaptation_cost_delta_vs_no_adapt: f64,
+    /// Positive means staged verification costs more resources than detector-triggered adaptation.
+    pub staged_adaptation_cost_delta_vs_detector_triggered: f64,
+    /// True when staged verification is no better on post-shift loss and costs more than detector-triggered.
+    pub staged_dominated_by_detector_triggered: bool,
+    /// True when no adaptation is no worse on whole-stream loss and uses strictly fewer resources than staged policy.
+    pub staged_dominated_by_no_adapt: bool,
     /// True when no adaptation is no worse on task loss and uses strictly fewer resources.
     pub detector_dominated_by_no_adapt: bool,
     /// Resource units spent per total task-loss unit reduced; absent when there is no gain.
@@ -147,16 +161,28 @@ pub fn score_counterfactual_utility(
         "detector_triggered arm name must be 'detector-triggered'"
     );
     ensure!(
+        input.detector_benefit_gated.name == "detector-benefit-gated",
+        "detector_benefit_gated arm name must be 'detector-benefit-gated'"
+    );
+    ensure!(
+        input.staged_verify_rollback.name == "staged-verify-rollback",
+        "staged_verify_rollback arm name must be 'staged-verify-rollback'"
+    );
+    ensure!(
         input.oracle_timed.name == "oracle-timed",
         "oracle_timed arm name must be 'oracle-timed'"
     );
 
     validate_arm(&mut input.no_adapt, "no_adapt")?;
     validate_arm(&mut input.detector_triggered, "detector_triggered")?;
+    validate_arm(&mut input.detector_benefit_gated, "detector_benefit_gated")?;
+    validate_arm(&mut input.staged_verify_rollback, "staged_verify_rollback")?;
     validate_arm(&mut input.oracle_timed, "oracle_timed")?;
     for (arm, name) in [
         (&input.no_adapt, "no_adapt"),
         (&input.detector_triggered, "detector_triggered"),
+        (&input.detector_benefit_gated, "detector_benefit_gated"),
+        (&input.staged_verify_rollback, "staged_verify_rollback"),
         (&input.oracle_timed, "oracle_timed"),
     ] {
         ensure!(
@@ -169,14 +195,18 @@ pub fn score_counterfactual_utility(
     ensure!(cycle_count > 0, "counterfactual arms must contain at least one observation");
     ensure!(
         input.detector_triggered.observations.len() == cycle_count
+            && input.detector_benefit_gated.observations.len() == cycle_count
+            && input.staged_verify_rollback.observations.len() == cycle_count
             && input.oracle_timed.observations.len() == cycle_count,
-        "all counterfactual arms must cover the same number of cycles"
+        "all five counterfactual arms must cover the same number of cycles"
     );
     for index in 0..cycle_count {
         let expected = index as u64;
         ensure!(
             input.no_adapt.observations[index].cycle_index == expected
                 && input.detector_triggered.observations[index].cycle_index == expected
+                && input.detector_benefit_gated.observations[index].cycle_index == expected
+                && input.staged_verify_rollback.observations[index].cycle_index == expected
                 && input.oracle_timed.observations[index].cycle_index == expected,
             "counterfactual arms must share the same contiguous cycle panel starting at zero"
         );
@@ -190,6 +220,8 @@ pub fn score_counterfactual_utility(
     let canonical_input_sha256 = hex_sha256(&serde_json::to_vec(&input)?);
     let no_adapt = arm_metrics(&input.no_adapt, &input.evaluation_windows)?;
     let detector_triggered = arm_metrics(&input.detector_triggered, &input.evaluation_windows)?;
+    let detector_benefit_gated = arm_metrics(&input.detector_benefit_gated, &input.evaluation_windows)?;
+    let staged_verify_rollback = arm_metrics(&input.staged_verify_rollback, &input.evaluation_windows)?;
     let oracle_timed = arm_metrics(&input.oracle_timed, &input.evaluation_windows)?;
 
     let improvement = no_adapt.mean_task_loss - detector_triggered.mean_task_loss;
@@ -198,14 +230,23 @@ pub fn score_counterfactual_utility(
         no_adapt.post_shift_mean_task_loss - detector_triggered.post_shift_mean_task_loss;
     let post_shift_regret =
         detector_triggered.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
+    let staged_post_shift_improvement =
+        detector_triggered.post_shift_mean_task_loss - staged_verify_rollback.post_shift_mean_task_loss;
+    let staged_post_shift_regret =
+        staged_verify_rollback.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
     let cost_delta =
         detector_triggered.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
+    let staged_cost_delta =
+        staged_verify_rollback.total_adaptation_cost_units - detector_triggered.total_adaptation_cost_units;
     ensure!(
         improvement.is_finite()
             && regret.is_finite()
             && post_shift_improvement.is_finite()
             && post_shift_regret.is_finite()
-            && cost_delta.is_finite(),
+            && staged_post_shift_improvement.is_finite()
+            && staged_post_shift_regret.is_finite()
+            && cost_delta.is_finite()
+            && staged_cost_delta.is_finite(),
         "counterfactual metric calculation overflowed"
     );
 
@@ -236,12 +277,25 @@ pub fn score_counterfactual_utility(
         task_loss_unit: input.task_loss_unit,
         no_adapt,
         detector_triggered,
+        detector_benefit_gated,
+        staged_verify_rollback,
         oracle_timed,
         detector_task_loss_improvement_vs_no_adapt: improvement,
         detector_task_loss_regret_vs_oracle_timed: regret,
         detector_post_shift_task_loss_improvement_vs_no_adapt: post_shift_improvement,
         detector_post_shift_task_loss_regret_vs_oracle_timed: post_shift_regret,
+        staged_post_shift_task_loss_improvement_vs_detector_triggered: staged_post_shift_improvement,
+        staged_post_shift_task_loss_regret_vs_oracle_timed: staged_post_shift_regret,
         detector_adaptation_cost_delta_vs_no_adapt: cost_delta,
+        staged_adaptation_cost_delta_vs_detector_triggered: staged_cost_delta,
+        staged_dominated_by_detector_triggered: staged_verify_rollback.post_shift_mean_task_loss
+            >= detector_triggered.post_shift_mean_task_loss
+            && staged_verify_rollback.total_adaptation_cost_units
+                > detector_triggered.total_adaptation_cost_units,
+        staged_dominated_by_no_adapt: staged_verify_rollback.mean_task_loss
+            >= no_adapt.mean_task_loss
+            && staged_verify_rollback.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units,
         detector_dominated_by_no_adapt: detector_triggered.mean_task_loss
             >= no_adapt.mean_task_loss
             && detector_triggered.total_adaptation_cost_units
@@ -474,6 +528,16 @@ mod tests {
                 &[0.1, 0.4, 0.3, 0.3],
                 &[0.0, 0.2, 0.4, 0.1],
             ),
+            detector_benefit_gated: arm(
+                "detector-benefit-gated",
+                &[0.1, 0.45, 0.25, 0.25],
+                &[0.0, 0.1, 0.2, 0.05],
+            ),
+            staged_verify_rollback: arm(
+                "staged-verify-rollback",
+                &[0.1, 0.4, 0.2, 0.2],
+                &[0.0, 0.1, 0.1, 0.05],
+            ),
             oracle_timed: arm(
                 "oracle-timed",
                 &[0.1, 0.2, 0.2, 0.2],
@@ -497,6 +561,11 @@ mod tests {
         assert_eq!(result.detector_triggered.recovery_cycle, Some(2));
         assert_eq!(result.detector_triggered.recovery_delay_cycles, Some(1));
         assert_eq!(result.oracle_timed.recovery_cycle, Some(1));
+        assert!((result.staged_post_shift_task_loss_improvement_vs_detector_triggered - (1.0 / 15.0)).abs() < 1e-12);
+        assert!((result.staged_post_shift_task_loss_regret_vs_oracle_timed - (1.0 / 15.0)).abs() < 1e-12);
+        assert!((result.staged_verify_rollback.post_shift_mean_task_loss - (4.0 / 15.0)).abs() < 1e-12);
+        assert_eq!(result.staged_verify_rollback.recovery_cycle, Some(2));
+        assert!((result.staged_verify_rollback.total_adaptation_cost_units - 0.25).abs() < 1e-12);
         assert!((result.detector_triggered.total_adaptation_cost_units - 0.7).abs() < 1e-12);
         assert!(!result.detector_dominated_by_no_adapt);
         assert_eq!(result.result_sha256.as_ref().map(String::len), Some(64));
