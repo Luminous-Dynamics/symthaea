@@ -153,7 +153,8 @@
               "proof_sha256",
               "run_receipt_sha256",
               "resource_usage",
-              "budget_caps"
+              "budget_caps",
+              "semantic_gate"
             ],
             "properties": {
               "status": {
@@ -353,6 +354,241 @@
                     "type": "null"
                   }
                 ]
+              },
+              "semantic_gate": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "status",
+                      "checked_target_statement_sha256",
+                      "statement_correspondence",
+                      "axiom_policy",
+                      "successor_check",
+                      "mutation_controls"
+                    ],
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "passed",
+                          "failed",
+                          "unknown"
+                        ]
+                      },
+                      "checked_target_statement_sha256": {
+                        "$ref": "#/$defs/sha256"
+                      },
+                      "statement_correspondence": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "status",
+                          "independent_reviewer_count",
+                          "receipt_sha256"
+                        ],
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "matches_intended_claim",
+                              "mismatch",
+                              "unknown"
+                            ]
+                          },
+                          "independent_reviewer_count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "receipt_sha256": {
+                            "$ref": "#/$defs/sha256"
+                          }
+                        }
+                      },
+                      "axiom_policy": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "status",
+                          "policy_id",
+                          "receipt_sha256"
+                        ],
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "compliant",
+                              "violation",
+                              "unknown"
+                            ]
+                          },
+                          "policy_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "receipt_sha256": {
+                            "$ref": "#/$defs/sha256"
+                          }
+                        }
+                      },
+                      "successor_check": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "status",
+                          "receipt_sha256",
+                          "reason"
+                        ],
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "passed",
+                              "failed",
+                              "not_applicable",
+                              "unknown"
+                            ]
+                          },
+                          "receipt_sha256": {
+                            "$ref": "#/$defs/sha256"
+                          },
+                          "reason": {
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "allOf": [
+                          {
+                            "if": {
+                              "properties": {
+                                "status": {
+                                  "const": "not_applicable"
+                                }
+                              },
+                              "required": [
+                                "status"
+                              ]
+                            },
+                            "then": {
+                              "properties": {
+                                "reason": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "status": {
+                                  "enum": [
+                                    "passed",
+                                    "failed",
+                                    "unknown"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "status"
+                              ]
+                            },
+                            "then": {
+                              "properties": {
+                                "reason": {
+                                  "type": "null"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "mutation_controls": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "status",
+                          "suite_sha256",
+                          "receipt_sha256"
+                        ],
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "passed",
+                              "failed",
+                              "unknown"
+                            ]
+                          },
+                          "suite_sha256": {
+                            "$ref": "#/$defs/sha256"
+                          },
+                          "receipt_sha256": {
+                            "$ref": "#/$defs/sha256"
+                          }
+                        }
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "status": {
+                              "const": "passed"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        },
+                        "then": {
+                          "properties": {
+                            "statement_correspondence": {
+                              "properties": {
+                                "status": {
+                                  "const": "matches_intended_claim"
+                                },
+                                "independent_reviewer_count": {
+                                  "minimum": 2
+                                }
+                              }
+                            },
+                            "axiom_policy": {
+                              "properties": {
+                                "status": {
+                                  "const": "compliant"
+                                }
+                              }
+                            },
+                            "successor_check": {
+                              "properties": {
+                                "status": {
+                                  "enum": [
+                                    "passed",
+                                    "not_applicable"
+                                  ]
+                                }
+                              }
+                            },
+                            "mutation_controls": {
+                              "properties": {
+                                "status": {
+                                  "const": "passed"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             },
             "allOf": [
@@ -398,6 +634,9 @@
                     },
                     "budget_caps": {
                       "type": "null"
+                    },
+                    "semantic_gate": {
+                      "type": "null"
                     }
                   }
                 }
@@ -423,7 +662,8 @@
                     "run_receipt_sha256",
                     "resource_usage",
                     "applicability_judgment",
-                    "checked_target_statement_sha256"
+                    "checked_target_statement_sha256",
+                    "semantic_gate"
                   ],
                   "properties": {
                     "model": {
@@ -464,6 +704,9 @@
                     "checked_target_statement_sha256": {
                       "type": "string",
                       "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "semantic_gate": {
+                      "type": "object"
                     }
                   }
                 }
@@ -484,6 +727,9 @@
                     "proof_sha256": {
                       "type": "string",
                       "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "semantic_gate": {
+                      "type": "object"
                     }
                   }
                 }
