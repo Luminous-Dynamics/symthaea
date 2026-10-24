@@ -566,6 +566,72 @@ mod tests {
         assert!(cluster_bootstrap_ci(&[vec![1], vec![-1]], 1, 100).is_some());
     }
 
+    fn score_report_fixture(rows: &[(&str, &str)]) -> ScoreReport {
+        let tasks = rows
+            .iter()
+            .map(|(instance_id, outcome)| ScoreTask {
+                instance_id: (*instance_id).to_string(),
+                outcome: (*outcome).to_string(),
+            })
+            .collect::<Vec<_>>();
+        let success_count = tasks.iter().filter(|row| row.outcome == "pass").count();
+        let failure_count = tasks.iter().filter(|row| row.outcome == "fail").count();
+        let unresolved_count = tasks.iter().filter(|row| row.outcome == "unresolved").count();
+        let lockable = unresolved_count == 0;
+        ScoreReport {
+            format_version: REPORT_VERSION,
+            protocol_id: "test-protocol".to_string(),
+            task_manifest_sha256: "a".repeat(64),
+            candidate_jsonl_sha256: "b".repeat(64),
+            task_count: tasks.len(),
+            success_count,
+            failure_count,
+            unresolved_count,
+            lockable,
+            pass_at_1: if lockable {
+                Some(success_count as f64 / tasks.len() as f64)
+            } else {
+                None
+            },
+            tasks,
+        }
+    }
+
+    #[test]
+    fn score_index_rejects_top_level_counts_that_disagree_with_rows() {
+        let mut report = score_report_fixture(&[("one", "pass"), ("two", "fail")]);
+        report.success_count = 0;
+        let ids = BTreeSet::from(["one".to_string(), "two".to_string()]);
+        let error = score_index(
+            &report,
+            "arm_a",
+            &"a".repeat(64),
+            "test-protocol",
+            &"b".repeat(64),
+            &ids,
+        )
+        .unwrap_err();
+        assert!(error.contains("top-level outcome counts disagree"));
+    }
+
+    #[test]
+    fn unresolved_score_report_is_accepted_but_remains_non_lockable() {
+        let report = score_report_fixture(&[("one", "unresolved"), ("two", "pass")]);
+        let ids = BTreeSet::from(["one".to_string(), "two".to_string()]);
+        let indexed = score_index(
+            &report,
+            "arm_a",
+            &"a".repeat(64),
+            "test-protocol",
+            &"b".repeat(64),
+            &ids,
+        )
+        .unwrap();
+        assert_eq!(indexed.get("one"), Some(&Outcome::Unresolved));
+        assert!(!report.lockable);
+        assert_eq!(report.pass_at_1, None);
+    }
+
     #[test]
     fn percentile_uses_nearest_rank_index_deterministically() {
         assert_eq!(percentile(&[1.0, 2.0, 3.0, 4.0], 0.0), Some(1.0));
