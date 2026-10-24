@@ -92,7 +92,7 @@ fn main() {
             arousal: snapshot.arousal,
             valence: snapshot.valence,
             consciousness_level: snapshot.consciousness_level as f32,
-            prediction_error: snapshot.prediction_error,
+            prediction_error: snapshot.prediction_error_sample().unwrap_or(0.0),
         };
 
         let config = symthaea_muse::MuseConfig {
