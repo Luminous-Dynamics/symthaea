@@ -646,6 +646,23 @@ fn future_policy_risks_by_calibration_outcome(
 /// Conservative one-step calibration allocator. For each candidate class, maximizes expected
 /// future robust risk over every vertex of the declared predictive-row ambiguity polytope.
 /// A class is eligible only when its worst-case expected risk reduction is positive.
+fn worst_case_predictive_future_risk(
+    outcome_risks: [f64; 3],
+    predictive_row: [Interval; 3],
+) -> Option<f64> {
+    row_vertices(predictive_row)
+        .iter()
+        .map(|row| {
+            row.iter()
+                .zip(outcome_risks.iter())
+                .map(|(probability, risk)| {
+                    f64::from(*probability) * *risk / f64::from(PROBABILITY_SCALE)
+                })
+                .sum::<f64>()
+        })
+        .max_by(f64::total_cmp)
+}
+
 fn select_next_calibration_class_robust(
     counts: [[u64; 3]; 3],
     predictive_ambiguity: [[Interval; 3]; 3],
@@ -672,17 +689,8 @@ fn select_next_calibration_class_robust(
             decisions,
             actions,
         )?;
-        let worst_future_risk = predictive_vertices
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .zip(outcome_risks.iter())
-                    .map(|(probability, risk)| {
-                        f64::from(*probability) * *risk / f64::from(PROBABILITY_SCALE)
-                    })
-                    .sum::<f64>()
-            })
-            .max_by(f64::total_cmp)?;
+        let worst_future_risk =
+            worst_case_predictive_future_risk(outcome_risks, predictive_ambiguity[class_index])?;
         let worst_case_improvement = current_risk - worst_future_risk;
         if worst_case_improvement <= EPSILON {
             continue;
@@ -1068,6 +1076,42 @@ fn plug_in_allocator_can_increase_risk_when_its_predictive_row_is_misspecified()
     ).expect("chair has positive value for every plausible chair predictive row");
     assert_eq!(robust.0, 0);
     assert!((robust.1 - 0.02544).abs() <= EPSILON);
+}
+
+#[test]
+fn confidence_derived_predictive_ambiguity_abstains_when_calibration_is_insufficient() {
+    let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
+    let regions = confusion_intervals(counts).expect("valid calibration region");
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed policy");
+    let current_risk = worst_policy_risk_from_counts(
+        counts, PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid current risk");
+    assert!((current_risk - 15.5128).abs() <= EPSILON);
+
+    let expected_worst_future = [15.5348512, 15.7774144, 15.6010048];
+    for class_index in 0..3 {
+        let outcome_risks = future_policy_risks_by_calibration_outcome(
+            counts, class_index, PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+        ).expect("valid candidate class");
+        let worst_future = worst_case_predictive_future_risk(outcome_risks, regions[class_index])
+            .expect("nonempty confidence-derived predictive region");
+        assert!(
+            (worst_future - expected_worst_future[class_index]).abs() <= EPSILON,
+            "class {class_index}: expected {}, got {worst_future}",
+            expected_worst_future[class_index]
+        );
+        assert!(
+            worst_future >= current_risk,
+            "no class has a positive worst-case risk reduction with this small calibration set"
+        );
+    }
+    assert_eq!(
+        select_next_calibration_class_robust(
+            counts, regions, PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+        ),
+        None
+    );
 }
 
 #[test]
