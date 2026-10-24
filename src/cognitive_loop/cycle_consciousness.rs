@@ -1242,6 +1242,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+    use crate::cognitive_loop::types::PredictionErrorEvidence;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
@@ -1257,6 +1258,9 @@ mod tests {
             compressed_state,
             output,
             prediction_error: 0.2,
+            prediction_error_valid: true,
+            prediction_evidence: PredictionErrorEvidence::valid(0.2, None, 1)
+                .expect("finite fixture evidence"),
             coherence: 0.5,
             unified_psi: 0.3,
             phi_attention_weight: 0.5,
@@ -1337,6 +1341,8 @@ mod tests {
         state.unified_psi = 0.0;
         state.coherence = 0.0;
         state.prediction_error = 0.0;
+        state.prediction_evidence =
+            PredictionErrorEvidence::valid(0.0, None, 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
         let m = s.compute_consciousness_metrics(&state, &mut timings);
         assert!(m.primitive_psi.is_finite());
@@ -1352,6 +1358,8 @@ mod tests {
         let hv = symthaea_core::hdc::BinaryHV::random(7);
         let mut state = make_cycle_state(&compressed, &output, &hv, "high error");
         state.prediction_error = 1.0;
+        state.prediction_evidence =
+            PredictionErrorEvidence::valid(1.0, Some(0), 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
         let m = s.compute_consciousness_metrics(&state, &mut timings);
         assert!(m.dissipative_health.is_finite());
