@@ -20,6 +20,52 @@ fn parse_seed(value: &str) -> Result<u64, String> {
     }
 }
 
+
+fn json_escape(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 8);
+    for ch in value.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch <= '\u{001f}' => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch => out.push(ch),
+        }
+    }
+    out
+}
+
+fn json_string_array(values: &[String]) -> String {
+    let items = values.iter()
+        .map(|value| format!("\"{}\"", json_escape(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{items}]")
+}
+
+/// Structured failure receipt for a run that did not produce a graph.
+/// DIMACS stdout remains empty on failure; this JSON is emitted on stderr.
+fn failure_receipt_json(args: &[String], error: &str) -> String {
+    format!(
+        concat!(
+            "{{",
+            "\"schema\":\"org.luminousdynamics.symthaea.qcomp.random-regular-generation.v1\",",
+            "\"status\":\"failed\",",
+            "\"operation\":\"generate_simple_regular_graph\",",
+            "\"arguments\":{},",
+            "\"error\":\"{}\",",
+            "\"output_graph_emitted\":false,",
+            "\"limitations\":[\"failure receipt is not a generated workload\",",
+            "\"no graph bytes or SHA-256 are available for a failed generation\"]",
+            "}}"
+        ),
+        json_string_array(args),
+        json_escape(error)
+    )
+}
+
 fn run(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args.len() > 4 {
         return Err("expected VERTICES DEGREE SEED [MAX_ATTEMPTS]".to_owned());
@@ -67,7 +113,35 @@ fn main() -> ExitCode {
         Err(error) => {
             eprintln!("qcomp_rrg_generate: {error}");
             eprintln!("Usage: qcomp_rrg_generate VERTICES DEGREE SEED [MAX_ATTEMPTS]");
+            eprintln!("{}", failure_receipt_json(&args, &error));
             ExitCode::from(2)
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failure_receipt_is_valid_json_shaped_and_escapes_untrusted_arguments() {
+        let args = vec!["not-a-number".to_owned(), "3\n4".to_owned(), "seed\"value".to_owned()];
+        let receipt = failure_receipt_json(&args, "invalid value: \"bad\"\nnext line");
+        assert!(receipt.contains("\"status\":\"failed\""));
+        assert!(receipt.contains("\"output_graph_emitted\":false"));
+        assert!(receipt.contains("\"arguments\":[\"not-a-number\",\"3\\n4\",\"seed\\\"value\"]"));
+        assert!(receipt.contains("\"error\":\"invalid value: \\\"bad\\\"\\nnext line\""));
+    }
+
+    #[test]
+    fn retry_exhaustion_receipt_keeps_all_user_arguments() {
+        let args = vec!["6".to_owned(), "3".to_owned(), "1".to_owned(), "1".to_owned()];
+        let receipt = failure_receipt_json(
+            &args,
+            "no simple pairing found in 1 attempts (n=6, degree=3, seed=1)",
+        );
+        assert!(receipt.contains("\"arguments\":[\"6\",\"3\",\"1\",\"1\"]"));
+        assert!(receipt.contains("\"status\":\"failed\""));
     }
 }
