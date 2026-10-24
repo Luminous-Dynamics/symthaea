@@ -25,6 +25,7 @@ const DEFAULT_QUERIES: usize = 200;
 const DEFAULT_ROUNDS: usize = 5;
 const DEFAULT_TOP_K: usize = 10;
 const DEFAULT_NOISE_BITS: usize = 128;
+const DEFAULT_HARD_NOISE_BITS: usize = BinaryHV::DIM / 4;
 const DEFAULT_CLUSTERS: usize = 64;
 const DEFAULT_CLUSTER_NOISE_BITS: usize = 1_024;
 const DEFAULT_LSH_CONFIGS: &str = "32x8,16x16,64x4";
@@ -41,6 +42,7 @@ struct Config {
     rounds: usize,
     top_k: usize,
     noise_bits: usize,
+    hard_noise_bits: usize,
     seed: u64,
     candidate_multiplier: usize,
     fallback_on_empty: bool,
@@ -267,6 +269,7 @@ fn parse_args() -> Result<Config, String> {
         "rounds",
         "top-k",
         "noise-bits",
+        "hard-noise-bits",
         "seed",
         "candidate-multiplier",
         "fallback-on-empty",
@@ -304,6 +307,7 @@ fn parse_args() -> Result<Config, String> {
     let rounds = parse_value(&values, "rounds", DEFAULT_ROUNDS)?;
     let top_k = parse_value(&values, "top-k", DEFAULT_TOP_K)?;
     let noise_bits = parse_value(&values, "noise-bits", DEFAULT_NOISE_BITS)?;
+    let hard_noise_bits = parse_value(&values, "hard-noise-bits", DEFAULT_HARD_NOISE_BITS)?;
     let seed = parse_value(&values, "seed", DEFAULT_SEED)?;
     let candidate_multiplier = parse_value(&values, "candidate-multiplier", 4usize)?;
     let lsh_configs = parse_lsh_configs(
@@ -325,9 +329,9 @@ fn parse_args() -> Result<Config, String> {
     if clusters == 0 || clusters > size {
         return Err("--clusters must be positive and no greater than --size".into());
     }
-    if noise_bits > BinaryHV::DIM || cluster_noise_bits > BinaryHV::DIM {
+    if noise_bits > BinaryHV::DIM || hard_noise_bits > BinaryHV::DIM || cluster_noise_bits > BinaryHV::DIM {
         return Err(format!(
-            "--noise-bits and --cluster-noise-bits must be <= {}",
+            "--noise-bits, --hard-noise-bits and --cluster-noise-bits must be <= {}",
             BinaryHV::DIM
         ));
     }
@@ -344,6 +348,7 @@ fn parse_args() -> Result<Config, String> {
         rounds,
         top_k,
         noise_bits,
+        hard_noise_bits,
         seed,
         candidate_multiplier,
         fallback_on_empty,
@@ -433,10 +438,15 @@ fn build_queries(config: &Config, store: &HdcStore) -> Vec<Query> {
                 .get(anchor as u64)
                 .expect("generated corpus must contain the selected anchor ID");
             let start_bit = mix64(config.seed ^ query_index as u64) as usize % BinaryHV::DIM;
-            flip_distinct_bits(&mut vector, config.noise_bits, start_bit);
+            let (kind, noise_bits) = if query_index % 5 == 1 {
+                ("hard_neighbor", config.hard_noise_bits)
+            } else {
+                ("near_neighbor", config.noise_bits)
+            };
+            flip_distinct_bits(&mut vector, noise_bits, start_bit);
             queries.push(Query {
                 vector,
-                kind: "near_neighbor",
+                kind,
                 // Probes from a shared source cluster are not assumed independent.
                 group_id: (anchor % config.clusters) as u64,
             });
@@ -555,7 +565,7 @@ fn mean(values: impl Iterator<Item = f64>) -> f64 {
 fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# protocol={PROTOCOL}");
     println!("# source_sha={}", config.source_sha);
-    println!("# workload=clustered BinaryHV memories; 80% known-memory probes; 20% random OOD probes");
+    println!("# workload=clustered BinaryHV memories; 60% low-noise known probes; 20% hard-neighbor probes; 20% random OOD probes");
     println!("# store_size={}", config.size);
     println!("# clusters={}", config.clusters);
     println!("# cluster_noise_bits={}", config.cluster_noise_bits);
@@ -563,6 +573,7 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# rounds={}", config.rounds);
     println!("# top_k={}", config.top_k);
     println!("# noise_bits={}", config.noise_bits);
+    println!("# hard_noise_bits={}", config.hard_noise_bits);
     println!("# seed={}", config.seed);
     println!("# candidate_multiplier={}", config.candidate_multiplier);
     println!("# fallback_on_empty={}", config.fallback_on_empty);
@@ -665,7 +676,7 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
         println!("# arm_{label}_approximate_p50_ns={approximate_p50}");
         println!("# arm_{label}_approximate_p95_ns={approximate_p95}");
         println!("# arm_{label}_ratio_exact_p95_over_approximate_p95={p95_ratio:.6}");
-        for kind in ["near_neighbor", "novel"] {
+        for kind in ["near_neighbor", "hard_neighbor", "novel"] {
             emit_quality_summary(kind, arm, quality);
             emit_latency_summary(kind, arm, samples);
             let grouped_speedups = paired_query_speedups(kind, arm, samples);
@@ -1009,6 +1020,7 @@ mod tests {
             rounds: 1,
             top_k: 5,
             noise_bits: 128,
+            hard_noise_bits: DEFAULT_HARD_NOISE_BITS,
             seed: 42,
             candidate_multiplier: 4,
             fallback_on_empty: true,
@@ -1032,6 +1044,7 @@ mod tests {
             rounds: 1,
             top_k: 5,
             noise_bits: 128,
+            hard_noise_bits: DEFAULT_HARD_NOISE_BITS,
             seed: 42,
             candidate_multiplier: 4,
             fallback_on_empty: true,
