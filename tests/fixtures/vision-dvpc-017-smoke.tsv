@@ -1,0 +1,22 @@
+META	format	VIS-DVPC-SEQUENTIAL-001-v1
+META	experiment_id	synthetic-smoke-001
+META	dataset_id	synthetic-dvpc-017
+META	dataset_revision	fixture-v1
+META	split	test
+META	utility_spec_sha256	b0789fa5ec59a2e7d0fe2904efb54c55a9261fafd153e74c4ef6790166d5c3d6
+META	risk_certificate_bundle_sha256	538138f527594a1f88931baab73c96dd8930b0eb591f3ef7bd125f6081a23e78
+META	paired_unit_set_sha256	cb26d7d1ffa9702e127b2cf283cc2653270e0c05bcf2787c7abf984028633754
+META	expected_trace_count	5
+META	expected_cluster_count	5
+META	latency_budget_us	1000
+META	energy_budget_uj	1000
+META	min_gain_lcb	0.05
+META	medium_risk_certificate_state	CERTIFIED
+META	full_risk_certificate_state	CERTIFIED
+META	harm_rate_limit	0.10
+TRACE	trace_id	cluster_id	group_id	utility_cheap	utility_medium	utility_full	harm_cheap	harm_medium	harm_full	medium_gain_lcb	full_gain_lcb	medium_cost_latency_upper_us	medium_cost_energy_upper_uj	full_cost_latency_upper_us	full_cost_energy_upper_uj	allocator_latency_us	allocator_energy_uj	cheap_latency_us	cheap_energy_uj	medium_latency_us	medium_energy_uj	full_latency_us	full_energy_uj	allocator_cost_complete	cheap_cost_complete	medium_cost_complete	full_cost_complete
+TRACE	t01	c01	gA	0.50	0.72	0.83	false	false	false	0.20	0.10	35	18	65	34	5	1	10	3	30	15	60	30	true	true	true	true
+TRACE	t02	c02	gA	0.58	0.66	0.90	false	false	false	0.08	0.02	35	18	65	34	5	1	10	3	30	15	60	30	true	true	true	true
+TRACE	t03	c03	gA	0.43	0.44	0.81	false	true	false	0.01	0.25	35	18	65	34	5	1	10	3	30	15	60	30	true	true	true	true
+TRACE	t04	c04	gB	0.30	0.62	0.80	false	false	false	0.30	0.16	35	18	65	34	5	1	10	3	30	15	60	30	true	true	true	true
+TRACE	t05	c05	gB	0.55	0.70	0.82	true	false	false	0.12	0.11	2000	18	65	34	5	1	10	3	30	15	60	30	true	true	true	true
