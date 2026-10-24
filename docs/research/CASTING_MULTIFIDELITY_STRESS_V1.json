@@ -106,6 +106,16 @@
       },
       "cost": 200,
       "description": "Low/medium paired discrepancy estimates, two high-fidelity anchors and three discrepancy-corrected promotions."
+    },
+    {
+      "id": "adaptive_budget",
+      "calls": {
+        "low": 60,
+        "medium": 8,
+        "high": 4
+      },
+      "cost": 200,
+      "description": "Cost-share heuristic with paired low/medium observations, feasibility-boundary and objective-extreme probes, high-fidelity discrepancy anchors, and budget-driven corrected promotions; default-cost calls only."
     }
   ],
   "primary_diagnostics": [
@@ -113,7 +123,9 @@
     "High-fidelity hypervolume against total fidelity cost.",
     "Constraint false-promotion count/rate based on pre-promotion predicted margin.",
     "Per-fidelity call counts and cost units.",
-    "Low-to-high scalar-rank inversions and feasibility inversions."
+    "Low-to-high scalar-rank inversions and feasibility inversions.",
+    "Paired per-seed normalized-hypervolume-fraction differences versus high-only with exploratory percentile-bootstrap intervals.",
+    "Unused cost under a common absolute budget when fidelity-cost ratios change."
   ],
   "safety_and_validity_limits": [
     "High-fidelity truth is available only to the benchmark audit path after the policy returns; this is API separation, not a sandbox against malicious same-process Python introspection.",
@@ -121,7 +133,10 @@
     "The chosen formulas and cost units are stress-test conventions, not calibrated industrial cost ratios.",
     "No policy is presumed superior. Report all seeds and ablations.",
     "Later work must sweep severity, cost ratios, feasibility thresholds and noise; use paired seeds and confidence intervals.",
-    "No physical safety, product quality or SOTA claims can be derived from this fixture."
+    "No physical safety, product quality or SOTA claims can be derived from this fixture.",
+    "The adaptive-budget policy is a transparent cost-share heuristic, not MF-HVKG/MOMF or a claim to beat SOTA.",
+    "Paired percentile-bootstrap intervals are exploratory and unadjusted for multiple comparisons; default ten-seed results do not establish superiority.",
+    "Cost-schedule sweeps use one common absolute cost cap across schedules; fixed-count policies may leave budget unused when ratios change."
   ],
   "research_context": [
     "https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO",
@@ -149,12 +164,14 @@
       1.5,
       2
     ],
-    "run_count_default": 200,
+    "run_count_default": 250,
     "reporting": [
       "Preserve each seed-level result; do not report only pooled means.",
       "Per policy and severity, report median and interquartile range of normalized finite-pool hypervolume fraction.",
       "Report mean false-promotion rate, mean high-fidelity calls, and cost spent.",
-      "Use these descriptive distributions as engineering diagnostics, not inferential SOTA claims until preregistered paired confidence intervals and external baselines are added."
+      "Use these descriptive distributions as engineering diagnostics, not inferential SOTA claims until preregistered paired confidence intervals and external baselines are added.",
+      "For each severity, report paired per-seed normalized-hypervolume-fraction differences against high_only, win/tie/loss counts, and a 95% percentile-bootstrap interval for the mean paired difference.",
+      "Treat intervals as exploratory, unadjusted comparisons; do not infer SOTA from small synthetic sweeps."
     ]
   },
   "policy_comparison_caveat": "The default stress severity sweep is paired across policies by seed and has a fixed 200-unit cap. Cost mixes and fidelity calls differ per policy by design; interpret it as quality under a fixed cost cap and report high-fidelity calls separately. This is not an iso-high-fidelity-call comparison.",
@@ -178,6 +195,26 @@
       "fixed_top_k": "50*low + 10*medium + 4*high",
       "discrepancy_aware": "55*low + 4*medium + 5*high"
     },
-    "reporting": "Always report costs and call counts by fidelity; compare quality under a fixed total cost cap and do not present it as equal high-fidelity call budget."
+    "reporting": "Always report costs and call counts by fidelity; compare quality under a fixed total cost cap and do not present it as equal high-fidelity call budget.",
+    "cost_sweep_cli_flag": "--sweep-cost-schedules",
+    "default_cost_schedules": [
+      {
+        "low": 1,
+        "medium": 5,
+        "high": 25
+      },
+      {
+        "low": 1,
+        "medium": 10,
+        "high": 50
+      },
+      {
+        "low": 1,
+        "medium": 20,
+        "high": 100
+      }
+    ],
+    "cost_schedule_budget_rule": "Use one common absolute cost cap for all schedules, equal by default to the largest required fixed-policy-template cost across the supplied schedules.",
+    "cost_schedule_reporting": "Report per-run cost, unused budget and fidelity call counts. Fixed-template policies may leave budget unused under changed cost ratios; do not silently interpret this as equal spend."
   }
 }
