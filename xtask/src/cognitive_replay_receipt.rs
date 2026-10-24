@@ -465,13 +465,13 @@ fn report_digest(report: &ReplayReceiptValidation) -> anyhow::Result<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn digest(c: char) -> String { c.to_string().repeat(64) }
     fn commit(c: char) -> String { c.to_string().repeat(40) }
 
-    fn valid_receipt() -> ReplayReceipt {
+    pub(crate) fn valid_receipt() -> ReplayReceipt {
         let events: Vec<ExogenousEvent> = (0..5).map(|index| ExogenousEvent {
             sequence_index: index,
             event_id: format!("e{index}"),
