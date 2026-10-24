@@ -4,7 +4,7 @@
   "status": "proposal_only",
   "linked_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8607",
   "protocol_document": "docs/research/SCIENTIFIC_DISCOVERY_NOISE_ROBUSTNESS_V0_1.md",
-  "claim_ceiling": "Protocol and scenario manifest only; no implementation, validation, statistical guarantee, or performance result is established by this file. The interleaved anchor schedule is a fixed-design diagnostic control, not a causal attribution guarantee.",
+  "claim_ceiling": "Protocol and scenario manifest only; no implementation, validation, statistical guarantee, or performance result is established by this file. The interleaved anchor schedule is a fixed-design diagnostic control, not a causal attribution guarantee. Cause-discriminating action selection is a benchmark track; no diagnosis policy or comparative result is yet qualified.",
   "design": {
     "unit_of_pairing": "world_seed_design_mode_noise_regime",
     "independent_rng_streams": [
@@ -139,6 +139,60 @@
         "residual by covariate",
         "diagnostic cause set or explicit unresolved attribution"
       ]
+    },
+    "cause_discrimination": {
+      "linked_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8628",
+      "world_classes": [
+        "stable_law_stable_noise",
+        "stable_law_changed_noise",
+        "changed_law_stable_noise",
+        "changed_law_changed_noise",
+        "observationally_non_identifiable"
+      ],
+      "action_candidates": [
+        "repeat_anchor_later_in_randomized_block",
+        "different_covariate_at_comparable_time_order",
+        "probe_below_or_above_candidate_transition",
+        "repeat_same_covariate_at_predeclared_times",
+        "ordinary_exploratory_observation",
+        "stop_as_unresolved"
+      ],
+      "baselines": [
+        "fixed_grid_round_robin",
+        "seeded_random",
+        "anchor_only",
+        "maximum_predicted_disagreement",
+        "stop_as_unresolved",
+        "qualified_existing_model_separation_selector"
+      ],
+      "metrics": [
+        "cause_set_coverage",
+        "unique_diagnosis_accuracy_on_identifiable_worlds",
+        "false_unique_diagnosis_rate_on_non_identifiable_worlds",
+        "unresolved_rate",
+        "not_evaluable_rate",
+        "paid_observations_to_diagnosis",
+        "detection_delay",
+        "post_diagnosis_validated_recovery",
+        "marginal_shift_prediction_error",
+        "joint_extrapolation_prediction_error"
+      ],
+      "constraints": [
+        "hidden_cause_labels_are_evaluator_only",
+        "all_actions_pay_the_same_declared_cost_model",
+        "anchor_queries_consume_budget",
+        "existing_model_separation_selector_only_after_qualification",
+        "no_new_EIG_or_model_ranking_API",
+        "non_identifiable_worlds_must_not_receive_forced_unique_diagnoses"
+      ],
+      "acceptance": {
+        "zero_false_unique_diagnoses_on_deterministic_non_identifiable_controls": true,
+        "full_denominator_by_world_class": true,
+        "paired_same_world_seed_and_budget": true,
+        "held_out_world_target": 60,
+        "minimum_structural_families": 6,
+        "paired_seeds_per_world": 20
+      }
     }
   },
   "metrics": {
