@@ -619,6 +619,7 @@ mod tests {
 
         let mut cursor = PredictionEvidenceCursor::default();
         let mut bits = 0x7A31_9D45u32;
+        let mut last_observed = None;
         let mut last_admitted = None;
         let mut admitted = 0usize;
 
@@ -651,21 +652,32 @@ mod tests {
                 cycle
             };
 
-            let expected = match (
-                evidence.value_for_observation(requested_cycle),
-                last_admitted,
-            ) {
-                (Some(value), Some(last)) if cycle > last => Some(value),
-                (Some(value), None) => Some(value),
-                _ => None,
+            // Independent reference model for both watermarks: every
+            // non-stale requested cycle is observed, even if its evidence is
+            // invalid or belongs to a different cycle.
+            let requested_is_stale =
+                last_observed.is_some_and(|last| requested_cycle < last);
+            let expected = if requested_is_stale {
+                None
+            } else {
+                last_observed = Some(requested_cycle);
+                match (
+                    evidence.value_for_observation(requested_cycle),
+                    last_admitted,
+                ) {
+                    (Some(value), Some(last)) if requested_cycle > last => Some(value),
+                    (Some(value), None) => Some(value),
+                    _ => None,
+                }
             };
             let actual = cursor.admit_evidence(&evidence, requested_cycle);
             assert_eq!(actual, expected, "trace mismatch at observation {cycle}");
 
             if actual.is_some() {
                 admitted += 1;
-                last_admitted = Some(cycle);
+                last_admitted = Some(requested_cycle);
             }
+            assert_eq!(cursor.last_observed_observation_cycle(), last_observed);
             assert_eq!(cursor.last_admitted_observation_cycle(), last_admitted);
         }
 
