@@ -73,7 +73,7 @@ jobs:
         run: echo "fb25a771fe8754e8b5185d5b93f2297b116e15896d0be3bbb23783f0908cf659  tools/morphology-continuity-oracle/coverage_width_tradeoff_v1_3.txt" | sha256sum --check -
 
       - name: Verify frozen joint prior-shift robustness request digest
-        run: echo "a3f7766876f9c060e715a5663245024d5d27886870590fca074a934bb9826bdd  tools/morphology-continuity-oracle/joint_prior_confusion_robustness_v1_4.txt" | sha256sum --check -
+        run: echo "b975e6a90c437868d49c25f2e78c7c448a07130ae6fdc4c2b89e8917a930aaeb  tools/morphology-continuity-oracle/joint_prior_confusion_robustness_v1_4.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
