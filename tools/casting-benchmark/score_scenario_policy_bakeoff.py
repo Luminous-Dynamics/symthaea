@@ -250,10 +250,29 @@ def _validate_and_score_run(
         errors.append("design_count must be an integer at least 75")
     elif run["design_count"] != expected_design_count:
         errors.append("run design_count differs from top-level design_count")
-    if run["cost_budget"] != cost_budget:
+    if isinstance(run["cost_budget"], bool) or not isinstance(run["cost_budget"], int):
+        errors.append("run cost_budget must be an integer")
+    elif run["cost_budget"] != cost_budget:
         errors.append("run cost_budget differs from top-level budget")
-    if run["fidelity_costs"] != fidelity_costs:
-        errors.append("run fidelity_costs differs from top-level cost map")
+    run_costs = run["fidelity_costs"]
+    if (
+        not isinstance(run_costs, dict)
+        or set(run_costs) != {"low", "medium", "high"}
+        or any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in run_costs.values())
+        or run_costs != fidelity_costs
+    ):
+        errors.append("run fidelity_costs differs from top-level cost map or contains invalid values")
+    for count_key in ("evaluation_count", "high_fidelity_call_count"):
+        if isinstance(run[count_key], bool) or not isinstance(run[count_key], int) or run[count_key] < 0:
+            errors.append(f"run {count_key} must be a non-negative integer")
+    for map_key in ("fidelity_evaluations", "fidelity_cost_units_by_level"):
+        value_map = run[map_key]
+        if (
+            not isinstance(value_map, dict)
+            or set(value_map) != {"low", "medium", "high"}
+            or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in value_map.values())
+        ):
+            errors.append(f"run {map_key} must map low/medium/high to non-negative integers")
 
     if errors:
         return None, errors
@@ -327,9 +346,15 @@ def _validate_and_score_run(
         errors.append("not all evaluation rows could be validated")
     if run["fidelity_evaluations"] != counts:
         errors.append(f"fidelity_evaluations mismatch: expected {counts}, observed {run['fidelity_evaluations']!r}")
-    expected_counts = expected_policy_call_counts(policy, fidelity_costs, cost_budget, int(run["design_count"]))
-    if counts != expected_counts:
-        errors.append(f"policy call template mismatch: expected {expected_counts}, observed {counts}")
+    try:
+        expected_counts = expected_policy_call_counts(
+            policy, fidelity_costs, cost_budget, int(run["design_count"])
+        )
+    except ValueError as exc:
+        errors.append(f"policy call template cannot be satisfied: {exc}")
+    else:
+        if counts != expected_counts:
+            errors.append(f"policy call template mismatch: expected {expected_counts}, observed {counts}")
     if run["fidelity_cost_units_by_level"] != costs:
         errors.append(f"fidelity_cost_units_by_level mismatch: expected {costs}, observed {run['fidelity_cost_units_by_level']!r}")
     cost_spent = sum(costs.values())
