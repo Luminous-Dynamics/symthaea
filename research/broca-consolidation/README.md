@@ -79,6 +79,8 @@ Run it from the exact checked-out commit with Rust installed:
 
 ```sh
 cargo test --manifest-path research/broca-consolidation/Cargo.toml
+bash -n scripts/run_broca_budget_frontier.sh scripts/check_broca_budget_frontier.sh scripts/test_broca_budget_frontier.sh
+bash scripts/test_broca_budget_frontier.sh
 bash scripts/run_broca_budget_frontier.sh
 ```
 
@@ -86,7 +88,7 @@ The run emits a JSONL header and one row per policy and budget. It sweeps abstra
 
 Arms are no-memory/retire-all, always-raw, always-summary, fixed-interval summary, dedup-and-merge, observable-feature threshold, budget-adaptive, promote-everything negative control, and a separate oracle dynamic-programming diagnostic. The oracle sees synthetic ground truth only and is never a candidate policy. Every non-oracle policy receives only observed counts, provenance diversity, recency, corrections and contradictions, and a capacity-pressure bit.
 
-Each output reports a bounded synthetic query score under the synthetic reward table (not empirical accuracy), task utility, net utility after an explicit token storage penalty, oracle regret, load-bearing coverage, unsafe/stale items retained and promoted, compression ratio, and utility per token. All budget units, query utilities, and token costs are toy definitions; they are not model tokens billed by a provider, product memory bytes, or measured task outcomes. The oracle is an upper bound for this fixture, not evidence that a learnable policy can attain it. The runner writes a JSONL output, stderr log and sidecar receipt with source SHA, command, seed, machine/toolchain metadata, exit status, and SHA-256 digests; it refuses to overwrite artifacts from an earlier run. The CLI requires `--source-sha` to equal `git rev-parse HEAD` and rejects tracked dirty-worktree changes; an untracked output file is permitted.
+Each output reports a bounded synthetic query score under the synthetic reward table (not empirical accuracy), task utility, net utility after an explicit token storage penalty, oracle regret, load-bearing coverage, unsafe/stale items retained and promoted, compression ratio, and utility per token. All budget units, query utilities, and token costs are toy definitions; they are not model tokens billed by a provider, product memory bytes, or measured task outcomes. The oracle is an upper bound for this fixture, not evidence that a learnable policy can attain it. The runner writes a JSONL output, stderr log and sidecar receipt with source SHA, command, seed, machine/toolchain metadata, exit status, and SHA-256 digests; it refuses to overwrite artifacts from an earlier run. It invokes the independent `scripts/check_broca_budget_frontier.sh` verifier before reporting success. The verifier requires exactly 82 JSONL records, all 9×9 policy/budget pairs, receipt and stderr/output digests, metadata consistency, nonnegative oracle regret with zero regret for the oracle, budget adherence, a true raw-fit upper-budget control, and the faulty-promotion negative control. `scripts/test_broca_budget_frontier.sh` generates synthetic protocol-shaped fixtures to test positive acceptance and rejection of tampering, missing rows and oracle-regret violations; these are verifier tests, not consolidation outcomes. The CLI requires `--source-sha` to equal `git rev-parse HEAD` and rejects tracked dirty-worktree changes; an untracked output file is permitted.
 
 ### Why this extension matters
 
