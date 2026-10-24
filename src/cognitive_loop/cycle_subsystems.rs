@@ -805,6 +805,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleUrgency};
+    use crate::cognitive_loop::types::PredictionErrorEvidence;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
@@ -822,6 +823,8 @@ mod tests {
             output,
             prediction_error: 0.2,
             prediction_error_valid: true,
+            prediction_evidence: PredictionErrorEvidence::valid(0.2, None, 1)
+                .expect("finite fixture evidence"),
             coherence: 0.5,
             unified_psi: 0.3,
             phi_attention_weight: 0.5,
