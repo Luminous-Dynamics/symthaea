@@ -136,6 +136,10 @@ name = "hdc_tiled_batch_search"
 harness = false
 
 [[bench]]
+name = "hdc_pivot_bound_search"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
