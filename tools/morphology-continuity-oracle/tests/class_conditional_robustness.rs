@@ -754,6 +754,72 @@ fn joint_matrix_and_prevalence_uncertainty_compose_conservatively() {
 }
 
 #[test]
+fn joint_prior_and_matrix_robustness_is_invariant_to_class_relabeling() {
+    let counts = nominal_counts(1_000);
+    let lower = [200, 100, 0];
+    let upper = [800, 700, 500];
+    let nominal_weights = [6_u64, 3, 1];
+    let assumed = assumed_sensor();
+    let base_regions = confusion_intervals(counts).expect("valid calibration counts");
+    let base = robust_net_value_over_prior_uncertainty(
+        base_regions,
+        lower,
+        upper,
+        nominal_weights,
+        assumed,
+        &DECISION_LOSSES,
+        1,
+        ACQUISITION_COST,
+    )
+    .expect("valid joint uncertainty region");
+    assert!((base.0 - 4.0).abs() <= EPSILON);
+    assert!((base.1 - 8.8648).abs() <= EPSILON);
+    assert!((base.2 + 4.9648).abs() <= EPSILON);
+
+    for order in [
+        [0_usize, 1_usize, 2_usize],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ] {
+        let permute_prior = |values: [u16; 3]| [values[order[0]], values[order[1]], values[order[2]]];
+        let permute_weights =
+            |values: [u64; 3]| [values[order[0]], values[order[1]], values[order[2]]];
+        let permute_matrix = |matrix: [[u16; 3]; 3]| {
+            [matrix[order[0]], matrix[order[1]], matrix[order[2]]]
+        };
+        let permute_counts = |matrix: [[u64; 3]; 3]| {
+            [matrix[order[0]], matrix[order[1]], matrix[order[2]]]
+        };
+        let permute_decisions = |decisions: &[[u32; 3]]| {
+            decisions
+                .iter()
+                .map(|losses| [losses[order[0]], losses[order[1]], losses[order[2]]])
+                .collect::<Vec<_>>()
+        };
+        let permuted_regions =
+            confusion_intervals(permute_counts(counts)).expect("permuted counts are valid");
+        let permuted_decisions = permute_decisions(&DECISION_LOSSES);
+        let result = robust_net_value_over_prior_uncertainty(
+            permuted_regions,
+            permute_prior(lower),
+            permute_prior(upper),
+            permute_weights(nominal_weights),
+            permute_matrix(assumed),
+            &permuted_decisions,
+            1,
+            ACQUISITION_COST,
+        )
+        .expect("permuted uncertainty region is valid");
+        assert!((result.0 - base.0).abs() <= EPSILON);
+        assert!((result.1 - base.1).abs() <= EPSILON);
+        assert!((result.2 - base.2).abs() <= EPSILON);
+    }
+}
+
+#[test]
 fn invalid_or_infeasible_prior_regions_fail_closed() {
     assert_eq!(prior_vertices([800, 300, 100], [900, 400, 200]), None);
     assert_eq!(prior_vertices([300, 300, 300], [300, 300, 300]), None);
