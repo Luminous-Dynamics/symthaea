@@ -388,6 +388,8 @@ pub enum MeshError {
     NoTransport,
     /// Transport I/O error.
     Io(String),
+    /// A complete frame exceeds the selected transport's declared MTU.
+    MtuExceeded { frame_size: usize, mtu: usize },
     /// Fragment reassembly failed (too many losses).
     ReassemblyFailed,
     /// Payload too large for fragmentation.
@@ -399,6 +401,9 @@ impl std::fmt::Display for MeshError {
         match self {
             Self::NoTransport => write!(f, "no mesh transport available"),
             Self::Io(msg) => write!(f, "mesh I/O error: {msg}"),
+            Self::MtuExceeded { frame_size, mtu } => {
+                write!(f, "mesh frame size {frame_size} exceeds transport MTU {mtu}")
+            }
             Self::ReassemblyFailed => write!(f, "fragment reassembly failed"),
             Self::PayloadTooLarge => write!(f, "payload exceeds max fragment count"),
         }

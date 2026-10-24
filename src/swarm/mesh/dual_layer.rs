@@ -272,16 +272,31 @@ impl DualLayerMesh {
         #[cfg(not(feature = "mesh-encryption"))]
         let envelope = compressed;
 
+        // Encryption helpers historically return an empty Vec on failure.
+        // Never allow that sentinel to become an apparently successful send.
+        if envelope.is_empty() {
+            return Err(MeshError::Io(
+                "compression/encryption produced an empty mesh envelope".into(),
+            ));
+        }
+
         match route {
             MeshRoute::LoRa => {
                 let transport = self.lora.as_ref().ok_or(MeshError::NoTransport)?;
                 let frags = fragment(packet.thought_id(), &envelope);
-                let mut buf = [0u8; LORA_MTU];
+                let mtu = transport.mtu();
+
+                // Stage and validate every wire frame before the first transport
+                // side effect. This prevents an oversized later fragment (notably
+                // one wrapped in fragment-level AEAD) from causing a partial send.
+                let mut frames = Vec::with_capacity(frags.len());
                 for frag in &frags {
+                    let mut buf = [0u8; LORA_MTU];
                     let len = frag.to_bytes(&mut buf);
-                    // Optionally encrypt each fragment individually
+
+                    // Optionally encrypt each fragment individually.
                     #[cfg(feature = "mesh-encryption")]
-                    if self.fragment_encryption {
+                    let frame = if self.fragment_encryption {
                         if let Some(ref key) = self.encryption_key {
                             let encrypted = super::encrypt_fragment(
                                 &buf[..len],
@@ -290,19 +305,56 @@ impl DualLayerMesh {
                                 packet.thought_id(),
                                 frag.fragment_index,
                             );
-                            transport.send_raw(&encrypted)?;
-                            continue;
+                            if encrypted.is_empty() {
+                                return Err(MeshError::Io(
+                                    "fragment encryption produced an empty frame".into(),
+                                ));
+                            }
+                            encrypted
+                        } else {
+                            buf[..len].to_vec()
                         }
+                    } else {
+                        buf[..len].to_vec()
+                    };
+
+                    #[cfg(not(feature = "mesh-encryption"))]
+                    let frame = buf[..len].to_vec();
+
+                    if frame.len() > mtu {
+                        return Err(MeshError::MtuExceeded {
+                            frame_size: frame.len(),
+                            mtu,
+                        });
                     }
-                    transport.send_raw(&buf[..len])?;
+                    frames.push(frame);
+                }
+
+                // No MTU failure can occur after this loop starts.
+                for frame in &frames {
+                    transport.send_raw(frame)?;
                 }
             }
             MeshRoute::Batman => {
                 let transport = self.batman.as_ref().ok_or(MeshError::NoTransport)?;
+                let mtu = transport.mtu();
+                if envelope.len() > mtu {
+                    return Err(MeshError::MtuExceeded {
+                        frame_size: envelope.len(),
+                        mtu,
+                    });
+                }
                 transport.send_raw(&envelope)?;
             }
             MeshRoute::Yggdrasil => {
                 let transport = self.yggdrasil.as_ref().ok_or(MeshError::NoTransport)?;
+                let mtu = transport.mtu();
+                if envelope.len() > mtu {
+                    return Err(MeshError::MtuExceeded {
+                        frame_size: envelope.len(),
+                        mtu,
+                    });
+                }
                 transport.send_raw(&envelope)?;
             }
         }
@@ -616,6 +668,52 @@ mod tests {
         }
     }
 
+    /// Shared recorder lets tests prove that preflight rejected a send before
+    /// the transport observed any frames.
+    struct SharedCaptureTransport {
+        mtu: usize,
+        sent: std::sync::Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
+    }
+
+    impl SharedCaptureTransport {
+        fn new(mtu: usize) -> (Self, std::sync::Arc<std::sync::Mutex<Vec<Vec<u8>>>>) {
+            let sent = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            (
+                Self {
+                    mtu,
+                    sent: std::sync::Arc::clone(&sent),
+                },
+                sent,
+            )
+        }
+    }
+
+    impl MeshTransport for SharedCaptureTransport {
+        fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
+            self.sent
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(data.to_vec());
+            Ok(())
+        }
+
+        fn recv_raw(&self, _buf: &mut [u8]) -> Result<usize, MeshError> {
+            Err(MeshError::Io("test transport is send-only".into()))
+        }
+
+        fn mtu(&self) -> usize {
+            self.mtu
+        }
+
+        fn name(&self) -> &str {
+            "shared-capture"
+        }
+
+        fn is_available(&self) -> bool {
+            true
+        }
+    }
+
     // -- Routing --
 
     #[test]
@@ -679,7 +777,10 @@ mod tests {
     fn send_over_batman_whole_packet() {
         let mesh = DualLayerMesh::new([0; 32]).with_batman(Box::new(LoopbackTransport::batman()));
 
-        let packet = test_packet(MeshUrgency::Critical);
+        // Use a compressible payload so the final envelope is within the
+        // loopback transport's declared Ethernet MTU (1500 bytes).
+        let mut packet = test_packet(MeshUrgency::Critical);
+        packet.wisdom = BinaryHV([0u8; 2048]);
         let route = mesh.send(&packet).unwrap();
         assert_eq!(route, MeshRoute::Batman);
     }
@@ -689,6 +790,74 @@ mod tests {
         let mesh = DualLayerMesh::new([0; 32]);
         let packet = test_packet(MeshUrgency::Normal);
         assert!(mesh.send(&packet).is_err());
+    }
+
+    #[test]
+    fn send_rejects_oversized_whole_frame_before_any_write() {
+        let (transport, sent) = SharedCaptureTransport::new(1);
+        let mesh = DualLayerMesh::new([0; 32]).with_batman(Box::new(transport));
+
+        let result = mesh.send(&test_packet(MeshUrgency::Critical));
+
+        assert!(matches!(
+            result,
+            Err(MeshError::MtuExceeded { frame_size, mtu }) if frame_size > mtu
+        ));
+        assert!(
+            sent.lock().unwrap_or_else(|e| e.into_inner()).is_empty(),
+            "oversized whole-frame rejection must happen before transport writes"
+        );
+    }
+
+    #[test]
+    fn send_rejects_oversized_lora_frame_before_any_write() {
+        let (transport, sent) = SharedCaptureTransport::new(8);
+        let mesh = DualLayerMesh::new([0; 32]).with_lora(Box::new(transport));
+
+        let result = mesh.send(&test_packet(MeshUrgency::Cruise));
+
+        assert!(matches!(
+            result,
+            Err(MeshError::MtuExceeded { frame_size, mtu }) if frame_size > mtu
+        ));
+        assert!(
+            sent.lock().unwrap_or_else(|e| e.into_inner()).is_empty(),
+            "LoRa MTU preflight must reject the complete fragment batch before sending"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn fragment_aead_mtu_overhead_is_rejected_before_any_write() {
+        let (transport, sent) = SharedCaptureTransport::new(LORA_MTU);
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(transport))
+            .with_encryption_key([0x42; 32])
+            .with_encryption_epoch(7)
+            .with_fragment_encryption(true);
+
+        // Make the serialized packet deliberately incompressible, forcing full
+        // LoRa fragments. Wrapping one with the 12-byte nonce and 16-byte tag
+        // must exceed the transport's declared MTU and reject the whole batch.
+        let mut packet = test_packet(MeshUrgency::Cruise);
+        let mut state = 0x9e37_79b9u32;
+        for byte in &mut packet.wisdom.0 {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            *byte = state as u8;
+        }
+
+        let result = mesh.send(&packet);
+
+        assert!(matches!(
+            result,
+            Err(MeshError::MtuExceeded { frame_size, mtu }) if frame_size > mtu
+        ));
+        assert!(
+            sent.lock().unwrap_or_else(|e| e.into_inner()).is_empty(),
+            "fragment-AEAD MTU rejection must precede every radio write"
+        );
     }
 
     // -- Loopback reassembly --
