@@ -168,14 +168,27 @@ impl LoRaFragment {
         let flags = buf[5];
         let checksum = u16::from_le_bytes([buf[6], buf[7]]);
 
-        // Sanity checks
-        if total_fragments == 0 || fragment_index >= total_fragments {
+        // Enforce the V1 fragment contract here, at the public parsing
+        // boundary, rather than requiring every downstream caller to repeat it.
+        // CRC detects accidental corruption only; it is not authentication.
+        if total_fragments < 2 || fragment_index >= total_fragments {
             return None;
         }
-        if payload_len as usize > PAYLOAD_SIZE {
+        if flags & !FLAG_FEC != 0 {
+            return None; // Reserved bits must remain zero in V1.
+        }
+        let is_fec = flags & FLAG_FEC != 0;
+        if is_fec != (fragment_index == total_fragments - 1) {
+            return None; // The last slot is the one and only XOR parity slot.
+        }
+        if payload_len == 0 || payload_len as usize > PAYLOAD_SIZE {
             return None;
         }
-        if buf.len() < HEADER_SIZE + payload_len as usize {
+        if is_fec && payload_len as usize != PAYLOAD_SIZE {
+            return None; // XOR parity is always a full zero-padded block.
+        }
+        let frame_len = HEADER_SIZE + payload_len as usize;
+        if frame_len > LORA_MTU || buf.len() < frame_len || buf.len() > LORA_MTU {
             return None;
         }
 
@@ -785,6 +798,74 @@ mod tests {
     fn truncated_buffer_rejected() {
         assert!(LoRaFragment::from_bytes(&[0; 4]).is_none());
         assert!(LoRaFragment::from_bytes(&[]).is_none());
+    }
+
+    // -- V1 parser rejects non-canonical structural metadata --
+
+    #[test]
+    fn parser_rejects_reserved_flag_bits_with_valid_crc() {
+        let mut malformed = fragment(42, &[0xA5; 17])[0].clone();
+        malformed.flags |= 0x02; // Bit 1 is reserved in V1.
+        malformed.checksum = malformed.compute_checksum();
+        let mut buf = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut buf);
+        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_fec_flag_in_data_slot_with_valid_crc() {
+        let mut malformed = fragment(43, &[0x5A; 31])[0].clone();
+        malformed.flags = FLAG_FEC; // Data index 0 is not the reserved parity slot.
+        malformed.checksum = malformed.compute_checksum();
+        let mut buf = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut buf);
+        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_non_fec_flag_in_parity_slot_with_valid_crc() {
+        let mut frags = fragment(44, &[0x5A; 31]);
+        let mut malformed = frags.pop().expect("fragmentation always emits parity");
+        malformed.flags = 0;
+        malformed.checksum = malformed.compute_checksum();
+        let mut buf = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut buf);
+        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_empty_data_and_short_fec_payloads() {
+        let mut empty_data = fragment(45, &[0x01])[0].clone();
+        empty_data.payload_len = 0;
+        empty_data.checksum = empty_data.compute_checksum();
+        let mut buf = [0u8; LORA_MTU];
+        let len = empty_data.to_bytes(&mut buf);
+        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+
+        let mut short_fec = fragment(46, &[0x02])[1].clone();
+        short_fec.payload_len = (PAYLOAD_SIZE - 1) as u8;
+        short_fec.checksum = short_fec.compute_checksum();
+        let len = short_fec.to_bytes(&mut buf);
+        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_single_slot_stream_and_oversize_wire_frame() {
+        let mut malformed = fragment(47, &[0x33])[0].clone();
+        malformed.total_fragments = 1;
+        malformed.checksum = malformed.compute_checksum();
+        let mut buf = [0u8; LORA_MTU + 1];
+        let len = malformed.to_bytes(&mut buf);
+        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+
+        // Even a valid, maximum-size frame plus one trailing byte exceeds the
+        // transport MTU and must not be normalized into an accepted fragment.
+        let valid = fragment(48, &[0x33; PAYLOAD_SIZE])[0].clone();
+        let mut valid_buf = [0u8; LORA_MTU];
+        let valid_len = valid.to_bytes(&mut valid_buf);
+        let mut oversize = vec![0u8; LORA_MTU + 1];
+        oversize[..valid_len].copy_from_slice(&valid_buf[..valid_len]);
+        assert!(LoRaFragment::from_bytes(&oversize).is_none());
     }
 
     // -- Malformed metadata is fail-closed --
