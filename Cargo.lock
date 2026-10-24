@@ -18644,6 +18644,13 @@ name = "symthaea-earth-system"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-cosmology-bench"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-ecology"
 version = "0.1.0"
 

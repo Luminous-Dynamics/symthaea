@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-cosmology-bench"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+authors = ["Luminous Dynamics"]
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+description = "Dependency-light audit tools for released cosmological posterior chains"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+sha2 = "0.10"
+
+[[bin]]
+name = "symthaea-cosmology-chain-audit"
+path = "src/main.rs"
