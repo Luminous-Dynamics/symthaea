@@ -268,6 +268,12 @@ def score_trace(
         raise TraceScoreError("scorer path differs from immutable analysis lock")
     if lock_scorer.get("trace_schema_path") != raw_trace_contract.get("trace_schema_file"):
         raise TraceScoreError("trace schema path differs between protocol and analysis lock")
+    if lock_scorer.get("path") != raw_trace_contract.get("scorer_file"):
+        raise TraceScoreError("scorer path differs between protocol and analysis lock")
+    if lock_scorer.get("receipt_schema_path") != raw_trace_contract.get("receipt_schema_file"):
+        raise TraceScoreError("receipt schema path differs between protocol and analysis lock")
+    if not _finite_number(analysis_lock.get("absolute_metric_tolerance")) or float(analysis_lock["absolute_metric_tolerance"]) != ABS_TOLERANCE:
+        raise TraceScoreError("metric tolerance differs from immutable analysis lock")
     if lock_scorer.get("supported_evaluation_modes") != ["single_fidelity"]:
         raise TraceScoreError("unsupported evaluation modes in analysis lock")
     if lock_scorer.get("supported_objective_count") != 2 or lock_scorer.get("supported_objective_direction") != "minimize_all":
@@ -437,8 +443,6 @@ def score_trace(
         "objective_evaluator_sha256": suite["objective_evaluator_sha256"],
         "source_revision": receipt["source_revision"],
         "environment_lock_sha256": receipt["environment_lock_sha256"],
-        "analysis_lock_sha256": sha256_hex(analysis_lock_bytes),
-        "planned_budget": receipt["budget"]["objective_evaluations"],
         "seed": receipt["seed"],
         "metrics_recomputed": recomputed,
         "reported_metrics_match": receipt["status"] == "success",
