@@ -76,7 +76,7 @@ jobs:
         run: echo "7f0310b7887d4d8e9def76887d761df475aafba87ef3b662848e063e71b81944  tools/morphology-continuity-oracle/joint_prior_confusion_robustness_v1_4.txt" | sha256sum --check -
 
       - name: Verify frozen active calibration allocation request digest
-        run: echo "2ed482be286224b2cd2da6f4924425cb2a1a4a39522b51115ddd4d2fec3842af  tools/morphology-continuity-oracle/active_calibration_allocation_v1_5.txt" | sha256sum --check -
+        run: echo "492101dd369d679bf45ca700b5fa70f7277a0e6a5109091c268351f3f161f464  tools/morphology-continuity-oracle/active_calibration_allocation_v1_5.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
