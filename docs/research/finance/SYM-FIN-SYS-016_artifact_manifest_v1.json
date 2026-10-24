@@ -1,0 +1,235 @@
+{
+  "schema": "civos.socioeconomic_interoperability.artifact_manifest.v1",
+  "status": "research",
+  "claim_ceiling": "synthetic_deterministic_only",
+  "hash_policy": "sha256_exact_utf8_bytes_v1",
+  "source_artifacts": [
+    {
+      "artifact_id": "scenario_registry_v1",
+      "path": "docs/research/finance/SYM-FIN-SYS-016_scenario_registry_v1.json",
+      "role": "scenario_registry",
+      "digest": "sha256:8ec2dded058cee8359778c17c1433ccd066048c86e4dbb23bc4e9c5a77ec1193"
+    },
+    {
+      "artifact_id": "run_receipt_schema_v1",
+      "path": "docs/research/finance/SYM-FIN-SYS-016_run_receipt_v1.schema.json",
+      "role": "json_schema",
+      "digest": "sha256:95722456fbeb864a0f892d172a85c7da381fd9d49c4911d9b56bb9962198006a"
+    },
+    {
+      "artifact_id": "run_receipt_negative_controls_v1",
+      "path": "docs/research/finance/SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json",
+      "role": "negative_control_corpus",
+      "digest": "sha256:ee80ed79830fa229efc01ba45a0c710c85cd4aad8525c53321169676779fb687"
+    },
+    {
+      "artifact_id": "run_receipt_validator",
+      "path": "scripts/validate_socioeconomic_run_receipt.py",
+      "role": "validator",
+      "digest": "sha256:7c7a019acbf6af9776c372d2c8d11c8e720765e1157fed8b0a659d89d18e42c1"
+    },
+    {
+      "artifact_id": "run_receipt_validator_tests",
+      "path": "scripts/test_validate_socioeconomic_run_receipt.py",
+      "role": "validator_tests",
+      "digest": "sha256:923c480c78a61ac9bed8666e62e758db344352105c29a88c543a3c31906788a8"
+    },
+    {
+      "artifact_id": "run_receipt_requirements",
+      "path": "scripts/socioeconomic_run_receipt_requirements.txt",
+      "role": "dependency_lock",
+      "digest": "sha256:8908b8dde5f6a9d0cfb025ef464134e3b40197e4a2757ac573917e4ec7643a2c"
+    },
+    {
+      "artifact_id": "symthaea_ci_workflow",
+      "path": ".github/workflows/ci.yml",
+      "role": "ci_workflow",
+      "digest": "sha256:06f26763de283cc67b411392a3108d5a775a2c050a23f7da4ae87e6f5f3a3851"
+    },
+    {
+      "artifact_id": "receipt_contract_workflow",
+      "path": ".github/workflows/socioeconomic-run-receipt.yml",
+      "role": "focused_validation_workflow",
+      "digest": "sha256:b57fefc8bb80bb29ae9f7d5e6394dbf4ceb4555868a94cd39302cf28373a8d9f"
+    }
+  ],
+  "digest_bindings": [
+    {
+      "binding_id": "binding-001",
+      "receipt_pointer": "/run/scenario_registry_digest",
+      "claimed_digest": "sha256:8ec2dded058cee8359778c17c1433ccd066048c86e4dbb23bc4e9c5a77ec1193",
+      "availability": "repository_bytes",
+      "verification_status": "verified_bytes",
+      "source_artifact_id": "scenario_registry_v1",
+      "reason": null
+    },
+    {
+      "binding_id": "binding-002",
+      "receipt_pointer": "/run/world_seed_digest",
+      "claimed_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-003",
+      "receipt_pointer": "/run/environment_digest",
+      "claimed_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-004",
+      "receipt_pointer": "/run/shock_schedule_digest",
+      "claimed_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-005",
+      "receipt_pointer": "/run/agent_model_digest",
+      "claimed_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-006",
+      "receipt_pointer": "/profiles/regime_assignments/0/profile_digest",
+      "claimed_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-007",
+      "receipt_pointer": "/profiles/regime_assignments/1/profile_digest",
+      "claimed_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-008",
+      "receipt_pointer": "/profiles/regime_assignments/2/profile_digest",
+      "claimed_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-009",
+      "receipt_pointer": "/profiles/regime_assignments/3/profile_digest",
+      "claimed_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-010",
+      "receipt_pointer": "/profiles/bridge_profiles/0/profile_digest",
+      "claimed_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-011",
+      "receipt_pointer": "/profiles/governance_profile_digest",
+      "claimed_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-012",
+      "receipt_pointer": "/profiles/settlement_finality_profile_digest",
+      "claimed_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-013",
+      "receipt_pointer": "/world/initial_state_digest",
+      "claimed_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-014",
+      "receipt_pointer": "/world/final_state_digest",
+      "claimed_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-015",
+      "receipt_pointer": "/world/resource_state_digest",
+      "claimed_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-016",
+      "receipt_pointer": "/events/0/payload_digest",
+      "claimed_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-017",
+      "receipt_pointer": "/events/1/payload_digest",
+      "claimed_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-018",
+      "receipt_pointer": "/evaluation/evaluator_digest",
+      "claimed_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    },
+    {
+      "binding_id": "binding-019",
+      "receipt_pointer": "/evaluation/counterexamples_digest",
+      "claimed_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "availability": "unavailable",
+      "verification_status": "unverified",
+      "source_artifact_id": null,
+      "reason": "Illustrative fixture digest only; the underlying run-generated input bytes are not supplied in this repository."
+    }
+  ],
+  "binding_policy": {
+    "unknown_bindings": "reject",
+    "missing_source_artifacts": "reject",
+    "unavailable_run_artifacts": "explicitly_unverified_only",
+    "production_authority": "none"
+  }
+}

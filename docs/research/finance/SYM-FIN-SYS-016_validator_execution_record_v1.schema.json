@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:civos:socioeconomic-interoperability:validator-execution-record:v1",
+  "title": "CivOS Run Bundle Validator Execution Record v1",
+  "description": "Execution report used as the subject of a separate signed artifact attestation. It is not itself the attestation predicate and is non-authoritative without external signature verification and appraisal policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "claim_ceiling",
+    "result",
+    "scope",
+    "repository",
+    "source_revision",
+    "event_sha",
+    "workflow",
+    "workflow_ref",
+    "workflow_sha",
+    "job",
+    "event",
+    "run_id",
+    "run_attempt",
+    "runner_os",
+    "python_version",
+    "test_commands",
+    "authored_test_function_count",
+    "executed_test_count",
+    "executed_test_counts_by_suite",
+    "artifacts",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "civos.socioeconomic_interoperability.validator_execution_record.v1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_deterministic_only"
+    },
+    "result": {
+      "const": "passed"
+    },
+    "scope": {
+      "const": "run_bundle_validator_and_execution_record_unit_tests"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "event_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "job": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event": {
+      "enum": [
+        "pull_request",
+        "push",
+        "workflow_dispatch",
+        "merge_group",
+        "schedule"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "run_attempt": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "runner_os": {
+      "enum": ["Linux", "Windows", "macOS"]
+    },
+    "python_version": {
+      "type": "string",
+      "pattern": "^Python [0-9]+\\.[0-9]+\\.[0-9]+"
+    },
+    "test_commands": {
+      "const": [
+        "python3 scripts/test_validate_socioeconomic_run_bundle.py",
+        "python3 scripts/test_write_socioeconomic_run_bundle_ci_report.py"
+      ]
+    },
+    "authored_test_function_count": {
+      "const": 25
+    },
+    "executed_test_count": {
+      "const": 25
+    },
+    "executed_test_counts_by_suite": {
+      "type": "array",
+      "prefixItems": [
+        {"const": 14},
+        {"const": 11}
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": false
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "authority_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proves_simulation_truth",
+        "can_authorize_real_actions",
+        "can_reserve_real_resources",
+        "can_settle_real_assets",
+        "production_ledger_import_allowed"
+      ],
+      "properties": {
+        "proves_simulation_truth": {"const": false},
+        "can_authorize_real_actions": {"const": false},
+        "can_reserve_real_resources": {"const": false},
+        "can_settle_real_assets": {"const": false},
+        "production_ledger_import_allowed": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "byte_length", "role"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "role": {
+          "enum": ["test_input", "test_log"]
+        }
+      }
+    }
+  }
+}

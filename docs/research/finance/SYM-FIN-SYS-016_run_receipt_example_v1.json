@@ -1,0 +1,135 @@
+{
+  "schema": "civos.socioeconomic_interoperability.run_receipt.v1",
+  "record_kind": "synthetic_simulation_receipt",
+  "claim_ceiling": "synthetic_deterministic_only",
+  "run": {
+    "run_id": "fixture-mixed-regime-001",
+    "created_at": "2026-10-15T14:00:00Z",
+    "source_revision": "a6ccaa5f8cf8fcb2f97442c86020a1d3c58a0b5a",
+    "scenario_id": "mixed-regime-essential-service-smoke",
+    "scenario_registry_digest": "sha256:8ec2dded058cee8359778c17c1433ccd066048c86e4dbb23bc4e9c5a77ec1193",
+    "random_seed": 314159,
+    "world_seed_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "model_version": "symthaea-civos-sim-v1",
+    "environment_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "shock_schedule_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "agent_model_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "artifact_manifest_digest": "sha256:90edc8a4ab56b9647eb5dd766fe52ffc0147a375909a3be27c001f2b5857698e"
+  },
+  "profiles": {
+    "regime_assignments": [
+      {
+        "community_id": "community-a",
+        "regime_id": "creditism",
+        "profile_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      {
+        "community_id": "community-b",
+        "regime_id": "mutual_credit",
+        "profile_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      {
+        "community_id": "community-c",
+        "regime_id": "debt_equity_market",
+        "profile_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "community_id": "community-d",
+        "regime_id": "commons_polycentric",
+        "profile_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+      }
+    ],
+    "bridge_profiles": [
+      {
+        "bridge_id": "trade-a-b",
+        "source_community_id": "community-a",
+        "target_community_id": "community-b",
+        "profile_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      }
+    ],
+    "governance_profile_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+    "evidence_policy_generation": 1,
+    "settlement_finality_profile_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "world": {
+    "initial_state_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+    "final_state_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resource_state_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "persons": 100,
+    "communities": 4,
+    "projects": 20,
+    "scarce_resource_classes": 8
+  },
+  "events": [
+    {
+      "event_id": "sim-event-0001",
+      "sequence": 0,
+      "simulation_tick": 0,
+      "event_type": "need_created",
+      "scope": "synthetic_simulation",
+      "authority_effect": "none",
+      "external_effect": "none",
+      "settlement_effect": "none",
+      "payload_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "event_id": "sim-event-0002",
+      "sequence": 1,
+      "simulation_tick": 4,
+      "event_type": "simulated_reservation",
+      "scope": "synthetic_simulation",
+      "authority_effect": "none",
+      "external_effect": "none",
+      "settlement_effect": "none",
+      "payload_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "essential_service_coverage",
+      "dimension": "access",
+      "value": 0.83,
+      "unit": "ratio",
+      "measurement_status": "model_observed",
+      "population_scope": "all_households",
+      "period": "scenario_horizon"
+    },
+    {
+      "metric_id": "unmet_essential_demand",
+      "dimension": "access",
+      "value": 17,
+      "unit": "households",
+      "measurement_status": "model_observed",
+      "population_scope": "all_households",
+      "period": "scenario_horizon"
+    },
+    {
+      "metric_id": "ecological_overshoot",
+      "dimension": "ecological",
+      "value": null,
+      "unit": "declared_model_unit",
+      "measurement_status": "unmeasured",
+      "population_scope": "shared_ecological_budget",
+      "period": "scenario_horizon"
+    }
+  ],
+  "evaluation": {
+    "oracle_version": "fixture-oracle-v1",
+    "evaluator_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "accounting_oracle_applied": true,
+    "power_oracle_applied": false,
+    "controls_applied": [
+      "fixed_institution",
+      "independent_accounting_oracle",
+      "stock_flow_reconciliation"
+    ],
+    "counterexamples_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "authority_boundary": {
+    "is_real_world_observation": false,
+    "can_authorize_real_actions": false,
+    "can_reserve_real_resources": false,
+    "can_settle_real_assets": false,
+    "production_ledger_import_allowed": false
+  }
+}

@@ -1723,6 +1723,32 @@ jobs:
           test -f COMPLIANCE.md || test -f docs/COMPLIANCE.md || echo "::warning::No COMPLIANCE.md found"
           echo "Documentation check complete"
 
+
+  # This narrow evidence-format check intentionally runs on draft PRs too.
+  # It does not build or activate any production Symthaea/Mycelix economic path.
+  socioeconomic-run-receipt:
+    name: Socioeconomic Run Receipt Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Create isolated validation environment
+        run: python3 -m venv "$RUNNER_TEMP/run-receipt-venv"
+
+      - name: Install pinned validation-only dependencies
+        run: |
+          "$RUNNER_TEMP/run-receipt-venv/bin/python" -m pip install --disable-pip-version-check --requirement scripts/socioeconomic_run_receipt_requirements.txt
+
+      - name: Test strict JSON parsing
+        run: "$RUNNER_TEMP/run-receipt-venv/bin/python" -m unittest discover -s scripts -p 'test_validate_socioeconomic_run_receipt.py'
+
+      - name: Validate positive fixture and reject negative controls
+        run: "$RUNNER_TEMP/run-receipt-venv/bin/python" scripts/validate_socioeconomic_run_receipt.py
+
   secrets-scan:
     name: Secrets Scan
     runs-on: ubuntu-latest

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:civos:socioeconomic-interoperability:validator-attestation-predicate:v1",
+  "title": "CivOS Validator Execution Attestation Predicate v1",
+  "description": "A bounded predicate attached to a signed attestation for a test report. It identifies the exact report digest but does not assert socioeconomic simulation truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "claim_ceiling",
+    "scope",
+    "result",
+    "repository",
+    "source_revision",
+    "event_sha",
+    "workflow",
+    "workflow_ref",
+    "workflow_sha",
+    "run_id",
+    "run_attempt",
+    "execution_record_digest",
+    "executed_test_count",
+    "executed_test_counts_by_suite",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "civos.socioeconomic_interoperability.validator_attestation_predicate.v1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_deterministic_only"
+    },
+    "scope": {
+      "const": "run_bundle_validator_and_execution_record_unit_tests"
+    },
+    "result": {
+      "const": "passed"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "event_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "run_attempt": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "execution_record_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executed_test_count": {
+      "const": 25
+    },
+    "executed_test_counts_by_suite": {
+      "type": "array",
+      "prefixItems": [
+        {"const": 14},
+        {"const": 11}
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": false
+    },
+    "authority_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proves_simulation_truth",
+        "can_authorize_real_actions",
+        "can_reserve_real_resources",
+        "can_settle_real_assets",
+        "production_ledger_import_allowed"
+      ],
+      "properties": {
+        "proves_simulation_truth": {"const": false},
+        "can_authorize_real_actions": {"const": false},
+        "can_reserve_real_resources": {"const": false},
+        "can_settle_real_assets": {"const": false},
+        "production_ledger_import_allowed": {"const": false}
+      }
+    }
+  }
+}

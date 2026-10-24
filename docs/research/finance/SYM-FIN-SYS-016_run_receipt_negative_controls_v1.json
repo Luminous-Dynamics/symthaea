@@ -1,0 +1,194 @@
+{
+  "schema": "civos.socioeconomic_interoperability.run_receipt_negative_controls.v1",
+  "status": "research_fixture",
+  "base_fixture": "SYM-FIN-SYS-016_run_receipt_example_v1.json",
+  "expected_result": "Each mutation must be rejected by the checker. json_schema cases must fail JSON Schema 2020-12 validation; semantic_check cases must fail cross-field semantic validation.",
+  "claim_ceiling": "These are regression inputs for the planned checker, not evidence that a validator or security proof has run.",
+  "cases": [
+    {
+      "id": "SRC-NEG-001",
+      "description": "A simulation receipt claims to be a real-world observation.",
+      "pointer": "/authority_boundary/is_real_world_observation",
+      "replacement_value": true,
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-002",
+      "description": "A simulation receipt claims permission to authorize real actions.",
+      "pointer": "/authority_boundary/can_authorize_real_actions",
+      "replacement_value": true,
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-003",
+      "description": "A simulation receipt claims permission to reserve real resources.",
+      "pointer": "/authority_boundary/can_reserve_real_resources",
+      "replacement_value": true,
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-004",
+      "description": "A simulation receipt claims it can settle real assets.",
+      "pointer": "/authority_boundary/can_settle_real_assets",
+      "replacement_value": true,
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-005",
+      "description": "A simulation receipt claims production-ledger import is allowed.",
+      "pointer": "/authority_boundary/production_ledger_import_allowed",
+      "replacement_value": true,
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-006",
+      "description": "The record attempts to broaden its evidence claim ceiling.",
+      "pointer": "/claim_ceiling",
+      "replacement_value": "deployment_ready",
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-007",
+      "description": "A simulated event attempts to declare a real payment effect.",
+      "pointer": "/events/0/external_effect",
+      "replacement_value": "payment_sent",
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-008",
+      "description": "A profile assigns an unknown socioeconomic regime.",
+      "pointer": "/profiles/regime_assignments/0/regime_id",
+      "replacement_value": "unbounded_optimal_economy",
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-009",
+      "description": "A profile digest has no valid SHA-256 identity prefix and length.",
+      "pointer": "/profiles/regime_assignments/0/profile_digest",
+      "replacement_value": "sha256:bad",
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-NEG-010",
+      "description": "A record tries to add an undeclared, potentially authority-bearing field.",
+      "pointer": "/authority_boundary/decision_authority",
+      "replacement_value": "simulator",
+      "validation_layer": "json_schema"
+    },
+    {
+      "id": "SRC-SEM-001",
+      "validation_layer": "semantic_check",
+      "description": "Two different regime profiles claim the same community, making regime assignment ambiguous.",
+      "pointer": "/profiles/regime_assignments/1/community_id",
+      "replacement_value": "community-a"
+    },
+    {
+      "id": "SRC-SEM-002",
+      "validation_layer": "semantic_check",
+      "description": "Event sequence number is duplicated, weakening deterministic replay order.",
+      "pointer": "/events/1/sequence",
+      "replacement_value": 0
+    },
+    {
+      "id": "SRC-SEM-003",
+      "validation_layer": "semantic_check",
+      "description": "A bridge names a community with no declared regime profile.",
+      "pointer": "/profiles/bridge_profiles/0/target_community_id",
+      "replacement_value": "community-z"
+    },
+    {
+      "id": "SRC-SEM-004",
+      "validation_layer": "semantic_check",
+      "description": "An unmeasured metric carries a numeric value rather than explicit missingness.",
+      "pointer": "/metrics/2/value",
+      "replacement_value": 0
+    },
+    {
+      "id": "SRC-SEM-005",
+      "validation_layer": "semantic_check",
+      "description": "The evaluator claims an independent accounting oracle was applied while omitting the corresponding control.",
+      "pointer": "/evaluation/controls_applied",
+      "replacement_value": [
+        "fixed_institution",
+        "stock_flow_reconciliation"
+      ]
+    },
+    {
+      "id": "SRC-SEM-006",
+      "validation_layer": "semantic_check",
+      "description": "A second event reuses an existing event_id, making event identity ambiguous.",
+      "pointer": "/events/1/event_id",
+      "replacement_value": "sim-event-0001"
+    },
+    {
+      "id": "SRC-SEM-007",
+      "validation_layer": "semantic_check",
+      "description": "An event's simulation tick moves backwards relative to the following event.",
+      "pointer": "/events/0/simulation_tick",
+      "replacement_value": 5
+    },
+    {
+      "id": "SRC-SEM-008",
+      "validation_layer": "semantic_check",
+      "description": "A bridge has identical source and target community identifiers.",
+      "pointer": "/profiles/bridge_profiles/0/target_community_id",
+      "replacement_value": "community-a"
+    },
+    {
+      "id": "SRC-SEM-009",
+      "validation_layer": "semantic_check",
+      "description": "A model-observed metric is marked missing without changing its measurement status.",
+      "pointer": "/metrics/0/value",
+      "replacement_value": null
+    },
+    {
+      "id": "SRC-SEM-010",
+      "validation_layer": "semantic_check",
+      "description": "The power-oracle flag is true although the independent power oracle control is absent.",
+      "pointer": "/evaluation/power_oracle_applied",
+      "replacement_value": true
+    },
+    {
+      "id": "SRC-SEM-011",
+      "description": "The receipt provides a digest-shaped value that does not identify the exact scenario-registry bytes.",
+      "pointer": "/run/scenario_registry_digest",
+      "replacement_value": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-012",
+      "description": "The receipt names a scenario absent from the versioned scenario catalogue.",
+      "pointer": "/run/scenario_id",
+      "replacement_value": "unregistered-scenario",
+      "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-013",
+      "description": "A metric ID absent from the scenario registry is reported as if it were part of the run.",
+      "pointer": "/metrics/0/metric_id",
+      "replacement_value": "unregistered_metric",
+      "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-014",
+      "description": "A registered metric is assigned a different, schema-valid dimension.",
+      "pointer": "/metrics/0/dimension",
+      "replacement_value": "distribution",
+      "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-015",
+      "validation_layer": "semantic_check",
+      "description": "The receipt's artifact-manifest digest does not match the exact manifest bytes.",
+      "pointer": "/run/artifact_manifest_digest",
+      "replacement_value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "SRC-SEM-016",
+      "validation_layer": "semantic_check",
+      "description": "A digest-shaped input value differs from the value bound by the artifact manifest.",
+      "pointer": "/run/environment_digest",
+      "replacement_value": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}
