@@ -158,14 +158,99 @@ pub fn AddMusicPage() -> impl IntoView {
                             <span><small>"Territory"</small><strong>"Unclassified"</strong></span>
                         </div>
                         <p>"Muse preserved the work as source-native. Section and motif findings remain reconstructed suggestions until you confirm them."</p>
-                        {analysis.motifs.first().cloned().map(|motif| view! {
-                            <div class="import-motif-result">
-                                <strong>"Possible opening motif"</strong>
-                                <span>{format!("{} notes · {} occurrence{} · {:.0}% confidence",
-                                    motif.midi_pitches.len(), motif.occurrence_count,
-                                    if motif.occurrence_count == 1 { "" } else { "s" }, motif.confidence * 100.0)}</span>
-                            </div>
-                        })}
+                        {analysis.motifs.iter().cloned().map(|motif| {
+                            let source_part = motif.source_part_id
+                                .map(|part_id| format!("Source part {part_id}"))
+                                .unwrap_or_else(|| "Source part unavailable (legacy record)".to_string());
+                            let heading = match motif.independent_occurrence_count {
+                                Some(count) if count > 1 => "Possible recurring contour",
+                                Some(_) => "Provisional opening contour",
+                                None => "Provisional contour summary",
+                            };
+                            let independent_text = motif.independent_occurrence_count
+                                .map(|count| format!("{} non-overlapping occurrence{}",
+                                    count, if count == 1 { "" } else { "s" }))
+                                .unwrap_or_else(|| "Independent occurrence count unavailable (legacy record)".to_string());
+                            let pitch_contour = if motif.pitch_interval_pattern.is_empty() {
+                                "Unavailable (legacy record)".to_string()
+                            } else {
+                                motif.pitch_interval_pattern.iter()
+                                    .map(|interval| format!("{interval:+}"))
+                                    .collect::<Vec<_>>()
+                                    .join(" → ")
+                            };
+                            let onset_gaps = if motif.onset_deltas.is_empty() {
+                                "Unavailable (legacy record)".to_string()
+                            } else {
+                                motif.onset_deltas.iter()
+                                    .map(|delta| format!("{}/{}", delta.numerator, delta.denominator))
+                                    .collect::<Vec<_>>()
+                                    .join(" → ")
+                            };
+                            let evidence_text = match motif.occurrence_evidence_complete {
+                                Some(true) => format!("Stored note snapshots: {} of {} exact windows",
+                                    motif.matched_occurrences.len(), motif.occurrence_count),
+                                Some(false) => format!("Stored note snapshots: {} of {} exact windows; evidence truncated",
+                                    motif.matched_occurrences.len(), motif.occurrence_count),
+                                None => "Stored-evidence completeness unavailable (legacy record)".to_string(),
+                            };
+                            let rhythm_near_match_text = match motif.rhythm_near_matches.as_ref() {
+                                Some(summary) if summary.occurrence_count == 0 => format!(
+                                    "Rhythm-aware near matches: no windows met the explicit rule (interval direction preserved; interval magnitude deviation ≤{} semitone; normalized onset-gap-share error ≤{:.2}).",
+                                    summary.max_allowed_pitch_interval_deviation_semitones,
+                                    summary.max_allowed_normalized_onset_gap_error,
+                                ),
+                                Some(summary) => {
+                                    let evidence_status = if summary.occurrence_evidence_complete {
+                                        "complete"
+                                    } else {
+                                        "truncated"
+                                    };
+                                    let first_example = summary
+                                        .occurrences
+                                        .first()
+                                        .map(|occurrence| {
+                                            let indices = occurrence
+                                                .notes
+                                                .iter()
+                                                .map(|note| note.score_note_index.to_string())
+                                                .collect::<Vec<_>>()
+                                                .join(", ");
+                                            format!(
+                                                "; first candidate score-note indices [{indices}], observed max interval deviation {} semitone(s), max normalized gap error {:.3}",
+                                            occurrence.observed_max_pitch_interval_deviation_semitones,
+                                            occurrence.observed_max_normalized_onset_gap_error,
+                                        )
+                                        })
+                                        .unwrap_or_default();
+                                    format!(
+                                        "Rhythm-aware near matches: {} windows, {} non-overlapping; tolerance ≤{} semitone(s) per interval magnitude and ≤{:.2} normalized onset-gap-share error; stored {} of {} evidence ({evidence_status}){first_example}",
+                                        summary.occurrence_count,
+                                        summary.independent_occurrence_count,
+                                        summary.max_allowed_pitch_interval_deviation_semitones,
+                                        summary.max_allowed_normalized_onset_gap_error,
+                                        summary.occurrences.len(),
+                                        summary.occurrence_count,
+                                    )
+                                }
+                                None => "Rhythm-aware near-match evidence unavailable (legacy record or insufficient timing evidence).".to_string(),
+                            };
+                            view! {
+                                <div class="import-motif-result">
+                                    <strong>{heading}</strong>
+                                    <span>{source_part}</span>
+                                    <span>{format!("{} notes · {} exact pitch-contour window{}",
+                                        motif.midi_pitches.len(), motif.occurrence_count,
+                                        if motif.occurrence_count == 1 { "" } else { "s" })}</span>
+                                    <span class="muted small">{independent_text}</span>
+                                    <span class="muted small">{format!("Pitch intervals (semitones): {pitch_contour}")}</span>
+                                    <span class="muted small">{format!("Representative onset gaps (beats, exact fractions): {onset_gaps}")}</span>
+                                    <span class="muted small">{evidence_text}</span>
+                                    <span class="muted small">{rhythm_near_match_text}</span>
+                                    <span class="muted small">"Exact contour matches do not require rhythm agreement; near matches use explicit timing tolerances. Neither establishes musical identity or listener recognition, and legacy confidence is not calibrated."</span>
+                                </div>
+                            }
+                        }).collect_view()}
                         <div class="import-actions">
                             <button type="button" on:click=move |_| muse.play_review_audio(
                                 api::imported_audio_url(api::DEFAULT_BACKEND, &audio_id), playback_title.clone())>

@@ -78,8 +78,10 @@ pub mod score_validation;
 pub mod sonata;
 pub mod spec;
 pub mod spelling;
+pub mod state_space;
 pub mod style;
 pub mod voicing;
+pub mod world_state;
 
 pub use accompaniment::Accompaniment;
 pub use cadence::Cadence;
@@ -138,5 +140,12 @@ pub use sonata::{
 };
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
+pub use state_space::{
+    MUSICAL_STATE_SPACE_V1, MusicalStateFrame, MusicalStateTrajectory, STATE_DIMS,
+};
 pub use style::Style;
 pub use voicing::{lead_bass, lead_upper};
+pub use world_state::{
+    MUSICAL_WORLD_STATE_V1, MotifRelationObservationV1, MusicalWorldStateContext,
+    MusicalWorldStateV1,
+};

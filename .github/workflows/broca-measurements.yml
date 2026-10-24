@@ -59,11 +59,80 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
 
       - name: Generate Broca measurement artifacts
+        id: generate
         run: scripts/broca_measurement_artifacts.sh target/broca-measurements
 
-      - name: Upload Broca measurement artifacts
+      # If the strict --locked measurement command fails, gather the proposed
+      # resolver delta in this disposable runner. Restore Cargo.lock before
+      # leaving the step, and keep the preceding measurement failure intact.
+      - name: Diagnose Cargo.lock drift after measurement failure
+        # Explicitly override Actions' default success() so this diagnostic
+        # executes after the measurement step fails.
+        if: ${{ failure() && steps.generate.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=target/broca-measurements/lockfile-diagnostic
+          mkdir -p "$out"
+          cp Cargo.lock "$out/Cargo.lock.before"
+          before_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          restore_lock() { cp "$out/Cargo.lock.before" Cargo.lock; }
+          trap restore_lock EXIT
+
+          # Recreate the same feature selection used by the failed decoder
+          # cargo run, so the proposed lockfile delta is attributable to that
+          # dependency graph rather than Cargo's default feature set.
+          source scripts/broca_runtime_crust.sh
+          broca_resolve_runtime
+          metadata_feature_args=()
+          IFS=',' read -r -a decoder_features <<< "$BROCA_DECODER_FEATURES"
+          for feature in "${decoder_features[@]}"; do
+            feature="${feature//[[:space:]]/}"
+            if [[ -n "$feature" ]]; then
+              metadata_feature_args+=(--features "symthaea-broca/$feature")
+            fi
+          done
+          printf '%s\n' "decoder_features=$BROCA_DECODER_FEATURES" >"$out/diagnostic.env"
+
+          set +e
+          cargo metadata --format-version 1 "${metadata_feature_args[@]}" >/dev/null 2>"$out/cargo-metadata.stderr"
+          metadata_status=$?
+          set -e
+
+          cp Cargo.lock "$out/Cargo.lock.after"
+          after_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          set +e
+          diff -u "$out/Cargo.lock.before" "$out/Cargo.lock.after" >"$out/Cargo.lock.diff"
+          diff_status=$?
+          set -e
+
+          {
+            echo "git_rev=$(git rev-parse HEAD)"
+            echo "decoder_features=$BROCA_DECODER_FEATURES"
+            echo "cargo_metadata_exit_code=$metadata_status"
+            echo "lockfile_sha256_before=$before_sha"
+            echo "lockfile_sha256_after=$after_sha"
+            if [[ "$diff_status" -eq 0 ]]; then
+              echo "lockfile_delta=none"
+            elif [[ "$diff_status" -eq 1 ]]; then
+              echo "lockfile_delta=proposed"
+            else
+              echo "lockfile_diff_exit_code=$diff_status"
+            fi
+            echo "diagnostic_only=1"
+            echo "locked_measurement_failure_preserved=1"
+          } >"$out/diagnostic.env"
+
+          restore_lock
+          trap - EXIT
+          git diff -- Cargo.lock >"$out/Cargo.lock.repo-diff-after-restore.patch"
+          echo "Cargo.lock diagnostic captured; repository lockfile restored."
+
+      - name: Upload Broca measurement artifacts and failure diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: broca-measurements-${{ github.sha }}
           path: target/broca-measurements/
+          if-no-files-found: ignore
           retention-days: 30
