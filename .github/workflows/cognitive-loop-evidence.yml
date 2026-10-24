@@ -15,6 +15,7 @@ on:
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
+      - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
   push:
     branches: [main]
@@ -27,9 +28,11 @@ on:
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
       - "xtask/src/cognitive_drift_baselines.rs"
+      - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
+      - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
   workflow_dispatch:
 
