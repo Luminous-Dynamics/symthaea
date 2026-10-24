@@ -531,7 +531,7 @@ jobs:
               "semantic_gate": {
                   "status": "passed",
                   "checked_target_statement_sha256": "d" * 64,
-                  "statement_correspondence": {"status": "matches_intended_claim", "independent_reviewer_count": 2, "receipt_sha256": "1" * 64},
+                  "statement_correspondence": {"status": "matches_intended_claim", "reviewers": [{"reviewer_id": "reviewer-a", "decision": "matches_intended_claim", "evidence_sha256": "6" * 64}, {"reviewer_id": "reviewer-b", "decision": "matches_intended_claim", "evidence_sha256": "7" * 64}], "receipt_sha256": "1" * 64},
                   "axiom_policy": {"status": "compliant", "policy_id": "schema-control-allowed-axioms", "receipt_sha256": "2" * 64},
                   "successor_check": {"status": "not_applicable", "receipt_sha256": "3" * 64, "reason": "No meaningful successor theorem exists for this schema-only example."},
                   "mutation_controls": {"status": "passed", "suite_sha256": "4" * 64, "receipt_sha256": "5" * 64}
@@ -583,7 +583,7 @@ jobs:
           else:
               raise SystemExit("executed-row schema accepted missing checked-target statement digest")
           bad_execution = copy.deepcopy(valid_execution)
-          bad_execution["semantic_gate"]["statement_correspondence"]["independent_reviewer_count"] = 1
+          bad_execution["semantic_gate"]["statement_correspondence"]["reviewers"].pop()
           try:
               execution_validator.validate(bad_execution)
           except ValidationError:
