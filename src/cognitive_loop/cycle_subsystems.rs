@@ -56,9 +56,11 @@ impl CognitiveLoopService {
         let hv16_cached = *state.hv16_cached;
         let unified_psi = state.unified_psi;
         let coherence = state.coherence;
-        let prediction_error = state.prediction_error;
-        let prediction_error_valid =
-            state.prediction_error_valid && prediction_error.is_finite();
+        let prediction_error_sample = state
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
         let phi_attention_weight = state.phi_attention_weight;
         let _compressed_state = state.compressed_state;
 
