@@ -8,6 +8,7 @@
 //! validation overlays, speed/scale modulation, and runtime reconfiguration.
 
 use std::collections::{HashMap, VecDeque};
+use std::time::Instant;
 
 use symthaea_core::hdc::substrate_independence::{
     CorticalRegion, SubstrateRequirements, SubstrateType,
@@ -24,6 +25,10 @@ use super::thresholds::{
 /// Default honest confidence for substrates not in the validation framework.
 /// Matches EvidenceLevel::Theoretical.confidence() = 0.10.
 const THEORETICAL_CONFIDENCE: f64 = 0.10;
+
+/// Do not compare a per-cycle energy estimate to a watts budget until at least
+/// one wall-clock second of monotonic observation has elapsed.
+const ENERGY_RATE_WINDOW_MIN_SECONDS: f64 = 1.0;
 
 /// Record of a substrate transition event.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -115,6 +120,14 @@ pub(crate) struct SubstrateManager {
     /// Energy spent in the most recent tick (for telemetry).
     #[cfg(feature = "jepa")]
     pub(crate) jepa_energy: f64,
+    /// Modeled energy accumulated since the last closed monotonic-rate window.
+    energy_rate_window_joules: f64,
+    /// Monotonic start of the current energy-rate observation window.
+    energy_rate_window_started_at: Option<Instant>,
+    /// Average model-estimated energy rate over the most recently closed window (watts).
+    estimated_energy_rate_watts: f64,
+    /// Duration of the most recently closed energy-rate window (seconds).
+    energy_rate_window_seconds: f64,
     last_energy_spent: f64,
 }
 
@@ -157,6 +170,10 @@ impl SubstrateManager {
             transition_history: VecDeque::new(),
             current_substrate: config.substrate_type,
             last_energy_spent: 0.0,
+            energy_rate_window_joules: 0.0,
+            energy_rate_window_started_at: None,
+            estimated_energy_rate_watts: 0.0,
+            energy_rate_window_seconds: 0.0,
             #[cfg(feature = "jepa")]
             jepa_energy: 0.0,
         };
@@ -351,26 +368,134 @@ impl SubstrateManager {
         self.scale_pressure = (sub_scale / bio_scale).log10() as f32;
     }
 
-    /// Track energy expenditure for this cycle.
-    /// When energy budget is enabled and exceeded, marks consciousness as non-viable.
+    /// Record this cycle's model-estimated energy and evaluate the configured watts
+    /// budget only after a measured monotonic observation window has closed.
     ///
-    /// Faster substrates (tau_factor > 1.0) complete more cycles per wall-clock
-    /// second, so energy per wall-clock tick scales with tau_factor.
+    /// `energy_per_cycle` and `total_energy_spent` are joules; a budget named
+    /// `energy_budget_joules_per_sec` is watts (joules/second). Comparing those
+    /// quantities directly is dimensionally invalid, so this gate compares the
+    /// window's estimated joules divided by monotonic wall elapsed seconds.
+    ///
+    /// This remains a substrate-model estimate, not a measurement of electrical
+    /// power drawn by the actual processor or robot.
     pub fn tick_energy(&mut self, config: &CognitiveLoopConfig) {
-        if !config.enable_energy_budget {
-            self.last_energy_spent = 0.0;
-            return;
-        }
-        let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
-        self.total_energy_spent += speed_adjusted_energy;
-        self.last_energy_spent = speed_adjusted_energy;
-        if let Some(budget) = config.energy_budget_joules_per_sec {
-            if self.total_energy_spent > budget {
-                self.consciousness_viable = false;
-            }
-        }
+        self.tick_energy_at(config, Instant::now());
     }
 
+    /// Deterministic time-injected form used by tests and controlled replay.
+    ///
+    /// Each call occurs at the start of a cognitive cycle. The previously
+    /// accumulated cycle energy is compared with elapsed start-to-start wall time;
+    /// the current cycle estimate is added only after the prior interval is closed.
+    pub(crate) fn tick_energy_at(&mut self, config: &CognitiveLoopConfig, now: Instant) {
+        if !config.enable_energy_budget {
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        }
+
+        // A malformed configured limit is a configuration fault, not something
+        // to defer until a complete measurement window. Reject it before recording
+        // energy or allowing another cycle to proceed under an invalid contract.
+        if let Some(budget_watts) = config.energy_budget_joules_per_sec {
+            if !budget_watts.is_finite() || budget_watts < 0.0 {
+                self.consciousness_viable = false;
+                self.last_energy_spent = 0.0;
+                self.energy_rate_window_joules = 0.0;
+                self.energy_rate_window_started_at = None;
+                self.estimated_energy_rate_watts = 0.0;
+                self.energy_rate_window_seconds = 0.0;
+                return;
+            }
+        }
+
+        // Joules per cognitive cycle come from the substrate's energy model.
+        // Cognitive tau changes internal integration dynamics; it is not an
+        // independent physical-energy multiplier. Wall-time throughput is captured
+        // by the measured observation interval below.
+        let modeled_energy_joules = self.energy_per_cycle;
+        let next_total_energy = self.total_energy_spent + modeled_energy_joules;
+        if !modeled_energy_joules.is_finite()
+            || modeled_energy_joules < 0.0
+            || !next_total_energy.is_finite()
+        {
+            // Non-finite/negative samples and cumulative overflow cannot safely feed
+            // a rate budget: NaN comparisons otherwise evaluate false.
+            self.consciousness_viable = false;
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        }
+        self.last_energy_spent = modeled_energy_joules;
+
+        // The first call starts a fresh window. Do not include idle time between
+        // manager construction and the first cognitive cycle in the denominator.
+        let Some(window_started_at) = self.energy_rate_window_started_at else {
+            self.energy_rate_window_started_at = Some(now);
+            self.energy_rate_window_joules = modeled_energy_joules;
+            self.total_energy_spent = next_total_energy;
+            return;
+        };
+
+        let Some(elapsed) = now.checked_duration_since(window_started_at) else {
+            // Reversed monotonic evidence invalidates the observation. Latch non-viable
+            // and discard the partial window; do not account the current sample because
+            // its relationship to that invalid interval cannot be established.
+            self.consciousness_viable = false;
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.energy_rate_window_joules = 0.0;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        };
+        let elapsed_seconds = elapsed.as_secs_f64();
+        if elapsed_seconds >= ENERGY_RATE_WINDOW_MIN_SECONDS {
+            let estimated_rate_watts = self.energy_rate_window_joules / elapsed_seconds;
+            if !estimated_rate_watts.is_finite() || estimated_rate_watts < 0.0 {
+                self.consciousness_viable = false;
+                self.last_energy_spent = 0.0;
+                self.energy_rate_window_joules = 0.0;
+                self.energy_rate_window_started_at = None;
+                self.estimated_energy_rate_watts = 0.0;
+                self.energy_rate_window_seconds = 0.0;
+                return;
+            }
+            self.estimated_energy_rate_watts = estimated_rate_watts;
+            self.energy_rate_window_seconds = elapsed_seconds;
+
+            if let Some(budget_watts) = config.energy_budget_joules_per_sec {
+                if estimated_rate_watts > budget_watts {
+                    self.consciousness_viable = false;
+                }
+            }
+
+            self.energy_rate_window_started_at = Some(now);
+            self.energy_rate_window_joules = 0.0;
+        }
+
+        // Attribute this cycle's estimate after checking the previously completed
+        // start-to-start interval, so the numerator and denominator refer to the
+        // same completed cycles.
+        let next_window_energy = self.energy_rate_window_joules + modeled_energy_joules;
+        if !next_window_energy.is_finite() || next_window_energy < 0.0 {
+            self.consciousness_viable = false;
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        }
+        self.energy_rate_window_joules = next_window_energy;
+        self.total_energy_spent = next_total_energy;
+    }
     /// Smooth transition dynamics via EMA blending each cycle.
     ///
     /// When `substrate_transition_alpha` < 1.0, effective_feasibility and
@@ -605,6 +730,8 @@ impl SubstrateManager {
             substrate_encoding_noise: encoding_noise,
             total_energy_spent: self.total_energy_spent,
             energy_this_cycle: self.last_energy_spent,
+            estimated_energy_rate_watts: self.estimated_energy_rate_watts,
+            energy_rate_window_seconds: self.energy_rate_window_seconds,
             energy_throughput_multiplier: self.energy_throughput_multiplier,
             effective_dim_fraction: self.effective_dim_fraction(),
             effective_dim_source: self.effective_dim_source(config),
@@ -1038,6 +1165,37 @@ mod tests {
     }
 
     #[test]
+    fn test_substrate_tau_sign_and_reference_values_are_explicit() {
+        let cases = [
+            (SubstrateType::PhotonicProcessor, 1.5_f32, "photonic faster than silicon"),
+            (SubstrateType::SiliconDigital, 1.333_333_4_f32, "silicon faster than biological"),
+            (SubstrateType::BiologicalNeurons, 1.0_f32, "biological reference"),
+            (SubstrateType::BiochemicalComputer, 0.833_333_3_f32, "biochemical slower than biological"),
+        ];
+        let mut observed = Vec::new();
+
+        for (substrate, expected, label) in cases {
+            let mut config = default_config();
+            config.enable_substrate_speed_modulation = true;
+            config.substrate_type = substrate;
+            let manager = SubstrateManager::new(&config);
+
+            assert!(
+                (manager.tau_factor - expected).abs() < 0.01,
+                "{label}: expected tau near {expected}, observed {}",
+                manager.tau_factor
+            );
+            observed.push((substrate, manager.tau_factor));
+        }
+
+        // operation_speed() is seconds per operation: smaller means faster.
+        // Therefore faster substrates yield larger factors under the current formula.
+        assert!(observed[0].1 > observed[1].1);
+        assert!(observed[1].1 > observed[2].1);
+        assert!(observed[2].1 > observed[3].1);
+    }
+
+    #[test]
     fn test_biological_tau_equals_one() {
         let mut config = default_config();
         config.enable_substrate_speed_modulation = true;
@@ -1205,20 +1363,24 @@ mod tests {
     }
 
     #[test]
-    fn test_budget_exhaustion_kills_viability() {
+    fn test_budget_exhaustion_kills_viability_after_wall_time_window() {
         let mut cfg = default_config();
         cfg.enable_energy_budget = true;
-        // Set budget to exactly 1 cycle's worth of energy
         let mgr_ref = SubstrateManager::new(&cfg);
         cfg.energy_budget_joules_per_sec = Some(mgr_ref.energy_per_cycle * 0.5);
         let mut mgr = SubstrateManager::new(&cfg);
+        let window_start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = Some(window_start);
         assert!(mgr.consciousness_viable);
-        // One tick should exceed the budget
-        mgr.tick_energy(&cfg);
+        mgr.tick_energy_at(&cfg, window_start); // seed the first cycle's modeled energy
+
+        mgr.tick_energy_at(&cfg, window_start + std::time::Duration::from_secs(1));
         assert!(
             !mgr.consciousness_viable,
-            "Exceeding energy budget should kill viability"
+            "Model-estimated average watts above the budget should trip the gate"
         );
+        assert!(mgr.estimated_energy_rate_watts > cfg.energy_budget_joules_per_sec.unwrap());
+        assert!((mgr.energy_rate_window_seconds - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1252,23 +1414,235 @@ mod tests {
     }
 
     #[test]
-    fn test_energy_scales_with_tau() {
-        // Photonic (fast, tau > 1.0) should burn more energy per tick
+    fn test_rate_budget_does_not_compare_joules_to_watts_before_window_closes() {
         let mut config = default_config();
         config.enable_energy_budget = true;
-        config.enable_substrate_speed_modulation = true;
-        config.substrate_type = SubstrateType::PhotonicProcessor;
-        config.energy_budget_joules_per_sec = Some(1e-6);
         let mut mgr = SubstrateManager::new(&config);
-        let initial_energy = mgr.energy_per_cycle;
-        mgr.tick_energy(&config);
-        // With tau > 1.0, energy spent should exceed base energy_per_cycle
+        let window_start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = Some(window_start);
+        config.energy_budget_joules_per_sec = Some(1e-20);
+
+        mgr.tick_energy_at(&config, window_start + std::time::Duration::from_millis(100));
         assert!(
-            mgr.total_energy_spent > initial_energy,
-            "Photonic substrate should burn more energy: {} vs {}",
-            mgr.total_energy_spent,
-            initial_energy
+            mgr.total_energy_spent > config.energy_budget_joules_per_sec.unwrap(),
+            "test requires cumulative joules to exceed the numeric watts budget"
         );
+        assert!(
+            mgr.consciousness_viable,
+            "a numeric joule-vs-watt comparison must not trip the rate budget"
+        );
+        assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+
+        mgr.tick_energy_at(&config, window_start + std::time::Duration::from_secs(1));
+        assert!(
+            !mgr.consciousness_viable,
+            "a completed measured window above budget must trip the rate gate"
+        );
+        assert!(mgr.estimated_energy_rate_watts > config.energy_budget_joules_per_sec.unwrap());
+    }
+
+    #[test]
+    fn test_invalid_energy_rate_budgets_fail_closed_before_first_window() {
+        for invalid_budget in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut config = default_config();
+            config.enable_energy_budget = true;
+            config.energy_budget_joules_per_sec = Some(invalid_budget);
+
+            let mut mgr = SubstrateManager::new(&config);
+            mgr.tick_energy_at(&config, std::time::Instant::now());
+
+            assert!(
+                !mgr.consciousness_viable,
+                "invalid watt budget {:?} must fail closed immediately",
+                invalid_budget
+            );
+            assert_eq!(
+                mgr.total_energy_spent, 0.0,
+                "invalid configuration must not record an apparently valid energy sample"
+            );
+            assert_eq!(mgr.energy_rate_window_joules, 0.0);
+            assert_eq!(mgr.energy_rate_window_started_at, None);
+            assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+            assert_eq!(mgr.energy_rate_window_seconds, 0.0);
+
+            // The same invalid input must invalidate an already-open window too.
+            let mut open_window_mgr = SubstrateManager::new(&config);
+            let start = std::time::Instant::now();
+            open_window_mgr.energy_rate_window_started_at = Some(start);
+            open_window_mgr.energy_rate_window_joules = 123.0;
+            open_window_mgr.tick_energy_at(
+                &config,
+                start + std::time::Duration::from_millis(500),
+            );
+            assert!(
+                !open_window_mgr.consciousness_viable,
+                "invalid watt budget {:?} must invalidate an open window immediately",
+                invalid_budget
+            );
+            assert_eq!(open_window_mgr.energy_rate_window_joules, 0.0);
+            assert_eq!(open_window_mgr.energy_rate_window_started_at, None);
+            assert_eq!(open_window_mgr.total_energy_spent, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_invalid_modeled_energy_fails_closed_before_accounting() {
+        for energy_per_cycle in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+            let mut config = default_config();
+            config.enable_energy_budget = true;
+            config.energy_budget_joules_per_sec = Some(1e9);
+
+            let mut mgr = SubstrateManager::new(&config);
+            mgr.energy_per_cycle = energy_per_cycle;
+            let now = std::time::Instant::now();
+            mgr.energy_rate_window_started_at = Some(now);
+            mgr.energy_rate_window_joules = 0.25;
+
+            mgr.tick_energy_at(&config, now + std::time::Duration::from_millis(500));
+
+            assert!(
+                !mgr.consciousness_viable,
+                "invalid modeled energy {energy_per_cycle:?} J/cycle must fail closed"
+            );
+            assert_eq!(mgr.total_energy_spent, 0.0);
+            assert_eq!(mgr.last_energy_spent, 0.0);
+            assert_eq!(mgr.energy_rate_window_joules, 0.0);
+            assert_eq!(mgr.energy_rate_window_started_at, None);
+            assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_energy_accumulation_overflow_fails_closed() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(f64::MAX);
+
+        // A finite sample that overflows the cumulative sum is still invalid evidence.
+        let mut total_overflow = SubstrateManager::new(&config);
+        total_overflow.total_energy_spent = f64::MAX;
+        total_overflow.energy_per_cycle = f64::MAX;
+        total_overflow.tau_factor = 1.0;
+        total_overflow.tick_energy_at(&config, std::time::Instant::now());
+        assert!(!total_overflow.consciousness_viable);
+        assert_eq!(total_overflow.total_energy_spent, f64::MAX);
+        assert_eq!(total_overflow.energy_rate_window_started_at, None);
+
+        // Window accumulation can overflow independently before its rate closes.
+        let mut window_overflow = SubstrateManager::new(&config);
+        window_overflow.energy_per_cycle = 1.0e308;
+        window_overflow.tau_factor = 1.0;
+        window_overflow.energy_rate_window_joules = 1.0e308;
+        let start = std::time::Instant::now();
+        window_overflow.energy_rate_window_started_at = Some(start);
+        window_overflow.tick_energy_at(
+            &config,
+            start + std::time::Duration::from_millis(500),
+        );
+        assert!(!window_overflow.consciousness_viable);
+        assert_eq!(window_overflow.energy_rate_window_joules, 0.0);
+        assert_eq!(window_overflow.energy_rate_window_started_at, None);
+        assert_eq!(window_overflow.total_energy_spent, 0.0, "overflowing window sample must not be accounted");
+    }
+
+    #[test]
+    fn test_energy_rate_telemetry_reports_the_closed_monotonic_window() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(1e10);
+        let mut mgr = SubstrateManager::new(&config);
+        let start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = Some(start);
+
+        mgr.tick_energy_at(&config, start);
+        let expected_window_energy = mgr.energy_per_cycle;
+        mgr.tick_energy_at(&config, start + std::time::Duration::from_secs(1));
+
+        assert!((mgr.estimated_energy_rate_watts - expected_window_energy).abs() < 1e-18);
+        assert!((mgr.energy_rate_window_seconds - 1.0).abs() < f64::EPSILON);
+        let telemetry = mgr.telemetry(&config);
+        assert_eq!(telemetry.estimated_energy_rate_watts, mgr.estimated_energy_rate_watts);
+        assert_eq!(telemetry.energy_rate_window_seconds, 1.0);
+    }
+
+    #[test]
+    fn test_energy_rate_uses_actual_elapsed_time_for_irregular_cycle_cadence() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(f64::MAX);
+
+        let mut mgr = SubstrateManager::new(&config);
+        mgr.tau_factor = 2.0;
+        let energy_per_cycle = mgr.energy_per_cycle;
+        let start = std::time::Instant::now();
+
+        mgr.tick_energy_at(&config, start);
+        mgr.tick_energy_at(&config, start + std::time::Duration::from_millis(250));
+        mgr.tick_energy_at(&config, start + std::time::Duration::from_millis(1_500));
+
+        let expected_watts = (2.0 * energy_per_cycle) / 1.5;
+        assert!(
+            (mgr.estimated_energy_rate_watts - expected_watts).abs() <= expected_watts.abs() * 1e-12,
+            "expected modeled rate {expected_watts:e} W over 1.5 s, got {:e} W",
+            mgr.estimated_energy_rate_watts
+        );
+        assert_eq!(mgr.energy_rate_window_seconds, 1.5);
+        assert!(
+            (mgr.total_energy_spent - 3.0 * energy_per_cycle).abs()
+                <= (3.0 * energy_per_cycle).abs() * 1e-12,
+            "cumulative modeled joules should account for all three ticks"
+        );
+        assert_eq!(
+            mgr.energy_rate_window_joules, energy_per_cycle,
+            "the cycle at the closing timestamp belongs to the next window"
+        );
+        assert!(mgr.consciousness_viable);
+    }
+
+    #[test]
+    fn test_reversed_monotonic_energy_window_fails_closed() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(1e10);
+        let mut mgr = SubstrateManager::new(&config);
+        let now = std::time::Instant::now();
+        mgr.energy_rate_window_started_at =
+            Some(now + std::time::Duration::from_secs(1));
+
+        mgr.tick_energy_at(&config, now);
+
+        assert!(
+            !mgr.consciousness_viable,
+            "reversed monotonic evidence must not authorize continued viability"
+        );
+        assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+        assert_eq!(mgr.energy_rate_window_seconds, 0.0);
+        assert_eq!(mgr.total_energy_spent, 0.0, "sample tied to reversed timing must not be accounted");
+        assert_eq!(mgr.energy_rate_window_joules, 0.0);
+        assert_eq!(mgr.energy_rate_window_started_at, None);
+        assert_eq!(mgr.last_energy_spent, 0.0);
+    }
+
+    #[test]
+    fn test_modeled_energy_per_cycle_is_independent_of_cognitive_tau() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(f64::MAX);
+
+        for tau in [0.5_f32, 1.0, 2.0] {
+            let mut mgr = SubstrateManager::new(&config);
+            mgr.tau_factor = tau;
+            let expected_energy = mgr.energy_per_cycle;
+            mgr.tick_energy_at(&config, std::time::Instant::now());
+
+            assert_eq!(
+                mgr.last_energy_spent, expected_energy,
+                "cognitive tau={tau} must not masquerade as an energy multiplier"
+            );
+            assert_eq!(mgr.total_energy_spent, expected_energy);
+            assert_eq!(mgr.energy_rate_window_joules, expected_energy);
+            assert!(mgr.consciousness_viable);
+        }
     }
 
     #[test]
@@ -1288,16 +1662,19 @@ mod tests {
     }
 
     #[test]
-    fn test_should_degrade_when_energy_exhausted() {
+    fn test_should_degrade_when_energy_rate_exceeds_budget() {
         let mut config = default_config();
         config.enable_energy_budget = true;
-        config.energy_budget_joules_per_sec = Some(1e-20); // impossibly small budget
+        config.energy_budget_joules_per_sec = Some(1e-20); // impossibly small modeled-watt budget
         let mut mgr = SubstrateManager::new(&config);
+        let window_start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = Some(window_start);
         assert!(!mgr.should_degrade_consciousness());
-        mgr.tick_energy(&config);
+        mgr.tick_energy_at(&config, window_start); // seed the first cycle's modeled energy
+        mgr.tick_energy_at(&config, window_start + std::time::Duration::from_secs(1));
         assert!(
             mgr.should_degrade_consciousness(),
-            "Should degrade after energy exhaustion"
+            "Should degrade after the model-estimated energy rate exceeds the rate budget"
         );
     }
 
