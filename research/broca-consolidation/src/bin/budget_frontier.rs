@@ -613,6 +613,15 @@ mod tests {
     }
 
     #[test]
+    fn maximum_supported_workload_fits_the_raw_retention_budget() {
+        const MAX_CANDIDATES: usize = 200;
+        const MAX_RAW_TOKENS_PER_CANDIDATE: usize = 40;
+        assert!(MAX_CANDIDATES * MAX_RAW_TOKENS_PER_CANDIDATE <= 8192);
+        assert!(build_fixture(91, MAX_CANDIDATES).iter()
+            .all(|candidate| candidate.raw_tokens <= MAX_RAW_TOKENS_PER_CANDIDATE));
+    }
+
+    #[test]
     fn oracle_matches_exhaustive_search_for_a_tiny_fixture() {
         let candidates = build_fixture(71, 3);
         let budget = 24;
