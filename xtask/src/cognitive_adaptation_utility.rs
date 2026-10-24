@@ -171,13 +171,27 @@ pub fn evaluate_file_with_receipt(
     input_path: &Path,
     receipt_path: &Path,
 ) -> anyhow::Result<CounterfactualUtilityScore> {
-    let mut score = evaluate_file(input_path)?;
+    let input_bytes = fs::read(input_path)
+        .with_context(|| format!("reading counterfactual utility input {}", input_path.display()))?;
+    let mut input: CounterfactualUtilityInput = serde_json::from_slice(&input_bytes)
+        .with_context(|| format!("parsing counterfactual utility input {}", input_path.display()))?;
+    // Normalize each arm exactly as the ordinary scorer does before digesting or joining cycles.
+    for arm in [
+        &mut input.no_adapt,
+        &mut input.detector_triggered,
+        &mut input.detector_benefit_gated,
+        &mut input.staged_verify_rollback,
+        &mut input.oracle_timed,
+    ] {
+        arm.observations.sort_by_key(|observation| observation.cycle_index);
+    }
+    let mut score = score_counterfactual_utility(input.clone())?;
     let bytes = fs::read(receipt_path)
         .with_context(|| format!("reading replay receipt {}", receipt_path.display()))?;
     let receipt: crate::cognitive_replay_receipt::ReplayReceipt =
         serde_json::from_slice(&bytes)
             .with_context(|| format!("parsing replay receipt {}", receipt_path.display()))?;
-    bind_replay_receipt(&mut score, receipt)?;
+    bind_replay_receipt(&mut score, &input, receipt)?;
     Ok(score)
 }
 
@@ -185,6 +199,7 @@ pub fn evaluate_file_with_receipt(
 /// The resulting digest commits to both the score and the validated receipt linkage.
 fn bind_replay_receipt(
     score: &mut CounterfactualUtilityScore,
+    input: &CounterfactualUtilityInput,
     receipt: crate::cognitive_replay_receipt::ReplayReceipt,
 ) -> anyhow::Result<()> {
     let validation = crate::cognitive_replay_receipt::validate_receipt(receipt.clone())?;
@@ -197,15 +212,18 @@ fn bind_replay_receipt(
     ensure!(score.shared_stream_sha256 == receipt.event_ledger_sha256,
         "replay receipt event_ledger_sha256 differs from the scored shared stream digest");
 
+    ensure!(score.no_adapt.cycle_count as u64 == receipt.stream_length_ticks,
+        "replay receipt stream length differs from scored cycle panel");
     let receipt_arms: std::collections::BTreeMap<&str, &crate::cognitive_replay_receipt::ReplayArm> =
         receipt.arms.iter().map(|arm| (arm.arm_id.as_str(), arm)).collect();
-    for arm in [
-        &score.no_adapt,
-        &score.detector_triggered,
-        &score.detector_benefit_gated,
-        &score.staged_verify_rollback,
-        &score.oracle_timed,
-    ] {
+    let input_arms = [
+        (&input.no_adapt, &score.no_adapt),
+        (&input.detector_triggered, &score.detector_triggered),
+        (&input.detector_benefit_gated, &score.detector_benefit_gated),
+        (&input.staged_verify_rollback, &score.staged_verify_rollback),
+        (&input.oracle_timed, &score.oracle_timed),
+    ];
+    for (input_arm, arm) in input_arms {
         let source = receipt_arms.get(arm.name.as_str())
             .with_context(|| format!("validated replay receipt is missing arm {}", arm.name))?;
         ensure!(arm.repository_head_sha == source.repository_head_sha,
@@ -214,6 +232,20 @@ fn bind_replay_receipt(
             "replay receipt policy configuration differs for arm {}", arm.name);
         ensure!(arm.exogenous_stream_sha256 == receipt.event_ledger_sha256,
             "scored stream digest differs from the validated event ledger for arm {}", arm.name);
+        ensure!(input_arm.observations.len() == source.decisions.len(),
+            "replay receipt cycle count differs for arm {}", arm.name);
+        if receipt.run_kind == "replay" {
+            for (observation, decision) in input_arm.observations.iter().zip(&source.decisions) {
+                ensure!(observation.cycle_index == decision.decision_tick,
+                    "replay receipt cycle index differs for arm {}", arm.name);
+                ensure!(decision.task_loss == Some(observation.task_loss),
+                    "replay receipt task_loss differs from scored outcome for arm {} at tick {}",
+                    arm.name, observation.cycle_index);
+                ensure!(decision.adaptation_cost_units == Some(observation.adaptation_cost_units),
+                    "replay receipt adaptation_cost_units differs from scored cost for arm {} at tick {}",
+                    arm.name, observation.cycle_index);
+            }
+        }
     }
 
     score.source_replay_receipt_sha256 = Some(validation.canonical_receipt_sha256);
@@ -839,8 +871,23 @@ mod tests {
             receipt_arm.configuration_digest = scored_arm.configuration_digest.clone();
         }
 
-        let mut score = score_counterfactual_utility(input).expect("score fixture");
-        bind_replay_receipt(&mut score, receipt.clone()).expect("matching receipt binds");
+        for receipt_arm in &mut receipt.arms {
+            let scored = match receipt_arm.arm_id.as_str() {
+                "no-adapt" => &input.no_adapt,
+                "detector-triggered" => &input.detector_triggered,
+                "detector-benefit-gated" => &input.detector_benefit_gated,
+                "staged-verify-rollback" => &input.staged_verify_rollback,
+                "oracle-timed" => &input.oracle_timed,
+                other => panic!("unexpected receipt arm {other}"),
+            };
+            for (decision, observation) in receipt_arm.decisions.iter_mut().zip(&scored.observations) {
+                decision.task_loss = Some(observation.task_loss);
+                decision.adaptation_cost_units = Some(observation.adaptation_cost_units);
+            }
+        }
+
+        let mut score = score_counterfactual_utility(input.clone()).expect("score fixture");
+        bind_replay_receipt(&mut score, &input, receipt.clone()).expect("matching receipt binds");
         assert_eq!(score.source_replay_run_kind.as_deref(), Some("replay"));
         assert_eq!(
             score.source_replay_receipt_sha256.as_ref().map(String::len),
@@ -854,15 +901,21 @@ mod tests {
 
         let mut wrong_identity = receipt.clone();
         wrong_identity.stream_id = "different-stream".to_owned();
-        let error = bind_replay_receipt(&mut score.clone(), wrong_identity)
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_identity)
             .expect_err("receipt from another stream must fail closed");
         assert!(error.to_string().contains("stream_id differs"));
 
         let mut wrong_policy = receipt;
         wrong_policy.arms[0].configuration_digest = "9".repeat(64);
-        let error = bind_replay_receipt(&mut score.clone(), wrong_policy)
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_policy)
             .expect_err("policy configuration mismatch must fail closed");
         assert!(error.to_string().contains("configuration differs"));
+
+        let mut wrong_outcome = receipt;
+        wrong_outcome.arms[0].decisions[0].task_loss = Some(99.0);
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_outcome)
+            .expect_err("receipt outcomes must match the observations being scored");
+        assert!(error.to_string().contains("task_loss differs from scored outcome"));
     }
 
 }
