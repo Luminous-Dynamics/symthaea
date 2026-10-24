@@ -9,6 +9,10 @@
 //! - Command classification and safety scoring
 //! - JSON output mode for structured results
 
+use super::authorization::{
+    ActionScope, AuthorizationAttempt, AuthorizationAuthority, CommandBinding,
+    ExecutionAuthorizationLedger, ExecutionPermit,
+};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -569,6 +573,63 @@ impl NixOSExecutor {
         }
     }
 
+    /// Execute a typed NixOS command only after consuming a matching one-shot permit.
+    ///
+    /// This is the permit-checked path for typed built-in commands. The action
+    /// scope is derived from this command's safety tier; callers cannot supply a
+    /// weaker scope. Custom commands are rejected here until a separate
+    /// command-classification policy can validate them independently.
+    ///
+    /// IMPORTANT: this method does not remove the legacy `execute_confirmed`
+    /// escape hatch. Until all real dispatch call sites are migrated or the
+    /// escape hatch is narrowed, the repository is not globally fail-closed.
+    pub async fn execute_with_permit(
+        &mut self,
+        command: NixOSCommand,
+        phi: f32,
+        ledger: &mut ExecutionAuthorizationLedger,
+        permit: &ExecutionPermit,
+        principal: &str,
+        authority: AuthorizationAuthority,
+    ) -> ExecutionResult {
+        let safety_level = command.safety_level();
+
+        if matches!(&command, NixOSCommand::Custom { .. }) {
+            return ExecutionResult::Blocked {
+                reason: "custom command requires a separately audited authorization policy"
+                    .to_string(),
+                safety_level,
+            };
+        }
+
+        let scope = match safety_level {
+            SafetyLevel::ReadOnly => ActionScope::ReadOnly,
+            SafetyLevel::UserModify => ActionScope::UserModify,
+            SafetyLevel::SystemModify => ActionScope::SystemModify,
+            SafetyLevel::SystemCritical => ActionScope::SystemCritical,
+            SafetyLevel::Destructive => ActionScope::Destructive,
+        };
+        let (executable, args) = command.to_command();
+
+        let authorization = CommandBinding::new(executable, args)
+            .and_then(|binding| {
+                AuthorizationAttempt::new(binding, principal.to_owned(), scope, authority)
+            })
+            .and_then(|attempt| ledger.consume(permit, &attempt));
+
+        if let Err(error) = authorization {
+            return ExecutionResult::Blocked {
+                reason: format!("one-shot authorization denied before dispatch: {error}"),
+                safety_level,
+            };
+        }
+
+        // No await or command transformation occurs between capability
+        // consumption and entering the dispatch routine. The immutable command
+        // value used to verify argv is the same value handed to the runner.
+        self.execute_confirmed(command, phi).await
+    }
+
     /// Execute unconditionally, bypassing the tier-threshold check in
     /// `execute()`. `phi` is recorded for telemetry only (`ExecutionRecord`),
     /// not checked. Only call this when the command was already confirmed by
@@ -775,6 +836,150 @@ mod tests {
             }
             _ => panic!("Expected pending confirmation"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_permit_accepts_exact_typed_command_once() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let command = NixOSCommand::RebuildSwitch {
+            flake: Some(".#host".to_string()),
+            extra_args: vec![],
+        };
+        let (executable, args) = command.to_command();
+        let binding = CommandBinding::new(executable, args).unwrap();
+        let request = AuthorizationRequest::new(
+            binding,
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "exec-test-001",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+
+        let result = executor
+            .execute_with_permit(
+                command.clone(),
+                0.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(result, ExecutionResult::Success { .. }));
+
+        let replay = executor
+            .execute_with_permit(
+                command,
+                0.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            replay,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_permit_blocks_command_substitution() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let approved = NixOSCommand::RebuildSwitch {
+            flake: Some(".#approved".to_string()),
+            extra_args: vec![],
+        };
+        let (executable, args) = approved.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "exec-test-002",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let substituted = NixOSCommand::RebuildSwitch {
+            flake: Some(".#attacker-controlled".to_string()),
+            extra_args: vec![],
+        };
+
+        let result = executor
+            .execute_with_permit(
+                substituted,
+                1.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("differ from the permit")
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_permit_rejects_unclassified_custom_command() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let command = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "touch /tmp/should-not-run".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        let (executable, args) = command.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::ReadOnly,
+            AuthorizationAuthority::ReadOnlyPolicy,
+            "exec-test-003",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+
+        let result = executor
+            .execute_with_permit(
+                command,
+                1.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::ReadOnlyPolicy,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("separately audited")
+        ));
     }
 
     #[tokio::test]
