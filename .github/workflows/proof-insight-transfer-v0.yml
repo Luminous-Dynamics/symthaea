@@ -192,6 +192,10 @@ jobs:
               raise SystemExit("pair-association interpretation is missing from the report")
           if config["cluster_count"] != 20 or len(config["cluster_sizes"]) != 20:
               raise SystemExit("power planning fixture must use 20 independent clusters")
+          if config["bootstrap_replicates"] != 1000:
+              raise SystemExit("power planning fixture must record the expected bootstrap replicate count")
+          if heterogeneous_config["bootstrap_replicates"] < 1000:
+              raise SystemExit("heterogeneous scenario does not have enough bootstrap replicates")
           if config["total_targets_per_simulated_study"] != sum(config["cluster_sizes"]):
               raise SystemExit("power report target count does not reconcile with cluster sizes")
           if results["gate_passes"] > results["valid_interval_trials"]:
