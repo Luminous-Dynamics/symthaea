@@ -140,6 +140,10 @@ name = "hdc_pivot_bound_search"
 harness = false
 
 [[bench]]
+name = "hdc_ordered_early_abandon"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
