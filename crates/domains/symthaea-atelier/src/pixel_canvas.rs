@@ -254,7 +254,7 @@ impl NeuralPainter {
     /// Encode cognitive snapshot to input HV.
     pub fn encode_snapshot(snapshot: &CognitiveSnapshot, genesis: &GenesisSeed) -> ContinuousHV {
         let dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
-        let channels: Vec<(f32, &str)> = vec![
+        let mut channels: Vec<(f32, &str)> = vec![
             (snapshot.consciousness_level as f32, "psi"),
             (snapshot.valence, "valence"),
             (snapshot.arousal, "arousal"),
@@ -265,8 +265,10 @@ impl NeuralPainter {
             (snapshot.harmony_activations[1], "h_flourish"),
             (snapshot.harmony_activations[3], "h_play"),
             (snapshot.harmony_activations[7], "h_stillness"),
-            (snapshot.prediction_error, "pe"),
         ];
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            channels.push((prediction_error, "pe"));
+        }
 
         let mut result = ContinuousHV::zero(dim);
         for (value, label) in &channels {
