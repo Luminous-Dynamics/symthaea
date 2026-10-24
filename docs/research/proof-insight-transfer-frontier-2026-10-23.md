@@ -199,3 +199,10 @@ This protects against malformed paired tasks and label contamination where the i
 The paired-state analyzer now cross-checks the intervention kind against the declared operation, before/after declaration identity, presence/type/position fields, and expected precondition/action policy. This prevents a row from being labelled "required hypothesis cleared" when the operation or declaration receipt says otherwise. The synthetic contract fixture was corrected so its required-type digest matches the actual declared required-precondition type. Regression tests include operation mismatch, type mismatch, a falsely retained cleared declaration, and an end-to-end analyzer rejection.
 
 This is a consistency guard only: it cannot establish that the intervention was actually performed by Lean, that a precondition is mathematically necessary, or that a system successfully transferred an insight.
+
+
+### 2026-10-24 update: semantic-gate-qualified primary success
+
+The proof-state analyzer now separates raw checker success from the primary, semantically qualified exact-target solve rate. Executed rows require a target-bound semantic-gate record covering dual statement-correspondence review, axiom-policy compliance, dependent-successor evidence or reasoned not-applicable status, and mutation controls. The analyzer derives overall gate state from these sub-results rather than trusting a self-reported `passed` label. The report now counts passed, failed, and unknown gates.
+
+This design is informed by the T² study's gap between compilation and dependent-successor testing, and by the 2026 formal-benchmark audit. It is only an evaluator contract until real receipts and model outcomes exist; it does not establish semantic correctness or improve a prover score by itself.
