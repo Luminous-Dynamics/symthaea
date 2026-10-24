@@ -51,10 +51,10 @@ struct PendingAssembly {
     /// Last fragment index seen — used to reject out-of-order fragments
     /// with gap exceeding the fragment range (likely injection).
     last_fragment_index: Option<u8>,
-    /// Key fingerprint when the first fragment arrived — used to detect
-    /// mid-stream key rotation. 16-bit hash of the key for ~1/65536 collision rate.
+    /// Full cryptographic digest of the key when the first fragment arrived.
+    /// Detects mid-stream key rotation without storing raw key material.
     #[cfg(feature = "mesh-encryption")]
-    key_fingerprint: Option<u16>,
+    key_fingerprint: Option<[u8; 32]>,
 }
 
 // ============================================================================
@@ -343,20 +343,12 @@ impl MeshReceiver {
             self.ensure_capacity(now);
         }
 
-        // Compute 16-bit key fingerprint for this fragment (Item 12).
-        // FNV-1a-inspired 16-bit hash over 8 evenly-spaced key bytes.
-        // Position-dependent mixing avoids collisions for uniform keys
-        // (e.g., [0xAA; 32] vs [0xBB; 32] which pure XOR would collapse to 0).
+        // Fingerprint the entire key. Sampling only a few bytes into a 16-bit
+        // digest lets distinct keys collide trivially and can hide mid-stream
+        // key rotation. Keep only the digest, never a duplicate of raw key data.
         #[cfg(feature = "mesh-encryption")]
-        let current_fingerprint: Option<u16> = self.encryption_key.map(|k| {
-            let samples = [k[0], k[4], k[8], k[12], k[16], k[20], k[24], k[31]];
-            let mut h: u16 = 0x811C; // FNV offset basis (truncated)
-            for &b in &samples {
-                h ^= b as u16;
-                h = h.wrapping_mul(0x0101); // FNV-like prime
-            }
-            h
-        });
+        let current_fingerprint: Option<[u8; 32]> =
+            self.encryption_key.map(|key| *blake3::hash(&key).as_bytes());
 
         // Get or create the assembler for this stream
         let assembly = self.pending.entry(key).or_insert_with(|| PendingAssembly {
@@ -1278,6 +1270,66 @@ mod tests {
             receiver.stats().fragments_key_mismatch,
             0,
             "No key mismatch when key is consistent"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_key_fingerprint_rejects_distinct_keys_that_collide_on_old_sample() {
+        use crate::swarm::mesh::encrypt_fragment;
+
+        // The former 16-bit fingerprint sampled bytes [0, 4, 8, 12, 16, 20, 24, 31].
+        // These keys therefore collided despite being distinct.
+        let key_a = [0u8; 32];
+        let mut key_b = [0u8; 32];
+        key_b[1] = 1;
+        let source = PEER_A;
+
+        let packet = test_packet(43, source, 0x43);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+
+        let encrypted_a = encrypt_fragment(
+            &wire[0],
+            &key_a,
+            &source,
+            packet.thought_id(),
+            frags[0].fragment_index,
+        );
+        let encrypted_b: Vec<Vec<u8>> = wire
+            .iter()
+            .zip(frags.iter())
+            .map(|(raw, frag)| {
+                encrypt_fragment(
+                    raw,
+                    &key_b,
+                    &source,
+                    packet.thought_id(),
+                    frag.fragment_index,
+                )
+            })
+            .collect();
+
+        let mut receiver = MeshReceiver::new()
+            .with_encryption_key(key_a)
+            .with_fragment_encryption(true);
+        assert!(receiver.receive_fragment(source, &encrypted_a).is_none());
+        assert_eq!(receiver.pending_count(), 1);
+
+        // Simulate rotation while an assembly is open. Even though the old
+        // sampled fingerprint collided, the new full digest must catch it.
+        receiver.set_encryption_key(Some(key_b));
+        let mut completed = false;
+        for raw in &encrypted_b[1..] {
+            if receiver.receive_fragment(source, raw).is_some() {
+                completed = true;
+            }
+        }
+
+        assert!(!completed, "a stream must not complete across a key change");
+        assert!(
+            receiver.stats().fragments_key_mismatch > 0,
+            "distinct keys must be distinguished even when the old sample collides"
         );
     }
 
