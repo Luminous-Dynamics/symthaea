@@ -44,7 +44,12 @@ impl CognitiveLoopService {
         fep_surprise: f32,
         fep_pragmatic_value: f32,
     ) -> super::TrainingPostResult {
-        let prediction_error_valid = perception.urgency.prediction_error_valid;
+        let prediction_error_valid = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64)
+            .is_some()
+            && prediction_error.is_finite();
         let neuromod_threshold =
             perception.encoding.effective_threshold * self.neuromod.bath.threshold_gate();
 
