@@ -312,13 +312,17 @@ A more substantive direction than adding another scalar threshold is to make the
 
 The Rust baseline runner now includes `predictive-rank-martingale-portfolio`. It uses a fixed calibration reference and four fixed-bet components: positive/negative order features and positive/negative dispersion features, combined with equal weights. Its configured `prm_alpha` defines the first-crossing boundary (1/\alpha); e.g. `0.05` means a wealth boundary of 20. The algorithm updates its predictive rank probabilities from the observed rank history, rather than treating repeated calibration-based p-values as independent.
 
+The runner emits a `diagnostics` object with the statistic name, stopping boundary, final and maximum statistic, configured alpha, whether the run stopped at the first crossing, and the number of valid samples processed. The focused CLI smoke test checks that the recorded maximum reaches the boundary and that the reported crossing cycle matches the processed sample count. A unit test checks the defining conditional invariant: each fixed-bet component has conditional mean one under the predictive null rank probabilities.
+
+After one-time feature-vector construction and calibration sorting, the implementation computes predictive feature expectations from base sums plus accumulated history sums. Each valid observation uses a binary-search rank lookup and constant-time updates, avoiding a full calibration-grid scan per cycle.
+
 The implementation is deliberately scoped:
 
 - It uses fixed betting coefficients, not the paper's adaptive Online Newton Step (ONS) bet updates.
 - It produces only the **first alarm per calibration epoch**. Repeated alarms require a fresh, justified calibration epoch or a separately validated alpha-spending construction; resetting wealth informally would destroy the stated guarantee.
 - Tie-breaking uses a deterministic PRNG stream derived from the recorded experiment seed, for reproducibility. The exact mathematical guarantee assumes independent randomized tie-breaking; do not claim the guarantee conditional on one fixed pseudorandom seed. Benchmark runs should treat the seed as independent experimental randomization and include multiple independent seeds.
 - The guarantee assumes a stable IID null for the calibrated scalar scores. It does not automatically establish validity for autocorrelated PE streams, informative missingness, changing calibration distributions, or the complete cognitive loop.
-- This implementation is a reference portfolio, not a reproduction of the paper's ONS algorithm or a measured superiority result.
+- This implementation is a reference portfolio, not a reproduction of the paper's ONS algorithm or a measured superiority result. It is currently first-alarm-only per calibration epoch, with the PRNG assumptions described above. The report's `diagnostics` are evidence about the implemented statistic, not by themselves proof of the theorem's assumptions in a deployed autocorrelated cognitive loop.
 
 A synthetic CLI fixture, `benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-run.json`, tests the first-crossing behavior on one sustained upward shift. It is not benchmark evidence.
 
