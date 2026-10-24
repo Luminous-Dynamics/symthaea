@@ -38,6 +38,18 @@ impl CognitiveLoopService {
         feedback: &mut FeedbackPhaseResult,
         mut module_timings: super::ModuleTimings,
     ) -> CycleResult {
+        let observation_cycle = self.stats.total_cycles as u64;
+        let prediction_error_sample = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(observation_cycle);
+        let prediction_error_valid =
+            prediction_error_sample.is_some() && dynamics.core.prediction_error.is_finite();
+        // Keep a numeric fallback for legacy diagnostics, but all PE-driven
+        // behavior below is gated by the typed sample above.
+        let prediction_error =
+            prediction_error_sample.unwrap_or(perception.encoding.encoding_result.prediction_error);
+
         let thalamic_depth_score = match self.cognitive_depth {
             super::CognitiveDepth::DeepThought => super::thresholds::DEPTH_SCORE_DEEP_THOUGHT,
             super::CognitiveDepth::Cortical => super::thresholds::DEPTH_SCORE_CORTICAL,
@@ -125,11 +137,11 @@ impl CognitiveLoopService {
                     .take(32)
                     .copied()
                     .collect();
-                if perception.urgency.prediction_error_valid {
+                if prediction_error_valid {
                     dream.record_consolidation_event(
                         &perception.encoding.compressed_state,
                         action,
-                        perception.urgency.prediction_error,
+                        prediction_error,
                     );
                 }
             }
@@ -546,8 +558,7 @@ impl CognitiveLoopService {
                 cfc_output: output.clone(),
                 tau: fep_tau * phi_tau,
                 prediction_error: dynamics.core.prediction_error,
-                prediction_error_valid: perception.urgency.prediction_error_valid
-                    && dynamics.core.prediction_error.is_finite(),
+                prediction_error_valid,
                 detected_primitives: perception
                     .encoding
                     .encoding_result
@@ -559,7 +570,6 @@ impl CognitiveLoopService {
             });
         }
 
-        let observation_cycle = self.stats.total_cycles as u64;
         metadata.prediction_evidence = Some(super::types::PredictionEvidenceTelemetry::from_evidence(
             &perception.urgency.prediction_evidence,
             observation_cycle,
@@ -585,8 +595,7 @@ impl CognitiveLoopService {
         CycleResult {
             output,
             prediction_error: dynamics.core.prediction_error,
-            prediction_error_valid: perception.urgency.prediction_error_valid
-                && dynamics.core.prediction_error.is_finite(),
+            prediction_error_valid,
             peak_attention: perception.encoding.encoding_result.peak_attention,
             detected_primitives: mem::take(
                 &mut perception.encoding.encoding_result.detected_primitives,
