@@ -451,12 +451,14 @@ mod tests {
     }
     fn envelope(conf:&str,ss:&[S<'_>],latlo:f64,lathi:f64,harmlo:f64,harmhi:f64,risk:&str,coverage:&str)->String{
         let mut o=String::new();
+        let conf_sha=sha256_hex(conf.as_bytes());
+        let point_count=ss.len().to_string();
         let rows:Vec<(&str,&str)>=vec![
             ("format","VIS-DVPC-OP-ENVELOPE-001-v1"),("experiment_id","synth019"),("dataset_id","synthetic"),
             ("dataset_revision","v1"),("split","test"),("bundle_lock_sha256",B),("paired_unit_set_sha256",C),
-            ("source_sweep_sha256",A),("source_confidence_receipt_sha256",&sha256_hex(conf.as_bytes())),
+            ("source_sweep_sha256",A),("source_confidence_receipt_sha256",&conf_sha),
             ("inference_receipt_sha256",C),("confidence_level","0.975"),("familywise_simultaneous","true"),
-            ("coverage_scope",coverage),("point_count",&ss.len().to_string()),("pooled_harm_limit","0.10"),
+            ("coverage_scope",coverage),("point_count",&point_count),("pooled_harm_limit","0.10"),
             ("worst_group_harm_limit","0.10"),("cvar95_loss_limit","0.25"),("safety_violations_max","0")
         ];
         for(k,v)in rows{let _=writeln!(o,"META\t{k}\t{v}");}
