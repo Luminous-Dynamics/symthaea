@@ -700,4 +700,43 @@ mod tests {
         assert_eq!(report.status, VerificationStatus::Rejected);
         assert!(report.violations.iter().any(|v| v.contains("overlapping")));
     }
+
+    #[test]
+    fn qualified_stock_beats_more_expensive_production() {
+        let mut scenario = reference_scenario();
+        scenario.qualified_stock_count = 1;
+        let plan = solve_exact(&scenario).unwrap();
+        assert_eq!(plan.part_source, PartSource::QualifiedStock);
+        assert_eq!(plan.total_cost, 5);
+        assert_eq!(verify_plan(&scenario, &plan).status, VerificationStatus::Verified);
+    }
+
+    #[test]
+    fn production_that_finishes_after_departure_is_not_used() {
+        let mut scenario = reference_scenario();
+        scenario.production.duration = 100;
+        let plan = solve_exact(&scenario).unwrap();
+        assert_eq!(plan.part_source, PartSource::None);
+        assert_eq!(plan.total_cost, 100);
+        assert_eq!(verify_plan(&scenario, &plan).status, VerificationStatus::Verified);
+    }
+
+    #[test]
+    fn production_and_repair_time_overflow_is_indeterminate() {
+        let mut scenario = reference_scenario();
+        let plan = solve_exact(&scenario).unwrap();
+        scenario.production.duration = u32::MAX;
+        let report = verify_plan(&scenario, &plan);
+        assert_eq!(report.status, VerificationStatus::Indeterminate);
+    }
+
+    #[test]
+    fn input_digest_mismatch_is_rejected() {
+        let scenario = reference_scenario();
+        let mut plan = solve_exact(&scenario).unwrap();
+        plan.input_digest = "another-input-bundle".into();
+        let report = verify_plan(&scenario, &plan);
+        assert_eq!(report.status, VerificationStatus::Rejected);
+        assert!(report.violations.iter().any(|v| v.contains("input digest")));
+    }
 }
