@@ -44,7 +44,15 @@ This remains short-term **single-coefficient structured correction search**, not
 
 The PIT monitor is only valid if the conditional predictive CDF is issued before the observation, its parameters/uncertainty protocol are frozen without leakage, and the context channels are based only on the selected action and permitted history. The current synthetic fixture has a known Gaussian noise model; this does not establish validity for real physics measurements, unknown noise, fitted-scale uncertainty, censored data, or adaptive repeated measurements.
 
-## 3. Integration smoke test
+## 4. Operator-held-out unary-function recovery
+
+The follow-on branch `research/heldout-operator-recovery-v0-1` adds a third, explicitly exploratory track beyond oracle-present discrimination and truth-absent in-grammar recovery. The evaluator constructs an ENERGY-valued target with a unary trigonometric term, `m * v^2 * sin(v*t/r)` or `m * v^2 * cos(v*t/r)`. The phase `v*t/r` is dimensionless, so the full target remains ENERGY-valued. The initial typed generator emits only algebraic expression trees and is tested to contain no unary function nodes.
+
+Only in this track, after the current candidate pool is falsified and bounded recovery runs, the policy may use a unit-checked `UnaryFunctionCorrection` basis. It enumerates a small public set of ENERGY scale templates (`m*v^2`, `m*(r/t)^2`, and `m*v*r/t`) and dimensionless phase templates (`v*t/r` or its inverse), pairs them with sine/cosine, and fits a scalar from previously observed data. Those templates are declared independently of the target reference and expand only this bounded operator family. The reference expression and evaluator holdouts remain outside that proposal API. Accepted unary-function corrections, same-domain matches, OOD matches, initial-pool equivalence hits, unresolved outcomes and fresh post-recovery audit counts are reported separately.
+
+This tests only a narrow held-out operator family: sine/cosine over a dimensionless expression. It does **not** establish arbitrary grammar expansion, general mechanism discovery or superiority over RESTART/other 2026 systems. A failed proposal, no recovery trigger, or missing post-recovery validation remains a negative result; this diagnostic does not force a law to be accepted.
+
+## 5. Integration smoke test
 
 The unit test `prequential_pit_audits_are_wired_into_adaptive_discovery` runs paired clean and discrepancy worlds for the same fixed seeds:
 

@@ -283,6 +283,74 @@ fn nontrivial_ground_truth(rng: &mut u64, probes: &[Experiment]) -> Expr {
     panic!("could not draw a sane nontrivial ground-truth law within the attempt cap");
 }
 
+/// Construct a held-out target that uses a unary trigonometric operator the typed
+/// algebraic candidate generator does not emit. Sin/Cos selection happens on the evaluator side;
+/// the target expression is never passed to candidate generation or recovery proposals.
+fn nontrivial_unary_ground_truth(rng: &mut u64, probes: &[Experiment]) -> Option<Expr> {
+    let units = demo_units();
+    for _ in 0..GEN_ATTEMPT_CAP {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        // v*t/r is dimensionless: (L/T)*T/L = 1.
+        let phase = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Var("t".to_string())),
+            )),
+            Box::new(Expr::Var("r".to_string())),
+        );
+        let unary = if rand_index(rng, 2) == 0 {
+            UnaryFn::Sin
+        } else {
+            UnaryFn::Cos
+        };
+        let candidate = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(base),
+            Box::new(Expr::Func(unary, Box::new(phase))),
+        );
+        if infer_dimensions(&candidate, &units)
+            != InferenceResult::Inferred(DimensionalSignature::ENERGY)
+        {
+            continue;
+        }
+        let Some(values) = probes
+            .iter()
+            .map(|point| eval_at(&candidate, point))
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        if values
+            .iter()
+            .all(|value| value.abs() > 1.0e-8 && value.abs() < 1.0e6)
+        {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn expr_contains_unary_function(expression: &Expr) -> bool {
+    match expression {
+        Expr::Func(_, _) => true,
+        Expr::BinOp(_, left, right) => {
+            expr_contains_unary_function(left) || expr_contains_unary_function(right)
+        }
+        Expr::Sum(body, _) => expr_contains_unary_function(body),
+        Expr::Var(_) | Expr::Const(_) => false,
+    }
+}
+
 fn functionally_distinct(cand_vals: &[f64], gt_vals: &[f64]) -> bool {
     cand_vals
         .iter()
@@ -322,6 +390,7 @@ enum RecoveryProposalFamily {
     AdditiveCorrection,
     MultiplicativeCorrection,
     InteractionCorrection,
+    UnaryFunctionCorrection,
     GenericTyped,
 }
 
@@ -329,6 +398,7 @@ enum RecoveryProposalFamily {
 struct RecoveryProposalSummary {
     accepted_count: usize,
     structured_count: usize,
+    unary_function_count: usize,
 }
 
 /// Build a unit-correct correction basis around a rejected candidate. The scalar coefficient is fitted
@@ -370,6 +440,79 @@ fn structured_correction_basis(
                 Box::new(Expr::Var(name.to_string())),
                 Box::new(correction),
             )
+        }
+        RecoveryProposalFamily::UnaryFunctionCorrection => {
+            // This proposal family is only enabled in the operator-held-out track. Search a
+            // small public set of ENERGY scales and dimensionless phase invariants, independent
+            // of the hidden reference. The coefficient fit composes (scale * sin/cos(phase))
+            // with the rejected base; this remains a bounded grammar extension, not arbitrary
+            // operator invention.
+            let energy_scale = match rand_index(rng, 3) {
+                0 => Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("m".to_string())),
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
+                        Box::new(Expr::Var("v".to_string())),
+                        Box::new(Expr::Const(2.0)),
+                    )),
+                ),
+                1 => Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("m".to_string())),
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
+                        Box::new(Expr::BinOp(
+                            BinOp::Div,
+                            Box::new(Expr::Var("r".to_string())),
+                            Box::new(Expr::Var("t".to_string())),
+                        )),
+                        Box::new(Expr::Const(2.0)),
+                    )),
+                ),
+                _ => Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::BinOp(
+                        BinOp::Mul,
+                        Box::new(Expr::Var("m".to_string())),
+                        Box::new(Expr::Var("v".to_string())),
+                    )),
+                    Box::new(Expr::BinOp(
+                        BinOp::Div,
+                        Box::new(Expr::Var("r".to_string())),
+                        Box::new(Expr::Var("t".to_string())),
+                    )),
+                ),
+            };
+            let velocity_time = Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Var("t".to_string())),
+            );
+            let phase = if rand_index(rng, 2) == 0 {
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(velocity_time),
+                    Box::new(Expr::Var("r".to_string())),
+                )
+            } else {
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::Var("r".to_string())),
+                    Box::new(velocity_time),
+                )
+            };
+            let unary = if rand_index(rng, 2) == 0 {
+                UnaryFn::Sin
+            } else {
+                UnaryFn::Cos
+            };
+            let oscillatory = Expr::BinOp(
+                BinOp::Mul,
+                Box::new(energy_scale),
+                Box::new(Expr::Func(unary, Box::new(phase))),
+            );
+            Expr::BinOp(BinOp::Sub, Box::new(oscillatory), Box::new(base.clone()))
         }
         RecoveryProposalFamily::GenericTyped => return None,
     };
@@ -466,6 +609,7 @@ fn reseed_typed_candidates_after_alarm(
     live: &mut Vec<usize>,
     rejected_candidates: &mut Vec<usize>,
     alarmed_candidate: usize,
+    allow_unary_function_recovery: bool,
 ) -> RecoveryProposalSummary {
     let archived_count = hypotheses.len();
     if candidate_pool.is_empty() || alarmed_candidate >= archived_count {
@@ -495,11 +639,21 @@ fn reseed_typed_candidates_after_alarm(
     let mut proposals: Vec<(u8, f64, Expr, Vec<f64>, RecoveryProposalFamily)> = Vec::new();
     let mut attempts = 0usize;
     while attempts < RECOVERY_GENERATION_ATTEMPT_CAP {
-        let family = match attempts % 4 {
-            0 => RecoveryProposalFamily::AdditiveCorrection,
-            1 => RecoveryProposalFamily::MultiplicativeCorrection,
-            2 => RecoveryProposalFamily::InteractionCorrection,
-            _ => RecoveryProposalFamily::GenericTyped,
+        let family = if allow_unary_function_recovery {
+            match attempts % 5 {
+                0 => RecoveryProposalFamily::AdditiveCorrection,
+                1 => RecoveryProposalFamily::MultiplicativeCorrection,
+                2 => RecoveryProposalFamily::InteractionCorrection,
+                3 => RecoveryProposalFamily::UnaryFunctionCorrection,
+                _ => RecoveryProposalFamily::GenericTyped,
+            }
+        } else {
+            match attempts % 4 {
+                0 => RecoveryProposalFamily::AdditiveCorrection,
+                1 => RecoveryProposalFamily::MultiplicativeCorrection,
+                2 => RecoveryProposalFamily::InteractionCorrection,
+                _ => RecoveryProposalFamily::GenericTyped,
+            }
         };
         attempts += 1;
 
@@ -585,6 +739,9 @@ fn reseed_typed_candidates_after_alarm(
         summary.accepted_count += 1;
         if family != RecoveryProposalFamily::GenericTyped {
             summary.structured_count += 1;
+        }
+        if family == RecoveryProposalFamily::UnaryFunctionCorrection {
+            summary.unary_function_count += 1;
         }
     }
     summary
@@ -735,6 +892,7 @@ struct TrialOutcome {
     recovery_triggered_on_empty_pool: bool,
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
+    unary_function_recovery_candidates: usize,
     accepted_recovery_candidates: usize,
     post_recovery_validation_measurements: usize,
     terminal_pit_alarm: bool,
@@ -765,6 +923,7 @@ fn unresolved_trial_outcome(
         recovery_triggered_on_empty_pool: false,
         typed_recovery_restarts: 0,
         structured_recovery_candidates: 0,
+        unary_function_recovery_candidates: 0,
         accepted_recovery_candidates: 0,
         post_recovery_validation_measurements: 0,
         terminal_pit_alarm,
@@ -875,6 +1034,7 @@ fn run_trial_with_discrepancy(
         systematic_discrepancy,
         false,
         true,
+        false,
     )
 }
 
@@ -895,6 +1055,29 @@ fn run_truth_absent_trial(
         0.0,
         true,
         enable_recovery,
+        false,
+    )
+}
+
+/// Operator-held-out recovery track. Its target has a dimensionally valid unary function that
+/// the initial typed algebraic generator does not produce; the recovery policy may explicitly
+/// enable a bounded sine/cosine proposal family after falsification.
+fn run_operator_heldout_trial(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+    enable_recovery: bool,
+) -> TrialOutcome {
+    run_trial_with_mode(
+        seed,
+        config,
+        max_rounds,
+        active_selector,
+        0.0,
+        true,
+        enable_recovery,
+        true,
     )
 }
 
@@ -906,10 +1089,14 @@ fn run_trial_with_mode(
     systematic_discrepancy: f64,
     truth_absent: bool,
     enable_recovery: bool,
+    operator_held_out: bool,
 ) -> TrialOutcome {
     let pit_mode = active_selector == ActiveSelector::InformationGainWithPrequentialPitAudits;
     if pit_mode && (!config.active_selection || config.smoothing) {
         return unresolved_trial_outcome(POOL_SIZE, true, true, false);
+    }
+    if operator_held_out && (!truth_absent || !config.typed_candidates) {
+        return unresolved_trial_outcome(0, true, false, true);
     }
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
@@ -925,14 +1112,25 @@ fn run_trial_with_mode(
         .collect();
     let mut reference_sanity_points = probes.clone();
     reference_sanity_points.extend(candidate_pool.iter().cloned());
-    let ground_truth = nontrivial_ground_truth(&mut setup_rng, &reference_sanity_points);
+    let ground_truth = if operator_held_out {
+        let Some(target) =
+            nontrivial_unary_ground_truth(&mut setup_rng, &reference_sanity_points)
+        else {
+            return unresolved_trial_outcome(0, true, false, true);
+        };
+        target
+    } else {
+        nontrivial_ground_truth(&mut setup_rng, &reference_sanity_points)
+    };
     let gt_vals: Vec<f64> = probes
         .iter()
         .map(|point| eval_at(&ground_truth, point).unwrap())
         .collect();
 
     let mut hypotheses: Vec<Expr> = if truth_absent {
-        let Some(candidates) = generate_truth_absent_candidates(seed, config, &candidate_pool) else {
+        let Some(candidates) =
+            generate_truth_absent_candidates(seed, config, &candidate_pool)
+        else {
             return unresolved_trial_outcome(0, true, false, true);
         };
         candidates
@@ -1026,6 +1224,7 @@ fn run_trial_with_mode(
     let mut monitoring_protocol_invalid = false;
     let mut typed_recovery_restarts = 0usize;
     let mut structured_recovery_candidates = 0usize;
+    let mut unary_function_recovery_candidates = 0usize;
     let mut accepted_recovery_candidates = 0usize;
     let mut awaiting_post_recovery_validation = false;
     let mut post_recovery_validation_measurements = 0usize;
@@ -1300,12 +1499,14 @@ fn run_trial_with_mode(
                 &mut live,
                 &mut rejected_after_alarm,
                 alarmed_index,
+                operator_held_out,
             );
             if recovery.accepted_count == 0 {
                 terminal_pit_alarm = true;
                 break;
             }
             structured_recovery_candidates += recovery.structured_count;
+            unary_function_recovery_candidates += recovery.unary_function_count;
             accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
             awaiting_post_recovery_validation = true;
@@ -1352,12 +1553,14 @@ fn run_trial_with_mode(
                 &mut live,
                 &mut rejected_after_alarm,
                 base_index,
+                operator_held_out,
             );
             if recovery.accepted_count == 0 || live.is_empty() {
                 terminal_pit_alarm = true;
                 break;
             }
             structured_recovery_candidates += recovery.structured_count;
+            unary_function_recovery_candidates += recovery.unary_function_count;
             accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
             awaiting_post_recovery_validation = true;
@@ -1416,6 +1619,7 @@ fn run_trial_with_mode(
         recovery_triggered_on_empty_pool,
         typed_recovery_restarts,
         structured_recovery_candidates,
+        unary_function_recovery_candidates,
         accepted_recovery_candidates,
         post_recovery_validation_measurements,
         terminal_pit_alarm,
@@ -2075,6 +2279,209 @@ mod tests {
     }
 
     #[test]
+    fn unary_correction_family_can_recover_a_planted_heldout_formula() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let phase = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Var("t".to_string())),
+            )),
+            Box::new(Expr::Var("r".to_string())),
+        );
+        let reference = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(base.clone()),
+            Box::new(Expr::Func(UnaryFn::Sin, Box::new(phase))),
+        );
+        assert!(matches!(
+            infer_dimensions(&reference, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+
+        let mut in_domain_rng = 0x51A7_0000_2026_0001_u64;
+        let in_domain: Vec<Experiment> = (0..64)
+            .map(|_| random_experiment(&mut in_domain_rng))
+            .collect();
+        let mut ood_rng = 0x00D0_0D0E_2026_0001_u64;
+        let ood: Vec<Experiment> = (0..64)
+            .map(|_| random_extrapolation_experiment(&mut ood_rng))
+            .collect();
+
+        let mut proposal_rng = 0x51A7_C0DE_2026_0001_u64;
+        let mut recovered = false;
+        for _ in 0..512 {
+            let Some(basis) = structured_correction_basis(
+                &mut proposal_rng,
+                &base,
+                RecoveryProposalFamily::UnaryFunctionCorrection,
+            ) else {
+                continue;
+            };
+            let Some(candidate) = compose_linear_correction(&base, &basis, 1.0) else {
+                continue;
+            };
+            if evaluator_matches_reference(&candidate, &reference, &in_domain)
+                && evaluator_matches_reference(&candidate, &reference, &ood)
+            {
+                recovered = true;
+                break;
+            }
+        }
+        assert!(
+            recovered,
+            "bounded unary proposal family failed to express the planted sin(v*t/r) law on both domains"
+        );
+    }
+
+    #[test]
+    fn unary_heldout_truth_is_valid_but_absent_from_typed_initial_candidates() {
+        let mut design_rng = 0x51A7_0000_2026_0001_u64;
+        let design: Vec<Experiment> = (0..EXPERIMENT_POOL_SIZE)
+            .map(|_| random_experiment(&mut design_rng))
+            .collect();
+        let mut truth_rng = 0x0A11_0F00_2026_0001_u64;
+        let truth = nontrivial_unary_ground_truth(&mut truth_rng, &design)
+            .expect("declared sin/cos family should yield a sane ENERGY law");
+        assert!(expr_contains_unary_function(&truth));
+        assert!(matches!(
+            infer_dimensions(&truth, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+
+        let candidates = generate_truth_absent_candidates(
+            0xCA7A_10_2026_0001,
+            PipelineConfig {
+                typed_candidates: true,
+                active_selection: true,
+                smoothing: false,
+            },
+            &design,
+        )
+        .expect("typed algebraic generator should fill its bounded initial pool");
+        assert_eq!(candidates.len(), POOL_SIZE);
+        assert!(
+            candidates.iter().all(|candidate| !expr_contains_unary_function(candidate)),
+            "held-out unary operators must not leak into the initial typed candidate grammar"
+        );
+    }
+
+    /// Full diagnostic for a true law whose unary operator is withheld from the initial typed
+    /// grammar. Results remain separate from oracle-present and in-grammar recovery rates.
+    #[test]
+    fn operator_heldout_recovery_is_reported_separately_from_in_grammar_recovery() {
+        const SEEDS: u64 = 8;
+        const ROUND_BUDGET: usize = 16;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+        let mut evaluable_worlds = 0usize;
+        let mut incomplete_evaluator_worlds = 0usize;
+        let mut initial_reference_hits = 0usize;
+        let mut baseline_reference_hits = 0usize;
+        let mut baseline_unresolved = 0usize;
+        let mut recovery_unresolved = 0usize;
+        let mut pool_collapse_recoveries = 0usize;
+        let mut accepted_unary_corrections = 0usize;
+        let mut same_domain_matches = 0usize;
+        let mut ood_matches = 0usize;
+        let mut full_successes = 0usize;
+        let mut post_recovery_validation_measurements = 0usize;
+
+        for seed in 1..=SEEDS {
+            let baseline = run_operator_heldout_trial(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                false,
+            );
+            let recovered = run_operator_heldout_trial(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                true,
+            );
+            if recovered.reference_audit_evaluable {
+                evaluable_worlds += 1;
+                initial_reference_hits += if recovered.initial_pool_contains_reference {
+                    1
+                } else {
+                    0
+                };
+            } else {
+                incomplete_evaluator_worlds += 1;
+            }
+            baseline_reference_hits += if baseline.reference_audit_evaluable
+                && baseline.initial_pool_contains_reference
+            {
+                1
+            } else {
+                0
+            };
+            baseline_unresolved += if baseline.final_live != 1 || !baseline.success {
+                1
+            } else {
+                0
+            };
+            recovery_unresolved += if recovered.final_live != 1 || !recovered.success {
+                1
+            } else {
+                0
+            };
+            pool_collapse_recoveries +=
+                if recovered.recovery_triggered_on_empty_pool { 1 } else { 0 };
+            accepted_unary_corrections += recovered.unary_function_recovery_candidates;
+            same_domain_matches += if recovered.ground_truth_equivalent { 1 } else { 0 };
+            ood_matches += if recovered.ground_truth_extrapolation_equivalent {
+                1
+            } else {
+                0
+            };
+            full_successes += if recovered.success { 1 } else { 0 };
+            post_recovery_validation_measurements +=
+                recovered.post_recovery_validation_measurements;
+
+            assert!(
+                !recovered.success
+                    || (recovered.ground_truth_equivalent
+                        && recovered.ground_truth_extrapolation_equivalent
+                        && recovered.post_recovery_validation_measurements
+                            >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS)
+            );
+        }
+        println!(
+            "operator_heldout_recovery,seeds={SEEDS},budget={ROUND_BUDGET},evaluable_worlds={evaluable_worlds},incomplete_evaluator_worlds={incomplete_evaluator_worlds},initial_reference_hits={initial_reference_hits},baseline_reference_hits={baseline_reference_hits},baseline_unresolved={baseline_unresolved},recovery_unresolved={recovery_unresolved},pool_collapse_recoveries={pool_collapse_recoveries},accepted_unary_corrections={accepted_unary_corrections},same_domain_matches={same_domain_matches},ood_matches={ood_matches},full_successes={full_successes},post_recovery_validation_measurements={post_recovery_validation_measurements}"
+        );
+        assert_eq!(evaluable_worlds + incomplete_evaluator_worlds, SEEDS as usize);
+        assert_eq!(initial_reference_hits, 0);
+        assert_eq!(baseline_reference_hits, 0);
+        assert!(
+            pool_collapse_recoveries > 0,
+            "operator-heldout pilot never exercised the post-falsification recovery path"
+        );
+        assert!(
+            accepted_unary_corrections > 0,
+            "operator-heldout pilot never accepted any bounded unary-function correction"
+        );
+        assert!(same_domain_matches <= evaluable_worlds);
+        assert!(ood_matches <= same_domain_matches);
+        assert!(full_successes <= ood_matches);
+    }
+
+    #[test]
     fn truth_absent_candidate_generation_exhaustion_returns_none_without_panicking() {
         let mut rng = 0xA11C_E55E_2026_0001_u64;
         let design = vec![random_experiment(&mut rng)];
@@ -2267,6 +2674,7 @@ mod tests {
             RecoveryProposalFamily::AdditiveCorrection,
             RecoveryProposalFamily::MultiplicativeCorrection,
             RecoveryProposalFamily::InteractionCorrection,
+            RecoveryProposalFamily::UnaryFunctionCorrection,
         ];
         let mut rng = 0xCAFE_BABE_1234_5678_u64;
 
@@ -2449,6 +2857,7 @@ mod tests {
             &mut live,
             &mut rejected,
             0,
+            false,
         );
 
         assert!(
@@ -2484,6 +2893,7 @@ mod tests {
             &mut live,
             &mut rejected,
             second_alarmed,
+            false,
         );
         assert!(rejected.contains(&0) && rejected.contains(&second_alarmed));
         assert!(!live.contains(&0) && !live.contains(&second_alarmed));
