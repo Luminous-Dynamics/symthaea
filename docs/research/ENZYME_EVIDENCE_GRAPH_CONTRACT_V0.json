@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "contract_id": "enzyme-evidence-graph-v0",
+  "status": "partial_verifier_implemented_policy_review_required",
+  "format_note": "Descriptive contract, not a JSON Schema. xtask's enzyme-evidence-graph-check command now enforces a fail-closed structural/provenance subset; see ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md. Full replay, scientific semantics, and policy enforcement remain future work.",
+  "purpose": "Bind each enzyme kinetic claim to exact source artifacts and the transformations, models, parameters, uncertainty, and evaluation decisions derived from them. Reuse EnzymeML/SBML for scientific objects; this contract addresses provenance and replay links.",
+  "design_principles": [
+    "A reported literature value, a raw measurement, a reproduced fit, and a prediction are distinct evidence classes.",
+    "Every derived result must name its exact input node IDs, transformation, code/version, configuration and output artifacts.",
+    "A content hash proves byte identity, not license clearance, experimental validity, or scientific truth.",
+    "Missing or failed evidence is explicit; it is never represented as numeric zero or silently removed.",
+    "The graph is immutable per run; revisions create a new graph version with parent links rather than rewriting past receipts."
+  ],
+  "artifact_record": {
+    "required_fields": [
+      "artifact_id",
+      "role",
+      "media_type",
+      "sha256",
+      "byte_length",
+      "locator",
+      "rights_record_id",
+      "acquisition_status"
+    ],
+    "field_rules": {
+      "artifact_id": "Unique stable identifier within the graph.",
+      "role": "One of source_record, raw_signal, control_signal, calibration, processed_measurement, model_specification, fit_output, reported_parameter_table, prediction_output, evaluation_output, supporting_metadata, transformation_code, transformation_configuration, or environment_lock.",
+      "media_type": "Declared media type; not inferred from filename alone.",
+      "sha256": "64 hexadecimal characters computed over the exact bytes consumed or produced.",
+      "byte_length": "Non-negative integer matching the exact payload length.",
+      "locator": "HTTPS URL or approved workspace-relative path. A remote URL must be acquired and hash-verified before the artifact may satisfy a replay requirement.",
+      "rights_record_id": "Reference to a separate source-specific rights/attribution review record. A checksum is not a rights grant.",
+      "acquisition_status": "available means an exact local workspace-relative payload is checked for byte length and SHA-256; not_acquired means HTTPS metadata only and is never downloaded by the verifier."
+    },
+    "role_values": [
+      "source_record",
+      "raw_signal",
+      "control_signal",
+      "calibration",
+      "processed_measurement",
+      "model_specification",
+      "fit_output",
+      "reported_parameter_table",
+      "prediction_output",
+      "evaluation_output",
+      "supporting_metadata",
+      "transformation_code",
+      "transformation_configuration",
+      "environment_lock"
+    ]
+  },
+  "node_types": [
+    {
+      "type": "source_record",
+      "evidence_class": "source_claim",
+      "description": "Versioned dataset/publication/record locator with source-specific rights receipt."
+    },
+    {
+      "type": "raw_signal_series",
+      "evidence_class": "observed",
+      "description": "Raw instrument signal or measured time course with units, times, controls and instrument provenance where available."
+    },
+    {
+      "type": "control_series",
+      "evidence_class": "observed",
+      "description": "Blank, no-enzyme, background, or other control observations with their own identities."
+    },
+    {
+      "type": "calibration",
+      "evidence_class": "derived_or_source_reported",
+      "description": "Calibration series, declared fit range, method/equation, coefficients, statistics and exact source/output artifacts."
+    },
+    {
+      "type": "processed_measurement",
+      "evidence_class": "derived",
+      "description": "Measurement after explicitly declared calibration, background correction, unit transformation or preprocessing."
+    },
+    {
+      "type": "rate_estimate",
+      "evidence_class": "derived_or_fitted",
+      "description": "Initial rate or time-course-derived rates, window and estimation method, uncertainty and exclusions."
+    },
+    {
+      "type": "model_specification",
+      "evidence_class": "model_assumption",
+      "description": "Kinetic equation, variables, parameter meanings, constraints, initial conditions and applicable context."
+    },
+    {
+      "type": "fit_run",
+      "evidence_class": "computation",
+      "description": "One execution of a specified model and fitting algorithm with configuration, environment, outputs, logs and terminal status."
+    },
+    {
+      "type": "reported_parameter_claim",
+      "evidence_class": "source_claim",
+      "description": "Parameter value exactly as reported by a source, retaining original units, context, uncertainty and source locator."
+    },
+    {
+      "type": "reproduced_parameter_estimate",
+      "evidence_class": "reproduced_computation",
+      "description": "Parameter estimate independently recomputed from source measurement artifacts and a declared model/fit procedure."
+    },
+    {
+      "type": "prediction",
+      "evidence_class": "prediction",
+      "description": "A model output for a declared target, input context, model revision and uncertainty/abstention status."
+    },
+    {
+      "type": "evaluation",
+      "evidence_class": "evaluation",
+      "description": "Frozen held-out evaluation result, scorer revision, denominator, metrics, uncertainty and negative-control outcomes."
+    }
+  ],
+  "edge_types": [
+    {
+      "type": "describes_source",
+      "from": "source_record",
+      "to": "any_artifact_or_node",
+      "description": "States the source lineage for an artifact or scientific claim."
+    },
+    {
+      "type": "measured_as",
+      "from": "raw_signal_series",
+      "to": "control_series",
+      "description": "Optional relation grouping a measurement series with an associated control; explicit control IDs remain separate nodes."
+    },
+    {
+      "type": "calibrated_by",
+      "from": "raw_signal_series",
+      "to": "calibration",
+      "description": "Records which calibration was used in a transformation."
+    },
+    {
+      "type": "corrected_with",
+      "from": "control_series",
+      "to": "processed_measurement",
+      "description": "Records a control series used in a correction."
+    },
+    {
+      "type": "derived_from",
+      "from": "one_or_more_input_nodes",
+      "to": "derived_output_node",
+      "description": "Explicit transformation dependency; exact dependency set must also appear in a transformation record."
+    },
+    {
+      "type": "fitted_using",
+      "from": "model_specification",
+      "to": "fit_run",
+      "description": "Binds equation and parameterization to a specific fit execution."
+    },
+    {
+      "type": "estimates",
+      "from": "fit_run",
+      "to": "reproduced_parameter_estimate",
+      "description": "Links one execution to parameters it estimates."
+    },
+    {
+      "type": "reported_by",
+      "from": "source_record",
+      "to": "reported_parameter_claim",
+      "description": "Links a reported value to its exact record/table/figure/page locator."
+    },
+    {
+      "type": "predicts",
+      "from": "model_specification",
+      "to": "prediction",
+      "description": "Binds a prediction to a model revision and target/context."
+    },
+    {
+      "type": "evaluated_by",
+      "from": "prediction",
+      "to": "evaluation",
+      "description": "Links predictions to a frozen, independent scorer and evaluation split."
+    }
+  ],
+  "transformation_record": {
+    "required_fields": [
+      "transformation_id",
+      "name",
+      "version",
+      "code_sha256",
+      "configuration_sha256",
+      "environment_lock_sha256",
+      "input_node_ids",
+      "output_node_ids",
+      "input_artifact_ids",
+      "output_artifact_ids",
+      "deterministic",
+      "terminal_status"
+    ],
+    "terminal_status_values": [
+      "success",
+      "null_result",
+      "failed",
+      "excluded",
+      "out_of_domain",
+      "blocked"
+    ],
+    "rules": [
+      "Every referenced node and artifact ID must resolve exactly once.",
+      "Every input and output artifact must be hash/length verified against its recorded bytes.",
+      "Code/configuration/environment identities are distinct from the data artifact hashes.",
+      "A successful status requires every declared output to exist and match its hash.",
+      "A failed/blocked/excluded transformation remains in the graph with a reason; it is not omitted.",
+      "A replay result compares stage outputs and declared tolerances, not only the final kcat value."
+    ],
+    "conditional_artifact_fields": {
+      "code_artifact_id": "When present, references an artifact with role transformation_code whose exact-byte SHA-256 equals code_sha256. Required and byte-verified for successful transformations.",
+      "configuration_artifact_id": "When present, references an artifact with role transformation_configuration whose exact-byte SHA-256 equals configuration_sha256. Required and byte-verified for successful transformations.",
+      "environment_lock_artifact_id": "When present, references an artifact with role environment_lock whose exact-byte SHA-256 equals environment_lock_sha256. Required and byte-verified for successful transformations.",
+      "note": "These identity artifacts are separate from scientific input/output artifacts. Unsuccessful/blocked transformations may omit them if execution never started."
+    }
+  },
+  "parameter_claim_record": {
+    "required_fields": [
+      "parameter_id",
+      "parameter_name",
+      "endpoint_definition",
+      "value",
+      "unit",
+      "enzyme_form_basis",
+      "reaction_id",
+      "substrate_ids",
+      "assay_context",
+      "kinetic_equation_id",
+      "source_or_fit_node_id",
+      "uncertainty_status"
+    ],
+    "uncertainty_status_values": [
+      "reported",
+      "recomputed",
+      "not_available",
+      "not_estimable",
+      "not_applicable"
+    ],
+    "rules": [
+      "A reported source parameter retains the verbatim source value/unit and a separate normalized value/unit when conversion is reviewed.",
+      "A fitted value is not relabeled as a directly measured datum.",
+      "kcat is not merged with Km, kcat/Km, Vmax, specific activity, yield, or activity without an explicitly defined conversion/model.",
+      "The subunit/oligomer concentration basis is explicit; if uncertain, comparability is blocked or qualified.",
+      "When source_or_fit_node_id identifies a source_record, a reported_by edge to a reported_parameter_claim node is required; when it identifies a fit_run, an estimates edge to a reproduced_parameter_estimate node is required.",
+      "Missing uncertainty is not encoded as zero uncertainty."
+    ]
+  },
+  "graph_invariants": [
+    "Unknown fields in typed graph records are rejected rather than silently ignored.",
+    "Every declared artifact is referenced by an evidence node or transformation input/output/execution-identity field.",
+    "Every node ID and artifact ID is unique within a graph version.",
+    "Every edge endpoint resolves to a declared node; dangling edges fail closed.",
+    "Derivation edges form a directed acyclic graph; provenance references may point to shared upstream source nodes.",
+    "Every derived/fitted/predicted node has at least one explicit derivation/model edge and a matching transformation record, except source records and directly observed inputs.",
+    "Predictions, source-reported claims, and independently reproduced estimates use distinct node types and evidence classes.",
+    "Every terminal run status and exclusion/failure reason remains represented; no denominator is silently reduced.",
+    "Raw artifact hashes are verified against exact payload bytes before the corresponding artifact is marked acquired or replayable.",
+    "The evidence graph's own serialized bytes are versioned and SHA-256 pinned when frozen."
+  ],
+  "future_verifier_checks": [
+    "Verify the execution semantics of the pinned source/configuration/environment artifacts and reproduce stage outputs in an independently implemented replay runner; matching identity hashes alone do not prove the declared code performed the claimed transform.",
+    "Finalize and enforce a JSON Schema for the instance layout.",
+    "Semantic-unit checks and parameter meaning using the selected EnzymeML version rather than a duplicate ontology.",
+    "Chemical reaction-balance checks where appropriate; this must be a separate domain-aware validator.",
+    "Human review and evidence for source-specific rights/attribution decisions; software status labels do not establish legal clearance.",
+    "A separately implemented computational replay verifier that compares every required pipeline-stage output within preregistered tolerances.",
+    "Independent checks of uncertainty calibration, parameter identifiability, model ambiguity, denominator accounting, and negative controls.",
+    "Prospective experimental-decision utility and generalization under study, sequence-family, laboratory/protocol, and assay-context holdouts.",
+    "Validate exact parameter source-value provenance and conversion-rule identity for normalized values; V0 checks the presence/type pairing of normalized value and unit but does not re-perform unit conversion."
+  ],
+  "non_claims": [
+    "The Rust verifier implements only a structural/provenance subset. Scientific semantics, legal clearance, and actual computational replay remain unimplemented.",
+    "It does not establish that source data are scientifically valid or that a reaction equation is chemically balanced.",
+    "It does not automatically clear source licenses or sequence-data benefit-sharing obligations.",
+    "It does not implement a kinetic solver, protein predictor, prospective experiment system, or laboratory automation."
+  ],
+  "references": [
+    {
+      "name": "EnzymeML V2 specification",
+      "url": "https://github.com/EnzymeML/enzymeml-specifications/blob/main/specifications/v2.md"
+    },
+    {
+      "name": "STRENDA current guidelines",
+      "url": "https://www.beilstein-institut.de/en/projects/strenda/guidelines/"
+    },
+    {
+      "name": "Reproducibility of enzyme reactions and kinetic modelling",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/35357794/"
+    }
+  ],
+  "graph_instance_v0": {
+    "required_top_level_fields": [
+      "schema_version",
+      "graph_id",
+      "status",
+      "rights_records",
+      "artifacts",
+      "nodes",
+      "edges",
+      "transformations",
+      "parameter_claims"
+    ],
+    "status_values": [
+      "draft",
+      "frozen"
+    ],
+    "acquisition_status_values": [
+      "available",
+      "not_acquired"
+    ],
+    "rights_status_values": [
+      "approved_for_this_use",
+      "review_pending",
+      "restricted",
+      "rejected",
+      "unknown"
+    ],
+    "note": "The record layout is a V0 implementation convention documented in ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md, not a finalized JSON Schema. Rust unit tests compare the executable checker vocabularies against these machine-readable enumerations. Frozen graphs require an external SHA-256 pin of their exact serialized bytes.",
+    "graph_status_values": [
+      "draft",
+      "frozen"
+    ],
+    "terminal_status_values": [
+      "success",
+      "null_result",
+      "failed",
+      "excluded",
+      "out_of_domain",
+      "blocked"
+    ],
+    "uncertainty_status_values": [
+      "reported",
+      "recomputed",
+      "not_available",
+      "not_estimable",
+      "not_applicable"
+    ]
+  },
+  "v0_implemented_checks": [
+    "Unique IDs for node, edge, artifact, rights-record, transformation, and parameter-claim records.",
+    "Contract node-type/evidence-class consistency; known edge types and endpoint type constraints.",
+    "Dangling references and directed-cycle detection.",
+    "Exact byte-length and SHA-256 verification for acquired local artifacts; workspace confinement and symlink-escape protection.",
+    "HTTPS-only metadata locators for not-acquired artifacts; no automatic remote fetch.",
+    "Transformation input/output node and artifact reference closure, explicit dependency edges, and verified artifacts for successful transformations.",
+    "Explicit terminal reason for non-success transformations; null_result cannot claim outputs.",
+    "Parameter-claim uncertainty-status vocabulary and source/fit-node reference checks.",
+    "External exact-byte SHA-256 pin requirement for frozen graph inputs.",
+    "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication.",
+    "Parameter claim source values must be a JSON number or non-empty verbatim string; optional normalized_value and normalized_unit must appear together, and normalized_value is numeric.",
+    "Parameter claims require at least one unique substrate ID; missing substrate identity must be represented explicitly rather than as an empty list.",
+    "For successful transformations, code/configuration/environment-lock fingerprints resolve to separate artifacts with matching declared SHA-256, verified local bytes, and approved-for-this-use rights status.",
+    "The Rust unit suite loads this contract and compares node/evidence-class, edge, artifact-role, graph-status, rights-status, acquisition-status, terminal-status, and uncertainty vocabularies against executable policy constants."
+  ]
+}

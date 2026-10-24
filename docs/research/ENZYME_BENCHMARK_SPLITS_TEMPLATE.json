@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "split_mode": "study_holdout",
+  "train_study_ids": [],
+  "test_study_ids": [],
+  "train_sequence_family_ids": [],
+  "test_sequence_family_ids": []
+}

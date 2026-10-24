@@ -186,3 +186,6 @@ demos/infin-love/
 
 # Exceptions for code synthesis
 !crates/domains/symthaea-geodesic/src/token_codebook.rs
+
+# Local, rights-gated enzyme benchmark artifacts; never commit source records.
+/research-data/enzyme-benchmark/

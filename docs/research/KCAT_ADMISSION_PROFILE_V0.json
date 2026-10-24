@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "profile_id": "kcat-admission-profile-v0",
+  "status": "tier_counter_implemented_policy_review_required",
+  "purpose": "Define endpoint-specific evidence tiers for reported enzyme turnover numbers without treating metadata completeness as scientific quality. The Rust checker now emits per-row aggregate counts for context-qualified, primary-comparison, and kinetic-reproduction candidate tiers; this policy still requires domain review before a real corpus is classified. The CLI also emits an observation-ID-linked highest-tier label so the aggregate counts are auditable.",
+  "target": {
+    "endpoint": "kcat",
+    "normalized_unit": "s^-1",
+    "observation_unit": "one reported kinetic parameter estimate tied to a specific enzyme form, reaction/substrate, source record, study, and assay context"
+  },
+  "source_basis": [
+    {
+      "title": "STRENDA Guidelines",
+      "version": "1.8",
+      "doi": "10.3762/strenda.28",
+      "url": "https://www.beilstein-institut.de/en/projects/strenda/guidelines/",
+      "scope": "Level 1A materials/methods and assay context; Level 1B enzyme activity, independent experiments, precision, parameter definition, and raw data recommendations"
+    }
+  ],
+  "policy_rules": {
+    "do_not_infer_missing_values": true,
+    "explicit_missingness_states": [
+      "not_reported",
+      "not_applicable"
+    ],
+    "not_applicable_requires_reason": true,
+    "metadata_coverage_is_quality_score": false,
+    "synthetic_fixtures_are_biological_evidence": false,
+    "zero_or_nondetect_is_exact_kcat": false,
+    "pool_multiple_sources_without_per_source_rights_review": false,
+    "eligibility_is_not_prediction_validation": true,
+    "descriptive_coverage_counters_sum_to_observation_count": true,
+    "tier_counter_implemented": true,
+    "profile_is_runtime_policy_source": false,
+    "row_level_tier_labels_emitted": true,
+    "tier_counts_are_nested": true
+  },
+  "tiers": [
+    {
+      "id": "integrity_admitted",
+      "meaning": "The source-rights, provenance, file-integrity, target-unit, unit-conversion, row-identity, and frozen-split admission gate has passed.",
+      "implemented_by": "enzyme-bench-check (corpus-level integrity gate, not a per-row scientific tier)",
+      "does_not_imply": [
+        "assay conditions are sufficient for direct comparability",
+        "reported kcat estimate is scientifically correct",
+        "kinetic model was independently reproduced",
+        "prediction generalizes to unseen enzymes"
+      ],
+      "classifier_checks": [
+        "The corpus-level enzyme-bench-check succeeds after rights, source identity, artifact hashes, target/unit conversion, row identity and split checks."
+      ]
+    },
+    {
+      "id": "context_qualified",
+      "meaning": "A record has enough explicitly reported reaction and assay context to be considered for a context-stratified comparison.",
+      "required_evidence": [
+        "enzyme identity and enzyme form, including the subunit/oligomer basis used for molar concentration",
+        "unambiguous substrate and stoichiometrically balanced reaction equation",
+        "kcat endpoint definition and kinetic equation/model",
+        "pH and assay temperature reported as actual values, not merely marked missing",
+        "temperature at which pH was measured, when known or material to interpretation",
+        "substrate concentration range with lower/upper bounds and units",
+        "buffer system and concentration, plus relevant salts/coupled-assay components when applicable",
+        "assay pressure stated when non-atmospheric, or explicit not_applicable with rationale when ambient pressure is assumed",
+        "assay/measurement method locator and source-record locator"
+      ],
+      "missingness_policy": "Records lacking any core item remain in the review inventory but do not enter a comparison that assumes that item is known.",
+      "implemented_by": "enzyme-bench-check row-level tier counter",
+      "classifier_checks": [
+        "ph has status reported and a finite numeric value",
+        "temperature_c has status reported and a finite numeric value",
+        "substrate_id has status reported and a non-empty string value",
+        "enzyme_form is reported and passes the non-empty-string shape check",
+        "substrate_concentration_range is reported with finite lower >= 0, finite upper > lower, and a non-empty unit",
+        "reaction_equation and kinetic_equation are reported non-empty strings",
+        "assay_pressure is reported with a positive finite value and unit, or not_applicable with a non-empty reason",
+        "buffer_system and buffer_concentration are both reported with valid shapes, or both not_applicable with non-empty reasons"
+      ],
+      "manual_review_before_evaluation": [
+        "Verify enzyme/protein accession and source identity refer to the actual assayed catalyst.",
+        "Verify the reaction equation is chemically balanced and the substrate range is relevant to the fitted kinetic regime.",
+        "Assess pH-measurement temperature where material, buffer chemistry/components, and the assay method reference."
+      ]
+    },
+    {
+      "id": "primary_comparison_candidate",
+      "meaning": "A context-qualified record with sufficient reporting to support an uncertainty-aware held-out kcat comparison, pending domain review.",
+      "additional_required_evidence": [
+        "enzyme purity/preparation description",
+        "enzyme concentration with units and basis; mass concentration alone must not be silently treated as molar concentration",
+        "independent experiment count",
+        "replicate structure describing what varied across repeats",
+        "measurement precision or uncertainty with measure, value, and units",
+        "analysis software, version, method and the procedure used to obtain kcat",
+        "supporting parameter/model context sufficient to distinguish kcat from Vmax or specific activity"
+      ],
+      "missingness_policy": "Missing any additional required item excludes the record from the strict primary-comparison cohort, while retaining it for transparent secondary/sensitivity summaries.",
+      "implemented_by": "enzyme-bench-check row-level tier counter",
+      "classifier_checks": [
+        "All context_qualified checks pass",
+        "enzyme_purity is reported with a non-empty description",
+        "enzyme_concentration has a finite positive value and unit, and its unit is one of the implemented molar concentration spellings",
+        "replicate_count and independent_experiment_count are positive integer values",
+        "replicate_structure is reported and non-empty",
+        "measurement_precision has a non-empty measure, finite non-negative numeric value, and non-empty unit",
+        "analysis_method includes non-empty software, version, and method strings"
+      ],
+      "manual_review_before_evaluation": [
+        "Check whether enzyme concentration is total vs active enzyme and whether the subunit/oligomer basis is consistent.",
+        "Check that purity/preparation and uncertainty descriptions are scientifically meaningful, not merely syntactically present.",
+        "Review the kcat calculation, fitting assumptions, parameter identifiability, and source-specific model definition."
+      ]
+    },
+    {
+      "id": "kinetic_reproduction_candidate",
+      "meaning": "A record has the raw and procedural evidence needed to attempt independent reconstruction of the published kinetic estimate.",
+      "additional_required_evidence": [
+        "raw time-course or initial-rate measurements, with units and source identifiers",
+        "blank/control handling and assay direction/readout specification",
+        "initial-rate selection or rate-estimation procedure",
+        "fitted model equation, constraints, parameterization, software/version and optimization settings",
+        "replicate-level data or an explicit statement of what raw data were unavailable",
+        "preregistered numerical tolerances and a report of failed/non-identifiable fits",
+        "SHA-256 for the exact raw time-course data payload, distinct from the SHA-256 of the corpus CSV",
+        "explicit initial-rate estimation procedure",
+        "blank/control handling description"
+      ],
+      "missingness_policy": "Parameter-table reproduction alone is not kinetic-pipeline reproduction.",
+      "implemented_by": "enzyme-bench-check row-level tier counter",
+      "classifier_checks": [
+        "All primary_comparison_candidate checks pass",
+        "raw_measurement_data is a syntactically valid HTTPS URL without embedded credentials",
+        "raw_measurement_data_sha256 is 64 hexadecimal characters (format only; bytes are not fetched or bound by this checker)",
+        "initial_rate_method and controls_description are reported non-empty strings"
+      ],
+      "manual_review_before_evaluation": [
+        "Fetch raw data under authorized terms and independently verify SHA-256 against the exact bytes.",
+        "Confirm units, measurement identifiers, replicate-level data, blanks/controls, assay direction/readout and initial-rate window.",
+        "Confirm fitted model, parameterization, constraints, optimizer/version/settings, numerical tolerances and failed-fit accounting."
+      ]
+    }
+  ],
+  "field_rules": [
+    {
+      "field": "ph",
+      "representation": "{\"status\":\"reported\",\"value\":number} or an explicit missingness object",
+      "context_tier": "context_qualified",
+      "strict_comparison": "actual value required"
+    },
+    {
+      "field": "temperature_c",
+      "representation": "{\"status\":\"reported\",\"value\":number} or an explicit missingness object",
+      "context_tier": "context_qualified",
+      "strict_comparison": "actual value required"
+    },
+    {
+      "field": "ph_measurement_temperature_c",
+      "representation": "{\"status\":\"reported\",\"value\":number} or an explicit missingness object",
+      "context_tier": "context_qualified",
+      "strict_comparison": "record when reported; lack of this detail is a limitation until an endpoint-specific policy says otherwise"
+    },
+    {
+      "field": "substrate_id",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty identifier} or an explicit missingness object",
+      "context_tier": "context_qualified",
+      "strict_comparison": "actual substrate identity required"
+    },
+    {
+      "field": "substrate_concentration_range",
+      "representation": "{\"status\":\"reported\",\"value\":{\"lower\":number,\"upper\":number,\"unit\":string}}",
+      "context_tier": "context_qualified",
+      "validation": "finite lower >= 0; finite upper > lower; non-empty unit; do not extrapolate beyond the reported range"
+    },
+    {
+      "field": "enzyme_concentration",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}}",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "positive finite value and unit; strict primary-comparison tier requires a recognized molar concentration unit (or a separately reviewed conversion to molar concentration); mass concentration alone never silently qualifies"
+    },
+    {
+      "field": "independent_experiment_count",
+      "representation": "{\"status\":\"reported\",\"value\":positive integer}",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "distinguish independent preparations/experiments from technical repeat readings"
+    },
+    {
+      "field": "replicate_structure",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description}",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "describe what varied between replicates"
+    },
+    {
+      "field": "measurement_precision",
+      "representation": "{\"status\":\"reported\",\"value\":{\"measure\":string,\"value\":number,\"unit\":string}}",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "retain whether uncertainty is SD, SEM, confidence interval, or another stated measure; never harmonize unlike measures silently"
+    },
+    {
+      "field": "raw_measurement_data",
+      "representation": "{\"status\":\"reported\",\"value\":HTTPS URL} or explicit missingness",
+      "context_tier": "kinetic_reproduction_candidate",
+      "validation": "raw data are preferred and needed for a full replay; a parameter table by itself does not satisfy this tier"
+    },
+    {
+      "field": "enzyme_purity",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "describe purity criterion and whether purified enzyme, preparation, or crude fraction was used; text is not independently verified"
+    },
+    {
+      "field": "enzyme_form",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "state whether concentration/turnover is relative to subunit, monomer, oligomer, or another defined catalyst entity"
+    },
+    {
+      "field": "buffer_system",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "identify buffer and counter-ion where available; if no buffer applies, use not_applicable with a reason"
+    },
+    {
+      "field": "buffer_concentration",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "positive finite value and unit when a buffer concentration is relevant"
+    },
+    {
+      "field": "assay_pressure",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "report non-atmospheric pressure; when ambient pressure is assumed, use not_applicable with explicit rationale"
+    },
+    {
+      "field": "kinetic_equation",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty model/equation description} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "identify the kinetic equation and variable definitions used to obtain kcat; this is distinct from a stoichiometrically balanced reaction equation"
+    },
+    {
+      "field": "replicate_count",
+      "representation": "{\"status\":\"reported\",\"value\":positive integer} or explicit missingness",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "record total replicate count separately from independent-experiment count and describe replicate structure"
+    },
+    {
+      "field": "detection_limit",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}} or explicit missingness",
+      "context_tier": "conditional_for_nondetects",
+      "validation": "finite non-negative value with unit and documented estimation basis where no activity/binding is detected; nondetect is not kcat=0"
+    },
+    {
+      "field": "reaction_equation",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty equation} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "report stoichiometrically balanced reaction and identify products; checker validates only non-empty text, not chemical balance"
+    },
+    {
+      "field": "analysis_method",
+      "representation": "{\"status\":\"reported\",\"value\":{\"software\":string,\"version\":string,\"method\":string}} or explicit missingness",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "identify analysis software, version and method; structural shape does not validate the algorithm"
+    },
+    {
+      "field": "raw_measurement_data_sha256",
+      "representation": "{\"status\":\"reported\",\"value\":64 hexadecimal SHA-256 characters} or explicit missingness",
+      "context_tier": "kinetic_reproduction_candidate",
+      "validation": "hash the exact raw payload bytes; a corpus CSV hash does not substitute for a raw-file hash"
+    },
+    {
+      "field": "initial_rate_method",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "kinetic_reproduction_candidate",
+      "validation": "describe the initial-rate window/fit and avoid unsupported extrapolation"
+    },
+    {
+      "field": "controls_description",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "kinetic_reproduction_candidate",
+      "validation": "document relevant blanks/no-enzyme/background controls and correction procedure"
+    }
+  ],
+  "cohort_handling": {
+    "unqualified_records": "Retain in a review inventory with reasons; do not impute missing assay conditions.",
+    "context_qualified_records": "May support context-stratified descriptive comparisons once the frozen split and source rights are independently reviewed.",
+    "primary_comparison_candidates": "Only records meeting all declared primary requirements before held-out labels are examined may enter the strict primary evaluation.",
+    "kinetic_reproduction_candidates": "Evaluate in a separate reproduction track, not as if successful parameter reproduction proved predictive generalization.",
+    "nondetects_and_failed_fits": "Represent as censored, failed, or unresolved states in a separate accounting path; do not encode as kcat=0 or quietly remove from denominators.",
+    "conflicts_and_duplicates": "Keep source observations distinct until a documented conflict/duplicate resolution rule is applied; linked records must not cross held-out boundaries."
+  },
+  "limitations": [
+    "This is a proposed analysis profile, not a formal STRENDA conformance checker.",
+    "The current checker reports optional-field coverage and validates field shapes but does not establish scientific validity.",
+    "A record that meets these metadata requirements can still be biased, incorrectly fitted, duplicated, or out of domain.",
+    "The Rust checker reports per-row aggregate tier counts, but the JSON file is not loaded as the runtime source of policy; a unit test checks that its field inventory covers all audited descriptors, and the hard-coded tier rules still require synchronized review.",
+    "Tier labels are candidate classifications based on declared metadata shape and presence, not validation that values are truthful, assays are comparable in all material respects, or kinetic fits are scientifically correct.",
+    "The tier classifier is implemented and reports aggregate counts, but its threshold choices still require domain review; it has not yet been validated against an independently reviewed real kcat corpus.",
+    "For raw_measurement_data_sha256, the current checker validates only a 64-character hexadecimal value and does not download the URL or prove that the digest matches its payload; the kinetic-reproduction tier is a pre-screen until an independent raw-file verifier binds URL, bytes, and digest.",
+    "The context-qualified/primary/kinetic labels are implemented as shape-and-presence pre-screens using the classifier_checks above; the manual_review_before_evaluation entries are not automatically validated."
+  ]
+}

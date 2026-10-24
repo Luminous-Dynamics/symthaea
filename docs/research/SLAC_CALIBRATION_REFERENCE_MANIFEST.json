@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "status": "reference_only_not_admitted",
+  "note": "Metadata-only calibration reference index. Raw source files are not part of this repository; acquire them separately under the canonical DaRUS terms and place them at the listed ignored local paths before running the Rust suite checker. Expected hashes refer to the pinned EnzymeML/slac_modeling mirror payload returned at the commit below; MD5 values are cross-checked against DaRUS file metadata.",
+  "source": {
+    "dataset_doi": "10.18419/DARUS-3867",
+    "dataverse_url": "https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi%3A10.18419%2Fdarus-3867",
+    "license": "CC-BY-4.0",
+    "mirror_repository": "EnzymeML/slac_modeling",
+    "mirror_commit": "737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5"
+  },
+  "files": [
+    {
+      "file_name": "ABTS_standard_25.0C.json",
+      "local_path": "research-data/enzyme-benchmark/slac-calibration/ABTS_standard_25.0C.json",
+      "github_blob_sha": "ea1a3f69f5c01f6b6f7880c445833c5a733e4655",
+      "byte_length": 5054,
+      "sha256": "39ccca8d0288e71f9ea686fdd19b96f04e6761e658a599fee108b897a3c20187",
+      "canonical_dataverse_md5": "c8561fe8784f956d1123bbcd52a65121",
+      "expected_fit": {
+        "concentration_unit": "umol / l",
+        "range_lower": 0,
+        "range_upper": 150,
+        "total_samples": 30,
+        "selected_samples": 27,
+        "excluded_samples": 3,
+        "slope": 0.01832986232564407,
+        "r2": 0.9965435394942497,
+        "rmsd": 0.05253117083141901,
+        "ph": 3,
+        "temperature_c": 25,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
+      }
+    },
+    {
+      "file_name": "ABTS_standard_30.0C.json",
+      "local_path": "research-data/enzyme-benchmark/slac-calibration/ABTS_standard_30.0C.json",
+      "github_blob_sha": "0da47be959d22936cbe6984070515e0f9c7d87c0",
+      "byte_length": 5052,
+      "sha256": "de7da34ff636397e5ca130b4dbe28916d537290699847a63ce1acdcf33fff4f9",
+      "canonical_dataverse_md5": "b9b51ddcd76bf1ee8dcb5c08f258b7a2",
+      "expected_fit": {
+        "concentration_unit": "umol / l",
+        "range_lower": 0,
+        "range_upper": 150,
+        "total_samples": 30,
+        "selected_samples": 27,
+        "excluded_samples": 3,
+        "slope": 0.01731460518695782,
+        "r2": 0.9997826256275483,
+        "rmsd": 0.012440262679447662,
+        "ph": 3,
+        "temperature_c": 30,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
+      }
+    },
+    {
+      "file_name": "ABTS_standard_35.5C.json",
+      "local_path": "research-data/enzyme-benchmark/slac-calibration/ABTS_standard_35.5C.json",
+      "github_blob_sha": "26bb88c6abacc6feec1349f0377f215189d71520",
+      "byte_length": 5050,
+      "sha256": "229a013d707ae09dc200588a2b1cd5a2fcfb7831c2f1461663b237e14226a8c5",
+      "canonical_dataverse_md5": "38e7b2be4eb40a383eec57efa319e897",
+      "expected_fit": {
+        "concentration_unit": "umol / l",
+        "range_lower": 0,
+        "range_upper": 150,
+        "total_samples": 30,
+        "selected_samples": 27,
+        "excluded_samples": 3,
+        "slope": 0.017977302593713523,
+        "r2": 0.9961949291160336,
+        "rmsd": 0.05377164085489365,
+        "ph": 3,
+        "temperature_c": 35.5,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
+      }
+    },
+    {
+      "file_name": "ABTS_standard_40.0C.json",
+      "local_path": "research-data/enzyme-benchmark/slac-calibration/ABTS_standard_40.0C.json",
+      "github_blob_sha": "6bd7e0499c8021417aa0ab99a8ee67a76d21bc76",
+      "byte_length": 5054,
+      "sha256": "5d2d5f91a5d8cc02508f6591f592687ee711c746143edbb0acdcc83155b112df",
+      "canonical_dataverse_md5": "7ffcd2249695adb526afe06eee28066b",
+      "expected_fit": {
+        "concentration_unit": "umol / l",
+        "range_lower": 0,
+        "range_upper": 150,
+        "total_samples": 30,
+        "selected_samples": 27,
+        "excluded_samples": 3,
+        "slope": 0.019069431818646787,
+        "r2": 0.9997064382973191,
+        "rmsd": 0.015898666121098373,
+        "ph": 3,
+        "temperature_c": 40,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
+      }
+    },
+    {
+      "file_name": "ABTS_standard_45.0C.json",
+      "local_path": "research-data/enzyme-benchmark/slac-calibration/ABTS_standard_45.0C.json",
+      "github_blob_sha": "51e004de9f65589ccdbaf721c9308c9d04326e77",
+      "byte_length": 5052,
+      "sha256": "b8fcf7ee94bd64b85acd886adc29a2653979ebdfefd4909b00b305f1b3663c6d",
+      "canonical_dataverse_md5": "e1960a2f3cfeabb71e291ae4967b6e91",
+      "expected_fit": {
+        "concentration_unit": "umol / l",
+        "range_lower": 0,
+        "range_upper": 150,
+        "total_samples": 30,
+        "selected_samples": 27,
+        "excluded_samples": 3,
+        "slope": 0.01805986560361547,
+        "r2": 0.9977614756102724,
+        "rmsd": 0.04146734721174711,
+        "ph": 3,
+        "temperature_c": 45,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
+      }
+    }
+  ]
+}

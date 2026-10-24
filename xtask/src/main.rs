@@ -3,6 +3,10 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod enzyme_bench;
+mod enzyme_calibration;
+mod enzyme_evidence_graph;
+mod enzyme_model_falsification;
 mod manifest;
 mod rhn_sweep;
 
@@ -21,7 +25,7 @@ enum Commands {
         registry: PathBuf,
     },
 
-    /// Crate truth registry: join `cargo metadata` with `docs/crate-status.toml`.
+    /// Crate truth registry: join cargo metadata with docs/crate-status.toml.
     /// A crate's existence does not imply endorsement.
     CrateStatus {
         /// Emit the generated markdown inventory instead of checking.
@@ -60,6 +64,42 @@ enum Commands {
         #[arg(long)]
         input: PathBuf,
         #[arg(long)]
+        out: PathBuf,
+    },
+    /// Validate a frozen, provenance-complete enzyme benchmark before any model scoring.
+    EnzymeBenchCheck {
+        /// Manifest path, relative to the workspace root unless absolute.
+        #[arg(long)]
+        manifest: PathBuf,
+    },
+    /// Reproduce and verify one declared zero-intercept EnzymeML calibration fit.
+    EnzymeCalibrationCheck {
+        /// Path to the local calibration JSON artifact.
+        #[arg(long)]
+        input: PathBuf,
+        /// Expected SHA-256 of the exact input bytes.
+        #[arg(long)]
+        sha256: String,
+    },
+    /// Verify all five hash-pinned SLAC calibration files from a local research-data staging area.
+    EnzymeCalibrationSuiteCheck {
+        /// Metadata-only suite manifest, workspace-relative unless absolute.
+        #[arg(long)]
+        manifest: PathBuf,
+    },
+    /// Independently verify evidence-graph references, edge constraints, hashes, and transformation closure.
+    EnzymeEvidenceGraphCheck {
+        /// Graph JSON path, relative to the workspace root unless absolute.
+        #[arg(long)]
+        input: PathBuf,
+        /// External SHA-256 pin for the exact serialized graph bytes (required for status=frozen).
+        #[arg(long)]
+        sha256: Option<String>,
+    },
+    /// Run deterministic synthetic parameter-recovery and model-discrimination fixtures.
+    EnzymeModelFalsification {
+        /// Output path for the machine-readable synthetic-only report.
+        #[arg(long, default_value = "reports/enzyme_model_falsification_v0.json")]
         out: PathBuf,
     },
     GenerateManifest {
@@ -105,6 +145,39 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::EnzymeBenchCheck { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() {
+                manifest
+            } else {
+                root.join(manifest)
+            };
+            enzyme_bench::check(&root, &manifest_path)?;
+        }
+        Commands::EnzymeCalibrationCheck { input, sha256 } => {
+            enzyme_calibration::check(&input, &sha256)?;
+        }
+        Commands::EnzymeCalibrationSuiteCheck { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() { manifest } else { root.join(manifest) };
+            enzyme_calibration::check_suite(&root, &manifest_path)?;
+        }
+        Commands::EnzymeEvidenceGraphCheck { input, sha256 } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            enzyme_evidence_graph::check(&root, &input, sha256.as_deref())?;
+        }
+        Commands::EnzymeModelFalsification { out } => {
+            enzyme_model_falsification::run(&out)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "candidate",
+  "source": {
+    "source_id": "BRENDA",
+    "release": "2026.1",
+    "url": "https://www.brenda-enzymes.info/download.php",
+    "license_id": "CC-BY-4.0",
+    "license_accepted": false,
+    "rights_review_status": "not_reviewed",
+    "attribution": "",
+    "access_date": ""
+  },
+  "target": {
+    "endpoint": "kcat",
+    "normalized_unit": "s^-1"
+  },
+  "dataset_artifact": {
+    "path": "research-data/enzyme-benchmark/corpus.csv",
+    "sha256": "",
+    "record_count": 0
+  },
+  "split_manifest_artifact": {
+    "path": "research-data/enzyme-benchmark/splits.json",
+    "sha256": ""
+  },
+  "preregistration_artifact": {
+    "path": "research-data/enzyme-benchmark/preregistration.md",
+    "sha256": ""
+  },
+  "evaluation": {
+    "random_seed": 17,
+    "baseline_ids": [
+      "constant_median",
+      "context_group_median",
+      "descriptor_knn",
+      "symthaea_assisted"
+    ]
+  }
+}
