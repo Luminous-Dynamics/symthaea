@@ -11,8 +11,9 @@
 //! A verified plan establishes only feasibility under this scenario's declared
 //! synthetic constraints. It does not establish aircraft safety, regulatory
 //! compliance, or commercial savings. The planner and verifier have separate
-//! feasibility/cost paths; the verifier resolves stable IDs and independently
-//! recomputes constraints and objective cost.
+//! compliance, or commercial savings. The planner and verifier have separate
+//! feasibility/cost paths; the verifier resolves stable IDs and recomputes constraints
+//! This is a separate code path in the same crate, not an independently maintained
 
 /// Upper bound keeps exact enumeration appropriate for unit tests and tiny oracles.
 pub const MAX_EXACT_FLIGHTS: usize = 6;
@@ -376,8 +377,8 @@ fn candidate_cost(
     Some(total)
 }
 
-/// Independently check a plan against its scenario. No result from this function
-/// authorizes a real-world operation.
+/// Check a plan against its scenario using a separate stable-ID code path. No result
+/// from this function authorizes a real-world operation.
 pub fn verify_plan(scenario: &Scenario, plan: &Plan) -> VerificationReport {
     if let Err(reason) = scenario.validate() {
         return VerificationReport::indeterminate(reason);
