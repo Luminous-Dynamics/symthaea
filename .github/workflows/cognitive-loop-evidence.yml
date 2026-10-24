@@ -13,6 +13,7 @@ on:
       - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
+      - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
@@ -30,6 +31,7 @@ on:
       - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
+      - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
@@ -90,6 +92,9 @@ jobs:
 
       - name: Test counterfactual adaptation utility failure modes
         run: cargo test --locked -p xtask cognitive_adaptation_utility
+
+      - name: Test adaptation panel coverage and aggregation
+        run: cargo test --locked -p xtask cognitive_adaptation_panel
 
       - name: Test scalar drift baseline failure modes
         run: cargo test --locked -p xtask cognitive_drift_baselines
@@ -185,6 +190,25 @@ jobs:
             (.canonical_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/no-impact-adaptation-utility.json"
+
+      - name: Verify incomplete adaptation panel fails closed
+        run: |
+          cargo run --locked -p xtask -- compare-cognitive-adaptation-panel --input benchmarks/cognitive-loop-evidence/synthetic-adaptation-panel-incomplete.json --out "$RUNNER_TEMP/adaptation-panel-incomplete.json"
+          jq -e '
+            .metric_version == "cognitive-adaptation-panel-v1" and
+            .comparison_track == "valid-pe-only" and
+            .complete_coverage_gate_pass == false and
+            .expected_dataset_count == 7 and
+            .expected_seed_count_per_dataset == 50 and
+            .expected_run_count == 2800 and
+            .observed_run_count == 0 and
+            .missing_cell_count == 2800 and
+            (.missing_cells | length) == 2800 and
+            .primary_comparison == null and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64 and
+            (.interpretation_guard | contains("Incomplete panels"))
+          ' "$RUNNER_TEMP/adaptation-panel-incomplete.json"
 
       - name: Validate the synthetic cognitive replay receipt
         run: |
