@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-passive-topology"
+version = "0.1.0"
+edition = "2024"
+description = "Structural positive/negative-space descriptors for passive engineering search"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
