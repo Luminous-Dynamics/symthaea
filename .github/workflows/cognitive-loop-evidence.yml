@@ -190,6 +190,12 @@ jobs:
             .score.hard_gate_pass == true and
             (.detections | length) == 1 and
             (.detections[0].cycle_index < 40) and
+            .diagnostics.statistic_name == "predictive-rank-martingale-portfolio-wealth" and
+            .diagnostics.stopping_alpha == 0.2 and
+            .diagnostics.threshold_or_boundary == 5 and
+            .diagnostics.stopped_at_first_crossing == true and
+            .diagnostics.valid_samples_processed == (.detections[0].cycle_index + 1) and
+            (.diagnostics.maximum_statistic >= .diagnostics.threshold_or_boundary) and
             (.canonical_input_sha256 | length) == 64 and
             (.configuration_digest | length) == 64 and
             (.result_sha256 | length) == 64
