@@ -74,7 +74,29 @@ For the safety gate, choose the maximum tolerable event rate before observing ou
 
 ## Comparison to industry and state of evidence
 
-Compare HDC against exact-HDC, no-memory, lexical BM25, a strong dense or hybrid retriever, and a full-context/KV/summary memory baseline under the same answer model and declared budget. For infrastructure performance, separately compare matched binary-vector bytes and Hamming metric against an optimized exact scan and established binary ANN indexes. For agent value, compare end-task success and harmful-error rates on common cases. Do not compare incompatible model versions, test splits, K values, context budgets, or evaluators as if they were matched results.
+The field now has several complementary benchmarks; no single one is a complete proxy for memory quality. This matters because a system can retrieve relevant text yet fail to update a fact, use it in an action, respect deletion, or do so efficiently.
+
+| Benchmark / external reference | What it measures | How to use it for Broca |
+|---|---|---|
+| [LongMemEval-V2 official repo](https://github.com/xiaowu0162/LongMemEval-V2/) and [results page](https://xiaowu0162.github.io/longmemeval-v2/) | Long-horizon memory with a published accuracy/latency frontier | Reproduce the official evaluator; keep retrieval-only recall separate from end-to-end answer accuracy and latency |
+| [MemoryAgentBench (ICLR 2026)](https://arxiv.org/abs/2507.05257) | Accurate retrieval, test-time learning, long-range understanding, and selective forgetting | Use its native competency breakdown to expose weaknesses hidden by aggregate accuracy |
+| [Mem2ActBench (ACL 2026)](https://aclanthology.org/2026.acl-long.370/) | Memory applied to tool choice and argument grounding across 400 tool-use tasks; paper reports that 91.3% of tasks were judged strongly memory-dependent | Add action and argument correctness, not merely retrieval-hit rate |
+| [AMA-Bench (ICML 2026)](https://proceedings.mlr.press/v306/zhao26bs.html) | Long-horizon agent/environment trajectories with states, actions, observations and tool outputs | Extend beyond chat-only memory to persistent action/observation traces |
+| [Agent Memory Leaderboard / Cycle 2](https://agentmemories.ai/docs) | Textual, coding and multimodal tracks, with distinct measures including temporal reasoning, memory governance, context execution, and safety/privacy | Candidate external submission after API conformance and model/license requirements are verified; page checked 2026-10-24 lists materials due 2026-10-31 at 23:59 UTC+8, so recheck dates before acting |
+
+The LongMemEval-V2 results page currently lists very different accuracy/latency points, including 1.3% for a no-retrieval reader, 42.8% for query-to-slice RAG, 51.0% for RAG with notes, and 74.9% for AgentRunbook-C on the published Small configuration. These are the benchmark's reported rows, not HDC targets or automatically fair head-to-head comparisons: model, agent, budget, and latency differ. Use them to motivate a frontier, not to claim superiority by placing one raw number beside another. The official results page and evaluator version must be pinned in any actual report.
+
+### Matched industry baseline matrix
+
+Compare HDC against the following arms on the same held-out cases, answer model, evaluator, allowed context/tool budget and declared resource accounting:
+
+- **No-memory** establishes whether memory adds value at all.
+- **Exact HDC** isolates the loss/benefit introduced by approximate retrieval.
+- **BM25** and a strong dense/hybrid retriever establish competitive retrieval baselines.
+- **Full-context, KV memory, and summary/observation memory** test alternative memory representations, not just alternative indexes.
+- **Approximate HDC / hybrid HDC** are candidates, not presumed winners.
+
+For infrastructure performance, separately compare identical byte-packed binary vectors, Hamming distance, query vectors and K against optimized exact search and established binary ANN indexes. Measure index build/update/delete/rebuild cost, storage overhead and cold-start/recovery as well as search latency and recall. For agent value, compare end-task success, stale-memory errors and correct tool arguments on common cases. Never combine retrieval-only Recall@K, a native benchmark accuracy score, and a leaderboard score into one synthetic overall metric.
 
 At submission time, classify every number as one of: **measured here**, **reported by an external source**, or **proposed target**. This repository currently supplies a store-level synthetic retrieval protocol and a task-level protocol proposal; neither constitutes evidence that Liquid Broca beats state of the art. That conclusion must wait for executed paired evaluations and reproducible external baselines.
 
