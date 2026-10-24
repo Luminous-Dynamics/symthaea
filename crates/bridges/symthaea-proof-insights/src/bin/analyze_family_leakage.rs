@@ -195,6 +195,9 @@ fn validate_split(doc: &Value) -> Result<(String, BTreeMap<String, String>)> {
             bail!("declared {name} count differs from family assignments");
         }
     }
+    if (counts.train, counts.validation, counts.test) != EXPECTED_FAMILY_COUNTS {
+        bail!("family counts differ from the frozen PITB v0 partition");
+    }
     Ok((digest, actual))
 }
 
