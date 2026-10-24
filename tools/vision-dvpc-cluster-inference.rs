@@ -510,7 +510,7 @@ fn render_receipt(
     for result in results {
         let _ = writeln!(
             output,
-            "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             result.comparison_id,
             result.candidate_id,
             result.baseline_id,
