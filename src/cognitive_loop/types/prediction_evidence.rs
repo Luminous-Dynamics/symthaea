@@ -74,13 +74,6 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
                         "valid prediction evidence must contain a finite value",
                     ));
                 }
-                if wire.prediction_cycle.is_some()
-                    && wire.observation_cycle.checked_sub(1) != wire.prediction_cycle
-                {
-                    return Err(D::Error::custom(
-                        "prediction cycle must immediately precede observation cycle",
-                    ));
-                }
                 if let Some(prediction_cycle) = wire.prediction_cycle {
                     if wire.observation_cycle.checked_sub(1) != Some(prediction_cycle) {
                         return Err(D::Error::custom(
