@@ -562,6 +562,47 @@ mod tests {
     }
 
     #[test]
+    fn accepts_delayed_outcomes_with_out_of_order_availability() {
+        let mut receipt = valid_receipt();
+        receipt.events[0].available_at_tick = 2;
+        receipt.events[1].available_at_tick = 1;
+        receipt.events[2].available_at_tick = 2;
+        receipt.event_ledger_sha256 = sha256(&serde_json::to_vec(&receipt.events).unwrap());
+
+        let mut delivery_events: Vec<&ExogenousEvent> = receipt.events.iter().collect();
+        delivery_events.sort_by_key(|event| (event.available_at_tick, event.sequence_index));
+        let expected_deliveries: Vec<DeliveryRecord> = delivery_events.iter().map(|event| DeliveryRecord {
+            event_id: event.event_id.clone(),
+            delivered_at_tick: event.available_at_tick,
+        }).collect();
+        let visible_by_tick: Vec<Vec<String>> = (0..receipt.stream_length_ticks).map(|tick| {
+            receipt.events.iter()
+                .filter(|event| event.available_at_tick <= tick)
+                .map(|event| event.event_id.clone())
+                .collect()
+        }).collect();
+        for arm in &mut receipt.arms {
+            arm.deliveries = expected_deliveries.clone();
+            for decision in &mut arm.decisions {
+                decision.observed_event_ids = visible_by_tick[decision.decision_tick as usize].clone();
+            }
+        }
+
+        let result = validate_receipt(receipt).expect("delayed, timestamp-correct receipt validates");
+        assert_eq!(result.event_count, 5);
+    }
+
+    #[test]
+    fn rejects_adaptation_action_from_no_adapt_control() {
+        let mut receipt = valid_receipt();
+        let decision = &mut receipt.arms[0].decisions[1];
+        decision.action = "stage".to_owned();
+        decision.snapshot_sha256 = Some(digest('1'));
+        decision.candidate_state_sha256 = Some(digest('2'));
+        assert!(validate_receipt(receipt).unwrap_err().to_string().contains("no-adapt arm cannot execute adaptation action"));
+    }
+
+    #[test]
     fn rejects_future_information_even_when_present_in_the_ledger() {
         let mut receipt = valid_receipt();
         receipt.arms[0].decisions[0].observed_event_ids.push("e1".to_owned());
