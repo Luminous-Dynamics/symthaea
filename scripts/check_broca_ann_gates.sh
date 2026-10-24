@@ -21,6 +21,50 @@ for REPORT in "$@"; do
     continue
   fi
 
+  RECEIPT="${REPORT%.csv}.receipt.txt"
+  if [[ ! -f "$RECEIPT" ]]; then
+    echo "FAIL $REPORT: missing sidecar receipt $RECEIPT" >&2
+    FAILED=1
+    continue
+  fi
+  if ! command -v sha256sum >/dev/null 2>&1; then
+    echo "FAIL $REPORT: sha256sum is required to verify the output receipt" >&2
+    FAILED=1
+    continue
+  fi
+  if ! grep -qx 'exit_status=0' "$RECEIPT"; then
+    echo "FAIL $REPORT: sidecar receipt does not record exit_status=0" >&2
+    FAILED=1
+    continue
+  fi
+  EXPECTED_SHA="$(awk -F= '$1 == "output_sha256" { print $2; exit }' "$RECEIPT")"
+  ACTUAL_SHA="$(sha256sum "$REPORT" | awk '{ print $1 }')"
+  RECEIPT_SOURCE_SHA="$(awk -F= '$1 == "source_sha" { print $2; exit }' "$RECEIPT")"
+  CSV_SOURCE_SHA="$(awk -F= '/^# source_sha=/ { sub(/^# source_sha=/, ""); print; exit }' "$REPORT")"
+  STDERR_PATH="$(awk -F= '$1 == "stderr_log" { sub(/^[^=]*=/, ""); print; exit }' "$RECEIPT")"
+  EXPECTED_STDERR_SHA="$(awk -F= '$1 == "stderr_sha256" { print $2; exit }' "$RECEIPT")"
+  if [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" != "$ACTUAL_SHA" ]]; then
+    echo "FAIL $REPORT: output SHA-256 does not match sidecar receipt" >&2
+    FAILED=1
+    continue
+  fi
+  if [[ -z "$RECEIPT_SOURCE_SHA" || "$RECEIPT_SOURCE_SHA" != "$CSV_SOURCE_SHA" ]]; then
+    echo "FAIL $REPORT: receipt source SHA does not match CSV metadata" >&2
+    FAILED=1
+    continue
+  fi
+  if [[ -z "$STDERR_PATH" || ! -f "$STDERR_PATH" || -z "$EXPECTED_STDERR_SHA" ]]; then
+    echo "FAIL $REPORT: stderr log or its SHA-256 is missing from receipt" >&2
+    FAILED=1
+    continue
+  fi
+  ACTUAL_STDERR_SHA="$(sha256sum "$STDERR_PATH" | awk '{ print $1 }')"
+  if [[ "$EXPECTED_STDERR_SHA" != "$ACTUAL_STDERR_SHA" ]]; then
+    echo "FAIL $REPORT: stderr SHA-256 does not match sidecar receipt" >&2
+    FAILED=1
+    continue
+  fi
+
   echo "=== $REPORT ==="
   if awk '
     function fail(message) {
