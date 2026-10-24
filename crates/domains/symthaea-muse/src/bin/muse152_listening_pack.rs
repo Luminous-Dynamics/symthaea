@@ -1841,8 +1841,20 @@ fn render(
         &path,
     )
     .map_err(|error| error.to_string())?;
-    let wav = symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, None)
-        .ok_or_else(|| "FluidSynth render failed".to_owned());
+    let renderer_dialect = symthaea_muse::theory_realize::map_grammar_dialect(dialect);
+    let state = symthaea_muse::MusicalState::default();
+    let color = symthaea_muse::fluid_render::room_for_dialect(
+        symthaea_muse::fluid_render::RenderColor::from_state(&state),
+        renderer_dialect,
+    );
+    let mastering = symthaea_muse::auto_master::MasteringConfig::for_dialect(renderer_dialect);
+    let wav = symthaea_muse::fluid_render::render_midi_to_wav_with_mastering(
+        &path,
+        SAMPLE_RATE,
+        Some(color),
+        &mastering,
+    )
+    .ok_or_else(|| "FluidSynth render failed".to_owned());
     let _ = std::fs::remove_file(path);
     wav
 }

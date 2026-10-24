@@ -59,10 +59,12 @@ impl RenderColor {
 /// sliders stay authoritative (the base is computed from state exactly as
 /// before); the dialect only SHIFTS the room the way the tradition's
 /// recording practice would:
-/// - ProcessExact (minimalism/ambient/drone, sacred-like stillness) — a
-///   larger, wetter space: the sustained material IS the reverb's food.
-/// - DanceLocked / JazzLaidBack — drier and closer: a rhythm section is
-///   close-mic'd; a wash would smear the groove that is the clock.
+/// - ProcessExact / DroneElastic — larger, wetter spaces for sustained
+///   process or slowly unfolding modal/drone material.
+/// - ChoralBlend — a larger, softer room for a unified ensemble image.
+/// - DramaticTiming — a moderate room lift intended to reinforce large arcs.
+/// - DanceLocked / JazzLaidBack — drier and closer so reverberation does not
+///   smear the groove that is the clock.
 /// - ClassicalRubato / FolkLift — unchanged (returned bit-identical).
 #[cfg(feature = "theory")]
 pub fn room_for_dialect(
@@ -75,6 +77,21 @@ pub fn room_for_dialect(
         D::ProcessExact => RenderColor {
             reverb_room: (base.reverb_room + 0.18).clamp(0.0, 1.0),
             reverb_level: (base.reverb_level + 0.12).clamp(0.0, 1.0),
+            ..base
+        },
+        D::DroneElastic => RenderColor {
+            reverb_room: (base.reverb_room + 0.25).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.16).clamp(0.0, 1.0),
+            ..base
+        },
+        D::DramaticTiming => RenderColor {
+            reverb_room: (base.reverb_room + 0.12).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.08).clamp(0.0, 1.0),
+            ..base
+        },
+        D::ChoralBlend => RenderColor {
+            reverb_room: (base.reverb_room + 0.22).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.14).clamp(0.0, 1.0),
             ..base
         },
         D::DanceLocked | D::JazzLaidBack => RenderColor {
@@ -108,13 +125,31 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
 ///
 /// FluidSynth's default gain (0.2) leaves our deliberately-soft velocities
 /// whisper-quiet, so the render runs at gain 0.8 and the PCM then goes through
-/// [`master_wav`] — the same BS.1770-4 chain and the same
-/// [`crate::auto_master::MasteringConfig`] the native path uses, so the two
-/// renderers are post-processed identically.
+/// [`master_wav`] — the same BS.1770-4 mastering algorithm used by the native
+/// path. This compatibility wrapper passes the default config; composition
+/// paths should use [`render_midi_to_wav_with_mastering`] and supply the
+/// dialect-derived config also used by native realization.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
     color: Option<RenderColor>,
+) -> Option<Vec<u8>> {
+    render_midi_to_wav_with_mastering(
+        midi_path,
+        sample_rate,
+        color,
+        &crate::auto_master::MasteringConfig::default(),
+    )
+}
+
+/// Render MIDI with an explicit mastering profile. Composition paths should
+/// pass the same dialect-derived profile used by the native renderer; neutral
+/// previews and imported-work audition may keep using render_midi_to_wav.
+pub fn render_midi_to_wav_with_mastering(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    mastering: &crate::auto_master::MasteringConfig,
 ) -> Option<Vec<u8>> {
     let (binary, soundfont) = available()?;
     let out = std::env::temp_dir().join(format!(
@@ -171,7 +206,7 @@ pub fn render_midi_to_wav(
         let _ = std::fs::remove_file(&out);
         return None;
     }
-    let result = master_wav(&out);
+    let result = master_wav(&out, mastering);
     let _ = std::fs::remove_file(&out);
     result
 }
@@ -186,9 +221,9 @@ pub fn render_midi_to_wav(
 /// while FluidSynth output got none of it. Every one of `auto_master`'s
 /// listening-tuned defaults was inert on the renderer an A/B test had chosen.
 ///
-/// Both paths now run the same chain with the same `MasteringConfig::default()`,
-/// so a FluidSynth-vs-native comparison measures the renderers rather than the
-/// mastering.
+/// The mastering algorithm is shared with the native path. Controlled
+/// renderer comparisons must pass the same explicit `MasteringConfig` to both
+/// arms; the convenience wrapper intentionally retains the historical default.
 ///
 /// CORRECTION (2026-07-30). An earlier version of this comment claimed the
 /// original A/B listening test was confounded by the native arm being
@@ -208,20 +243,33 @@ pub fn render_midi_to_wav(
 /// What remains genuinely untested is narrower: now that both arms share one
 /// mastering chain, the comparison is FAIR for the first time (it was previously
 /// unfair AGAINST FluidSynth), so re-running it measures renderer timbre alone.
-fn master_wav(path: &Path) -> Option<Vec<u8>> {
+fn master_wav(path: &Path, mastering: &crate::auto_master::MasteringConfig) -> Option<Vec<u8>> {
     let mut reader = hound::WavReader::open(path).ok()?;
     let spec_in = reader.spec();
+    if spec_in.channels == 0 || spec_in.sample_rate == 0 {
+        return None;
+    }
     let samples: Vec<f32> = match spec_in.sample_format {
         hound::SampleFormat::Int => {
             let scale = 1.0 / (1i64 << (spec_in.bits_per_sample - 1)) as f32;
             reader
                 .samples::<i32>()
-                .filter_map(Result::ok)
-                .map(|s| s as f32 * scale)
-                .collect()
+                .map(|sample| sample.map(|value| value as f32 * scale))
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?
         }
-        hound::SampleFormat::Float => reader.samples::<f32>().filter_map(Result::ok).collect(),
+        hound::SampleFormat::Float => reader
+            .samples::<f32>()
+            .collect::<Result<Vec<_>, _>>()
+            .ok()?,
     };
+    let channels = spec_in.channels as usize;
+    if samples.is_empty()
+        || samples.len() % channels != 0
+        || samples.iter().any(|sample| !sample.is_finite())
+    {
+        return None;
+    }
     let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
     if peak < 1e-5 {
         return None; // silence — treat as a failed render
@@ -229,19 +277,14 @@ fn master_wav(path: &Path) -> Option<Vec<u8>> {
 
     // `auto_master` works on stereo frames. FluidSynth renders stereo, but
     // handle mono defensively by duplicating the channel rather than failing.
-    let channels = spec_in.channels.max(1) as usize;
     let mut frames: Vec<[f32; 2]> = match channels {
         1 => samples.iter().map(|&s| [s, s]).collect(),
         _ => samples
             .chunks_exact(channels)
-            .map(|c| [c[0], c[1 % channels]])
+            .map(|c| [c[0], c[1]])
             .collect(),
     };
-    crate::auto_master::auto_master(
-        &mut frames,
-        spec_in.sample_rate,
-        &crate::auto_master::MasteringConfig::default(),
-    );
+    crate::auto_master::auto_master(&mut frames, spec_in.sample_rate, mastering);
 
     // Re-encode as stereo regardless of input channel count: `frames` is always
     // stereo after the conversion above, so writing `spec_in.channels` would
@@ -286,8 +329,15 @@ mod tests {
         }
         // Process music: a larger, wetter space.
         let process = room_for_dialect(base, D::ProcessExact);
+        let drone = room_for_dialect(base, D::DroneElastic);
+        let drama = room_for_dialect(base, D::DramaticTiming);
+        let choir = room_for_dialect(base, D::ChoralBlend);
         assert!(process.reverb_room > base.reverb_room);
         assert!(process.reverb_level > base.reverb_level);
+        assert!(drone.reverb_room > process.reverb_room);
+        assert!(drone.reverb_level > process.reverb_level);
+        assert!(drama.reverb_room > base.reverb_room);
+        assert!(choir.reverb_room > base.reverb_room);
         // Groove dialects: drier and closer.
         for d in [D::DanceLocked, D::JazzLaidBack] {
             let dry = room_for_dialect(base, d);
@@ -305,7 +355,14 @@ mod tests {
                 ..Default::default()
             };
             let b = RenderColor::from_state(&state);
-            for d in [D::ProcessExact, D::DanceLocked, D::JazzLaidBack] {
+            for d in [
+                D::ProcessExact,
+                D::DroneElastic,
+                D::DramaticTiming,
+                D::ChoralBlend,
+                D::DanceLocked,
+                D::JazzLaidBack,
+            ] {
                 let r = room_for_dialect(b, d);
                 assert!((0.0..=1.0).contains(&r.reverb_room));
                 assert!((0.0..=1.0).contains(&r.reverb_level));
@@ -345,7 +402,8 @@ mod tests {
             w.write_sample((s * 32767.0) as i16).unwrap();
         }
         w.finalize().unwrap();
-        let bytes = master_wav(&quiet).expect("real audio masters");
+        let bytes = master_wav(&quiet, &crate::auto_master::MasteringConfig::default())
+            .expect("real audio masters");
         let mut r = hound::WavReader::new(std::io::Cursor::new(bytes)).unwrap();
         let out_spec = r.spec();
         // `master_wav` always emits stereo: it upmixes mono before mastering,
@@ -385,7 +443,66 @@ mod tests {
             w.write_sample(0i16).unwrap();
         }
         w.finalize().unwrap();
-        assert!(master_wav(&silent).is_none());
+        assert!(master_wav(&silent, &crate::auto_master::MasteringConfig::default()).is_none());
         std::fs::remove_file(&silent).ok();
+    }
+    #[test]
+    fn mastering_rejects_non_finite_float_samples() {
+        let path =
+            std::env::temp_dir().join(format!("muse_nonfinite_input_{}.wav", std::process::id()));
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut writer = hound::WavWriter::create(&path, spec).unwrap();
+        for _ in 0..512 {
+            writer.write_sample(0.1f32).unwrap();
+            writer.write_sample(f32::NAN).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        assert!(
+            master_wav(&path, &crate::auto_master::MasteringConfig::default()).is_none(),
+            "non-finite samples must fail the render rather than contaminate measurements"
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn mastering_rejects_truncated_pcm_instead_of_dropping_samples() {
+        let valid_path =
+            std::env::temp_dir().join(format!("muse_truncated_valid_{}.wav", std::process::id()));
+        let truncated_path =
+            std::env::temp_dir().join(format!("muse_truncated_input_{}.wav", std::process::id()));
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(&valid_path, spec).unwrap();
+        for i in 0..512 {
+            let sample = if i % 2 == 0 { 7000i16 } else { -7000i16 };
+            writer.write_sample(sample).unwrap();
+            writer.write_sample(-sample).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let mut bytes = std::fs::read(&valid_path).unwrap();
+        let truncated_len = bytes.len().saturating_sub(1);
+        bytes.truncate(truncated_len);
+        std::fs::write(&truncated_path, bytes).unwrap();
+        assert!(
+            master_wav(
+                &truncated_path,
+                &crate::auto_master::MasteringConfig::default()
+            )
+            .is_none(),
+            "truncated PCM must fail instead of silently lowering sample/frame counts"
+        );
+        std::fs::remove_file(&valid_path).ok();
+        std::fs::remove_file(&truncated_path).ok();
     }
 }

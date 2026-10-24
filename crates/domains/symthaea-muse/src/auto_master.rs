@@ -83,6 +83,79 @@ impl Default for MasteringConfig {
     }
 }
 
+impl MasteringConfig {
+    /// Return a conservative mastering hypothesis for a performance dialect.
+    ///
+    /// All profiles retain the same integrated-loudness target, limiter ceiling,
+    /// and section-leveling behavior. Only broad three-band balance targets and
+    /// EQ correction ceilings vary. These are controlled starting points for
+    /// evaluation, not claims that every recording in a tradition should sound
+    /// alike. ClassicalRubato is the exact historical default.
+    #[cfg(feature = "theory")]
+    pub fn for_dialect(dialect: crate::theory_realize::PerformanceDialect) -> Self {
+        use crate::theory_realize::PerformanceDialect as D;
+
+        let mut config = Self::default();
+        match dialect {
+            D::ClassicalRubato => {}
+            // A restrained low-end emphasis and softer high-band correction:
+            // a hypothesis for groove-led material, not a genre rule.
+            D::DanceLocked => {
+                config.target_low_ratio = 0.32;
+                config.target_mid_ratio = 0.45;
+                config.target_high_ratio = 0.23;
+                config.eq_max_correction_db = 4.5;
+                config.eq_max_high_boost_db = 1.0;
+            }
+            // Preserve more of the native spectrum on sustained/process music;
+            // the tighter correction ceiling avoids mastering the process away.
+            D::ProcessExact => {
+                config.target_low_ratio = 0.28;
+                config.target_mid_ratio = 0.43;
+                config.target_high_ratio = 0.29;
+                config.eq_max_correction_db = 3.5;
+                config.eq_max_high_boost_db = 1.0;
+            }
+            D::FolkLift => {
+                config.target_low_ratio = 0.30;
+                config.target_mid_ratio = 0.44;
+                config.target_high_ratio = 0.26;
+                config.eq_max_correction_db = 4.5;
+                config.eq_max_high_boost_db = 1.25;
+            }
+            D::JazzLaidBack => {
+                config.target_low_ratio = 0.29;
+                config.target_mid_ratio = 0.47;
+                config.target_high_ratio = 0.24;
+                config.eq_max_correction_db = 4.0;
+                config.eq_max_high_boost_db = 0.9;
+            }
+            D::DroneElastic => {
+                config.target_low_ratio = 0.29;
+                config.target_mid_ratio = 0.43;
+                config.target_high_ratio = 0.28;
+                config.eq_max_correction_db = 3.5;
+                config.eq_max_high_boost_db = 1.0;
+            }
+            D::DramaticTiming => {
+                config.target_low_ratio = 0.31;
+                config.target_mid_ratio = 0.44;
+                config.target_high_ratio = 0.25;
+                config.eq_max_correction_db = 4.5;
+                config.eq_max_high_boost_db = 1.2;
+            }
+            D::ChoralBlend => {
+                config.target_low_ratio = 0.28;
+                config.target_mid_ratio = 0.47;
+                config.target_high_ratio = 0.25;
+                config.eq_max_correction_db = 3.5;
+                config.eq_max_high_boost_db = 0.75;
+            }
+        }
+        config
+    }
+}
+
 /// Mastering result report.
 #[derive(Debug, Clone)]
 pub struct MasteringResult {
@@ -660,5 +733,57 @@ mod tests {
             balance.low_energy,
             balance.high_energy
         );
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn dialect_mastering_profiles_share_loudness_and_limiter_targets() {
+        use crate::theory_realize::PerformanceDialect as D;
+
+        let default = MasteringConfig::default();
+        let dialects = [
+            D::ClassicalRubato,
+            D::DanceLocked,
+            D::ProcessExact,
+            D::FolkLift,
+            D::JazzLaidBack,
+            D::DroneElastic,
+            D::DramaticTiming,
+            D::ChoralBlend,
+        ];
+        let profiles: Vec<_> = dialects
+            .iter()
+            .map(|d| MasteringConfig::for_dialect(*d))
+            .collect();
+
+        for profile in &profiles {
+            assert_eq!(profile.target_lufs, default.target_lufs);
+            assert_eq!(profile.limiter_ceiling_db, default.limiter_ceiling_db);
+            let ratios = [
+                profile.target_low_ratio,
+                profile.target_mid_ratio,
+                profile.target_high_ratio,
+            ];
+            assert!(ratios.iter().all(|x| x.is_finite() && *x > 0.0 && *x < 1.0));
+            assert!((ratios.iter().sum::<f32>() - 1.0).abs() < 1e-6);
+            assert!(profile.eq_max_correction_db.is_finite() && profile.eq_max_correction_db > 0.0);
+            assert!(profile.eq_max_high_boost_db.is_finite() && profile.eq_max_high_boost_db > 0.0);
+        }
+
+        let classical = MasteringConfig::for_dialect(D::ClassicalRubato);
+        assert_eq!(classical.target_low_ratio, default.target_low_ratio);
+        assert_eq!(classical.target_mid_ratio, default.target_mid_ratio);
+        assert_eq!(classical.target_high_ratio, default.target_high_ratio);
+        assert_eq!(classical.eq_max_correction_db, default.eq_max_correction_db);
+        assert_eq!(classical.eq_max_high_boost_db, default.eq_max_high_boost_db);
+
+        assert_ne!(profiles[0].target_low_ratio, profiles[1].target_low_ratio);
+        assert_ne!(profiles[1].target_high_ratio, profiles[2].target_high_ratio);
+        assert_ne!(profiles[2].target_mid_ratio, profiles[4].target_mid_ratio);
+        assert_ne!(
+            profiles[5].eq_max_correction_db,
+            profiles[6].eq_max_correction_db
+        );
+        assert_ne!(profiles[6].target_mid_ratio, profiles[7].target_mid_ratio);
     }
 }

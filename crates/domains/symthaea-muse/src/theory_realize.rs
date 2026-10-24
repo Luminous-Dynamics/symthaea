@@ -28,8 +28,10 @@ use crate::{AudioData, Composition, MuseConfig, MusicalState, Note};
 use symthaea_music_theory::score::{Emphasis, VoiceRole as TheoryRole};
 use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 
-/// Per-style-family PERFORMANCE INTERPRETATION — how a tradition's player
-/// treats the clock, not what notes they play. Until this existed, ONE
+/// Per-style PERFORMANCE INTERPRETATION — how a tradition's player treats
+/// the clock, not what notes they play. The style-level grammar profile is
+/// authoritative when available; dialect_for_spec remains a fallback for
+/// user-authored specs with no style identity. Until this existed, ONE
 /// classical-piano-derived performer interpreted every tradition: the same
 /// rubato constants, the same humanize jitter, the same MAESTRO piano
 /// expressive blend for a tango, a drone piece, and a nocturne alike.
@@ -63,10 +65,17 @@ pub enum PerformanceDialect {
     /// reduced (0.6x — a reel drives through its cadences), and jitter is
     /// slightly LOOSER (1.2x): session looseness, not concert precision.
     FolkLift,
-    /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
-    /// and the expressive blend both kept — a jazz ballad leans harder
-    /// into time than a classical player, never less.
+    /// Blues/jazz/bossa: laid-back time with slightly looser placement.
     JazzLaidBack,
+    /// A slowly unfolding, elastic drone or modal arc: more breath and climax
+    /// time than a pulse-driven process, without classical-style accent shaping.
+    DroneElastic,
+    /// Dramatic scenes and long-range climaxes: broadened phrase breaths and
+    /// cadential timing to clarify the large-scale narrative arc.
+    DramaticTiming,
+    /// Choral/imitative ensemble: restrained independent-note jitter and a
+    /// gentler expressive layer so simultaneous lines keep their blend.
+    ChoralBlend,
 }
 
 impl PerformanceDialect {
@@ -78,6 +87,9 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
+            PerformanceDialect::DroneElastic => 1.4,
+            PerformanceDialect::DramaticTiming => 1.35,
+            PerformanceDialect::ChoralBlend => 0.8,
         }
     }
 
@@ -89,6 +101,9 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
+            PerformanceDialect::DroneElastic => 1.4,
+            PerformanceDialect::DramaticTiming => 1.5,
+            PerformanceDialect::ChoralBlend => 0.8,
         }
     }
 
@@ -99,6 +114,9 @@ impl PerformanceDialect {
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
+            PerformanceDialect::DroneElastic => 1.1,
+            PerformanceDialect::DramaticTiming => 1.4,
+            PerformanceDialect::ChoralBlend => 0.75,
         }
     }
 
@@ -110,6 +128,9 @@ impl PerformanceDialect {
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
             PerformanceDialect::JazzLaidBack => 1.3,
+            PerformanceDialect::DroneElastic => 0.7,
+            PerformanceDialect::DramaticTiming => 1.1,
+            PerformanceDialect::ChoralBlend => 0.5,
         }
     }
 
@@ -123,6 +144,9 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
+            PerformanceDialect::DroneElastic => 0.7,
+            PerformanceDialect::DramaticTiming => 1.2,
+            PerformanceDialect::ChoralBlend => 0.65,
         }
     }
 }
@@ -144,10 +168,9 @@ impl PerformanceDialect {
 /// 3. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
 /// 4. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
-/// Known v1 limits (documented, not hidden): March reads as ClassicalRubato
-/// (no spec property marks its clock-insistence), and plain Folk/ModalFolk
-/// read as ClassicalRubato (their specs carry none of the folk habit flags
-/// — only Celtic's drone and Irish's rolls are visible at the spec level).
+/// This heuristic remains a fallback only: incidental spec flags cannot
+/// reliably reconstruct an author's intended tradition. Preset-driven
+/// composition should use Style::grammar_profile().performance.
 pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> PerformanceDialect {
     use symthaea_music_theory::Accompaniment as A;
     use symthaea_music_theory::DrumPolicy;
@@ -1013,7 +1036,7 @@ pub fn realize_styled(
         seed,
         state,
         sample_rate,
-        None,
+        Some(map_grammar_dialect(style.grammar_profile().performance)),
     )
 }
 
@@ -1078,6 +1101,34 @@ pub fn perform_with_spec(
         .collect()
 }
 
+/// As [`perform_with_spec`], but preserve the style's declared grammar-level
+/// performance dialect. Use this when the candidate retained an explicit
+/// preset identity; custom specs should continue through `perform_with_spec`.
+pub fn perform_with_spec_and_dialect(
+    score: &TheoryScore,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &MusicalState,
+    dialect: symthaea_music_theory::PerformanceDialect,
+) -> Vec<PerformedVoice> {
+    let ensemble = resolve_spec_ensemble(spec, seed);
+    performance_voices_with_dialect(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+        map_grammar_dialect(dialect),
+    )
+    .into_iter()
+    .map(|pv| PerformedVoice {
+        name: pv.name.to_string(),
+        instrument: format!("{:?}", pv.instrument),
+        notes: pv.notes,
+    })
+    .collect()
+}
+
 /// Resolve a spec's instrument names into the four performed voices
 /// (melody, harmony, bass, counter). Unknown names fall back LOUDLY
 /// (stderr); an unset `counter_instrument` gets the automatic timbral
@@ -1140,9 +1191,8 @@ pub fn realize_with_spec(
 /// listening study needs: e.g. force every arm to `ProcessExact` (neutral
 /// performance) so timing/expression differences don't confound a
 /// structural-recognition question, or force each arm to its own style's
-/// dialect deliberately. Maps down to this crate's own smaller
-/// [`PerformanceDialect`] via [`map_grammar_dialect`] before reaching the
-/// render internals.
+/// dialect deliberately. Maps one-to-one into this crate's renderer
+/// dialect through [`map_grammar_dialect`] before reaching render internals.
 pub fn realize_with_spec_and_dialect(
     score: &TheoryScore,
     spec: &symthaea_music_theory::CompositionSpec,
@@ -1162,28 +1212,58 @@ pub fn realize_with_spec_and_dialect(
     )
 }
 
-/// Map the grammar-level 8-variant [`symthaea_music_theory::
-/// PerformanceDialect`] (declared per [`crate::style::Style::
-/// grammar_profile`]/[`symthaea_music_theory::grammar::GrammarProfile`])
-/// down to this crate's own 5-variant rendering-internals enum. The two
-/// are deliberately separate types (this crate's is what `Rubato`/
-/// `performance_voices_with_dialect` actually consume; the grammar crate's
-/// is a higher-level per-style-family label) — `DramaticTiming`/
-/// `ChoralBlend` have no closer existing analog than the general classical
-/// rubato feel, disclosed here rather than silently picked.
-pub(crate) fn map_grammar_dialect(
-    d: symthaea_music_theory::PerformanceDialect,
-) -> PerformanceDialect {
+/// Map a declared grammar/style performance dialect to the renderer's
+/// matching timing, articulation, and mastering profile. Kept explicit so
+/// preset-driven native rendering, MIDI export, and FluidSynth rendering all
+/// consume the same selected dialect rather than independently guessing from
+/// spec flags.
+pub fn map_grammar_dialect(d: symthaea_music_theory::PerformanceDialect) -> PerformanceDialect {
     use symthaea_music_theory::PerformanceDialect as G;
     match d {
         G::ClassicalRubato => PerformanceDialect::ClassicalRubato,
         G::DanceLocked => PerformanceDialect::DanceLocked,
         G::JazzLaidBack => PerformanceDialect::JazzLaidBack,
         G::FolkLift => PerformanceDialect::FolkLift,
-        // Matches dialect_for_spec's own drone -> ProcessExact precedent.
-        G::ProcessExact | G::DroneElastic => PerformanceDialect::ProcessExact,
-        G::DramaticTiming | G::ChoralBlend => PerformanceDialect::ClassicalRubato,
+        G::ProcessExact => PerformanceDialect::ProcessExact,
+        G::DroneElastic => PerformanceDialect::DroneElastic,
+        G::DramaticTiming => PerformanceDialect::DramaticTiming,
+        G::ChoralBlend => PerformanceDialect::ChoralBlend,
     }
+}
+
+/// Apply the same directional room hypothesis to the native DSP room as the
+/// FluidSynth backend receives through `room_for_dialect`. The algorithms are
+/// different, so these settings are not acoustically equivalent; the invariant
+/// is that a declared style does not get a style-specific room in only one arm
+/// of a renderer comparison.
+fn native_reverb_for_dialect(
+    mut base: crate::ReverbConfig,
+    dialect: PerformanceDialect,
+) -> crate::ReverbConfig {
+    match dialect {
+        PerformanceDialect::ClassicalRubato | PerformanceDialect::FolkLift => {}
+        PerformanceDialect::ProcessExact => {
+            base.room_size = (base.room_size + 0.18).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.12).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::DroneElastic => {
+            base.room_size = (base.room_size + 0.25).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.16).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::DramaticTiming => {
+            base.room_size = (base.room_size + 0.12).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.08).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::ChoralBlend => {
+            base.room_size = (base.room_size + 0.22).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.14).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::DanceLocked | PerformanceDialect::JazzLaidBack => {
+            base.room_size = (base.room_size - 0.12).max(0.0);
+            base.wet_floor = (base.wet_floor * 0.75).clamp(0.0, 1.0);
+        }
+    }
+    base
 }
 
 /// Compose from a user spec AND realize it — the full user-owned pipeline.
@@ -1614,12 +1694,15 @@ fn realize_core(
         // read as synthetic ("dry GM violin is brutal" — listening
         // review). Bigger room + higher wet floor than the default
         // streaming path; state still adds its share of wet on top.
-        reverb: crate::ReverbConfig {
-            room_size: 0.68,
-            damping: 0.45,
-            width: 0.9,
-            wet_floor: 0.2,
-        },
+        reverb: native_reverb_for_dialect(
+            crate::ReverbConfig {
+                room_size: 0.68,
+                damping: 0.45,
+                width: 0.9,
+                wet_floor: 0.2,
+            },
+            dialect,
+        ),
         ..Default::default()
     };
     let mut audio =
@@ -1633,18 +1716,15 @@ fn realize_core(
         mix_drums(frames, &drums, sample_rate, state);
     }
 
-    // Master the final mix: corrective 3-band EQ + loudness-normalize to
-    // -14 LUFS (streaming standard) + brick-wall limit. `auto_master` is
-    // real, tested BS.1770 mastering code (`auto_master.rs`) that already
-    // existed in this crate but was never called from ANY generation
-    // path before this -- render_arrangement's own normalization/limiter
-    // is a simpler RMS-target pass, not a real mastering chain.
+    // Master the final mix with the shared BS.1770 loudness pipeline,
+    // corrective three-band EQ, section leveling, and brick-wall limiter.
+    // The configured loudness target currently defaults to -16 LUFS for this
+    // engine's dynamic chamber material; it is not a universal streaming
+    // standard. The selected performance dialect chooses the spectral-balance
+    // hypothesis, while loudness and limiter targets remain invariant.
     if let AudioData::StereoF32(frames) = &mut audio {
-        crate::auto_master::auto_master(
-            frames,
-            sample_rate,
-            &crate::auto_master::MasteringConfig::default(),
-        );
+        let mastering = crate::auto_master::MasteringConfig::for_dialect(dialect);
+        crate::auto_master::auto_master(frames, sample_rate, &mastering);
     }
 
     // Flatten notes for the Composition record.
@@ -2778,5 +2858,91 @@ mod tests {
             "contrasting valence/arousal (calm vs excited) must produce a materially \
              different melody -- got a byte-identical note sequence for both states"
         );
+    }
+
+    #[test]
+    fn grammar_dialects_are_preserved_by_renderer_mapping() {
+        use symthaea_music_theory::PerformanceDialect as G;
+
+        let pairs = [
+            (G::ClassicalRubato, PerformanceDialect::ClassicalRubato),
+            (G::DanceLocked, PerformanceDialect::DanceLocked),
+            (G::JazzLaidBack, PerformanceDialect::JazzLaidBack),
+            (G::FolkLift, PerformanceDialect::FolkLift),
+            (G::ProcessExact, PerformanceDialect::ProcessExact),
+            (G::DroneElastic, PerformanceDialect::DroneElastic),
+            (G::DramaticTiming, PerformanceDialect::DramaticTiming),
+            (G::ChoralBlend, PerformanceDialect::ChoralBlend),
+        ];
+        for (grammar, renderer) in pairs {
+            assert_eq!(map_grammar_dialect(grammar), renderer, "{grammar:?}");
+        }
+    }
+
+    #[test]
+    fn every_performance_dialect_has_finite_bounded_scales() {
+        let dialects = [
+            PerformanceDialect::ClassicalRubato,
+            PerformanceDialect::DanceLocked,
+            PerformanceDialect::JazzLaidBack,
+            PerformanceDialect::FolkLift,
+            PerformanceDialect::ProcessExact,
+            PerformanceDialect::DroneElastic,
+            PerformanceDialect::DramaticTiming,
+            PerformanceDialect::ChoralBlend,
+        ];
+        for dialect in dialects {
+            let scales = [
+                dialect.breath_scale(),
+                dialect.climax_scale(),
+                dialect.cadence_scale(),
+                dialect.jitter_scale() as f64,
+                dialect.expressive_blend_scale() as f64,
+            ];
+            assert!(
+                scales
+                    .iter()
+                    .all(|scale| scale.is_finite() && *scale >= 0.0 && *scale <= 1.5),
+                "{dialect:?}: {scales:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn native_room_profiles_follow_all_eight_dialects() {
+        use PerformanceDialect as D;
+
+        let base = crate::ReverbConfig {
+            room_size: 0.68,
+            damping: 0.45,
+            width: 0.9,
+            wet_floor: 0.2,
+        };
+        let room = |dialect| native_reverb_for_dialect(base, dialect);
+        for dialect in [D::ClassicalRubato, D::FolkLift] {
+            assert_eq!(room(dialect).room_size, base.room_size);
+            assert_eq!(room(dialect).wet_floor, base.wet_floor);
+        }
+        assert!(room(D::ProcessExact).room_size > base.room_size);
+        assert!(room(D::DroneElastic).room_size > room(D::ProcessExact).room_size);
+        assert!(room(D::DramaticTiming).room_size > base.room_size);
+        assert!(room(D::ChoralBlend).room_size > base.room_size);
+        assert!(room(D::DanceLocked).room_size < base.room_size);
+        assert!(room(D::JazzLaidBack).wet_floor < base.wet_floor);
+
+        for dialect in [
+            D::ClassicalRubato,
+            D::DanceLocked,
+            D::JazzLaidBack,
+            D::FolkLift,
+            D::ProcessExact,
+            D::DroneElastic,
+            D::DramaticTiming,
+            D::ChoralBlend,
+        ] {
+            let profile = room(dialect);
+            assert!((0.0..=1.0).contains(&profile.room_size), "{dialect:?}");
+            assert!((0.0..=1.0).contains(&profile.wet_floor), "{dialect:?}");
+        }
     }
 }
