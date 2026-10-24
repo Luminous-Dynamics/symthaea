@@ -172,3 +172,25 @@ jobs:
             (.configuration_digest | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/page-hinkley-baseline.json"
+
+      - name: Run the predictive-rank martingale portfolio against its synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-drift-baseline --input benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-run.json --out "$RUNNER_TEMP/predictive-rank-martingale.json"
+          jq -e '
+            .metric_version == "scalar-drift-baselines-v1" and
+            .detector_id == "predictive-rank-martingale-portfolio" and
+            .comparison_track == "valid-pe-only" and
+            .calibration_observation_count == 20 and
+            .valid_evaluation_observation_count == 40 and
+            .evaluation_cycle_count == 40 and
+            .score.ground_truth_events == 1 and
+            .score.true_positive_events == 1 and
+            .score.false_positive_alarms == 0 and
+            .score.missed_events == 0 and
+            .score.hard_gate_pass == true and
+            (.detections | length) == 1 and
+            (.detections[0].cycle_index < 40) and
+            (.canonical_input_sha256 | length) == 64 and
+            (.configuration_digest | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/predictive-rank-martingale.json"
