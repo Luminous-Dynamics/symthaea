@@ -13,6 +13,7 @@ from multifidelity_stress import (
     hypervolume_2d,
     run_policy,
     run_suite,
+    run_sweep,
 )
 
 
@@ -124,6 +125,24 @@ class MultiFidelityStressTests(unittest.TestCase):
         first = run_policy("discrepancy_aware", seed=29, cost_budget=200, grid_size=13, severity=0.8)
         second = run_policy("discrepancy_aware", seed=29, cost_budget=200, grid_size=13, severity=0.8)
         self.assertEqual(first, second)
+
+    def test_paired_severity_sweep_reports_distributions_without_collapsing_runs(self) -> None:
+        first = run_sweep(seeds=(17, 23), severities=(0.5, 1.0), cost_budget=200, grid_size=9)
+        second = run_sweep(seeds=(17, 23), severities=(0.5, 1.0), cost_budget=200, grid_size=9)
+        self.assertEqual(first, second)
+        self.assertTrue(first["synthetic_fixture_only"])
+        self.assertEqual(len(first["paired_runs"]), 2 * 2 * 4)
+        self.assertEqual(len(first["summary_by_policy_and_severity"]), 2 * 4)
+        for summary in first["summary_by_policy_and_severity"]:
+            self.assertEqual(summary["seed_count"], 2)
+            self.assertLessEqual(
+                summary["q25_normalized_hypervolume_fraction"],
+                summary["median_normalized_hypervolume_fraction"],
+            )
+            self.assertLessEqual(
+                summary["median_normalized_hypervolume_fraction"],
+                summary["q75_normalized_hypervolume_fraction"],
+            )
 
     def test_policy_templates_reject_incompatible_budget_or_grid(self) -> None:
         with self.assertRaisesRegex(ValueError, "at least 200"):
