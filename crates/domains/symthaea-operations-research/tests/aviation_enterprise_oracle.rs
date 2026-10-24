@@ -128,7 +128,7 @@ fn evaluate_independently(scenario: &Scenario, plan: &Plan) -> Option<u64> {
                 (*chosen == Some(aircraft_index)).then_some(&scenario.flights[flight_index])
             })
             .collect();
-        assigned.sort_by_key(|flight| (flight.start, flight.end, flight.id.as_str()));
+        assigned.sort_by(|a, b| (a.start, a.end, a.id.as_str()).cmp(&(b.start, b.end, b.id.as_str())));
         for consecutive in assigned.windows(2) {
             if consecutive[0].end.checked_add(aircraft.turnaround)? > consecutive[1].start {
                 return None;
