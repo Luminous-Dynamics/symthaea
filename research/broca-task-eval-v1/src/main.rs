@@ -331,7 +331,16 @@ impl SplitMix64 {
 
     fn below(&mut self, bound: usize) -> usize {
         debug_assert!(bound > 0);
-        (self.next_u64() % bound as u64) as usize
+        let bound = bound as u64;
+        // Lemire's multiply-high method with rejection avoids modulo bias.
+        let threshold = bound.wrapping_neg() % bound;
+        loop {
+            let product = u128::from(self.next_u64()) * u128::from(bound);
+            let low = product as u64;
+            if low >= threshold {
+                return (product >> 64) as usize;
+            }
+        }
     }
 }
 
