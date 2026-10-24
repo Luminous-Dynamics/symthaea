@@ -73,10 +73,24 @@ impl MotifReturnEvidence {
             return false;
         }
 
-        let uniform_scaling_required = matches!(
-            self.expected_transformation,
-            ReturnTransformation::Augmented | ReturnTransformation::Diminished
-        );
+        let expected_scale = match self.expected_transformation {
+            ReturnTransformation::Augmented => Some(2.0_f32),
+            ReturnTransformation::Diminished => Some(0.5_f32),
+            _ => None,
+        };
+        // Duration-shape normalization alone cannot distinguish augmentation
+        // from an unchanged phrase. Require the absolute duration scale to be
+        // close to the declared transformation as well as internally uniform.
+        // A quarter-octave log2 tolerance permits modest quantization noise
+        // while rejecting identity, diminution-as-augmentation, and extreme
+        // scale changes. This is a provisional engineering bound to calibrate
+        // on held-out annotated returns, not a learned perceptual threshold.
+        let expected_scale_compatible = expected_scale.is_none_or(|expected| {
+            self.duration_scale.is_finite()
+                && self.duration_scale > f32::EPSILON
+                && (self.duration_scale / expected).log2().abs() <= 0.25
+        });
+        let uniform_scaling_required = expected_scale.is_some();
         let length_compatible = match self.expected_transformation {
             ReturnTransformation::Literal
             | ReturnTransformation::Transposed
@@ -95,6 +109,7 @@ impl MotifReturnEvidence {
         self.aligned_note_count >= 2
             && length_compatible
             && self.overall_similarity >= threshold.clamp(0.0, 1.0)
+            && expected_scale_compatible
             && (!uniform_scaling_required || self.duration_scale_consistency >= 0.85)
     }
 }
@@ -675,6 +690,53 @@ mod tests {
             compare_melodic_sequences(&source, &longer_target, ReturnTransformation::Transposed);
         assert!(evidence.overall_similarity > 0.75);
         assert!(!evidence.meets_threshold(0.75));
+    }
+
+    #[test]
+    fn augmentation_and_diminution_require_the_declared_absolute_scale() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::quarter()),
+            note(65, 2, Duration::quarter()),
+            note(64, 3, Duration::quarter()),
+        ];
+
+        // Identity has perfect pitch and normalized rhythm-shape scores, but
+        // must not satisfy an augmentation/diminution claim at the 0.85 floor.
+        let unchanged_augmentation =
+            compare_melodic_sequences(&source, &source, ReturnTransformation::Augmented);
+        assert!((unchanged_augmentation.overall_similarity - 0.85).abs() < 1e-6);
+        assert!(!unchanged_augmentation.meets_threshold(0.85));
+
+        let unchanged_diminution =
+            compare_melodic_sequences(&source, &source, ReturnTransformation::Diminished);
+        assert!((unchanged_diminution.overall_similarity - 0.85).abs() < 1e-6);
+        assert!(!unchanged_diminution.meets_threshold(0.85));
+
+        // A uniform but wrong factor is also not the transformation requested.
+        let quadrupled: Vec<_> = source
+            .iter()
+            .copied()
+            .map(|mut event| {
+                event.duration = event.duration.scale(4, 1);
+                event
+            })
+            .collect();
+        let wrong_augmentation =
+            compare_melodic_sequences(&source, &quadrupled, ReturnTransformation::Augmented);
+        assert!(!wrong_augmentation.meets_threshold(0.85));
+
+        let quartered: Vec<_> = source
+            .iter()
+            .copied()
+            .map(|mut event| {
+                event.duration = event.duration.scale(1, 4);
+                event
+            })
+            .collect();
+        let wrong_diminution =
+            compare_melodic_sequences(&source, &quartered, ReturnTransformation::Diminished);
+        assert!(!wrong_diminution.meets_threshold(0.85));
     }
 
     #[test]
