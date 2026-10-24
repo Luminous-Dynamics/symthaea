@@ -157,5 +157,27 @@
       "Use these descriptive distributions as engineering diagnostics, not inferential SOTA claims until preregistered paired confidence intervals and external baselines are added."
     ]
   },
-  "policy_comparison_caveat": "The default stress severity sweep is paired across policies by seed and has a fixed 200-unit cap. Cost mixes and fidelity calls differ per policy by design; interpret it as quality under a fixed cost cap and report high-fidelity calls separately. This is not an iso-high-fidelity-call comparison."
+  "policy_comparison_caveat": "The default stress severity sweep is paired across policies by seed and has a fixed 200-unit cap. Cost mixes and fidelity calls differ per policy by design; interpret it as quality under a fixed cost cap and report high-fidelity calls separately. This is not an iso-high-fidelity-call comparison.",
+  "fidelity_cost_sensitivity": {
+    "configurable": true,
+    "cli_flag": "--fidelity-costs low=<positive_integer>,medium=<positive_integer>,high=<positive_integer>",
+    "default_costs": {
+      "low": 1,
+      "medium": 5,
+      "high": 25
+    },
+    "example_costs": {
+      "low": 1,
+      "medium": 10,
+      "high": 50
+    },
+    "budget_rule": "If no --cost-budget is supplied, the run derives a single cap equal to the largest fixed-template cost under the chosen fidelity costs. Each policy is then evaluated under that same cap; lower-spending policies report unused cost.",
+    "expected_policy_costs_default": {
+      "high_only": "8*high",
+      "low_screen": "75*low + 5*high",
+      "fixed_top_k": "50*low + 10*medium + 4*high",
+      "discrepancy_aware": "55*low + 4*medium + 5*high"
+    },
+    "reporting": "Always report costs and call counts by fidelity; compare quality under a fixed total cost cap and do not present it as equal high-fidelity call budget."
+  }
 }
