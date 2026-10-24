@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn reservations_account_for_other_outstanding_decisions() {
-        let mut ledger = AllInBudgetLedger::new(config(40, 20)).unwrap();
+        let mut ledger = AllInBudgetLedger::new(config(39, 20)).unwrap();
         assert!(ledger.reserve_allocator("d1").unwrap());
         assert!(ledger.reserve_escalation("d1").unwrap());
         assert!(!ledger.reserve_allocator("d2").unwrap());
