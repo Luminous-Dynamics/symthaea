@@ -87,6 +87,32 @@ pub fn crc16_ccitt(data: &[u8]) -> u16 {
 // LORA FRAGMENT
 // ============================================================================
 
+/// Error returned by LoRaFragment::try_to_bytes when a fragment cannot
+/// be serialized without violating the V1 wire contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FragmentEncodeError {
+    /// Fragment metadata is invalid or not canonical for V1.
+    InvalidMetadata,
+    /// The provided destination cannot hold the complete frame.
+    BufferTooSmall { required: usize, available: usize },
+    /// The stored checksum does not match the fragment fields and payload.
+    ChecksumMismatch,
+}
+
+impl std::fmt::Display for FragmentEncodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidMetadata => write!(f, "invalid LoRa fragment metadata"),
+            Self::BufferTooSmall { required, available } => {
+                write!(f, "LoRa fragment buffer too small: need {required}, got {available}")
+            }
+            Self::ChecksumMismatch => write!(f, "LoRa fragment checksum does not match content"),
+        }
+    }
+}
+
+impl std::error::Error for FragmentEncodeError {}
+
 /// A single LoRa radio fragment, ready for transmission.
 ///
 /// 8-byte header + up to 214 bytes payload. Fits within LoRa's ~222-byte MTU.
@@ -125,10 +151,68 @@ impl std::fmt::Debug for LoRaFragment {
 }
 
 impl LoRaFragment {
+    /// Validate and serialize a fragment without panicking or partially writing.
+    ///
+    /// Unlike the compatibility-oriented to_bytes API, this method validates
+    /// all public fields, the V1 FEC-slot contract, frame MTU, destination
+    /// capacity, and stored checksum before touching the destination buffer.
+    /// Prefer it when serializing caller-built or otherwise untrusted values.
+    pub fn try_to_bytes(
+        &self,
+        buf: &mut [u8],
+    ) -> Result<usize, FragmentEncodeError> {
+        let payload_len = self.payload_len as usize;
+        let is_fec = self.flags & FLAG_FEC != 0;
+
+        if self.total_fragments < 2
+            || self.fragment_index >= self.total_fragments
+            || self.flags & !FLAG_FEC != 0
+            || is_fec != (self.fragment_index == self.total_fragments - 1)
+            || payload_len == 0
+            || payload_len > PAYLOAD_SIZE
+            || (is_fec && payload_len != PAYLOAD_SIZE)
+        {
+            return Err(FragmentEncodeError::InvalidMetadata);
+        }
+
+        let frame_len = HEADER_SIZE + payload_len;
+        if frame_len > LORA_MTU {
+            return Err(FragmentEncodeError::InvalidMetadata);
+        }
+        if buf.len() < frame_len {
+            return Err(FragmentEncodeError::BufferTooSmall {
+                required: frame_len,
+                available: buf.len(),
+            });
+        }
+        if self.compute_checksum() != self.checksum {
+            return Err(FragmentEncodeError::ChecksumMismatch);
+        }
+
+        // All validation happens before this first write, so failures are
+        // atomic from the caller's perspective.
+        let id_bytes = self.thought_id.to_le_bytes();
+        let checksum_bytes = self.checksum.to_le_bytes();
+        buf[0] = id_bytes[0];
+        buf[1] = id_bytes[1];
+        buf[2] = self.fragment_index;
+        buf[3] = self.total_fragments;
+        buf[4] = self.payload_len;
+        buf[5] = self.flags;
+        buf[6] = checksum_bytes[0];
+        buf[7] = checksum_bytes[1];
+        buf[HEADER_SIZE..frame_len].copy_from_slice(&self.payload[..payload_len]);
+        Ok(frame_len)
+    }
+
     /// Serialize to a byte buffer for radio transmission.
     ///
     /// Returns the number of bytes written: `HEADER_SIZE + payload_len`.
     /// The buffer must be at least `HEADER_SIZE + payload_len` bytes.
+    ///
+    /// This legacy method retains its existing panic-on-buffer-error behavior
+    /// for compatibility. Prefer try_to_bytes for caller-built values and new
+    /// code.
     pub fn to_bytes(&self, buf: &mut [u8]) -> usize {
         let total = HEADER_SIZE + self.payload_len as usize;
         assert!(
@@ -816,6 +900,57 @@ mod tests {
             );
         }
         assert!(LoRaFragment::from_bytes(&wire[..frame_len]).is_some());
+    }
+
+    // -- Checked encoding is fail-closed and does not partially write --
+
+    #[test]
+    fn checked_encoder_roundtrips_valid_fragment() {
+        let source = fragment(51, &[0xAC; 19])[0].clone();
+        let mut wire = [0u8; LORA_MTU];
+        let len = source.try_to_bytes(&mut wire).expect("valid frame encodes");
+        assert_eq!(len, HEADER_SIZE + 19);
+        let parsed = LoRaFragment::from_bytes(&wire[..len]).expect("valid frame parses");
+        assert_eq!(parsed.thought_id, source.thought_id);
+        assert_eq!(&parsed.payload[..19], &[0xAC; 19]);
+    }
+
+    #[test]
+    fn checked_encoder_rejects_invalid_public_length_without_panicking() {
+        let mut malformed = fragment(52, &[0xAD; 19])[0].clone();
+        malformed.payload_len = u8::MAX;
+        let mut wire = [0xCC; LORA_MTU];
+        assert_eq!(
+            malformed.try_to_bytes(&mut wire),
+            Err(FragmentEncodeError::InvalidMetadata)
+        );
+        assert!(wire.iter().all(|byte| *byte == 0xCC));
+    }
+
+    #[test]
+    fn checked_encoder_rejects_short_buffer_without_partial_write() {
+        let source = fragment(53, &[0xAE; 19])[0].clone();
+        let mut wire = [0xCC; HEADER_SIZE + 18];
+        assert_eq!(
+            source.try_to_bytes(&mut wire),
+            Err(FragmentEncodeError::BufferTooSmall {
+                required: HEADER_SIZE + 19,
+                available: HEADER_SIZE + 18,
+            })
+        );
+        assert!(wire.iter().all(|byte| *byte == 0xCC));
+    }
+
+    #[test]
+    fn checked_encoder_rejects_stale_checksum_without_partial_write() {
+        let mut source = fragment(54, &[0xAF; 19])[0].clone();
+        source.payload[0] ^= 1;
+        let mut wire = [0xCC; LORA_MTU];
+        assert_eq!(
+            source.try_to_bytes(&mut wire),
+            Err(FragmentEncodeError::ChecksumMismatch)
+        );
+        assert!(wire.iter().all(|byte| *byte == 0xCC));
     }
 
     // -- V1 parser rejects non-canonical structural metadata --
