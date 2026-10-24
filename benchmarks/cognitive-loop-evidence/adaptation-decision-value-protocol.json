@@ -162,6 +162,7 @@
   ],
   "score_receipt_binding": {
     "receipt_schema_version": 2,
+    "executed_replay_outcomes": "Every arm decision must carry finite non-negative task_loss and adaptation_cost_units plus task_loss_available_at_tick >= decision_tick.",
     "cli_flag": "--receipt",
     "required_identity_matches": [
       "score.dataset_id equals receipt.dataset_id",
@@ -170,8 +171,9 @@
       "score.shared_stream_sha256 equals receipt.event_ledger_sha256",
       "each of the five score arm repository_head_sha values equals the corresponding receipt arm",
       "each of the five score arm configuration_digest values equals the corresponding receipt arm",
-      "for run_kind=replay, every per-cycle task_loss and adaptation_cost_units value equals the corresponding receipt decision record",
-      "each score arm cycle panel exactly matches the receipt stream length and decision ticks"
+      "for run_kind=replay, every per-cycle task_loss, adaptation_cost_units, and task_loss_available_at_tick value equals the corresponding receipt decision record",
+      "each score arm cycle panel exactly matches the receipt stream length and decision ticks",
+      "task_loss_available_at_tick must not precede its decision tick"
     ],
     "score_provenance_fields": [
       "source_replay_receipt_sha256",
