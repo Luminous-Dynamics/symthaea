@@ -1,0 +1,79 @@
+{
+  "analysis_lock_version": "1.0.0",
+  "protocol_id": "CASTING-MO-BO-001",
+  "purpose": "Freeze per-suite dimensions, objective direction, fixed bounds, scorer scope and metric convention for independent receipt scoring.",
+  "absolute_metric_tolerance": 1e-9,
+  "scorer": {
+    "path": "tools/casting-benchmark/score_trace.py",
+    "trace_schema_path": "docs/research/CASTING_BENCHMARK_TRACE.schema.json",
+    "receipt_schema_path": "docs/research/CASTING_BENCHMARK_RECEIPT.schema.json",
+    "supported_evaluation_modes": [
+      "single_fidelity"
+    ],
+    "supported_objective_count": 2,
+    "supported_objective_direction": "minimize_all"
+  },
+  "suite_contracts": {
+    "zdt_standard": {
+      "fixture_only": false,
+      "objective_count": 2,
+      "objective_direction": "minimize_all",
+      "ideal_point": [
+        0,
+        0
+      ],
+      "reference_point": [
+        1.1,
+        1.1
+      ],
+      "normalization_area": 1.21,
+      "instances": {
+        "ZDT1": {
+          "decision_dimension": 30
+        },
+        "ZDT2": {
+          "decision_dimension": 30
+        },
+        "ZDT3": {
+          "decision_dimension": 30
+        },
+        "ZDT4": {
+          "decision_dimension": 10
+        }
+      }
+    },
+    "test_only_hv_2d": {
+      "fixture_only": true,
+      "objective_count": 2,
+      "objective_direction": "minimize_all",
+      "ideal_point": [
+        0,
+        0
+      ],
+      "reference_point": [
+        10,
+        10
+      ],
+      "normalization_area": 100,
+      "instances": {
+        "known-answer": {
+          "decision_dimension": 2
+        }
+      },
+      "note": "Test-only known-answer fixture contract; must never be used for empirical result claims."
+    }
+  },
+  "auc_convention": {
+    "curve": "stepwise hypervolume after each objective-oracle call",
+    "integration": "sum observed step values; if a successful run reaches a predeclared target before planned budget, carry final observed HV to remaining budget steps",
+    "denominator": "planned objective-evaluation budget multiplied by fixed normalization_area",
+    "absolute_tolerance": 1e-9
+  },
+  "evidence_rules": [
+    "The scorer verifies receipt protocol_sha256 and analysis_lock_sha256 against the exact checked-out file bytes.",
+    "The scorer verifies receipt trace_schema_sha256 and scorer_sha256 against the exact checked-out file bytes.",
+    "Run-specific bounds must exactly match the immutable suite contract; per-algorithm or per-run reference changes are prohibited.",
+    "Test-only suite contracts require synthetic_fixture_only=true and are never publishable empirical evidence.",
+    "COCO runs use native target-reaching/runtime and ECDF outputs; this custom AUC is not a replacement for official COCO analysis."
+  ]
+}

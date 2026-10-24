@@ -55,7 +55,13 @@
         1.1,
         1.1
       ],
-      "reference_point_policy": "Fixed per suite instance and shared by all algorithms; minimize both objectives. Never choose reference points per run or algorithm."
+      "reference_point_policy": "Fixed per suite instance and shared by all algorithms; minimize both objectives. Never choose reference points per run or algorithm.",
+      "fixed_ideal_point": [
+        0,
+        0
+      ],
+      "normalization_area": 1.21,
+      "objective_direction": "minimize_all"
     },
     {
       "id": "coco_bbob_biobj",
@@ -136,9 +142,14 @@
     "rule": "This protocol is not execution-ready until every required baseline, suite adapter, and environment has immutable identifiers. Do not substitute 'latest' for a version."
   },
   "primary_metric": {
-    "id": "normalized_hypervolume_auc",
+    "id": "suite_native_anytime_performance",
     "direction": "maximize",
-    "definition": "Area under hypervolume-versus-objective-evaluations curve, divided by the evaluation budget and by a frozen task-specific normalization constant. Freeze metric implementation, reference point, normalization constant and trapezoid/step convention in a hashed analysis lock before execution."
+    "definitions": {
+      "zdt_standard": "Primary for the fixed-reference 2D ZDT track is normalized stepwise hypervolume AUC independently recomputed from the immutable JSONL evaluation trace. After each objective call, record exact feasible-archive hypervolume; carry the last observed hypervolume through any unused part of the planned budget after a predeclared early stop; divide the sum by planned_budget times the fixed ideal-to-reference rectangle area. Use ideal [0,0] and reference [1.1,1.1] for the stated ZDT suite; the normalization area is 1.21. Values are supplementary and must not be conflated with COCO's native metric.",
+      "coco_bbob_biobj": "Use COCO's official target-reaching/runtime and ECDF methodology, prescribed normalized objective-space conventions, and official target sets as the primary result. The custom hypervolume AUC is supplementary only and must never replace or be presented as the official COCO metric.",
+      "casting_simulator": "Report best quality achieved at fixed declared fidelity-aware cost budgets, with a separately reported per-run trace-derived quality curve. Freeze all objective units, constraints, reference points, fidelity costs, and analysis before unsealing final seeds."
+    },
+    "common_reporting": "Report final hypervolume, feasibility/failure counts, runtime and paired per-task uncertainty. Do not collapse suites with incompatible official indicators into one unlabeled scalar ranking."
   },
   "secondary_metrics": [
     "final_hypervolume",
@@ -247,5 +258,43 @@
       "https://doi.org/10.1145/3801959",
       "https://link.springer.com/article/10.1007/s43939-026-00685-5"
     ]
+  },
+  "raw_trace_contract": {
+    "schema_version": "1.0.0",
+    "format": "UTF-8 JSON Lines; one JSON object per objective-oracle call; no blank lines; exact raw bytes hashed in the run receipt.",
+    "required_fields": [
+      "schema_version",
+      "evaluation_index",
+      "candidate_id",
+      "status",
+      "objectives"
+    ],
+    "statuses": [
+      "feasible",
+      "infeasible",
+      "invalid",
+      "failed"
+    ],
+    "indices": "1-based, contiguous, in actual oracle-call order.",
+    "status_semantics": "Only feasible rows enter the unconstrained 2D hypervolume archive. Infeasible rows may contain valid objective values but are excluded from the archive. Invalid and failed rows must set objectives=null. All rows consume one objective evaluation.",
+    "strictness": "Unknown keys, duplicate JSON keys, non-finite numbers, inconsistent status counts, index gaps, trace hash mismatch and objective values below the locked ideal point are rejected.",
+    "receipt_artifact_hashes": [
+      "raw_trace_sha256",
+      "trace_schema_sha256",
+      "scorer_sha256"
+    ],
+    "scorer_scope": "v1 independent scorer supports only single-fidelity, 2-objective, minimize-all runs; all other modes/dimensions fail closed until an independently tested scorer is added.",
+    "metric_checks": [
+      "final_hypervolume",
+      "normalized_hypervolume_auc",
+      "feasible_fraction",
+      "invalid_or_failed_fraction"
+    ],
+    "numeric_tolerance_absolute": 1e-9,
+    "scorer_file": "tools/casting-benchmark/score_trace.py",
+    "trace_schema_file": "docs/research/CASTING_BENCHMARK_TRACE.schema.json",
+    "receipt_schema_file": "docs/research/CASTING_BENCHMARK_RECEIPT.schema.json",
+    "analysis_lock_file": "docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json",
+    "rule": "undefined Run receipts must bind both protocol_sha256 and analysis_lock_sha256 to the exact checked-out files; the scorer rejects run-specific bounds that differ from the frozen suite contract."
   }
 }
