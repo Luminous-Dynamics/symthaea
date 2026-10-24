@@ -341,6 +341,7 @@ impl PredictiveHdcEncoder {
         } else {
             None
         };
+        let no_prediction_count_before = self.stats.degenerate_no_prediction_cycles;
         if stale_prediction {
             // encode() will execute the ordinary missing-prediction path, which
             // cannot train attention or PE statistics. Preserve the more specific
@@ -351,6 +352,10 @@ impl PredictiveHdcEncoder {
         if stale_prediction {
             self.last_degeneracy = PredictionDegeneracy::StalePrediction;
             self.last_compared_prediction_cycle = stale_source_cycle;
+            // The fallback encode() increments the cold-start counter because
+            // the stale vector was cleared. Reclassify that one increment so
+            // the diagnostics preserve the actual failure reason.
+            self.stats.degenerate_no_prediction_cycles = no_prediction_count_before;
             self.stats.degenerate_stale_prediction_cycles += 1;
         }
         result
@@ -1003,6 +1008,11 @@ mod tests {
         assert_eq!(
             encoder.stats().degenerate_stale_prediction_cycles,
             1
+        );
+        assert_eq!(
+            encoder.stats().degenerate_no_prediction_cycles,
+            0,
+            "stale evidence must not be counted as a cold start"
         );
         assert_eq!(
             encoder.stats().avg_prediction_error,
