@@ -18,7 +18,7 @@ cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
   --size=10000 --clusters=64 --cluster-noise-bits=1024 --noise-bits=128 --hard-noise-bits=4096 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42
 ```
 
-Run the recommended multi-size/fallback matrix through the checked-in helper. It captures the exact source SHA, Rust/Cargo versions, machine information, command, exit code, and CSV SHA-256 in a sidecar receipt for each run:
+Run the recommended multi-size/fallback matrix through the checked-in helper. It captures the exact source SHA, Rust/Cargo versions, machine information, command, exit code, CSV SHA-256, stderr log path and stderr SHA-256 in a sidecar receipt for each run:
 
 ```sh
 bash scripts/run_broca_ann_sweep.sh
