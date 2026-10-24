@@ -417,8 +417,9 @@ where
 fn build_queries(config: &Config, store: &HdcStore) -> Vec<Query> {
     let mut queries = Vec::with_capacity(config.queries);
     for query_index in 0..config.queries {
-        // One in five queries deliberately has no stored source vector. The
-        // remaining queries are bounded-noise probes of known stored memories.
+        // The deterministic schedule is 60% low-noise known probes, 20% hard
+        // known probes (large but bounded perturbation), and 20% novel/OOD probes.
+        // Only the known-memory classes have a source anchor.
         if query_index % 5 == 0 {
             let novel_input = config.seed
                 ^ (1u64 << 63)
@@ -1074,8 +1075,27 @@ mod tests {
                 .iter()
                 .filter(|query| query.kind == "near_neighbor")
                 .count(),
-            16
+            12
         );
+        assert_eq!(
+            left_queries
+                .iter()
+                .filter(|query| query.kind == "hard_neighbor")
+                .count(),
+            4
+        );
+        let hard_anchor = 997usize
+            .wrapping_add((config.seed % config.size as u64) as usize)
+            % config.size;
+        let original_anchor = store.get(hard_anchor as u64).unwrap();
+        let hard_distance: usize = original_anchor
+            .0
+            .iter()
+            .zip(left_queries[1].vector.0.iter())
+            .map(|(left, right)| (left ^ right).count_ones() as usize)
+            .sum();
+        assert_eq!(left_queries[1].kind, "hard_neighbor");
+        assert_eq!(hard_distance, config.hard_noise_bits);
         assert!(left_queries
             .iter()
             .filter(|query| query.kind == "near_neighbor")
