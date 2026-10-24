@@ -160,8 +160,9 @@ impl CognitiveSubsystem for DriveManager {
         let mut output = SubsystemOutput::NEUTRAL;
 
         // ── 1. Record prediction error ────────────────────────────────────
-        let pe = snapshot.prediction_error;
-        let prediction_error_valid = snapshot.prediction_error_valid != 0;
+        let prediction_error_sample = snapshot.prediction_error_sample();
+        let prediction_error_valid = prediction_error_sample.is_some();
+        let pe = prediction_error_sample.unwrap_or(0.0);
         if prediction_error_valid {
             self.push_error(pe);
         }
