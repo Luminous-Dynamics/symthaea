@@ -26,6 +26,7 @@ use super::super::thresholds::{
     PERCEPTION_COHERENCE_LOW, PERCEPTION_SENSITIVITY_MAX, PERCEPTION_SENSITIVITY_MIN,
     PERCEPTION_VIGILANCE_COHERENCE, PERCEPTION_VIGILANCE_PE,
 };
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Perception Manager — attention gating and perceptual quality assessment.
 ///
@@ -43,6 +44,8 @@ pub struct PerceptionManager {
     coherence_count: usize,
     /// Whether currently in vigilant mode (high attention)
     vigilant: bool,
+    /// Prevents a repeated or stale PE sample from toggling vigilance twice.
+    prediction_error_cursor: PredictionEvidenceCursor,
 }
 
 impl Default for PerceptionManager {
@@ -55,6 +58,7 @@ impl Default for PerceptionManager {
             coherence_idx: 0,
             coherence_count: 0,
             vigilant: false,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
         }
     }
 }
@@ -183,7 +187,10 @@ impl CognitiveSubsystem for PerceptionManager {
 
         // ── 4. Vigilance mode ─────────────────────────────────────────────
         // Enter vigilant mode on low coherence + high prediction error
-        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+        let prediction_error_sample = self
+            .prediction_error_cursor
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number);
+        if let Some(prediction_error) = prediction_error_sample {
             let should_be_vigilant = coherence < PERCEPTION_VIGILANCE_COHERENCE
                 && prediction_error > PERCEPTION_VIGILANCE_PE;
             if should_be_vigilant && !self.vigilant {
@@ -215,21 +222,93 @@ impl CognitiveSubsystem for PerceptionManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(16);
+        // Preserve the legacy 13-byte state prefix and append PEVC v2 watermarks.
+        let mut data = Vec::with_capacity(36);
         data.extend_from_slice(&self.attention_sensitivity.to_le_bytes());
         data.extend_from_slice(&self.budget_utilization.to_le_bytes());
         data.extend_from_slice(&self.budget_exceeded_streak.to_le_bytes());
         data.push(self.vigilant as u8);
+        data.extend_from_slice(b"PEVC");
+        data.push(2); // extension version
+        let observed_cycle = self
+            .prediction_error_cursor
+            .last_observed_observation_cycle();
+        data.push(u8::from(observed_cycle.is_some()));
+        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
+        let admitted_cycle = self
+            .prediction_error_cursor
+            .last_admitted_observation_cycle();
+        data.push(u8::from(admitted_cycle.is_some()));
+        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
         data
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
-        if data.len() < 13 {
+        if data.len() != 13 && data.len() != 36 {
             return Err(format!(
-                "PerceptionManager checkpoint too short: {} < 13",
+                "PerceptionManager checkpoint has unsupported length: {}",
                 data.len()
             ));
         }
+
+        // Decode/validate cursor extension before mutating manager state.
+        // Legacy 13-byte checkpoints restore with an empty cursor.
+        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 13 {
+            (None, None)
+        } else {
+            if &data[13..17] != b"PEVC" {
+                return Err("PerceptionManager: invalid PE cursor checkpoint magic".to_string());
+            }
+            if data[17] != 2 {
+                return Err(format!(
+                    "PerceptionManager: unsupported PE cursor checkpoint version {}",
+                    data[17]
+                ));
+            }
+            let has_observed = data[18];
+            let observed_value = u64::from_le_bytes(
+                data[19..27]
+                    .try_into()
+                    .map_err(|_| "PerceptionManager: corrupt observed-cycle bytes".to_string())?,
+            );
+            let has_admitted = data[27];
+            let admitted_value = u64::from_le_bytes(
+                data[28..36]
+                    .try_into()
+                    .map_err(|_| "PerceptionManager: corrupt admitted-cycle bytes".to_string())?,
+            );
+            if has_observed > 1 || has_admitted > 1 {
+                return Err("PerceptionManager: invalid PE cursor presence flag".to_string());
+            }
+            let observed = match has_observed {
+                1 => Some(observed_value),
+                0 if observed_value == 0 => None,
+                0 => {
+                    return Err(
+                        "PerceptionManager: absent observed cycle must encode zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            let admitted = match has_admitted {
+                1 => Some(admitted_value),
+                0 if admitted_value == 0 => None,
+                0 => {
+                    return Err(
+                        "PerceptionManager: absent admitted cycle must encode zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
+                return Err(
+                    "PerceptionManager: admitted PE cycle exceeds observed high-water mark"
+                        .to_string(),
+                );
+            }
+            (observed, admitted)
+        };
+
         self.attention_sensitivity = f32::from_le_bytes(
             data[0..4]
                 .try_into()
@@ -246,6 +325,8 @@ impl CognitiveSubsystem for PerceptionManager {
                 .map_err(|_| "PerceptionManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
         self.vigilant = data[12] != 0;
+        self.prediction_error_cursor
+            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
         Ok(())
     }
 }
@@ -386,6 +467,133 @@ mod tests {
 
         assert!(manager.vigilant);
         assert_eq!(manager.attention_sensitivity, initial_sensitivity);
+    }
+
+    #[test]
+    fn duplicate_pe_cannot_toggle_vigilance_twice_in_one_cycle() {
+        let mut manager = PerceptionManager::default();
+        let mut alarming = snapshot(0.2, 0.7, 0.5, false);
+        alarming.cycle_number = 10;
+        manager.process(&alarming);
+        assert!(manager.vigilant);
+        let sensitivity_after_alarm = manager.attention_sensitivity;
+
+        // Contradictory PE/coherence payload with the same cycle is not a
+        // second admissible observation and must not clear vigilance.
+        alarming.coherence = 0.9;
+        alarming.prediction_error = 0.0;
+        manager.process(&alarming);
+        assert!(manager.vigilant);
+        assert_eq!(manager.attention_sensitivity, sensitivity_after_alarm);
+    }
+
+    #[test]
+    fn invalid_newer_pe_blocks_delayed_older_but_allows_same_cycle_recovery() {
+        let mut manager = PerceptionManager::default();
+        let mut invalid = snapshot(0.2, 0.9, 0.5, false);
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+        assert!(!manager.vigilant);
+
+        let mut delayed = snapshot(0.2, 0.9, 0.5, false);
+        delayed.cycle_number = 11;
+        manager.process(&delayed);
+        assert!(!manager.vigilant);
+
+        let mut retry = snapshot(0.2, 0.9, 0.5, false);
+        retry.cycle_number = 12;
+        manager.process(&retry);
+        assert!(manager.vigilant);
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
+    }
+
+    #[test]
+    fn checkpoint_roundtrip_preserves_vigilance_pe_watermarks() {
+        let mut manager = PerceptionManager::default();
+        let mut valid = snapshot(0.2, 0.9, 0.5, false);
+        valid.cycle_number = 10;
+        manager.process(&valid);
+        let mut invalid = valid;
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+
+        let checkpoint = manager.checkpoint();
+        assert_eq!(checkpoint.len(), 36);
+        let mut restored = PerceptionManager::default();
+        restored.restore(&checkpoint).unwrap();
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+
+        let mut delayed = valid;
+        delayed.cycle_number = 11;
+        restored.process(&delayed);
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+
+        let mut retry = valid;
+        retry.cycle_number = 12;
+        restored.process(&retry);
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
+    }
+
+    #[test]
+    fn legacy_perception_checkpoint_clears_pe_cursor() {
+        let mut manager = PerceptionManager::default();
+        let mut prior = snapshot(0.2, 0.9, 0.5, false);
+        prior.cycle_number = 80;
+        manager.process(&prior);
+        let legacy = manager.checkpoint()[..13].to_vec();
+
+        manager.restore(&legacy).unwrap();
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            None
+        );
+        let mut first_after_restore = prior;
+        first_after_restore.cycle_number = 1;
+        manager.process(&first_after_restore);
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn malformed_perception_pe_checkpoint_is_rejected_atomically() {
+        let mut manager = PerceptionManager::default();
+        let mut sample = snapshot(0.2, 0.9, 0.5, false);
+        sample.cycle_number = 12;
+        manager.process(&sample);
+        let sensitivity_before = manager.attention_sensitivity;
+        let mut checkpoint = manager.checkpoint();
+        checkpoint[0..4].copy_from_slice(&0.5_f32.to_le_bytes());
+        checkpoint[28..36].copy_from_slice(&13_u64.to_le_bytes());
+        assert!(manager.restore(&checkpoint).is_err());
+        assert_eq!(manager.attention_sensitivity, sensitivity_before);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
     }
 
     #[test]
