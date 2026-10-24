@@ -227,28 +227,113 @@ mod tests {
         assert!(graph.edges().windows(2).all(|w| w[0] < w[1]));
     }
 
-    #[test]
-    fn seeded_graph_matches_independent_javascript_reference_fixture() {
-        // Frozen from QCOMP-RRG-CLASSICAL-PREFLIGHT-001.json:
-        // N=50, degree=3, seed=202660230150, accepted pairing attempt=5.
-        // FNV-1a is a regression fingerprint only, not cryptographic provenance.
-        let config = MisRandomRegularConfig::new(50, 3, 202_660_230_150);
-        let (graph, report) = generate_mis_random_regular(config).unwrap();
-        assert_eq!(report.attempts, 5);
-        assert_eq!(graph.vertex_count(), 50);
-        assert_eq!(graph.edges().len(), 75);
-        assert!(degrees(&graph).iter().all(|&degree| degree == 3));
-
-        let mut canonical = format!("p edge {} {}\n", graph.vertex_count(), graph.edges().len()).into_bytes();
+    fn canonical_graph_fnv1a64(graph: &MisGraph) -> String {
+        let mut canonical =
+            format!("p edge {} {}\\n", graph.vertex_count(), graph.edges().len()).into_bytes();
         for &(u, v) in graph.edges() {
-            canonical.extend_from_slice(format!("e {} {}\n", u + 1, v + 1).as_bytes());
+            canonical.extend_from_slice(format!("e {} {}\\n", u + 1, v + 1).as_bytes());
         }
         let mut hash = 0xcbf2_9ce4_8422_2325_u64;
         for byte in canonical {
             hash ^= u64::from(byte);
             hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
         }
-        assert_eq!(format!("{hash:016x}"), "5ef6d3ec4c3dea16");
+        format!("{hash:016x}")
+    }
+
+    #[test]
+    fn seeded_graphs_match_independent_javascript_reference_for_all_70_frozen_instances() {
+        // Generator-seed/acceptance/hash vectors extracted from
+        // QCOMP-RRG-CLASSICAL-PREFLIGHT-001.json at blob
+        // 3a4dc72106e8de2f73afe3af33a66cee2beee70e.
+        // FNV-1a is only a compact regression fingerprint, not cryptographic provenance.
+        const FIXTURES: &[(&str, usize, usize, u64, usize, &str)] = &[
+            ("rrg3-n50-i001", 50, 3, 202660230150u64, 5, "5ef6d3ec4c3dea16"),
+            ("rrg3-n50-i002", 50, 3, 202660238069u64, 1, "7e5760f553fcb36c"),
+            ("rrg3-n50-i003", 50, 3, 202660245988u64, 10, "dff5e7f1bd974004"),
+            ("rrg3-n50-i004", 50, 3, 202660253907u64, 5, "26497251480cc382"),
+            ("rrg3-n50-i005", 50, 3, 202660261826u64, 1, "092cec71f6bb0578"),
+            ("rrg3-n50-i006", 50, 3, 202660269745u64, 3, "fc1ab7cb2cf32812"),
+            ("rrg3-n50-i007", 50, 3, 202660277664u64, 20, "061184f83bba4a6a"),
+            ("rrg3-n50-i008", 50, 3, 202660285583u64, 4, "39899551ca8f101c"),
+            ("rrg3-n50-i009", 50, 3, 202660293502u64, 1, "5792e165a52cdc84"),
+            ("rrg3-n50-i010", 50, 3, 202660301421u64, 4, "c5f9835001d1e706"),
+            ("rrg3-n50-i011", 50, 3, 202660309340u64, 19, "7dc9b7ed1601d52e"),
+            ("rrg3-n50-i012", 50, 3, 202660317259u64, 1, "824d48d7f9a7b090"),
+            ("rrg3-n50-i013", 50, 3, 202660325178u64, 3, "e13c30a7bb4bdee4"),
+            ("rrg3-n50-i014", 50, 3, 202660333097u64, 18, "e5e29d385b3bd2e4"),
+            ("rrg3-n50-i015", 50, 3, 202660341016u64, 6, "4326f2889ee970ac"),
+            ("rrg3-n50-i016", 50, 3, 202660348935u64, 6, "36ef37adc663370e"),
+            ("rrg3-n50-i017", 50, 3, 202660356854u64, 4, "9da24068efc329de"),
+            ("rrg3-n50-i018", 50, 3, 202660364773u64, 2, "eabae4c1607240ec"),
+            ("rrg3-n50-i019", 50, 3, 202660372692u64, 2, "66bd22140b37abb4"),
+            ("rrg3-n50-i020", 50, 3, 202660380611u64, 2, "54e11882a387aabc"),
+            ("rrg3-n100-i001", 100, 3, 202710230300u64, 3, "e2c3805240071e8c"),
+            ("rrg3-n100-i002", 100, 3, 202710238219u64, 6, "76a75279fb6704d6"),
+            ("rrg3-n100-i003", 100, 3, 202710246138u64, 5, "3ac293112617e4e4"),
+            ("rrg3-n100-i004", 100, 3, 202710254057u64, 13, "830d8caed70ab77c"),
+            ("rrg3-n100-i005", 100, 3, 202710261976u64, 15, "642d4f7f97dc2564"),
+            ("rrg3-n100-i006", 100, 3, 202710269895u64, 1, "850602fa5799f7aa"),
+            ("rrg3-n100-i007", 100, 3, 202710277814u64, 1, "bb8d05c98215fcf8"),
+            ("rrg3-n100-i008", 100, 3, 202710285733u64, 2, "68808e7506fb19b2"),
+            ("rrg3-n100-i009", 100, 3, 202710293652u64, 1, "c955863ba7591e50"),
+            ("rrg3-n100-i010", 100, 3, 202710301571u64, 13, "0529a7db5be34280"),
+            ("rrg3-n100-i011", 100, 3, 202710309490u64, 4, "7c3e323805fb82ae"),
+            ("rrg3-n100-i012", 100, 3, 202710317409u64, 1, "e718aa1a737e462e"),
+            ("rrg3-n100-i013", 100, 3, 202710325328u64, 8, "34eb5c3fe02e5e38"),
+            ("rrg3-n100-i014", 100, 3, 202710333247u64, 9, "c9e56ac1eb4f462a"),
+            ("rrg3-n100-i015", 100, 3, 202710341166u64, 15, "8d577a255d15f8c4"),
+            ("rrg3-n100-i016", 100, 3, 202710349085u64, 2, "707812d99d31fd94"),
+            ("rrg3-n100-i017", 100, 3, 202710357004u64, 7, "30504114f5aa4040"),
+            ("rrg3-n100-i018", 100, 3, 202710364923u64, 2, "b5f18de96d6eca10"),
+            ("rrg3-n100-i019", 100, 3, 202710372842u64, 8, "71135f1529438b64"),
+            ("rrg3-n100-i020", 100, 3, 202710380761u64, 4, "346451aafc7c8bce"),
+            ("rrg3-n200-i001", 200, 3, 202810230600u64, 2, "1fa8cd44ba27c3cf"),
+            ("rrg3-n200-i002", 200, 3, 202810238519u64, 4, "bfe63e7001742b11"),
+            ("rrg3-n200-i003", 200, 3, 202810246438u64, 4, "6372160663e48a1d"),
+            ("rrg3-n200-i004", 200, 3, 202810254357u64, 6, "da113d590973d987"),
+            ("rrg3-n200-i005", 200, 3, 202810262276u64, 5, "b7810970cf5116d9"),
+            ("rrg3-n200-i006", 200, 3, 202810270195u64, 1, "a52a6e53b0dcc5df"),
+            ("rrg3-n200-i007", 200, 3, 202810278114u64, 6, "8342f597572e2dbd"),
+            ("rrg3-n200-i008", 200, 3, 202810286033u64, 9, "05231ea71610c2ff"),
+            ("rrg3-n200-i009", 200, 3, 202810293952u64, 11, "79e08dc3bb8f3cd1"),
+            ("rrg3-n200-i010", 200, 3, 202810301871u64, 17, "cc2f0448a8af5af7"),
+            ("rrg3-n200-i011", 200, 3, 202810309790u64, 3, "c0d49ded2cc29b71"),
+            ("rrg3-n200-i012", 200, 3, 202810317709u64, 1, "146cde0fc183aff7"),
+            ("rrg3-n200-i013", 200, 3, 202810325628u64, 9, "e926d144a80aabfd"),
+            ("rrg3-n200-i014", 200, 3, 202810333547u64, 14, "03284b8c55a18947"),
+            ("rrg3-n200-i015", 200, 3, 202810341466u64, 12, "6d13dd5125b00897"),
+            ("rrg3-n200-i016", 200, 3, 202810349385u64, 8, "36645235df5cea2f"),
+            ("rrg3-n200-i017", 200, 3, 202810357304u64, 2, "c31f5a3d731611d7"),
+            ("rrg3-n200-i018", 200, 3, 202810365223u64, 6, "f62c1a97edf3e02b"),
+            ("rrg3-n200-i019", 200, 3, 202810373142u64, 28, "de34d0a9daa31b7d"),
+            ("rrg3-n200-i020", 200, 3, 202810381061u64, 2, "17e0c9acc05597b5"),
+            ("rrg3-n500-i001", 500, 3, 203110231500u64, 12, "8264a4b397287086"),
+            ("rrg3-n500-i002", 500, 3, 203110239419u64, 4, "af4636788344d2ce"),
+            ("rrg3-n500-i003", 500, 3, 203110247338u64, 8, "d1fce8e357c550e8"),
+            ("rrg3-n500-i004", 500, 3, 203110255257u64, 33, "b09307afb9c20802"),
+            ("rrg3-n500-i005", 500, 3, 203110263176u64, 2, "619f29382a46acd8"),
+            ("rrg3-n500-i006", 500, 3, 203110271095u64, 4, "773a4d0cf29cf42e"),
+            ("rrg3-n500-i007", 500, 3, 203110279014u64, 4, "9df71ff63770bf18"),
+            ("rrg3-n500-i008", 500, 3, 203110286933u64, 12, "95d6188704a85eee"),
+            ("rrg3-n500-i009", 500, 3, 203110294852u64, 7, "879dfb4ca13cab32"),
+            ("rrg3-n500-i010", 500, 3, 203110302771u64, 13, "75fee262d2e1b8f4"),
+        ];
+
+        for &(id, vertex_count, degree, seed, expected_attempts, expected_hash) in FIXTURES {
+            let config = MisRandomRegularConfig::new(vertex_count, degree, seed);
+            let (graph, report) = generate_mis_random_regular(config)
+                .unwrap_or_else(|error| panic!("{id}: generation failed: {error}"));
+            assert_eq!(report.attempts, expected_attempts, "{id}: accepted attempt count drift");
+            assert_eq!(report.edge_count, vertex_count * degree / 2, "{id}: edge-count drift");
+            assert_eq!(graph.edges().len(), vertex_count * degree / 2, "{id}: wrong edge count");
+            assert!(degrees(&graph).iter().all(|&actual| actual == degree), "{id}: degree drift");
+            assert_eq!(
+                canonical_graph_fnv1a64(&graph),
+                expected_hash,
+                "{id}: canonical DIMACS graph fingerprint drift for seed {seed}"
+            );
+        }
     }
 
     #[test]
