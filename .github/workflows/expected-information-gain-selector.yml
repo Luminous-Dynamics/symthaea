@@ -98,6 +98,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge extrapolation_equivalence_distinguishes_an_equivalent_law_from_a_shift --lib
       - name: Test truth-absent generator fails closed on exhaustion
         run: cargo test -p symthaea-physics-bridge truth_absent_candidate_generation_exhaustion_returns_none_without_panicking --lib
+      - name: Test truth-absent generator exhaustion is fail-closed
+        run: cargo test -p symthaea-physics-bridge truth_absent_candidate_generation_exhaustion_returns_none_without_panicking --lib
       - name: Benchmark truth-absent recovery without oracle candidates
         run: cargo test -p symthaea-physics-bridge truth_absent_recovery_is_reported_separately_from_oracle_present_discrimination --lib -- --nocapture
       - name: Run robust noise-envelope pilot
