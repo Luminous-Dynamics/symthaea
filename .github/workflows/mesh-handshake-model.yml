@@ -111,6 +111,11 @@ jobs:
               docs/security/models/fragment_wrap_strict.cfg
           fi
 
+          if [[ -f docs/security/models/MESH_CROSS_API_NONCE_LIFECYCLE.tla ]]; then
+            run_strict docs/security/models/MESH_CROSS_API_NONCE_LIFECYCLE.tla \
+              docs/security/models/cross_api_purpose_keys_strict.cfg
+          fi
+
       - name: Require legacy mutants to violate the intended invariant
         shell: bash
         run: |
@@ -163,6 +168,11 @@ jobs:
               docs/security/models/packet_restart_epoch_collision_legacy.cfg NoNonceReuse
             check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
               docs/security/models/fragment_wrap_legacy.cfg NoNonceReuse
+          fi
+
+          if [[ -f docs/security/models/MESH_CROSS_API_NONCE_LIFECYCLE.tla ]]; then
+            check_mutant docs/security/models/MESH_CROSS_API_NONCE_LIFECYCLE.tla \
+              docs/security/models/cross_api_shared_key_legacy.cfg NoNonceReuse
           fi
 
       - name: Finalize evidence manifest
