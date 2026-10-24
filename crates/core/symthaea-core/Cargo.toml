@@ -148,6 +148,10 @@ name = "hdc_compositional_workload"
 harness = false
 
 [[bench]]
+name = "hdc_representation_tradeoff"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
