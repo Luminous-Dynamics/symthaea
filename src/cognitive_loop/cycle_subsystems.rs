@@ -870,6 +870,8 @@ mod tests {
             "budget test",
             CycleUrgency::Normal,
         );
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(46), 47)
+            .expect("finite fixture evidence");
         state.attention_budget_exceeded = true;
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
@@ -885,7 +887,9 @@ mod tests {
         let compressed = vec![0.0f32; 64];
         let output = vec![0.0f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(42);
-        let state = make_cycle_state(&compressed, &output, &hv, "cruise", CycleUrgency::Cruise);
+        let mut state = make_cycle_state(&compressed, &output, &hv, "cruise", CycleUrgency::Cruise);
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(93), 94)
+            .expect("finite fixture evidence");
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
         let metrics = s.run_advanced_subsystems(&state, &primitives, &mut timings);
@@ -903,6 +907,8 @@ mod tests {
         let hv = symthaea_core::hdc::BinaryHV::random(42);
         let mut state =
             make_cycle_state(&compressed, &output, &hv, "combined", CycleUrgency::Cruise);
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(187), 188)
+            .expect("finite fixture evidence");
         state.attention_budget_exceeded = true;
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
@@ -954,13 +960,15 @@ mod tests {
         let compressed = vec![0.0f32; 64];
         let output = vec![0.0f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(42);
-        let state = make_cycle_state(
+        let mut state = make_cycle_state(
             &compressed,
             &output,
             &hv,
             "debug this code function",
             CycleUrgency::Normal,
         );
+        state.prediction_evidence = PredictionErrorEvidence::valid(0.2, Some(10), 11)
+            .expect("finite fixture evidence");
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
         let m = s.run_advanced_subsystems(&state, &primitives, &mut timings);
