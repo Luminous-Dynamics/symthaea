@@ -600,6 +600,129 @@ mod tests {
         assert!(lag_one_correlation > 0.55, "rho1={lag_one_correlation}");
     }
 
+
+    fn sample_variance(values: &[f64]) -> f64 {
+        assert!(values.len() >= 2);
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        values
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / (values.len() - 1) as f64
+    }
+
+    #[test]
+    fn heteroscedastic_fixture_changes_variance_with_the_covariate() {
+        let model = NoiseModel::GaussianHeteroscedastic {
+            sigma_floor: 0.05,
+            sigma_per_abs_covariate: 0.1,
+        };
+        let mut low = NoiseProcess::new(model.clone(), 0xAABB_CCDD).unwrap();
+        let mut high = NoiseProcess::new(model, 0xAABB_CCDD).unwrap();
+        let low_values: Vec<f64> = (0..3_000)
+            .map(|step| match low.observe(0.0, 0.0, step).unwrap() {
+                Observation::Observed(value) => value,
+                other => panic!("unexpected observation: {other:?}"),
+            })
+            .collect();
+        let high_values: Vec<f64> = (0..3_000)
+            .map(|step| match high.observe(0.0, 3.0, step).unwrap() {
+                Observation::Observed(value) => value,
+                other => panic!("unexpected observation: {other:?}"),
+            })
+            .collect();
+        assert!(
+            sample_variance(&high_values) > 10.0 * sample_variance(&low_values),
+            "high variance should exceed low variance by a wide margin"
+        );
+    }
+
+    #[test]
+    fn student_t_fixture_has_more_extreme_residuals_than_a_gaussian_control() {
+        let mut heavy =
+            NoiseProcess::new(
+                NoiseModel::StudentTHeavyTail {
+                    scale: 1.0,
+                    degrees_of_freedom: 3,
+                },
+                0xBEEF_1234,
+            )
+            .unwrap();
+        let mut gaussian =
+            NoiseProcess::new(NoiseModel::GaussianHomoscedastic { sigma: 1.0 }, 0xBEEF_1234)
+                .unwrap();
+        let mut heavy_extremes = 0;
+        let mut gaussian_extremes = 0;
+        for step in 0..3_000 {
+            let heavy_value = match heavy.observe(0.0, 0.0, step).unwrap() {
+                Observation::Observed(value) => value,
+                other => panic!("unexpected observation: {other:?}"),
+            };
+            let gaussian_value = match gaussian.observe(0.0, 0.0, step).unwrap() {
+                Observation::Observed(value) => value,
+                other => panic!("unexpected observation: {other:?}"),
+            };
+            heavy_extremes += usize::from(heavy_value.abs() > 3.0);
+            gaussian_extremes += usize::from(gaussian_value.abs() > 3.0);
+        }
+        assert!(heavy_extremes > 50, "heavy-tail extremes={heavy_extremes}");
+        assert!(
+            heavy_extremes > gaussian_extremes + 30,
+            "heavy={heavy_extremes}, gaussian={gaussian_extremes}"
+        );
+    }
+
+    #[test]
+    fn contamination_fixture_produces_a_separate_extreme_residual_population() {
+        let mut process = NoiseProcess::new(
+            NoiseModel::ContaminationOutliers {
+                sigma: 0.1,
+                contamination_probability: 0.15,
+                outlier_scale: 8.0,
+            },
+            0xC011_AB1E,
+        )
+        .unwrap();
+        let extremes = (0..2_000)
+            .filter(|step| match process.observe(0.0, 0.0, *step).unwrap() {
+                Observation::Observed(value) => value.abs() > 0.5,
+                other => panic!("unexpected observation: {other:?}"),
+            })
+            .count();
+        assert!(extremes > 40, "contaminated extremes={extremes}");
+    }
+
+    #[test]
+    fn scale_drift_fixture_changes_variance_at_the_predeclared_step() {
+        let mut process = NoiseProcess::new(
+            NoiseModel::ScaleDrift {
+                sigma_before: 0.1,
+                sigma_after: 0.5,
+                change_at_step: 2_000,
+            },
+            0xD12F_0001,
+        )
+        .unwrap();
+        let mut before = Vec::with_capacity(2_000);
+        let mut after = Vec::with_capacity(2_000);
+        for step in 0..4_000 {
+            let Observation::Observed(value) = process.observe(0.0, 0.0, step).unwrap() else {
+                panic!("scale-drift fixture should always return an observed value");
+            };
+            if step < 2_000 {
+                before.push(value);
+            } else {
+                after.push(value);
+            }
+        }
+        assert!(
+            sample_variance(&after) > 10.0 * sample_variance(&before),
+            "before variance={}, after variance={}",
+            sample_variance(&before),
+            sample_variance(&after)
+        );
+    }
+
     #[test]
     fn non_finite_inputs_and_outputs_are_rejected() {
         let mut process =
