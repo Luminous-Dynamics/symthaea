@@ -38,9 +38,21 @@ def solve_minimax_mixture(risk_vectors):
     weights=np.maximum(res.x[:n_policies],0.0)
     weights=weights/weights.sum()
     actual=vectors.T@weights
+    dual_weights=np.maximum(-np.asarray(res.ineqlin.marginals,dtype=float),0.0)
+    if dual_weights.sum() <= 0.0:
+        raise RuntimeError('LP dual did not yield a normalized scenario certificate')
+    dual_weights=dual_weights/dual_weights.sum()
+    dual_payoffs=vectors@dual_weights
+    dual_lower=float(dual_payoffs.min())
+    primal_upper=float(actual.max())
+    duality_gap=max(0.0,primal_upper-dual_lower)
+    if duality_gap > 1e-7:
+        raise RuntimeError(f'LP primal/dual certificate gap too large: {duality_gap}')
     return {'weights':weights.tolist(),'mixture_risk_vector':actual.tolist(),
-            'worst_case_bits':float(actual.max()),'mean_scenario_bits':float(actual.mean()),
+            'worst_case_bits':primal_upper,'mean_scenario_bits':float(actual.mean()),
             'support_size':int(np.count_nonzero(weights>1e-8)),
+            'scenario_dual_weights':dual_weights.tolist(),'dual_lower_bound_bits':dual_lower,
+            'primal_dual_gap_bits':duality_gap,
             'lp_reported_objective':float(res.fun),'lp_status':res.message}
 
 def run_benchmark(candidate_prior_names=PRIOR_NAMES, learner_prior_names=PRIOR_NAMES,
