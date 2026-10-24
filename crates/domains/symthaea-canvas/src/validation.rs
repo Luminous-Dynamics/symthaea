@@ -114,6 +114,8 @@ impl CognitiveSnapshot {
                     &mut report,
                 ),
                 prediction_error: clamp_f32(self.prediction_error, 0.0, 1.0, 0.0, &mut report),
+                prediction_error_valid: self.prediction_error_valid
+                    && self.prediction_error.is_finite(),
                 living_mind_vitality: clamp_f64(
                     self.living_mind_vitality,
                     0.0,
@@ -266,6 +268,30 @@ mod tests {
         );
         assert_eq!(clean.thought_vector.len(), 256);
         assert!(clean.thought_vector.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn sanitization_does_not_turn_invalid_prediction_error_into_evidence() {
+        let mut snapshot = CognitiveSnapshot::dormant();
+        snapshot.prediction_error = f32::INFINITY;
+        snapshot.prediction_error_valid = true;
+
+        let (clean, report) = snapshot.sanitize_with_limits(SnapshotLimits::default());
+        assert!(report.changed());
+        assert_eq!(clean.prediction_error, 0.0);
+        assert!(!clean.prediction_error_valid);
+        assert_eq!(clean.prediction_error_sample(), None);
+    }
+
+    #[test]
+    fn sanitization_preserves_valid_finite_prediction_error() {
+        let mut snapshot = CognitiveSnapshot::dormant();
+        snapshot.prediction_error = 0.3;
+        snapshot.prediction_error_valid = true;
+
+        let (clean, _) = snapshot.sanitize_with_limits(SnapshotLimits::default());
+        assert!(clean.prediction_error_valid);
+        assert_eq!(clean.prediction_error_sample(), Some(0.3));
     }
 
     #[test]
