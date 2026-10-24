@@ -9,6 +9,7 @@ use super::super::feedback_state::Priority;
 use super::super::helpers;
 use super::super::phase_results::PerceptionPhaseResult;
 use super::super::thresholds::*;
+use super::super::types::PredictionErrorEvidence;
 
 impl CognitiveLoopService {
     /// Memory recall, resonator matching, phenomenal binding, and goal attention.
@@ -19,7 +20,8 @@ impl CognitiveLoopService {
         &mut self,
         perception: &PerceptionPhaseResult,
         urgency: super::super::CycleUrgency,
-        prediction_error: f32,
+        prediction_evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
         module_timings: &mut super::super::ModuleTimings,
     ) -> super::MemoryBindingResult {
         // ═══════════════════════════════════════════════════════════════════════
@@ -302,7 +304,11 @@ impl CognitiveLoopService {
                     * super::super::thresholds::GOAL_PRIORITY_LR_SCALE;
                 self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }
-            if prediction_error < self.config.learning_threshold
+            if prediction_evidence
+                .value_for_observation(observation_cycle)
+                .is_some_and(|prediction_error| {
+                    prediction_error < self.config.learning_threshold
+                })
                 && goal_priority > GOAL_PRIORITY_EXPLORATION_THRESHOLD
             {
                 self.adjust_exploration(
