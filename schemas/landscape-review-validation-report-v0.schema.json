@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/landscape-review-validation-report-v0.schema.json",
+  "title": "Symthaea Landscape Review Validation Report v0",
+  "description": "Deterministic structural/policy check report. A valid report is not proof of science, causality, land rights, consent authenticity or impact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_schema",
+    "schema_uri",
+    "review_schema",
+    "review_schema_uri",
+    "input_sha256",
+    "input_bytes",
+    "valid",
+    "errors",
+    "interpretation_limit"
+  ],
+  "properties": {
+    "report_schema": {
+      "const": "symthaea.landscape-review-validation-report.v0"
+    },
+    "schema_uri": {
+      "const": "https://luminousdynamics.io/schemas/landscape-review-validation-report-v0.schema.json"
+    },
+    "review_schema": {
+      "const": "symthaea.landscape-alternative-review.v0"
+    },
+    "review_schema_uri": {
+      "const": "https://luminousdynamics.io/schemas/landscape-alternative-review-v0.schema.json"
+    },
+    "input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "input_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "interpretation_limit": {
+      "const": "structural-policy-validation-does-not-prove-scientific-validity-or-impact"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "valid": {
+            "const": true
+          }
+        },
+        "required": [
+          "valid"
+        ]
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}
