@@ -96,6 +96,9 @@ enum Commands {
     ScoreCounterfactualAdaptationUtility {
         #[arg(long)]
         input: PathBuf,
+        /// Raw replay receipt to validate and bind to the score. Required for confirmatory panels.
+        #[arg(long)]
+        receipt: Option<PathBuf>,
         #[arg(long)]
         out: Option<PathBuf>,
     },
@@ -240,8 +243,12 @@ fn main() -> anyhow::Result<()> {
                 println!("{rendered}");
             }
         }
-        Commands::ScoreCounterfactualAdaptationUtility { input, out } => {
-            let result = cognitive_adaptation_utility::evaluate_file(&input)?;
+        Commands::ScoreCounterfactualAdaptationUtility { input, receipt, out } => {
+            let result = if let Some(receipt_path) = receipt {
+                cognitive_adaptation_utility::evaluate_file_with_receipt(&input, &receipt_path)?
+            } else {
+                cognitive_adaptation_utility::evaluate_file(&input)?
+            };
             let rendered = serde_json::to_string_pretty(&result)?;
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
