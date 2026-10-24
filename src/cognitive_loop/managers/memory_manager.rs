@@ -647,6 +647,35 @@ mod tests {
     }
 
     #[test]
+    fn malformed_pevc_v2_watermarks_are_rejected_before_state_mutation() {
+        let mut manager = MemoryManager::default();
+        let valid = CycleSnapshot {
+            cycle_number: 12,
+            prediction_error: 0.6,
+            prediction_error_valid: 1,
+            ..Default::default()
+        };
+        manager.process(&valid);
+        let pressure_before = manager.consolidation_pressure();
+        let mut checkpoint = manager.checkpoint();
+
+        // Make the saved pressure visibly different, then encode an admitted
+        // cycle beyond the observed watermark. Restore must reject atomically.
+        checkpoint[0..4].copy_from_slice(&0.0_f32.to_le_bytes());
+        checkpoint[24..32].copy_from_slice(&13_u64.to_le_bytes());
+        assert!(manager.restore(&checkpoint).is_err());
+        assert_eq!(manager.consolidation_pressure(), pressure_before);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
+    }
+
+    #[test]
     fn malformed_prediction_error_checkpoint_extension_is_rejected() {
         let mut manager = MemoryManager::default();
         let mut checkpoint = manager.checkpoint();
