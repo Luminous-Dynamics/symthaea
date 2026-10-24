@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from score_trace import TraceScoreError, hypervolume_2d_minimize, score_trace
+from score_trace import HypervolumeArchive2D, TraceScoreError, hypervolume_2d_minimize, score_trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "success_receipt.fixture.json"
@@ -108,6 +108,21 @@ class IndependentTraceScorerTests(unittest.TestCase):
             "feasible_fraction": 1.0,
             "invalid_or_failed_fraction": 0.0,
         }
+
+    def test_incremental_archive_matches_batch_hypervolume_after_every_insertion(self) -> None:
+        sequence = [
+            [2.0, 8.0], [4.0, 4.0], [7.0, 2.0], [5.0, 8.0],
+            [2.0, 7.0], [5.0, 3.0], [2.0, 9.0], [8.0, 1.0],
+            [3.0, 3.0], [4.0, 1.0], [10.0, 2.0], [3.0, 10.0],
+        ]
+        archive = HypervolumeArchive2D([10.0, 10.0])
+        observed: list[list[float]] = []
+        for point in sequence:
+            observed.append(point)
+            incremental = archive.observe(point)
+            batch = hypervolume_2d_minimize(observed, [10.0, 10.0])
+            self.assertAlmostEqual(incremental, batch, places=9)
+        self.assertAlmostEqual(archive.area, 64.0, places=9)
 
     def test_known_answer_hypervolume_and_early_stop_auc(self) -> None:
         result = score_known_answer(self.known_rows, 6, self.known_metrics)
