@@ -21,7 +21,7 @@ cargo clippy --manifest-path research/scientific-discovery-noise-robustness-v0-1
 - A predeclared noise-scale change point.
 - A bounded interleaved-anchor schedule helper to reduce confounding between time/order drift and covariate shifts in fixed-design controls.
 
-The combined-shift regime in the protocol manifest remains reserved for a later stress phase and is not implemented here. The protocol also now specifies a cause-discrimination track (stable law versus law change versus noise change); this crate does not yet implement the diagnosis policy or evaluator.
+The combined-shift regime in the protocol manifest remains reserved for a later stress phase and is not implemented here. The protocol also now specifies a cause-discrimination track (stable law versus law change versus noise change); this crate does not yet implement the diagnosis policy or evaluator. The protocol also includes candidate-set omission and harmful-informativeness stress cases; no robust acquisition algorithm is implemented here.
 
 ## Boundary and limitations
 
