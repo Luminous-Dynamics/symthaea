@@ -159,3 +159,20 @@ For systems performance, MLPerf Training measures time to a defined quality targ
 ## 8. Current validation boundary
 
 This document defines acceptance criteria; it is not evidence that the gates have passed. Regression assertions have been authored in the current branch, but the authoring environment has not executed `cargo test` or a release benchmark. Record the exact final PR head and actual test output when a supported build environment is available.
+
+
+## 9. Typed subsystem-boundary admission
+
+The compatibility `repr(C)` `CycleSnapshot` remains fixed-layout, but PE-dependent consumers should not treat its float and validity byte as separate inputs. The boundary adapter `prediction_error_evidence()` must construct a `PredictionErrorEvidence` with the snapshot's observation cycle and a non-usable status for non-canonical validity bytes or non-finite values. Since the ABI has no prediction-source-cycle field, this adapter must leave that provenance unknown rather than fabricate it.
+
+The preferred cursor API, `admit_evidence(evidence, requested_observation_cycle)`, first requires a valid value for the requested observation and only then applies the consumer's monotonic exactly-once rule. The legacy `admit(cycle, Option<f32>)` remains for compatibility, but new stateful PE consumers should use the typed method.
+
+### Additional deterministic gates
+
+- Snapshot validity bytes `0`, `2`, and `255` never yield usable evidence, regardless of the float payload.
+- A NaN or infinity with validity byte `1` is classified as non-finite and never yields a value.
+- An evidence object requested for another observation cycle is rejected without advancing the cursor.
+- A fixed-seed 10,000-entry mixed trace interleaves valid samples, unavailable evidence, non-canonical flags, duplicate and out-of-order cycle numbers, and requested-cycle mismatches. Each admission decision and the cursor state must match an independent reference rule.
+- This trace is a cursor/adapter contract test, not a substitute for the 15 consumer-level counterfactual cases. End-to-end state-digest comparisons across downstream learners, replay stores, safety, and checkpoint restoration remain required.
+
+The above are acceptance tests, not measured results until executed against the exact tested commit with a supported Rust toolchain.
