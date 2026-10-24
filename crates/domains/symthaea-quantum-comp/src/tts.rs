@@ -130,7 +130,8 @@ impl TtsEstimate {
             return Err(TtsError::SuccessesExceedTrials { successes, trials });
         }
         if !target_success_probability.is_finite()
-            || !(0.0..1.0).contains(&target_success_probability)
+            || target_success_probability <= 0.0
+            || target_success_probability >= 1.0
         {
             return Err(TtsError::InvalidTarget {
                 value: target_success_probability,
@@ -330,6 +331,10 @@ mod tests {
         ));
         assert!(matches!(
             TtsEstimate::from_counts(1, 2, 1.0, 1.0, Z_95),
+            Err(TtsError::InvalidTarget { .. })
+        ));
+        assert!(matches!(
+            TtsEstimate::from_counts(1, 2, 1.0, 0.0, Z_95),
             Err(TtsError::InvalidTarget { .. })
         ));
         assert!(matches!(
