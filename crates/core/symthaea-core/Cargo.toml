@@ -23,6 +23,7 @@ harness = false
 required-features = ["abstract_thought"]
 
 [dependencies]
+symthaea-types = { path = "../symthaea-types" }
 wgpu = { workspace = true, features = ["spirv"], optional = true }
 bytemuck = { version = "1", features = ["derive"] }
 # NOTE: `symthaea-evidence-plane` was a dependency here for the Phase-2

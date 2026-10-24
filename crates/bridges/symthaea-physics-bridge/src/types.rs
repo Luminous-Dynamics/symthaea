@@ -121,6 +121,24 @@ impl DimensionalSignature {
         amount: 0,
         luminous: 0,
     };
+    pub const POWER: Self = Self {
+        mass: 1,
+        length: 2,
+        time: -3,
+        current: 0,
+        temperature: 0,
+        amount: 0,
+        luminous: 0,
+    };
+    pub const FREQUENCY: Self = Self {
+        mass: 0,
+        length: 0,
+        time: -1,
+        current: 0,
+        temperature: 0,
+        amount: 0,
+        luminous: 0,
+    };
     pub const CHARGE: Self = Self {
         mass: 0,
         length: 0,
@@ -234,34 +252,40 @@ impl DimensionalSignature {
         }
     }
 
-    /// Add two dimensional signatures element-wise (corresponds to multiplying
-    /// quantities: `m·v` has dimensions M + (LT⁻¹) = M¹L¹T⁻¹).
-    ///
-    /// Returns a new signature; does not mutate `self`.
-    pub fn add(&self, other: &Self) -> Self {
-        Self {
-            mass: self.mass + other.mass,
-            length: self.length + other.length,
-            time: self.time + other.time,
-            current: self.current + other.current,
-            temperature: self.temperature + other.temperature,
-            amount: self.amount + other.amount,
-            luminous: self.luminous + other.luminous,
+    /// Checked dimensional multiplication arithmetic.
+    pub fn checked_add(&self, other: &Self) -> Option<Self> {
+        let a = self.as_array();
+        let b = other.as_array();
+        let mut out = [0i8; 7];
+        for i in 0..7 {
+            out[i] = a[i].checked_add(b[i])?;
         }
+        Some(Self::from_array(out))
     }
 
-    /// Subtract two dimensional signatures (corresponds to dividing
-    /// quantities: `F/m` has dimensions (MLT⁻²) − M = LT⁻²).
-    pub fn sub(&self, other: &Self) -> Self {
-        Self {
-            mass: self.mass - other.mass,
-            length: self.length - other.length,
-            time: self.time - other.time,
-            current: self.current - other.current,
-            temperature: self.temperature - other.temperature,
-            amount: self.amount - other.amount,
-            luminous: self.luminous - other.luminous,
+    /// Checked dimensional division arithmetic.
+    pub fn checked_sub(&self, other: &Self) -> Option<Self> {
+        let a = self.as_array();
+        let b = other.as_array();
+        let mut out = [0i8; 7];
+        for i in 0..7 {
+            out[i] = a[i].checked_sub(b[i])?;
         }
+        Some(Self::from_array(out))
+    }
+
+    /// Compatibility helper retained for existing callers.
+    /// New inference paths should use `checked_add` and fail closed.
+    pub fn add(&self, other: &Self) -> Self {
+        self.checked_add(other)
+            .expect("physical dimension exponent overflow")
+    }
+
+    /// Compatibility helper retained for existing callers.
+    /// New inference paths should use `checked_sub` and fail closed.
+    pub fn sub(&self, other: &Self) -> Self {
+        self.checked_sub(other)
+            .expect("physical dimension exponent overflow")
     }
 
     /// Scale a dimensional signature by an integer factor (corresponds to
