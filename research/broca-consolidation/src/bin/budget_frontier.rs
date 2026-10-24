@@ -640,13 +640,19 @@ mod tests {
     }
 
     #[test]
-    fn raw_fit_arm_retains_every_candidate() {
+    fn budget_adaptive_switches_from_consolidation_to_raw_when_evidence_fits() {
         let candidates = build_fixture(52, 120);
         let raw_demand: usize = candidates.iter().map(|candidate| candidate.raw_tokens).sum();
         assert!(raw_demand <= 8192);
-        let decisions = choose_policy(&candidates, 8192, "always_raw");
-        assert!(decisions.iter().all(|decision| decision.action == Action::Raw));
-        assert_eq!(decisions.iter().map(|d| d.tokens).sum::<usize>(), raw_demand);
+
+        let tight = choose_policy(&candidates, 128, "budget_adaptive");
+        assert!(tight.iter().any(|decision| {
+            matches!(decision.action, Action::Summary | Action::Merge | Action::Abstract | Action::Provisional)
+        }), "tight-budget policy never consolidated any evidence");
+
+        let full = choose_policy(&candidates, 8192, "budget_adaptive");
+        assert!(full.iter().all(|decision| decision.action == Action::Raw));
+        assert_eq!(full.iter().map(|d| d.tokens).sum::<usize>(), raw_demand);
     }
 
     #[test]
