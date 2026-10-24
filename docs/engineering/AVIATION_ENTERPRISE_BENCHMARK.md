@@ -29,6 +29,31 @@ The target is not to rebuild Skywise, airline operations research, predictive-ma
 
 No claim of industry novelty or superiority is permitted until a reproducible public benchmark and fair baselines support it.
 
+## Public evaluation ladder and dataset caveats
+
+AECB's integrated schedule/maintenance/production scenario is necessarily synthetic at first: public datasets rarely contain the linked passenger, crew legality, aircraft configuration, maintenance task cards, parts inventory, supplier contracts, production capacity, cost ledger, and operator interventions required for a fair end-to-end airline backtest. Do not fill these gaps with invented data and then describe the outcome as field evidence.
+
+Use three complementary benchmark layers:
+
+1. **Exact synthetic enterprise layer.** Freeze tiny scenarios and enumerate them exactly. This is the layer that tests cross-domain coupling, evidence invalidation, and fail-closed behavior. Use hand-calculated expected outcomes, negative controls, and deterministic seeds.
+2. **Public submodel validation layer.** Use open aviation-performance and telemetry references to challenge individual model owners independently:
+   - [OpenAP](https://www.mdpi.com/2226-4310/7/8/104) is an open aircraft performance model built from open surveillance data and literature models. Compare any claimed fuel/trajectory surrogate against a frozen OpenAP version and a declared trajectory slice. Do not assume OpenAP itself is ground truth; report disagreement and observed-data residuals.
+   - [NASA's Aircraft Engine Run-To-Failure Data Set Under Real Flight Conditions](https://ntrs.nasa.gov/citations/20205001125) documents engine run-to-failure trajectories derived from a dynamical model with recorded commercial-flight conditions. Check the exact downloadable artifact, rights, variables, and split before adopting it.
+   - The [official NASA C-MAPSS dataset page](https://data.nasa.gov/dataset/c-mapss-aircraft-engine-simulator-data) currently warns that C-MAPSS and C-MAPSS40K software are unavailable for download while availability is reviewed. Do not make a benchmark pipeline depend on downloading these tools until that status changes and is rechecked.
+   - Public trajectory/emissions studies can validate route- and fuel-related submodels, but flight tracks alone do not reveal passenger connections, crew legality, maintenance tasks, or proprietary costs.
+3. **Operator retrospective and prospective layer.** Only after an operator supplies authorized, appropriately governed data should we compare against its record-of-decision and existing production optimizer. Require matched scenarios, the same operational constraints, blinded evaluation where feasible, human override logging, and a pre-registered analysis. A public synthetic result cannot establish production savings.
+
+Keep these layers separate in reports. A model that accurately predicts a component's residual life has not thereby proved maintenance scheduling quality; good trajectory fuel estimates do not establish dispatch feasibility; and a passing exact synthetic optimizer does not prove commercial superiority.
+
+### Required baselines at each layer
+
+- **Aircraft trajectory/fuel layer:** frozen OpenAP/reference configuration, naive phase-based baseline, and observed-data residuals where the data supports them.
+- **Engine health layer:** task-appropriate statistical/physics baseline and published benchmark protocol; report the exact dataset revision, split, leakage controls, sensor normalization, failure definition, and evaluation horizon.
+- **Integrated scheduling layer:** original plan, transparent greedy rules, siloed specialist solvers, a conventional integrated MILP/CP-SAT or equivalent method, and an exact tiny-instance oracle.
+- **Field layer:** incumbent decisions and outcomes on matched cases; no claim of beating named commercial vendors without a reproducible, fair comparison.
+
+Use Rust for the production/coordinator implementation where practical. External research tools may be used as frozen reference oracles in benchmark preparation, but a Python-only reference implementation must not silently become a production dependency.
+
 ## System boundary and existing owners
 
 Compose existing work; do not create a parallel airline solver, maintenance evaluator, aircraft physics engine, manufacturing scheduler, or energy solver.
