@@ -178,6 +178,20 @@ impl CognitiveLoopService {
             &compressed_state,
             self.last_prediction.as_deref(),
         );
+        let observation_cycle = self.stats.total_cycles as u64;
+        let evidence_status = if prediction_error_evidence.is_some() {
+            super::types::PredictionEvidenceStatus::Valid
+        } else if self.last_prediction.is_none() {
+            super::types::PredictionEvidenceStatus::NoPriorPrediction
+        } else {
+            super::types::PredictionEvidenceStatus::SourceUnavailable
+        };
+        let prediction_evidence = super::types::PredictionErrorEvidence::from_comparison(
+            evidence_status,
+            prediction_error_evidence,
+            None,
+            observation_cycle,
+        );
         let prediction_error = prediction_error_evidence.unwrap_or(0.0);
 
         // 9. Store experience
@@ -231,6 +245,14 @@ impl CognitiveLoopService {
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
+        let mut metadata = super::CycleMetadata::default();
+        metadata.prediction_evidence = Some(
+            super::types::PredictionEvidenceTelemetry::from_evidence(
+                &prediction_evidence,
+                observation_cycle,
+            ),
+        );
+
         Ok(CycleResult {
             output,
             prediction_error,
@@ -247,7 +269,7 @@ impl CognitiveLoopService {
             recall_similarity: None,
             recall_matched_timestamp: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
-            metadata: super::CycleMetadata::default(),
+            metadata,
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
             language_output: None,
