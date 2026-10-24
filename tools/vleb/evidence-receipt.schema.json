@@ -393,7 +393,8 @@
               "environment_match": {"const": "match"},
               "verdict": {"const": "pass"},
               "auditor_output_sha256": {"$ref": "#/$defs/sha256"}
-            }
+            },
+            "required": ["auditor_output_sha256"]
           },
           "environment": {
             "properties": {
@@ -401,7 +402,17 @@
               "runtime_identity": {
                 "properties": {
                   "network_mode_observed": {"const": true}
-                }
+                },
+                "anyOf": [
+                  {
+                    "properties": {"immutable_image_id": {"type": "string", "minLength": 1}},
+                    "required": ["immutable_image_id"]
+                  },
+                  {
+                    "properties": {"host_attestation_uri": {"type": "string", "format": "uri", "minLength": 1}},
+                    "required": ["host_attestation_uri"]
+                  }
+                ]
               },
               "checkout_identity": {
                 "properties": {
