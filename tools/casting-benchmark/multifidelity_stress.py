@@ -444,13 +444,17 @@ def adaptive_budget_policy(evaluator: PolicyEvaluator, seed: int) -> None:
     """
     costs = evaluator.fidelity_costs
     budget = evaluator.cost_budget
+    reserved_high_calls = min(2, budget // costs["high"])
+    reserved_high_cost = reserved_high_calls * costs["high"]
     low_target = min(75, max(5, int((budget * 0.30) // costs["low"])))
-    low_target = min(low_target, len(evaluator.candidate_ids))
+    # Preserve the minimum viable two-medium/two-high design even at the minimum accepted cap.
+    affordable_low = max(
+        0, (budget - reserved_high_cost - 2 * costs["medium"]) // costs["low"]
+    )
+    low_target = min(low_target, max(5, affordable_low), len(evaluator.candidate_ids))
     low_ids = deterministic_sample(evaluator.candidate_ids, low_target, seed)
     low = _evaluate_sample(evaluator, low_ids, "low")
 
-    reserved_high_calls = min(2, budget // costs["high"])
-    reserved_high_cost = reserved_high_calls * costs["high"]
     medium_target = min(10, max(2, int((budget * 0.20) // costs["medium"])))
     medium_target = min(medium_target, len(low))
     affordable_medium = max(
