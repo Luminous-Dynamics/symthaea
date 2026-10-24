@@ -110,6 +110,12 @@ Required design:
 
 The existing counterfactual scorer remains useful as a downstream summary auditor. It is not the replay orchestrator and should not be described as proving causal execution on its own.
 
+### Replay receipt validator (implemented; not a replay engine)
+
+The new Rust `xtask validate-cognitive-replay-receipt` command validates a typed receipt containing a canonical event ledger and five required policy arms. It recomputes the event-ledger digest, requires identical delivery IDs and delivery ticks across arms, rejects use of events before their availability tick, isolates the oracle-access flag to the oracle-timed diagnostic arm, and checks state-digest continuity plus stage → verify-with-evidence-digest → commit and exact-snapshot rollback records. Unit tests and focused-workflow negative controls cover future-information leakage, event mutation/timing mismatch, deployable oracle access, verification without an evidence digest, unverified commit, and invalid rollback.
+
+The validator explicitly reports receipt integrity only. It cannot prove that the runner executed honestly, that a sandbox actually prevented oracle access, that the referenced evidence artifact is genuine, or that task-loss claims are correct. A replay driver must generate raw receipts from actual execution, and a separate review must verify the runner and artifacts. The included receipt fixture is synthetic and marked `synthetic-not-measured`.
+
 ## Reference datasets and comparators
 
 Use the seven public datasets and eight drift cells registered by the current benchmark plan as the minimum detector-comparability panel. Pin data sources, licensing, transformations, and per-dataset checksums. Record all exclusions and all missing runs; never silently substitute a dataset.
