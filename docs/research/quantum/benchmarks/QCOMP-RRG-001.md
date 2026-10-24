@@ -90,6 +90,16 @@ Controls:
 
 The canonical generator now includes a deterministic Rust test over 5,000 seeds at N=6, degree 3. It checks that the no-triangle K3,3 class occurs within ±0.04 of the exact 1/7 reference. The exact class counts were independently derived by enumerating all 32,768 labelled simple graphs on six vertices. A separate JavaScript translation of the generation algorithm sampled 100,000 graphs and observed 14,277 K3,3 versus 14,286 expected, but this is a small-N gross-bias diagnostic, not a proof of generator quality. The Rust test remains uncompiled/unexecuted because the authoring environment lacks cargo/rustc.
 
+## Pinned Marino–Kirkpatrick classical reference (2026-10-24)
+
+The source search found the author-maintained implementation linked by the 2020 paper: [RaffaeleMarino's repository](https://github.com/RaffaeleMarino/Large-Independent-Set-on-random-d-regular-graphs-with-small-and-fixed-connectivity-d), pinned at commit `ae59badc1c07fc27d12088593546e8b98e909c8a`. Its C++ tree contains `main.cpp`, `Random.hpp`, `Header.h`, and `README.md`; its root has no license file and GitHub reports no license metadata. The exact file-object IDs and sizes are recorded in [QCOMP-MK-REFERENCE-001.json](QCOMP-MK-REFERENCE-001.json).
+
+**Do not vendor or redistribute the upstream code without clarified reuse terms.** The pinned source is a reproducible source reference, not a Symthaea implementation or a completed reproduction. If permission cannot be established, implement a clean-room Rust reimplementation directly from the published algorithm description, then validate it against independently generated small fixtures and declared paper-level invariants before it is treated as a reference baseline.
+
+A crucial methodology distinction: Marino–Kirkpatrick's deferred-decision approach co-generates the random regular graph and its independent-set labels using virtual nodes and priority operations. Do not silently treat it as a fixed-input solver. Maintain two tracks: (A) paired, fixed-graph comparisons for policies that accept the same completed DIMACS bytes; (B) distribution-level comparisons for the native co-generated deferred-decision method, retaining every generated graph and independently verifying its output. Matching seed integers does not create a paired observation unless the completed graph bytes are identical.
+
+The 2026 QAOA-enhanced greedy paper explicitly compares against this stronger prioritized baseline, reporting statistically significant p=4 gains on its considered sizes up to N ≤ 2000 while also noting that finite-size simulations had not exceeded the paper's asymptotic 0.445330 value. Those are external paper claims, not Symthaea measurements. A minimal-degree greedy win alone is therefore insufficient for an SOTA claim on the random-3-regular track.
+
 ## Classical restart-budget preflight
 
 A post-hoc quality-versus-budget analysis of the 70 graph / 16-restart JavaScript preflight is now recorded in [QCOMP-RRG-BUDGET-CURVE-001](QCOMP-RRG-BUDGET-CURVE-001.md), with machine-readable output in [the JSON record](QCOMP-RRG-BUDGET-CURVE-001.json). It computes the expected best objective over every size-k subset of the 16 observed restart results for k = 1, 2, 4, 8, 16, then uses a graph-level stratified bootstrap that preserves each N stratum's sample size.
