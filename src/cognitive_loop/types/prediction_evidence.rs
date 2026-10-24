@@ -74,6 +74,13 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
                         "valid prediction evidence must contain a finite value",
                     ));
                 }
+                if let Some(prediction_cycle) = wire.prediction_cycle {
+                    if wire.observation_cycle.checked_sub(1) != Some(prediction_cycle) {
+                        return Err(D::Error::custom(
+                            "valid prediction evidence must come from the preceding cycle",
+                        ));
+                    }
+                }
                 Ok(Self {
                     status: wire.status,
                     value: Some(value),
@@ -111,10 +118,17 @@ impl PredictionErrorEvidence {
     ) -> Self {
         let (status, value) = match status {
             PredictionEvidenceStatus::Valid => match value {
-                Some(value) if value.is_finite() => {
-                    (PredictionEvidenceStatus::Valid, Some(value))
+                Some(value) if !value.is_finite() => {
+                    (PredictionEvidenceStatus::NonFiniteInput, None)
                 }
-                Some(_) => (PredictionEvidenceStatus::NonFiniteInput, None),
+                Some(value)
+                    if prediction_cycle.is_some()
+                        && observation_cycle.checked_sub(1) != prediction_cycle =>
+                {
+                    let _ = value;
+                    (PredictionEvidenceStatus::StaleOrOutOfOrder, None)
+                }
+                Some(value) => (PredictionEvidenceStatus::Valid, Some(value)),
                 None => (PredictionEvidenceStatus::SourceUnavailable, None),
             },
             invalid_status => (invalid_status, None),
@@ -136,6 +150,11 @@ impl PredictionErrorEvidence {
     ) -> Result<Self, &'static str> {
         if !value.is_finite() {
             return Err("prediction error must be finite");
+        }
+        if let Some(prediction_cycle) = prediction_cycle {
+            if observation_cycle.checked_sub(1) != Some(prediction_cycle) {
+                return Err("prediction cycle must immediately precede observation cycle");
+            }
         }
         Ok(Self {
             status: PredictionEvidenceStatus::Valid,
@@ -187,12 +206,12 @@ impl PredictionErrorEvidence {
                 observation_cycle,
             };
         }
-        Self {
-            status: PredictionEvidenceStatus::Valid,
-            value: Some(value),
+        Self::from_comparison(
+            PredictionEvidenceStatus::Valid,
+            Some(value),
             prediction_cycle,
             observation_cycle,
-        }
+        )
     }
 
     /// Evidence classification.
@@ -207,8 +226,10 @@ impl PredictionErrorEvidence {
         &self,
         observation_cycle: u64,
     ) -> PredictionEvidenceStatus {
+        let source_cycle_inconsistent = self.prediction_cycle.is_some()
+            && self.observation_cycle.checked_sub(1) != self.prediction_cycle;
         if self.status == PredictionEvidenceStatus::Valid
-            && self.observation_cycle != observation_cycle
+            && (self.observation_cycle != observation_cycle || source_cycle_inconsistent)
         {
             PredictionEvidenceStatus::StaleOrOutOfOrder
         } else {
@@ -314,6 +335,20 @@ mod tests {
     }
 
     #[test]
+    fn inconsistent_explicit_prediction_cycle_is_rejected_or_downgraded() {
+        assert!(PredictionErrorEvidence::valid(0.5, Some(3), 5).is_err());
+
+        let evidence = PredictionErrorEvidence::from_comparison(
+            PredictionEvidenceStatus::Valid,
+            Some(0.5),
+            Some(3),
+            5,
+        );
+        assert_eq!(evidence.status(), PredictionEvidenceStatus::StaleOrOutOfOrder);
+        assert_eq!(evidence.value_for_observation(5), None);
+    }
+
+    #[test]
     fn invalid_constructor_rejects_valid_status() {
         assert!(
             PredictionErrorEvidence::invalid(PredictionEvidenceStatus::Valid, None, 1).is_err()
@@ -384,5 +419,8 @@ mod tests {
         let non_finite =
             r#"{"status":"valid","value":1e999,"prediction_cycle":1,"observation_cycle":2}"#;
         assert!(serde_json::from_str::<PredictionErrorEvidence>(non_finite).is_err());
+
+        let stale = r#"{"status":"valid","value":0.5,"prediction_cycle":1,"observation_cycle":3}"#;
+        assert!(serde_json::from_str::<PredictionErrorEvidence>(stale).is_err());
     }
 }
