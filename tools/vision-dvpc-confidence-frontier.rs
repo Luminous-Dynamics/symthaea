@@ -441,7 +441,8 @@ fn possibly_dominates(a: &Point, a_band: Band, b: &Point, b_band: Band) -> bool 
 }
 
 fn exact_equivalent(a: &Point, a_band: Band, b: &Point, b_band: Band) -> bool {
-    a.latency == b.latency
+    a.utility_estimate == b.utility_estimate
+        && a.latency == b.latency
         && a.energy == b.energy
         && a_band.lower == b_band.lower
         && a_band.upper == b_band.upper
@@ -791,6 +792,60 @@ mod tests {
         let b = bands(&p, &[("p10", "a", 0.40, 0.60), ("p10", "b", 0.20, 0.40), ("p10", "extra", 0.20, 0.40)], "true");
         let e = analyze(p.as_bytes(), &sha256_hex(p.as_bytes()), b.as_bytes(), &sha256_hex(b.as_bytes()), SHA_C).unwrap_err();
         assert!(e.contains("duplicate band") || e.contains("confidence-band count") || e.contains("identities"));
+    }
+
+    #[test]
+    fn mismatched_sweep_digest_is_rejected() {
+        let p = receipt(&[
+            Spec { budget: "p10", policy: "a", status: "FEASIBLE_FRONTIER", utility: 0.50, latency: 10, energy: 10, reasons: "-" },
+            Spec { budget: "p10", policy: "b", status: "FEASIBLE_DOMINATED", utility: 0.30, latency: 20, energy: 20, reasons: "-" },
+        ]);
+        let mut b = bands(&p, &[("p10", "a", 0.40, 0.60), ("p10", "b", 0.20, 0.40)], "true");
+        b = b.replace(
+            &format!("META\\tsource_sweep_sha256\\t{SHA_A}"),
+            &format!("META\\tsource_sweep_sha256\\t{SHA_B}"),
+        );
+        let e = analyze(p.as_bytes(), &sha256_hex(p.as_bytes()), b.as_bytes(), &sha256_hex(b.as_bytes()), SHA_C).unwrap_err();
+        assert!(e.contains("same frozen sweep input"));
+    }
+
+    #[test]
+    fn mismatched_paired_unit_digest_is_rejected() {
+        let p = receipt(&[
+            Spec { budget: "p10", policy: "a", status: "FEASIBLE_FRONTIER", utility: 0.50, latency: 10, energy: 10, reasons: "-" },
+            Spec { budget: "p10", policy: "b", status: "FEASIBLE_DOMINATED", utility: 0.30, latency: 20, energy: 20, reasons: "-" },
+        ]);
+        let mut b = bands(&p, &[("p10", "a", 0.40, 0.60), ("p10", "b", 0.20, 0.40)], "true");
+        b = b.replace(
+            &format!("META\\tpaired_unit_set_sha256\\t{SHA_C}"),
+            &format!("META\\tpaired_unit_set_sha256\\t{SHA_B}"),
+        );
+        let e = analyze(p.as_bytes(), &sha256_hex(p.as_bytes()), b.as_bytes(), &sha256_hex(b.as_bytes()), SHA_C).unwrap_err();
+        assert!(e.contains("paired_unit_set_sha256 differs"));
+    }
+
+    #[test]
+    fn unknown_coverage_scope_is_rejected() {
+        let p = receipt(&[
+            Spec { budget: "p10", policy: "a", status: "FEASIBLE_FRONTIER", utility: 0.50, latency: 10, energy: 10, reasons: "-" },
+            Spec { budget: "p10", policy: "b", status: "FEASIBLE_DOMINATED", utility: 0.30, latency: 20, energy: 20, reasons: "-" },
+        ]);
+        let mut b = bands(&p, &[("p10", "a", 0.40, 0.60), ("p10", "b", 0.20, 0.40)], "true");
+        b = b.replace("ALL_POLICY_BUDGET_POINTS", "ALL_FEASIBLE_POINTS");
+        let e = analyze(p.as_bytes(), &sha256_hex(p.as_bytes()), b.as_bytes(), &sha256_hex(b.as_bytes()), SHA_C).unwrap_err();
+        assert!(e.contains("family-wise simultaneous"));
+    }
+
+    #[test]
+    fn non_finite_interval_bound_is_rejected() {
+        let p = receipt(&[
+            Spec { budget: "p10", policy: "a", status: "FEASIBLE_FRONTIER", utility: 0.50, latency: 10, energy: 10, reasons: "-" },
+            Spec { budget: "p10", policy: "b", status: "FEASIBLE_DOMINATED", utility: 0.30, latency: 20, energy: 20, reasons: "-" },
+        ]);
+        let mut b = bands(&p, &[("p10", "a", 0.40, 0.60), ("p10", "b", 0.20, 0.40)], "true");
+        b = b.replace("BAND\\tp10\\ta\\t0.400000\\t0.600000", "BAND\\tp10\\ta\\tNaN\\t0.600000");
+        let e = analyze(p.as_bytes(), &sha256_hex(p.as_bytes()), b.as_bytes(), &sha256_hex(b.as_bytes()), SHA_C).unwrap_err();
+        assert!(e.contains("must be finite"));
     }
 
     #[test]
