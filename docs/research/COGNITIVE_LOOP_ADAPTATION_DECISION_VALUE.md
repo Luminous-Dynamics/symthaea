@@ -79,6 +79,8 @@ Report these separately:
 - False adaptation rate on nuisance/no-impact shifts.
 - Adaptation benefit persistence after the verification window.
 
+The implemented counterfactual utility scorer is schema v2 and requires all five policy arms. It computes whole-stream and pre/post-window loss, post-shift loss area above the preregistered threshold, recovery cycle/delay, intervention cost, and the primary paired-record effect of staged-verify-rollback versus detector-triggered adaptation on post-shift mean task loss. It also reports benefit-gated and staged effects relative to no-adapt. These are metrics over supplied arm summaries, not yet outputs from a driver-owned real replay.
+
 **Decision quality**
 - Fraction of interventions that improve task loss.
 - Unnecessary intervention rate, harmful intervention rate, missed opportunities, and abstention rate.
