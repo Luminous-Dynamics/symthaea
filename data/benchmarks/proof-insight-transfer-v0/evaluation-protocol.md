@@ -394,3 +394,8 @@ Added `discover_family_leakage_candidates`, which validates the same pinned 372-
 **Every output remains `title_similarity_only` and `unreviewed`.** The discovery output is never auto-converted into a hard dependency edge and never changes the split. The heuristic is designed to prioritize human review; it is not proof of mathematical dependence or actual leakage, and it may miss dependencies with dissimilar titles.
 
 The generated report is produced in runner temporary storage rather than checked in as benchmark evidence. The actual dependency inventory remains incomplete; neither this new tool nor its synthetic CI controls qualify the benchmark holdout.
+### 2026-10-24 amendment — independent artifact-path candidate channel
+
+Added `discover_artifact_path_candidates`, which scans the pinned family's linked artifact paths independently from the title-token triage. Its output includes split labels, source titles, matching paths, shared/rare tokens, overlap score, rarity score and a content digest. A dedicated Draft 2020-12 schema and CI byte-for-byte reproducibility control protect its report.
+
+All path-derived candidates remain `artifact_path_similarity_only` and `unreviewed`; a matching slug does not prove shared artifact bytes, mathematical dependence or contamination. Do not merge path and title scores or tune thresholds on the held-out results without a pre-outcome calibration plan. An independently reviewed real relationship inventory remains mandatory for confirmatory scoring.
