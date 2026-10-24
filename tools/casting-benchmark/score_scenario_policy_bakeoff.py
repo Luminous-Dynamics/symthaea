@@ -441,8 +441,10 @@ def score_document(
     fidelity_costs = document["fidelity_costs"]
     if isinstance(design_count, bool) or not isinstance(design_count, int) or design_count < 75:
         errors.append("top-level design_count must be an integer >=75")
+        design_count = 75
     if isinstance(cost_budget, bool) or not isinstance(cost_budget, int) or cost_budget < 1:
         errors.append("top-level cost_budget must be a positive integer")
+        cost_budget = 1
     if not isinstance(fidelity_costs, dict) or set(fidelity_costs) != {"low", "medium", "high"} or any(isinstance(v, bool) or not isinstance(v, int) or v <= 0 for v in (fidelity_costs.values() if isinstance(fidelity_costs, dict) else [])):
         errors.append("top-level fidelity_costs must define positive integer low/medium/high costs")
         fidelity_costs = {"low": 1, "medium": 5, "high": 25}
