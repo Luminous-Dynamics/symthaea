@@ -49,6 +49,8 @@ pub mod fission_dispatch;
 pub mod fusion_twin;
 pub mod grid;
 pub mod multiscale;
+pub mod mars_mola;
+pub mod mars_tether;
 pub mod nppad_validation;
 pub mod plasma_control;
 pub mod plasma_hdc_encoder;
