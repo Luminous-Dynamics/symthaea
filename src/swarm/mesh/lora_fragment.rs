@@ -800,6 +800,24 @@ mod tests {
         assert!(LoRaFragment::from_bytes(&[]).is_none());
     }
 
+    #[test]
+    fn parser_rejects_every_truncation_of_maximum_sized_frame() {
+        let fragment = fragment(50, &[0xAB; PAYLOAD_SIZE])[0].clone();
+        let mut wire = [0u8; LORA_MTU];
+        let frame_len = fragment.to_bytes(&mut wire);
+        assert_eq!(frame_len, LORA_MTU);
+
+        // Every strict prefix must be rejected, including cuts inside each
+        // header/payload region. The complete frame is the positive control.
+        for truncated_len in 0..frame_len {
+            assert!(
+                LoRaFragment::from_bytes(&wire[..truncated_len]).is_none(),
+                "truncated frame length {truncated_len} must be rejected"
+            );
+        }
+        assert!(LoRaFragment::from_bytes(&wire[..frame_len]).is_some());
+    }
+
     // -- V1 parser rejects non-canonical structural metadata --
 
     #[test]
