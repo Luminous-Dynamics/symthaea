@@ -70,7 +70,8 @@ pub struct AdaptationPanelResult {
     pub missing_cells: Vec<MissingPanelCell>,
     /// True only when every registered dataset × seed × scenario cell is present exactly once.
     pub complete_coverage_gate_pass: bool,
-    /// True only for a complete grid whose every score is linked to a validated replay receipt marked run_kind=replay.
+    /// True only for a complete grid whose every score carries receipt-link metadata marked run_kind=replay.
+    /// This gate does not independently re-read the raw receipts; see interpretation_guard.
     pub receipt_linkage_gate_pass: bool,
     /// No comparison is emitted unless coverage and receipt-linkage gates both pass.
     pub primary_comparison: Option<crate::cognitive_drift_compare::ComparisonResult>,
@@ -311,7 +312,7 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
         complete_coverage_gate_pass,
         receipt_linkage_gate_pass,
         primary_comparison,
-        interpretation_guard: "The primary comparison is emitted only for a complete registered dataset × seed × scenario grid with every score carrying a validated-receipt linkage marked run_kind=replay. Missing coverage or synthetic receipt linkage suppresses the effect estimate. Digests establish artifact consistency, not honest runner execution, oracle sandboxing, or scientific validity; a complete panel is necessary, not sufficient, for SOTA claims.".to_owned(),
+        interpretation_guard: "The primary comparison is emitted only for a complete registered dataset × seed × scenario grid with every score carrying receipt-link metadata marked run_kind=replay. Missing coverage or synthetic receipt linkage suppresses the effect estimate. This panel validates the score digest and receipt-link fields but does not independently re-read raw receipt files. Digests establish artifact consistency, not honest runner execution, oracle sandboxing, or scientific validity; a complete panel is necessary, not sufficient, for SOTA claims.".to_owned(),
     };
     result.result_sha256 = Some(panel_result_digest(&result)?);
     Ok(result)
