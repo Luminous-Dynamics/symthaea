@@ -289,7 +289,7 @@ fn validate_arm_decisions(
             );
             ensure!(
                 arm.deliveries.iter().any(|delivery|
-                    delivery.event_id == *event_id
+                    delivery.event_id.as_str() == event_id.as_str()
                         && delivery.delivered_at_tick <= decision.decision_tick),
                 "arm {} uses event {} before it was delivered",
                 arm.arm_id, event_id
@@ -603,7 +603,8 @@ mod tests {
         arm.decisions[2].action = "commit".to_owned();
         arm.decisions[2].snapshot_sha256 = Some(digest('1'));
         arm.decisions[2].candidate_state_sha256 = Some(digest('2'));
-        assert!(validate_receipt(receipt).unwrap_err().to_string().contains("verification"));
+        arm.decisions[2].verification_evidence_sha256 = None;
+        assert!(validate_receipt(receipt).unwrap_err().to_string().contains("candidate must pass verification"));
     }
 
     #[test]
