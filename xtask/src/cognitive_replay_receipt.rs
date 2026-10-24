@@ -586,6 +586,14 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn executed_replay_requires_per_cycle_task_loss_and_cost() {
+        let mut receipt = valid_receipt();
+        receipt.run_kind = "replay".to_owned();
+        let error = validate_receipt(receipt).expect_err("executed replay cannot omit outcome records");
+        assert!(error.to_string().contains("missing task_loss at tick 0"));
+    }
+
+    #[test]
     fn accepts_delayed_outcomes_with_out_of_order_availability() {
         let mut receipt = valid_receipt();
         receipt.events[0].available_at_tick = 2;
