@@ -93,7 +93,13 @@ fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn token_set(title: &str, tag_re: &Regex, entity_re: &Regex, token_re: &Regex, stop: &BTreeSet<&str>) -> BTreeSet<String> {
+fn token_set(
+    title: &str,
+    tag_re: &Regex,
+    entity_re: &Regex,
+    token_re: &Regex,
+    stop: &BTreeSet<&str>,
+) -> BTreeSet<String> {
     let no_tags = tag_re.replace_all(title, " ");
     let no_entities = entity_re.replace_all(&no_tags, " ");
     token_re
@@ -104,7 +110,15 @@ fn token_set(title: &str, tag_re: &Regex, entity_re: &Regex, token_re: &Regex, s
 }
 
 fn stopwords() -> BTreeSet<&'static str> {
-    "the a an and or nor but of on in to for from with by at as is are was were be been being not does do did every each any all some over under into beyond across between within without against after before through during result results family families conjecture conjectures theorem theorems lemma lemmas proof proofs bound bounds formula formulas problem problems new related general using its their this that".split_whitespace().collect()
+    concat!(
+        "the a an and or nor but of on in to for from with by at as is are was were be been being ",
+        "not does do did every each any all some over under into beyond across between within without ",
+        "against after before through during result results family families conjecture conjectures ",
+        "theorem theorems lemma lemmas proof proofs bound bounds formula formulas problem problems ",
+        "new related general using its their this that"
+    )
+    .split_whitespace()
+    .collect()
 }
 
 fn deterministic_splits(ids: &[String]) -> Result<BTreeMap<String, String>> {
@@ -125,7 +139,13 @@ fn deterministic_splits(ids: &[String]) -> Result<BTreeMap<String, String>> {
     let train_end = ranked.len() * 70 / 100;
     let validation_end = ranked.len() * 85 / 100;
     Ok(ranked.into_iter().enumerate().map(|(index, (_, id))| {
-        let split = if index < train_end { "train" } else if index < validation_end { "validation" } else { "test" };
+        let split = if index < train_end {
+            "train"
+        } else if index < validation_end {
+            "validation"
+        } else {
+            "test"
+        };
         (id, split.to_owned())
     }).collect())
 }
@@ -249,10 +269,16 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
                 continue;
             }
             let jaccard = shared.len() as f64 / union_count as f64;
-            let rarity = rare.iter().map(|token| {
-                ((families.len() + 1) as f64
-                    / (document_frequency.get(token).copied().unwrap_or(usize::MAX) + 1) as f64).ln()
-            }).sum::<f64>();
+            let rarity = rare
+                .iter()
+                .map(|token| {
+                    let frequency = document_frequency
+                        .get(token)
+                        .copied()
+                        .unwrap_or(usize::MAX);
+                    ((families.len() + 1) as f64 / (frequency + 1) as f64).ln()
+                })
+                .sum::<f64>();
             if jaccard < MIN_JACCARD && rarity < MIN_RARITY_SCORE {
                 continue;
             }
@@ -396,7 +422,13 @@ mod tests {
         let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
         let token = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").unwrap();
         let stop = stopwords();
-        let tokens = token_set("The <i>log</i> abundance &amp; theorem", &tag, &entity, &token, &stop);
+        let tokens = token_set(
+            "The <i>log</i> abundance &amp; theorem",
+            &tag,
+            &entity,
+            &token,
+            &stop,
+        );
         assert!(tokens.contains("log"));
         assert!(tokens.contains("abundance"));
         assert!(!tokens.contains("the"));
