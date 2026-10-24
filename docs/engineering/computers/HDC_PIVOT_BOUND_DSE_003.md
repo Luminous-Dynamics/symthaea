@@ -34,8 +34,9 @@ Axes:
 - deterministic random corpus / query control;
 - eight-cluster synthetic corpus and query near cluster 5;
 - 2/4/8 pivot metadata entries per candidate.
+- Two pivot selectors: a cheap evenly-spaced ID control and farthest-first/maximin selection.
 
-Pivots are sampled as evenly spaced cluster/corpus representatives. Each candidate stores one u16 Hamming distance per pivot (4, 8 or 16 bytes per candidate). This is much smaller than 2,048 bytes per vector, but it adds index-construction work, a metadata scan and per-query pivot distances. The benchmark times index construction separately from query latency so amortization can be calculated from actual results.
+The clustered corpus is interleaved by cluster member rank, so equal index strides do not reliably select representatives from different clusters. Farthest-first selection greedily chooses the candidate farthest from its nearest selected pivot. Each candidate stores one u16 Hamming distance per pivot (4, 8 or 16 bytes per candidate). This is much smaller than 2,048 bytes per vector, but index selection/construction, metadata scans and per-query pivot distances still cost work. The benchmark times complete selector-plus-index construction separately from query latency so amortization can be calculated from actual results.
 
 The timed search includes query-signature and lower-bound buffer creation, because allocations are part of its current implementation. It does not yet model persistent scratch-buffer reuse; that is a follow-up only if this first version shows promise.
 
@@ -51,7 +52,7 @@ The timed search includes query-signature and lower-bound buffer creation, becau
 
 Pivot bounds are not expected to help uniformly. Random high-dimensional Hamming vectors concentrate near half the dimensions; a small number of pivots can yield weak lower bounds, in which case metadata work is overhead. This negative control is mandatory.
 
-The clustered fixture is deliberately structured: eight anchors define groups, candidates within each group are deterministic perturbations of their anchor, and the query is near a member of cluster 5. Using all eight anchor pivots may separate clusters; 2 or 4 pivots test whether fewer signatures suffice. This synthetic case does not represent an arbitrary production embedding distribution.
+The clustered fixture is deliberately structured but interleaved: eight anchors define groups, candidates within each group are deterministic perturbations of their anchor, and members are interwoven so corpus-order sampling cannot simply pick one pivot per cluster. The query is near a member of cluster 5. The comparison tests whether farthest-first pivot selection adds value over fixed index-stride selection. This synthetic case does not represent an arbitrary production embedding distribution.
 
 Continue only if the exact path:
 1. preserves exact IDs/distances on random, clustered and tie fixtures;
@@ -78,15 +79,23 @@ No Rust compilation, Criterion timing, physical cache/DRAM traffic, energy, RTL,
 
 ## Independent mathematical reference pilot (not Rust execution)
 
-An independent Python integer-bit model used 16,384-bit vectors, the same eight-anchor clustered construction, the same evenly spaced pivot policy, and exhaustive exact Hamming top-1 as oracle. The model verified identical winner ID and distance for every pivot count. At 16,384 candidates:
+An independent Python integer-bit model used 16,384-bit vectors, eight deterministic anchors, the same interleaved-cluster construction, the same two selectors, the same bound formula and exhaustive Hamming top-1 as oracle. Every exact winner ID and distance matched the oracle.
 
-| Corpus profile | Pivots | Full-vector evaluations | Signature payload |
-|---|---:|---:|---:|
-| Random control | 2 | 16,382 / 16,384 (99.99%) | 64 KiB |
-| Random control | 4 | 16,381 / 16,384 (99.98%) | 128 KiB |
-| Random control | 8 | 16,376 / 16,384 (99.95%) | 256 KiB |
-| Eight-cluster fixture | 2 | 3,525 / 16,384 (21.51%) | 64 KiB |
-| Eight-cluster fixture | 4 | 468 / 16,384 (2.86%) | 128 KiB |
-| Eight-cluster fixture | 8 | 32 / 16,384 (0.20%) | 256 KiB |
+At 16,384 candidates:
 
-This is a candidate-vector evaluation count, not elapsed time, physical memory traffic or energy. The random control is deliberately negative: nearly every candidate still needs full evaluation, so metadata scanning is likely overhead there. The synthetic clustered case demonstrates that pivot count and data geometry can dramatically change the amount of exact work, but it is not representative proof for production traces. Python's PRNG generated the reference vectors, so the model does not test Rust `BinaryHV::random`, Rust source correctness or a compiled benchmark. The Rust target must reproduce equivalent results and then show actual latency improvement before any win can be claimed.
+| Corpus profile | Selector | Pivots | Full-vector evaluations | Signature payload |
+|---|---|---:|---:|---:|
+| Random control | Evenly spaced | 2 | 16,382 / 16,384 (99.99%) | 64 KiB |
+| Random control | Farthest-first | 2 | 16,383 / 16,384 (99.99%) | 64 KiB |
+| Random control | Evenly spaced | 4 | 16,381 / 16,384 (99.98%) | 128 KiB |
+| Random control | Farthest-first | 4 | 16,380 / 16,384 (99.98%) | 128 KiB |
+| Random control | Evenly spaced | 8 | 16,376 / 16,384 (99.95%) | 256 KiB |
+| Random control | Farthest-first | 8 | 16,376 / 16,384 (99.95%) | 256 KiB |
+| Interleaved clusters | Evenly spaced | 2 | 2,363 / 16,384 (14.42%) | 64 KiB |
+| Interleaved clusters | Farthest-first | 2 | 2,173 / 16,384 (13.26%) | 64 KiB |
+| Interleaved clusters | Evenly spaced | 4 | 1,556 / 16,384 (9.50%) | 128 KiB |
+| Interleaved clusters | Farthest-first | 4 | 727 / 16,384 (4.44%) | 128 KiB |
+| Interleaved clusters | Evenly spaced | 8 | 1,389 / 16,384 (8.48%) | 256 KiB |
+| Interleaved clusters | Farthest-first | 8 | 24 / 16,384 (0.15%) | 256 KiB |
+
+The diagnostic counts how many candidate vectors require complete exact Hamming evaluation. It does not measure latency, physical memory traffic or energy. The model supports two limited conclusions: the bound is almost useless on this random 16K-bit control, and pivot selection quality materially affects the deliberately clustered fixture. That matches known limitations of metric-pivot indexing under high-dimensional distance concentration; it is not a novelty or SOTA claim. Python's PRNG generated the reference vectors, so this does not test Rust `BinaryHV::random`, Rust source correctness or a compiled benchmark. The Rust target must reproduce exact results and show measured latency improvement after selector, index-build, metadata and allocation costs before any win can be claimed.
