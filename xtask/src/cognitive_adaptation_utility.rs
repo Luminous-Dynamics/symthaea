@@ -131,7 +131,7 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<CounterfactualUtilityScore> 
 pub fn score_counterfactual_utility(
     mut input: CounterfactualUtilityInput,
 ) -> anyhow::Result<CounterfactualUtilityScore> {
-    ensure!(input.schema_version == 1, "counterfactual utility schema_version must be 1");
+    ensure!(input.schema_version == 2, "counterfactual utility schema_version must be 2");
     nonempty(&input.dataset_id, "dataset_id")?;
     nonempty(&input.stream_id, "stream_id")?;
     nonempty(&input.scenario_id, "scenario_id")?;
