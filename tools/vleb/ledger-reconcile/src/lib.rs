@@ -555,6 +555,176 @@ mod tests {
     }
 
     #[test]
+    fn amount_tokens_must_be_canonical_ascii_integers() {
+        for amount in ["+1", " 1", "1 ", "1.0", "1e2", "١"] {
+            let input = format!(
+                "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,{amount}\n"
+            );
+            assert!(
+                reconcile_csv(&input).is_err(),
+                "amount token {amount:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn equal_maximum_credit_and_debit_are_valid_without_net_overflow() {
+        let input = format!(
+            "transaction_id,account_id,side,amount_minor\nTX-C,AC-1,CREDIT,{}\nTX-D,AC-1,DEBIT,{}\n",
+            u64::MAX,
+            u64::MAX
+        );
+        let report = reconcile_csv(&input).expect("separate checked totals fit");
+        assert_eq!(report.credits_minor, u64::MAX);
+        assert_eq!(report.debits_minor, u64::MAX);
+        assert_eq!(report.net_minor, 0);
+        assert_eq!(report.accounts[0].net_minor, 0);
+    }
+
+    #[test]
+    fn transaction_order_does_not_change_the_result() {
+        let lines: Vec<&str> = INPUT.trim_end_matches('\n').lines().collect();
+        let mut reversed = String::new();
+        reversed.push_str(lines[0]);
+        reversed.push('\n');
+        for line in lines[1..].iter().rev() {
+            reversed.push_str(line);
+            reversed.push('\n');
+        }
+        let original = reconcile_csv(INPUT).expect("original fixture is valid");
+        let reordered = reconcile_csv(&reversed).expect("permuted fixture is valid");
+        assert_eq!(original, reordered);
+    }
+
+    #[test]
+    fn repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity() {
+        let header = "transaction_id,account_id,side,amount_minor\n";
+        let row = "TX-1,AC-1,CREDIT,10\n";
+        let mut input = header.to_owned();
+        for _ in 0..100 {
+            input.push_str(row);
+        }
+        let report = reconcile_csv(&input).expect("repeated exact rows are valid");
+        assert_eq!(report.credits_minor, 10);
+        assert_eq!(report.unique_transactions, 1);
+        assert_eq!(report.exact_duplicate_rows_ignored, 99);
+    }
+
+    #[test]
+    fn deterministic_generated_ledgers_match_independent_reference_reducer() {
+        // This reference reducer deliberately uses a linear Vec lookup instead of the
+        // implementation's HashMap/BTreeMap path. A fixed LCG seed makes every case
+        // reproducible while exploring many account/side/amount combinations.
+        for case in 0u64..64 {
+            let mut seed = 0x5eed_cafe_f00d_u64 ^ case;
+            let mut generated: Vec<(String, String, Side, u64)> = Vec::new();
+            let count = 20 + (case % 45) as usize;
+
+            for index in 0..count {
+                seed = seed
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                let account_id = format!("AC-{:02}", (seed >> 32) % 7);
+                seed = seed
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                let side = if seed & 1 == 0 { Side::Credit } else { Side::Debit };
+                seed = seed
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                let amount = (seed % 1_000_000) + 1;
+                generated.push((
+                    format!("TX-{case:02}-{index:04}"),
+                    account_id,
+                    side,
+                    amount,
+                ));
+                if index % 9 == 0 {
+                    let duplicate = generated.last().expect("just inserted").clone();
+                    generated.push(duplicate);
+                }
+            }
+
+            let mut csv = String::from("transaction_id,account_id,side,amount_minor\n");
+            for (transaction_id, account_id, side, amount) in &generated {
+                let side_text = match side {
+                    Side::Credit => "CREDIT",
+                    Side::Debit => "DEBIT",
+                };
+                csv.push_str(&format!(
+                    "{transaction_id},{account_id},{side_text},{amount}\n"
+                ));
+            }
+
+            let mut accepted: Vec<(String, String, Side, u64)> = Vec::new();
+            let mut duplicate_count = 0u64;
+            let mut oracle_accounts: BTreeMap<String, (u64, u64, u64)> = BTreeMap::new();
+
+            for transaction in &generated {
+                if let Some(previous) = accepted
+                    .iter()
+                    .find(|previous| previous.0 == transaction.0)
+                {
+                    assert_eq!(previous, transaction, "generator only emits exact duplicates");
+                    duplicate_count += 1;
+                    continue;
+                }
+
+                accepted.push(transaction.clone());
+                let account = oracle_accounts
+                    .entry(transaction.1.clone())
+                    .or_insert((0, 0, 0));
+                match &transaction.2 {
+                    Side::Credit => account.0 += transaction.3,
+                    Side::Debit => account.1 += transaction.3,
+                }
+                account.2 += 1;
+            }
+
+            let expected_accounts: Vec<AccountReport> = oracle_accounts
+                .into_iter()
+                .map(|(account_id, (credits, debits, count))| AccountReport {
+                    account_id,
+                    credits_minor: credits,
+                    debits_minor: debits,
+                    net_minor: i128::from(credits) - i128::from(debits),
+                    unique_transactions: count,
+                })
+                .collect();
+            let expected_credits: u64 = expected_accounts.iter().map(|a| a.credits_minor).sum();
+            let expected_debits: u64 = expected_accounts.iter().map(|a| a.debits_minor).sum();
+            let expected_unique: u64 = expected_accounts.iter().map(|a| a.unique_transactions).sum();
+
+            let report = reconcile_csv(&csv).expect("generated ledger should reconcile");
+            assert_eq!(report.accounts, expected_accounts, "case {case}");
+            assert_eq!(report.credits_minor, expected_credits, "case {case}");
+            assert_eq!(report.debits_minor, expected_debits, "case {case}");
+            assert_eq!(
+                report.net_minor,
+                i128::from(expected_credits) - i128::from(expected_debits),
+                "case {case}"
+            );
+            assert_eq!(report.unique_transactions, expected_unique, "case {case}");
+            assert_eq!(
+                report.exact_duplicate_rows_ignored,
+                duplicate_count,
+                "case {case}"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_quoting_and_unterminated_fields_are_rejected() {
+        for input in [
+            "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,1\"x\n",
+            "transaction_id,account_id,side,amount_minor\n\"TX-1,AC-1,CREDIT,1\n",
+            "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,\"1",
+        ] {
+            assert!(reconcile_csv(input).is_err(), "malformed CSV should fail: {input:?}");
+        }
+    }
+
+    #[test]
     fn bare_carriage_return_is_rejected() {
         let input = "transaction_id,account_id,side,amount_minor\rTX-1,AC-1,CREDIT,1";
         assert!(reconcile_csv(input).is_err());
