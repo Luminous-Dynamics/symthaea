@@ -957,5 +957,128 @@
     "caveat": "Published external records only; not a Symthaea run or controlled cross-hardware comparison."
   },
   "last_research_update_utc": "2026-10-24",
-  "last_research_note": "Added a separate random-3-regular QAOA-enhanced greedy reproduction track. Bare minimum-degree greedy is not the sufficient classical SOTA comparison on regular graphs: include Marino-Kirkpatrick linear-prioritized search. No official repository surfaced in the source search, so reproduction remains planned and no paper result is claimed."
+  "last_research_note": "Added a separate random-3-regular QAOA-enhanced greedy reproduction track. Bare minimum-degree greedy is not the sufficient classical SOTA comparison on regular graphs: include Marino-Kirkpatrick linear-prioritized search. No official repository surfaced in the source search, so reproduction remains planned and no paper result is claimed.",
+  "external_baseline_snapshot": {
+    "snapshot_id": "QOBLIB-MIS-BASELINES-2026-10-19",
+    "repository": "ZIB-AOPT/QOBLIB",
+    "commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+    "commit_date_utc": "2026-10-19T09:52:56Z",
+    "purpose": "Pin representative public comparison records and the current best-known table separately from the graph-instance inventory.",
+    "sources": {
+      "CONTRIBUTING.md": {
+        "git_blob_sha1": "5b0bcc30ea1eb1c62530b22deb6a934d25e7382b",
+        "size_bytes": 25905,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/CONTRIBUTING.md"
+      },
+      "07-independentset/instances/farm.gph": {
+        "git_blob_sha1": "ae103bba88413c1a8eafdeddd07ba5fe69fddc8d",
+        "size_bytes": 291,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/farm.gph"
+      },
+      "07-independentset/instances/chesapeake.gph": {
+        "git_blob_sha1": "3e3754fe393d4e239359c872c0b4aa9cbcfc1716",
+        "size_bytes": 1303,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/chesapeake.gph"
+      },
+      "07-independentset/submissions/20260806_ParallelILS_Hegade/README.md": {
+        "git_blob_sha1": "e1e5a5fbb4e148d4adcf021202314406584ccff8",
+        "size_bytes": 4250,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260806_ParallelILS_Hegade/README.md"
+      },
+      "07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/README.md": {
+        "git_blob_sha1": "31cfc42f73f6760402f5d7bdfdd8cb54256f6677",
+        "size_bytes": 1355,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/README.md"
+      },
+      "07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/README.md": {
+        "git_blob_sha1": "3b5257cf1219644412ccbd866370ae50aaa1b403",
+        "size_bytes": 1646,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/README.md"
+      },
+      "07-independentset/solutions/README.md": {
+        "git_blob_sha1": "001ecfcab4e9147dc1a8f92a6027863660034f7a",
+        "size_bytes": 4291,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/solutions/README.md"
+      }
+    },
+    "qoblib_native_runtime_semantics": {
+      "reference": "CONTRIBUTING.md at the pinned commit",
+      "report_total_runtime_cpu_gpu_qpu_other_hardware_runtime": true,
+      "compilation_and_queue_time_included_in_native_runtime": false,
+      "time_series_optional": true,
+      "stochastic_run_recommendation": "10 or more trials recommended; at least 5 required by current contributor guide",
+      "all_in_cost_reporting": "Symthaea must report a separate all-in operational metric including its explicit cost boundary; do not silently substitute it for QOBLIB-native runtime."
+    },
+    "reported_records": [
+      {
+        "instance_id": "farm",
+        "algorithm": "Cooperative parallel ILS (classical)",
+        "objective": 10,
+        "best_known": 10,
+        "successful_runs": 10,
+        "total_runs": 10,
+        "reported_total_runtime_seconds": 0.0004,
+        "hardware": "Apple M5 Max arm64, 48 GB RAM, 18 CPU cores; C++ clang -O3 -march=native",
+        "source_path": "07-independentset/submissions/20260806_ParallelILS_Hegade/README.md",
+        "source_commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+        "qualification": "Published upstream record; not independently reproduced by Symthaea."
+      },
+      {
+        "instance_id": "es60fst02",
+        "algorithm": "Cooperative parallel ILS (classical)",
+        "objective": 88,
+        "best_known": 88,
+        "successful_runs": 10,
+        "total_runs": 10,
+        "reported_total_runtime_seconds": 0.0006,
+        "hardware": "Apple M5 Max arm64, 48 GB RAM, 18 CPU cores; C++ clang -O3 -march=native",
+        "source_path": "07-independentset/submissions/20260806_ParallelILS_Hegade/README.md",
+        "source_commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+        "qualification": "Published upstream record; not independently reproduced by Symthaea."
+      },
+      {
+        "instance_id": "es60fst02",
+        "algorithm": "HSQC hybrid quantum hardware",
+        "objective": 88,
+        "successful_runs": 5,
+        "total_runs": 5,
+        "reported_total_runtime_seconds": 2.5608,
+        "reported_cpu_seconds": 0.0843,
+        "reported_qpu_seconds": 2.4765,
+        "hardware": "IBM Heron R3 at ibm_aachen; Apple M5 Max CPU single-core classical pre/post",
+        "source_path": "07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/README.md",
+        "source_commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+        "qualification": "Published upstream record on different hardware/algorithm; not controlled head-to-head timing."
+      },
+      {
+        "instance_id": "es60fst02",
+        "algorithm": "QAOA quantum hardware",
+        "objective": 88,
+        "successful_runs": 5,
+        "total_runs": 20,
+        "reported_total_runtime_seconds": 23365.8542,
+        "reported_cpu_seconds": 23287.8542,
+        "reported_qpu_seconds": 78,
+        "hardware": "IBM Heron R3 at ibm_aachen; 32 CPU cores and 128 GB VM for classical compute",
+        "source_path": "07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/README.md",
+        "source_commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+        "qualification": "Published upstream record on different hardware/algorithm; not controlled head-to-head timing."
+      }
+    ],
+    "scientific_caveat": "These records are useful for workload selection, metric conventions and public baselines, but different implementations, machines, trial protocols and reporting boundaries prevent direct causal speedup claims. Re-run all arms under matched conditions before asserting relative advantage."
+  },
+  "paradigm_shift_hypothesis": {
+    "id": "QCOMP-MARGINAL-INFO-001",
+    "hypothesis": "The quantum system should be tested as an information coprocessor inside a fixed reduction wrapper; the treatment is the information source, not an entire unmatched stack.",
+    "required_matched_arms": [
+      "same classical reductions + reducer only",
+      "same reductions + seeded random informer",
+      "same reductions + classical simulated annealing informer",
+      "same reductions + classical population/ILS informer",
+      "same reductions + quantum-informed frozen-vertex score"
+    ],
+    "fairness_contract": "Same graph digest, reduction rules and order, candidate kernel, stopping target, downstream reconstruction, verifier, wall-clock/cost boundary and paired repetition schedule. Charge the classical informer its full compute budget and the quantum arm its complete acquisition cost.",
+    "critical_failure_mode": "A quantum arm that matches the final solution quality but incurs greater all-in cost, or whose gain disappears against a strong classical informer, is not a practical advantage.",
+    "evidence_scope": "This is an experimental hypothesis and design requirement, not a measured result."
+  }
 }
