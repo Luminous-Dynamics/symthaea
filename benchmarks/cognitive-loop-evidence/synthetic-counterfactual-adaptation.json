@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "dataset_id": "synthetic-fixture-not-measured",
   "stream_id": "synthetic-counterfactual-fixture-not-measured",
   "scenario_id": "fixture-only-adaptation-recovery",
@@ -93,5 +93,13 @@
       }
     ],
     "exogenous_stream_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "evaluation_windows": {
+    "pre_shift_start_cycle": 0,
+    "pre_shift_end_cycle": 1,
+    "post_shift_start_cycle": 1,
+    "post_shift_end_cycle": 4,
+    "recovery_loss_threshold": 0.35,
+    "recovery_consecutive_cycles": 2
   }
 }
