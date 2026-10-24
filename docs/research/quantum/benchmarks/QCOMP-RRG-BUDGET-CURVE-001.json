@@ -65,7 +65,8 @@
             "wins": 13,
             "ties": 0,
             "losses": 7
-          }
+          },
+          "mean_expected_best_ratio": 0.4235
         },
         {
           "vertex_count": 100,
@@ -76,7 +77,8 @@
             "wins": 9,
             "ties": 1,
             "losses": 10
-          }
+          },
+          "mean_expected_best_ratio": 0.4261875
         },
         {
           "vertex_count": 200,
@@ -87,7 +89,8 @@
             "wins": 9,
             "ties": 0,
             "losses": 11
-          }
+          },
+          "mean_expected_best_ratio": 0.430078125
         },
         {
           "vertex_count": 500,
@@ -98,7 +101,8 @@
             "wins": 7,
             "ties": 0,
             "losses": 3
-          }
+          },
+          "mean_expected_best_ratio": 0.4307125
         }
       ]
     },
@@ -131,7 +135,8 @@
             "wins": 15,
             "ties": 0,
             "losses": 5
-          }
+          },
+          "mean_expected_best_ratio": 0.4285416666666666
         },
         {
           "vertex_count": 100,
@@ -142,7 +147,8 @@
             "wins": 13,
             "ties": 0,
             "losses": 7
-          }
+          },
+          "mean_expected_best_ratio": 0.4311375000000001
         },
         {
           "vertex_count": 200,
@@ -153,7 +159,8 @@
             "wins": 13,
             "ties": 0,
             "losses": 7
-          }
+          },
+          "mean_expected_best_ratio": 0.43334999999999996
         },
         {
           "vertex_count": 500,
@@ -164,7 +171,8 @@
             "wins": 7,
             "ties": 0,
             "losses": 3
-          }
+          },
+          "mean_expected_best_ratio": 0.4329916666666666
         }
       ]
     },
@@ -197,7 +205,8 @@
             "wins": 15,
             "ties": 1,
             "losses": 4
-          }
+          },
+          "mean_expected_best_ratio": 0.4321983516483517
         },
         {
           "vertex_count": 100,
@@ -208,7 +217,8 @@
             "wins": 16,
             "ties": 0,
             "losses": 4
-          }
+          },
+          "mean_expected_best_ratio": 0.434862912087912
         },
         {
           "vertex_count": 200,
@@ -219,7 +229,8 @@
             "wins": 15,
             "ties": 0,
             "losses": 5
-          }
+          },
+          "mean_expected_best_ratio": 0.4359162087912088
         },
         {
           "vertex_count": 500,
@@ -230,7 +241,8 @@
             "wins": 8,
             "ties": 0,
             "losses": 2
-          }
+          },
+          "mean_expected_best_ratio": 0.43475604395604406
         }
       ]
     },
@@ -263,7 +275,8 @@
             "wins": 15,
             "ties": 3,
             "losses": 2
-          }
+          },
+          "mean_expected_best_ratio": 0.43533325563325564
         },
         {
           "vertex_count": 100,
@@ -274,7 +287,8 @@
             "wins": 16,
             "ties": 0,
             "losses": 4
-          }
+          },
+          "mean_expected_best_ratio": 0.4378759906759906
         },
         {
           "vertex_count": 200,
@@ -285,7 +299,8 @@
             "wins": 16,
             "ties": 0,
             "losses": 4
-          }
+          },
+          "mean_expected_best_ratio": 0.4379320707070707
         },
         {
           "vertex_count": 500,
@@ -296,7 +311,8 @@
             "wins": 9,
             "ties": 0,
             "losses": 1
-          }
+          },
+          "mean_expected_best_ratio": 0.43617089355089356
         }
       ]
     },
@@ -329,7 +345,8 @@
             "wins": 15,
             "ties": 5,
             "losses": 0
-          }
+          },
+          "mean_expected_best_ratio": 0.43799999999999994
         },
         {
           "vertex_count": 100,
@@ -340,7 +357,8 @@
             "wins": 16,
             "ties": 4,
             "losses": 0
-          }
+          },
+          "mean_expected_best_ratio": 0.44049999999999995
         },
         {
           "vertex_count": 200,
@@ -351,7 +369,8 @@
             "wins": 17,
             "ties": 2,
             "losses": 1
-          }
+          },
+          "mean_expected_best_ratio": 0.43975000000000003
         },
         {
           "vertex_count": 500,
@@ -362,7 +381,8 @@
             "wins": 9,
             "ties": 1,
             "losses": 0
-          }
+          },
+          "mean_expected_best_ratio": 0.43739999999999996
         }
       ]
     }
@@ -374,5 +394,15 @@
     "The pooled average is an instance-weighted mixture of the stated size strata; per-size values are reported to reveal heterogeneity.",
     "The graph-level bootstrap interval is exploratory and post-hoc, and is not adjusted for multiple endpoints or algorithm selection.",
     "No wall-clock timings, quantum output, SOTA improvement or quantum advantage are claimed."
-  ]
+  ],
+  "literature_reference": {
+    "title": "Large independent sets on random d-regular graphs with fixed degree d",
+    "authors": "Raffaele Marino and Scott Kirkpatrick",
+    "arxiv": "https://arxiv.org/abs/2003.12293",
+    "degree": 3,
+    "reported_asymptotic_ratio": 0.44533,
+    "reported_uncertainty": 0.000003,
+    "interpretation": "Paper-reported asymptotic independence ratio of the deferred-decision prioritized algorithm as N grows. It is not an upper bound on the maximum independent-set ratio and not a controlled finite-N runtime comparison.",
+    "source_note": "The QGreedy 2026 preprint uses this as the classical linear-time prioritized-search reference."
+  }
 }
