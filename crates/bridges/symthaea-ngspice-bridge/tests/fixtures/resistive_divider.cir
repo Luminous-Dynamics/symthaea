@@ -1,0 +1,8 @@
+* ENG-SPICE-001 deterministic resistive divider fixture
+V1 in 0 DC 10
+R1 in out 1k
+R2 out 0 1k
+.tran 1u 10u
+.measure tran vout_final FIND v(out) AT=10u
+.print tran v(out)
+.end
