@@ -801,7 +801,13 @@ mod tests {
     #[test]
     fn encrypted_only_policy_rejects_plaintext_whole_packet_without_key() {
         let packet = test_packet(39, PEER_A, 0x39);
-        let mut receiver = MeshReceiver::new().with_encryption_required(true);
+        let key = [0x39; 32];
+        let mut receiver = MeshReceiver::new()
+            .with_encryption_key(key)
+            .with_encryption_required(true);
+        // Losing key material must not silently turn encrypted-only into
+        // compatibility/plaintext mode.
+        receiver.set_encryption_key(None);
 
         assert!(receiver.receive_whole(&packet.to_bytes()).is_none());
         assert_eq!(receiver.stats().whole_packets, 0);
