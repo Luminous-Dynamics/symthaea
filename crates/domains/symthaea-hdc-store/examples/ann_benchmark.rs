@@ -1096,6 +1096,9 @@ mod tests {
             .sum();
         assert_eq!(left_queries[1].kind, "hard_neighbor");
         assert_eq!(hard_distance, config.hard_noise_bits);
+        // The stress probe is useful only if the intended source remains exact top-1.
+        let exact_hard_top_one = store.scan_similar(&left_queries[1].vector, 1);
+        assert_eq!(exact_hard_top_one[0].0, hard_anchor as u64);
         assert!(left_queries
             .iter()
             .filter(|query| query.kind == "near_neighbor")
