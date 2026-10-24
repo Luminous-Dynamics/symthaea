@@ -34,6 +34,18 @@ assumed as a universal substrate for animal or unknown communication.
 | `crates/domains/symthaea-broca` native generator | feature-gated / experimental | Intent | Thought-to-text provider. Mock backends and synthetic curricula are test fixtures, never benchmark evidence. |
 | `symthaea-broca` cognitive REPL | disconnected demo | Intent | Uses a mock generator and is not a measured comprehension pipeline. |
 
+## Cetacean research contract
+
+Dolphin and whale work is part of the same evidence ladder, but the acoustic task and input-bandwidth contract must be species/signal-specific. See `docs/research/CETACEAN_COMMUNICATION_RESEARCH_CONTRACT_V1.md` for existing module inventory, data/license admission, profile-specific metrics and next gates.
+
+The safer `CetaceanClassifier::try_new` / `try_classify_audio` paths validate analysis-band Nyquist limits and refuse implicit downsampling via the current linear interpolator. The safer `WhaleSentinel::try_with_config` / `try_process_buffer` paths validate temporal configuration and require the source rate to match the configured sample clock. Older infallible APIs remain for compatibility and do not provide the same input checks.
+
+The shared `symthaea-communication::bioacoustic_corpus` module provides a versioned `BioacousticCorpusManifest` (schema v3), rights-admission evidence, a canonical BLAKE3 manifest identity, annotation bounds/Nyquist checks, source-crop offsets, explicit unscored/ambiguous regions, and cross-split source/session/site/individual leakage checks. `bioacoustic-corpus-preflight` checks declared metadata; `bioacoustic-asset-audit` verifies local file bytes against SHA-256. Neither authenticates legal rights or annotation truth.
+
+The `bioacoustic-event-eval` CLI evaluates a precomputed prediction bundle against Test annotations. It enforces non-overlapping scored source coverage, performs deterministic one-to-one event matching, reports event AP/F1/precision/recall and false alarms per scored hour, and explicitly counts predictions discarded because they fell in unscored regions. It does not run the model or authenticate predictions/threshold provenance. Use per-task metrics and keep unknown intervals out of the negative class, as in established DCASE bioacoustic event-evaluation practice.
+
+High-rate dolphin recordings must not be silently converted to the 44.1 kHz default before click analysis. A successful config check is only input-contract evidence; it does not prove click/whistle detection accuracy, coda classification, communicative meaning or dialogue.
+
 ## Expression policy
 
 Animal playback requires reviewed `ExpressionAuthorization` and `CapabilityLevel::Intent`.
