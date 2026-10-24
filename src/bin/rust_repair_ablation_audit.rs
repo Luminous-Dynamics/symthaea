@@ -290,11 +290,13 @@ fn validate_preregistration(prereg: &Preregistration) -> Result<(), String> {
     for (field, value) in [
         ("model_id", prereg.model_id.as_str()),
         ("budget_id", prereg.budget_id.as_str()),
-        ("randomization_seed", prereg.randomization_seed.as_str()),
     ] {
         if !non_empty(value) {
             return Err(format!("{field} must not be empty"));
         }
+    }
+    if !is_hex(&prereg.randomization_seed, 64) {
+        return Err("randomization_seed must be a 64-character SHA-256 hex seed generated before trial assignment".to_string());
     }
     if !valid_container_image_id(&prereg.container_image_id) {
         return Err("container_image_id must be sha256:<64-hex>".to_string());
@@ -804,10 +806,11 @@ fn resolved_effect(pairs: &[AuditPair]) -> (usize, usize, usize, usize, Option<f
         }
     }
     let ties = resolved_count.saturating_sub(gcs_wins + control_wins);
-    let effect = (resolved_count > 0).then_some(
-        (gcs_passes as f64 / resolved_count as f64 - control_passes as f64 / resolved_count as f64)
-            * 100.0,
-    );
+    let effect = (resolved_count > 0).then(|| {
+        (gcs_passes as f64 / resolved_count as f64
+            - control_passes as f64 / resolved_count as f64)
+            * 100.0
+    });
     (resolved_count, gcs_wins, control_wins, ties, effect)
 }
 
@@ -1300,6 +1303,17 @@ mod tests {
     }
 
     #[test]
+    fn preregistration_rejects_weak_randomization_seed() {
+        let mut prereg = test_preregistration(1);
+        prereg.randomization_seed = "chosen-after-results".to_string();
+        assert!(
+            validate_preregistration(&prereg)
+                .unwrap_err()
+                .contains("64-character SHA-256 hex seed")
+        );
+    }
+
+    #[test]
     fn preregistration_rejects_networked_trials_and_short_bootstrap() {
         let mut prereg = test_preregistration(10);
         prereg.network_policy = "bridge".to_string();
@@ -1587,7 +1601,7 @@ mod tests {
             budget_id: "test-budget".to_string(),
             container_image_id: format!("sha256:{}", "d".repeat(64)),
             network_policy: "none".to_string(),
-            randomization_seed: "seed-locked-before-results".to_string(),
+            randomization_seed: "0123456789abcdef".repeat(4),
             bootstrap_seed: 7,
             bootstrap_resamples: 1_000,
             assignment: (0..repository_count)
@@ -1595,7 +1609,7 @@ mod tests {
                     instance_id: format!("task-{index}"),
                     repository_id: format!("repo-{index}"),
                     first_arm: randomized_first_arm(
-                        "seed-locked-before-results",
+                        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                         &format!("task-{index}"),
                     ),
                 })
