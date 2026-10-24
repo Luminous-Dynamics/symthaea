@@ -154,5 +154,27 @@
     "https://doi.org/10.1145/3801959",
     "https://doi.org/10.1007/s11831-025-10392-8",
     "https://link.springer.com/article/10.1007/s43939-026-00685-5"
-  ]
+  ],
+  "independent_scoring": {
+    "status": "post_run_replay_scorer_added_not_prerun_locked",
+    "implementation": "tools/casting-benchmark/score_scenario_policy_bakeoff.py",
+    "tests": "tools/casting-benchmark/test_score_scenario_policy_bakeoff.py",
+    "input": "The saved JSON produced by tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py.",
+    "receipt_label": "SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
+    "checks": [
+      "Exact top-level/run/evaluation/promotion key sets",
+      "Scenario replay of each recorded low/medium/high observation",
+      "Per-fidelity evaluation counts and cost reconciliation",
+      "Post-promotion observed margin matches the high-fidelity trace",
+      "False-promotion and feasibility-label metrics recomputed",
+      "Exact 2D hypervolume independently recomputed from the finite-pool truth and selected high-fidelity trace",
+      "Per-cell summaries and paired comparisons reconstructed from scored raw run records",
+      "SHA-256 digests of the input result and local source/manifest bytes recorded in the receipt"
+    ],
+    "limitations": [
+      "Receipt hashes are post-run provenance, not a signature or pre-run source lock.",
+      "Replay uses the same analytic scenario implementation as the synthetic truth oracle; it is separate metric/scoring code but not an independently authored physical model.",
+      "A valid receipt proves internal trace/metric consistency only; it does not establish external SOTA, foundry physics or industrial benefit."
+    ]
+  }
 }
