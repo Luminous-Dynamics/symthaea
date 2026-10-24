@@ -337,6 +337,49 @@ fn decide_semantic(
     }
 }
 
+
+/// Estimate the chance of at least one false accept over a corpus.
+///
+/// This Šidák-style calculation assumes every candidate independently has the
+/// same per-candidate false-accept probability. Real HDC corpora can be
+/// correlated, so use this as a diagnostic, not a substitute for empirical
+/// maximum-score calibration on held-out corpora.
+pub fn familywise_false_accept_probability(
+    per_candidate_false_accept_rate: f64,
+    candidate_count: usize,
+) -> Option<f64> {
+    if !per_candidate_false_accept_rate.is_finite()
+        || !(0.0..=1.0).contains(&per_candidate_false_accept_rate)
+    {
+        return None;
+    }
+    if candidate_count == 0 {
+        return Some(0.0);
+    }
+    Some(-((candidate_count as f64) * (-per_candidate_false_accept_rate).ln_1p()).exp_m1())
+}
+
+/// Convert a target corpus-level false-accept probability into a per-candidate
+/// probability under an independent-candidate null model.
+///
+/// For a correlated corpus, this is only a theoretical starting point. The
+/// acceptance threshold still needs empirical held-out calibration.
+pub fn per_candidate_rate_for_familywise_target(
+    familywise_target: f64,
+    candidate_count: usize,
+) -> Option<f64> {
+    if !familywise_target.is_finite()
+        || !(0.0..=1.0).contains(&familywise_target)
+        || candidate_count == 0
+    {
+        return None;
+    }
+    if familywise_target == 1.0 {
+        return Some(1.0);
+    }
+    Some(-((-familywise_target).ln_1p() / candidate_count as f64).exp_m1())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,6 +593,34 @@ mod tests {
                 reason: DecisionReason::InvalidPolicy,
             }
         );
+    }
+
+    #[test]
+    fn familywise_risk_accounts_for_corpus_size() {
+        let per_candidate = 0.00135;
+        let single = familywise_false_accept_probability(per_candidate, 1).unwrap();
+        let thousand = familywise_false_accept_probability(per_candidate, 1_000).unwrap();
+        assert!((single - per_candidate).abs() < 1e-12);
+        assert!(thousand > 0.7 && thousand < 0.8);
+        assert_eq!(familywise_false_accept_probability(0.5, 0), Some(0.0));
+    }
+
+    #[test]
+    fn familywise_target_round_trips_under_independent_null() {
+        for count in [1, 10, 1_000, 100_000] {
+            let target = 1e-4;
+            let per_candidate = per_candidate_rate_for_familywise_target(target, count).unwrap();
+            let recovered = familywise_false_accept_probability(per_candidate, count).unwrap();
+            assert!((recovered - target).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn invalid_familywise_inputs_are_rejected() {
+        assert_eq!(familywise_false_accept_probability(f64::NAN, 10), None);
+        assert_eq!(familywise_false_accept_probability(1.1, 10), None);
+        assert_eq!(per_candidate_rate_for_familywise_target(0.01, 0), None);
+        assert_eq!(per_candidate_rate_for_familywise_target(-0.01, 10), None);
     }
 
     #[test]
