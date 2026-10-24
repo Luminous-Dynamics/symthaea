@@ -602,32 +602,54 @@ impl CognitiveLoopService {
         }
     }
 
-    /// Return a comparable finite MSE only when both embedding states are present
-    /// and share the same non-empty dimension. A missing or incompatible state is
-    /// absence of evidence, not a zero-error prediction.
+    /// Compute typed embedding prediction evidence for this observation cycle.
+    /// Failure modes remain distinct instead of collapsing to `None`, which used
+    /// to lose the difference between a cold start, malformed input, and a bad
+    /// numerical comparison.
     fn compute_prediction_error_evidence(
         current: &[f32],
         previous: Option<&[f32]>,
-    ) -> Option<f32> {
-        let previous = previous?;
-        if current.is_empty() || current.len() != previous.len() {
-            return None;
-        }
-        if current
-            .iter()
-            .chain(previous.iter())
-            .any(|value| !value.is_finite())
-        {
-            return None;
-        }
+        observation_cycle: u64,
+    ) -> super::types::PredictionErrorEvidence {
+        use super::types::PredictionEvidenceStatus as Status;
 
-        let error = current
-            .iter()
-            .zip(previous.iter())
-            .map(|(current, previous)| (current - previous).powi(2))
-            .sum::<f32>()
-            / current.len() as f32;
-        error.is_finite().then_some(error)
+        let (status, value) = match previous {
+            None => (Status::NoPriorPrediction, None),
+            Some(previous) if current.is_empty() || previous.is_empty() => {
+                (Status::EmptyObservation, None)
+            }
+            Some(previous) if current.len() != previous.len() => {
+                (Status::DimensionMismatch, None)
+            }
+            Some(previous)
+                if current
+                    .iter()
+                    .chain(previous.iter())
+                    .any(|value| !value.is_finite()) =>
+            {
+                (Status::NonFiniteInput, None)
+            }
+            Some(previous) => {
+                let error = current
+                    .iter()
+                    .zip(previous.iter())
+                    .map(|(current, previous)| (current - previous).powi(2))
+                    .sum::<f32>()
+                    / current.len() as f32;
+                if error.is_finite() {
+                    (Status::Valid, Some(error))
+                } else {
+                    (Status::NonFiniteInput, None)
+                }
+            }
+        };
+
+        super::types::PredictionErrorEvidence::from_comparison(
+            status,
+            value,
+            None,
+            observation_cycle,
+        )
     }
 
     pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
@@ -1116,25 +1138,45 @@ mod prediction_evidence_replay_tests {
     }
 
     #[test]
-    fn embedding_prediction_error_requires_compatible_finite_states() {
-        assert_eq!(CognitiveLoopService::compute_prediction_error_evidence(&[0.1], None), None);
-        assert_eq!(
-            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1])),
-            None
+    fn embedding_prediction_error_reports_specific_evidence_status() {
+        use crate::cognitive_loop::types::PredictionEvidenceStatus as Status;
+
+        let cold_start =
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1], None, 7);
+        assert_eq!(cold_start.status(), Status::NoPriorPrediction);
+        assert_eq!(cold_start.value_for_observation(7), None);
+
+        let empty = CognitiveLoopService::compute_prediction_error_evidence(&[], Some(&[]), 7);
+        assert_eq!(empty.status(), Status::EmptyObservation);
+        assert_eq!(empty.value_for_observation(7), None);
+
+        let mismatch =
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1]), 7);
+        assert_eq!(mismatch.status(), Status::DimensionMismatch);
+        assert_eq!(mismatch.value_for_observation(7), None);
+
+        let non_finite =
+            CognitiveLoopService::compute_prediction_error_evidence(&[f32::NAN], Some(&[0.0]), 7);
+        assert_eq!(non_finite.status(), Status::NonFiniteInput);
+        assert_eq!(non_finite.value_for_observation(7), None);
+
+        let identical = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.1, 0.2],
+            Some(&[0.1, 0.2]),
+            7,
         );
-        assert_eq!(
-            CognitiveLoopService::compute_prediction_error_evidence(&[f32::NAN], Some(&[0.0])),
-            None
-        );
-        assert_eq!(
-            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1, 0.2])),
-            Some(0.0)
-        );
-        let error = CognitiveLoopService::compute_prediction_error_evidence(
+        assert_eq!(identical.status(), Status::Valid);
+        assert_eq!(identical.value_for_observation(7), Some(0.0));
+
+        let mismatch_error = CognitiveLoopService::compute_prediction_error_evidence(
             &[0.1, 0.2],
             Some(&[0.2, 0.3]),
-        )
-        .expect("finite, equal-dimensional states should yield comparable evidence");
+            7,
+        );
+        let error = mismatch_error
+            .value_for_observation(7)
+            .expect("finite, equal-dimensional states should yield comparable evidence");
+        assert_eq!(mismatch_error.status(), Status::Valid);
         assert!((error - 0.01).abs() < 1e-6, "unexpected MSE: {error}");
     }
 
