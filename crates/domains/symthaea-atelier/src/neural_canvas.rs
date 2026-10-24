@@ -122,7 +122,7 @@ impl NeuralCanvas {
         let dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
 
         // Encode key dimensions as level-coded HVs, then bundle
-        let channels: Vec<(f32, &str)> = vec![
+        let mut channels: Vec<(f32, &str)> = vec![
             (snapshot.consciousness_level as f32, "consciousness"),
             (snapshot.valence, "valence"),
             (snapshot.arousal, "arousal"),
@@ -132,8 +132,10 @@ impl NeuralCanvas {
             (snapshot.harmony_activations[0], "harmony_0"),
             (snapshot.harmony_activations[3], "harmony_3"), // InfinitePlay
             (snapshot.harmony_activations[7], "harmony_7"), // SacredStillness
-            (snapshot.prediction_error, "prediction_error"),
         ];
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            channels.push((prediction_error, "prediction_error"));
+        }
 
         let mut result = ContinuousHV::zero(dim);
         for (value, label) in &channels {
