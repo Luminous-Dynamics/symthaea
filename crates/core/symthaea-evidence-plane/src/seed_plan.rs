@@ -137,7 +137,7 @@ impl SeedPlan {
         let mut d = self.development.clone();
         c.sort_unstable();
         d.sort_unstable();
-        crate::config_hash(&(c, d))
+        crate::stable_config_hash(&(c, d))
     }
 }
 

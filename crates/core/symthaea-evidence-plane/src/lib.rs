@@ -88,23 +88,89 @@ impl From<String> for RunId {
     }
 }
 
-/// Canonical, single-implementation config-identity fingerprint.
+/// Legacy config-identity fingerprint retained for compatibility.
 ///
-/// Hashes the `Debug` representation of `config` via `DefaultHasher`. This
-/// is an identity fingerprint for logging/deduplication/dashboards — it is
-/// **not** a cryptographic hash and must never be used for anything
-/// security-sensitive (no collision resistance, no stability guarantee
-/// across Rust versions).
-///
-/// Other code in this workspace should call this instead of reinventing the
-/// same `DefaultHasher`-over-`Debug`-string pattern locally (see the crate
-/// doc comment for the audit finding this closes).
+/// This is intentionally process/toolchain dependent: Rust does not specify
+/// the `DefaultHasher` algorithm as a stable serialization format. It is
+/// suitable only for local diagnostics/deduplication, never for persisted
+/// experiment identity or cross-version reproducibility.
 pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
     let mut hasher = DefaultHasher::new();
     format!("{config:?}").hash(&mut hasher);
     format!("{:x}", hasher.finish())
 }
 
+/// Version identifier for the stable semantic configuration identity contract.
+///
+/// Persist this alongside [`stable_config_hash`] when an evidence record needs
+/// to declare which identity schema produced its digest.
+pub const STABLE_CONFIG_IDENTITY_SCHEMA: &str = "symthaea:stable-config-identity:v1";
+
+/// Stable semantic configuration identity.
+///
+/// The input is first converted to a JSON value, object keys are recursively
+/// sorted, and the canonical JSON bytes are hashed with BLAKE3. This avoids
+/// accidentally inheriting `HashMap` iteration order from a caller's
+/// serialization implementation.
+///
+/// The schema/domain tag is part of the bytes being hashed. Changing this
+/// canonicalization contract therefore requires an explicit version bump rather
+/// than silently producing a different meaning under the same identity scheme.
+///
+/// This is an identity/determinism primitive, not an authorization primitive.
+/// Use the evidence/provenance contracts for security-sensitive commitments.
+pub fn stable_config_hash<T: Serialize>(config: &T) -> String {
+    stable_config_hash_result(config)
+        .expect("stable config serialization must produce a JSON value")
+}
+
+/// Fallible form of the stable semantic configuration identity.
+///
+/// Use this at persistence, ingestion, or externally supplied configuration
+/// boundaries where serialization failure must remain an explicit validation
+/// result rather than becoming a panic.
+pub fn stable_config_hash_result<T: Serialize>(
+    config: &T,
+) -> Result<String, serde_json::Error> {
+    const DOMAIN: &[u8] = b"symthaea:stable-config-identity:v1\0";
+    let value = serde_json::to_value(config)?;
+    let mut bytes = Vec::with_capacity(256);
+    bytes.extend_from_slice(DOMAIN);
+    write_canonical_json(&value, &mut bytes);
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+/// Serialize a JSON value deterministically, recursively sorting object keys.
+fn write_canonical_json(value: &serde_json::Value, out: &mut Vec<u8>) {
+    match value {
+        serde_json::Value::Null => out.extend_from_slice(b"null"),
+        serde_json::Value::Bool(v) => out.extend_from_slice(if *v { b"true" } else { b"false" }),
+        serde_json::Value::Number(v) => out.extend_from_slice(v.to_string().as_bytes()),
+        serde_json::Value::String(v) => {
+            out.extend_from_slice(serde_json::to_string(v).expect("string serialization").as_bytes())
+        }
+        serde_json::Value::Array(values) => {
+            out.push(b'[');
+            for (index, value) in values.iter().enumerate() {
+                if index != 0 { out.push(b','); }
+                write_canonical_json(value, out);
+            }
+            out.push(b']');
+        }
+        serde_json::Value::Object(values) => {
+            let mut entries: Vec<_> = values.iter().collect();
+            entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+            out.push(b'{');
+            for (index, (key, value)) in entries.into_iter().enumerate() {
+                if index != 0 { out.push(b','); }
+                out.extend_from_slice(serde_json::to_string(key).expect("object-key serialization").as_bytes());
+                out.push(b':');
+                write_canonical_json(value, out);
+            }
+            out.push(b'}');
+        }
+    }
+}
 /// A named bag of measured evidence values.
 ///
 /// Backed by `f64` (not `u64`) so it can hold both integer call-counts
@@ -290,7 +356,18 @@ pub fn enforce_integrity(declared: &HashMap<String, Expectation>, measured: &Evi
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunEvidence {
     pub run_id: RunId,
+    /// Legacy/local fingerprint retained for serialized compatibility.
     pub config_hash: String,
+    /// Stable semantic configuration identity, when the run was constructed
+    /// through [`RunEvidence::new_stable`]. Historical records deserialize as
+    /// `None` rather than receiving an invented identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity: Option<String>,
+    /// Schema/domain identifier for [`config_identity`]. Kept separate from
+    /// the digest so consumers cannot confuse an identity value with its
+    /// canonicalization contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity_schema: Option<String>,
     /// Declared expectations, human-readable (`BTreeMap` for deterministic
     /// ordering in exported JSON/logs).
     pub declared: BTreeMap<String, Expectation>,
@@ -318,11 +395,29 @@ impl RunEvidence {
         Self {
             run_id,
             config_hash: config_hash(config),
+            config_identity: None,
+            config_identity_schema: None,
             declared,
             measured,
             satisfied,
             violations,
         }
+    }
+
+    /// Build a `RunEvidence` record with the stable semantic configuration
+    /// identity contract while retaining the legacy fingerprint for backward
+    /// compatibility. This method is additive: old records remain readable,
+    /// and legacy `config_hash` is never silently reinterpreted.
+    pub fn new_stable<T: Serialize>(
+        run_id: RunId,
+        config: &T,
+        declared: BTreeMap<String, Expectation>,
+        measured: EvidenceCounters,
+    ) -> Self {
+        let mut evidence = Self::new(run_id, config, declared, measured);
+        evidence.config_identity = Some(stable_config_hash(config));
+        evidence.config_identity_schema = Some(STABLE_CONFIG_IDENTITY_SCHEMA.to_string());
+        evidence
     }
 
     /// Panic with the recorded violations' `Display` output if this run's
@@ -342,6 +437,62 @@ impl RunEvidence {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stable_config_hash_is_deterministic() {
+        let a = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
+        let b = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 64, "BLAKE3 hex digest must be 256 bits");
+    }
+
+    #[test]
+    fn stable_config_hash_result_rejects_non_json_numbers() {
+        #[derive(Serialize)]
+        struct Unsupported {
+            value: f64,
+        }
+
+        assert!(stable_config_hash_result(&Unsupported { value: f64::NAN }).is_err());
+        assert!(stable_config_hash_result(&Unsupported { value: f64::INFINITY }).is_err());
+    }
+    #[test]
+    fn stable_config_hash_changes_with_semantic_input() {
+        let a = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
+        let b = stable_config_hash(&(vec![100_u64, 101, 103], vec![1_u64, 2]));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn stable_config_hash_is_domain_separated() {
+        let value = serde_json::json!({"a": 1, "b": 2});
+        let mut canonical = Vec::new();
+        write_canonical_json(&value, &mut canonical);
+        let raw = blake3::hash(&canonical).to_hex().to_string();
+        assert_ne!(stable_config_hash(&value), raw);
+    }
+
+    #[test]
+    fn canonical_json_sorts_object_keys_recursively() {
+        let a = serde_json::json!({"outer": {"z": 1, "a": 2}, "first": [3, 4]});
+        let b = serde_json::json!({"first": [3, 4], "outer": {"a": 2, "z": 1}});
+        assert_eq!(stable_config_hash(&a), stable_config_hash(&b));
+    }
+
+    #[test]
+    fn canonical_json_bytes_are_explicitly_stable() {
+        let value = serde_json::json!({
+            "outer": {"z": 1, "a": 2},
+            "first": [3, "x", true, null]
+        });
+        let mut canonical = Vec::new();
+        write_canonical_json(&value, &mut canonical);
+        assert_eq!(
+            String::from_utf8(canonical).unwrap(),
+            r#"{"first":[3,"x",true,null],"outer":{"a":2,"z":1}}"#
+        );
+    }
+
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
@@ -503,6 +654,58 @@ mod tests {
         assert_eq!(round_tripped.config_hash, evidence.config_hash);
         assert_eq!(round_tripped.satisfied, evidence.satisfied);
         assert_eq!(round_tripped.measured, evidence.measured);
+    }
+
+
+    #[test]
+    fn run_evidence_stable_identity_is_explicit_and_versioned() {
+        let mut declared = BTreeMap::new();
+        declared.insert("hdc_ltc_predict".to_string(), Expectation::MustBePositive);
+        let mut measured = EvidenceCounters::new();
+        measured.record("hdc_ltc_predict", 1.0);
+
+        let config = serde_json::json!({
+            "mode": "HdcLtc",
+            "seed": 42,
+            "nested": {"z": 2, "a": 1}
+        });
+        let evidence = RunEvidence::new_stable(
+            RunId::new("stable-identity-run"),
+            &config,
+            declared,
+            measured,
+        );
+
+        assert_eq!(
+            evidence.config_identity_schema.as_deref(),
+            Some(STABLE_CONFIG_IDENTITY_SCHEMA)
+        );
+        assert_eq!(
+            evidence.config_identity.as_deref(),
+            Some(stable_config_hash(&config).as_str())
+        );
+        assert!(!evidence.config_hash.is_empty());
+    }
+
+    #[test]
+    fn run_evidence_legacy_json_deserializes_without_inventing_identity() {
+        let legacy = r#"{
+            "run_id":"legacy-run",
+            "config_hash":"legacy-fingerprint",
+            "declared":{},
+            "measured":{},
+            "satisfied":true,
+            "violations":[]
+        }"#;
+
+        let evidence: RunEvidence = serde_json::from_str(legacy).expect("legacy JSON must read");
+        assert_eq!(evidence.config_hash, "legacy-fingerprint");
+        assert!(evidence.config_identity.is_none());
+        assert!(evidence.config_identity_schema.is_none());
+
+        let reserialized = serde_json::to_string(&evidence).expect("legacy JSON must reserialize");
+        assert!(!reserialized.contains("config_identity"));
+        assert!(!reserialized.contains("config_identity_schema"));
     }
 
     #[test]
