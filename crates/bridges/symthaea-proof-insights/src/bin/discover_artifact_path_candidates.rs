@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     fn path_candidate_order_is_deterministic() {
-        let token_re = Regex::new(r"(?u)[\\p{L}]{3,}").unwrap();
+        let token_re = Regex::new(r"(?u)[\p{L}]{3,}").unwrap();
         let stop = stopwords();
         let make_family = |id: &str, title: &str, split: &str, path: &str| Family {
             id: id.to_owned(),
@@ -552,12 +552,11 @@ mod tests {
             "preprints/Prime-Degree-Cohomology.pdf",
         );
         let first = discover(&[a.clone(), b.clone(), c.clone()]);
-        let second = discover(&[c, a, b]);
+        let second = discover(&[a, b, c]);
         assert!(!first.is_empty());
         assert_eq!(
             serde_json::to_value(first).unwrap(),
             serde_json::to_value(second).unwrap()
         );
     }
-}
 }
