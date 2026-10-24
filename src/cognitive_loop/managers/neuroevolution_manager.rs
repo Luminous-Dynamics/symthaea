@@ -22,6 +22,7 @@ use symthaea_neuroevolution::{
 
 use crate::cognitive_loop::subsystem_trait::{CycleSnapshot, SubsystemOutput};
 use crate::cognitive_loop::thresholds;
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Manager interval (co-prime with other managers).
 pub const NEUROEVOLUTION_MANAGER_INTERVAL: usize = 71;
@@ -85,8 +86,8 @@ pub struct NeuroevolutionManager {
     /// Accumulated observations between manager runs.
     accumulated_psi: Vec<f64>,
     accumulated_prediction_error: Vec<f32>,
-    /// Highest cycle whose PE evidence was admitted (prevents duplicate/stale replay).
-    last_prediction_error_cycle: Option<u64>,
+    /// Prevents duplicate or out-of-order PE samples entering fitness history.
+    prediction_error_cursor: PredictionEvidenceCursor,
     accumulated_confidence: Vec<f64>,
     /// Latest champion topology suggestion.
     champion: ChampionSuggestion,
@@ -122,7 +123,7 @@ impl NeuroevolutionManager {
             initialized: false,
             accumulated_psi: Vec::new(),
             accumulated_prediction_error: Vec::new(),
-            last_prediction_error_cycle: None,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
             accumulated_confidence: Vec::new(),
             champion: ChampionSuggestion::default(),
             pending_mutations: Vec::new(),
@@ -158,14 +159,11 @@ impl NeuroevolutionManager {
 
         // Accumulate observations every cycle
         self.accumulated_psi.push(snapshot.unified_psi);
-        if let Some(prediction_error) = snapshot.prediction_error_sample() {
-            let is_new_cycle = self
-                .last_prediction_error_cycle
-                .map_or(true, |last_cycle| snapshot.cycle_number > last_cycle);
-            if is_new_cycle {
-                self.accumulated_prediction_error.push(prediction_error);
-                self.last_prediction_error_cycle = Some(snapshot.cycle_number);
-            }
+        if let Some(prediction_error) = self
+            .prediction_error_cursor
+            .admit(snapshot.cycle_number, snapshot.prediction_error_sample())
+        {
+            self.accumulated_prediction_error.push(prediction_error);
         }
         self.accumulated_confidence
             .push(snapshot.prediction_confidence);
