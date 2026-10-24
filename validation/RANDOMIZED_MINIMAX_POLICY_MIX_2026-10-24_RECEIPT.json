@@ -37,7 +37,7 @@
   },
   "summary": {
     "path": "validation/randomized_minimax_policy_mix_summary_2026-10-24.json",
-    "git_blob": "53953555f5032d58fa3fdc8d14c9e881e3b545f8"
+    "git_blob": "832e5d76ce95cd6b2f2e710ef9bf4eb2104ee5bb"
   },
   "validation": {
     "combined_local_regression": "69/69_PASS",
@@ -48,7 +48,7 @@
     "result_json_binds_to_source_blob": true,
     "max_primal_dual_gap_bits": 8.881784197001252e-16,
     "external_benchmark_run": false,
-    "remote_ci": "inspect exact final PR head; skipped is not pass"
+    "remote_ci": "At code/artifact commit 125933b2e6446fa913fe9702a9d201b6b1eebc78, combined statuses and PR-triggered workflow runs were empty; no remote pass claimed"
   },
   "scientific_boundary": [
     "16 joint hypotheses; chain/fork structures only",
