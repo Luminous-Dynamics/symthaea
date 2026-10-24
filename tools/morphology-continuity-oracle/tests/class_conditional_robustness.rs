@@ -8,7 +8,8 @@
 //! oracle, not evidence that calibration remains valid under distribution shift or dependence.
 
 const PROBABILITY_SCALE: u16 = 1_000;
-const SIMULTANEOUS_WILSON_Z_95: f64 = 2.772_921_294_608_662;
+const FAMILYWISE_ALPHA: f64 = 0.05;
+const SIMULTANEOUS_CELL_TAIL_ALPHA: f64 = FAMILYWISE_ALPHA / 18.0;
 const MAX_EXACT_F64_INTEGER: u64 = (1_u64 << 53) - 1;
 const EPSILON: f64 = 1.0e-9;
 const PRIOR_WEIGHTS: [u64; 3] = [6, 3, 1];
@@ -21,27 +22,149 @@ struct Interval {
     upper: u16,
 }
 
-/// Wilson interval for one multinomial cell's marginal binomial probability.
-/// Bonferroni's correction is applied across the 9 cells before this helper is called.
-fn wilson_cell_interval(successes: u64, total: u64) -> Option<Interval> {
+const LANCZOS_COEFFICIENTS: [f64; 9] = [
+    0.999_999_999_999_809_93,
+    676.520_368_121_885_1,
+    -1_259.139_216_722_402_8,
+    771.323_428_777_653_1,
+    -176.615_029_162_140_6,
+    12.507_343_278_686_905,
+    -0.138_571_095_265_720_12,
+    9.984_369_578_019_572e-6,
+    1.505_632_735_149_311_6e-7,
+];
+
+/// Natural log of Gamma(x), using the Lanczos approximation for positive x.
+fn log_gamma(value: f64) -> f64 {
+    let shifted = value - 1.0;
+    let mut sum = LANCZOS_COEFFICIENTS[0];
+    for (index, coefficient) in LANCZOS_COEFFICIENTS.iter().enumerate().skip(1) {
+        sum += coefficient / (shifted + index as f64);
+    }
+    let t = shifted + 7.5;
+    0.918_938_533_204_672_7 + (shifted + 0.5) * t.ln() - t + sum.ln()
+}
+
+fn log_binomial_mass(total: u64, successes: u64, probability: f64) -> f64 {
+    if probability <= 0.0 {
+        return if successes == 0 { 0.0 } else { f64::NEG_INFINITY };
+    }
+    if probability >= 1.0 {
+        return if successes == total { 0.0 } else { f64::NEG_INFINITY };
+    }
+    log_gamma(total as f64 + 1.0)
+        - log_gamma(successes as f64 + 1.0)
+        - log_gamma((total - successes) as f64 + 1.0)
+        + successes as f64 * probability.ln()
+        + (total - successes) as f64 * (-probability).ln_1p()
+}
+
+/// P[X >= successes] evaluated from the boundary mass and stable recurrence.
+/// Call at p <= successes / total, where right-tail terms decrease.
+fn binomial_upper_tail(total: u64, successes: u64, probability: f64) -> f64 {
+    if successes == 0 {
+        return 1.0;
+    }
+    if probability <= 0.0 {
+        return 0.0;
+    }
+    if probability >= 1.0 {
+        return 1.0;
+    }
+
+    let mut term = log_binomial_mass(total, successes, probability).exp();
+    if term == 0.0 {
+        return 0.0;
+    }
+    let mut sum = term;
+    for current in successes..total {
+        let ratio = (total - current) as f64 / (current + 1) as f64
+            * probability / (1.0 - probability);
+        term *= ratio;
+        sum += term;
+        if ratio < 1.0 && term <= sum * 1.0e-15 {
+            break;
+        }
+    }
+    sum.min(1.0)
+}
+
+/// P[X <= successes] evaluated from the boundary mass and stable recurrence.
+/// Call at p >= successes / total, where left-tail terms decrease.
+fn binomial_lower_tail(total: u64, successes: u64, probability: f64) -> f64 {
+    if successes >= total {
+        return 1.0;
+    }
+    if probability <= 0.0 {
+        return 1.0;
+    }
+    if probability >= 1.0 {
+        return 0.0;
+    }
+
+    let mut term = log_binomial_mass(total, successes, probability).exp();
+    if term == 0.0 {
+        return 0.0;
+    }
+    let mut sum = term;
+    for current in (1..=successes).rev() {
+        let ratio =
+            current as f64 / (total - current + 1) as f64 * (1.0 - probability) / probability;
+        term *= ratio;
+        sum += term;
+        if ratio < 1.0 && term <= sum * 1.0e-15 {
+            break;
+        }
+    }
+    sum.min(1.0)
+}
+
+/// Two-sided Clopper-Pearson exact binomial interval with per-cell alpha = 0.05 / 9.
+/// The endpoints are found by inverting exact binomial tail probabilities. Outward per-mille
+/// rounding expands rather than narrows the interval, preserving its coverage guarantee.
+fn clopper_pearson_cell_interval(successes: u64, total: u64) -> Option<Interval> {
     if total == 0 || successes > total || total > MAX_EXACT_F64_INTEGER {
         return None;
     }
-    let n = total as f64;
-    let proportion = successes as f64 / n;
-    let z_squared = SIMULTANEOUS_WILSON_Z_95 * SIMULTANEOUS_WILSON_Z_95;
-    let denominator = 1.0 + z_squared / n;
-    let center = (proportion + z_squared / (2.0 * n)) / denominator;
-    let half_width = SIMULTANEOUS_WILSON_Z_95
-        * (proportion * (1.0 - proportion) / n + z_squared / (4.0 * n * n)).sqrt()
-        / denominator;
-    let lower = (center - half_width).clamp(0.0, 1.0);
-    let upper = (center + half_width).clamp(0.0, 1.0);
-    let interval = Interval {
-        lower: (lower * f64::from(PROBABILITY_SCALE)).floor() as u16,
-        upper: (upper * f64::from(PROBABILITY_SCALE)).ceil() as u16,
+
+    let lower = if successes == 0 {
+        0.0
+    } else {
+        let mut low = 0.0;
+        let mut high = successes as f64 / total as f64;
+        for _ in 0..80 {
+            let middle = (low + high) / 2.0;
+            if binomial_upper_tail(total, successes, middle) < SIMULTANEOUS_CELL_TAIL_ALPHA {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+        low
     };
-    if interval.lower > interval.upper || interval.upper > PROBABILITY_SCALE {
+
+    let upper = if successes == total {
+        1.0
+    } else {
+        let mut low = successes as f64 / total as f64;
+        let mut high = 1.0;
+        for _ in 0..80 {
+            let middle = (low + high) / 2.0;
+            if binomial_lower_tail(total, successes, middle) > SIMULTANEOUS_CELL_TAIL_ALPHA {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+        high
+    };
+
+    let scale = f64::from(PROBABILITY_SCALE);
+    let interval = Interval {
+        lower: ((lower * scale - 1.0e-9).floor().max(0.0) as u16).min(PROBABILITY_SCALE),
+        upper: ((upper * scale + 1.0e-9).ceil().max(0.0) as u16).min(PROBABILITY_SCALE),
+    };
+    if interval.lower > interval.upper {
         return None;
     }
     Some(interval)
@@ -87,7 +210,7 @@ fn confusion_intervals(counts: [[u64; 3]; 3]) -> Option<[[Interval; 3]; 3]> {
             return None;
         }
         for (outcome_index, count) in row.iter().enumerate() {
-            regions[class_index][outcome_index] = wilson_cell_interval(*count, total)?;
+            regions[class_index][outcome_index] = clopper_pearson_cell_interval(*count, total)?;
         }
         if row_vertices(regions[class_index]).is_empty() {
             return None;
@@ -259,17 +382,17 @@ fn class_conditional_intervals_are_simultaneous_and_outward_rounded() {
     assert_eq!(
         intervals[0],
         [
-            Interval { lower: 927, upper: 966 },
-            Interval { lower: 34, upper: 73 },
-            Interval { lower: 0, upper: 8 },
+            Interval { lower: 927, upper: 968 },
+            Interval { lower: 32, upper: 73 },
+            Interval { lower: 0, upper: 6 },
         ]
     );
     assert_eq!(
         intervals[1],
         [
-            Interval { lower: 34, upper: 73 },
-            Interval { lower: 927, upper: 966 },
-            Interval { lower: 0, upper: 8 },
+            Interval { lower: 32, upper: 73 },
+            Interval { lower: 927, upper: 968 },
+            Interval { lower: 0, upper: 6 },
         ]
     );
 }
