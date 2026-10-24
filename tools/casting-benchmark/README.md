@@ -8,7 +8,8 @@ This directory contains benchmark-only tooling for CASTING-MO-BO-001. It is not 
 - `docs/research/CASTING_BENCHMARK_RECEIPT.schema.json`: strict JSON Schema for a per-run receipt.
 - `tools/casting-benchmark/validate_receipt.py`: semantic validator for accounting invariants that JSON Schema alone cannot express.
 - `docs/research/CASTING_BENCHMARK_TRACE.schema.json`: versioned JSONL schema for each objective-oracle call.
-- `tools/casting-benchmark/score_trace.py`: independent exact 2D hypervolume scorer that verifies trace/schema/scorer digests and recomputes receipt metrics.
+- `docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json`: immutable suite/instance bounds and scoring convention.
+- `tools/casting-benchmark/score_trace.py`: independent exact 2D hypervolume scorer that verifies protocol/analysis-lock/trace-schema/scorer digests and recomputes receipt metrics.
 - `tools/casting-benchmark/fixtures/success_receipt.fixture.json`: structure-only fixture, **not measured data**.
 - `tools/casting-benchmark/test_validate_receipt.py`: positive and adversarial receipt-validator checks.
 - `tools/casting-benchmark/test_score_trace.py`: known-answer, hash-integrity, archive-invariant and fail-closed trace-scorer tests.
@@ -93,3 +94,6 @@ The v1 scorer accepts only two-objective minimization, single-fidelity traces. F
 The carry-forward applies only after a successful run stopped at a predeclared target; a receipt marked `budget_exhausted` must have exactly B rows. Failed/abstained/incomplete runs are accounted but never accepted as algorithm passes. The ZDT track uses fixed ideal [0,0], reference [1.1,1.1], and normalization area 1.21. The per-run receipt repeats locked ideal/reference values and the independent scorer checks them against its declared objective count and direction.
 
 Do not use this custom AUC in place of COCO's native target-reaching/ECDF analysis. For other objective counts, objective directions or multi-fidelity receipts, v1 rejects the run and requires a separately specified scorer.
+
+
+The analysis lock is versioned separately at `docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json`. A receipt's protocol and analysis-lock hashes must match the exact checked-out bytes, and its per-run ideal/reference points must exactly match the suite+instance contract. The test-only known-answer suite is explicitly fixture-only; real-run mode cannot use its [0,0]/[10,10] range. This prevents an algorithm from inflating its score by selecting an easier per-run reference point.
