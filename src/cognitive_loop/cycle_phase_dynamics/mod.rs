@@ -3019,6 +3019,7 @@ impl CognitiveLoopService {
                     {
                         self.last_prediction = None;
                         self.last_prediction_cycle = None;
+                        self.encoder.clear_prediction();
                         self.set_confidence("inference_mode_init", INFERENCE_MODE_INIT_CONFIDENCE);
                         // Reset world model levels to accept new patterns
                         self.fep.world_model.reset();
