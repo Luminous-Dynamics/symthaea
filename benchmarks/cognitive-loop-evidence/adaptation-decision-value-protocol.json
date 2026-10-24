@@ -170,13 +170,13 @@
   "primary_metrics": [
     {
       "id": "mean_task_loss",
-      "role": "primary task outcome",
+      "role": "secondary descriptive outcome",
       "direction": "lower",
       "metric_source": "counterfactual-utility-v2"
     },
     {
       "id": "post_shift_mean_task_loss",
-      "role": "primary task outcome",
+      "role": "single confirmatory task endpoint",
       "direction": "lower",
       "metric_source": "counterfactual-utility-v2"
     },
@@ -302,7 +302,8 @@
       "threshold_unit": "task_loss_unit",
       "consecutive_cycles_field": "evaluation_windows.recovery_consecutive_cycles",
       "success": "First post-shift cycle beginning a run of the registered number of consecutive task-loss observations at or below threshold.",
-      "censored": "If no qualifying run occurs within the post-shift window, recovery_cycle and recovery_delay_cycles are null."
+      "censored": "If no qualifying run occurs within the post-shift window, recovery_cycle and recovery_delay_cycles are null.",
+      "area_metric_interpretation": "Discrete per-cycle sum of positive excess loss above recovery_loss_threshold; all stream ticks have equal weight in this scorer."
     },
     "output_fields": [
       "mean_task_loss",
