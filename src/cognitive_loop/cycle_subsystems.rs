@@ -821,8 +821,6 @@ mod tests {
         super::super::CycleState {
             compressed_state,
             output,
-            prediction_error: 0.2,
-            prediction_error_valid: true,
             prediction_evidence: PredictionErrorEvidence::valid(0.2, None, 1)
                 .expect("finite fixture evidence"),
             coherence: 0.5,
