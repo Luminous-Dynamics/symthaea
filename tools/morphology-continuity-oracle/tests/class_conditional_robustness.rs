@@ -1574,3 +1574,55 @@ fn impossible_observation_falls_back_to_safe_hold() {
     .expect("valid policy");
     assert_eq!(actions, [0, 1, 1]);
 }
+
+
+#[test]
+fn robust_allocation_value_never_increases_when_predictive_ambiguity_widens() {
+    let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed policy");
+
+    // Nested set 1: each predictive row is the assumed point estimate.
+    let point = predictive_ambiguity_from_rows(
+        [[950, 50, 0], [50, 950, 0], [50, 950, 0]],
+        [[950, 50, 0], [50, 950, 0], [50, 950, 0]],
+    )
+    .expect("point rows are feasible");
+    let point_choice = select_next_calibration_class_robust(
+        counts, point, PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+    )
+    .expect("the point-estimate model has positive value");
+    assert_eq!(point_choice.0, 1);
+    assert!((point_choice.1 - 0.30528).abs() <= EPSILON);
+
+    // Nested set 2 contains every point row above, but admits table/stool reversals.
+    let widened = predictive_ambiguity_from_rows(
+        [[950, 50, 0], [50, 50, 0], [50, 50, 0]],
+        [[950, 50, 0], [950, 950, 0], [950, 950, 0]],
+    )
+    .expect("widened rows are feasible");
+    let widened_choice = select_next_calibration_class_robust(
+        counts, widened, PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+    )
+    .expect("one class retains positive worst-case value");
+    assert_eq!(widened_choice.0, 0);
+    assert!((widened_choice.1 - 0.02544).abs() <= EPSILON);
+    assert!(
+        widened_choice.1 <= point_choice.1 + EPSILON,
+        "widening a nested ambiguity set must not improve the best worst-case value"
+    );
+
+    // Nested set 3 contains set 2 and is broad enough that no sample is robustly valuable.
+    let broad = predictive_ambiguity_from_rows(
+        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+        [[1000, 1000, 0], [1000, 1000, 0], [1000, 1000, 0]],
+    )
+    .expect("broad two-outcome rows are feasible");
+    assert_eq!(
+        select_next_calibration_class_robust(
+            counts, broad, PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+        ),
+        None,
+        "the allocator must abstain when the wider set removes all positive guarantees"
+    );
+}
