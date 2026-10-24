@@ -283,6 +283,74 @@ fn nontrivial_ground_truth(rng: &mut u64, probes: &[Experiment]) -> Expr {
     panic!("could not draw a sane nontrivial ground-truth law within the attempt cap");
 }
 
+/// Construct a held-out target that uses a unary trigonometric operator the typed
+/// algebraic candidate generator does not emit. Sin/Cos selection happens on the evaluator side;
+/// the target expression is never passed to candidate generation or recovery proposals.
+fn nontrivial_unary_ground_truth(rng: &mut u64, probes: &[Experiment]) -> Option<Expr> {
+    let units = demo_units();
+    for _ in 0..GEN_ATTEMPT_CAP {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        // v*t/r is dimensionless: (L/T)*T/L = 1.
+        let phase = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Var("t".to_string())),
+            )),
+            Box::new(Expr::Var("r".to_string())),
+        );
+        let unary = if rand_index(rng, 2) == 0 {
+            UnaryFn::Sin
+        } else {
+            UnaryFn::Cos
+        };
+        let candidate = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(base),
+            Box::new(Expr::Func(unary, Box::new(phase))),
+        );
+        if infer_dimensions(&candidate, &units)
+            != InferenceResult::Inferred(DimensionalSignature::ENERGY)
+        {
+            continue;
+        }
+        let Some(values) = probes
+            .iter()
+            .map(|point| eval_at(&candidate, point))
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        if values
+            .iter()
+            .all(|value| value.abs() > 1.0e-8 && value.abs() < 1.0e6)
+        {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn expr_contains_unary_function(expression: &Expr) -> bool {
+    match expression {
+        Expr::Func(_, _) => true,
+        Expr::BinOp(_, left, right) => {
+            expr_contains_unary_function(left) || expr_contains_unary_function(right)
+        }
+        Expr::Sum(body, _) => expr_contains_unary_function(body),
+        Expr::Var(_) | Expr::Const(_) => false,
+    }
+}
+
 fn functionally_distinct(cand_vals: &[f64], gt_vals: &[f64]) -> bool {
     cand_vals
         .iter()
@@ -775,6 +843,7 @@ struct TrialOutcome {
     recovery_triggered_on_empty_pool: bool,
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
+    unary_function_recovery_candidates: usize,
     accepted_recovery_candidates: usize,
     post_recovery_validation_measurements: usize,
     terminal_pit_alarm: bool,
@@ -805,6 +874,7 @@ fn unresolved_trial_outcome(
         recovery_triggered_on_empty_pool: false,
         typed_recovery_restarts: 0,
         structured_recovery_candidates: 0,
+        unary_function_recovery_candidates: 0,
         accepted_recovery_candidates: 0,
         post_recovery_validation_measurements: 0,
         terminal_pit_alarm,
