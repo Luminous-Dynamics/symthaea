@@ -1826,15 +1826,12 @@ mod tests {
 
         let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
-            |pair| {
-                (if pair.eig_false_singleton { 1.0 } else { 0.0 })
-                    - (if pair.eig_detected { 1.0 } else { 0.0 })
-            },
+            |pair| (if pair.1 { 1.0 } else { 0.0 }) - (if pair.0 { 1.0 } else { 0.0 }),
             0x4549_475f_5355_4343,
         );
         let (round_delta, round_ci_low, round_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
-            |pair| pair.audit_false_singleton as f64 - pair.audit_detected as f64,
+            |pair| pair.3 as f64 - pair.2 as f64,
             0x4549_475f_524f_554e,
         );
         println!(
@@ -1991,24 +1988,9 @@ mod tests {
             );
         }
 
-        println!(concat!(
-            "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},",
-            "initial_reference_hits={initial_reference_hits},",
-            "unresolved_without_recovery={unresolved_without_recovery},",
-            "false_singletons_without_recovery={false_singletons_without_recovery},",
-            "unresolved_after_recovery={unresolved_after_recovery},",
-            "selection_failures_after_recovery={selection_failures_after_recovery},",
-            "baseline_measurements={baseline_measurements},",
-            "recovery_measurements={recovery_measurements},",
-            "runs_with_post_recovery_validation={runs_with_post_recovery_validation},",
-            "total_post_recovery_validation_measurements={total_post_recovery_validation_measurements},",
-            "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
-            "failed_recovery_attempts={failed_recovery_attempts},",
-            "accepted_recovery_candidates={accepted_recovery_candidates},",
-            "false_singletons_after_recovery={false_singletons_after_recovery},",
-            "same_domain_recovered={same_domain_recovered},",
-            "ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
-        ));
+        println!(
+            "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},initial_reference_hits={initial_reference_hits},unresolved_without_recovery={unresolved_without_recovery},false_singletons_without_recovery={false_singletons_without_recovery},unresolved_after_recovery={unresolved_after_recovery},selection_failures_after_recovery={selection_failures_after_recovery},baseline_measurements={baseline_measurements},recovery_measurements={recovery_measurements},runs_with_post_recovery_validation={runs_with_post_recovery_validation},total_post_recovery_validation_measurements={total_post_recovery_validation_measurements},empty_pool_recovery_attempts={empty_pool_recovery_attempts},failed_recovery_attempts={failed_recovery_attempts},accepted_recovery_candidates={accepted_recovery_candidates},false_singletons_after_recovery={false_singletons_after_recovery},same_domain_recovered={same_domain_recovered},ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
+        );
         assert_eq!(
             initial_reference_hits, 0,
             "truth-absent initial pool unexpectedly contains a reference-equivalent candidate"
