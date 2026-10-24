@@ -137,3 +137,22 @@ The output schema is `family-leakage-candidate-discovery.schema.json`. Candidate
 `discover_artifact_path_candidates` scans the manifest's linked artifact paths independently of title similarity. It strips generic directory, filename, publication-date and document-type tokens, computes rare path-token overlap, and emits the actual matching paths alongside shared-token explanations and a content digest. Its output schema is `family-artifact-path-candidate-discovery.schema.json`.
 
 Every row is forced to `artifact_path_similarity_only` and `unreviewed`. Path slugs are metadata, not artifact bytes: overlap does not prove that two families share a source document or a mathematical dependency. The path channel has its own thresholds, output and reproducibility check; do not combine its scores with the title channel without a preregistered calibration.
+
+## Simulation-based power planning
+
+`crates/bridges/symthaea-proof-insights/src/bin/plan_pitb_power.rs` is a deterministic planning simulator for the registered paired, family-clustered exact-target success gate. It accepts the observed or proposed component-size vector instead of treating all theorem families as equally sized, models shared family difficulty with a beta-binomial sensitivity parameter, and reports estimated probability of meeting the preregistered gate:
+
+- observed treatment-minus-control success-rate difference is at least the selected minimum gain (the current research target is +10 percentage points);
+- the approximate 95% cluster-level interval has a lower bound above zero;
+- degenerate zero-width intervals never count as passing.
+
+Example (synthetic planning assumptions only; 20 cluster sizes shown):
+
+```sh
+cargo run --locked --bin plan_pitb_power -- \
+  0.35 0.15 0.10 0.05 \
+  2,3,1,4,2,2,3,1,4,2,3,1,2,4,1,3,2,2,4,1 \
+  10000 12345 power-plan.json
+```
+
+The output is governed by `power-planning-report.schema.json`. Repeat with a sensitivity grid over baseline success, expected gain, and ICC; use the real eligible connected-component sizes once the relationship audit is complete. A power estimate is conditional on this explicit generative model, not proof that the assumed baseline or ICC matches PITB. Do not use synthetic assumptions to claim that the benchmark is powered, and do not tune assumptions after observing held-out outcomes.
