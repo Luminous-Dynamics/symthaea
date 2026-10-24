@@ -282,6 +282,23 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_change_hybrid_encoding() {
+        let genesis = GenesisSeed::from_phrase("hybrid-invalid-pe-boundary");
+        let mut low = CognitiveSnapshot::dormant();
+        low.prediction_error = 0.0;
+        low.prediction_error_valid = false;
+        let mut sentinel = low.clone();
+        sentinel.prediction_error = 1.0;
+
+        let low_hv = HybridController::encode_snapshot(&low, &genesis);
+        let sentinel_hv = HybridController::encode_snapshot(&sentinel, &genesis);
+        assert_eq!(
+            low_hv.values, sentinel_hv.values,
+            "invalid PE payload must be omitted from hybrid HDC encoding"
+        );
+    }
+
+    #[test]
     fn hybrid_generates_multi_layer() {
         let genesis = GenesisSeed::from_phrase("test-hybrid");
         let mut ctrl = HybridController::new(&genesis);
