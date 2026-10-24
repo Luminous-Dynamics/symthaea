@@ -1,0 +1,398 @@
+{
+  "schema_version": "beverage-data-sources-v1",
+  "status": "source_triage_not_a_download_or_rights_clearance_receipt",
+  "source_records": [
+    {
+      "id": "BEER-CHEM-SENSORY-2024",
+      "title": "Data from: Predicting and improving complex beer flavor through machine learning",
+      "uri": "https://zenodo.org/records/10653704",
+      "related_paper": "https://www.nature.com/articles/s41467-024-46346-0",
+      "domain": [
+        "beer",
+        "chemistry",
+        "trained_sensory_panel"
+      ],
+      "stated_scope": "Associated supplementary data and analysis scripts for a study of 250 commercial beers; article reports over 200 chemical features and trained-panel descriptors.",
+      "rights_status": "CHECK_EXACT_RECORD_AND_FILE_TERMS_BEFORE_INGESTION",
+      "restricted_components": [
+        "RateBeer review scores are stated as restricted in the paper; exclude without separate permission."
+      ],
+      "use_gate": "Record exact file names, license/terms, SHA-256, stable sample identifiers, units and missingness before adapter implementation.",
+      "claims_not_supported": [
+        "new-brewery generalization unless group identifiers support it",
+        "fermentation trajectory forecasting",
+        "plant control",
+        "universal consumer preference"
+      ]
+    },
+    {
+      "id": "UCI-WINE-QUALITY-186",
+      "title": "Wine Quality",
+      "uri": "https://archive.ics.uci.edu/dataset/186/wine%2Bquality",
+      "doi": "https://doi.org/10.24432/C56S3T",
+      "license": "CC BY 4.0 as stated by UCI",
+      "domain": [
+        "wine",
+        "physicochemical_features",
+        "quality_score"
+      ],
+      "sample_count": 4898,
+      "predictor_count": 11,
+      "target": "quality score",
+      "rights_status": "PUBLIC_REPOSITORY_LICENSE_REPORTED_CC_BY_4_0",
+      "use_gate": "Record exact archive version and SHA-256; preserve red/white label; use only for a separate static chemistry-to-score baseline.",
+      "known_missing_context": [
+        "brand",
+        "grape type",
+        "vineyard",
+        "vintage",
+        "production site",
+        "process time series"
+      ],
+      "claims_not_supported": [
+        "vintage/site generalization",
+        "fermentation control",
+        "terroir causality",
+        "brand-level preference"
+      ]
+    },
+    {
+      "id": "BIER-BENCHMARK-2025",
+      "title": "2025 Water, Energy, and Emissions Benchmarking Summary",
+      "uri": "https://www.bieroundtable.com/2025-water-energy-and-emissions-benchmarking-summary-bier",
+      "domain": [
+        "brewery",
+        "distillery",
+        "winery",
+        "bottling",
+        "water",
+        "energy",
+        "emissions"
+      ],
+      "published_scope": "BIER reports over 1600 facilities across the 2020, 2022 and 2024 reporting years, stratified by facility type.",
+      "rights_status": "PUBLIC_SUMMARY; CHECK_REPORT_TERMS_BEFORE_REPRODUCTION",
+      "use_gate": "Use as a facility-type-aware comparison reference; do not assume the public summary is a row-level training dataset.",
+      "claims_not_supported": [
+        "causal savings attributable to our optimizer",
+        "universal per-liter target across facility types"
+      ],
+      "published_results": {
+        "reported_water_use_ratio_reduction_percent": 3,
+        "reported_energy_use_ratio_reduction_percent": 4,
+        "reported_emissions_ratio_reduction_percent": 11,
+        "reporting_years": [
+          2020,
+          2022,
+          2024
+        ],
+        "participating_facilities": "more than 1600",
+        "water_risk_context": "more than 60% of facilities face at least medium water risk; more than half projected to face medium-to-extremely-high water stress by 2030",
+        "published_release_date": "2026-04-22",
+        "caveat": "Aggregate sector ratios across reporting facilities; not a matched causal baseline for a single-site intervention or a universal target.",
+        "reported_production_growth_percent": 8,
+        "participating_companies": 15,
+        "continents": 6
+      }
+    },
+    {
+      "id": "PUBLIC-FERMENTATION-SENSOR-GAP-AUDIT",
+      "title": "Standardized alcoholic-fermentation sensor time-series candidates",
+      "uri": "https://doi.org/10.1007/s13197-025-06528-0",
+      "domain": [
+        "beer",
+        "wine",
+        "spirits",
+        "fermentation_time_series",
+        "sensor_monitoring"
+      ],
+      "rights_status": "DISCOVERY_TASK",
+      "stated_gap": "A 2026 review identifies a lack of public standardized fermentation sensor datasets and limited industrial validation.",
+      "use_gate": "Audit and record candidate datasets; this review finding is not proof that no relevant public dataset exists.",
+      "required_fields_for_fit": [
+        "batch_or_lot_id",
+        "timestamp",
+        "prediction_cutoff",
+        "sensor_identity_and_units",
+        "calibration_context",
+        "process_events",
+        "target_measurement_and_method",
+        "rights_and_attribution"
+      ]
+    },
+    {
+      "id": "WINE-TEMPERATURE-DRYAD-2026",
+      "title": "Fermentation temperature as a strategy to limit Hanseniaspora uvarum proliferation during spontaneous wine fermentation",
+      "uri": "https://datadryad.org/dataset/doi:10.5061/dryad.cfxpnvxp3",
+      "doi": "https://doi.org/10.5061/dryad.cfxpnvxp3",
+      "publisher": "Dryad; Onetto, McCarthy and Schmidt",
+      "publication_date": "2026-08-22",
+      "collection_period": "2024-01-01 to 2025-12-01",
+      "location": "Adelaide, South Australia, Australia",
+      "license": "CC0 as stated in Dryad README",
+      "domain": [
+        "wine",
+        "fermentation_time_series",
+        "yeast_ecology",
+        "temperature_response",
+        "microbial_community"
+      ],
+      "dataset_tables": [
+        {
+          "file": "Onetto2026_Figure1_raw_data_final.txt",
+          "rows": 175,
+          "variables": 8,
+          "described_target": "Growth of Hanseniaspora uvarum and Saccharomyces cerevisiae, alone and co-inoculated, in chemically defined grape juice; long-form fields include time, treatment temperature, inoculation, analyte, units, replicate and value."
+        },
+        {
+          "file": "Onetto2026_Figure2_raw_data_final.txt",
+          "rows": 121,
+          "variables": 7,
+          "described_target": "Microbial dynamics of spontaneous Chardonnay must fermentation at 17, 23 and 25 °C."
+        },
+        {
+          "file": "Onetto2026_FigureS1_raw_data_final.txt",
+          "rows": 334,
+          "variables": 6,
+          "described_target": "Freeze-thaw effects on spontaneous Chardonnay fermentation and yeast population; fields include treatment, time_hours, analyte, units, replicate and value."
+        }
+      ],
+      "rights_status": "CC0_STATED_BY_SOURCE_RECORD; VERIFY_DOWNLOAD_AND_PRESERVE_ATTRIBUTION",
+      "use_gate": "Download exact files and README; record file SHA-256, delimiters/headers, NA and ND semantics, units, treatment/replicate structure, analyte families, and whether replicates are biological or technical. Group splits at the fermentation/treatment unit; never treat each time row as independent.",
+      "claims_not_supported": [
+        "generalization across wineries or vintages",
+        "industrial sensor prediction",
+        "consumer sensory preference",
+        "universal temperature optimum",
+        "automatic process control"
+      ],
+      "caveats": [
+        "The web preview exposed file names and metadata but returned 403 for direct file streams; exact source bytes and hashes have not been captured in this pass.",
+        "175, 121 and 334 are the raw table row counts, not counts of independent fermentation batches."
+      ]
+    },
+    {
+      "id": "WINE-KINETICS-FRONTIERS-2026",
+      "title": "Evaluation of wine fermentation dynamics through kinetic analysis",
+      "uri": "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1821488/full",
+      "doi": "https://doi.org/10.3389/fsufs.2026.1821488",
+      "publisher": "Frontiers in Sustainable Food Systems",
+      "publication_date": "2026-05-19",
+      "license": "Article states Creative Commons Attribution (CC BY); inspect supplementary files/terms individually",
+      "domain": [
+        "wine",
+        "fermentation_kinetics",
+        "brix_time_series",
+        "ethanol_time_series",
+        "kinetic_model_reproduction"
+      ],
+      "stated_scope": "Published Brix and ethanol time courses over 0–168 h across selected yeast-inoculum, 20/25/30 °C, initial-sugar and yeast-pre-propagation conditions; paper reports triplicate experiments and propagated uncertainty.",
+      "rights_status": "OPEN_ACCESS_ARTICLE_CC_BY_STATED; SUPPLEMENTARY_FILES_AND_EXTRACTED_DATA_TO_BE_REVIEWED",
+      "use_gate": "Acquire article and supplementary material, preserve table definitions and uncertainty, reconstruct reported kinetic quantities, and compare simple and nonlinear baselines. Do not count triplicates or timepoints as independent external batches.",
+      "claims_not_supported": [
+        "industrial brewery/winery transfer",
+        "site/vintage transfer",
+        "flavor or sensory preference",
+        "universal temperature optimum",
+        "safety certification"
+      ]
+    },
+    {
+      "id": "LAGER-TRANSCRIPTOME-GSE79",
+      "title": "Lager beer fermentation time course transcriptome",
+      "uri": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE79",
+      "discovery_mirror": "https://www.omicsdi.org/dataset/geo/GSE79",
+      "stated_scope": "Archived production-scale lager fermentation yeast transcriptome measured at 12 time points.",
+      "domain": [
+        "beer",
+        "yeast_transcriptomics",
+        "biological_state_time_series"
+      ],
+      "rights_status": "PUBLIC_ARCHIVE_CANDIDATE; VERIFY GEO RECORD AND TERMS",
+      "use_gate": "Pin official GEO sample/platform records and raw/processed file hashes. Treat transcript counts/expressions as biological-state observations; do not conflate with inline temperature, gravity, ethanol, quality or sensory targets.",
+      "claims_not_supported": [
+        "direct finished-beer quality prediction without target linkage",
+        "industrial controller evaluation",
+        "generalization from one time course to multiple breweries"
+      ]
+    },
+    {
+      "id": "SYNTHETIC-BEER-FAULTS-ZENODO-2026",
+      "title": "Synthetic Beer Fermentation Dataset Generation and Hybrid MSPC-ML Case Study in R",
+      "uri": "https://zenodo.org/records/21917783",
+      "publisher": "Zenodo record; Francesch-Domenech, Fernandez-Calviño, Naya-Fernández and Tarrío",
+      "domain": [
+        "beer",
+        "synthetic_fermentation",
+        "fault_injection",
+        "anomaly_detection"
+      ],
+      "evidence_class": "SYNTHETIC",
+      "stated_scope": "Research code and synthetic beer-fermentation data generation, fault injection, PCA-based multivariate statistical process control, XGBoost classification and SHAP interpretation.",
+      "rights_status": "CHECK_EXACT_RECORD_LICENSE_BEFORE_REDISTRIBUTION",
+      "use_gate": "Use for evaluator smoke tests and synthetic anomaly-detector comparisons only after record/license audit; keep synthetic provenance encoded in every output.",
+      "claims_not_supported": [
+        "real-world fault prevalence",
+        "real plant anomaly detection performance",
+        "biological model validity",
+        "resource savings"
+      ]
+    },
+    {
+      "id": "WINE-ML-KB-HYBRID-2026",
+      "title": "Critical assessment of machine learning approaches for classification, dynamic prediction and surrogate modeling in food fermentation",
+      "uri": "https://doi.org/10.1016/j.foodres.2026.118403",
+      "article_uri": "https://www.sciencedirect.com/science/article/pii/S0963996926000773",
+      "publisher": "Food Research International",
+      "publication_date": "2026-04-01",
+      "license": "Open access under a Creative Commons license; confirm exact article/supplement terms before reuse",
+      "domain": [
+        "wine",
+        "fermentation_time_series",
+        "mechanistic_kinetics",
+        "machine_learning",
+        "hybrid_residual_model",
+        "surrogate_model"
+      ],
+      "reported_results": {
+        "knowledge_based_dynamic_prediction_average_nrmse_percent": 6,
+        "ml_with_expanded_data_nrmse_percent": 7.6,
+        "hybrid_knowledge_based_plus_residual_network_test_nrmse_percent": 5,
+        "synthetic_mechanistic_surrogate_nrmse_percent_against_knowledge_based_model": 0.6,
+        "synthetic_surrogate_speedup_factor": 30
+      },
+      "results_context": "Study-specific results: knowledge-based and ML dynamic-prediction comparisons use experimental time-series data; the approximately 0.6% surrogate result is fidelity to the knowledge-based model on synthetic test cases, not real-world fermentation measurement error.",
+      "use_gate": "Reproduce the published data definitions, split strategy, uncertainty and baseline values first. Separate empirical NRMSE from synthetic simulator-fidelity error; compare on same inputs, targets and test units. Treat the hybrid residual network as a candidate, not a presumed winner.",
+      "claims_not_supported": [
+        "universal superiority of mechanistic or ML models",
+        "industrial-site/vintage transfer without separate holdout",
+        "0.6% error against physical fermentation outcomes",
+        "resource savings or food-safety performance"
+      ]
+    },
+    {
+      "id": "INDUSTRIAL-YEAST-FEEDRATE-FIGSHARE-2026",
+      "title": "Industrial baker's yeast fed-batch fermentation nutrient-addition time series",
+      "uri": "https://doi.org/10.6084/m9.figshare.33201579",
+      "code_companion": "https://github.com/tyrone1979/yeast",
+      "publisher": "figshare deposit referenced by the public analysis repository",
+      "dataset_reported_scope": {
+        "production_batches": 59,
+        "hourly_records": 1090,
+        "full_process_batches": 10,
+        "sparse_batches": 49,
+        "target": "sugar_feed_rate_kg_rs_h",
+        "target_unit": "kg reducing sugar per hour",
+        "strain_id": "167"
+      },
+      "reported_reference_result": {
+        "model": "BiLSTM",
+        "validation": "leave-one-batch-out on 10 full-process batches",
+        "held_out_windows": 129,
+        "pooled_mae_kg_rs_h": 99.1193,
+        "pooled_mape_percent": 10.4589,
+        "pooled_r2": 0.901,
+        "caveat": "Numbers are reported in the public code companion; not independently reproduced. Per-batch errors vary materially, and only 10 full-process batches are in this result.",
+        "worst_fold": {
+          "batch_id": "B04",
+          "mape_percent": 32.9842,
+          "mae_kg_rs_h": 146.6107,
+          "rmse_kg_rs_h": 202.4703,
+          "test_windows": 13
+        },
+        "second_notable_fold": {
+          "batch_id": "B05",
+          "mape_percent": 17.9196,
+          "mae_kg_rs_h": 113.6546,
+          "test_windows": 13
+        },
+        "additional_caveat": "Pooled MAPE of about 10.46% masks the B04 held-out batch MAPE of about 32.98%. Report batch-level distributions and worst-batch error rather than only pooled metrics."
+      },
+      "domain": [
+        "industrial_baker_yeast",
+        "fed_batch_fermentation",
+        "nutrient_feed_rate",
+        "process_time_series",
+        "batch_holdout"
+      ],
+      "evidence_class": "REPORTED_ON_PLANT_MEASUREMENTS_IN_SOURCE_DESCRIPTION",
+      "rights_status": "FIGSHARE_LICENSE_AND_DOWNLOAD_TERMS_NOT_YET_VERIFIED",
+      "use_gate": "Verify the Figshare deposit's current license and metadata, download authorized files, record byte-level SHA-256 and column/units dictionary, audit missingness and unusual records, then reproduce the published leave-one-batch-out baseline before any comparison. Review each feature's actual timestamp/availability against the feed-decision cutoff; current-hour target/feature alignment may describe the historical operator policy rather than prospective controllable prediction.",
+      "claims_not_supported": [
+        "beer, wine or spirits performance without separate domain validation",
+        "prospective feed-control benefit from current-hour feed-rate reconstruction",
+        "generalization beyond represented batches or strain",
+        "SOTA superiority without matching the published split, preprocessing and metrics",
+        "industrial resource saving or safe actuator control"
+      ],
+      "next_benchmark": "Compare persistence/last-action, simple regression, tree baseline and sequence models under identical leave-one-batch-out splits; separately score truly next-hour prediction after an explicit feature cutoff, calibration, error by batch, and matched decision value.",
+      "references": [
+        "https://github.com/tyrone1979/yeast",
+        "https://github.com/tyrone1979/yeast/blob/main/usage/results/lobo_metrics.json"
+      ]
+    },
+    {
+      "id": "ABNORMAL-FERMENTATION-ADAPTATION-2026",
+      "title": "Effect of data availability on in-line adaptation of fermentation mechanistic models under abnormal conditions",
+      "uri": "https://doi.org/10.1016/j.ceja.2026.101157",
+      "article_uri": "https://www.sciencedirect.com/science/article/pii/S2666821126001262",
+      "publisher": "Chemical Engineering Journal Advances",
+      "publication_date": "2026-05",
+      "evidence_class": "PUBLISHED_RESULT_CONFIDENTIAL_SOURCE_DATA",
+      "domain": [
+        "industrial_fed_batch_fermentation",
+        "abnormality_detection",
+        "mechanistic_model_adaptation",
+        "substrate_prediction",
+        "product_prediction"
+      ],
+      "reported_scope": {
+        "industrial_contaminated_batches": 30,
+        "process_duration_hours": 32,
+        "measurement_frequency_hours": 4,
+        "states": [
+          "substrate_concentration",
+          "biomass_concentration",
+          "product_concentration"
+        ],
+        "method": "Monod-type kinetics with empirical decay terms; posterior Bayesian parameter inference on truncated post-detection data; genetic-algorithm fitting as more data accumulate; phase-dependent switch"
+      },
+      "reported_results": {
+        "early_sparse_data_bayesian_relative_error_reduction_percent_vs_ga": {
+          "substrate_prediction": 26,
+          "product_prediction": 44
+        },
+        "larger_data_ga_prediction_accuracy_improvement_percent_vs_bayesian": {
+          "substrate_prediction": 25,
+          "product_prediction": 19
+        },
+        "abnormal_batch_final_product_titer_mean_g_l": 87.37,
+        "abnormal_batch_final_product_titer_sd_g_l": 25.22,
+        "simulated_normal_final_product_titer_g_l": 217.9
+      },
+      "rights_status": "ARTICLE_OPEN_ACCESS_CC_BY_STATED; UNDERLYING_INDUSTRIAL_DATA_CONFIDENTIAL",
+      "data_availability": "Article states underlying data are confidential; the full industrial dataset is not a public reproducibility benchmark.",
+      "use_gate": "Treat published numbers as study-specific literature comparators. Build synthetic contract tests from method structure only. Require an open/licensed independent dataset before empirical re-analysis; do not reconstruct private trajectories from figures without checking reuse terms.",
+      "benchmark_value": "A reference for phase-aware estimation under different data availability regimes and model-process mismatch, not a beverage-specific baseline.",
+      "claims_not_supported": [
+        "independent reproduction without source data",
+        "beer/wine/spirits transfer",
+        "the same numeric improvement on a different process",
+        "contamination diagnosis accuracy without detection labels and protocol",
+        "causal production recovery, safer control, or feed-policy benefit",
+        "model superiority on the full industrial data"
+      ],
+      "research_question": "Can a predeclared model-switch policy choose a better-calibrated estimator as the available post-detection prefix grows, while preserving abstention and hard process constraints?"
+    }
+  ],
+  "research_notes": [
+    "Public process-related time-course data exist in research repositories; the gap is not absolute absence but fragmented formats, limited numbers of independent fermentation units, heterogeneous targets, and few standardized industrial sensor streams with aligned batch IDs and quality outcomes.",
+    "Primary intake candidate: Dryad 2026 CC0 wine-temperature/yeast-ecology files, after raw-byte and replicate-structure audit.",
+    "Separate curve-reproduction candidate: 2026 Frontiers wine-kinetics article and supplement; table/uncertainty reproduction is not external validation.",
+    "Transcriptome time courses are biological evidence, not direct process-sensor or final-quality targets.",
+    "Synthetic fermentation data are for pipeline and fault-injection tests only.",
+    "An additional industrial process-data candidate is a baker's-yeast fed-batch dataset (59 batches/1,090 hourly rows reported by its code companion). It is not alcoholic beverage data; use it as an external process-method validation only after the Figshare license and source bytes are verified.",
+    "Reported current-hour feed-rate prediction may not be a prospective control task unless all inputs are proven available before the target decision. Evaluate next-hour and decision-cutoff tasks separately.",
+    "Published 2026 abnormal-fermentation adaptation results use 30 confidential industrial contaminated runs. They motivate the evaluation protocol but cannot be independently reproduced from the cited dataset.",
+    "The novel open benchmark target is decision quality under truncated data and model mismatch: compare fixed estimators and a declared switch policy at each detection prefix, with calibration, abstention and constraint-violation metrics."
+  ]
+}

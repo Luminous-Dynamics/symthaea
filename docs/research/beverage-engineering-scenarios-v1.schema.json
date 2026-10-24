@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/beverage-engineering-scenarios-v1.schema.json",
+  "title": "Beverage Engineering Scenario Corpus V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "description",
+    "source_spec",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "beverage-engineering-scenarios-v1"
+    },
+    "status": {
+      "const": "synthetic_contract_fixtures_not_beverage_measurements"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_spec": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "product",
+          "task",
+          "evidence_class",
+          "expected_disposition",
+          "guards",
+          "primary_metrics",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^BEV-[0-9]{3}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "product": {
+            "enum": [
+              "beer",
+              "wine",
+              "spirits",
+              "cross_beverage"
+            ]
+          },
+          "task": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_class": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "enum": [
+              "ACCEPT_FOR_EVALUATION",
+              "REJECT",
+              "EVALUATE_WITH_SHIFT_REPORT",
+              "INDETERMINATE",
+              "ACCEPT_WITH_SEPARATE_REPORTS",
+              "NOT_COMPARABLE",
+              "INELIGIBLE_FOR_REUSE",
+              "ACCEPT_IF_LINKS_RESOLVE",
+              "FAIL_CALIBRATION_GATE",
+              "REJECT_CLAIM"
+            ]
+          },
+          "guards": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "primary_metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

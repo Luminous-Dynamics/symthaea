@@ -18568,6 +18568,7 @@ dependencies = [
  "rand 0.8.6",
  "rand_distr 0.4.3",
  "rayon",
+ "rustfft",
  "serde",
  "serde_json",
  "sha3",
@@ -18756,6 +18757,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]

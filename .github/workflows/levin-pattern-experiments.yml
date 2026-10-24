@@ -1,0 +1,175 @@
+name: Levin and Abstract Pattern Experiments
+
+on:
+  pull_request:
+    branches: [main, feat/platonic-pattern-interaction-benchmark]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/levin-pattern-experiments.yml"
+      - "crates/core/symthaea-core/src/hdc/pattern_interaction.rs"
+      - "crates/core/symthaea-core/src/hdc/hrr_baseline.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
+      - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
+      - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "crates/domains/symthaea-cell-foundry/**"
+      - "crates/core/symthaea-observation-attestation/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/ABSTRACT_PATTERN_MEMORY_EVALUATION_PLAN.md"
+      - "docs/research/LEVIN_MULTISCALE_EXPERIMENT_PROTOCOL.md"
+      - "docs/research/PLATONIC_PATTERN_INTERACTION_BENCHMARK.md"
+      - "docs/research/SELECTIVE_RETRIEVAL_AND_ABSTENTION_BENCHMARK.md"
+      - "docs/research/IDENTITY_EVIDENCE_GATED_RETRIEVAL.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/levin-pattern-experiments.yml"
+      - "crates/core/symthaea-core/src/hdc/pattern_interaction.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
+      - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
+      - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "crates/domains/symthaea-cell-foundry/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: levin-pattern-experiments-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  research-experiments:
+    name: Reproducible Research Experiments
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-research-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/pattern_interaction.rs', 'crates/domains/symthaea-cell-foundry/examples/levin_multiscale_experiments.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-research-${{ hashFiles('Cargo.lock') }}-
+
+      - name: Capture run identity
+        run: |
+          mkdir -p research-results
+          {
+            echo "commit_sha=$(git rev-parse HEAD)"
+            echo "event=${GITHUB_EVENT_NAME}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "kernel=$(uname -srmo)"
+          } | tee research-results/run-metadata.txt
+
+      - name: Resolve workspace metadata and capture lockfile drift
+        run: |
+          cargo metadata --format-version 1 >/dev/null
+          if ! git diff --quiet -- Cargo.lock; then
+            git diff -- Cargo.lock > research-results/Cargo.lock-resolution.patch
+            echo "LOCKFILE_DRIFT=true" > research-results/lockfile-drift.txt
+            cat research-results/Cargo.lock-resolution.patch
+          else
+            echo "LOCKFILE_DRIFT=false" > research-results/lockfile-drift.txt
+          fi
+
+      - name: Verify HDC pattern invariants and retrieval tests
+        run: cargo test --locked --release -p symthaea-core pattern_interaction -- --nocapture
+
+      - name: Verify HRR binding, unbinding and capacity tests
+        run: cargo test --locked --release -p symthaea-core hrr_baseline -- --nocapture
+
+      - name: Test pattern interaction benchmark invariants and K95
+        run: cargo test --locked --release -p symthaea-core --example platonic_pattern_interaction -- --nocapture
+
+      - name: Run abstract pattern interaction benchmark
+        run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction 2>&1 | tee research-results/platonic-pattern-interaction.log
+
+      - name: Run high-capacity MAP versus HRR stress sweep
+        run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction -- --stress 2>&1 | tee research-results/platonic-pattern-interaction-stress.log
+
+      - name: Check selective retrieval example formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/platonic_selective_retrieval.rs
+
+      - name: Test selective retrieval calibration and certification
+        run: cargo test --locked --release -p symthaea-core --example platonic_selective_retrieval -- --nocapture
+
+      - name: Run calibrated selective retrieval benchmark
+        run: cargo run --locked --release -p symthaea-core --example platonic_selective_retrieval 2>&1 | tee research-results/platonic-selective-retrieval.log
+
+      - name: Check identity-evidence API and example formatting
+        if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/identity_evidence.rs crates/core/symthaea-core/examples/identity_evidence_boundary.rs
+
+      - name: Test fail-closed identity evidence resolution
+        if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
+        run: cargo test --locked --release -p symthaea-core hdc::identity_evidence -- --nocapture
+
+      - name: Run identity evidence boundary experiment
+        if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
+        run: cargo run --locked --release -p symthaea-core --example identity_evidence_boundary 2>&1 | tee research-results/identity-evidence-boundary.log
+
+      - name: Verify Cell Foundry equifinality tests
+        run: cargo test --locked --release -p symthaea-cell-foundry experiments::tests -- --nocapture
+
+      - name: Run Levin-inspired multiscale experiment sweep
+        run: |
+          cargo run --locked --release -p symthaea-cell-foundry --example levin_multiscale_experiments 2>&1 | tee research-results/levin-multiscale-experiments.log
+          cp levin_multiscale_results.json research-results/levin-multiscale-results.json
+          cp levin_adaptive_coupling_results.json research-results/levin-adaptive-coupling-results.json
+
+      - name: Fail closed on uncommitted lockfile drift
+        if: always()
+        run: |
+          if grep -qx "LOCKFILE_DRIFT=true" research-results/lockfile-drift.txt 2>/dev/null; then
+            echo "::error::Cargo resolved a different lockfile. Commit Cargo.lock-resolution.patch before accepting results."
+            exit 1
+          fi
+
+      - name: Record artifact hashes
+        if: always()
+        run: |
+          set -euo pipefail
+          find research-results -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 -r sha256sum > research-results/SHA256SUMS
+          cat research-results/SHA256SUMS
+
+      - name: Upload research outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: symthaea-levin-pattern-results-${{ github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30

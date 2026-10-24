@@ -35,6 +35,7 @@ bytemuck = { version = "1", features = ["derive"] }
 ndarray = { workspace = true }
 rand = { workspace = true }
 rand_distr = "0.4"
+rustfft = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -108,6 +109,16 @@ required-features = ["abstract_thought"]
 [[example]]
 name = "cross_domain_query"
 path = "examples/cross_domain_query.rs"
+
+[[example]]
+name = "platonic_pattern_interaction"
+path = "examples/platonic_pattern_interaction.rs"
+test = true
+
+[[example]]
+name = "platonic_selective_retrieval"
+path = "examples/platonic_selective_retrieval.rs"
+test = true
 
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
