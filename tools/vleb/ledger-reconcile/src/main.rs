@@ -11,15 +11,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let path = arguments.next();
     let extra = arguments.next();
 
-    if flag.as_deref() != Some("--input") || path.is_none() || extra.is_some() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "usage: ledger-reconcile --input <csv-path>",
-        )
-        .into());
-    }
+    let path = match (flag.as_deref(), path, extra) {
+        (Some("--input"), Some(path), None) => path,
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "usage: ledger-reconcile --input <csv-path>",
+            )
+            .into());
+        }
+    };
 
-    let input = fs::read_to_string(path.expect("validated path argument"))?;
+    let input = fs::read_to_string(path)?;
     // Reconcile everything before writing stdout so errors cannot emit partial output.
     let report = reconcile_csv(&input)?;
     let output = report.to_json();
