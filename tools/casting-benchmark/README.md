@@ -56,6 +56,10 @@ https://link.springer.com/article/10.1007/s43939-026-00685-5
 
 The stretch targets in the protocol are aspirational acceptance gates, not current performance claims.
 
+### External baseline version candidate (not executed yet)
+
+The official BoTorch changelog and PyPI release metadata currently surface `botorch==0.18.1` (released June 8, 2026) as the latest published release. The immutable source tag `v0.18.1` contains the public MF-HVKG implementation in `botorch/acquisition/multi_objective/hypervolume_knowledge_gradient.py` (blob SHA `c1203203c27d4729be9ab19aac55e15156056a87`) and MOMF in `botorch/acquisition/multi_objective/multi_fidelity.py` (blob SHA `9282a708a67bf46eb4d6f3352ca4ef1dd1d1562e`). Treat this as the first version candidate for the bake-off, not as a completed environment lock: pin the full Python/PyTorch/GPyTorch dependency graph and environment digest, execute smoke tests, and archive the exact source revisions before results are accepted.
+
 ## Multi-fidelity accounting
 
 For `evaluation_mode="multi_fidelity"`, both `accounting.fidelity_evaluations` and `accounting.fidelity_cost_units_by_level` are mandatory. Fidelity call counts must sum exactly to `objective_evaluations`; the count and cost maps must have the same keys. This prevents a run with many cheap calls from being treated as equivalent to a run that spends the same number of calls on expensive solver tiers.
@@ -117,7 +121,7 @@ All runs are labelled `synthetic_fixture_only`. At the default settings all five
 The low-fidelity response includes deliberate non-monotone objective bias, deterministic heteroscedastic perturbations, and constraint-margin inversions. The test checks that the stress properties are actually present instead of assuming low fidelity is informative. The discrepancy-aware baseline uses four paired low/medium probes and two high-fidelity anchors to construct a simple correction; it is intentionally a transparent reference policy, not a claim to beat MF-HVKG/MOMF. Its accuracy must be measured across severity sweeps and paired seeds.
 
 Benchmarks and research context:
-- BoTorch's MF-HVKG/MOMF tutorial: https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO
+- BoTorch's MF-HVKG/MOMF tutorial: https://github.com/meta-pytorch/botorch/blob/v0.18.1/tutorials/Multi_objective_multi_fidelity_BO/Multi_objective_multi_fidelity_BO.ipynb
 - Multi-Fidelity Methods for Optimization: A Survey (2026): https://doi.org/10.1145/3801959
 - Best practices for multi-fidelity Bayesian optimization in materials/molecular research: https://www.nature.com/articles/s43588-025-00822-9
 - Review of casting/foundry digital twins, validation and reproducible benchmarking: https://link.springer.com/article/10.1007/s43939-026-00685-5
