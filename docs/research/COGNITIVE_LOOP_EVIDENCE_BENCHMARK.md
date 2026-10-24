@@ -271,6 +271,14 @@ cargo test --locked -p xtask cognitive_adaptation_utility
 
 Task loss and resource cost remain separate axes. The evaluator reports resource cost per task-loss unit reduced only when the candidate improves loss; it does not invent a universal exchange rate or hide a trade-off behind an unregistered composite score. The oracle-timed arm is an informative gap-to-reference, not a fair deployable baseline. Matching cycle indices and a shared-stream digest are necessary provenance, not proof that hidden state, random streams, environment transitions, or adaptation code were identical. Verify those properties with the runner's independent audit and retain per-cycle records.
 
+### Counterfactual scorer v2: registered phase windows and recovery
+
+The counterfactual input schema is now version 2. It requires `evaluation_windows` with half-open pre-shift and post-shift cycle windows, a fixed absolute `recovery_loss_threshold`, and a number of consecutive below-threshold cycles required to declare recovery. The evaluator validates that the windows are non-empty, in range, and non-overlapping. It reports each arm's pre-shift mean loss, post-shift mean and cumulative loss, post-shift loss area above the registered recovery threshold, the first recovery cycle, and recovery delay. The direct detector-versus-no-adapt effect and detector-versus-oracle regret for **post-shift mean loss** are reported separately from whole-stream effects and resource cost.
+
+The registered recovery threshold is part of the input digest; it must be frozen before the held-out run and expressed in the declared task-loss unit. A missing recovery cycle is emitted as null, not silently converted to the last cycle or an arbitrary penalty. If an analysis requires a finite recovery penalty, preregister that penalty and report censored/non-recovered runs separately. The schema-v1 fixtures are intentionally upgraded to v2 rather than silently assigning phase windows.
+
+The v2 CLI smoke tests assert a known synthetic recovery pattern and the no-impact-shift negative control. These values verify metric wiring only and are not evidence of performance.
+
 The synthetic fixture at `benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json` exists solely for CLI regression tests. Its values are synthetic, not benchmark results. This evaluator is a scoring primitive, not the replay engine; actual task runs, pinned datasets, cost instrumentation, and counterfactual state-isolation checks remain necessary before reporting efficacy.
 
 
