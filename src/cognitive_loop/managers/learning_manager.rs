@@ -624,7 +624,9 @@ mod tests {
         let mut cycle_one = prior;
         cycle_one.cycle_number = 1;
         restored.process(&cycle_one);
-        assert_eq!(restored.surprise_count, 1);
+        // The legacy checkpoint does not persist the ring buffer; the prior
+        // in-memory entry remains and the newly admitted post-restore sample adds one.
+        assert_eq!(restored.surprise_count, 2);
     }
 
     #[test]
