@@ -137,3 +137,16 @@ python3 tools/casting-benchmark/multifidelity_stress.py \
 The default sweep produces 200 policy-run observations (10 seeds x 5 severities x 4 policies). The same seeds and candidate pool are used across methods, and the raw per-seed outputs are preserved in the JSON. Each policy is run under a 200-unit maximum budget; their fidelity mixes differ by design, so compare quality under fixed cost and report high-fidelity call counts separately. This is not an iso-high-fidelity-call comparison.
 
 The sweep summaries are descriptive. Before making SOTA claims, extend the suite to locked external MF-HVKG/MOMF and single-fidelity baselines, preregister paired confidence intervals and correction for multiple comparisons, and publish per-seed/per-task results rather than only pooled averages.
+
+
+### Fidelity-cost sensitivity
+
+Fidelity cost ratios can be changed without editing source. Example: one low-fidelity call costs 1 unit, medium costs 10, and high costs 50. The runner computes the shared cap from the most expensive frozen policy template when `--cost-budget` is omitted, then reports actual cost and unused budget per policy.
+
+```sh
+python3 tools/casting-benchmark/multifidelity_stress.py \
+  --fidelity-costs low=1,medium=10,high=50 \
+  --grid-size 21 --severity 1.0
+```
+
+The same cost map can be combined with the paired severity sweep. This measures whether fidelity management remains useful as expensive-solver economics change; cost units are controlled experimental parameters, not measured foundry cost estimates.
