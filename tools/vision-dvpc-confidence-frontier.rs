@@ -548,7 +548,7 @@ fn analyze(
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tduplicate_equivalent_count\t{}", status_count("DUPLICATE_EQUIVALENT"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tinfeasible_count\t{}", status_count("INFEASIBLE"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tperformance_claim\tNONE");
-    let _ = writeln!(output, "CONFIDENCE_RESULT_HEADER\tbudget_point_id\tpolicy_id\tstatus\tutility_estimate\tutility_lcb\tutility_ucb\tactual_all_in_latency_us\tactual_all_in_energy_uj\tlatency_budget_us\tenergy_budget_uj\tupstream_point_status\tupstream_reasons\treason\tupstream_point_dominated_by");
+    let _ = writeln!(output, "CONFIDENCE_RESULT_HEADER\tbudget_point_id\tpolicy_id\tstatus\tutility_estimate\tutility_lcb\tutility_ucb\tactual_all_in_latency_us\tactual_all_in_energy_uj\tlatency_budget_us\tenergy_budget_uj\tupstream_point_status\tupstream_reasons\treason\tupstream_point_dominated_by\tband_dominated_by");
     for item in &classified {
         let _ = writeln!(
             output,
