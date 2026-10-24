@@ -2042,7 +2042,8 @@ mod tests {
 
     #[test]
     fn truth_absent_candidate_generation_exhaustion_returns_none_without_panicking() {
-        let design = vec![random_experiment(&mut 0xA11C_E55E_2026_0001_u64)];
+        let mut rng = 0xA11C_E55E_2026_0001_u64;
+        let design = vec![random_experiment(&mut rng)];
         let result = generate_truth_absent_candidates_with_attempt_cap(
             0xA11C_E55E_2026_0001,
             PipelineConfig {
