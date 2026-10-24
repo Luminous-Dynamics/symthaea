@@ -1,6 +1,6 @@
 # Scientific Law Discovery Under Unknown Noise and Adaptive Sampling
 
-**Protocol v0.1.1 — preregistration proposal only. No method-performance or SOTA claim is made.**
+**Protocol v0.1.2 — preregistration proposal only. No method-performance or SOTA claim is made.**
 
 Issue: [SCI-NOISE-001 (#8607)](https://github.com/Luminous-Dynamics/symthaea/issues/8607)  
 Parent research: [truth-absent recovery (#8536)](https://github.com/Luminous-Dynamics/symthaea/issues/8536)  
@@ -175,6 +175,8 @@ Do not hide a high false-alarm rate, increased abstention, or a weak regime behi
 - A recovered singleton must survive fresh policy-visible measurements and independent evaluator-only same-domain and relevant OOD checks.
 - Confirmatory scientific structure coverage: at least 60 held-out worlds across 6 or more structural families and 20 paired seeds per world. Noise regimes must have a predeclared precision/power target; if run as a full factorial, publish the complete per-cell denominators.
 - False-alarm target: at most 5% on each predeclared clean-law/noise-mismatch cell **only when the 95% upper confidence bound also meets the declared limit**. Select an adequate number of independent worlds for this bound before unblinding; a small fixed-seed pilot is not sufficient.
+
+**Per-cell denominator rule:** for a one-sided 95% exact binomial upper confidence bound, zero false alarms in (n) independent world-level trials gives (p_{upper}=1-0.05^{1/n}). Therefore, at least **59 independent worlds in a declared cell with zero false alarms** are needed for the upper bound to fall below 5%. This zero-event shortcut does not apply when any false alarm is observed; plan the larger denominator and decision rule before unblinding. The 60-world overall minimum is not a substitute for this per-cell denominator, and 20 seeds from one world are not 20 independent worlds. Do not pool noise regimes to make a failing cell appear calibrated.
 - Report comparative superiority only if an agreed primary endpoint improves against the strongest compatible matched baseline without violating false-confidence and unresolved-rate guardrails.
 - Exact-head executable tests and CI are required for implementation qualification. Queued, skipped or stale-head checks are not passes.
 
