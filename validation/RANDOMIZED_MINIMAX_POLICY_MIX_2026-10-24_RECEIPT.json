@@ -1,0 +1,61 @@
+{
+  "schema": "symthaea-randomized-minimax-policy-mixture-receipt-v1",
+  "date": "2026-10-24",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "status": "EXACT_FINITE_MODEL_RANDOMIZED_POLICY_MIXTURE_PILOT_NOT_EXTERNAL_QUALIFICATION",
+  "source": {
+    "path": "validation/randomized_minimax_policy_mix_benchmark.py",
+    "git_blob": "b967b77490842363705378a20097fb34e5aecef3",
+    "sha256": "11944a76aeb2fe52b935d08e9a0267498523764c1170a52990fd88785bff7173",
+    "bytes": 9028
+  },
+  "test_source": {
+    "path": "validation/test_randomized_minimax_policy_mix_benchmark.py",
+    "git_blob": "6018638585518dc03d45492dd7c12685b1030b06",
+    "sha256": "5d2f13bb25fda935041c34520dfb7c69175d12440cda91c6c8b2d6af58a29916",
+    "bytes": 2060,
+    "tests": 9,
+    "result": "9/9_PASS_LOCAL"
+  },
+  "base_source": {
+    "path": "validation/fixed_prior_minimax_policy_benchmark.py",
+    "git_blob": "438301f07649d7ffebca6690990a4909ea28e054",
+    "byte_identity_verified": true
+  },
+  "artifact": {
+    "filename": "randomized_minimax_policy_mix_results_2026-10-24.json",
+    "rows": 36,
+    "bytes": 52198,
+    "sha256": "7ce7818e8e86e66baf61cea7108987352570950b457560a691da0a22cf50daf7",
+    "source_git_blob_bound": "b967b77490842363705378a20097fb34e5aecef3",
+    "local_only": true
+  },
+  "report": {
+    "path": "docs/research/RANDOMIZED_MINIMAX_POLICY_MIX_BENCHMARK_2026-10-24.md",
+    "git_blob": "e7f81af2a755c731167013a7496b5b9d606018fb"
+  },
+  "summary": {
+    "path": "validation/randomized_minimax_policy_mix_summary_2026-10-24.json",
+    "git_blob": "53953555f5032d58fa3fdc8d14c9e881e3b545f8"
+  },
+  "validation": {
+    "combined_local_regression": "69/69_PASS",
+    "source_git_blob_matches_executed_file": true,
+    "test_git_blob_matches_executed_file": true,
+    "base_solver_git_blob_matches_executed_file": true,
+    "result_artifact_hash_recomputed": true,
+    "result_json_binds_to_source_blob": true,
+    "max_primal_dual_gap_bits": 8.881784197001252e-16,
+    "external_benchmark_run": false,
+    "remote_ci": "inspect exact final PR head; skipped is not pass"
+  },
+  "scientific_boundary": [
+    "16 joint hypotheses; chain/fork structures only",
+    "six finite, uncalibrated candidate priors",
+    "exact realized target-subset telemetry",
+    "no action cost, noisy/missing telemetry, or disturbance",
+    "randomization gains negligible on this finite model",
+    "no SOTA, novelty, or production claim"
+  ]
+}
