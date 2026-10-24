@@ -39,6 +39,7 @@ The sweep covers:
 - record-build benchmarks for the smaller 256 / 1,024 / 4,096 corpus sizes;
 - an independent byte-wise XOR/popcount top-1 oracle on smaller non-power-of-two and ordinary corpora;
 - a duplicated exact-match fixture that enforces lowest-candidate-ID tie behavior;
+- open-set rejection diagnostics: calibrate a nearest-similarity acceptance threshold on clean known cues and absent-target cues, freeze that threshold, then report held-out false-reject rates for noisy known cues and false-accept rates for absent-target cues;
 - optimized-versus-scalar top-1 oracle checks at every query-noise rate on 17- and 257-record fixtures, plus an assertion that each noise fixture flips exactly the requested number of bits.
 
 Run on an exact revision:
@@ -46,9 +47,21 @@ Run on an exact revision:
     cargo test -p symthaea-core test_binary_hv_direct_pack_matches_reference_encoders
     cargo bench -p symthaea-core --bench hdc_compositional_workload
 
-Criterion output measures host execution time for the clean representative query only. Separate diagnostic lines print semantic_hit_at_1, sampled median target rank, and the minimum observed target-versus-impostor similarity margin for the fixed eight-query sample at every corruption level. The noise schedule flips exactly floor(DIM × rate) bits using a deterministic coprime-stride pattern. Eight queries are a pilot sample, not a statistical claim about population-level recall; increase and hold out query seeds before reporting a stable quality estimate.
+Criterion output measures host execution time for the clean representative query only. Separate diagnostic lines print semantic_hit_at_1, sampled median target rank, and the minimum observed target-versus-impostor similarity margin for the fixed eight-query sample at every corruption level. The noise schedule flips exactly floor(DIM × rate) bits using a deterministic coprime-stride pattern. The open-set diagnostic calibrates a maximum-similarity acceptance threshold using eight clean known-record cues and eight absent-target cues, then tests eight distinct known record IDs and eight new unknown-value cues. It does not retune the threshold at each noise level. These small in-benchmark counts are pilots, not a population-level error-rate guarantee; increase calibration and held-out sets before reporting stable false-accept/false-reject rates.
 
 The corpus and query cues are fully resident during query timing. The build group measures deterministic role/value encoding and record bundling, not cold storage, file I/O, OS page faults, or an accelerator transfer. Query latency and build cost must remain separate; do not call setup free.
+
+## Open-set acceptance: a crucial distinction from exact top-1
+
+Nearest-neighbour search always returns a winner when the corpus is non-empty. That does **not** imply the query belongs to any stored record. The Rust benchmark now produces role-bound query atoms whose value was not used in any corpus record, calibrates an acceptance threshold from clean known and absent-target query sets, and reports:
+- calibration false-reject rate for known cues;
+- calibration false-accept rate for absent-target cues;
+- held-out false-reject rate when known cues have 0%, 1%, 2%, 5% or 10% bit corruption;
+- held-out false-accept rate on absent-target cues, without threshold retuning.
+
+The threshold operates on the nearest BinaryHV similarity score and accepts when the score is at least the threshold. Calibration and test examples have distinct target IDs / unknown value seeds. The in-benchmark pilot uses eight known and eight unknown calibration examples and eight held-out examples of each class; these counts are deliberately labeled too small for a stable population-level guarantee.
+
+Independent Python model pilot (not Rust execution and not the branch's BLAKE3 vector generator): for each of N = 256 and 1,024 and bundle arities K = 3, 7, 15, I calibrated the threshold on 32 clean known cues and 32 absent-target cues, then evaluated 48 held-out known cues and 48 held-out absent-target cues. The clean calibration false-reject and false-accept rates were both zero in these synthetic trials. At 5% corruption, known-cue false-reject rates were 54.2% / 64.6% for K=3 at N=256 / 1,024; 4.2% / 8.3% for K=7; and 8.3% / 2.1% for K=15. At 10% corruption, rates were 93.8% / 100% for K=3, 20.8% / 41.7% for K=7, and 29.2% / 18.8% for K=15. No absent-target query was falsely accepted in these 48-query-per-setting synthetic tests. Those zeros do not prove zero real-world false accepts: both query classes are generated from the same clean synthetic distribution, and the query counts are limited. The key observation is that a threshold calibrated on clean inputs can reject many genuinely related but corrupted cues, even when the top-1 search algorithm remains exact. This calls for an explicit quality/abstention trade-off, not a looser exact-search contract.
 
 ## Independent model and evidence boundary
 
@@ -77,6 +90,7 @@ The benchmark now includes a deterministic query-cue corruption sweep at 0%, 1%,
 - role reuse and record overlap;
 - correlated records with shared components;
 - stale or updated memories;
+- open-set distribution shift, including unknown values with partial overlap to stored components rather than only independent unseen values;
 - open-set queries whose source record is not stored;
 - corpus growth beyond the point where false nearest neighbors dominate.
 
@@ -115,6 +129,7 @@ Runtime, TDP, logical bytes visited, and modeled popcount counts are not energy 
 - Semantic hit@1 and target-rank measurements are reproducible across fixed seeds; report uncertainty when comparing approaches.
 - Keep a search optimization only when it improves measured query latency on the compositional workload without a material regression on random controls.
 - Keep a representation variant only when it improves the task-level quality/capacity or memory trade-off at an acceptable build/runtime cost.
+- - Open-set acceptance is reported separately from top-1 exactness, and its threshold is frozen before held-out/noisy testing; never call a nearest-neighbour result “accepted” solely because it is the nearest candidate.
 - Call a method an industry improvement only after a same-byte, same-workload baseline comparison.
 - Call it energy-superior only after direct device measurement with the same successful retrieval definition.
 
