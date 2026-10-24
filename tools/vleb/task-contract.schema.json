@@ -79,6 +79,16 @@
         "source_sha256": {
           "$ref": "#/$defs/sha256"
         },
+        "fixture_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["input_csv", "expected_output_json", "negative_control_csv"],
+          "properties": {
+            "input_csv": {"$ref": "#/$defs/sha256"},
+            "expected_output_json": {"$ref": "#/$defs/sha256"},
+            "negative_control_csv": {"$ref": "#/$defs/sha256"}
+          }
+        },
         "task_manifest_sha256": {
           "$ref": "#/$defs/sha256"
         },
