@@ -1,0 +1,195 @@
+{
+  "schema_version": "1.0.0",
+  "protocol_id": "CASTING-MO-BO-001",
+  "lock_id": "CASTING-EXTERNAL-BASELINE-LOCK-001",
+  "status": "source_pins_recorded_environment_unlocked",
+  "execution_eligible": false,
+  "inspected_on": "2026-10-24",
+  "candidate_release": {
+    "distribution": "botorch",
+    "version": "0.18.1",
+    "source_repository": "meta-pytorch/botorch",
+    "source_tag": "v0.18.1",
+    "source_commit": "cd0249c60b2a81af0d91b5e7d462ef6f574fceec",
+    "release_date": "2026-06-08",
+    "pypi_project_url": "https://pypi.org/project/botorch/0.18.1/",
+    "release_artifacts": {
+      "sdist": {
+        "filename": "botorch-0.18.1.tar.gz",
+        "sha256": "f3e444efae2622b3ad88a5efe1859583ba2cd0913761f76677a189b2fd1aee99"
+      },
+      "wheel": {
+        "filename": "botorch-0.18.1-py3-none-any.whl",
+        "sha256": "fa1cd4483fbc21087dcc40088b6031661e46ce5fe9d0b47a56ebcd578c260f33"
+      }
+    },
+    "pyproject": {
+      "path": "pyproject.toml",
+      "git_blob_sha1": "804ab938eb3fafdace26472fab60468fe236332a"
+    },
+    "python_requires": ">=3.11",
+    "declared_runtime_requirement_floors": {
+      "gpytorch": ">=1.15.2",
+      "linear_operator": ">=0.6.1",
+      "torch": ">=2.4",
+      "scipy": "version not bounded in pyproject.toml",
+      "multipledispatch": "version not bounded in pyproject.toml",
+      "threadpoolctl": "version not bounded in pyproject.toml",
+      "ninja": "version not bounded in pyproject.toml",
+      "typing_extensions": "version not bounded in pyproject.toml",
+      "pyre_extensions": "version not bounded in pyproject.toml"
+    },
+    "requirement_warning": "These are release metadata lower bounds, not an environment lock. Do not infer exact compatible versions from them."
+  },
+  "required_method_ids": [
+    "botorch_mf_hvkg",
+    "botorch_momf",
+    "botorch_qlognehvi",
+    "botorch_qlogehvi",
+    "botorch_qlognparego",
+    "uniform_random",
+    "sobol",
+    "nsga2",
+    "symthaea_gp_lcb",
+    "symthaea_nearest_neighbor",
+    "symthaea_largest_gap_epsilon",
+    "symthaea_reliability_aware"
+  ],
+  "method_pins": [
+    {
+      "baseline_id": "botorch_mf_hvkg",
+      "track": "multi_fidelity",
+      "package": "botorch",
+      "package_version": "0.18.1",
+      "source_tag": "v0.18.1",
+      "source_commit": "cd0249c60b2a81af0d91b5e7d462ef6f574fceec",
+      "source_path": "botorch/acquisition/multi_objective/hypervolume_knowledge_gradient.py",
+      "source_blob_sha1": "c1203203c27d4729be9ab19aac55e15156056a87",
+      "symbol": "qMultiFidelityHypervolumeKnowledgeGradient",
+      "pin_status": "source_pinned_environment_unlocked",
+      "execution_eligible": false
+    },
+    {
+      "baseline_id": "botorch_momf",
+      "track": "multi_fidelity",
+      "package": "botorch",
+      "package_version": "0.18.1",
+      "source_tag": "v0.18.1",
+      "source_commit": "cd0249c60b2a81af0d91b5e7d462ef6f574fceec",
+      "source_path": "botorch/acquisition/multi_objective/multi_fidelity.py",
+      "source_blob_sha1": "9282a708a67bf46eb4d6f3352ca4ef1dd1d1562e",
+      "symbol": "MOMF",
+      "pin_status": "source_pinned_environment_unlocked",
+      "execution_eligible": false
+    },
+    {
+      "baseline_id": "botorch_qlognehvi",
+      "track": "single_fidelity",
+      "package": "botorch",
+      "package_version": "0.18.1",
+      "source_tag": "v0.18.1",
+      "source_commit": "cd0249c60b2a81af0d91b5e7d462ef6f574fceec",
+      "source_path": "botorch/acquisition/multi_objective/logei.py",
+      "source_blob_sha1": "3c71b1f98b4e3799aadfadd6f3b7cadfb4a3b89a",
+      "symbol": "qLogNoisyExpectedHypervolumeImprovement",
+      "pin_status": "source_pinned_environment_unlocked",
+      "execution_eligible": false
+    },
+    {
+      "baseline_id": "botorch_qlogehvi",
+      "track": "single_fidelity",
+      "package": "botorch",
+      "package_version": "0.18.1",
+      "source_tag": "v0.18.1",
+      "source_commit": "cd0249c60b2a81af0d91b5e7d462ef6f574fceec",
+      "source_path": "botorch/acquisition/multi_objective/logei.py",
+      "source_blob_sha1": "3c71b1f98b4e3799aadfadd6f3b7cadfb4a3b89a",
+      "symbol": "qLogExpectedHypervolumeImprovement",
+      "pin_status": "source_pinned_environment_unlocked",
+      "execution_eligible": false
+    },
+    {
+      "baseline_id": "botorch_qlognparego",
+      "track": "single_fidelity",
+      "package": "botorch",
+      "package_version": "0.18.1",
+      "source_tag": "v0.18.1",
+      "source_commit": "cd0249c60b2a81af0d91b5e7d462ef6f574fceec",
+      "source_path": "botorch/acquisition/multi_objective/parego.py",
+      "source_blob_sha1": "3abd7d316c8dbc33f1db975f3f9bcf651dab62b6",
+      "symbol": "qLogNParEGO",
+      "pin_status": "source_pinned_environment_unlocked",
+      "execution_eligible": false
+    }
+  ],
+  "unresolved_baselines": [
+    {
+      "baseline_id": "uniform_random",
+      "status": "not_pinned",
+      "blocker": "Freeze implementation revision, seed handling and initial-design accounting."
+    },
+    {
+      "baseline_id": "sobol",
+      "status": "not_pinned",
+      "blocker": "Freeze framework/distribution implementation and version, scrambling settings and seed semantics."
+    },
+    {
+      "baseline_id": "nsga2",
+      "status": "not_pinned",
+      "blocker": "Pin the NSGA-II implementation/version, population size, variation operators, and count all objective calls including initialization."
+    },
+    {
+      "baseline_id": "symthaea_gp_lcb",
+      "status": "not_pinned",
+      "blocker": "Record exact Symthaea source commit, adapter configuration and config digest."
+    },
+    {
+      "baseline_id": "symthaea_nearest_neighbor",
+      "status": "not_pinned",
+      "blocker": "Record exact Symthaea source commit, adapter configuration and config digest."
+    },
+    {
+      "baseline_id": "symthaea_largest_gap_epsilon",
+      "status": "not_pinned",
+      "blocker": "Record exact Symthaea source commit, adapter configuration and config digest."
+    },
+    {
+      "baseline_id": "symthaea_reliability_aware",
+      "status": "not_pinned",
+      "blocker": "Record exact Symthaea source commit, adapter configuration and config digest for the candidate-under-test."
+    }
+  ],
+  "environment_lock": {
+    "status": "not_locked",
+    "lockfile_path": null,
+    "lockfile_sha256": null,
+    "python_version": null,
+    "framework_versions": {},
+    "platform": null,
+    "device": null,
+    "dependency_artifact_hashes": {},
+    "execution_smoke_test": "not_run",
+    "note": "Must lock Python, PyTorch, GPyTorch, linear_operator, SciPy, transitive dependency versions and hashes plus platform/device settings. PyTorch accelerator choice must not alter objective-call budgets or silently change data precision."
+  },
+  "execution_blockers": [
+    "The external BoTorch release and five method source files are pinned, but the complete runtime environment is not locked.",
+    "Seven required baseline implementations/configurations remain unpinned.",
+    "No baseline adapter smoke test has been run in the locked environment.",
+    "MF-HVKG/MOMF and single-fidelity qLog methods run on different track definitions; do not compare their headline metrics as if they were one directly matched task."
+  ],
+  "execution_rules": [
+    "Structural validation does not imply execution readiness.",
+    "Execution eligibility requires all required_method_ids to be source-pinned, an immutable environment lock digest, and successful baseline smoke tests recorded outside this source manifest.",
+    "Pin all baselines, suite adapters, seeds, objective transforms, cost accounting, initial designs, stopping rules and metric/reference conventions before examining comparative outcomes.",
+    "Every failed, invalid, timed-out or infeasible objective call consumes budget; algorithm compute and wall-clock time are reported separately.",
+    "The immutable source tag and source blob hashes identify code, not a working environment or a successful experiment."
+  ],
+  "references": [
+    "https://pypi.org/project/botorch/0.18.1/",
+    "https://github.com/meta-pytorch/botorch/tree/v0.18.1",
+    "https://github.com/meta-pytorch/botorch/blob/v0.18.1/botorch/acquisition/multi_objective/hypervolume_knowledge_gradient.py",
+    "https://github.com/meta-pytorch/botorch/blob/v0.18.1/botorch/acquisition/multi_objective/multi_fidelity.py",
+    "https://github.com/meta-pytorch/botorch/blob/v0.18.1/botorch/acquisition/multi_objective/logei.py",
+    "https://github.com/meta-pytorch/botorch/blob/v0.18.1/botorch/acquisition/multi_objective/parego.py"
+  ]
+}

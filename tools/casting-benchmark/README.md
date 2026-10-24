@@ -97,3 +97,50 @@ Do not use this custom AUC in place of COCO's native target-reaching/ECDF analys
 
 
 The analysis lock is versioned separately at `docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json`. A receipt's protocol and analysis-lock hashes must match the exact checked-out bytes, and its per-run ideal/reference points must exactly match the suite+instance contract. The test-only known-answer suite is explicitly fixture-only; real-run mode cannot use its [0,0]/[10,10] range. This prevents an algorithm from inflating its score by selecting an easier per-run reference point.
+
+## External baseline source lock
+
+`docs/research/CASTING_EXTERNAL_BASELINE_LOCK_V1.json` records a source-level pin candidate for BoTorch 0.18.1, including its PyPI artifact SHA-256 digests and the Git blob SHA-1 values for MF-HVKG, MOMF, qLogNEHVI, qLogEHVI, and qLogNParEGO source files. The release metadata was inspected on 2026-10-24. These source references do not identify an executed Python/Torch environment.
+
+Validate the manifest structure:
+
+```sh
+python3 tools/casting-benchmark/validate_baseline_lock.py
+```
+
+The current manifest should report `BASELINE_LOCK_STRUCTURE_VALID_BUT_EXECUTION_BLOCKED`. This means the recorded source pins and blocker inventory satisfy the manifest format; it does **not** mean the baseline runs. The execution gate is expected to fail closed until exact dependency artifacts, platform/device, environment lock digest and smoke-test evidence are recorded, and all required baseline implementations are pinned:
+
+```sh
+python3 tools/casting-benchmark/validate_baseline_lock.py --for-execution
+```
+
+The current source lock is intentionally partial: seven required baselines remain unresolved (random, Sobol, NSGA-II and four repository methods). The benchmark protocol remains blocked until those entries and the full environment are immutable. The validator verifies the recorded structure and hash syntax; it does not download, hash, or authenticate remote files. A source SHA recorded in the manifest is a claim that must be independently checked during environment materialization.
+
+Verify the pinned source tree without network access after checking out the recorded release tag:
+
+```sh
+git clone https://github.com/meta-pytorch/botorch.git /tmp/botorch
+git -C /tmp/botorch checkout --detach v0.18.1
+python3 tools/casting-benchmark/verify_baseline_source_tree.py --source-tree /tmp/botorch
+```
+
+To also verify both downloaded PyPI artifact checksums, supply the archive and wheel paths:
+
+```sh
+python3 tools/casting-benchmark/verify_baseline_source_tree.py \
+  --source-tree /tmp/botorch \
+  --sdist /path/to/botorch-0.18.1.tar.gz \
+  --wheel /path/to/botorch-0.18.1-py3-none-any.whl \
+  --require-artifacts
+```
+
+This verifier calculates Git blob SHA-1 over the exact file bytes and checks the checkout commit and clean-tree state. It can verify local inputs offline; the example `git clone` is only for materializing the source. A pass authenticates the pinned source/artifact inputs, not the Python dependency resolution, method adapter, smoke test, or optimizer result.
+
+Tests for the lock validator:
+
+```sh
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_*baseline*.py' -v
+```
+
+Use the test discovery command in the main section to run all benchmark test modules.
+
