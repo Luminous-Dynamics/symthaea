@@ -422,6 +422,13 @@ impl CognitiveLoopService {
         let mut feedback =
             self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
 
+        let prediction_error_valid = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64)
+            .is_some()
+            && dynamics.core.prediction_error.is_finite();
+
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 3.5: SAFETY ENFORCEMENT
         // NRC defense-in-depth: assess consciousness → gate LR/exploration/motor
@@ -431,8 +438,7 @@ impl CognitiveLoopService {
         {
             let safety_result = self.safety_supervisor.assess_with_evidence(
                 feedback.consciousness.consciousness_level as f32,
-                (perception.urgency.prediction_error_valid
-                    && dynamics.core.prediction_error.is_finite())
+                prediction_error_valid
                     .then_some(dynamics.core.prediction_error),
                 feedback.self_model.temporal_coherence_score as f32,
                 {
@@ -558,8 +564,7 @@ impl CognitiveLoopService {
             // Produces CivicCrisisEvent for the Mycelix emergency-incidents zome.
             let crisis_input = super::civic_crisis_detector::CrisisDetectorInput {
                 prediction_error: dynamics.core.prediction_error as f64,
-                prediction_error_valid: perception.urgency.prediction_error_valid
-                    && dynamics.core.prediction_error.is_finite(),
+                prediction_error_valid,
                 safety_level_ordinal: match safety_result.level {
                     crate::safety::SafetyLevel::Green => 0,
                     crate::safety::SafetyLevel::Yellow => 1,
@@ -739,8 +744,7 @@ impl CognitiveLoopService {
             // A missing comparison is not a scientific observation. Keep existing
             // hypotheses intact on an invalid cycle; independent safety/feedback
             // pathways continue to operate normally.
-            if perception.urgency.prediction_error_valid
-                && dynamics.core.prediction_error.is_finite()
+            if prediction_error_valid
             {
                 let pe = dynamics.core.prediction_error as f64;
                 let phi = feedback.consciousness.consciousness_level;
