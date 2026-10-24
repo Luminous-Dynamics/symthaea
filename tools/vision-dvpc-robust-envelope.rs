@@ -259,6 +259,7 @@ fn parse_envelopes(text:&str,conf:&ConfidenceReceipt,conf_sha:&str,expected_infe
                     if lo>hi{return Err(invalid(format!("envelope line {ln}: {name} interval inverted")));}Ok(Interval{lo,hi})
                 };
                 let latency=interval(3,4,"latency")?;let energy=interval(5,6,"energy")?;
+                if latency.lo<0.0||energy.lo<0.0{return Err(invalid(format!("envelope line {ln}: latency/energy bounds must be non-negative")));}
                 let pooled=interval(7,8,"pooled_harm")?;let worst=interval(9,10,"worst_group_harm")?;
                 let cvar=interval(11,12,"cvar95_loss")?;
                 for (name,v) in [("pooled_harm",pooled),("worst_group_harm",worst)]{if v.lo<0.0||v.hi>1.0{return Err(invalid(format!("envelope line {ln}: {name} must lie in [0,1]")));}}
@@ -563,5 +564,11 @@ mod tests {
         assert!(out.contains("ROBUST_RESULT\\tp1\\tworse-utility\\tROBUST_UNRESOLVED_FEASIBILITY"));
     }
 
+    #[test] fn negative_resource_lower_bound_is_rejected(){
+        let s=one("BAND_NONDOMINATED","FEASIBLE_FRONTIER");let c=confidence(&s);
+        let mut e=envelope(&c,&s,30.0,50.0,0.02,0.04,"CERTIFIED","ALL_POLICY_BUDGET_SAFETY_METRICS");
+        e=e.replace("30\\t50","-1\\t50");
+        assert!(run(&c,&e).unwrap_err().contains("latency/energy bounds must be non-negative"));
+    }
     #[test] fn sha256_known_vector(){assert_eq!(sha256_hex(b"abc"),"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");}
 }
