@@ -176,3 +176,38 @@ The preferred cursor API, `admit_evidence(evidence, requested_observation_cycle)
 - This trace is a cursor/adapter contract test, not a substitute for the 15 consumer-level counterfactual cases. End-to-end state-digest comparisons across downstream learners, replay stores, safety, and checkpoint restoration remain required.
 
 The above are acceptance tests, not measured results until executed against the exact tested commit with a supported Rust toolchain.
+
+
+## 10. Research experiment: reliability-adjusted replay after hard evidence admission
+
+**Hypothesis.** Once invalid evidence is excluded by the typed contract, valid samples can still differ in predictive reliability. A replay policy that separates evidence eligibility from reliability may improve learning per unit cost over uniform replay and conventional priority-by-error.
+
+This is an experiment proposal, not a production policy or a claim that Symthaea beats an external method. It is motivated by ICLR 2026 work on [Reliability-Adjusted Prioritized Experience Replay (ReaPER)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60e3d7caf8cfdaf6598467f9b0ebf36a-Abstract-Conference.html), which studies replay prioritization using temporal-difference error reliability, and by [Forget Forgetting](https://proceedings.iclr.cc/paper_files/paper/2026/hash/17fc58b1ba92abbb72c5f457e140d851-Abstract-Conference.html), which reports that simple replay can be highly competitive when memory is abundant but compute is constrained. [IDER](https://proceedings.iclr.cc/paper_files/paper/2026/hash/e34f98c14b861d6f24879e861fcbce1a-Abstract-Conference.html) further motivates testing repeated-event idempotence and prediction reliability independently.
+
+### Candidate ablations
+
+1. **Uniform replay:** sample from the eligible buffer uniformly.
+2. **Error-prioritized replay:** conventional priority proportional to a positive offset plus absolute prediction error, raised to exponent \\(\\alpha\\).
+3. **Reliability-adjusted replay:** scale error priority by an independently calibrated per-sample reliability estimate, while retaining an explicit novelty/shift channel so out-of-distribution observations are not automatically suppressed.
+4. **Matched no-replay/stateless baseline:** estimate the contribution of accumulated experience itself.
+5. **Invalid-event negative control:** deliberately inject invalid evidence into the harness, but require all policies to exclude it before sampling. If any arm admits an invalid event, the entire run is disqualified.
+
+One candidate sampling mixture for eligible samples is:
+
+\\[
+P(i)=(1-\\lambda)\\,\\operatorname{Normalize}((\\epsilon+|\\delta_i|)^\\alpha r_i^\\beta)
++\\lambda\\,\\operatorname{Normalize}(n_i)
+\\]
+
+where \\(r_i\\) is the calibrated reliability of a valid sample, \\(n_i\\) is an independently defined novelty/shift score, and \\(\\lambda\\) is fixed before evaluation. Invalid evidence is excluded by eligibility before this equation; reliability is not a substitute for validity. The formula is a test candidate, not an approved production algorithm.
+
+### Acceptance and reporting
+
+- **Hard gate:** zero invalid replay admissions and zero duplicate state transitions across all arms, including replay after checkpoint/restore.
+- **Task utility:** positive paired gain over matched stateless and uniform-replay baselines, with per-task results and confidence intervals.
+- **Calibration:** report Brier score or another appropriate proper scoring rule, calibration error, and coverage; reliability estimates must be trained/calibrated on held-out outcomes, not on the test stream.
+- **Shift robustness:** measure adaptation speed after task/domain shifts and report whether reliability weighting suppresses genuinely novel but initially uncertain evidence.
+- **Retention and cost:** report forward/backward transfer, forgetting, valid samples admitted, updates per task, wall-clock time to a fixed quality target, CPU/GPU time, and peak memory.
+- **Protocol:** same stream order, task resets, buffer capacity, optimizer/training budget, and seeds for all methods. Use at least 10 paired seeds for the internal study and preserve every failure trace. Report mean and dispersion as well as worst-task outcomes.
+
+This experiment can establish whether reliability-aware replay helps Symthaea's chosen workloads. It cannot establish a general SOTA win without running the external benchmark's complete protocol under comparable conditions.
