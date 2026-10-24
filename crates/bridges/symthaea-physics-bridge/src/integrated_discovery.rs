@@ -2274,6 +2274,71 @@ mod tests {
     }
 
     #[test]
+    fn unary_correction_family_can_recover_a_planted_heldout_formula() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let phase = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Var("t".to_string())),
+            )),
+            Box::new(Expr::Var("r".to_string())),
+        );
+        let reference = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(base.clone()),
+            Box::new(Expr::Func(UnaryFn::Sin, Box::new(phase))),
+        );
+        assert!(matches!(
+            infer_dimensions(&reference, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+
+        let mut in_domain_rng = 0x51A7_0000_2026_0001_u64;
+        let in_domain: Vec<Experiment> = (0..64)
+            .map(|_| random_experiment(&mut in_domain_rng))
+            .collect();
+        let mut ood_rng = 0x00D0_0D0E_2026_0001_u64;
+        let ood: Vec<Experiment> = (0..64)
+            .map(|_| random_extrapolation_experiment(&mut ood_rng))
+            .collect();
+
+        let mut proposal_rng = 0x51A7_C0DE_2026_0001_u64;
+        let mut recovered = false;
+        for _ in 0..512 {
+            let Some(basis) = structured_correction_basis(
+                &mut proposal_rng,
+                &base,
+                RecoveryProposalFamily::UnaryFunctionCorrection,
+            ) else {
+                continue;
+            };
+            let Some(candidate) = compose_linear_correction(&base, &basis, 1.0) else {
+                continue;
+            };
+            if evaluator_matches_reference(&candidate, &reference, &in_domain)
+                && evaluator_matches_reference(&candidate, &reference, &ood)
+            {
+                recovered = true;
+                break;
+            }
+        }
+        assert!(
+            recovered,
+            "bounded unary proposal family failed to express the planted sin(v*t/r) law on both domains"
+        );
+    }
+
+    #[test]
     fn unary_heldout_truth_is_valid_but_absent_from_typed_initial_candidates() {
         let mut design_rng = 0x51A7_0000_2026_0001_u64;
         let design: Vec<Experiment> = (0..EXPERIMENT_POOL_SIZE)
