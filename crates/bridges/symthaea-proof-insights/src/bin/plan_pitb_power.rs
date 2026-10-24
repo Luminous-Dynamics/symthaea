@@ -168,6 +168,17 @@ fn parse_config(args: &[String]) -> Result<Config> {
             "at least {MIN_CLUSTERS} independent component clusters are required for this planning gate"
         );
     }
+    let total_targets = cluster_sizes.iter().try_fold(0usize, |sum, size| {
+        sum.checked_add(*size).context("sum of cluster sizes overflows usize")
+    })?;
+    if total_targets == 0 {
+        bail!("cluster-size vector must contain at least one target");
+    }
+    let alpha = baseline_rate * (1.0 - icc) / icc.max(f64::MIN_POSITIVE);
+    let beta = (1.0 - baseline_rate) * (1.0 - icc) / icc.max(f64::MIN_POSITIVE);
+    if icc > 0.0 && (!alpha.is_finite() || !beta.is_finite() || alpha <= 0.0 || beta <= 0.0) {
+        bail!("icc and baseline_rate produce invalid beta-binomial shape parameters");
+    }
     if simulations < MIN_SIMULATIONS {
         bail!("simulations must be at least {MIN_SIMULATIONS}");
     }
@@ -260,7 +271,7 @@ fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
     }
     let variance = clusters as f64 / (clusters - 1) as f64
         * sum_sq
-        / ((total_n * total_n) as f64);
+        / ((total_n as f64) * (total_n as f64));
     let se = variance.max(0.0).sqrt();
 
     // Degenerate samples are deliberately not granted a zero-width interval.
@@ -464,6 +475,38 @@ mod tests {
         );
         assert!(report["limitations"].as_array().is_some());
         assert!(report["results"]["estimated_gate_power"].as_f64().is_some());
+    }
+
+    #[test]
+    fn parser_accepts_eight_positional_arguments_after_program_name() {
+        let args = vec![
+            "plan_pitb_power".to_owned(),
+            "0.35".to_owned(),
+            "0.15".to_owned(),
+            "0.10".to_owned(),
+            "0.05".to_owned(),
+            std::iter::repeat("2").take(MIN_CLUSTERS).collect::<Vec<_>>().join(","),
+            "1000".to_owned(),
+            "123".to_owned(),
+            "power.json".to_owned(),
+        ];
+        assert!(parse_config(&args).is_ok());
+    }
+
+    #[test]
+    fn parser_rejects_fewer_than_twenty_independent_clusters() {
+        let args = vec![
+            "plan_pitb_power".to_owned(),
+            "0.35".to_owned(),
+            "0.15".to_owned(),
+            "0.10".to_owned(),
+            "0.05".to_owned(),
+            "2,3,1".to_owned(),
+            "1000".to_owned(),
+            "123".to_owned(),
+            "power.json".to_owned(),
+        ];
+        assert!(parse_config(&args).is_err());
     }
 
     #[test]
