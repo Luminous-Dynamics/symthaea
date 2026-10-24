@@ -25,7 +25,7 @@ pub use authorization::{
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use executor::{
     ChannelOperation, ExecutionRecord, ExecutionResult, FlakeOperation, NixOSCommand,
-    NixOSExecutor, SafetyLevel,
+    NixOSCommandRunner, NixOSExecutor, SafetyLevel,
 };
 pub use flake_ops::{FlakeCheckResult, FlakeMetadata, FlakeOps};
 pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
