@@ -36,7 +36,7 @@ sha256sum frozen-input.tsv
 /tmp/vis-dvpc-017 frozen-input.tsv EXPECTED_SHA256_FROM_SHA256SUM
 ~~~
 
-The program rejects any input-byte SHA-256 mismatch. Use an immutable, held-out file and preserve both the file and stdout receipt.
+The program rejects any input-byte SHA-256 mismatch. Use an immutable, held-out file and preserve both the file and stdout receipt. The repository includes a five-trace synthetic smoke bundle at tests/fixtures/vision-dvpc-017-smoke.tsv; it is fixture data only, not empirical evidence.
 
 ## Strict TSV contract
 
