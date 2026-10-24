@@ -188,9 +188,6 @@ impl CognitiveLoopService {
         let cycle_state = CycleState {
             compressed_state: &perception.encoding.compressed_state,
             output: &dynamics.core.output,
-            prediction_error,
-            prediction_error_valid: perception.urgency.prediction_error_valid
-                && prediction_error.is_finite(),
             prediction_evidence: perception.urgency.prediction_evidence.clone(),
             coherence,
             unified_psi,
