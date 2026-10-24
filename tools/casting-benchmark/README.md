@@ -121,3 +121,19 @@ Benchmarks and research context:
 - Multi-Fidelity Methods for Optimization: A Survey (2026): https://doi.org/10.1145/3801959
 - Best practices for multi-fidelity Bayesian optimization in materials/molecular research: https://www.nature.com/articles/s43588-025-00822-9
 - Review of casting/foundry digital twins, validation and reproducible benchmarking: https://link.springer.com/article/10.1007/s43939-026-00685-5
+
+
+### Paired severity sweep
+
+A single severity can accidentally flatter a policy. The runner can execute a preregistered paired seed-by-severity sweep and retain every run-level result while reporting median/IQR by policy and severity:
+
+```sh
+python3 tools/casting-benchmark/multifidelity_stress.py \
+  --sweep-seeds 17,23,29,31,37,41,43,47,53,59 \
+  --sweep-severities 0,0.5,1,1.5,2 \
+  --cost-budget 200 --grid-size 21
+```
+
+The default sweep produces 200 policy-run observations (10 seeds x 5 severities x 4 policies). The same seeds and candidate pool are used across methods, and the raw per-seed outputs are preserved in the JSON. Each policy is run under a 200-unit maximum budget; their fidelity mixes differ by design, so compare quality under fixed cost and report high-fidelity call counts separately. This is not an iso-high-fidelity-call comparison.
+
+The sweep summaries are descriptive. Before making SOTA claims, extend the suite to locked external MF-HVKG/MOMF and single-fidelity baselines, preregister paired confidence intervals and correction for multiple comparisons, and publish per-seed/per-task results rather than only pooled averages.
