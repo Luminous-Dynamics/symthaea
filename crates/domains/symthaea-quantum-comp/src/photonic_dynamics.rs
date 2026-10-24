@@ -239,8 +239,14 @@ impl TransitionSchedule {
         time: f64,
         delta_t: f64,
     ) -> Result<f64, PhotonicDynamicsError> {
-        if !time.is_finite() || time < 0.0 || !delta_t.is_finite() || delta_t <= 0.0 {
+        if !time.is_finite() || time < 0.0 {
             return Err(PhotonicDynamicsError::InvalidScheduleTime { value: time });
+        }
+        if !delta_t.is_finite() || delta_t <= 0.0 {
+            return Err(PhotonicDynamicsError::InvalidParameter {
+                name: "delta_t",
+                value: delta_t,
+            });
         }
         let normalized_time = time / delta_t;
         if !normalized_time.is_finite() {
