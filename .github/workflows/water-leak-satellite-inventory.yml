@@ -1,0 +1,183 @@
+name: Water Leak Satellite Live Inventory
+
+on:
+  push:
+    branches:
+      - "research/water-leak-001-johannesburg-transfer"
+    paths:
+      - ".github/workflows/water-leak-satellite-inventory.trigger"
+  workflow_dispatch:
+    inputs:
+      bbox:
+        description: "WGS84 west,south,east,north bounding box. Default is coarse reconnaissance only, not an approved utility AOI."
+        required: true
+        default: "27.7,-26.5,28.4,-25.8"
+        type: string
+      start_date:
+        description: "Inclusive start date (UTC), YYYY-MM-DD"
+        required: true
+        default: "2023-01-01"
+        type: string
+      end_date:
+        description: "Inclusive end date (UTC), YYYY-MM-DD"
+        required: true
+        default: "2026-10-12"
+        type: string
+      reconnaissance_only:
+        description: "Acknowledge that the output is metadata discovery only and not a leak/coverage claim."
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: water-leak-satellite-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-tests:
+    name: Verify offline tooling before live query
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Require explicit reconnaissance acknowledgement
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RECON_ACK: ${{ inputs.reconnaissance_only }}
+        run: |
+          if [ "$RECON_ACK" != "true" ]; then
+            echo "::error::Set reconnaissance_only=true to explicitly acknowledge the result's limited scope."
+            exit 2
+          fi
+
+      - name: Compile and run deterministic offline tests
+        run: |
+          python3 -m py_compile tools/water_leak_satellite/strict_json.py tools/water_leak_satellite/catalog_inventory.py tools/water_leak_satellite/verify_inventory.py tools/water_leak_satellite/odata_inventory.py tools/water_leak_satellite/ground_truth.py tests/test_water_leak_satellite_*.py
+          python3 -m unittest discover -s tests -p 'test_water_leak_satellite_*.py' -v
+
+  live-catalog-inventory:
+    name: Live Copernicus scene inventory (reconnaissance only)
+    needs: offline-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      BBOX: ${{ inputs.bbox || '27.7,-26.5,28.4,-25.8' }}
+      START_DATE: ${{ inputs.start_date || '2023-01-01' }}
+      END_DATE: ${{ inputs.end_date || '2026-10-12' }}
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Inventory Sentinel-1 and Sentinel-2 metadata
+        run: |
+          python3 tools/water_leak_satellite/catalog_inventory.py \
+            --bbox "$BBOX" \
+            --start "$START_DATE" \
+            --end "$END_DATE" \
+            --limit 100 \
+            --max-pages 100 \
+            --timeout 45 \
+            --out artifacts/water-leak/satellite-catalog-inventory.json
+
+      - name: Verify saved inventory integrity
+        run: python3 tools/water_leak_satellite/verify_inventory.py artifacts/water-leak/satellite-catalog-inventory.json
+
+      - name: Print bounded inventory summary
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from tools.water_leak_satellite.strict_json import loads as strict_json_loads
+          p = Path("artifacts/water-leak/satellite-catalog-inventory.json")
+          data = strict_json_loads(p.read_text(encoding="utf-8"))
+          print("inventory_manifest_sha256=" + data["inventory_manifest_sha256"])
+          print("catalog_discovery_only=true")
+          print("scope_status=" + data["scope"]["study_area_status"])
+          print("bbox_wgs84=" + json.dumps(data["scope"]["bbox_wgs84"]))
+          print("start_date=" + data["scope"]["start_date_inclusive"])
+          print("end_date=" + data["scope"]["end_date_inclusive"])
+          for item in data["collections"]:
+              print(f"collection={item['collection']} scenes={item['item_count']} pages={item['page_count']} duplicates_dropped={item['duplicate_items_dropped']}")
+          print("No raster assets downloaded; counts do not establish usable coverage or leak performance.")
+          PY
+
+      - name: Upload auditable metadata inventory
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: water-leak-satellite-catalog-inventory
+          path: artifacts/water-leak/satellite-catalog-inventory.json
+          if-no-files-found: error
+          retention-days: 7
+
+  live-odata-inventory:
+    name: Live Copernicus OData cross-check (reconnaissance only)
+    needs: offline-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      BBOX: ${{ inputs.bbox || '27.7,-26.5,28.4,-25.8' }}
+      START_DATE: ${{ inputs.start_date || '2023-01-01' }}
+      END_DATE: ${{ inputs.end_date || '2026-10-12' }}
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Cross-check Sentinel-1 and Sentinel-2 products through OData
+        run: |
+          python3 tools/water_leak_satellite/odata_inventory.py \
+            --bbox "$BBOX" \
+            --start "$START_DATE" \
+            --end "$END_DATE" \
+            --limit 100 \
+            --max-pages 100 \
+            --window-months 3 \
+            --timeout 30 \
+            --retries 2 \
+            --out artifacts/water-leak/satellite-odata-inventory.json
+
+      - name: Verify saved OData inventory independently
+        run: python3 tools/water_leak_satellite/odata_inventory.py --verify artifacts/water-leak/satellite-odata-inventory.json
+
+      - name: Print OData metadata-only summary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from tools.water_leak_satellite.strict_json import loads
+          data = loads(Path("artifacts/water-leak/satellite-odata-inventory.json").read_text(encoding="utf-8"))
+          print("inventory_manifest_sha256=" + data["inventory_manifest_sha256"])
+          print("catalogue_discovery_only=true")
+          print("bbox_wgs84=" + str(data["scope"]["bbox_wgs84"]))
+          print("start_date=" + data["scope"]["start_date_inclusive"])
+          print("end_date=" + data["scope"]["end_date_inclusive"])
+          print("window_months=" + str(data["scope"]["window_months"]))
+          print("request_policy=" + str(data["request_policy"]))
+          for query in data["queries"]:
+              print(f"profile={query['profile_id']} window={query['start_date_inclusive']}..{query['end_date_exclusive']} products={query['item_count']} pages={query['page_count']} duplicates_dropped={query['duplicate_items_dropped']}")
+          print("No raster assets downloaded; products/footprints do not establish leak evidence or suitability.")
+          PY
+
+      - name: Upload OData metadata inventory
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: water-leak-satellite-odata-inventory
+          path: artifacts/water-leak/satellite-odata-inventory.json
+          if-no-files-found: error
+          retention-days: 7

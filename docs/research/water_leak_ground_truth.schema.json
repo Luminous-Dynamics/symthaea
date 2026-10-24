@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/water_leak_ground_truth.schema.json",
+  "title": "Water leak ground-truth corpus",
+  "description": "Strict schema for permissioned field-investigation records. Valid schema is not proof the represented physical outcome is true.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "water-leak-ground-truth-corpus/v1"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_id",
+        "zone_id",
+        "asset_segment_id",
+        "observed_at",
+        "outcome",
+        "location",
+        "verification",
+        "rights",
+        "evaluation_split",
+        "split_group_id"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "water-leak-ground-truth/v1"
+        },
+        "record_id": {
+          "$ref": "#/$defs/id"
+        },
+        "zone_id": {
+          "$ref": "#/$defs/id"
+        },
+        "asset_segment_id": {
+          "$ref": "#/$defs/id"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "outcome": {
+          "enum": [
+            "confirmed_leak",
+            "inspected_no_leak",
+            "inconclusive",
+            "unknown"
+          ]
+        },
+        "location": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "longitude",
+            "latitude",
+            "horizontal_uncertainty_m"
+          ],
+          "properties": {
+            "longitude": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "latitude": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "horizontal_uncertainty_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "coordinate_reference_system": {
+              "const": "EPSG:4326"
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "independent",
+            "evidence_sha256"
+          ],
+          "properties": {
+            "method": {
+              "enum": [
+                "excavation_confirmed",
+                "physical_flow_test",
+                "repair_postchange_verified",
+                "documented_no_leak_inspection",
+                "acoustic_localization_only",
+                "utility_record_only",
+                "complaint_only",
+                "unknown"
+              ]
+            },
+            "independent": {
+              "type": "boolean"
+            },
+            "evidence_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "post_repair_change_observed": {
+              "type": "boolean"
+            }
+          }
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "allowed_uses",
+            "permission_reference_sha256"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "allowed_uses": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "internal_research",
+                  "commercial_model_training",
+                  "commercial_inference",
+                  "public_redistribution"
+                ]
+              }
+            },
+            "permission_reference_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "evaluation_split": {
+          "enum": [
+            "train",
+            "threshold_validation",
+            "held_out_test",
+            "prospective_field"
+          ]
+        },
+        "split_group_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    }
+  }
+}
