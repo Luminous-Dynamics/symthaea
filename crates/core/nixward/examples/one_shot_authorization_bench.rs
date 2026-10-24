@@ -207,4 +207,8 @@ fn main() {
     );
     println!("measurement_scope=ledger.consume_only");
     println!("not_measured=process_launch,policy_latency,system_side_effects,global_bypass_paths");
+
+    if false_permits != 0 || false_blocks != 0 {
+        std::process::exit(1);
+    }
 }
