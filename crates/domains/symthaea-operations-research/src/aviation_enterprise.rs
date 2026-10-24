@@ -712,6 +712,30 @@ mod tests {
     }
 
     #[test]
+    fn factory_coupling_ablation_exposes_cross_domain_value() {
+        let integrated_scenario = reference_scenario();
+        let integrated = solve_exact(&integrated_scenario).unwrap();
+
+        // Ablation: hide factory production from the exact same scenario.
+        // This is a toy structural ablation, not a comparison to industry SOTA.
+        let mut production_blind = integrated_scenario.clone();
+        production_blind.production.available = false;
+        let siloed = solve_exact(&production_blind).unwrap();
+
+        assert_eq!(integrated.total_cost, 40);
+        assert_eq!(siloed.total_cost, 100);
+        assert_eq!(siloed.total_cost - integrated.total_cost, 60);
+        assert_eq!(
+            verify_plan(&integrated_scenario, &integrated).status,
+            VerificationStatus::Verified
+        );
+        assert_eq!(
+            verify_plan(&production_blind, &siloed).status,
+            VerificationStatus::Verified
+        );
+    }
+
+    #[test]
     fn exact_oracle_is_deterministic() {
         let scenario = reference_scenario();
         assert_eq!(solve_exact(&scenario), solve_exact(&scenario));
