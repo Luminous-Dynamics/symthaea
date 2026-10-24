@@ -7,10 +7,13 @@ import unittest
 from multifidelity_stress import (
     BudgetExceeded,
     FIDELITY_COSTS,
+    POLICIES,
     PolicyEvaluator,
     SyntheticCastingWorld,
     deterministic_sample,
     hypervolume_2d,
+    required_policy_costs,
+    run_cost_sweep,
     run_policy,
     run_suite,
     run_sweep,
@@ -131,8 +134,15 @@ class MultiFidelityStressTests(unittest.TestCase):
         second = run_sweep(seeds=(17, 23), severities=(0.5, 1.0), cost_budget=200, grid_size=9)
         self.assertEqual(first, second)
         self.assertTrue(first["synthetic_fixture_only"])
-        self.assertEqual(len(first["paired_runs"]), 2 * 2 * 4)
-        self.assertEqual(len(first["summary_by_policy_and_severity"]), 2 * 4)
+        self.assertEqual(len(first["paired_runs"]), 2 * 2 * len(POLICIES))
+        self.assertEqual(len(first["summary_by_policy_and_severity"]), 2 * len(POLICIES))
+        self.assertEqual(len(first["paired_comparisons_vs_high_only"]), 2 * (len(POLICIES) - 1))
+        for comparison in first["paired_comparisons_vs_high_only"]:
+            self.assertEqual(comparison["paired_seed_count"], 2)
+            self.assertLessEqual(
+                comparison["bootstrap_95_ci_mean_delta"]["lower"],
+                comparison["bootstrap_95_ci_mean_delta"]["upper"],
+            )
         for summary in first["summary_by_policy_and_severity"]:
             self.assertEqual(summary["seed_count"], 2)
             self.assertLessEqual(
@@ -142,6 +152,63 @@ class MultiFidelityStressTests(unittest.TestCase):
             self.assertLessEqual(
                 summary["median_normalized_hypervolume_fraction"],
                 summary["q75_normalized_hypervolume_fraction"],
+            )
+
+    def test_adaptive_budget_policy_allocates_by_cost_and_reconciles(self) -> None:
+        default = run_policy(
+            "adaptive_budget", seed=17, cost_budget=200, grid_size=9, severity=1.0
+        )
+        self.assertEqual(default["cost_spent"], 200)
+        self.assertEqual(default["fidelity_evaluations"], {"low": 60, "medium": 8, "high": 4})
+
+        costs = {"low": 1, "medium": 10, "high": 50}
+        budget = max(required_policy_costs(costs).values())
+        adaptive = run_policy(
+            "adaptive_budget", seed=17, cost_budget=budget, grid_size=9,
+            severity=1.0, fidelity_costs=costs,
+        )
+        self.assertEqual(budget, 400)
+        self.assertLessEqual(adaptive["cost_spent"], budget)
+        self.assertEqual(
+            adaptive["cost_spent"],
+            sum(adaptive["fidelity_cost_units_by_level"].values()),
+        )
+        self.assertEqual(
+            adaptive["fidelity_cost_units_by_level"],
+            {
+                fidelity: adaptive["fidelity_evaluations"][fidelity] * costs[fidelity]
+                for fidelity in costs
+            },
+        )
+        self.assertGreater(adaptive["high_fidelity_call_count"], 0)
+        self.assertGreater(adaptive["fidelity_evaluations"]["medium"], 0)
+
+    def test_cost_schedule_sweep_uses_one_common_absolute_budget(self) -> None:
+        schedules = (
+            {"low": 1, "medium": 5, "high": 25},
+            {"low": 1, "medium": 10, "high": 50},
+        )
+        result = run_cost_sweep(
+            seeds=(17, 23), severities=(0.5,), cost_schedules=schedules,
+            grid_size=9, bootstrap_samples=100,
+        )
+        self.assertEqual(result["cost_budget"], 400)
+        self.assertEqual(len(result["cost_schedules"]), 2)
+        self.assertTrue(all(item["cost_budget"] == 400 for item in result["cost_schedules"]))
+        self.assertEqual(len(result["paired_runs"]), 2 * 1 * 2 * len(POLICIES))
+        self.assertEqual(
+            len(result["paired_comparisons_vs_high_only"]),
+            2 * (len(POLICIES) - 1),
+        )
+        adaptive_rows = [
+            row for row in result["paired_runs"] if row["policy"] == "adaptive_budget"
+        ]
+        self.assertEqual(len(adaptive_rows), 4)
+        for row in adaptive_rows:
+            self.assertLessEqual(row["cost_spent"], result["cost_budget"])
+            self.assertEqual(
+                row["cost_spent"],
+                sum(row["fidelity_cost_units_by_level"].values()),
             )
 
     def test_custom_fidelity_cost_ratios_are_reported_and_reconciled(self) -> None:
