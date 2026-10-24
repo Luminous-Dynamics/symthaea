@@ -19,7 +19,7 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 const CORPUS_SIZES: [usize; 4] = [256, 1024, 4096, 16384];
 const PIVOT_COUNTS: [usize; 3] = [2, 4, 8];
 const CLUSTER_COUNT: usize = 8;
-const QUERY_SEED: u64 = 0xA11C_E001;
+const QUERY_SEED: u64 = 0xDEAD_BEEF_9876;
 const CORPUS_SEED: u64 = 0xA11C_C0A5;
 
 #[derive(Clone)]
