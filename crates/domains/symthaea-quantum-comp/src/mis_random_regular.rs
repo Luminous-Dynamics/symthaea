@@ -229,9 +229,9 @@ mod tests {
 
     fn canonical_graph_fnv1a64(graph: &MisGraph) -> String {
         let mut canonical =
-            format!("p edge {} {}\\n", graph.vertex_count(), graph.edges().len()).into_bytes();
+            format!("p edge {} {}\n", graph.vertex_count(), graph.edges().len()).into_bytes();
         for &(u, v) in graph.edges() {
-            canonical.extend_from_slice(format!("e {} {}\\n", u + 1, v + 1).as_bytes());
+            canonical.extend_from_slice(format!("e {} {}\n", u + 1, v + 1).as_bytes());
         }
         let mut hash = 0xcbf2_9ce4_8422_2325_u64;
         for byte in canonical {
