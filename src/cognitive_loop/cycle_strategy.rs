@@ -277,7 +277,7 @@ impl CognitiveLoopService {
     ) -> EncodingPhaseResult {
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
-        let mut encoding_result = self.encoder.encode(input);
+        let mut encoding_result = self.encoder.encode_at(input, self.stats.total_cycles as u64);
         let prediction_error = encoding_result.prediction_error;
         let prediction_error_valid = self.encoder.last_prediction_degeneracy()
             == symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine;
@@ -1071,8 +1071,10 @@ mod tests {
         assert!(svc.buffer.is_empty());
 
         // Force an explicitly present zero-norm prediction on the next cycle.
-        svc.encoder
-            .set_prediction(vec![0.0; svc.config.cfc_config.input_dim]);
+        svc.encoder.set_prediction_at(
+            vec![0.0; svc.config.cfc_config.input_dim],
+            svc.stats.total_cycles as u64,
+        );
         let second = svc.cycle("invalid PE zero norm regression");
         assert_eq!(second.prediction_error, 1.0);
         assert!(!second.prediction_error_valid);
