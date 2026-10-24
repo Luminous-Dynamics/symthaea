@@ -1,0 +1,56 @@
+name: VIS-DVPC-020 decision-value acquisition benchmark
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-acquisition-bench.rs"
+      - "tests/fixtures/vision-dvpc-020-actions.tsv"
+      - "tests/fixtures/vision-dvpc-020-oracle.tsv"
+      - "docs/research/VIS_DVPC_020_DECISION_VALUE_NEXT_EVALUATION_V1.md"
+      - ".github/workflows/vis-dvpc-020-acquisition-bench.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-acquisition-bench.rs"
+      - "tests/fixtures/vision-dvpc-020-actions.tsv"
+      - "tests/fixtures/vision-dvpc-020-oracle.tsv"
+      - "docs/research/VIS_DVPC_020_DECISION_VALUE_NEXT_EVALUATION_V1.md"
+      - ".github/workflows/vis-dvpc-020-acquisition-bench.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and fixtures
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Run unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-acquisition-bench.rs -o /tmp/vis-dvpc-020-tests
+          /tmp/vis-dvpc-020-tests
+
+      - name: Build standalone benchmark scorer
+        run: rustc --edition=2024 -O tools/vision-dvpc-acquisition-bench.rs -o /tmp/vis-dvpc-020
+
+      - name: Score value-aware adapter on the frozen synthetic fixture
+        run: |
+          actions_sha="$(sha256sum tests/fixtures/vision-dvpc-020-actions.tsv | cut -d ' ' -f1)"
+          oracle_sha="$(sha256sum tests/fixtures/vision-dvpc-020-oracle.tsv | cut -d ' ' -f1)"
+          /tmp/vis-dvpc-020 tests/fixtures/vision-dvpc-020-actions.tsv "$actions_sha" tests/fixtures/vision-dvpc-020-oracle.tsv "$oracle_sha" decision-value-lcb > /tmp/dvpc-020-voi.tsv
+          grep -q 'credited_regret_reduction_sum[[:space:]]0.450000000000' /tmp/dvpc-020-voi.tsv
+          grep -q 'reserved_cost_overrun_count[[:space:]]1' /tmp/dvpc-020-voi.tsv
+          grep -q 'unauthorized-source[[:space:]]d5[[:space:]]false[[:space:]]EXCLUDED_UNAUTHORIZED' /tmp/dvpc-020-voi.tsv
+          /tmp/vis-dvpc-020 tests/fixtures/vision-dvpc-020-actions.tsv "$actions_sha" tests/fixtures/vision-dvpc-020-oracle.tsv "$oracle_sha" highest-uncertainty > /tmp/dvpc-020-uncertainty.tsv
+          grep -q 'credited_regret_reduction_sum[[:space:]]0.000000000000' /tmp/dvpc-020-uncertainty.tsv
+
+      - name: Check formatting after executable tests
+        if: always()
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-acquisition-bench.rs
