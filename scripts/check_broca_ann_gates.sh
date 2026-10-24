@@ -47,6 +47,12 @@ for REPORT in "$@"; do
       if (x != x || x > ceiling) fail(name " = " value ", required <= " ceiling)
       else print "PASS: " name " = " value " (<= " ceiling ")"
     }
+    function check_strict_floor(value, floor, name,    x) {
+      if (value == "") return
+      x = value + 0
+      if (x != x || x <= floor) fail(name " = " value ", required > " floor)
+      else print "PASS: " name " = " value " (> " floor ")"
+    }
     BEGIN { FS = ","; OFS = "," }
 
     /^# / {
@@ -108,6 +114,8 @@ for REPORT in "$@"; do
       if (length(values["source_sha"]) != 40 || values["source_sha"] !~ /^[0-9a-fA-F]+$/)
         fail("missing/invalid 40-hex source SHA")
       if (!header_seen) fail("missing raw CSV header with group_id")
+      if (values["bootstrap_unit"] != "source_cluster_for_near_neighbor; singleton_query_for_novel")
+        fail("missing/unsupported group-bootstrap unit metadata")
       if (expected_count < 1) fail("missing LSH configuration list")
       if (expected_queries < 100) fail("unique query count " expected_queries ", required >= 100")
       if (expected_rounds < 1) fail("missing/invalid timing round count")
@@ -139,7 +147,7 @@ for REPORT in "$@"; do
         group_n = require_metric("near_neighbor_bootstrap_group_count", arm, "near-neighbor independent groups") + 0
         if (group_n < 10) fail("arm " arm " has fewer than 10 near-neighbor groups; interval is not qualified")
         lower = require_metric("near_neighbor_median_speedup_group_bootstrap_95ci_low", arm, "median speedup group-bootstrap lower bound")
-        if (lower != "") check_floor(lower, 1.0000001, "arm " arm " near-neighbor group-bootstrap lower 95% bound")
+        if (lower != "") check_strict_floor(lower, 1.0, "arm " arm " near-neighbor group-bootstrap lower 95% bound")
 
         check_floor(require_metric("near_neighbor_mean_recall_at_k", arm, "mean strict Recall@K"), 0.95, "arm " arm " near-neighbor mean strict Recall@K")
         check_floor(require_metric("near_neighbor_worst_recall_at_k", arm, "worst strict Recall@K"), 0.80, "arm " arm " near-neighbor worst strict Recall@K")
