@@ -263,5 +263,23 @@
     ],
     "reporting": "Keep detector metrics, task outcomes, decisions, safety/integrity, and resource costs separate. Preserve all failures and exclusions."
   },
-  "status_note": "This is a proposed protocol, not an implementation, test result, or performance claim. The replay driver, adapters, and experimental runs remain future work."
+  "status_note": "This is a proposed protocol, not an implementation, test result, or performance claim. The replay driver, adapters, and experimental runs remain future work.",
+  "confirmatory_inference": {
+    "primary_estimand": "Dataset-macro paired effect on post-shift task loss in the held-out dataset.",
+    "primary_comparison": {
+      "candidate": "staged-verify-rollback",
+      "reference": "detector-triggered",
+      "metric": "post_shift_task_loss",
+      "direction": "lower-is-better"
+    },
+    "alpha": 0.05,
+    "selection_rule": "Freeze the primary policy, metric, direction, and interpretation rule before examining held-out outcomes.",
+    "multiple_comparisons": "All other detector, policy, metric, and scenario comparisons are exploratory unless a comparison family and multiplicity-control procedure are preregistered before evaluation.",
+    "prohibition": "Do not select the best result from many detector/metric/scenario combinations and report its unadjusted interval as confirmatory evidence.",
+    "reporting": [
+      "Report effect size and paired uncertainty, all per-dataset effects, and leave-one-dataset-out sensitivity.",
+      "Report the number of exploratory comparisons and any multiplicity-control procedure used.",
+      "A coverage pass, positive unadjusted interval, or single-dataset win is not proof of broad SOTA superiority."
+    ]
+  }
 }
