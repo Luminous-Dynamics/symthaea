@@ -188,6 +188,19 @@ mod tests {
     }
 
     #[test]
+    fn legacy_serialized_snapshot_without_validity_fails_closed() {
+        let mut value = serde_json::to_value(CognitiveSnapshot::dormant()).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("prediction_error_valid");
+        object.insert("prediction_error".to_string(), serde_json::json!(0.75));
+
+        let restored: CognitiveSnapshot = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.prediction_error, 0.75);
+        assert!(!restored.prediction_error_valid);
+        assert_eq!(restored.prediction_error_sample(), None);
+    }
+
+    #[test]
     fn dormant_snapshot_renders() {
         let snap = CognitiveSnapshot::dormant();
         let (svg, state) = render_snapshot(&snap);
