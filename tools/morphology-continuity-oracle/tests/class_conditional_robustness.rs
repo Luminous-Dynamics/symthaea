@@ -623,6 +623,96 @@ fn select_next_calibration_class(
     best
 }
 
+fn future_policy_risks_by_calibration_outcome(
+    counts: [[u64; 3]; 3],
+    class_index: usize,
+    weights: [u64; 3],
+    decisions: &[[u32; 3]],
+    actions: [usize; 3],
+) -> Option<[f64; 3]> {
+    if class_index >= 3 {
+        return None;
+    }
+    let mut risks = [0.0; 3];
+    for (outcome_index, risk) in risks.iter_mut().enumerate() {
+        let mut updated = counts;
+        updated[class_index][outcome_index] =
+            updated[class_index][outcome_index].checked_add(1)?;
+        *risk = worst_policy_risk_from_counts(updated, weights, decisions, actions)?;
+    }
+    Some(risks)
+}
+
+/// Conservative one-step calibration allocator. For each candidate class, maximizes expected
+/// future robust risk over every vertex of the declared predictive-row ambiguity polytope.
+/// A class is eligible only when its worst-case expected risk reduction is positive.
+fn select_next_calibration_class_robust(
+    counts: [[u64; 3]; 3],
+    predictive_ambiguity: [[Interval; 3]; 3],
+    weights: [u64; 3],
+    decisions: &[[u32; 3]],
+    actions: [usize; 3],
+    class_costs: [f64; 3],
+) -> Option<(usize, f64)> {
+    if class_costs.iter().any(|cost| !cost.is_finite() || *cost <= 0.0) {
+        return None;
+    }
+    let current_risk = worst_policy_risk_from_counts(counts, weights, decisions, actions)?;
+    let mut best: Option<(usize, f64)> = None;
+
+    for (class_index, class_cost) in class_costs.iter().enumerate() {
+        let predictive_vertices = row_vertices(predictive_ambiguity[class_index]);
+        if predictive_vertices.is_empty() {
+            return None;
+        }
+        let outcome_risks = future_policy_risks_by_calibration_outcome(
+            counts,
+            class_index,
+            weights,
+            decisions,
+            actions,
+        )?;
+        let worst_future_risk = predictive_vertices
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .zip(outcome_risks.iter())
+                    .map(|(probability, risk)| {
+                        f64::from(*probability) * *risk / f64::from(PROBABILITY_SCALE)
+                    })
+                    .sum::<f64>()
+            })
+            .max_by(f64::total_cmp)?;
+        let worst_case_improvement = current_risk - worst_future_risk;
+        if worst_case_improvement <= EPSILON {
+            continue;
+        }
+        let value_per_cost = worst_case_improvement / *class_cost;
+        if best.is_none_or(|(_, best_value)| value_per_cost > best_value + EPSILON) {
+            best = Some((class_index, value_per_cost));
+        }
+    }
+    best
+}
+
+fn predictive_ambiguity_from_rows(lower: [[u16; 3]; 3], upper: [[u16; 3]; 3]) -> Option<[[Interval; 3]; 3]> {
+    let mut ambiguity = [[Interval { lower: 0, upper: 0 }; 3]; 3];
+    for row_index in 0..3 {
+        let mut row = [Interval { lower: 0, upper: 0 }; 3];
+        for outcome_index in 0..3 {
+            row[outcome_index] = Interval {
+                lower: lower[row_index][outcome_index],
+                upper: upper[row_index][outcome_index],
+            };
+        }
+        if row_vertices(row).is_empty() {
+            return None;
+        }
+        ambiguity[row_index] = row;
+    }
+    Some(ambiguity)
+}
+
 fn nominal_counts(per_class: u64) -> [[u64; 3]; 3] {
     [
         [per_class * 95 / 100, per_class * 5 / 100, 0],
@@ -935,6 +1025,61 @@ fn joint_prior_and_matrix_robustness_is_invariant_to_class_relabeling() {
         assert!((result.1 - base.1).abs() <= EPSILON);
         assert!((result.2 - base.2).abs() <= EPSILON);
     }
+}
+
+#[test]
+fn plug_in_allocator_can_increase_risk_when_its_predictive_row_is_misspecified() {
+    let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed policy");
+    let plug_in = select_next_calibration_class(
+        counts, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+    ).expect("nominal positive-value class");
+    assert_eq!(plug_in.0, 1);
+    assert!((plug_in.1 - 0.30528).abs() <= EPSILON);
+
+    let shifted_truth = [[950, 50, 0], [950, 50, 0], [50, 950, 0]];
+    let current_risk = worst_policy_risk_from_counts(
+        counts, PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid current risk");
+    let shifted_table_future = expected_risk_after_one_calibration_sample(
+        counts, 1, shifted_truth, PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid shifted predictive row");
+    let shifted_stool_future = expected_risk_after_one_calibration_sample(
+        counts, 2, shifted_truth, PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("valid stool predictive row");
+    assert!((current_risk - 15.5128).abs() <= EPSILON);
+    assert!((shifted_table_future - 16.97008).abs() <= EPSILON);
+    assert!((shifted_stool_future - 15.41104).abs() <= EPSILON);
+    assert!(shifted_table_future > current_risk, "plug-in table sampling increases expected risk");
+    assert!(shifted_stool_future < current_risk, "the shifted model makes stool the better sample");
+
+    let ambiguity = predictive_ambiguity_from_rows(
+        [[950, 50, 0], [50, 50, 0], [50, 50, 0]],
+        [[950, 50, 0], [950, 950, 0], [950, 950, 0]],
+    ).expect("valid bounded predictive ambiguity");
+    let robust = select_next_calibration_class_robust(
+        counts, ambiguity, PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+    ).expect("chair has positive value for every plausible chair predictive row");
+    assert_eq!(robust.0, 0);
+    assert!((robust.1 - 0.02544).abs() <= EPSILON);
+}
+
+#[test]
+fn robust_predictive_allocator_abstains_when_every_class_has_nonpositive_worst_case_value() {
+    let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed policy");
+    let ambiguity = predictive_ambiguity_from_rows(
+        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+        [[1000, 1000, 0], [1000, 1000, 0], [1000, 1000, 0]],
+    ).expect("all two-outcome rows are feasible");
+    assert_eq!(
+        select_next_calibration_class_robust(
+            counts, ambiguity, PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+        ),
+        None
+    );
 }
 
 #[test]
