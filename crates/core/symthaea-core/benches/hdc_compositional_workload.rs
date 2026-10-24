@@ -191,7 +191,7 @@ fn calibrate_acceptance_threshold(
 /// Calibrate on clean cues and unknown values, then evaluate only on distinct
 /// held-out record IDs and unknown-value seeds. Noise is applied after the
 /// clean threshold is frozen so the robustness curve cannot retune itself.
-fn open_set_diagnostics(workload: &CompositionalWorkload) {
+fn open_set_diagnostics(workload: &CompositionalWorkload, arity: usize) {
     let n = workload.corpus.len();
     let known_calibration: Vec<f32> = (0..OPEN_SET_CALIBRATION_COUNT)
         .map(|i| {
@@ -228,8 +228,7 @@ fn open_set_diagnostics(workload: &CompositionalWorkload) {
             "open-set-acceptance arity={} n={} noise_bps={} threshold_similarity={:.6} \
              cal_fnr={:.3} cal_fpr={:.3} test_fnr={:.3} test_fpr={:.3} \
              test_known={}/{} test_unknown_false_accepts={}/{}",
-            // The arity is inferred by the caller's current workload label.
-            0,
+            arity,
             n,
             noise_bps,
             threshold.score,
@@ -348,6 +347,7 @@ fn bench_compositional_retrieval(c: &mut Criterion) {
     for arity in BUNDLE_ARITIES {
         for corpus_size in CORPUS_SIZES {
             let workload = build_workload(corpus_size, arity);
+            open_set_diagnostics(&workload, arity);
             for noise_bps in QUERY_NOISE_BPS {
                 let summary = summarize_retrieval(&workload, noise_bps);
                 eprintln!(
