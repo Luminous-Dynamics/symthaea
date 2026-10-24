@@ -624,6 +624,74 @@ mod tests {
     }
 
     #[test]
+    fn exact_identity_requires_provenance_and_freshness() {
+        let mut missing_provenance = candidate();
+        missing_provenance.provenance = EvidenceStatus::Missing;
+        assert_eq!(
+            decide(
+                &RetrievalMode::ExactIdentity {
+                    requested_record_id: "record-7".to_owned(),
+                    requested_version: Some("v2".to_owned()),
+                },
+                Some(&missing_provenance),
+            ),
+            RetrievalDecision::Abstain {
+                reason: DecisionReason::MissingProvenance,
+            }
+        );
+
+        let mut failed_freshness = candidate();
+        failed_freshness.freshness = EvidenceStatus::Failed;
+        assert_eq!(
+            decide(
+                &RetrievalMode::ExactIdentity {
+                    requested_record_id: "record-7".to_owned(),
+                    requested_version: Some("v2".to_owned()),
+                },
+                Some(&failed_freshness),
+            ),
+            RetrievalDecision::Abstain {
+                reason: DecisionReason::FailedFreshness,
+            }
+        );
+    }
+
+    #[test]
+    fn score_and_margin_thresholds_are_inclusive() {
+        let mut item = candidate();
+        item.score = Some(0.8);
+        item.margin = Some(0.1);
+        assert_eq!(
+            decide(
+                &RetrievalMode::Semantic {
+                    minimum_score: 0.8,
+                    minimum_margin: 0.1,
+                },
+                Some(&item),
+            ),
+            RetrievalDecision::AcceptedSemantic {
+                record_id: "record-7".to_owned(),
+                score: 0.8,
+                margin: 0.1,
+            }
+        );
+
+        item.margin = None;
+        assert_eq!(
+            decide(
+                &RetrievalMode::OpenSet {
+                    minimum_score: 0.8,
+                    minimum_margin: 0.1,
+                },
+                Some(&item),
+            ),
+            RetrievalDecision::Abstain {
+                reason: DecisionReason::InvalidMargin,
+            }
+        );
+    }
+
+    #[test]
     fn missing_candidate_returns_no_match() {
         assert_eq!(
             decide(
