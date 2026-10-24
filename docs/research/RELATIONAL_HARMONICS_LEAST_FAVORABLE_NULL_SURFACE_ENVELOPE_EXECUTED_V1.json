@@ -1,0 +1,66 @@
+{
+  "schema": "rh006-least-favorable-null-surface-envelope-receipt/v1",
+  "status": "research-diagnostic-only",
+  "formal_inference": false,
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "script_sha256_local_execution": "927c959e38b0067d43cf6a0152449cd916f364e21b3eeeecfc9290c69dcc9d24",
+  "repository_script_git_blob_sha1": "d9158acc5f4de627d57a184230ef7851de7b3a42",
+  "source_execution_identity": {
+    "byte_identity_claim": false,
+    "reason": "The repository connector exposes the committed script as Git blob d9158acc..., while the local execution file had SHA-256 927c959e...; no byte-identical exact-execution claim is made."
+  },
+  "pilot_12x1x49": {
+    "seed": 20261040,
+    "paths": 12,
+    "outcomes_per_point": 1,
+    "bootstrap": 49,
+    "directions_total": 16,
+    "scenarios": {
+      "iid": {"min_reject_rate": 0.0, "max_reject_rate": 0.25, "median_direction_reject_rate": 0.08333333333333333, "root_support_rate_min": 1.0, "root_support_rate_max": 1.0},
+      "ar_0_5": {"min_reject_rate": 0.0, "max_reject_rate": 0.16666666666666666, "median_direction_reject_rate": 0.0, "root_support_rate_min": 1.0, "root_support_rate_max": 1.0},
+      "ar_0_8": {"min_reject_rate": 0.0, "max_reject_rate": 0.08333333333333333, "median_direction_reject_rate": 0.0, "root_support_rate_min": 1.0, "root_support_rate_max": 1.0},
+      "ar_0_5_heteroskedastic": {"min_reject_rate": 0.0, "max_reject_rate": 0.16666666666666666, "median_direction_reject_rate": 0.08333333333333333, "root_support_rate_min": 1.0, "root_support_rate_max": 1.0}
+    }
+  },
+  "focus_ar_0_5_heteroskedastic_50x2x99": {
+    "seed": 20261050,
+    "paths": 50,
+    "outcomes_per_point": 2,
+    "bootstrap": 99,
+    "directions_total": 16,
+    "root_points": 800,
+    "total_possible_points": 800,
+    "min_reject_rate": 0.0,
+    "max_reject_rate": 0.02,
+    "median_direction_reject_rate": 0.0,
+    "root_support_rate": 1.0,
+    "top_directions": [
+      {"direction": "d02+", "reject_rate": 0.02, "root_median": 0.21543342563817214, "mean_p": 0.5047},
+      {"direction": "d07+", "reject_rate": 0.02, "root_median": 0.14594570998049294, "mean_p": 0.4642},
+      {"direction": "d00+", "reject_rate": 0.0, "root_median": 0.1459800375656422, "mean_p": 0.4682}
+    ]
+  },
+  "execution_limitations": [
+    "An initial unvectorized envelope implementation timed out and was discarded as non-evidence.",
+    "A planned 100-path x 2-outcome x 99-bootstrap AR(0.5)+heteroskedastic focus rerun exceeded the execution ceiling and is excluded.",
+    "The completed 12-path pilot has coarse directional rejection fractions and is not used to infer size."
+  ],
+  "scientific_conclusion": {
+    "surface_envelope": "The deeper completed AR(0.5)+heteroskedastic focus shows no systematic over-rejection across the fixed 16-direction grid; the maximum directional rejection is 2%.",
+    "pilot_noise": "The earlier 25% and 16.7% maxima from the 12-path pilot are consistent with coarse Monte Carlo resolution and should not be interpreted as evidence of size failure.",
+    "support_gate": "Null-root existence remains a separate first-class gate. Severe weak-direction root-support failures already occur in the previously tested epsilon=1e-4, ridge=1e-4 regime.",
+    "least_favorable": "A finite-grid maximum is a diagnostic envelope, not a mathematically justified least-favorable critical value. Uniform testing still requires a prespecified admissible surface and a valid worst-case calibration argument."
+  },
+  "next_gate": {
+    "name": "curvature/eigenstructure null-surface parameterization",
+    "requirements": [
+      "parameterize the actual quadratic equal-risk surface using Q eigenstructure and sign-asymmetric branches rather than arbitrary coefficient directions alone",
+      "stratify by root existence and local curvature",
+      "evaluate estimated-nuisance calibration within each stratum",
+      "include weak-identification stress regimes explicitly",
+      "preserve origin-local conditioning and hypothesis-preservation gates",
+      "keep projected estimands separate from the original three-channel hypothesis"
+    ]
+  }
+}

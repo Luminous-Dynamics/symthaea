@@ -1,0 +1,79 @@
+{
+  "schema": "relational-prediction-inference-selection-rule/v1",
+  "rule_id": "relational-inference-selection-rule-v1",
+  "scope": {
+    "analysis_family": "held-out-forecast-accuracy",
+    "primary_feature_set": "RelationalAugmented",
+    "benchmark_feature_set": "NonRelationalContext",
+    "loss": "squared_error",
+    "forecast_horizon": "fixed-single-horizon"
+  },
+  "ordered_rules": [
+    {
+      "id": "R1",
+      "when": "qualification is not validated against its exact retained input/provenance identity",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R2",
+      "when": "forecast horizon is non-positive, non-finite, or inconsistent across retained targets",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R3",
+      "when": "primary comparison is not the prespecified nested RelationalAugmented vs NonRelationalContext comparison",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R4",
+      "when": "single-window qualification is below the evaluator's structural minimum of 4 held-out target samples",
+      "then": "stop-assumption-failure",
+      "note": "This is an evaluator admissibility floor, not a claim that 4 samples provide adequate power or inferential precision."
+    },
+    {
+      "id": "R5",
+      "when": "rolling-origin qualification is below the evaluator's structural minimum of 4 origins, or held-out target windows are not disjoint",
+      "then": "stop-assumption-failure",
+      "note": "The origin floor is a structural prerequisite for this evidence packet, not a claim that 4 origins make an inferential result reliable."
+    },
+    {
+      "id": "R6",
+      "when": "the qualification/binding and loss-dependence characterization are valid, the estimator/procedure compatibility artifact explicitly approves the exact evaluator, the analysis remains within fixed-horizon v1 scope, the small-sample policy is small-sample-conservative-v1, the multiplicity policy is single-primary-comparison-v1, and the selected procedure bundle exactly matches the declared v1 nested forecast bootstrap",
+      "then": "nested-fixed-horizon-bootstrap"
+    },
+    {
+      "id": "R7",
+      "when": "any R1-R6 prerequisite fails, the estimator/procedure applicability mapping is missing or not approved for the exact estimator, dependence characterization is missing/invalid, a different or unregistered inferential bundle is requested, or a joint multi-horizon analysis is introduced",
+      "then": "stop-assumption-failure"
+    }
+  ],
+  "selected_method_bundle": {
+    "procedure_id": "nested-forecast-bootstrap-v1",
+    "dependence_method_id": "loss-dependence-bartlett-v1",
+    "resampling_method_id": "moving-block-bootstrap-v1",
+    "small_sample_policy_id": "small-sample-conservative-v1",
+    "multiplicity_policy_id": "single-primary-comparison-v1",
+    "procedure_spec_sha256": "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+    "dependence_spec_sha256": "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+    "resampling_spec_sha256": "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
+    "estimator_compatibility_id": "fixed-ridge-standardized-v1",
+    "estimator_compatibility_spec_sha256": "703ff832ca6fed91ca05d76c891ba6b2edb3bf063e7af40a23ae2c475061027e"
+  },
+  "decision_semantics": {
+    "rule_execution": "compiled-v1-rule-mirror",
+    "branch_recording": "ForecastInferenceSelectionReceipt",
+    "result_dependent_method_switching": false,
+    "temporal_preregistration_proof_in_code": false,
+    "structural_floors_are_not_adequacy_claims": true,
+    "estimator_compatibility_must_be_approved_before_inference": true
+  },
+  "method_specification_artifacts": {
+    "procedure": "docs/research/RELATIONAL_HARMONICS_NESTED_FORECAST_BOOTSTRAP_V1.json",
+    "procedure_sha256": "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+    "dependence": "docs/research/RELATIONAL_HARMONICS_LOSS_DEPENDENCE_BARTLETT_V1.json",
+    "dependence_sha256": "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+    "resampling": "docs/research/RELATIONAL_HARMONICS_MOVING_BLOCK_BOOTSTRAP_V1.json",
+    "resampling_sha256": "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
+    "estimator_compatibility_sha256": "703ff832ca6fed91ca05d76c891ba6b2edb3bf063e7af40a23ae2c475061027e"
+  }
+}

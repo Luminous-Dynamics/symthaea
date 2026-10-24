@@ -1,0 +1,16 @@
+{
+  "schema": "rh006-crosscov-execution-correction/v1",
+  "status": "superseded-unverified",
+  "supersedes": "docs/research/RELATIONAL_HARMONICS_JOINT_DGP_RISK_SURFACE_CROSS_MOMENT_EXECUTED_V1.json",
+  "reason": [
+    "The prior cross-moment receipt recorded a repository artifact SHA-256 that was not independently recomputed from the repository source in the verification loop.",
+    "The prior numerical execution was not byte-identity-verified against the repository source.",
+    "The generalized cross-covariance result recorded now is the authoritative independently executed diagnostic for this continuation."
+  ],
+  "replacement": "docs/research/RELATIONAL_HARMONICS_CROSSCOV_GENERALIZED_TOPOLOGY_EXECUTED_V1.json",
+  "scientific_boundary": {
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  }
+}

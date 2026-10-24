@@ -1,0 +1,49 @@
+{
+  "schema": "rh006-null-surface-locality-branch-conditioning-derived/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "formal_inference": false,
+  "derivation": {
+    "quadratic_null": "Delta(gamma)=gamma'Qgamma+b'gamma+c",
+    "ray": "gamma=t u, ||u||=1, t>0",
+    "coefficients": "A=u'Qu, B=b'u, C=c",
+    "discriminant": "D(u)=B^2-4AC=u'(bb'-4cQ)u",
+    "radial_derivative": "partial_t Delta=2At+B",
+    "exact_root_identity": "(2At+B)^2=D(u) at every quadratic root",
+    "branch_sensitivity": "|partial_t Delta|=sqrt(D(u)); first-order delta_t is proportional to 1/sqrt(D(u)) for fixed coefficient perturbation"
+  },
+  "weak_feature_limit": {
+    "direction": [0.0, 0.4472135954999579, -0.8944271909999159],
+    "epsilon_to_zero_relationship": "a2b -> al and b2a -> 0.25+0.5 al",
+    "u_dot_Z_limit": -0.22360679774997896,
+    "interpretation": "The weak-ray coefficient radius maps to an outcome-space mean-shift magnitude approximately 0.2236068*t."
+  },
+  "recorded_root_medians": {
+    "epsilon_1e-2": 14.2394285,
+    "epsilon_1e-3": 110.6787,
+    "epsilon_1e-4": 8895.1428
+  },
+  "derived_effect_scales": {
+    "epsilon_1e-2": 3.1840330086747866,
+    "epsilon_1e-3": 24.7485096861306,
+    "epsilon_1e-4": 1989.0143970367815
+  },
+  "provenance": {
+    "source_geometry_receipt": "docs/research/RELATIONAL_HARMONICS_NULL_SURFACE_EIGENSTRUCTURE_EXECUTED_V1.json",
+    "source_dgp": "scripts/research/rh006_null_surface_eigenstructure_splitmix64.py",
+    "derived_with": "deterministic algebraic transformation of declared DGP and recorded root medians",
+    "new_monte_carlo": false
+  },
+  "scientific_conclusion": "The severe weak-direction null is remote in outcome space, not merely in coefficient space. Discriminant collapse simultaneously marks loss of ray intersection and loss of radial branch conditioning.",
+  "next_gate": "predeclare an effect/risk-radius ladder and test continuous surface support and branch conditioning within that local scientific estimand.",
+  "nonclaims": [
+    "No formal p-value.",
+    "No confidence interval.",
+    "No uniform size guarantee.",
+    "No least-favorable critical value.",
+    "No empirical validation.",
+    "No claim that the derived effect-radius policy has already been selected for formal inference."
+  ],
+  "payload_sha256": "e8211e609fcd700c0723b1438e390c509947bcf2f379483f8ce04dedaf1cbf79"
+}

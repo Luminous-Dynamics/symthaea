@@ -1,0 +1,74 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v7",
+  "status": "not-approved-for-execution",
+  "predecessor": "docs/research/RELATIONAL_HARMONICS_INFERENCE_ESTIMATOR_APPLICABILITY_V6.json",
+  "current_evaluator": {
+    "estimator_id": "fixed-ridge-standardized-v1",
+    "training_preprocessing": "feature means and scales fit on the training window only",
+    "fit": "ridge-regularized linear model with deterministic Gaussian elimination",
+    "rolling_estimation": "fresh fit at every origin",
+    "primary_comparison": ["RelationalAugmented", "NonRelationalContext"]
+  },
+  "gates": {
+    "origin_local_conditioning": "required",
+    "hypothesis_preservation": "required",
+    "finite_sample_null_support": "required",
+    "estimated_nuisance_null": "required",
+    "uniform_null_surface": "required",
+    "least_favorable": "not-established",
+    "weak_identification": "requires robust calibration",
+    "null_surface_eigenstructure": "characterized",
+    "surface_criticality": "required",
+    "branch_conditioning": "derived",
+    "null_locality": "requires declared scientific radius or global estimand",
+    "effect_locality": "requires effect-space declaration",
+    "bootstrap_operator_equivalence": "established only for fixed-feature conditional refit equivalence",
+    "joint_feature_outcome_law": "explicit conditional risk-surface derivation now exists for the declared shared-shock construction",
+    "joint_dgp_risk_surface": "derived and executed",
+    "joint_dgp_topology": "executed; global discriminant signature transitions from +++ to --+",
+    "joint_dgp_uniform_calibration": "not-established",
+    "joint_dgp_resampling_validity": "not-established",
+    "rust_implementation_validation": "not-established"
+  },
+  "evidence": {
+    "joint_endogeneity_stress": "docs/research/RELATIONAL_HARMONICS_JOINT_FEATURE_OUTCOME_ENDOGENEITY_EXECUTED_V1.json",
+    "joint_risk_surface": "docs/research/RELATIONAL_HARMONICS_JOINT_DGP_RISK_SURFACE_CROSS_MOMENT_V1.md",
+    "joint_risk_surface_receipt": "docs/research/RELATIONAL_HARMONICS_JOINT_DGP_RISK_SURFACE_CROSS_MOMENT_EXECUTED_V1.json",
+    "joint_risk_surface_script": "scripts/research/rh006_joint_dgp_risk_surface_cross_moment_v2.py",
+    "operator_equivalence": "docs/research/RELATIONAL_HARMONICS_BOOTSTRAP_OPERATOR_EQUIVALENCE_AUDIT_V1.json"
+  },
+  "scientific_state": {
+    "joint_surface_form": "Delta(gamma;omega)=gamma'Qgamma+(b0+omega*b1)'gamma+c0+omega*c1+omega^2*c2",
+    "quadratic_in_gamma": true,
+    "q_fixed_in_omega_for_declared_shared_shock": true,
+    "global_topology_at_omega_0": "+++",
+    "global_topology_at_omega_0_5": "--+",
+    "global_topology_at_omega_0_9": "--+",
+    "median_c_zero_omega": 0.29238242041830853,
+    "weak_ray_support_at_omega_0_9": 0.0,
+    "strong_ray_support_at_omega_0_9": 0.0,
+    "global_positive_discriminant_eigenvalue_median_at_omega_0_9": 3.979367220243211e-05,
+    "mc_identity_check_max_absolute_error": 3.670447118691979e-05
+  },
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "define the scientifically admissible joint feature/outcome nuisance class",
+      "derive the matching estimator/procedure bridge for that joint law",
+      "establish a resampler that preserves the joint law and refits the exact rolling estimator when required",
+      "stratify calibration by joint cross-moment strength, Q curvature, discriminant topology, branch conditioning, and effect radius",
+      "evaluate prospective null size across independence and endogenous regimes",
+      "establish weak-identification robustness or justify a restricted local estimand",
+      "validate the actual Rust implementation independently from the mechanics mirror",
+      "preserve the declared scientific estimand under projection, regularization, and nuisance restriction"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "no_confidence_interval_claim": true,
+    "synthetic_calibration_is_not_empirical_validation": true,
+    "global_topology_is_not_least_favorable_calibration": true,
+    "joint_surface_derivation_is_not_bootstrap_validity": true
+  }
+}

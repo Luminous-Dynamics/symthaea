@@ -1,0 +1,42 @@
+{
+  "schema": "rh006-origin-local-conditioning-adversary-executed/v1",
+  "status": "research-diagnostic-only",
+  "faithfulness_scope": "independent deterministic mirror of the repository experiment; local execution was not a direct execution of the committed repository file",
+  "execution": {
+    "committed_script_blob_sha": "1a925c01c215b3906823762a08be4e7349cc5123",
+    "local_mirror_note": "Same SplitMix64 generator, 48/4/16/24/16 geometry, seven AR(0.35) feature sources, exact last-origin rank-one adversary, and per-origin/pooled singular-ratio calculations.",
+    "command": "python scripts/research/rh006_origin_local_conditioning_adversary_splitmix64.py --paths 8 --seed 20261017"
+  },
+  "geometry": {
+    "train": 48,
+    "test": 16,
+    "gap": 4,
+    "origins": 24,
+    "step": 16,
+    "paths": 8,
+    "target_threshold": 0.001
+  },
+  "results": [
+    {
+      "case": "baseline",
+      "pooled_min_singular_ratio_median": 0.3496179070700479,
+      "local_min_singular_ratio_median": 0.2718515742998961,
+      "last_origin_ratio_median": 0.3313154958190066,
+      "paths_with_any_origin_below_1e-3": 0
+    },
+    {
+      "case": "adversarial_last_origin",
+      "pooled_min_singular_ratio_median": 0.33002783893308013,
+      "local_min_singular_ratio_median": 4.893137763204144e-33,
+      "last_origin_ratio_median": 4.893137763204144e-33,
+      "paths_with_any_origin_below_1e-3": 8
+    }
+  ],
+  "interpretation": {
+    "finding": "A pooled SVD can remain apparently well-conditioned while one actual rolling training window is singular. The conditioning policy must therefore be origin-local, with the aggregate decision failing closed if any required forecast origin is inadmissible.",
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  },
+  "payload_sha256": "521c8e92a3fa185caf473597ccac04fc482c2d40906f3767c18f274f13ccd8a1"
+}

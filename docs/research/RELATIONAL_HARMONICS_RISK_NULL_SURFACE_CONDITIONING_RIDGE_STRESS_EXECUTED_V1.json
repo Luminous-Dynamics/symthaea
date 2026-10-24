@@ -1,0 +1,41 @@
+{
+  "execution": {
+    "command": "python scripts/research/rh006_null_surface_conditioning_ridge_stress_splitmix64.py --paths 8 --directions 256 --seed 20261013 --ridges 0 1e-12 1e-10 1e-8 1e-6 1e-4 1e-2",
+    "script_sha256": "192b601ba776bcd6ef44646cfb7ce69a570106059a38a8511a88cba1ed2ab338"
+  },
+  "faithfulness_scope": "independent estimator-mechanics reimplementation; not the Symthaea Rust implementation",
+  "geometry": {
+    "alpha": 0.05,
+    "epsilons": [0.01,0.001,0.0001,0.0],
+    "gap": 4,
+    "heteroskedastic_strength": 0.1,
+    "origins": 24,
+    "outcome_rho": 0.8,
+    "ridges": [0.0,1e-12,1e-10,1e-08,1e-06,0.0001,0.01],
+    "step": 16,
+    "surface_directions": 256,
+    "test": 16,
+    "train": 48
+  },
+  "status": "research-diagnostic-only",
+  "interpretation": {
+    "applicability":"not-approved-for-execution",
+    "formal_inference":false,
+    "selection":"stop-assumption-failure",
+    "finding":"Positive ridge restores numerical solvability under exact collinearity but not identification of the nearly flat equal-risk surface."
+  },
+  "selected_results": [
+    {"epsilon":0.0,"ridge":0.0,"paths":8,"singular_paths":8,"design_condition_max_median":7.658162351410026e16,"Q_condition_abs_median":null,"Q_eigen_min_median":null,"Q_rank_tol_1e-10_min":null,"positive_root_median_mean":null,"positive_root_max_global":null},
+    {"epsilon":0.0,"ridge":1e-8,"paths":8,"singular_paths":0,"design_condition_max_median":7.658162351410026e16,"Q_condition_abs_median":2.582500683770032e16,"Q_eigen_min_median":-3.845998473516532e-18,"Q_rank_tol_1e-10_min":1,"positive_root_median_mean":0.1603635079243229,"positive_root_max_global":37.29761510296468},
+    {"epsilon":0.0,"ridge":0.0001,"paths":8,"singular_paths":0,"design_condition_max_median":7.658162351410026e16,"Q_condition_abs_median":2.5684379190779004e16,"Q_eigen_min_median":-3.9294969060849526e-18,"Q_rank_tol_1e-10_min":1,"positive_root_median_mean":0.1603633185275006,"positive_root_max_global":37.29757137341507},
+    {"epsilon":0.0001,"ridge":0.0,"paths":8,"singular_paths":0,"design_condition_max_median":33774.38485639509,"Q_condition_abs_median":543467127.9850097,"Q_eigen_min_median":1.7650198440742238e-10,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.26909864572062625,"positive_root_max_global":61.91925831973077},
+    {"epsilon":0.0001,"ridge":1e-8,"paths":8,"singular_paths":0,"design_condition_max_median":33774.38485639509,"Q_condition_abs_median":545022858.8921341,"Q_eigen_min_median":1.7594720718123328e-10,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.2636475511460178,"positive_root_max_global":60.501643218983105},
+    {"epsilon":0.0001,"ridge":0.0001,"paths":8,"singular_paths":0,"design_condition_max_median":33774.38485639509,"Q_condition_abs_median":14329959356.425102,"Q_eigen_min_median":-6.9272113740339345e-12,"Q_rank_tol_1e-10_min":1,"positive_root_median_mean":0.16034761113362214,"positive_root_max_global":37.32515360621677},
+    {"epsilon":0.001,"ridge":0.0,"paths":8,"singular_paths":0,"design_condition_max_median":3282.1379159277058,"Q_condition_abs_median":5423757.781061184,"Q_eigen_min_median":1.7800015459905454e-08,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.2779141449579069,"positive_root_max_global":61.786065586554656},
+    {"epsilon":0.001,"ridge":1e-8,"paths":8,"singular_paths":0,"design_condition_max_median":3282.1379159277058,"Q_condition_abs_median":5423759.350636782,"Q_eigen_min_median":1.7800009747489235e-08,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.2778565294584189,"positive_root_max_global":61.77281185766745},
+    {"epsilon":0.001,"ridge":0.0001,"paths":8,"singular_paths":0,"design_condition_max_median":3282.1379159277058,"Q_condition_abs_median":20035587.767352022,"Q_eigen_min_median":4.897010759861522e-09,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.1885025347021752,"positive_root_max_global":43.441296791913686},
+    {"epsilon":0.01,"ridge":0.0,"paths":8,"singular_paths":0,"design_condition_max_median":358.1784715144796,"Q_condition_abs_median":52558.2257848802,"Q_eigen_min_median":1.8343407800577686e-06,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.27805483508472006,"positive_root_max_global":26.435539895950086},
+    {"epsilon":0.01,"ridge":1e-8,"paths":8,"singular_paths":0,"design_condition_max_median":358.1784715144796,"Q_condition_abs_median":52558.225787452655,"Q_eigen_min_median":1.8343407799062145e-06,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.2780541897510789,"positive_root_max_global":26.435481816013098},
+    {"epsilon":0.01,"ridge":0.0001,"paths":8,"singular_paths":0,"design_condition_max_median":358.1784715144796,"Q_condition_abs_median":52724.00832865706,"Q_eigen_min_median":1.8290852290221936e-06,"Q_rank_tol_1e-10_min":3,"positive_root_median_mean":0.27203126072306355,"positive_root_max_global":25.91566704116601}
+  ]
+}

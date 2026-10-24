@@ -68,7 +68,10 @@ getrandom = "0.2"
 mycelix-zkp-core = { path = "stubs/mycelix-zkp-core", features = ["dilithium"] }
 
 # Mycelix Shared Deps (Bundled Standalone)
-sha2 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", optional = true }
+# Research-only relational prediction schedule commitments need SHA-256 on
+# ordinary/default builds without changing the existing feature-gated sha2 edge.
+sha2-relational-schedule = { package = "sha2", version = "0.10", features = ["oid"] }
 pqcrypto-traits = "0.3"
 pqcrypto-dilithium = "0.5"
 subtle = "2.5"
@@ -247,7 +250,7 @@ symthaea-dream = { path = "crates/domains/symthaea-dream" }
 
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
 symthaea-phi-search = { path = "crates/domains/symthaea-phi-search" }
-sha2 = { version = "0.10", optional = true }
+sha2 = { version = "0.10", features = ["oid"] }
 hmac = { version = "0.12", optional = true }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)

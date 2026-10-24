@@ -1,0 +1,217 @@
+{
+  "schema": "rh006-null-surface-eigenstructure-executed/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "formal_inference": false,
+  "source_identity": {
+    "geometry_script": {
+      "path": "scripts/research/rh006_null_surface_eigenstructure_splitmix64.py",
+      "repository_git_blob_sha1": "ea67f2ee93b53fea8615d583008436d021927fe2",
+      "local_execution_sha256": "7a01bd2e866d767fe6a46527a7b1ad4656454bc7d22da99670225595bc24e5d5",
+      "script_commit": "585eba7c63d0c47e52df10566b2c15e086db6ba2"
+    },
+    "nuisance_script": {
+      "path": "scripts/research/rh006_null_surface_eigenstructure_nuisance_splitmix64.py",
+      "repository_git_blob_sha1": "7263e002a43578318e50a12a81197c8488fd1245",
+      "local_execution_sha256": "577cbc630ba5c34d50b84f8468757c1cc4389c3d2911173963186a43724696eb",
+      "script_commit": "c57bdc2b3f7f3d3d3ca2e630f5717b568f6077e9"
+    },
+    "byte_identity_claim": false,
+    "reason": "Git blob identity and local SHA-256 are retained separately; the execution record does not require a byte-identical claim."
+  },
+  "frozen_geometry": {
+    "train": 48,
+    "gap": 4,
+    "test": 16,
+    "origins": 24,
+    "step": 16,
+    "ridge": 0.0001,
+    "oracle_rho": 0.5,
+    "oracle_heteroskedastic": true,
+    "quadratic": "Delta(gamma)=gamma'Qgamma+b'gamma+c",
+    "ray": "gamma=t u, ||u||=1, t>0",
+    "discriminant": "D(u)=u'(bb'-4cQ)u"
+  },
+  "geometry_1000_path_severe": {
+    "command": "python rh006_null_surface_eigenstructure_splitmix64.py --paths 1000 --epsilon 0.0001 --ridge 0.0001 --seed 20261028",
+    "seed": 20261028,
+    "epsilon": 0.0001,
+    "paths": 1000,
+    "weak_direction_root_support": 0.421,
+    "weak_direction_failure_negative_discriminant": 578,
+    "weak_direction_failure_linear_nonpositive": 1,
+    "eigenstructure_grid_support_quantiles": [
+      0.5806451612903226,
+      0.5806451612903226,
+      0.7096774193548387,
+      0.8387096774193549,
+      1.0
+    ],
+    "q_second_abs_eigen_ratio_quantiles": [
+      1.0041785207528873e-11,
+      4.449442978256898e-11,
+      8.379828287184255e-11,
+      1.5470736988390822e-10,
+      3.5186998283523213e-10
+    ],
+    "discriminant_second_abs_eigen_ratio_quantiles": [
+      1.0041825463777873e-11,
+      4.449443519152434e-11,
+      8.379840756763639e-11,
+      1.5470735783028191e-10,
+      3.5186999026091365e-10
+    ],
+    "bb_over_minus4cQ_frobenius_ratio_quantiles": [
+      1.6491574909993602e-19,
+      6.292996953362394e-15,
+      2.1686327043029535e-13,
+      1.1456037765898402e-12,
+      4.137542485629595e-12
+    ],
+    "R_vs_minus4cQ_frobenius_alignment_quantiles": [
+      0.9999999999999996,
+      1.0,
+      1.0,
+      1.0,
+      1.0000000000000004
+    ],
+    "weak_root_magnitude_quantiles": [
+      3642.6743,
+      5361.7221,
+      8895.1428,
+      19284.7462,
+      61141.7834,
+      1616922428.9103
+    ],
+    "root_fraction_above_radius": {
+      "0.1": 0.44057248080611675,
+      "1": 0.16085872120272823,
+      "10": 0.16085872120272823,
+      "100": 0.16085872120272823,
+      "1000": 0.16085872120272823
+    },
+    "surface_gradient_normalized_criticality_quantiles": [
+      3.8873e-13,
+      6.9997e-12,
+      5.56798e-11,
+      0.7071068,
+      0.9998477,
+      1.0,
+      1.0
+    ],
+    "two_positive_root_points": 0,
+    "payload_sha256_local": "57e7cb19fb017f40bcbe35dab873babcd97a039acf4ee28117fcb8406589ae6d"
+  },
+  "epsilon_controls_same_ridge": {
+    "epsilon_0.01_300": {
+      "seed": 20261021,
+      "weak_root_support": 1.0,
+      "weak_root_median": 14.2394285
+    },
+    "epsilon_0.001_300": {
+      "seed": 20261022,
+      "weak_root_support": 1.0,
+      "weak_root_median": 110.67870
+    },
+    "epsilon_0.0001_1000": {
+      "seed": 20261028,
+      "weak_root_support": 0.421,
+      "weak_root_median_supported": 8895.1428
+    }
+  },
+  "stratified_nuisance": {
+    "pilot_30x39": {
+      "command": "python rh006_null_surface_eigenstructure_nuisance_splitmix64.py --paths 30 --bootstrap 39 --epsilons 0.001 0.0001",
+      "payload_sha256": "3411803edfd4608d0a9a11627c5dc2aebc8ff92368502c20afa52397ef77b47d",
+      "epsilon_0.001": {
+        "high_local_regular": {
+          "points": 120,
+          "estimated_root_support": 1.0,
+          "median_root_ratio": 0.9694667292,
+          "oracle_reject_rate": 0.0333333333,
+          "estimated_nuisance_reject_rate": 0.0333333333
+        },
+        "near_flat_remote_critical": {
+          "points": 294,
+          "estimated_root_support": 1.0,
+          "median_root_ratio": 0.9682779374,
+          "oracle_reject_rate": 0.0442176871,
+          "estimated_nuisance_reject_rate": 0.0340136054
+        }
+      },
+      "epsilon_0.0001": {
+        "high_local_regular": {
+          "points": 120,
+          "estimated_root_support": 1.0,
+          "median_root_ratio": 0.9675397965,
+          "oracle_reject_rate": 0.0083333333,
+          "estimated_nuisance_reject_rate": 0.025
+        },
+        "near_flat_remote_critical": {
+          "points": 106,
+          "estimated_root_support": 1.0,
+          "median_root_ratio": 0.9592768895,
+          "oracle_reject_rate": 0.0377358491,
+          "estimated_nuisance_reject_rate": 0.0566037736
+        }
+      }
+    },
+    "severe_focus_60x49": {
+      "command": "python rh006_null_surface_eigenstructure_nuisance_splitmix64.py --paths 60 --bootstrap 49 --epsilons 0.0001",
+      "payload_sha256": "2af47f8d33ca01ab12aa191e6d8c322e4c4f8a77592bf5c5ba87073e24ecbf62",
+      "high_local_regular": {
+        "points": 240,
+        "estimated_root_support": 1.0,
+        "median_root_ratio": 0.9671801714,
+        "oracle_reject_rate": 0.0333333333,
+        "estimated_nuisance_reject_rate": 0.0333333333
+      },
+      "near_flat_remote_critical": {
+        "points": 206,
+        "estimated_root_support": 1.0,
+        "median_root_ratio": 0.9659088672,
+        "oracle_reject_rate": 0.0194174757,
+        "estimated_nuisance_reject_rate": 0.0291262136
+      },
+      "direction_support_below_one": {
+        "De0_plus": 0.0166666667,
+        "De0_minus": 0.0166666667,
+        "Qe0_plus": 0.0166666667,
+        "Qe0_minus": 0.0166666667,
+        "De1_plus": 0.6,
+        "De1_minus": 0.6,
+        "Qe1_plus": 0.6,
+        "Qe1_minus": 0.6,
+        "weak_plus": 0.4833333333,
+        "weak_minus": 0.4833333333
+      }
+    }
+  },
+  "interpretation": {
+    "topology": "In the severe cell, R=bb'-4cQ is numerically almost -4cQ, so root-existence is essentially a curvature-sign problem rather than an independent nuisance phenomenon.",
+    "locality": "Supported weak-direction roots are extremely remote in coefficient space. Their median grows by roughly two orders of magnitude from epsilon=1e-3 to 1e-4.",
+    "criticality": "The remote weak-null stratum is also near-critical under the normalized surface-gradient diagnostic, so coefficient magnitude and differential-geometric regularity deteriorate together.",
+    "nuisance": "The deep 60x49 severe-cell stratified pilot did not show estimated-root collapse conditional on support and produced 3.33% rejection in the high/local stratum versus 2.91% in the near-flat/remote/critical stratum. This remains diagnostic and does not establish valid size."
+  },
+  "gates": {
+    "null_surface_support": "required-and-measured",
+    "root_existence_boundary": "measured",
+    "curvature_stratification": "measured",
+    "surface_criticality": "measured",
+    "local_null_radius": "not-yet-predeclared",
+    "estimated_nuisance_by_stratum": "measured-diagnostic-only",
+    "uniform_size_control": "not-established",
+    "least_favorable_distribution": "not-established",
+    "rust_implementation_bridge": "not-established",
+    "empirical_validation": "not-established"
+  },
+  "nonclaims": [
+    "No formal p-value.",
+    "No formal confidence interval.",
+    "No least-favorable critical value.",
+    "No uniform size guarantee.",
+    "No empirical validation.",
+    "No exact-Rust implementation qualification."
+  ]
+}

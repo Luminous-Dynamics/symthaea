@@ -1,0 +1,99 @@
+{
+  "schema": "rh006-null-surface-local-effect-inversion-design/v1",
+  "status": "research-design-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "scientific_question": "Is the intended RH-006 equal-accuracy null global over the full finite-sample quadratic surface, or local over a scientifically bounded effect/risk neighborhood?",
+  "null_surface": {
+    "equation": "Delta(gamma)=gamma'Qgamma+b'gamma+c=0",
+    "ray_parameterization": "gamma=t u, ||u||=1, t>0",
+    "ray_coefficients": "A=u'Qu, B=b'u, C=c",
+    "discriminant": "D(u)=B^2-4AC=u'(bb'-4cQ)u"
+  },
+  "exact_branch_conditioning": {
+    "identity": "(2At+B)^2=D(u) at every quadratic root",
+    "interpretation": "sqrt(D) is the absolute radial derivative of the null surface along the ray",
+    "policy": "D<0 means unsupported; D near zero means critical branch sensitivity; both positive roots must be retained if present"
+  },
+  "effect_coordinate": {
+    "G": "mean held-out feature Gram matrix G=average_o(Z_test_o' Z_test_o / TEST)",
+    "rho_effect": "sqrt(gamma'Ggamma)/sigma_ref",
+    "sigma_ref": "frozen reference innovation/residual scale declared by analysis plan",
+    "reason": "measures induced outcome-space perturbation rather than arbitrary coefficient magnitude"
+  },
+  "exploratory_radius_ladder": [0.25, 0.5, 1.0, 2.0, 4.0, 8.0],
+  "radius_policy": {
+    "formal_status": "not-selected",
+    "rule": "The ladder is exploratory only. A formal local null radius must be fixed prospectively from the scientific estimand and cannot be selected by rejection behavior."
+  },
+  "continuous_inversion_strategy": {
+    "preferred": "Represent the full admissible quadratic surface in canonical/eigen coordinates and invert a valid test over the set.",
+    "numerical_guard": "Use ray root-finding only as an analytic parameterization; use adaptive/approximation-controlled coverage diagnostics rather than treating an arbitrary finite grid as the inferential set.",
+    "reason": "Recent weak-identification confidence-set work documents that ordinary grid inversion can miss disconnected components and truncate unbounded regions; polynomial structure can support more reliable inversion. This is methodological precedent, not a ready-made RH-006 estimator bridge."
+  },
+  "candidate_calibration_routes": [
+    {
+      "id": "restricted-bootstrap-v1",
+      "purpose": "baseline comparator",
+      "weak_identification_status": "not-robust-by-assumption"
+    },
+    {
+      "id": "identification-state-targeted-bootstrap-v1",
+      "purpose": "target strong/weak/critical identification states explicitly",
+      "weak_identification_status": "candidate only; requires derivation"
+    },
+    {
+      "id": "set-inversion-v1",
+      "purpose": "invert a valid test over the entire admissible local/global surface",
+      "weak_identification_status": "candidate only; requires valid test and estimator bridge"
+    }
+  ],
+  "required_falsification": {
+    "radius_support_curve": "For every frozen radius, report the fraction of surface branches represented inside that radius.",
+    "branch_sensitivity": "Report discriminant and normalized radial-derivative conditioning by radius stratum.",
+    "component_recovery": "Demonstrate that disconnected/unbounded surface components are not lost by the numerical representation.",
+    "parameterization_invariance": "Equivalent coefficient parameterizations must yield equivalent effect-radius classification.",
+    "identification_stress": "Compare regular, near-flat, and critical strata under explicit weak-identification DGPs.",
+    "nuisance_stratification": "Compare oracle and estimated-nuisance calibration within each geometry stratum."
+  },
+  "external_literature": [
+    {
+      "citation": "Schlemper and Moreira (2026), Confidence Sets under Weak Identification: Theory and Practice",
+      "relevance": "Exact/controlled inversion of polynomial or rational test geometry; warning that ordinary grids can miss components.",
+      "url": "https://arxiv.org/abs/2604.04279"
+    },
+    {
+      "citation": "Andrews and Cheng (2012), Estimation and Inference With Weak, Semi-Strong, and Strong Identification",
+      "relevance": "Weak-identification robustness as an explicit uniform-in-identification requirement.",
+      "doi": "10.3982/ECTA9456"
+    },
+    {
+      "citation": "Hill (2021), Weak-Identification Robust Wild Bootstrap Applied to a Consistent Model Specification Test",
+      "relevance": "Identification-state targeted bootstrap and uniform-size motivation; RH-006 requires a new derivation because the statistical object differs.",
+      "doi": "10.1017/S0266466620000201"
+    },
+    {
+      "citation": "Giacomini and White (2006), Tests of Conditional Predictive Ability",
+      "relevance": "Forecast evaluation with estimation uncertainty and general estimation procedures.",
+      "doi": "10.1111/j.1468-0262.2006.00718.x"
+    },
+    {
+      "citation": "Clark and McCracken (2015), Nested forecast model comparisons: A new approach to testing equal accuracy",
+      "relevance": "Finite-sample equal-accuracy null with weak nonzero nested coefficients; rolling estimation included.",
+      "doi": "10.1016/j.jeconom.2014.06.016"
+    }
+  ],
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "formal_p_value": "disabled",
+    "formal_confidence_interval": "disabled",
+    "next": "execute effect-radius support curves and branch-conditioning strata, then compare candidate robust calibration routes without selecting a radius from results"
+  },
+  "nonclaims": [
+    "No formal inference.",
+    "No least-favorable critical value.",
+    "No uniform size guarantee.",
+    "No empirical validation.",
+    "No claim that any exploratory radius is the final scientific locality threshold."
+  ]
+}

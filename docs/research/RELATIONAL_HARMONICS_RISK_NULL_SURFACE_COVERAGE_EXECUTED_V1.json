@@ -1,0 +1,119 @@
+{
+  "schema": "rh006-risk-null-surface-coverage-executed/v1",
+  "status": "research-diagnostic-only",
+  "faithfulness_scope": "independent estimator-mechanics reimplementation; not the Symthaea Rust implementation",
+  "execution": {
+    "command": "python scripts/research/rh006_oracle_null_surface_coverage_splitmix64.py --paths 20 --outcomes-per-point 2 --bootstrap 199 --seed 20261010",
+    "script_sha256": "a632094a023e782857ec4ea7d80bda7971051faa7b8e694848b51392f0ebaaf5",
+    "source_output_payload_sha256": "a25774338bab2ee1b99a3474056b6ce6b764a709d981551e451461d7b52c1076"
+  },
+  "geometry": {
+    "train": 48,
+    "test": 16,
+    "gap": 4,
+    "origins": 24,
+    "step": 16,
+    "ridge": 1e-8,
+    "bartlett_lag": 3,
+    "alpha": 0.05
+  },
+  "design": {
+    "feature_paths": 20,
+    "directions_per_path": 8,
+    "outcomes_per_point": 2,
+    "bootstrap_reps": 199,
+    "null_points_per_scenario": 160,
+    "outcomes_per_scenario": 320,
+    "directions": [
+      "a2b",
+      "b2a",
+      "turn_taking",
+      "plus_plus_plus",
+      "plus_plus_minus",
+      "plus_minus_plus",
+      "minus_plus_plus",
+      "plus_minus_minus"
+    ]
+  },
+  "scenarios": [
+    {
+      "rho": 0.0,
+      "heteroskedastic": false,
+      "overall_rejection_rate": 0.040625,
+      "direction_rejection_range": [0.0, 0.125],
+      "direction_results": {
+        "a2b": {"rejection_rate": 0.125, "mean_p": 0.446, "root_mean": 0.1181, "root_range": [0.1112, 0.1247]},
+        "b2a": {"rejection_rate": 0.025, "mean_p": 0.506, "root_mean": 0.1181, "root_range": [0.1109, 0.1263]},
+        "turn_taking": {"rejection_rate": 0.075, "mean_p": 0.479, "root_mean": 0.1740, "root_range": [0.1631, 0.1860]},
+        "plus_plus_plus": {"rejection_rate": 0.025, "mean_p": 0.455, "root_mean": 0.1079, "root_range": [0.1012, 0.1148]},
+        "plus_plus_minus": {"rejection_rate": 0.0, "mean_p": 0.478, "root_mean": 0.1749, "root_range": [0.1658, 0.1842]},
+        "plus_minus_plus": {"rejection_rate": 0.0, "mean_p": 0.572, "root_mean": 0.1089, "root_range": [0.1022, 0.1193]},
+        "minus_plus_plus": {"rejection_rate": 0.025, "mean_p": 0.474, "root_mean": 0.1757, "root_range": [0.1634, 0.1830]},
+        "plus_minus_minus": {"rejection_rate": 0.05, "mean_p": 0.550, "root_mean": 0.1757, "root_range": [0.1634, 0.1830]}
+      }
+    },
+    {
+      "rho": 0.5,
+      "heteroskedastic": false,
+      "overall_rejection_rate": 0.05625,
+      "direction_rejection_range": [0.0, 0.1],
+      "direction_results": {
+        "a2b": {"rejection_rate": 0.0, "mean_p": 0.542, "root_mean": 0.1437, "root_range": [0.1369, 0.1503]},
+        "b2a": {"rejection_rate": 0.1, "mean_p": 0.398, "root_mean": 0.1434, "root_range": [0.1361, 0.1519]},
+        "turn_taking": {"rejection_rate": 0.025, "mean_p": 0.499, "root_mean": 0.2147, "root_range": [0.1996, 0.2292]},
+        "plus_plus_plus": {"rejection_rate": 0.075, "mean_p": 0.521, "root_mean": 0.1322, "root_range": [0.1244, 0.1361]},
+        "plus_plus_minus": {"rejection_rate": 0.05, "mean_p": 0.497, "root_mean": 0.2127, "root_range": [0.2021, 0.2218]},
+        "plus_minus_plus": {"rejection_rate": 0.05, "mean_p": 0.495, "root_mean": 0.1325, "root_range": [0.1247, 0.1416]},
+        "minus_plus_plus": {"rejection_rate": 0.05, "mean_p": 0.553, "root_mean": 0.2133, "root_range": [0.1981, 0.2367]},
+        "plus_minus_minus": {"rejection_rate": 0.1, "mean_p": 0.513, "root_mean": 0.2133, "root_range": [0.1981, 0.2367]}
+      }
+    },
+    {
+      "rho": 0.8,
+      "heteroskedastic": false,
+      "overall_rejection_rate": 0.040625,
+      "direction_rejection_range": [0.0, 0.1],
+      "direction_results": {
+        "a2b": {"rejection_rate": 0.025, "mean_p": 0.573, "root_mean": 0.2020, "root_range": [0.1812, 0.2199]},
+        "b2a": {"rejection_rate": 0.0, "mean_p": 0.533, "root_mean": 0.2031, "root_range": [0.1888, 0.2274]},
+        "turn_taking": {"rejection_rate": 0.025, "mean_p": 0.517, "root_mean": 0.2926, "root_range": [0.2559, 0.3165]},
+        "plus_plus_plus": {"rejection_rate": 0.1, "mean_p": 0.453, "root_mean": 0.1850, "root_range": [0.1627, 0.2191]},
+        "plus_plus_minus": {"rejection_rate": 0.1, "mean_p": 0.470, "root_mean": 0.3056, "root_range": [0.2751, 0.3694]},
+        "plus_minus_plus": {"rejection_rate": 0.0, "mean_p": 0.475, "root_mean": 0.1842, "root_range": [0.1702, 0.1931]},
+        "minus_plus_plus": {"rejection_rate": 0.025, "mean_p": 0.504, "root_mean": 0.3014, "root_range": [0.2750, 0.3296]},
+        "plus_minus_minus": {"rejection_rate": 0.05, "mean_p": 0.378, "root_mean": 0.3014, "root_range": [0.2750, 0.3296]}
+      }
+    },
+    {
+      "rho": 0.5,
+      "heteroskedastic": true,
+      "overall_rejection_rate": 0.034375,
+      "direction_rejection_range": [0.0, 0.1],
+      "direction_results": {
+        "a2b": {"rejection_rate": 0.0, "mean_p": 0.533, "root_mean": 0.1459, "root_range": [0.1389, 0.1525]},
+        "b2a": {"rejection_rate": 0.1, "mean_p": 0.401, "root_mean": 0.1438, "root_range": [0.1352, 0.1536]},
+        "turn_taking": {"rejection_rate": 0.025, "mean_p": 0.577, "root_mean": 0.2139, "root_range": [0.1994, 0.2341]},
+        "plus_plus_plus": {"rejection_rate": 0.025, "mean_p": 0.478, "root_mean": 0.1325, "root_range": [0.1235, 0.1441]},
+        "plus_plus_minus": {"rejection_rate": 0.075, "mean_p": 0.478, "root_mean": 0.2126, "root_range": [0.2013, 0.2234]},
+        "plus_minus_plus": {"rejection_rate": 0.025, "mean_p": 0.567, "root_mean": 0.1337, "root_range": [0.1257, 0.1411]},
+        "minus_plus_plus": {"rejection_rate": 0.025, "mean_p": 0.552, "root_mean": 0.2174, "root_range": [0.2031, 0.2399]},
+        "plus_minus_minus": {"rejection_rate": 0.0, "mean_p": 0.548, "root_mean": 0.2174, "root_range": [0.2031, 0.2399]}
+      }
+    }
+  ],
+  "interpretation": {
+    "finding": "The oracle bootstrap did not show catastrophic over-rejection in this small surface-coverage pilot; overall rejection stayed between 0.034 and 0.056 across the four DGPs.",
+    "geometry": "Null-point amplitude varies materially with direction. Direction-specific pilot rejection rates range from 0 to 0.125 with only 40 outcomes per direction, so those rates are too noisy for a uniform-size conclusion.",
+    "next_gate": "Increase deterministic surface coverage and Monte Carlo depth, then compare oracle-known versus estimated-nuisance null calibration.",
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  },
+  "limitations": [
+    "40 outcomes per direction are insufficient to estimate direction-specific 5% size precisely.",
+    "Nuisance quantities are oracle-known.",
+    "Feature paths are conditioned on.",
+    "No uniform-validity result is established."
+  ],
+  "payload_sha256": "83582ebc18a1353e096a86777c27473f4d5cdaca945aa8f9fc755ca0da1e3754"
+}

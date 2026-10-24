@@ -1,0 +1,59 @@
+{
+  "schema": "rh006-joint-dgp-risk-surface-evidence/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "commit_source": "677e48d1ba436b8197f72b9e2a0a5335e36bf6e9",
+  "artifact": "scripts/research/rh006_joint_dgp_risk_surface_cross_moment_v2.py",
+  "artifact_git_blob_sha1": "9938bebabf9e537b419664ce363d96125f43a3c9",
+  "artifact_sha256": "a13aff5c28010504afb80d82bb697dcc08ac40c1eb93742f3b0ca206de6f9fa8",
+  "dependency": {
+    "path": "scripts/research/rh006_joint_feature_outcome_endogeneity_splitmix64.py",
+    "git_blob_sha1": "5e956ffa3dcf632d81566bd63f92893939f2fd5d",
+    "sha256": "ec255396810ad8caeb10ceb286ffd5e41f7cab384cd5a2f9777955497f15c178"
+  },
+  "execution": {
+    "paths": 40,
+    "seed": 20261080,
+    "geometry": {"train": 48, "gap": 4, "test": 16, "origins": 24, "step": 16},
+    "ridge": 0.0001,
+    "omega_cells": [0.0, 0.25, 0.5, 0.75, 0.9],
+    "mc_identity_check": {"paths": 4, "directions": 2, "omega_values": [0.0, 0.5, 0.9], "outcomes_per_cell": 1000, "cells": 24}
+  },
+  "derived_surface": {
+    "conditional_mean": "E[e|q]=omega Lq",
+    "conditional_covariance": "Var(e|q)=(1-omega^2)LL'",
+    "risk_difference": "Delta(gamma;omega)=gamma'Qgamma+(b0+omega*b1)'gamma+c0+omega*c1+omega^2*c2",
+    "discriminant_matrix": "R(omega)=b(omega)b(omega)'-4c(omega)Q"
+  },
+  "results": {
+    "global_topology": {
+      "omega_0_signature": "+++",
+      "omega_0_25_signature": "+++",
+      "omega_0_5_signature": "--+",
+      "omega_0_75_signature": "--+",
+      "omega_0_9_signature": "--+"
+    },
+    "c_zero_omega_quantiles": [0.2723932591420268, 0.2779298974769924, 0.29238242041830853, 0.3051911497177682, 0.3164618457052444],
+    "weak_support_rates": [1.0, 1.0, 0.0, 0.0, 0.0],
+    "strong_support_rates": [1.0, 1.0, 0.0, 0.0, 0.0],
+    "independence_root_mean_delta": {
+      "weak": {"0.25": -0.0003091264188261019, "0.5": 0.0007107426128979066, "0.75": 0.0030596070951720254, "0.9": 0.00510684360080055},
+      "strong": {"0.25": 0.0018317568751222819, "0.5": 0.004992509200794673, "0.75": 0.009482256977017175, "0.9": 0.012814023459014732}
+    },
+    "mc_identity_check": {
+      "max_absolute_error": 3.670447118691979e-05,
+      "mean_absolute_error": 1.2598977411476947e-05,
+      "rmse": 1.628354567050448e-05
+    }
+  },
+  "scientific_conclusion": "For the declared shared-shock joint DGP, feature/outcome dependence preserves quadraticity in gamma but changes the nuisance-indexed null surface and can change its global real-root topology. The weak and strong rays can become unsupported while the global null remains nonempty.",
+  "nonclaims": [
+    "No formal p-value.",
+    "No confidence interval.",
+    "No uniform or least-favorable size guarantee.",
+    "No empirical validation.",
+    "No exact-Rust implementation qualification.",
+    "No universal claim for arbitrary endogenous DGPs."
+  ]
+}

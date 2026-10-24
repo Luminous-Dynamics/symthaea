@@ -1,0 +1,71 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v9",
+  "status": "not-approved-for-execution",
+  "predecessor": "docs/research/RELATIONAL_HARMONICS_INFERENCE_ESTIMATOR_APPLICABILITY_V8.json",
+  "gates": {
+    "origin_local_conditioning": "required",
+    "hypothesis_preservation": "required",
+    "finite_sample_null_support": "required",
+    "estimated_nuisance_null": "required",
+    "uniform_null_surface": "required",
+    "least_favorable": "not-established",
+    "weak_identification": "requires robust calibration",
+    "null_surface_eigenstructure": "characterized",
+    "surface_criticality": "required",
+    "branch_conditioning": "derived",
+    "null_locality": "requires declared scientific radius or global estimand",
+    "effect_locality": "requires effect-space declaration",
+    "bootstrap_operator_equivalence": "established only for fixed-feature conditional refit equivalence",
+    "joint_feature_outcome_law": "extended from the shared-shock family to an explicit linear K / Sigma_q class",
+    "joint_dgp_risk_surface": "derived for the explicit linear conditional-mean / covariance-completion class",
+    "cross_covariance_geometry": "extended to seven multi-channel / multi-lag operator families",
+    "exact_q_pd_topology": "derived and independently spectrum-checked on 168 generalized-K cells",
+    "weak_q_topology": "not solved; retain eigenstructure and stratified analysis",
+    "joint_dgp_uniform_calibration": "not-established",
+    "joint_dgp_resampling_validity": "not-established",
+    "rust_implementation_validation": "not-established",
+    "affine_K_quadraticity": "mechanically established for fixed feature path, fixed forecast operators, and affine K interpolation",
+    "operator_strength_coordinate": "defined as ||Sigma_e^{-1/2} K Sigma_q^{1/2}||_2",
+    "general_K_null_surface": "characterized but not calibrated uniformly",
+    "general_K_transition_threshold": "geometry-dependent; c(s)=0 roots observed for six of seven executed families"
+  },
+  "evidence": {
+    "prior_crosscov_generalized": "docs/research/RELATIONAL_HARMONICS_CROSSCOV_GENERALIZED_TOPOLOGY_EXECUTED_V1.json",
+    "general_k_script": "scripts/research/rh006_general_k_joint_dgp_splitmix64.py",
+    "general_k_method": "docs/research/RELATIONAL_HARMONICS_GENERAL_K_JOINT_DGP_V1.md",
+    "general_k_receipt": "docs/research/RELATIONAL_HARMONICS_GENERAL_K_JOINT_DGP_EXECUTED_V1.json"
+  },
+  "scientific_state": {
+    "universal_fixed_K_surface_form": "Delta(gamma;K)=gamma'Qgamma+b(K)'gamma+c(K)",
+    "affine_K_joint_degree": 2,
+    "affine_K_slice_form": "Delta(gamma;s)=gamma'Qgamma+(b0+s*b1)'gamma+c0+s*c1+s^2*c2",
+    "q_pd_topology": "exact classification by sign(c) and b'Q^{-1}b-4c",
+    "general_K_topology_cells_checked": 168,
+    "theorem_vs_actual_spectrum_match_rate": 1.0,
+    "general_K_c_zero_transition_families": 6,
+    "lag1_no_c_zero_transition_observed": true,
+    "general_K_directional_support_is_nonuniversal": true
+  },
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "define the scientifically admissible K(theta) class, including channel and lag structure",
+      "declare Sigma_q and marginal Sigma_e constraints jointly with K",
+      "derive the matching estimator/procedure bridge for that class",
+      "preserve the joint feature/outcome law under resampling",
+      "use the exact Q-positive-definite topology theorem where applicable",
+      "retain weak-Q eigenstructure treatment where the theorem does not apply",
+      "stratify calibration by operator geometry, operator strength, cross-moment structure, Q curvature, discriminant topology, branch conditioning, and effect radius",
+      "evaluate prospective null size across independence, contemporaneous, lagged, distributed-lag, and mixed operator regimes",
+      "validate the actual Rust implementation independently from the mechanics mirror"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "no_confidence_interval_claim": true,
+    "synthetic_calibration_is_not_empirical_validation": true,
+    "topology_diagnostics_are_not_least_favorable_calibration": true,
+    "general_K_family_is_not_all_endogeneity": true
+  }
+}

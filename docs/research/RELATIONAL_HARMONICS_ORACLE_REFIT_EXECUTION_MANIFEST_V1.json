@@ -1,0 +1,12 @@
+{
+  "schema": "rh006-oracle-refit-execution-manifest/v1",
+  "script_path": "scripts/research/rh006_oracle_refit_splitmix64.py",
+  "script_sha256": "16b2bd1e50dfce9152828347b473f9390ac5f47817c8f30b72fa38e9438a1f20",
+  "command": "python scripts/research/rh006_oracle_refit_splitmix64.py --mc 400 --bootstrap 199 --seed 20261008",
+  "observed_output_sha256": "44a791523fed1124a46762e2323b69ad4fedb6da109c36a34b849905231257cb",
+  "seed": 20261008,
+  "scope": "independent-estimator-mechanics reimplementation",
+  "formal_inference_enabled": false,
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure"
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "relational-prediction-dependence-specification/v1",
+  "dependence_method_id": "loss-dependence-bartlett-v1",
+  "status": "measured-diagnostic",
+  "scope": {
+    "target": "target-level squared-loss differential",
+    "single_window": "ordered held-out loss differential sequence",
+    "rolling_origin": "within-origin serial dependence plus across-origin dependence of origin-level means"
+  },
+  "estimator": {
+    "name": "Bartlett long-run variance",
+    "autocovariance_weights": "1 - lag/(max_lag+1)",
+    "raw_autocovariances_retained": true,
+    "effective_sample_size_retained": true
+  },
+  "requirements": [
+    "Retain the complete loss-differential vector before dependence characterization.",
+    "Prespecify the maximum lag used by the dependence characterization.",
+    "Treat the resulting dependence profile as an input to method selection, not as a result-dependent reason to choose a more favorable method.",
+    "Reject non-finite or structurally inconsistent dependence profiles."
+  ],
+  "scientific_boundary": {
+    "formal_inference_in_this_spec": false,
+    "bartlett_long_run_variance_is_not_a_p_value": true
+  }
+}

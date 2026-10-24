@@ -1,0 +1,75 @@
+{
+  "faithfulness_scope": "independent-estimator-mechanics-reimplementation; not the Symthaea Rust implementation",
+  "geometry": {
+    "alpha": 0.05,
+    "bartlett_lag": 3,
+    "bootstrap_reps": 199,
+    "gap": 4,
+    "horizon": 1.0,
+    "monte_carlo_reps": 400,
+    "origins": 24,
+    "ridge": 1e-08,
+    "step": 16,
+    "test": 16,
+    "train": 48
+  },
+  "interpretation": {
+    "applicability": "not-approved-for-execution",
+    "finding": "Oracle conditional-on-features bootstrap with full nested rolling refits was executed independently. The observed pilot size behavior is a diagnostic only.",
+    "formal_inference": false,
+    "not_a_validity_proof": true,
+    "selection": "stop-assumption-failure"
+  },
+  "null": {
+    "dgp_parameters": "oracle-known",
+    "feature_conditioning": "fixed feature path in bootstrap",
+    "full_refit_each_bootstrap": true,
+    "restriction": "beta_relational = 0"
+  },
+  "payload_sha256": "64051e6b2d18e85a7369a02d086817c5fa42da6624837c8ae6409bf66a7b5d93",
+  "rng": "SplitMix64 v1 + Rademacher innovations",
+  "scenarios": [
+    {
+      "empirical_size": 0.0275,
+      "heteroskedastic": false,
+      "mean_D": -0.000590549011558566,
+      "mean_T": -3.131238769994687,
+      "mean_p": 0.506925,
+      "monte_carlo_se": 0.008176758220713145,
+      "reject_count": 11,
+      "rho": 0.0
+    },
+    {
+      "empirical_size": 0.04,
+      "heteroskedastic": false,
+      "mean_D": -0.0008915634921526617,
+      "mean_T": -2.729983664594572,
+      "mean_p": 0.5119499999999999,
+      "monte_carlo_se": 0.009797958971132711,
+      "reject_count": 16,
+      "rho": 0.5
+    },
+    {
+      "empirical_size": 0.045,
+      "heteroskedastic": false,
+      "mean_D": -0.0018918184240619773,
+      "mean_T": -2.271716786909685,
+      "mean_p": 0.50935,
+      "monte_carlo_se": 0.01036520622081394,
+      "reject_count": 18,
+      "rho": 0.8
+    },
+    {
+      "empirical_size": 0.0225,
+      "heteroskedastic": true,
+      "mean_D": -0.0009183155408569727,
+      "mean_T": -2.6828460885830894,
+      "mean_p": 0.5014375000000001,
+      "monte_carlo_se": 0.007415144974981945,
+      "reject_count": 9,
+      "rho": 0.5
+    }
+  ],
+  "schema": "rh006-oracle-restricted-dgp-refit-bootstrap-executed/v2",
+  "status": "research-diagnostic-only"
+}

@@ -1,0 +1,27 @@
+{
+  "schema":"rh006-bootstrap-operator-equivalence-audit/v1",
+  "status":"research-diagnostic-only",
+  "formal_inference":false,
+  "applicability":"not-approved-for-execution",
+  "selection":"stop-assumption-failure",
+  "algebra":"W=B(A'A+lambda P)^(-1)A'; for any bootstrap y*, fresh ridge forecast B beta* = W y* when A,B,lambda fixed",
+  "conditions":[
+    "fixed training/test features",
+    "training-only feature preprocessing fixed by features",
+    "fixed ridge",
+    "linear outcome fit"
+  ],
+  "numerical_audit":{
+    "paths":100,
+    "n_train":48,
+    "n_features":4,
+    "n_test":16,
+    "ridge":1e-4,
+    "max_abs_difference":5.551115123125783e-16,
+    "seed":20261060
+  },
+  "closes":"Cached forecast operators are exact refits under the declared conditional fixed-feature linear ridge estimator.",
+  "remaining_boundary":"Joint feature/outcome resampling, endogeneity, and data-dependent nuisance/preprocessing remain outside this equivalence and require their own DGP/bootstrap derivation.",
+  "nonclaims":["No formal inference","No empirical validation","No uniform size guarantee","No exact-Rust implementation qualification"],
+  "payload_sha256":"223785b123b1e6d3f4f10abb9cb46d8ca1d4aac4fa01a8108ac7e252e5165754"
+}
