@@ -63,6 +63,7 @@ pub mod stability;
 pub mod statistics;
 pub mod substrate;
 pub mod topology;
+pub mod tts;
 pub mod validation_snapshot;
 pub mod verification_matrix;
 
@@ -144,6 +145,7 @@ pub use statistics::{
 };
 pub use substrate::{BackendKind, ConfidenceLevel, SubstrateProfile};
 pub use topology::TopologySummary;
+pub use tts::{TtsError, TtsEstimate};
 pub use validation_snapshot::{ValidationSnapshot, current_validation_snapshot};
 pub use verification_matrix::{
     VerificationMatrix, VerificationMatrixRow, VerificationStage, current_verification_matrix,
