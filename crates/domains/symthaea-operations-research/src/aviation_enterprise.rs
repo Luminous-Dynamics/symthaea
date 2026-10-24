@@ -889,6 +889,42 @@ mod tests {
     }
 
     #[test]
+    fn increasing_cancellation_penalty_never_increases_cancellations() {
+        let mut previous_cancelled = usize::MAX;
+        for penalty in (0_u64..=200).step_by(5) {
+            let mut scenario = reference_scenario();
+            for flight in &mut scenario.flights {
+                flight.cancellation_cost = penalty;
+            }
+            let plan = solve_exact(&scenario).expect("tiny scenario has a feasible plan");
+            let cancelled = plan.assignments.iter().filter(|a| a.aircraft_id.is_none()).count();
+            assert!(
+                cancelled <= previous_cancelled,
+                "cancellation count increased at penalty {penalty}: {previous_cancelled} -> {cancelled}"
+            );
+            assert_eq!(verify_plan(&scenario, &plan).status, VerificationStatus::Verified);
+            previous_cancelled = cancelled;
+        }
+    }
+
+    #[test]
+    fn increasing_production_lead_time_never_improves_optimal_cost() {
+        let mut previous_cost = 0_u64;
+        for duration in (0_u32..=100).step_by(5) {
+            let mut scenario = reference_scenario();
+            scenario.production.duration = duration;
+            let plan = solve_exact(&scenario).expect("no-part/cancel plan remains feasible");
+            assert!(
+                plan.total_cost >= previous_cost,
+                "cost decreased when production lead time increased to {duration}: {previous_cost} -> {}",
+                plan.total_cost
+            );
+            assert_eq!(verify_plan(&scenario, &plan).status, VerificationStatus::Verified);
+            previous_cost = plan.total_cost;
+        }
+    }
+
+    #[test]
     fn manifest_json_escapes_control_characters() {
         let scenario = reference_scenario();
         let plan = solve_exact(&scenario).unwrap();
