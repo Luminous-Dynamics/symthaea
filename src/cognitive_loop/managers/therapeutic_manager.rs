@@ -671,11 +671,11 @@ impl CognitiveSubsystem for TherapeuticManager {
         // ── 6b. Shadow dynamics — observability mode ────────────────────────
         // Prediction-error-based shadow telemetry is admitted only on a genuine
         // comparison. Narrative and affect processing above remain independent.
-        if snapshot.prediction_error_valid != 0 {
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
             let narrative_integration = self.narrative.coherence;
             let mut shadow_telemetry = self.shadow_detector.process(
                 snapshot.cycle_number,
-                snapshot.prediction_error,
+                prediction_error,
                 snapshot.valence,
                 snapshot.arousal,
                 &fragment_text,
