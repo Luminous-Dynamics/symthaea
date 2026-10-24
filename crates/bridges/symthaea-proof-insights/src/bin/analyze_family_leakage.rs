@@ -14,6 +14,8 @@ use sha2::{Digest, Sha256};
 const UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
 const SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
+const EXPECTED_PARTITION_DIGEST: &str = "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
+const EXPECTED_FAMILY_COUNTS: (usize, usize, usize) = (260, 56, 56);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -176,7 +178,9 @@ fn validate_split(doc: &Value) -> Result<(String, BTreeMap<String, String>)> {
     }
     let digest = partition_digest(&actual);
     if !valid_digest(plan["partition_digest_sha256"].as_str().unwrap_or(""))
-        || plan["partition_digest_sha256"].as_str() != Some(&digest)
+        || plan["partition_digest_sha256"].as_str() != Some(digest.as_str())
+        || digest != EXPECTED_PARTITION_DIGEST
+        || actual.len() != 372
     {
         bail!("partition digest does not match computed assignments");
     }
@@ -464,4 +468,36 @@ fn main() -> Result<()> {
         report.relationship_inventory_status
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deterministic_family_split_is_stable_and_balanced() {
+        let ids = vec!["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned()];
+        let first = deterministic_splits(&ids).expect("first split");
+        let second = deterministic_splits(&ids).expect("second split");
+        assert_eq!(first, second);
+        let counts = split_counts(&first, None);
+        assert_eq!((counts.train, counts.validation, counts.test), (2, 1, 1));
+        assert_eq!(partition_digest(&first), partition_digest(&second));
+    }
+
+    #[test]
+    fn hard_leakage_requires_a_registered_structural_relation() {
+        assert!(hard_relation("exact_duplicate"));
+        assert!(hard_relation("formal_dependency"));
+        assert!(hard_relation("reused_lemma"));
+        assert!(!hard_relation("conceptual_similarity"));
+        assert!(!hard_relation("citation_only"));
+    }
+
+    #[test]
+    fn digest_shape_is_fail_closed() {
+        assert!(valid_digest(&"a".repeat(64)));
+        assert!(!valid_digest(&"a".repeat(63)));
+        assert!(!valid_digest(&format!("{}z", "a".repeat(63))));
+    }
 }
