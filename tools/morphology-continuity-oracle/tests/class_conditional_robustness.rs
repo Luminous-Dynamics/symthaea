@@ -558,7 +558,7 @@ fn select_next_calibration_class(
     }
     let current_risk = worst_policy_risk_from_counts(counts, weights, decisions, actions)?;
     let mut best: Option<(usize, f64)> = None;
-    for class_index in 0..3 {
+    for (class_index, class_cost) in class_costs.iter().enumerate() {
         let expected_risk = expected_risk_after_one_calibration_sample(
             counts,
             class_index,
@@ -571,7 +571,7 @@ fn select_next_calibration_class(
         if improvement <= EPSILON {
             continue;
         }
-        let ratio = improvement / class_costs[class_index];
+        let ratio = improvement / *class_cost;
         if best.is_none_or(|(_, best_ratio)| ratio > best_ratio + EPSILON) {
             best = Some((class_index, ratio));
         }
