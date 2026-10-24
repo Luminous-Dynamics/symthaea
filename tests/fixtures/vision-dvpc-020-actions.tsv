@@ -1,0 +1,27 @@
+META	action_count	9
+META	decision_count	7
+META	dataset_id	synthetic-dvpc-020
+META	dataset_revision	v1
+META	energy_budget_uj	100
+META	experiment_id	dvpc020-synthetic-v1
+META	format	VIS-DVPC-020-ACTIONS-001-v1
+META	latency_budget_us	100
+META	max_actions	3
+META	seed	17
+META	source_bundle_lock_sha256	bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+META	source_frontier_receipt_sha256	cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+META	split	synthetic_known_answer
+META	utility_spec_sha256	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+META	value_additivity_scope	DISJOINT_DECISION_CLAIMS_DECLARED
+META	value_model_sha256	dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+META	value_semantics	DISTRIBUTION_FREE_REGRET_REDUCTION_LCB
+ACTION_HEADER	action_id	decision_id	challenge_family	uncertainty_priority	regret_reduction_lcb	latency_cost_ucb_us	energy_cost_ucb_uj	eligibility	evidence_type
+ACTION	irrelevant-high-uncertainty	d1	IRRELEVANT_UNCERTAINTY	99	0	80	80	ELIGIBLE	REPLAY
+ACTION	targeted-boundary	d1	FEASIBILITY_CLIFF	2	0.30	20	20	ELIGIBLE	NEW_INDEPENDENT_CLUSTER
+ACTION	paired-cluster	d2	RANK_REVERSAL	8	0.18	25	25	ELIGIBLE	NEW_INDEPENDENT_CLUSTER
+ACTION	calibrate-meter	d3	EVIDENCE_QUALITY	6	0.12	15	20	ELIGIBLE	METER_CALIBRATION
+ACTION	low-cost-replay	d4	DECISION_IRRELEVANT	15	0.02	10	10	ELIGIBLE	REPLAY
+ACTION	shift-replication	d4	SHIFT_SIGN_REVERSAL	5	0.10	20	30	ELIGIBLE	NEW_INDEPENDENT_CLUSTER
+ACTION	unauthorized-source	d5	AUTHORIZATION	100	0.99	1	1	UNAUTHORIZED	PUBLIC_SOURCE_AUDIT
+ACTION	sealed-test	d6	SEALED_TEST	100	0.99	1	1	SEALED_TEST	PRIVATE_TEST
+ACTION	no-info-action	d7	NO_INFORMATION	45	-0.05	10	10	ELIGIBLE	REPLAY
