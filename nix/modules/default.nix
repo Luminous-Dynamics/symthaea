@@ -3,10 +3,11 @@
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 # Symthaea NixOS Modules
 #
-# Composable modules for the God-Tier NixOS boot sequence.
+# Composable modules for the Spore/NixOS boot and system experience.
 # Each module is independently enableable:
 #
-#   services.symthaea-boot.enable = true;              # Boot animation (quicken-fb)
+#   services.symthaea-boot.enable = true;               # Spore boot renderer (quicken-fb)
+#   services.symthaea-boot.observability.enable = true; # Explicit quiet/diagnostic presentation policy
 #   services.symthaea-dashboard.enable = true;          # Local web dashboard (Sacred Bridge)
 #   services.symthaea-recovery.enable = true;           # Ahimsa recovery timer
 #   services.symthaea-first-boot.enable = true;         # Auto-hardening on first boot
@@ -17,6 +18,7 @@
 {
   imports = [
     ./quicken-fb.nix
+    ./symthaea-boot-observability.nix
     ./symthaea-dashboard.nix
     ./recovery-timer.nix
     ./first-boot.nix
