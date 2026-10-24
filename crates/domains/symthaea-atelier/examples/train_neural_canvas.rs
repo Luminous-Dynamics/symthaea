@@ -33,6 +33,7 @@ fn main() {
             noradrenaline: 0.2,
             harmony_activations: [0.7, 0.8, 0.6, 0.3, 0.7, 0.6, 0.5, 0.8],
             prediction_error: 0.05,
+            prediction_error_valid: true,
             thought_vector: vec![0.3, -0.1],
             ..CognitiveSnapshot::dormant()
         },
@@ -45,6 +46,7 @@ fn main() {
             noradrenaline: 0.9,
             harmony_activations: [0.3, 0.2, 0.4, 0.9, 0.5, 0.2, 0.8, 0.1],
             prediction_error: 0.7,
+            prediction_error_valid: true,
             thought_vector: vec![0.8, -0.7],
             ..CognitiveSnapshot::dormant()
         },
@@ -57,6 +59,7 @@ fn main() {
             noradrenaline: 0.5,
             harmony_activations: [0.4, 0.5, 0.3, 0.95, 0.6, 0.4, 0.7, 0.1],
             prediction_error: 0.3,
+            prediction_error_valid: true,
             thought_vector: vec![0.5, 0.3],
             ..CognitiveSnapshot::dormant()
         },
@@ -69,6 +72,7 @@ fn main() {
             noradrenaline: 0.1,
             harmony_activations: [0.8, 0.6, 0.9, 0.2, 0.5, 0.7, 0.4, 0.95],
             prediction_error: 0.02,
+            prediction_error_valid: true,
             thought_vector: vec![0.1, 0.0],
             ..CognitiveSnapshot::dormant()
         },
