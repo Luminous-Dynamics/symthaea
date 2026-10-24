@@ -10,6 +10,12 @@ cargo test --manifest-path research/scientific-discovery-noise-robustness-v0-1/C
 cargo clippy --manifest-path research/scientific-discovery-noise-robustness-v0-1/Cargo.toml --all-targets --locked -- -D warnings
 ```
 
+## Versioned seed domains
+
+Use `derive_stream_seed_v1(master_seed, domain, world_id)` to derive reproducible, domain-separated seeds for the seven domains in the scenario manifest: public design, target law, noise process, in-domain evaluation, marginal-shift evaluation, joint-extrapolation evaluation, and near-boundary evaluation.
+
+A known-answer test freezes this function's integer outputs. Changing the derivation must be treated as a new seed-contract version, not a silent refactor. Domain separation helps prevent accidental seed reuse; this deterministic test PRNG is **not** cryptographically secure, does not conceal hidden labels, and does not mathematically guarantee statistical independence between streams.
+
 ## Implemented observation-process fixtures
 
 - Homoscedastic Gaussian noise.
