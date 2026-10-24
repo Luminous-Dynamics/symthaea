@@ -1,0 +1,232 @@
+name: crime-economics-synthetic-evaluator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/crime-economics-synthetic-evaluator.yml"
+      - "tools/crime-economics-sim/**"
+      - "docs/research/life-civic/CRIME_ECONOMICS_ROBOTICS_RESEARCH.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/crime-economics-synthetic-evaluator.yml"
+      - "tools/crime-economics-sim/**"
+      - "docs/research/life-civic/CRIME_ECONOMICS_ROBOTICS_RESEARCH.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Verify pinned runtime and workflow source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="tools/crime-economics-sim/manifest.json"
+          jq -e '
+            .manifest_id == "SYMTHAEA-CRIME-ECONOMICS-SIM-001" and
+            .schema_version == 1 and
+            .status == "research_fixture" and
+            .model_dimensions.scenario_count == 8 and
+            .model_dimensions.policy_count == 5 and
+            .model_dimensions.replications_per_scenario_policy_cell == 32 and
+            .model_dimensions.expected_data_rows == 1280 and
+            .model_dimensions.expected_tsv_lines_including_header == 1281 and
+            .viability_dimensions.schema_version == 1 and
+            .viability_dimensions.scenario_count == 10 and
+            .viability_dimensions.cohort_count == 5 and
+            .viability_dimensions.expected_data_rows == 50 and
+            .viability_dimensions.expected_tsv_lines_including_header == 51 and
+            .viability_dimensions.uses_person_level_records == false and
+            .viability_dimensions.feeds_crime_rate_model == false and
+            .parameter_registry_version == "0.2.0" and
+            .parameter_registry_status == "all_parameters_are_synthetic_assumptions" and
+            (.parameter_registry | length) == 15 and
+            ([.parameter_registry[].parameter_id] | unique | length) == 15 and
+            all(.parameter_registry[];
+              .source_class == "synthetic_assumption" and
+              .evidence_status == "not_empirical" and
+              (.unit | length) > 0 and
+              (.limitation | length) > 20
+            ) and
+            ([.scenario_ids[]] | unique | length) == 8 and
+            ([.policy_ids[]] | unique | length) == 5 and
+            ([.output_schema[]] | unique | length) == 20 and
+            ([.viability_scenario_ids[]] | unique | length) == 10 and
+            ([.viability_cohort_ids[]] | unique | length) == 5 and
+            ([.viability_output_schema[]] | unique | length) == 22 and
+            (.viability_gate_registry | length) == 11 and
+            ([.viability_gate_registry[].gate_id] | unique | length) == 11 and
+            (.viability_measure_definitions | length) == 7 and
+            ([.viability_measure_definitions[].measure_id] | unique | length) == 7 and
+            all(.viability_measure_definitions[];
+              .person_level_scoring_allowed == false and
+              (.denominator | length) > 25 and
+              (.required_data | length) > 20 and
+              (.non_substitution_rule | length) > 20
+            ) and
+            (.viability_uncertainty_semantics.low_high_values | length) > 40 and
+            (.viability_status_semantics | keys | length) == 3 and
+            (.non_compensatory_rules | length) >= 5 and
+            all(.viability_gate_registry[];
+              .source_class == "synthetic_policy_gate" and
+              .evidence_status == "not_empirical" and
+              (.limitation | length) > 20
+            ) and
+                        ([.viability_gate_registry[] | select(.gate_id == "MIN_ESSENTIALS_ACCESS" and .value == 0.9)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_LAWFUL_OPPORTUNITY_COVERAGE" and .value == 0.8)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_FAIR_PAY_ADEQUACY" and .value == 0.8)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_SAFE_WORK" and .value == 0.9)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_WORK_STABILITY" and .value == 0.75)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_SOCIAL_PROTECTION" and .value == 0.75)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_LAWFUL_ACCESS_TIME_MINUTES" and .value == 60)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_COHORT_COVERAGE_GAP" and .value == 0.15)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_INTERVAL_WIDTH" and .value == 0.2)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_TIME_INTERVAL_WIDTH_MINUTES" and .value == 20)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_EVIDENCE_AGE_DAYS" and .value == 180)] | length) == 1 and
+            (.evidence_context_sources | length) == 4 and
+            ([.evidence_context_sources[].source_id] | unique | length) == 4 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26" and .used_as_crime_effect_parameter == false)] | length) == 1 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26") | .indicator_precision_examples[]? | select(.release == "GPSJS 2024/25" and .table == "Table 41" and .indicator_id == "household_housebreaking_experience_past_12_months" and .estimate_percent == 43.1 and .coefficient_of_variation_percent == 3 and .not_precision_for_reporting_rate_change == true and .used_as_model_parameter == false)] | length) == 1 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26") | .indicator_precision_examples[]? | select(.release == "GPSJS 2025/26" and .table == "Table 41" and .indicator_id == "household_housebreaking_experience_past_12_months" and .estimate_percent == 46.0 and .coefficient_of_variation_percent == 3 and .not_precision_for_reporting_rate_change == true and .used_as_model_parameter == false)] | length) == 1 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26" and .precision_scope_limits.reporting_share_change_percent_points == 4.8 and .precision_scope_limits.table_41_cvs_are_precision_for_reporting_share_change == false and .precision_scope_limits.cv_alone_establishes_statistical_significance == false and .precision_scope_limits.year_over_year_significance_established == false and .precision_scope_limits.reporting_share_change_is_causal_effect == false)] | length) == 1 and
+            all(.evidence_context_sources[]; .used_as_crime_effect_parameter == false) and
+            (.files | length) == 10 and
+            ([.files[].path] | unique | length) == (.files | length) and
+            all(.files[];
+              (.path | (startswith("tools/crime-economics-sim/") or . == ".github/workflows/crime-economics-synthetic-evaluator.yml")) and
+              (.git_blob_sha1 | test("^[0-9a-f]{40}$"))
+            )
+          ' "$manifest"
+          while IFS="$(printf '\t')" read -r path expected; do
+            test -f "$path"
+            actual="$(git hash-object "$path")"
+            test "$actual" = "$expected"
+          done < <(jq -r '.files[] | [.path, .git_blob_sha1] | @tsv' "$manifest")
+      - name: Verify viability thresholds match manifest and independent verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="tools/crime-economics-sim/manifest.json"
+          while IFS='|' read -r name value rust_type; do
+            grep -Fq "pub const $name: $rust_type = $value;" tools/crime-economics-sim/src/viability.rs
+            grep -Fq "const $name: $rust_type = $value;" tools/crime-economics-sim/src/bin/verify_viability.rs
+          done <<'THRESHOLDS'
+          MIN_ESSENTIALS_ACCESS|0.90|f64
+          MIN_LAWFUL_OPPORTUNITY_COVERAGE|0.80|f64
+          MIN_FAIR_PAY_ADEQUACY|0.80|f64
+          MIN_SAFE_WORK|0.90|f64
+          MIN_WORK_STABILITY|0.75|f64
+          MIN_SOCIAL_PROTECTION|0.75|f64
+          MAX_LAWFUL_ACCESS_TIME_MINUTES|60.0|f64
+          MAX_COHORT_COVERAGE_GAP|0.15|f64
+          MAX_INTERVAL_WIDTH|0.20|f64
+          MAX_TIME_INTERVAL_WIDTH_MINUTES|20.0|f64
+          MAX_EVIDENCE_AGE_DAYS|180|u32
+          THRESHOLDS
+          while IFS= read -r scenario; do
+            grep -Fq "id: \"$scenario\"" tools/crime-economics-sim/src/viability.rs
+            grep -Fq "\"$scenario\"" tools/crime-economics-sim/src/bin/verify_viability.rs
+          done < <(jq -r '.viability_scenario_ids[]' "$manifest")
+          while IFS= read -r cohort; do
+            grep -Fq "\"$cohort\"" tools/crime-economics-sim/src/viability.rs
+            grep -Fq "\"$cohort\"" tools/crime-economics-sim/src/bin/verify_viability.rs
+          done < <(jq -r '.viability_cohort_ids[]' "$manifest")
+      - name: Check isolated crate formatting
+        run: cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml -- --check
+      - name: Run isolated Rust unit and adversarial tests
+        run: cargo test --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked
+      - name: Generate deterministic-seed synthetic matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/crime-economics-evidence
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate \
+            > target/crime-economics-evidence/simulation.tsv
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate \
+            > target/crime-economics-evidence/simulation-repeat.tsv
+          cmp target/crime-economics-evidence/simulation.tsv target/crime-economics-evidence/simulation-repeat.tsv
+          rm target/crime-economics-evidence/simulation-repeat.tsv
+          test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 1281
+          expected_header="$(jq -r '.output_schema | @tsv' tools/crime-economics-sim/manifest.json)"
+          actual_header="$(head -n 1 target/crime-economics-evidence/simulation.tsv)"
+          test "$actual_header" = "$expected_header"
+          sha256sum target/crime-economics-evidence/simulation.tsv \
+            > target/crime-economics-evidence/simulation.tsv.sha256
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin assess_viability \
+            > target/crime-economics-evidence/lawful-alternative-viability.tsv
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin assess_viability \
+            > target/crime-economics-evidence/lawful-alternative-viability-repeat.tsv
+          cmp target/crime-economics-evidence/lawful-alternative-viability.tsv target/crime-economics-evidence/lawful-alternative-viability-repeat.tsv
+          rm target/crime-economics-evidence/lawful-alternative-viability-repeat.tsv
+          test "$(wc -l < target/crime-economics-evidence/lawful-alternative-viability.tsv)" -eq 51
+          expected_viability_header="$(jq -r '.viability_output_schema | @tsv' tools/crime-economics-sim/manifest.json)"
+          actual_viability_header="$(head -n 1 target/crime-economics-evidence/lawful-alternative-viability.tsv)"
+          test "$actual_viability_header" = "$expected_viability_header"
+          sha256sum target/crime-economics-evidence/lawful-alternative-viability.tsv \
+            > target/crime-economics-evidence/lawful-alternative-viability.tsv.sha256
+      - name: Independently verify the emitted artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify -- \
+            target/crime-economics-evidence/simulation.tsv \
+            | tee target/crime-economics-evidence/verification.txt
+          {
+            echo ""
+            echo "### Crime-economics synthetic evaluator"
+            echo ""
+            echo "This is a synthetic model and verifier result, not an empirical crime-reduction result."
+            echo ""
+            cat target/crime-economics-evidence/verification.txt
+            echo ""
+            echo "Artifact SHA-256:"
+            cat target/crime-economics-evidence/simulation.tsv.sha256
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Independently verify lawful-alternative viability gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify_viability -- \
+            target/crime-economics-evidence/lawful-alternative-viability.tsv \
+            | tee target/crime-economics-evidence/viability-verification.txt
+          {
+            echo ""
+            echo "### Lawful-alternative viability fixture"
+            echo ""
+            echo "The following results apply only to synthetic reference profiles and illustrative gates; they are not population findings."
+            echo ""
+            cat target/crime-economics-evidence/viability-verification.txt
+            echo ""
+            echo "Artifact SHA-256:"
+            cat target/crime-economics-evidence/lawful-alternative-viability.tsv.sha256
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Record exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "commit_sha=$(git rev-parse HEAD)"
+            echo "tool=tools/crime-economics-sim"
+            echo "model_version=0.3.0"
+            echo "claim_ceiling=synthetic invariant checks only; no causal or real-world claim"
+            echo "simulator_has_external_effects=false"
+            echo "lawful_alternative_viability_schema_version=1"
+            echo "lawful_alternative_viability_uses_person_records=false"
+            echo "lawful_alternative_viability_feeds_crime_model=false"
+          } > target/crime-economics-evidence/source-identity.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crime-economics-synthetic-evidence
+          path: target/crime-economics-evidence/
+          if-no-files-found: error
+          retention-days: 7

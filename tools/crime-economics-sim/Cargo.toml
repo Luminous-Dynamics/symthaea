@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-crime-economics-sim"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Effects-disabled aggregate simulator and independent artifact verifier for crime-prevention hypotheses"
+
+[workspace]
