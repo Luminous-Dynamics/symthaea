@@ -257,6 +257,7 @@ mod tests {
         let snap = CognitiveSnapshot {
             consciousness_level: 0.6,
             prediction_error: 0.1,
+            prediction_error_valid: true,
             living_mind_vitality: 0.5,
             living_mind_coherence: 0.5,
             dopamine: 0.5,
