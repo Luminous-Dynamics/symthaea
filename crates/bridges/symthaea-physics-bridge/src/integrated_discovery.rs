@@ -322,6 +322,7 @@ enum RecoveryProposalFamily {
     AdditiveCorrection,
     MultiplicativeCorrection,
     InteractionCorrection,
+    UnaryFunctionCorrection,
     GenericTyped,
 }
 
@@ -329,6 +330,7 @@ enum RecoveryProposalFamily {
 struct RecoveryProposalSummary {
     accepted_count: usize,
     structured_count: usize,
+    unary_function_count: usize,
 }
 
 /// Build a unit-correct correction basis around a rejected candidate. The scalar coefficient is fitted
@@ -370,6 +372,30 @@ fn structured_correction_basis(
                 Box::new(Expr::Var(name.to_string())),
                 Box::new(correction),
             )
+        }
+        RecoveryProposalFamily::UnaryFunctionCorrection => {
+            // This family is only enabled in the operator-held-out track. Construct a
+            // dimensionally valid oscillatory expression and subtract the rejected base so the
+            // fitted coefficient can replace the old structure when it is identifiable.
+            let energy_term =
+                random_expr_with_dimension(rng, DimensionalSignature::ENERGY, &units, GEN_MAX_DEPTH);
+            let phase = random_expr_with_dimension(
+                rng,
+                DimensionalSignature::DIMENSIONLESS,
+                &units,
+                GEN_MAX_DEPTH,
+            );
+            let unary = if rand_index(rng, 2) == 0 {
+                UnaryFn::Sin
+            } else {
+                UnaryFn::Cos
+            };
+            let oscillatory = Expr::BinOp(
+                BinOp::Mul,
+                Box::new(energy_term),
+                Box::new(Expr::Func(unary, Box::new(phase))),
+            );
+            Expr::BinOp(BinOp::Sub, Box::new(oscillatory), Box::new(base.clone()))
         }
         RecoveryProposalFamily::GenericTyped => return None,
     };
@@ -466,6 +492,7 @@ fn reseed_typed_candidates_after_alarm(
     live: &mut Vec<usize>,
     rejected_candidates: &mut Vec<usize>,
     alarmed_candidate: usize,
+    allow_unary_function_recovery: bool,
 ) -> RecoveryProposalSummary {
     let archived_count = hypotheses.len();
     if candidate_pool.is_empty() || alarmed_candidate >= archived_count {
@@ -495,11 +522,21 @@ fn reseed_typed_candidates_after_alarm(
     let mut proposals: Vec<(u8, f64, Expr, Vec<f64>, RecoveryProposalFamily)> = Vec::new();
     let mut attempts = 0usize;
     while attempts < RECOVERY_GENERATION_ATTEMPT_CAP {
-        let family = match attempts % 4 {
-            0 => RecoveryProposalFamily::AdditiveCorrection,
-            1 => RecoveryProposalFamily::MultiplicativeCorrection,
-            2 => RecoveryProposalFamily::InteractionCorrection,
-            _ => RecoveryProposalFamily::GenericTyped,
+        let family = if allow_unary_function_recovery {
+            match attempts % 5 {
+                0 => RecoveryProposalFamily::AdditiveCorrection,
+                1 => RecoveryProposalFamily::MultiplicativeCorrection,
+                2 => RecoveryProposalFamily::InteractionCorrection,
+                3 => RecoveryProposalFamily::UnaryFunctionCorrection,
+                _ => RecoveryProposalFamily::GenericTyped,
+            }
+        } else {
+            match attempts % 4 {
+                0 => RecoveryProposalFamily::AdditiveCorrection,
+                1 => RecoveryProposalFamily::MultiplicativeCorrection,
+                2 => RecoveryProposalFamily::InteractionCorrection,
+                _ => RecoveryProposalFamily::GenericTyped,
+            }
         };
         attempts += 1;
 
@@ -585,6 +622,9 @@ fn reseed_typed_candidates_after_alarm(
         summary.accepted_count += 1;
         if family != RecoveryProposalFamily::GenericTyped {
             summary.structured_count += 1;
+        }
+        if family == RecoveryProposalFamily::UnaryFunctionCorrection {
+            summary.unary_function_count += 1;
         }
     }
     summary
