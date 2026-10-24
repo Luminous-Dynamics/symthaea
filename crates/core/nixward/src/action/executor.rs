@@ -904,7 +904,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cfg(unix)]
+#[tokio::test]
     async fn test_execute_with_permit_accepts_exact_typed_command_once() {
         use super::super::authorization::{
             ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
@@ -965,7 +966,8 @@ mod tests {
         assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
-    #[tokio::test]
+    #[cfg(unix)]
+#[tokio::test]
     async fn test_execute_with_permit_blocks_command_substitution() {
         use super::super::authorization::{
             ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
@@ -1016,7 +1018,8 @@ mod tests {
         assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
-    #[tokio::test]
+    #[cfg(unix)]
+#[tokio::test]
     async fn test_execute_with_permit_rejects_unclassified_custom_command() {
         use super::super::authorization::{
             ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
