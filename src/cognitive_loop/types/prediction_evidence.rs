@@ -762,22 +762,33 @@ mod tests {
         let mut last_admitted = None;
         let mut admitted = 0usize;
 
-        for _ in 0..10_000 {
-            // Reproducible stream with cycles deliberately repeated and shuffled.
+        for index in 0..10_000u64 {
+            // Reproducible values/status variation combined with a deliberately
+            // adversarial six-event cycle schedule. Each group exercises:
+            // valid admission, duplicate, invalid newer cycle, delayed older
+            // cycle, requested/evidence-cycle mismatch, then same-cycle recovery.
             bits ^= bits << 13;
             bits ^= bits >> 17;
             bits ^= bits << 5;
 
-            let cycle = u64::from(bits % 512);
+            let phase = index % 6;
+            let base_cycle = (index / 6) * 4;
+            let (cycle, requested_cycle) = match phase {
+                0 | 1 => (base_cycle, base_cycle),
+                2 => (base_cycle + 2, base_cycle + 2),
+                3 => (base_cycle + 1, base_cycle + 1),
+                4 => (base_cycle + 2, base_cycle + 3),
+                _ => (base_cycle + 3, base_cycle + 3),
+            };
             let value = (bits as f32) / (u32::MAX as f32);
-            let evidence = match bits % 4 {
-                0 => PredictionErrorEvidence::invalid(
+            let evidence = match phase {
+                2 if bits & 1 == 0 => PredictionErrorEvidence::invalid(
                     PredictionEvidenceStatus::InvalidValidityFlag,
                     None,
                     cycle,
                 )
                 .unwrap(),
-                1 => PredictionErrorEvidence::invalid(
+                2 => PredictionErrorEvidence::invalid(
                     PredictionEvidenceStatus::SourceUnavailable,
                     None,
                     cycle,
@@ -785,15 +796,10 @@ mod tests {
                 .unwrap(),
                 _ => PredictionErrorEvidence::valid(value, None, cycle).unwrap(),
             };
-            let requested_cycle = if bits & 0x100 != 0 {
-                cycle.saturating_add(1)
-            } else {
-                cycle
-            };
 
             // Independent reference model for both watermarks: every
-            // non-stale requested cycle is observed, even if its evidence is
-            // invalid or belongs to a different cycle.
+            // non-stale requested cycle is observed even when its evidence is
+            // invalid or belongs to a different observation cycle.
             let requested_is_stale =
                 last_observed.is_some_and(|last| requested_cycle < last);
             let expected = if requested_is_stale {
@@ -810,7 +816,7 @@ mod tests {
                 }
             };
             let actual = cursor.admit_evidence(&evidence, requested_cycle);
-            assert_eq!(actual, expected, "trace mismatch at observation {cycle}");
+            assert_eq!(actual, expected, "trace mismatch at event {index}");
 
             if actual.is_some() {
                 admitted += 1;
@@ -820,7 +826,12 @@ mod tests {
             assert_eq!(cursor.last_admitted_observation_cycle(), last_admitted);
         }
 
-        assert!(admitted > 0, "generated trace should contain valid admissions");
+        // Fail if a future generator edit degenerates into an almost-all-stale
+        // stream that barely exercises successful admissions.
+        assert!(
+            admitted >= 3_000,
+            "adversarial trace must exercise thousands of valid admissions, got {admitted}"
+        );
     }
 
     #[test]
