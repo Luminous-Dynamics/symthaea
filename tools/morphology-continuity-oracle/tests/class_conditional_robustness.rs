@@ -364,6 +364,145 @@ fn robust_net_value(
     Some((worst, baseline - worst - acquisition_cost))
 }
 
+/// Vertices of an uncertainty set for the class prior, represented in per-mille units.
+/// A vertex is formed by assigning two cells to interval bounds and solving the sum constraint.
+fn prior_vertices(lower: [u16; 3], upper: [u16; 3]) -> Option<Vec<[u16; 3]>> {
+    if lower
+        .iter()
+        .zip(upper.iter())
+        .any(|(minimum, maximum)| minimum > maximum || *maximum > PROBABILITY_SCALE)
+        || lower.iter().map(|value| u32::from(*value)).sum::<u32>()
+            > u32::from(PROBABILITY_SCALE)
+        || upper.iter().map(|value| u32::from(*value)).sum::<u32>()
+            < u32::from(PROBABILITY_SCALE)
+    {
+        return None;
+    }
+    let mut vertices = Vec::new();
+    for (first, second, remaining) in [(0_usize, 1_usize, 2_usize), (0, 2, 1), (1, 2, 0)] {
+        for first_value in [lower[first], upper[first]] {
+            for second_value in [lower[second], upper[second]] {
+                let assigned = u32::from(first_value) + u32::from(second_value);
+                if assigned > u32::from(PROBABILITY_SCALE) {
+                    continue;
+                }
+                let remaining_value = (u32::from(PROBABILITY_SCALE) - assigned) as u16;
+                if !(lower[remaining]..=upper[remaining]).contains(&remaining_value) {
+                    continue;
+                }
+                let mut prior = [0_u16; 3];
+                prior[first] = first_value;
+                prior[second] = second_value;
+                prior[remaining] = remaining_value;
+                if !vertices.contains(&prior) {
+                    vertices.push(prior);
+                }
+            }
+        }
+    }
+    if vertices.is_empty() {
+        None
+    } else {
+        Some(vertices)
+    }
+}
+
+/// Worst-case no-measurement action: choose one action before the unknown prior is revealed.
+fn robust_baseline_loss(priors: &[[u16; 3]], decisions: &[[u32; 3]]) -> Option<f64> {
+    if priors.is_empty() || decisions.is_empty() {
+        return None;
+    }
+    decisions
+        .iter()
+        .map(|losses| {
+            priors
+                .iter()
+                .map(|prior| {
+                    prior
+                        .iter()
+                        .zip(losses.iter())
+                        .map(|(probability, loss)| {
+                            f64::from(*probability) * f64::from(*loss)
+                        })
+                        .sum::<f64>()
+                        / f64::from(PROBABILITY_SCALE)
+                })
+                .max_by(f64::total_cmp)
+                .unwrap_or(f64::INFINITY)
+        })
+        .min_by(f64::total_cmp)
+}
+
+/// Maximize fixed-policy risk over both plausible priors and plausible confusion matrices.
+/// For fixed prior, risk is linear in each matrix row; for fixed matrix, it is linear in prior.
+/// Therefore the maximum over this Cartesian product is attained at a pair of vertices.
+fn worst_case_policy_risk_over_priors(
+    regions: [[Interval; 3]; 3],
+    priors: &[[u16; 3]],
+    decisions: &[[u32; 3]],
+    actions: [usize; 3],
+) -> Option<f64> {
+    if priors.is_empty() {
+        return None;
+    }
+    let rows = [
+        row_vertices(regions[0]),
+        row_vertices(regions[1]),
+        row_vertices(regions[2]),
+    ];
+    if rows.iter().any(Vec::is_empty) {
+        return None;
+    }
+    let mut worst = f64::NEG_INFINITY;
+    for chair_row in &rows[0] {
+        for table_row in &rows[1] {
+            for stool_row in &rows[2] {
+                let truth = [*chair_row, *table_row, *stool_row];
+                for prior in priors {
+                    let mut loss = 0.0;
+                    for (class_index, row) in truth.iter().enumerate() {
+                        for (outcome_index, probability) in row.iter().enumerate() {
+                            loss += f64::from(prior[class_index])
+                                * f64::from(*probability)
+                                * f64::from(decisions[actions[outcome_index]][class_index]);
+                        }
+                    }
+                    worst = worst.max(loss / f64::from(PROBABILITY_SCALE * PROBABILITY_SCALE));
+                }
+            }
+        }
+    }
+    if worst.is_finite() {
+        Some(worst)
+    } else {
+        None
+    }
+}
+
+fn robust_net_value_over_prior_uncertainty(
+    regions: [[Interval; 3]; 3],
+    prior_lower: [u16; 3],
+    prior_upper: [u16; 3],
+    nominal_weights: [u64; 3],
+    assumed: [[u16; 3]; 3],
+    decisions: &[[u32; 3]],
+    safe_fallback: usize,
+    acquisition_cost: f64,
+) -> Option<(f64, f64, f64)> {
+    if !acquisition_cost.is_finite() || acquisition_cost < 0.0 {
+        return None;
+    }
+    let priors = prior_vertices(prior_lower, prior_upper)?;
+    let actions = deployed_policy(assumed, nominal_weights, decisions, safe_fallback)?;
+    let baseline = robust_baseline_loss(&priors, decisions)?;
+    let worst_policy = worst_case_policy_risk_over_priors(regions, &priors, decisions, actions)?;
+    Some((
+        baseline,
+        worst_policy,
+        baseline - worst_policy - acquisition_cost,
+    ))
+}
+
 fn nominal_counts(per_class: u64) -> [[u64; 3]; 3] {
     [
         [per_class * 95 / 100, per_class * 5 / 100, 0],
@@ -527,6 +666,109 @@ fn coverage_width_frontier_compares_exact_and_wilson_regions() {
             assert!(cp_width > wilson_width);
         }
     }
+}
+
+#[test]
+fn prior_shift_uncertainty_can_reverse_a_nominally_positive_acquisition_decision() {
+    let known_matrix = [
+        [
+            Interval { lower: 950, upper: 950 },
+            Interval { lower: 50, upper: 50 },
+            Interval { lower: 0, upper: 0 },
+        ],
+        [
+            Interval { lower: 50, upper: 50 },
+            Interval { lower: 950, upper: 950 },
+            Interval { lower: 0, upper: 0 },
+        ],
+        [
+            Interval { lower: 50, upper: 50 },
+            Interval { lower: 950, upper: 950 },
+            Interval { lower: 0, upper: 0 },
+        ],
+    ];
+    let nominal = [600, 300, 100];
+    let nominal_loss = policy_risk(
+        [[950, 50, 0], [50, 950, 0], [50, 950, 0]],
+        nominal,
+        &DECISION_LOSSES,
+        [0, 1, 1],
+    )
+    .expect("valid nominal model");
+    assert!((nominal_loss - 3.64).abs() <= EPSILON);
+    assert!((4.0 - nominal_loss - ACQUISITION_COST - 0.26).abs() <= EPSILON);
+
+    let broad = robust_net_value_over_prior_uncertainty(
+        known_matrix,
+        [200, 100, 0],
+        [800, 700, 500],
+        [6, 3, 1],
+        assumed_sensor(),
+        &DECISION_LOSSES,
+        1,
+        ACQUISITION_COST,
+    )
+    .expect("feasible broad prior region");
+    assert!((broad.0 - 4.0).abs() <= EPSILON);
+    assert!((broad.1 - 7.08).abs() <= EPSILON);
+    assert!((broad.2 + 3.18).abs() <= EPSILON);
+    assert!(broad.2 < 0.0);
+
+    let narrow = robust_net_value_over_prior_uncertainty(
+        known_matrix,
+        [600, 250, 50],
+        [700, 350, 150],
+        [6, 3, 1],
+        assumed_sensor(),
+        &DECISION_LOSSES,
+        1,
+        ACQUISITION_COST,
+    )
+    .expect("feasible narrow prior region");
+    assert!((narrow.0 - 4.0).abs() <= EPSILON);
+    assert!((narrow.1 - 3.64).abs() <= EPSILON);
+    assert!((narrow.2 - 0.26).abs() <= EPSILON);
+    assert!(narrow.2 > 0.0);
+}
+
+#[test]
+fn invalid_or_infeasible_prior_regions_fail_closed() {
+    assert_eq!(prior_vertices([800, 300, 100], [900, 400, 200]), None);
+    assert_eq!(prior_vertices([300, 300, 300], [300, 300, 300]), None);
+    assert_eq!(
+        robust_baseline_loss(&[], &DECISION_LOSSES),
+        None
+    );
+    let exact_matrix = [
+        [
+            Interval { lower: 950, upper: 950 },
+            Interval { lower: 50, upper: 50 },
+            Interval { lower: 0, upper: 0 },
+        ],
+        [
+            Interval { lower: 50, upper: 50 },
+            Interval { lower: 950, upper: 950 },
+            Interval { lower: 0, upper: 0 },
+        ],
+        [
+            Interval { lower: 50, upper: 50 },
+            Interval { lower: 950, upper: 950 },
+            Interval { lower: 0, upper: 0 },
+        ],
+    ];
+    assert_eq!(
+        robust_net_value_over_prior_uncertainty(
+            exact_matrix,
+            [200, 100, 0],
+            [800, 700, 500],
+            [6, 3, 1],
+            assumed_sensor(),
+            &DECISION_LOSSES,
+            1,
+            -0.1,
+        ),
+        None
+    );
 }
 
 #[test]
