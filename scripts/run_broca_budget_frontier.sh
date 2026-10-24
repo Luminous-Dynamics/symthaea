@@ -30,8 +30,8 @@ if [[ ! "$SEED" =~ ^[0-9]+$ ]]; then
   echo "FAIL: SEED must be an unsigned integer" >&2
   exit 2
 fi
-if [[ ! "$CANDIDATES" =~ ^[0-9]+$ ]] || (( CANDIDATES < 30 || CANDIDATES > 1000 )); then
-  echo "FAIL: CANDIDATES must be in 30..=1000" >&2
+if [[ ! "$CANDIDATES" =~ ^[0-9]+$ ]] || (( CANDIDATES < 30 || CANDIDATES > 200 )); then
+  echo "FAIL: CANDIDATES must be in 30..=200 so raw evidence always fits the 8192-unit budget" >&2
   exit 2
 fi
 
