@@ -211,3 +211,10 @@ This design is informed by the T² study's gap between compilation and dependent
 ### 2026-10-24 update: individual review decisions are part of the gate
 
 The semantic-gate contract now records each statement-correspondence review separately: reviewer ID, decision, and evidence digest. The Rust analyzer rejects duplicate identities, malformed digests, and disagreement hidden behind a claimed consensus status. Disagreement is unresolved unless a separately preregistered adjudication procedure is implemented. This is stricter than trusting an integer such as `independent_reviewer_count: 2`, which alone does not describe who reviewed the statement or whether their decisions agree.
+
+
+### 2026-10-24 update: quarantine cross-family contamination before scoring
+
+Added a non-destructive family-leakage audit. It re-derives the fixed 70/15/15 family assignments from the registered SHA-256 ranking and pins the resulting count/digest (372 families; 260/56/56). A content-addressed relationship inventory classifies exact duplicates, shared artifacts, formal dependencies, reused lemmas and equivalent statements separately from ordinary conceptual similarity. Confirmed **and unresolved** hard-link components spanning splits are enumerated for quarantine; the frozen partition is never silently reshuffled. An incomplete inventory is categorically unable to certify a clean holdout.
+
+The analyzer, two Draft 2020-12 schemas, synthetic control fixture, run instructions and CI negative controls are present on the research branch. The fixture is fabricated test data; the real cross-family inventory and byte-level independent review do not yet exist. Exact-head workflow/status queries currently return no runs/checks for the latest commit, and no Rust build/test pass is claimed. This is benchmark-validity infrastructure—not a measured transfer gain.
