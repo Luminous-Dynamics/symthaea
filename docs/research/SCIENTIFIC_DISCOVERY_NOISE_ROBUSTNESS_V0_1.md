@@ -1,6 +1,6 @@
 # Scientific Law Discovery Under Unknown Noise and Adaptive Sampling
 
-**Protocol v0.1.2 — preregistration proposal only. No method-performance or SOTA claim is made.**
+**Protocol v0.1.3 — preregistration proposal only. No method-performance or SOTA claim is made.**
 
 Issue: [SCI-NOISE-001 (#8607)](https://github.com/Luminous-Dynamics/symthaea/issues/8607)  
 Parent research: [truth-absent recovery (#8536)](https://github.com/Luminous-Dynamics/symthaea/issues/8536)  
@@ -120,7 +120,7 @@ Use a layered comparison rather than pretending every published algorithm solves
 - Existing nominal expected-information-gain selector, random selection, and fixed-grid/round-robin under matched budgets.
 - Current residual-guided typed correction/recovery path.
 - A robust/noise-aware selector only as an explicitly proposed treatment, not as a presumed improvement.
-- On compatible static equation-recovery tracks, include PySR/SymbolicRegression.jl, AI Feynman where its assumptions fit, and pinned ERBench/SRBench protocol versions. RESTART, GenSR and EGG-SR are important structural-search comparators, but their published results are not transferable to this active, factorial protocol without matched implementations and budgets.
+- On compatible static equation-recovery tracks, include PySR/SymbolicRegression.jl, AI Feynman where its assumptions fit, and pinned ERBench/SRBench protocol versions. Include [Flash-ANSR with SimpliPy (ICML 2026)](https://proceedings.mlr.press/v306/saegert26a.html) on a compatible FastSRB-style track: the paper reports a 100-fold simplification speedup over SymPy and performance on par with PySR on FastSRB, while recovering more concise expressions as inference budget grows. Treat these as published results to replicate, not transferable scores for this noise-robust active-discovery task. RESTART, GenSR and EGG-SR are important structural-search comparators, but all published results require matched implementations, evaluation sets and budgets before making a superiority claim.
 
 Do not compare a policy's best-of-many run with a baseline's single run. Publish all attempted runs and resource accounting.
 
@@ -190,5 +190,6 @@ External context:
 - [GenSR (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/8fd1a81c882cd45f64958da6284f4a3f-Abstract-Conference.html) explores latent-space guidance for symbolic search.
 - [EGG-SR (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/1704fe7aaff33a54802b83a016050ab8-Abstract-Conference.html) uses symbolic equivalence to reduce redundant search.
 - [2026 symbolic-regression survey](https://doi.org/10.1007/s11831-026-10681-w) identifies realistic noise, missing data, shift and uncertainty quantification as continuing benchmark concerns.
+- [Flash-ANSR / SimpliPy (ICML 2026)](https://proceedings.mlr.press/v306/saegert26a.html) targets the simplification bottleneck in amortized neural-symbolic regression; use it as a pinned static-track comparator, not evidence of noise-robust active-discovery performance.
 
 **Status:** protocol PR only. The scenario manifest is a versioned design artifact, not an executable generator, validated statistical guarantee, or performance report.
