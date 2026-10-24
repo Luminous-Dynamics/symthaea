@@ -121,11 +121,10 @@ impl PredictionErrorEvidence {
                 Some(value) if !value.is_finite() => {
                     (PredictionEvidenceStatus::NonFiniteInput, None)
                 }
-                Some(value)
+                Some(_)
                     if prediction_cycle.is_some()
                         && observation_cycle.checked_sub(1) != prediction_cycle =>
                 {
-                    let _ = value;
                     (PredictionEvidenceStatus::StaleOrOutOfOrder, None)
                 }
                 Some(value) => (PredictionEvidenceStatus::Valid, Some(value)),
