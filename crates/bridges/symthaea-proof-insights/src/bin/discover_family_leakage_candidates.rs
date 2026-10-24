@@ -293,7 +293,7 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
     candidates
 }
 
-fn counts(families: &[Family], candidates: &[Candidate]) -> CandidateCounts {
+fn counts(candidates: &[Candidate]) -> CandidateCounts {
     CandidateCounts {
         candidate_pairs: candidates.len(),
         cross_split_pairs: candidates.iter().filter(|c| c.source_split != c.target_split).count(),
@@ -310,7 +310,7 @@ fn make_report(
     split_counts: SplitCounts,
     candidates: Vec<Candidate>,
 ) -> DiscoveryReport {
-    let counts = counts(families, &candidates);
+    let counts = counts(&candidates);
     DiscoveryReport {
         schema_version: "pitb.family-leakage-candidate-discovery.v0",
         upstream_repository: "https://github.com/openai/math",
@@ -405,17 +405,19 @@ mod tests {
 
     #[test]
     fn candidate_order_is_deterministic() {
-        let a = family("001", "Iitaka subadditivity and logarithmic additivity", "train");
-        let b = family("002", "Log abundance under logarithmic Iitaka subadditivity", "test");
-        let candidates_1 = vec![a.clone(), b.clone()];
-        let candidates_2 = vec![a, b];
+        let tag = Regex::new(r"<[^>]*>").unwrap();
+        let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
+        let token = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").unwrap();
+        let stop = stopwords();
+        let mut a = family("001", "Iitaka subadditivity and logarithmic additivity", "train");
+        let mut b = family("002", "Log abundance under logarithmic Iitaka subadditivity", "test");
+        a.tokens = token_set(&a.title, &tag, &entity, &token, &stop);
+        b.tokens = token_set(&b.title, &tag, &entity, &token, &stop);
+        let first = discover(&[a.clone(), b.clone()]);
+        let second = discover(&[a, b]);
         assert_eq!(
-            serde_json::to_value(candidates_1.len()).unwrap(),
-            serde_json::to_value(candidates_2.len()).unwrap()
+            serde_json::to_value(first).unwrap(),
+            serde_json::to_value(second).unwrap()
         );
     }
-}
-
-fn _unused_family_guard(families: &[Family]) -> usize {
-    families.iter().map(|f| f.tokens.len()).sum()
 }
