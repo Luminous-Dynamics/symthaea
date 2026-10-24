@@ -729,6 +729,7 @@ struct TrialOutcome {
     ground_truth_equivalent: bool,
     ground_truth_extrapolation_equivalent: bool,
     initial_pool_contains_reference: bool,
+    reference_audit_evaluable: bool,
     in_domain_holdout_points: usize,
     extrapolation_holdout_points: usize,
     recovery_triggered_on_empty_pool: bool,
@@ -758,6 +759,7 @@ fn unresolved_trial_outcome(
         ground_truth_equivalent: false,
         ground_truth_extrapolation_equivalent: false,
         initial_pool_contains_reference: false,
+        reference_audit_evaluable: false,
         in_domain_holdout_points: 0,
         extrapolation_holdout_points: 0,
         recovery_triggered_on_empty_pool: false,
@@ -1371,14 +1373,17 @@ fn run_trial_with_mode(
         && evaluator_matches_reference(&hypotheses[live[0]], &ground_truth, &extrapolation_holdout);
     // Evaluator-only audit of the initial candidate set. It runs after the policy ends and is
     // used only to identify accidentally oracle-present trials in the truth-absent track.
-    let initial_pool_contains_reference = initial_hypotheses.iter().any(|candidate| {
-        evaluator_matches_reference_across_domains(
-            candidate,
-            &ground_truth,
-            &holdout,
-            &extrapolation_holdout,
-        )
-    });
+    let reference_audit_evaluable = holdout.len() >= IN_DOMAIN_HOLDOUT_MINIMUM
+        && extrapolation_holdout.len() >= OOD_HOLDOUT_MINIMUM;
+    let initial_pool_contains_reference = reference_audit_evaluable
+        && initial_hypotheses.iter().any(|candidate| {
+            evaluator_matches_reference_across_domains(
+                candidate,
+                &ground_truth,
+                &holdout,
+                &extrapolation_holdout,
+            )
+        });
 
     TrialOutcome {
         rounds_used: round,
@@ -1386,7 +1391,7 @@ fn run_trial_with_mode(
             && holdout.len() >= IN_DOMAIN_HOLDOUT_MINIMUM
             && ground_truth_equivalent
             && ground_truth_extrapolation_equivalent
-            && (!truth_absent || !initial_pool_contains_reference)
+            && (!truth_absent || !reference_audit_evaluable || !initial_pool_contains_reference)
             && (!truth_absent
                 || post_recovery_validation_measurements
                     >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS)
@@ -1405,6 +1410,7 @@ fn run_trial_with_mode(
         ground_truth_equivalent,
         ground_truth_extrapolation_equivalent,
         initial_pool_contains_reference,
+        reference_audit_evaluable,
         in_domain_holdout_points: holdout.len(),
         extrapolation_holdout_points: extrapolation_holdout.len(),
         recovery_triggered_on_empty_pool,
@@ -1899,6 +1905,10 @@ mod tests {
             smoothing: false,
         };
         let mut initial_reference_hits = 0usize;
+        let mut baseline_initial_reference_hits = 0usize;
+        let mut incomplete_reference_audits = 0usize;
+        let mut in_domain_holdout_points_total = 0usize;
+        let mut ood_holdout_points_total = 0usize;
         let mut unresolved_without_recovery = 0usize;
         let mut false_singletons_without_recovery = 0usize;
         let mut empty_pool_recovery_attempts = 0usize;
@@ -1930,11 +1940,27 @@ mod tests {
                 ActiveSelector::InformationGainWithAudits,
                 true,
             );
-            initial_reference_hits += if recovered.initial_pool_contains_reference {
+            initial_reference_hits += if recovered.reference_audit_evaluable
+                && recovered.initial_pool_contains_reference
+            {
                 1
             } else {
                 0
             };
+            baseline_initial_reference_hits += if baseline.reference_audit_evaluable
+                && baseline.initial_pool_contains_reference
+            {
+                1
+            } else {
+                0
+            };
+            incomplete_reference_audits += if recovered.reference_audit_evaluable {
+                0
+            } else {
+                1
+            };
+            in_domain_holdout_points_total += recovered.in_domain_holdout_points;
+            ood_holdout_points_total += recovered.extrapolation_holdout_points;
             baseline_measurements += baseline.rounds_used;
             recovery_measurements += recovered.rounds_used;
             unresolved_without_recovery += if baseline.final_live != 1 { 1 } else { 0 };
@@ -1999,7 +2025,8 @@ mod tests {
                     "baseline_rounds={},baseline_live={},baseline_success={},",
                     "baseline_selection_failed={},baseline_false_singleton={},",
                     "recovery_rounds={},recovery_live={},recovery_selection_failed={},",
-                    "reference_equivalent_initial_pool={},",
+                    "reference_audit_evaluable={},reference_equivalent_initial_pool={},",
+                    "in_domain_holdout_points={},ood_holdout_points={},",
                     "recovery_triggered={},recovery_restarts={},accepted_candidates={},",
                     "same_domain_match={},ood_match={},post_recovery_singleton_audits={},",
                     "full_recovery_success={}"
@@ -2012,7 +2039,10 @@ mod tests {
                 recovered.rounds_used,
                 recovered.final_live,
                 recovered.selection_failed,
+                recovered.reference_audit_evaluable,
                 recovered.initial_pool_contains_reference,
+                recovered.in_domain_holdout_points,
+                recovered.extrapolation_holdout_points,
                 recovered.recovery_triggered_on_empty_pool,
                 recovered.typed_recovery_restarts,
                 recovered.accepted_recovery_candidates,
@@ -2024,11 +2054,15 @@ mod tests {
         }
 
         println!(
-            "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},initial_reference_hits={initial_reference_hits},unresolved_without_recovery={unresolved_without_recovery},false_singletons_without_recovery={false_singletons_without_recovery},unresolved_after_recovery={unresolved_after_recovery},selection_failures_after_recovery={selection_failures_after_recovery},baseline_measurements={baseline_measurements},recovery_measurements={recovery_measurements},runs_with_post_recovery_validation={runs_with_post_recovery_validation},total_post_recovery_validation_measurements={total_post_recovery_validation_measurements},empty_pool_recovery_attempts={empty_pool_recovery_attempts},failed_recovery_attempts={failed_recovery_attempts},accepted_recovery_candidates={accepted_recovery_candidates},false_singletons_after_recovery={false_singletons_after_recovery},same_domain_recovered={same_domain_recovered},ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
+            "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},initial_reference_hits={initial_reference_hits},baseline_initial_reference_hits={baseline_initial_reference_hits},incomplete_reference_audits={incomplete_reference_audits},in_domain_holdout_points_total={in_domain_holdout_points_total},ood_holdout_points_total={ood_holdout_points_total},unresolved_without_recovery={unresolved_without_recovery},false_singletons_without_recovery={false_singletons_without_recovery},unresolved_after_recovery={unresolved_after_recovery},selection_failures_after_recovery={selection_failures_after_recovery},baseline_measurements={baseline_measurements},recovery_measurements={recovery_measurements},runs_with_post_recovery_validation={runs_with_post_recovery_validation},total_post_recovery_validation_measurements={total_post_recovery_validation_measurements},empty_pool_recovery_attempts={empty_pool_recovery_attempts},failed_recovery_attempts={failed_recovery_attempts},accepted_recovery_candidates={accepted_recovery_candidates},false_singletons_after_recovery={false_singletons_after_recovery},same_domain_recovered={same_domain_recovered},ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
         );
         assert_eq!(
             initial_reference_hits, 0,
             "truth-absent initial pool unexpectedly contains a reference-equivalent candidate"
+        );
+        assert_eq!(
+            baseline_initial_reference_hits, 0,
+            "truth-absent no-recovery baseline unexpectedly contains a reference-equivalent candidate"
         );
         assert!(
             empty_pool_recovery_attempts > 0,
