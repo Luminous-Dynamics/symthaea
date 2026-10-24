@@ -556,9 +556,7 @@ mod tests {
         let flow_snapshot = snapshot_with(0.05, 0.8, 0.5, 0.3);
 
         // Enter flow
-        for _ in 0..10 {
-            dm.process(&flow_snapshot);
-        }
+        process_cycles(&mut dm, &flow_snapshot, 0, 10);
         assert!(dm.in_flow);
 
         // Disrupt with high error
