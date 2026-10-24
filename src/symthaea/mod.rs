@@ -1899,7 +1899,7 @@ impl Symthaea {
             let lang = thought
                 .code_context
                 .as_ref()
-                .map(|c| c.language.clone())
+                .map(|c| c.language.trim().to_ascii_lowercase())
                 .unwrap_or_else(|| "rust".to_string());
 
             const MAX_CODE_RETRIES: usize = 3;
