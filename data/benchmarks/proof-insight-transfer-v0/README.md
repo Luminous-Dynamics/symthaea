@@ -119,3 +119,10 @@ cargo run --locked --bin analyze_success_cost_frontier -- \
 Each outcome must match the plan's run ID, target, component, arm, budget, and input digest. Executed rows must include receipts for the exact target statement, kernel/checker, semantic gate, successor gate, and run; resource use must stay within the assigned caps. Missing runs are not silently dropped. The primary success curve uses the full assigned target denominator, so unattempted/unavailable cases remain non-solves. Report the paired component-clustered interval for each same-budget arm contrast, actual cost per assigned target, cost per verified solve where defined, and the observed non-dominated success/cost points. Do not interpolate between unmeasured caps.
 
 The frontier analyzer is deliberately **descriptive only**: `confirmatory_decision` is permanently `not_evaluated_*`; it does not open checker receipt contents, independently certify statement correspondence, or replace `analyze_pitb_results` and its pre-registered power/primary-utility gate. A successful JSON/Rust pipeline would qualify the analysis harness, not establish insight-transfer utility or a state-of-the-art win.
+
+
+## Cross-family leakage audit
+
+- **family-leakage-edges.schema.json** and **family-leakage-report.schema.json** define a secondary, non-destructive audit for cross-family dependencies. The Rust analyzer recomputes the frozen assignment, binds the edge inventory to its partition digest, joins confirmed and unresolved hard-leakage edges into connected components, and reports conservative quarantine counts.
+- **fixtures/family-leakage-edges.synthetic.json** contains deliberately invented negative/control relationships for CI only. It is not an actual dependency inventory and must not be treated as evidence about those families.
+- The real relationship inventory has not yet been independently curated. Its status is incomplete; therefore, the system cannot certify the frozen test split as leakage-free. The audit preserves the original split and does not turn metadata checks into mathematical evidence.
