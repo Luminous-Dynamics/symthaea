@@ -124,6 +124,7 @@ impl AuthorizationRequest {
         if lifetime.is_zero() {
             return Err(AuthorizationError::ZeroLifetime);
         }
+        validate_authority_scope(authority, scope)?;
 
         Ok(Self {
             binding,
@@ -157,6 +158,7 @@ impl AuthorizationAttempt {
         if principal.trim().is_empty() {
             return Err(AuthorizationError::EmptyPrincipal);
         }
+        validate_authority_scope(authority, scope)?;
 
         Ok(Self {
             binding,
@@ -374,6 +376,26 @@ impl ExecutionAuthorizationLedger {
     }
 }
 
+fn validate_authority_scope(
+    authority: AuthorizationAuthority,
+    scope: ActionScope,
+) -> Result<(), AuthorizationError> {
+    let valid = match authority {
+        AuthorizationAuthority::ReadOnlyPolicy => scope == ActionScope::ReadOnly,
+        AuthorizationAuthority::RollbackPolicy => scope == ActionScope::Rollback,
+        AuthorizationAuthority::RecoveryPolicy => scope == ActionScope::Recovery,
+        AuthorizationAuthority::HumanOperator | AuthorizationAuthority::WatchdogOperator => {
+            !matches!(scope, ActionScope::Rollback | ActionScope::Recovery)
+        }
+    };
+
+    if valid {
+        Ok(())
+    } else {
+        Err(AuthorizationError::AuthorityScopeMismatch)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum AuthorizationError {
     #[error("the executable must not be empty")]
@@ -412,6 +434,8 @@ pub enum AuthorizationError {
     ScopeMismatch,
     #[error("actual authority kind differs from the permit")]
     AuthorityMismatch,
+    #[error("authority kind is not permitted for this action scope")]
+    AuthorityScopeMismatch,
     #[error("permit identifier space exhausted")]
     PermitIdExhausted,
     #[error("ledger identifier space exhausted")]
@@ -796,6 +820,33 @@ mod tests {
         assert_eq!(
             ledger.issue(request).unwrap_err(),
             AuthorizationError::LifetimeTooLong
+        );
+    }
+
+    #[test]
+    fn authority_kind_cannot_claim_an_unrelated_scope() {
+        let command = binding(&["-d", "--delete-old"]);
+        assert_eq!(
+            AuthorizationRequest::new(
+                command.clone(),
+                "policy:readonly",
+                ActionScope::Destructive,
+                AuthorizationAuthority::ReadOnlyPolicy,
+                "decision-authority-scope-mismatch",
+                Duration::from_secs(1),
+            )
+            .unwrap_err(),
+            AuthorizationError::AuthorityScopeMismatch
+        );
+        assert_eq!(
+            AuthorizationAttempt::new(
+                command,
+                "operator:alice",
+                ActionScope::Rollback,
+                AuthorizationAuthority::HumanOperator,
+            )
+            .unwrap_err(),
+            AuthorizationError::AuthorityScopeMismatch
         );
     }
 
