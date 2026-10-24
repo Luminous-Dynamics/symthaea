@@ -75,6 +75,48 @@ impl fmt::Display for NoiseError {
 
 impl Error for NoiseError {}
 
+/// Named evaluator RNG domains used by the SCI-NOISE-001 scenario manifest.
+///
+/// These tags are part of the versioned deterministic fixture contract.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeedDomain {
+    PublicDesign,
+    TargetLaw,
+    NoiseProcess,
+    InDomainEvaluation,
+    MarginalShiftEvaluation,
+    JointExtrapolationEvaluation,
+    NearBoundaryEvaluation,
+}
+
+impl SeedDomain {
+    const fn tag(self) -> u64 {
+        match self {
+            Self::PublicDesign => 0x5055_424C_4943_0001,
+            Self::TargetLaw => 0x5441_5247_4554_0002,
+            Self::NoiseProcess => 0x4E4F_4953_4500_0003,
+            Self::InDomainEvaluation => 0x494E_444F_4D41_0004,
+            Self::MarginalShiftEvaluation => 0x4D41_5247_494E_0005,
+            Self::JointExtrapolationEvaluation => 0x4A4F_494E_5400_0006,
+            Self::NearBoundaryEvaluation => 0x4E45_4152_424F_0007,
+        }
+    }
+}
+
+/// Derive a reproducible, domain-separated seed (version 1).
+///
+/// This uses a fixed 64-bit mixing function to keep stream-seed derivation stable
+/// across runs and platforms. Domain separation reduces accidental seed reuse; it
+/// does not make this deterministic generator cryptographically secure, conceal
+/// evaluator labels, or mathematically guarantee independent random streams.
+pub fn derive_stream_seed_v1(master_seed: u64, domain: SeedDomain, world_id: u64) -> u64 {
+    let mut value = master_seed ^ domain.tag();
+    value = value.wrapping_add(world_id.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
 impl NoiseModel {
     /// Validate a model before constructing a generator.
     pub fn validate(&self) -> Result<(), NoiseError> {
@@ -565,6 +607,31 @@ mod tests {
                 change_at_step: 100,
             },
         ]
+    }
+
+    #[test]
+    fn stream_seed_derivation_v1_matches_frozen_known_answer_vectors() {
+        let vectors = [
+            (SeedDomain::PublicDesign, 0x3757_A662_5757_78A7),
+            (SeedDomain::TargetLaw, 0x8543_7C19_93DA_14CB),
+            (SeedDomain::NoiseProcess, 0x27B6_FFCD_BD11_742F),
+            (SeedDomain::InDomainEvaluation, 0xE3F6_6000_933D_5F6E),
+            (SeedDomain::MarginalShiftEvaluation, 0x00ED_4162_5484_1244),
+            (SeedDomain::JointExtrapolationEvaluation, 0x83C5_B82A_3D47_CA22),
+            (SeedDomain::NearBoundaryEvaluation, 0x6D3B_4031_131D_02DB),
+        ];
+        let mut seen = Vec::with_capacity(vectors.len());
+        for (domain, expected) in vectors {
+            let actual = derive_stream_seed_v1(0xC0FF_EE12, domain, 42);
+            assert_eq!(actual, expected, "known-answer vector for {domain:?}");
+            assert!(!seen.contains(&actual), "duplicate seed for {domain:?}");
+            seen.push(actual);
+        }
+        assert_ne!(
+            derive_stream_seed_v1(0xC0FF_EE12, SeedDomain::NoiseProcess, 42),
+            derive_stream_seed_v1(0xC0FF_EE12, SeedDomain::NoiseProcess, 43),
+            "world IDs must affect the derived seed"
+        );
     }
 
     #[test]
