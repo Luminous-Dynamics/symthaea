@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/source-catalog/v0/source.schema.json",
+  "title": "Knowledge Source Catalog Record v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_id",
+    "source_family_id",
+    "uri",
+    "tradition_scope",
+    "source_kind",
+    "split",
+    "rights_status",
+    "content_access",
+    "rights_review",
+    "annotation_status",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "knowledge-source-v0"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tradition_scope": {
+      "enum": [
+        "ancient_egyptian_religion",
+        "western_esotericism"
+      ]
+    },
+    "source_kind": {
+      "enum": [
+        "museum_exhibition",
+        "academic_chapter_summary",
+        "university_museum_resource",
+        "journal_article",
+        "academic_reference",
+        "encyclopedia_article",
+        "institutional_research_program"
+      ]
+    },
+    "split": {
+      "enum": [
+        "development",
+        "validation",
+        "test",
+        "holdout"
+      ]
+    },
+    "rights_status": {
+      "enum": [
+        "public_domain_verified",
+        "open_license_verified",
+        "metadata_only",
+        "permission_required",
+        "restricted",
+        "community_governed",
+        "unknown"
+      ]
+    },
+    "content_access": {
+      "enum": [
+        "metadata_only",
+        "permissioned_full_text",
+        "verified_open_content",
+        "restricted_content"
+      ]
+    },
+    "rights_review": {
+      "enum": [
+        "pending",
+        "approved_limited_use",
+        "denied",
+        "not_applicable_metadata_only"
+      ]
+    },
+    "annotation_status": {
+      "enum": [
+        "not_reviewed",
+        "subject_expert_pending",
+        "subject_expert_reviewed"
+      ]
+    },
+    "locators": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

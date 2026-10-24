@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/benchmark-runs/v0/pair-result.schema.json",
+  "title": "Adjudicated paired-intervention evaluation row v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_id",
+    "plan_id",
+    "system_id",
+    "pair_id",
+    "observed_relation",
+    "preservation_satisfied",
+    "change_satisfied",
+    "forbidden_behaviors",
+    "citation_identity_valid",
+    "adjudication_status",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "paired-intervention-result-v0"
+    },
+    "result_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_relation": {
+      "enum": [
+        "invariant",
+        "local_change",
+        "abstain_or_revise",
+        "reject_unsupported_relation",
+        "deny_access",
+        "incorrect",
+        "ambiguous"
+      ]
+    },
+    "preservation_satisfied": {
+      "type": "boolean"
+    },
+    "change_satisfied": {
+      "type": "boolean"
+    },
+    "forbidden_behaviors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "citation_identity_valid": {
+      "type": "boolean"
+    },
+    "adjudication_status": {
+      "enum": [
+        "synthetic_only",
+        "independent_review",
+        "blind_human_adjudicated"
+      ]
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

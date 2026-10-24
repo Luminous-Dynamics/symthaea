@@ -1,0 +1,18 @@
+[package]
+name = "knowledge-benchmark-harness"
+version = "0.12.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Offline structural and domain-contract validation for EsotericaBench and MythologyBench"
+
+# Isolated from the root workspace so a focused validator does not silently
+# weaken or depend on unrelated workspace manifest health.
+[workspace]
+resolver = "2"
+
+[dependencies]
+jsonschema = { version = "=0.59.0", default-features = false }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"

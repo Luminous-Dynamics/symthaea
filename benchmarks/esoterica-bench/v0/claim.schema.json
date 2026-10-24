@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/esoterica-bench/v0/claim.schema.json",
+  "title": "Esoterica Knowledge Fabric Claim v0",
+  "description": "Evidence-linked claim record. A valid record describes provenance and uncertainty; schema validity does not imply truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "statement",
+    "claim_type",
+    "epistemic_status",
+    "scope",
+    "sources",
+    "uncertainty",
+    "access_policy",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "esoterica-claim-v0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_type": {
+      "enum": [
+        "historical",
+        "tradition_internal",
+        "scholarly_interpretation",
+        "comparative_hypothesis",
+        "empirical",
+        "practice_description",
+        "symbol_interpretation",
+        "catalog_metadata"
+      ]
+    },
+    "epistemic_status": {
+      "enum": [
+        "source_attested",
+        "scholarly_consensus",
+        "contested",
+        "tradition_internal",
+        "hypothesis",
+        "empirically_supported",
+        "empirically_refuted",
+        "unknown"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tradition_context",
+        "language"
+      ],
+      "properties": {
+        "tradition_context": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "school_or_community": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ISO 8601 date or human-readable interval; do not invent precision."
+        },
+        "valid_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "place_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2
+        },
+        "genre_or_practice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "uri",
+          "title",
+          "role",
+          "relationship",
+          "rights_status"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "creator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publication_year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "edition_or_translation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locator": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Page, section, chapter, stable identifier, manuscript folio or IIIF canvas if actually known."
+          },
+          "role": {
+            "enum": [
+              "primary_source",
+              "scholarly_analysis",
+              "catalog_record",
+              "community_authorized_source",
+              "experimental_data",
+              "metadata_index",
+              "synthetic_control"
+            ]
+          },
+          "relationship": {
+            "enum": [
+              "supports",
+              "contradicts",
+              "contextualizes",
+              "records_tradition_internal_teaching",
+              "records_scholarly_interpretation",
+              "tests_empirical_claim",
+              "synthetic_fixture"
+            ]
+          },
+          "rights_status": {
+            "enum": [
+              "public_domain_verified",
+              "open_license_verified",
+              "metadata_only",
+              "permission_required",
+              "restricted",
+              "community_governed",
+              "unknown"
+            ]
+          },
+          "rights_evidence_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "counterclaims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "statement",
+          "source_ids"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "reason"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "low",
+            "moderate",
+            "high",
+            "unassessed"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Optional and only meaningful with a defined, calibrated method."
+        }
+      }
+    },
+    "access_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "permitted_uses"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "open",
+            "restricted",
+            "community_governed",
+            "embargoed",
+            "unknown"
+          ]
+        },
+        "authority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permitted_uses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "review_or_expiry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recorded_by",
+        "derived_from",
+        "transformation"
+      ],
+      "properties": {
+        "recorded_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recorded_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "reviewed_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "derived_from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transformation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supersedes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}

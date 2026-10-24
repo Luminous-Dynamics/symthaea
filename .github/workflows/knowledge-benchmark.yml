@@ -1,0 +1,71 @@
+name: Knowledge Benchmark Contracts
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "benchmarks/esoterica-bench/v0/**"
+      - "benchmarks/mythology-bench/v0/**"
+      - "benchmarks/source-catalog/v0/**"
+      - "benchmarks/knowledge-annotation/v0/**"
+      - "benchmarks/benchmark-runs/v0/**"
+      - "tools/knowledge-benchmark-harness/src/bin/**"
+      - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
+      - "tools/knowledge-benchmark-harness/**"
+      - "scripts/validate-knowledge-benchmarks.sh"
+      - ".github/workflows/knowledge-benchmark.yml"
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/esoterica-bench/v0/**"
+      - "benchmarks/mythology-bench/v0/**"
+      - "benchmarks/source-catalog/v0/**"
+      - "benchmarks/knowledge-annotation/v0/**"
+      - "benchmarks/benchmark-runs/v0/**"
+      - "tools/knowledge-benchmark-harness/src/bin/**"
+      - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
+      - "tools/knowledge-benchmark-harness/**"
+      - "scripts/validate-knowledge-benchmarks.sh"
+      - ".github/workflows/knowledge-benchmark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: knowledge-benchmark-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate schemas, fixtures, and graph contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Run local contract validation
+        env:
+          SUBJECT_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+          REPORTS_DIR: target/knowledge-benchmark-reports
+        run: bash scripts/validate-knowledge-benchmarks.sh
+
+      - name: Upload exact-head validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-benchmark-contract-reports-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            target/knowledge-benchmark-reports/
+            tools/knowledge-benchmark-harness/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 30

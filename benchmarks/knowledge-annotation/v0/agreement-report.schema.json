@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/knowledge-annotation/v0/agreement-report.schema.json",
+  "title": "Annotation agreement report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_schema_version",
+    "tool_version",
+    "qualification_only",
+    "annotation_count",
+    "reviewer_count",
+    "annotation_sha256",
+    "dependency_lock_sha256",
+    "metrics",
+    "nonclaims"
+  ],
+  "properties": {
+    "report_schema_version": {
+      "const": "annotation-agreement-report-v0"
+    },
+    "tool_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "qualification_only": {
+      "type": "boolean"
+    },
+    "annotation_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reviewer_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "annotation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dependency_lock_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/metric"
+      }
+    },
+    "nonclaims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "unit_kind",
+        "eligible_unit_count",
+        "excluded_single_rater_units",
+        "rating_count",
+        "category_count",
+        "exact_agreement_rate",
+        "krippendorff_alpha_nominal",
+        "interpretation"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "answerability",
+            "abstention_assessment",
+            "support_label",
+            "epistemic_lane",
+            "severity"
+          ]
+        },
+        "unit_kind": {
+          "enum": [
+            "answer",
+            "claim"
+          ]
+        },
+        "eligible_unit_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_single_rater_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rating_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "category_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exact_agreement_rate": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "krippendorff_alpha_nominal": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interpretation": {
+          "enum": [
+            "estimated",
+            "insufficient_multi_reviewed_units",
+            "undefined_no_category_variation"
+          ]
+        }
+      }
+    }
+  }
+}

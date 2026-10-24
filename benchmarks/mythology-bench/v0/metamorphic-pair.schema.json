@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/mythology-bench/v0/metamorphic-pair.schema.json",
+  "title": "MythologyBench Metamorphic Pair v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pair_id",
+    "split",
+    "synthetic_only",
+    "source_family_ids",
+    "dimension",
+    "baseline",
+    "intervention",
+    "mutated",
+    "expected_relation",
+    "acceptance",
+    "criticality"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mythology-metamorphic-pair-v0"
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dimension": {
+      "enum": [
+        "context_swap",
+        "source_swap",
+        "evidence_removal",
+        "relation_mutation",
+        "variant_isolation",
+        "tradition_transfer",
+        "counterevidence_addition",
+        "rights_revocation",
+        "alias_equivalence",
+        "prompt_injection"
+      ]
+    },
+    "baseline": {
+      "$ref": "#/$defs/state"
+    },
+    "mutated": {
+      "$ref": "#/$defs/state"
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "operation",
+        "before_value",
+        "after_value"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "context_id",
+            "source_id",
+            "evidence_pack",
+            "relation",
+            "variant_id",
+            "tradition_scope",
+            "counterevidence",
+            "rights_status",
+            "access_decision",
+            "alias",
+            "source_text"
+          ]
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "before_value": {
+          "type": "string"
+        },
+        "after_value": {
+          "type": "string"
+        }
+      }
+    },
+    "expected_relation": {
+      "enum": [
+        "invariant",
+        "local_change",
+        "abstain_or_revise",
+        "reject_unsupported_relation",
+        "deny_access"
+      ]
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "must_preserve",
+        "must_change",
+        "must_not"
+      ],
+      "properties": {
+        "must_preserve": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "must_change": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "must_not": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "criticality": {
+      "enum": [
+        "release_blocker",
+        "major",
+        "diagnostic"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "split": {
+      "enum": [
+        "synthetic",
+        "development",
+        "validation",
+        "test",
+        "holdout"
+      ]
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "source_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "tradition_scope",
+        "source_id",
+        "variant_id",
+        "prompt",
+        "rights_status",
+        "evidence_pack",
+        "access_decision"
+      ],
+      "properties": {
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tradition_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_status": {
+          "enum": [
+            "synthetic_only",
+            "public_domain_verified",
+            "open_license_verified",
+            "metadata_only",
+            "permission_required",
+            "restricted",
+            "community_governed",
+            "unknown"
+          ]
+        },
+        "evidence_pack": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "evidence_id",
+              "source_id",
+              "statement",
+              "kind"
+            ],
+            "properties": {
+              "evidence_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "synthetic_control",
+                  "source_attestation",
+                  "scholarly_interpretation",
+                  "community_authorized_source",
+                  "archival_transcription",
+                  "metadata_only"
+                ]
+              },
+              "locator": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "proposed_relation": {
+          "type": "string",
+          "enum": [
+            "resembles",
+            "historically_influences",
+            "precedes",
+            "causes",
+            "supports",
+            "contradicts",
+            "co_occurs",
+            "same_entity",
+            "unknown"
+          ]
+        },
+        "alias": {
+          "type": "string"
+        },
+        "source_text": {
+          "type": "string"
+        },
+        "access_decision": {
+          "enum": [
+            "synthetic_only",
+            "allow",
+            "deny",
+            "require_permission",
+            "metadata_only"
+          ]
+        }
+      }
+    }
+  }
+}

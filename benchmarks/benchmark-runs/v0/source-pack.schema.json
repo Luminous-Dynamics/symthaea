@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/benchmark-runs/v0/source-pack.schema.json",
+  "title": "Knowledge evidence-pack snapshot v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "synthetic_only",
+    "pair_id",
+    "state",
+    "context_id",
+    "tradition_scope",
+    "source_id",
+    "variant_id",
+    "prompt",
+    "rights_status",
+    "evidence_pack",
+    "access_decision",
+    "split"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "knowledge-source-pack-v0"
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "baseline",
+        "mutated"
+      ]
+    },
+    "context_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tradition_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rights_status": {
+      "enum": [
+        "synthetic_only",
+        "public_domain_verified",
+        "open_license_verified",
+        "metadata_only",
+        "permission_required",
+        "restricted",
+        "community_governed",
+        "unknown"
+      ]
+    },
+    "evidence_pack": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_id",
+          "statement",
+          "kind"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "synthetic_control",
+              "source_attestation",
+              "scholarly_interpretation",
+              "community_authorized_source",
+              "archival_transcription",
+              "metadata_only"
+            ]
+          }
+        }
+      }
+    },
+    "access_decision": {
+      "enum": [
+        "synthetic_only",
+        "allow",
+        "deny",
+        "require_permission",
+        "metadata_only"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "synthetic",
+        "development",
+        "validation",
+        "test",
+        "holdout"
+      ]
+    }
+  }
+}
