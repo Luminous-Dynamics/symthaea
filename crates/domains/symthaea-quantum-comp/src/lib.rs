@@ -113,7 +113,7 @@ pub use matrix::{
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
-pub use photonic_dynamics::{PhotonicDynamicsConfig, PhotonicDynamicsError, QuadratureState, QuadratureStep};
+pub use photonic_dynamics::{PhotonicDynamicsConfig, PhotonicDynamicsError, QuadratureState, QuadratureStep, TransitionSchedule};
 pub use preflight::{
     PreflightFinding, PreflightReport, PreflightSeverity, preflight_binding_config,
     preflight_comparative_config, preflight_matrix_config, preflight_noise_sweep_config,
