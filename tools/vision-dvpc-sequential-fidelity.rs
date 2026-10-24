@@ -840,9 +840,9 @@ mod tests {
         let tiers: Vec<Tier> = table.traces.iter().map(|trace| route(trace, &meta).tier).collect();
         assert_eq!(tiers, vec![Tier::Full, Tier::Medium, Tier::Cheap, Tier::Full, Tier::Cheap]);
         let rendered = receipt(&table, &meta, &digest);
-        assert!(rendered.contains("SCOPE\\tEVALUATION_ONLY_NOT_A_CERTIFICATE"));
-        assert!(rendered.contains("DECISION\\tt02\\tmedium\\tfull_gain_below_floor"));
-        assert!(rendered.contains("DECISION\\tt05\\tcheap\\tmedium_reservation_exceeds_budget"));
+        assert!(rendered.contains("SCOPE\tEVALUATION_ONLY_NOT_A_CERTIFICATE"));
+        assert!(rendered.contains("DECISION\tt02\tmedium\tfull_gain_below_floor"));
+        assert!(rendered.contains("DECISION\tt05\tcheap\tmedium_reservation_exceeds_budget"));
     }
 
     #[test]
