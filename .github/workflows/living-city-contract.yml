@@ -1,0 +1,48 @@
+name: Living City Contract
+
+on:
+  push:
+    branches:
+      - research/urban-systems-lab-v0-1
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-scenarios/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/living-city-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: living-city-contract-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  living-city-contract:
+    name: Living City crate contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check scenario-crate formatting
+        run: cargo fmt --package symthaea-scenarios -- --check
+
+      - name: Test Living City library contracts
+        run: cargo test --locked --package symthaea-scenarios --lib
+
+      - name: Test offline verifier and run-package negative controls
+        run: cargo test --locked --package symthaea-scenarios --bin living_city_verify
+
+      - name: Lint scenario contracts and verifier
+        run: cargo clippy --locked --package symthaea-scenarios --lib --bin living_city_verify -- -D warnings
