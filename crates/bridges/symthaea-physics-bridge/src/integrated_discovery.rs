@@ -1128,7 +1128,9 @@ fn run_trial_with_mode(
         .collect();
 
     let mut hypotheses: Vec<Expr> = if truth_absent {
-        let Some(candidates) = generate_truth_absent_candidates(seed, config, &candidate_pool) else {
+        let Some(candidates) =
+            generate_truth_absent_candidates(seed, config, &candidate_pool)
+        else {
             return unresolved_trial_outcome(0, true, false, true);
         };
         candidates
