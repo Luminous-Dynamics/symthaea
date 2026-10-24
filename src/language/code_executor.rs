@@ -1660,6 +1660,40 @@ mod tests {
         );
     }
 
+    #[test]
+    fn execution_capabilities_are_explicit_and_case_insensitive() {
+        assert!(CodeExecutor::supports_language("rust"));
+        assert!(CodeExecutor::supports_language(" Python "));
+        assert!(CodeExecutor::supports_language("NIX"));
+        assert!(!CodeExecutor::supports_language("cobol"));
+        assert!(!CodeExecutor::supports_language("asm"));
+        assert!(!CodeExecutor::supports_language(""));
+    }
+
+    #[test]
+    fn unsupported_language_fails_closed_without_simulation_or_surprise() {
+        let mut executor = CodeExecutor::new();
+        let result = executor.execute_language(
+            "COBOL",
+            "       DISPLAY 'MUST NOT BE SENT TO RUSTC'.",
+            None,
+        );
+
+        assert!(!result.compiled);
+        assert!(!result.simulated);
+        assert!(!result.is_success());
+        assert!(result.is_unsupported_language());
+        assert_eq!(
+            result.to_surprise(),
+            0.0,
+            "an unavailable executor is a capability gap, not a model prediction error"
+        );
+        assert!(
+            result.test_output.contains("No execution backend is registered"),
+            "unsupported language result should explain the missing backend"
+        );
+    }
+
     /// Regression test for a real bug (found 2026-07-07 via the Rust-native
     /// orchestrator benchmark): the compiled test binary's dynamically
     /// generated path was never in the sandbox's static command allowlist,
