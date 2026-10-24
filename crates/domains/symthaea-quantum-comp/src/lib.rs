@@ -40,6 +40,9 @@ pub mod experiment;
 pub mod fixtures;
 pub mod interop;
 pub mod matrix;
+pub mod mis_cost_risk;
+pub mod mis_pareto;
+pub mod mis_pareto_stability;
 pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
@@ -110,6 +113,11 @@ pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
 };
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
+pub use mis_pareto::{MisNormalizedCostValue, MisParetoError, MisParetoPoint, mis_cost_pareto_frontier};
+pub use mis_pareto_stability::{
+    MisParetoClusterObservation, MisParetoStabilityConfig, MisParetoStabilityEntry,
+    MisParetoStabilityError, MisParetoStabilityReport, mis_cost_pareto_frontier_stability,
+};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
 pub use preflight::{
