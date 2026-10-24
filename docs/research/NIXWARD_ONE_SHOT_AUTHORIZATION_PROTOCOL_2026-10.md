@@ -100,6 +100,38 @@ Proposed targets—not current results:
 
 For an agent-level evaluation, include noisy natural-language contexts, explicit opt-outs, quoted/reported/conditional instructions, adversarial prompt variations, benign workflows, and culturally/domain-specific acceptable responses. Moral competence should not be reduced to one verdict-accuracy number; moral sensitivity, context counterfactuals, reasoning quality, steerability, and pluralism need distinct metrics.
 
+## Additional assurance boundary: issuance is not verification
+
+The ledger enforces a capability once one has been issued, but the enum `AuthorizationAuthority` and the public `issue(request)` operation do not authenticate the issuer. The current profile therefore assumes that code with mutable ledger access is inside the trusted computing base and calls `issue` only after a qualified decision. This is a stated trust assumption, not an enforcement property of the type.
+
+Before using this across an agent/daemon boundary, explicitly separate:
+
+```text
+untrusted planner / model
+        -> typed proposed intent
+trusted approval/policy component
+        -> authenticated, audience-bound authority
+executor / reference monitor
+        -> independently verify issuer + audience + intent + epoch + expiry
+        -> reserve one-shot/replay state at a defined linearization point
+        -> process dispatch
+        -> outcome receipt
+```
+
+A caller-selected `HumanOperator` or `WatchdogOperator` label is not evidence that the corresponding authority actually approved an action. A process-local opaque handle is not a signed cross-process credential. Key custody, audience restriction, delegation attenuation, revocation freshness, durable nonce reservation, and crash behavior must be specified before receipts are accepted across a boundary. This is being tracked separately in [NIXWARD-AUTH-ISSUER-001](https://github.com/Luminous-Dynamics/symthaea/issues/8624), distinct from [NIXWARD-AUTH-INTENT-001](https://github.com/Luminous-Dynamics/symthaea/issues/8615), which concerns action-context and pre-state binding.
+
+## Fair performance comparison: compare like with like
+
+Published performance figures are useful reference points, not portable targets unless the measured layer and environment match.
+
+- [Agent Passport System's published benchmarks](https://agent-passport.org/benchmarks.html) report 420 ns p50 / 470 ns p99 for its raw verifier core on an AMD EPYC 7313P reference machine, and 822 µs p50 / 6 ms p99 for its gateway round-trip. The core, SDK, durable-record, and gateway layers use different workloads and iteration counts; these are project-published results and have not been independently reproduced by Nixward.
+- [Open Agent Passport's pre-action authorization paper](https://arxiv.org/abs/2603.20953) reports a 53 ms median in its 1,000-request setup. This includes a different enforcement configuration and must not be compared directly with a local in-memory ledger.
+- [APort Vault](https://arxiv.org/abs/2609.22076) reports a large paired authorization benchmark and publishes its evaluation data. Its separation of requested tool calls, policy decisions, payments, and unpermitted successful transfers is a useful model for event accounting. Its own disclosed missing/error rows reinforce that non-completions must remain visible.
+
+Nixward should report at least four distinct latency layers when those paths exist: (1) in-memory ledger verification/consume, (2) authenticated receipt + durable replay reservation, (3) complete authorization gateway round-trip, and (4) end-to-end dispatch through observed postcondition. For every layer, freeze the workload, policy, machine, toolchain, warm/cold-cache state, iteration count, concurrency and percentile definition. Never claim that a faster primitive makes the full authorization system faster or safer without a matched end-to-end measurement.
+
+The current example now prints p50/p95/p99 consumption latency **per scenario** as well as the aggregate. This is source-reviewed, not an observed result until the exact-head benchmark has been executed and its output archived.
+
 ## External baselines and reading
 
 These are external reports, not results for Symthaea or Nixward:
