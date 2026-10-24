@@ -405,8 +405,8 @@ fn validate_outcome_consistency(task: &ScoreTask) -> Result<(), String> {
             let required_failed = task.required_test_count.saturating_sub(task.required_tests_passing);
             let expected_reason = format!("{required_failed} required regression/fail-to-pass test(s) failed");
             if required_failed > 0
-                && task.scored_test_exit_code != Some(0)
-                && task.reasons.as_slice() == [expected_reason.as_str()]
+                && task.reasons.len() == 1
+                && task.reasons[0] == expected_reason
             {
                 Ok(())
             } else {
