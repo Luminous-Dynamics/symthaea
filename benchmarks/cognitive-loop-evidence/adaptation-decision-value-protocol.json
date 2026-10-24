@@ -169,24 +169,28 @@
   ],
   "primary_metrics": [
     {
-      "id": "whole_stream_task_loss",
+      "id": "mean_task_loss",
       "role": "primary task outcome",
-      "direction": "lower"
+      "direction": "lower",
+      "metric_source": "counterfactual-utility-v2"
     },
     {
-      "id": "post_shift_task_loss",
+      "id": "post_shift_mean_task_loss",
       "role": "primary task outcome",
-      "direction": "lower"
+      "direction": "lower",
+      "metric_source": "counterfactual-utility-v2"
     },
     {
-      "id": "post_shift_loss_area",
+      "id": "post_shift_loss_area_above_threshold",
       "role": "recovery outcome",
-      "direction": "lower"
+      "direction": "lower",
+      "metric_source": "counterfactual-utility-v2"
     },
     {
-      "id": "recovery_time",
+      "id": "recovery_delay_cycles",
       "role": "recovery outcome",
-      "direction": "lower"
+      "direction": "lower",
+      "metric_source": "counterfactual-utility-v2"
     },
     {
       "id": "harmful_intervention_rate",
@@ -269,7 +273,7 @@
     "primary_comparison": {
       "candidate": "staged-verify-rollback",
       "reference": "detector-triggered",
-      "metric": "post_shift_task_loss",
+      "metric": "post_shift_mean_task_loss",
       "direction": "lower-is-better"
     },
     "alpha": 0.05,
@@ -281,5 +285,36 @@
       "Report the number of exploratory comparisons and any multiplicity-control procedure used.",
       "A coverage pass, positive unadjusted interval, or single-dataset win is not proof of broad SOTA superiority."
     ]
+  },
+  "counterfactual_metric_schema": {
+    "schema_version": 2,
+    "command": "score-counterfactual-adaptation-utility",
+    "metric_version": "counterfactual-adaptation-utility-v2",
+    "cycle_windows": {
+      "convention": "half-open [start_cycle, end_cycle)",
+      "pre_shift": "evaluation_windows.pre_shift_start_cycle to pre_shift_end_cycle",
+      "post_shift": "evaluation_windows.post_shift_start_cycle to post_shift_end_cycle",
+      "constraints": "Each window must be non-empty and within the common cycle panel; pre-shift end must not exceed post-shift start."
+    },
+    "recovery": {
+      "threshold_field": "evaluation_windows.recovery_loss_threshold",
+      "threshold_unit": "task_loss_unit",
+      "consecutive_cycles_field": "evaluation_windows.recovery_consecutive_cycles",
+      "success": "First post-shift cycle beginning a run of the registered number of consecutive task-loss observations at or below threshold.",
+      "censored": "If no qualifying run occurs within the post-shift window, recovery_cycle and recovery_delay_cycles are null."
+    },
+    "output_fields": [
+      "mean_task_loss",
+      "pre_shift_mean_task_loss",
+      "post_shift_mean_task_loss",
+      "post_shift_cumulative_task_loss",
+      "post_shift_loss_area_above_threshold",
+      "recovery_cycle",
+      "recovery_delay_cycles",
+      "total_adaptation_cost_units",
+      "detector_post_shift_task_loss_improvement_vs_no_adapt",
+      "detector_post_shift_task_loss_regret_vs_oracle_timed"
+    ],
+    "claim_guard": "These v2 phase-specific metrics are computed from supplied per-cycle arm summaries. They do not establish causal replay execution or validate outcomes independently."
   }
 }
