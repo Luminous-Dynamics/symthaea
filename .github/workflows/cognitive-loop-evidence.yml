@@ -161,7 +161,11 @@ jobs:
             .oracle_timed.recovery_cycle == 1 and
             .detector_dominated_by_no_adapt == false and
             (.canonical_input_sha256 | length) == 64 and
-            (.result_sha256 | length) == 64
+            (.result_sha256 | length) == 64 and
+            .source_replay_receipt_sha256 == null and
+            .source_replay_receipt_validation_sha256 == null and
+            .source_replay_run_id == null and
+            .source_replay_run_kind == null
           ' "$RUNNER_TEMP/adaptation-utility.json"
 
       - name: Run the no-impact-shift adaptation negative control
@@ -198,6 +202,7 @@ jobs:
             .metric_version == "cognitive-adaptation-panel-v1" and
             .comparison_track == "valid-pe-only" and
             .complete_coverage_gate_pass == false and
+            .receipt_linkage_gate_pass == false and
             .expected_dataset_count == 7 and
             .expected_seed_count_per_dataset == 50 and
             .expected_run_count == 2800 and
@@ -207,7 +212,7 @@ jobs:
             .primary_comparison == null and
             (.canonical_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64 and
-            (.interpretation_guard | contains("Incomplete panels"))
+            (.interpretation_guard | contains("Missing coverage"))
           ' "$RUNNER_TEMP/adaptation-panel-incomplete.json"
 
       - name: Validate the synthetic cognitive replay receipt
