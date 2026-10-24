@@ -577,14 +577,15 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# bootstrap_unit=source_cluster_for_near_neighbor; singleton_query_for_novel");
     println!("# bootstrap_resampling=sample query medians by group with replacement, retaining all queries in each sampled group");
     println!(
-        "query_index,round,kind,lsh_bands,lsh_rows,exact_ns,approximate_ns,recall_at_k,tie_aware_recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
+        "query_index,round,kind,group_id,lsh_bands,lsh_rows,exact_ns,approximate_ns,recall_at_k,tie_aware_recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
     );
     for sample in samples {
         println!(
-            "{},{},{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},{},{}",
             sample.query_index,
             sample.round,
             sample.kind,
+            sample.group_id,
             sample.lsh_bands,
             sample.lsh_rows,
             sample.exact_ns,
@@ -686,9 +687,14 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
                 "# arm_{label}_{kind}_bootstrap_group_count={}",
                 grouped_speedups.iter().map(|(group, _)| *group).collect::<HashSet<_>>().len()
             );
+            let group_count = grouped_speedups
+                .iter()
+                .map(|(group, _)| *group)
+                .collect::<HashSet<_>>()
+                .len();
             println!(
                 "# arm_{label}_{kind}_bootstrap_resamples={}",
-                if speedups.len() < 2 { 0 } else { BOOTSTRAP_RESAMPLES }
+                if group_count < 2 { 0 } else { BOOTSTRAP_RESAMPLES }
             );
         }
     }
