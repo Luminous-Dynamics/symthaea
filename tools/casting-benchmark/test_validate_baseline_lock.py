@@ -89,6 +89,12 @@ class BaselineLockValidatorTests(unittest.TestCase):
         manifest["method_pins"][0]["source_blob_sha1"] = "bad"
         self.assertTrue(any("source_blob_sha1" in error for error in validate_lock(manifest)))
 
+    def test_malformed_track_type_is_rejected_without_crashing(self) -> None:
+        manifest = load_manifest()
+        manifest["method_pins"][0]["track"] = ["not", "a", "track"]
+        errors = validate_lock(manifest)
+        self.assertTrue(any("track is not a supported track" in error for error in errors))
+
     def test_method_pin_must_match_candidate_release(self) -> None:
         manifest = load_manifest()
         manifest["method_pins"][0]["source_commit"] = "e" * 40
