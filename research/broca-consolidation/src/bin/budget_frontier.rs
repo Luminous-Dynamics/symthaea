@@ -9,7 +9,7 @@ use std::process::{self, Command};
 
 const PROTOCOL: &str = "GMC-BUDGET-FRONTIER-V1";
 const COST_PER_TOKEN: f64 = 0.02;
-const DEFAULT_BUDGETS: &[usize] = &[32, 64, 128, 256, 512, 1024, 2048, 4096];
+const DEFAULT_BUDGETS: &[usize] = &[32, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Action {
@@ -181,7 +181,7 @@ struct Summary {
     used_tokens: usize,
     stored_candidates: usize,
     future_queries: usize,
-    expected_accuracy: f64,
+    synthetic_query_score: f64,
     task_utility: f64,
     net_utility: f64,
     oracle_net_utility: f64,
@@ -287,7 +287,7 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     }
     let sha = sha.ok_or_else(|| "--source-sha is required".to_string())?;
     if !valid_sha(&sha) { return Err("--source-sha must be 40 hexadecimal characters".to_string()); }
-    if !(30..=5000).contains(&candidates) { return Err("--candidates must be in 30..=5000".to_string()); }
+    if !(30..=1000).contains(&candidates) { return Err("--candidates must be in 30..=1000".to_string()); }
 
     let actual = Command::new("git").args(["rev-parse", "HEAD"]).output()
         .map_err(|e| format!("cannot run git rev-parse HEAD: {e}"))?;
@@ -452,7 +452,7 @@ fn evaluate(candidates: &[Candidate], decisions: &[Decision], budget: usize, pol
         used_tokens,
         stored_candidates,
         future_queries,
-        expected_accuracy: successful_query_mass / future_queries.max(1) as f64,
+        synthetic_query_score: successful_query_mass / future_queries.max(1) as f64,
         task_utility,
         net_utility,
         oracle_net_utility: oracle_net,
@@ -467,9 +467,9 @@ fn evaluate(candidates: &[Candidate], decisions: &[Decision], budget: usize, pol
 
 fn print_summary(sha: &str, seed: u64, candidate_count: usize, summary: &Summary) {
     println!(
-        "{{\"record\":\"budget_summary\",\"protocol\":\"{PROTOCOL}\",\"source_sha\":\"{sha}\",\"seed\":{seed},\"candidates\":{candidate_count},\"policy\":\"{}\",\"budget_tokens\":{},\"raw_token_demand\":{},\"used_tokens\":{},\"stored_candidates\":{},\"future_queries\":{},\"expected_accuracy\":{:.6},\"task_utility\":{:.4},\"net_utility\":{:.4},\"oracle_net_utility\":{:.4},\"regret\":{:.4},\"load_bearing_coverage\":{:.6},\"bad_retained\":{},\"bad_promoted\":{},\"compression_ratio\":{:.6},\"net_utility_per_token\":{:.6},\"storage_cost_per_token\":{:.4}}}",
+        "{{\"record\":\"budget_summary\",\"protocol\":\"{PROTOCOL}\",\"source_sha\":\"{sha}\",\"seed\":{seed},\"candidates\":{candidate_count},\"policy\":\"{}\",\"budget_tokens\":{},\"raw_token_demand\":{},\"used_tokens\":{},\"stored_candidates\":{},\"future_queries\":{},\"synthetic_query_score\":{:.6},\"task_utility\":{:.4},\"net_utility\":{:.4},\"oracle_net_utility\":{:.4},\"regret\":{:.4},\"load_bearing_coverage\":{:.6},\"bad_retained\":{},\"bad_promoted\":{},\"compression_ratio\":{:.6},\"net_utility_per_token\":{:.6},\"storage_cost_per_token\":{:.4}}}",
         summary.policy, summary.budget, summary.raw_demand, summary.used_tokens,
-        summary.stored_candidates, summary.future_queries, summary.expected_accuracy,
+        summary.stored_candidates, summary.future_queries, summary.synthetic_query_score,
         summary.task_utility, summary.net_utility, summary.oracle_net_utility,
         summary.regret, summary.load_bearing_coverage, summary.bad_retained,
         summary.bad_promoted, summary.compression_ratio, summary.utility_per_token,
@@ -591,8 +591,8 @@ mod tests {
     #[test]
     fn anti_control_exposes_unsafe_promotion() {
         let candidates = build_fixture(51, 120);
-        let decisions = choose_policy(&candidates, 4096, "promote_everything");
-        let summary = evaluate(&candidates, &decisions, 4096, "promote_everything", 0.0, 0);
+        let decisions = choose_policy(&candidates, 8192, "promote_everything");
+        let summary = evaluate(&candidates, &decisions, 8192, "promote_everything", 0.0, 0);
         assert!(summary.bad_promoted > 0);
     }
 }
