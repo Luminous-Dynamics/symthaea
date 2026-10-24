@@ -11,6 +11,11 @@ class RandomizedMinimaxPolicyMixTests(unittest.TestCase):
     def test_lp_weights_sum_to_one(self):
         r=solve_minimax_mixture([[0,2],[1,3],[2,0]])
         self.assertAlmostEqual(sum(r['weights']),1.0,places=9)
+    def test_primal_dual_certificate_closes(self):
+        r=solve_minimax_mixture([[0,1],[1,0],[0.6,0.6]])
+        self.assertAlmostEqual(sum(r['scenario_dual_weights']),1.0,places=8)
+        self.assertLessEqual(r['primal_dual_gap_bits'],1e-7)
+        self.assertLessEqual(r['dual_lower_bound_bits'],r['worst_case_bits']+1e-8)
     def test_mixture_never_worse_than_deterministic_frontier(self):
         r=run_benchmark(('uniform','high_spill_biased'),('uniform','chain_biased'),('joint',),(1,2))
         for row in r['rows']:
