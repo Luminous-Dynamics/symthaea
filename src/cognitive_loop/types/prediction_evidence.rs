@@ -109,10 +109,11 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
 
 /// Per-consumer monotonic cursor for exactly-once PE admission.
 ///
-/// Each PE-dependent consumer owns its own cursor. A missing or non-finite
-/// sample does not advance the cursor, so a valid retry for that observation
-/// can still be admitted. A duplicate or out-of-order observation is rejected.
-/// Independent non-PE inputs are not governed by this cursor.
+/// Each PE-dependent consumer owns its own cursor. The cursor tracks the
+/// highest observation cycle separately from the highest admitted cycle:
+/// invalid/missing evidence advances only the observed watermark, so a valid
+/// retry at that same cycle remains possible while delayed older cycles are
+/// rejected. Independent non-PE inputs are not governed by this cursor.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PredictionEvidenceCursor {
     /// Highest observation cycle seen, including cycles whose evidence was invalid.
