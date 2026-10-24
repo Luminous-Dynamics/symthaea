@@ -4,9 +4,10 @@
 //! Φ-Gated Action Execution
 //!
 //! All NixOS actions are routed through the consciousness-gated executor.
-//! Sub-modules produce `NixOSCommand` values; the executor checks Φ
+//! Sub-modules produce NixOSCommand values; the executor checks Φ
 //! thresholds, handles rollback, and records outcomes for episodic memory.
 
+pub mod authorization;
 pub mod config_writer;
 pub mod executor;
 pub mod flake_ops;
@@ -16,6 +17,11 @@ pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
 
+pub use authorization::{
+    ActionScope, AuthorizationAttempt, AuthorizationAuthority, AuthorizationError,
+    AuthorizationReceipt, AuthorizationRequest, CommandBinding, ExecutionAuthorizationLedger,
+    ExecutionPermit, DEFAULT_MAX_PERMIT_LIFETIME,
+};
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use executor::{
     ChannelOperation, ExecutionRecord, ExecutionResult, FlakeOperation, NixOSCommand,
