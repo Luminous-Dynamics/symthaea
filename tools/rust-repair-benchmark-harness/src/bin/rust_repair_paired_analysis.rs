@@ -58,6 +58,17 @@ struct ScoreTask {
     outcome: String,
 }
 
+#[derive(Debug, Default)]
+struct RepositoryAccounting {
+    task_count: usize,
+    complete_pair_count: usize,
+    arm_a_unresolved_count: usize,
+    arm_b_unresolved_count: usize,
+    arm_a_wins: usize,
+    arm_b_wins: usize,
+    ties: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Outcome {
     Pass,
@@ -375,15 +386,21 @@ fn run() -> Result<(), String> {
     let mut bounds_lower_sum: i64 = 0;
     let mut bounds_upper_sum: i64 = 0;
     let mut repository_deltas: BTreeMap<String, Vec<i8>> = BTreeMap::new();
+    let mut repository_accounting: BTreeMap<String, RepositoryAccounting> = BTreeMap::new();
 
     for task_id in &expected_ids {
         let a = *arm_a.get(task_id).expect("validated arm A task set");
         let b = *arm_b.get(task_id).expect("validated arm B task set");
+        let repository = repositories.get(task_id).expect("validated manifest repo").clone();
+        let accounting = repository_accounting.entry(repository.clone()).or_default();
+        accounting.task_count += 1;
         if a == Outcome::Unresolved {
             unresolved_a += 1;
+            accounting.arm_a_unresolved_count += 1;
         }
         if b == Outcome::Unresolved {
             unresolved_b += 1;
+            accounting.arm_b_unresolved_count += 1;
         }
         let (low, high) = sensitivity_bounds(a, b);
         bounds_lower_sum += i64::from(low);
@@ -391,17 +408,24 @@ fn run() -> Result<(), String> {
 
         if let Some(delta) = paired_delta(a, b) {
             complete_pairs += 1;
+            accounting.complete_pair_count += 1;
             complete_a_successes += if a == Outcome::Pass { 1 } else { 0 };
             complete_b_successes += if b == Outcome::Pass { 1 } else { 0 };
             match delta.cmp(&0) {
-                std::cmp::Ordering::Greater => wins_a += 1,
-                std::cmp::Ordering::Less => wins_b += 1,
-                std::cmp::Ordering::Equal => ties += 1,
+                std::cmp::Ordering::Greater => {
+                    wins_a += 1;
+                    accounting.arm_a_wins += 1;
+                }
+                std::cmp::Ordering::Less => {
+                    wins_b += 1;
+                    accounting.arm_b_wins += 1;
+                }
+                std::cmp::Ordering::Equal => {
+                    ties += 1;
+                    accounting.ties += 1;
+                }
             }
-            repository_deltas
-                .entry(repositories.get(task_id).expect("validated manifest repo").clone())
-                .or_default()
-                .push(delta);
+            repository_deltas.entry(repository).or_default().push(delta);
         }
     }
 
@@ -420,6 +444,21 @@ fn run() -> Result<(), String> {
     let lower_bound = 100.0 * bounds_lower_sum as f64 / total_tasks as f64;
     let upper_bound = 100.0 * bounds_upper_sum as f64 / total_tasks as f64;
     let ci_excludes_zero = ci.map(|(lower, upper)| lower > 0.0 || upper < 0.0);
+    let repository_summary = repository_accounting
+        .iter()
+        .map(|(repository, stats)| {
+            json!({
+                "repository": repository,
+                "task_count": stats.task_count,
+                "complete_pair_count": stats.complete_pair_count,
+                "arm_a_unresolved_count": stats.arm_a_unresolved_count,
+                "arm_b_unresolved_count": stats.arm_b_unresolved_count,
+                "arm_a_wins": stats.arm_a_wins,
+                "arm_b_wins": stats.arm_b_wins,
+                "ties": stats.ties
+            })
+        })
+        .collect::<Vec<_>>();
 
     let report: Value = json!({
         "format_version": REPORT_VERSION,
@@ -435,7 +474,8 @@ fn run() -> Result<(), String> {
             "bootstrap_iterations": cli.iterations
         },
         "task_count": total_tasks,
-        "repository_count": repositories.values().collect::<BTreeSet<_>>().len(),
+        "repository_count": repository_accounting.len(),
+        "repository_outcome_accounting": repository_summary,
         "complete_pair_count": complete_pairs,
         "complete_pair_repository_count": cluster_count,
         "arm_a_unresolved_count": unresolved_a,
