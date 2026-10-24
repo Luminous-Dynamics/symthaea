@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-shift-manifest:v1",
+  "title": "Nanotechnology distribution-shift manifest",
+  "description": "Frozen shift groups, independent split assignments and sample provenance. Group-leakage checks are performed by the Rust auditor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "task_contract_sha256",
+    "split_policy",
+    "shift_groups"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-shift-manifest-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "task_contract_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_policy": {
+      "const": "independence_key_group_holdout_v1"
+    },
+    "shift_groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "group_id",
+          "severity",
+          "split",
+          "physical_rationale",
+          "severity_definition",
+          "source_artifact_path",
+          "source_artifact_sha256",
+          "independence_keys",
+          "sample_ids",
+          "shift_kind",
+          "shift_axes",
+          "shift_families"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "severity": {
+            "enum": [
+              "baseline",
+              "mild",
+              "moderate",
+              "severe"
+            ]
+          },
+          "split": {
+            "enum": [
+              "train",
+              "calibration",
+              "validation",
+              "test_lockbox"
+            ]
+          },
+          "physical_rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "severity_definition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "source_artifact_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "source_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "independence_keys": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "sample_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "shift_kind": {
+            "enum": [
+              "in_distribution",
+              "single_factor",
+              "compounded"
+            ]
+          },
+          "shift_axes": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 6,
+            "description": "Mechanism axes, distinct from the material/system family. An in-distribution group has none; single_factor has exactly one; compounded has at least two.",
+            "items": {
+              "enum": [
+                "feature_support",
+                "label_distribution",
+                "graph_topology",
+                "physical_regime",
+                "chemical_environment",
+                "measurement_process"
+              ]
+            }
+          },
+          "shift_families": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 6,
+            "description": "Physical perturbation families represented in the group. This is independent of shift_kind and the statistical/physical mechanism axes.",
+            "items": {
+              "enum": [
+                "composition",
+                "surface_coordination",
+                "defects",
+                "temperature_energy",
+                "strain_pressure_phase",
+                "size_interface_passivation_substrate"
+              ]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "in_distribution"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_families": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "in_distribution"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "severity": {
+                  "const": "baseline"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "single_factor"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "mild",
+                    "moderate",
+                    "severe"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "compounded"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "mild",
+                    "moderate",
+                    "severe"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "in_distribution"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_axes": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "single_factor"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_axes": {
+                  "minItems": 1,
+                  "maxItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "compounded"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_axes": {
+                  "minItems": 2
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

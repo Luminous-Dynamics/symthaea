@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:made-run-provenance:v1",
+  "title": "MADE run provenance sidecar",
+  "description": "A self-reported run sidecar whose declared artifact hashes and counter arithmetic are independently verified by symthaea-nanotech-audit. It does not itself prove legal rights, source authenticity, or true external call counts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "benchmark_id",
+    "upstream_repository",
+    "upstream_commit",
+    "policy_revision",
+    "task_contract_sha256",
+    "evaluation_manifest_sha256",
+    "source_manifest_sha256",
+    "resolved_config_sha256",
+    "data_sources",
+    "oracle_accounting",
+    "artifacts",
+    "oracle_call_ledger_path",
+    "oracle_call_ledger_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "made-run-provenance-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "upstream_repository": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "upstream_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "policy_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "task_contract_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "resolved_config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "data_sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "source_url",
+          "revision",
+          "license",
+          "rights_status",
+          "source_artifact_path",
+          "source_artifact_sha256"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "rights_status": {
+            "enum": [
+              "verified",
+              "unknown",
+              "restricted",
+              "not_applicable"
+            ]
+          },
+          "source_artifact_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Relative path under the run directory to the local snapshot of this source."
+          },
+          "source_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "oracle_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setup_requests",
+        "proposal_requests",
+        "retry_requests",
+        "cache_hits",
+        "external_calls",
+        "failed_external_calls",
+        "total_cost",
+        "cost_unit",
+        "local_rejections"
+      ],
+      "properties": {
+        "setup_requests": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "proposal_requests": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "retry_requests": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "cache_hits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "external_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "failed_external_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "total_cost": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "cost_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "local_rejections": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "description": "Proposal candidates rejected locally before any external oracle invocation or cache lookup."
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "size_bytes"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Relative path under the run directory; absolute paths, dot components and parent traversal are rejected by the verifier."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "oracle_call_ledger_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Relative path to strict JSONL per-request ledger, included in artifacts."
+    },
+    "oracle_call_ledger_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "shift_manifest_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Optional relative path to a frozen nano-shift-manifest-v1 included in artifacts."
+    },
+    "shift_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "shift_manifest_path"
+        ]
+      },
+      "then": {
+        "required": [
+          "shift_manifest_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "shift_manifest_sha256"
+        ]
+      },
+      "then": {
+        "required": [
+          "shift_manifest_path"
+        ]
+      }
+    }
+  ]
+}
