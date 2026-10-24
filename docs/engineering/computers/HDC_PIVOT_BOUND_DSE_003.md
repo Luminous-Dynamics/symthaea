@@ -99,3 +99,14 @@ At 16,384 candidates:
 | Interleaved clusters | Farthest-first | 8 | 24 / 16,384 (0.15%) | 256 KiB |
 
 The diagnostic counts how many candidate vectors require complete exact Hamming evaluation. It does not measure latency, physical memory traffic or energy. The model supports two limited conclusions: the bound is almost useless on this random 16K-bit control, and pivot selection quality materially affects the deliberately clustered fixture. That matches known limitations of metric-pivot indexing under high-dimensional distance concentration; it is not a novelty or SOTA claim. Python's PRNG generated the reference vectors, so this does not test Rust `BinaryHV::random`, Rust source correctness or a compiled benchmark. The Rust target must reproduce exact results and show measured latency improvement after selector, index-build, metadata and allocation costs before any win can be claimed.
+
+## Literature boundary and novelty discipline
+
+Triangle-inequality pivot bounds and pivot-selection algorithms are established metric-indexing ideas, not a new mathematical result in this PR. Prior work discusses pivot indexing, dimension reduction, and the limits imposed by distance concentration in high-dimensional spaces:
+
+- Pivot selection and distance-space embedding: https://doi.org/10.1016/j.jda.2011.10.004
+- Distance concentration and degradation of exact similarity indexes: https://doi.org/10.1016/j.jda.2011.10.002
+- Comparative study of pivot-selection strategies: https://doi.org/10.1007/s00778-021-00691-4
+- FAISS binary index families, including exact flat, IVF, HNSW and multi-index hashing: https://github.com/facebookresearch/faiss/wiki/Binary-Indexes
+
+The research contribution being tested is narrower: can compact Hamming signatures plus a build-cost-aware pivot selector reduce end-to-end exact retrieval cost for Symthaea's 16,384-bit hypervectors on real, production-relevant HDC corpora? A synthetic clustered win or lower full-vector count alone is not a novelty, SOTA, or latency claim.
