@@ -18,16 +18,20 @@ cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
   --size=10000 --clusters=64 --cluster-noise-bits=1024 --noise-bits=128 --hard-noise-bits=4096 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42
 ```
 
-Run at multiple store sizes, using the same machine and compiler build:
+Run the recommended multi-size/fallback matrix through the checked-in helper. It captures the exact source SHA, Rust/Cargo versions, machine information, command, exit code, and CSV SHA-256 in a sidecar receipt for each run:
 
 ```sh
-for size in 1000 10000 50000; do
-  cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
-    --source-sha="$(git rev-parse HEAD)" \
-    --size="$size" --clusters=64 --cluster-noise-bits=1024 --noise-bits=128 --hard-noise-bits=4096 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42 \
-    > "broca-ann-$size.csv"
-done
+bash scripts/run_broca_ann_sweep.sh
 ```
+
+By default this performs 6 benchmark runs (1k / 10k / 50k vectors × empty-result fallback on/off), at 200 queries × 5 timing rounds, and writes CSVs plus receipts under `artifacts/broca-ann/`. Override the workload without editing the script:
+
+```sh
+SIZES="10000 50000" QUERIES=500 ROUNDS=7 OUT_DIR=/tmp/broca-results \
+  bash scripts/run_broca_ann_sweep.sh
+```
+
+For a single controlled arm or an explicit candidate-multiplier sweep, use the direct `cargo run` command above. Keep the same seed, query plan, vector dimension, top-K and cache protocol across matched arms.
 
 The LSH parameters are explicit and recorded in the output. By default, each run sweeps three arms: `32x8`, `16x16`, and `64x4` (bands × rows). Override them with `--lsh-configs=32x8,16x16,64x4`; no arm may be duplicated and a run is limited to 16 arms. The same deterministic corpus and query vectors are reused across all arms, while each arm gets a separately built index. Do not compare arms whose source, vector corpus, query corpus or cache protocol differs.
 
