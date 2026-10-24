@@ -38,6 +38,9 @@ pub use symthaea_cognitive_types::{
     QualityDiagnostics, StructuralPhiMetrics, TemporalPhenomenalMetrics,
 };
 
+use super::prediction_evidence::{
+    PredictionErrorEvidence, PredictionEvidenceStatus,
+};
 use super::scheduling::CycleUrgency;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -199,9 +202,39 @@ fn default_half_f32() -> f32 {
     0.5
 }
 
+/// Public provenance summary for the prediction-error evidence used during a cycle.
+/// This deliberately omits raw input vectors and other potentially sensitive payloads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PredictionEvidenceTelemetry {
+    /// Valid or explicitly invalid evidence status for the observed cycle.
+    pub status: PredictionEvidenceStatus,
+    /// Originating prediction cycle, when known.
+    pub prediction_cycle: Option<u64>,
+    /// Observation cycle this evidence was evaluated against.
+    pub observation_cycle: u64,
+}
+
+impl PredictionEvidenceTelemetry {
+    pub fn from_evidence(
+        evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
+    ) -> Self {
+        Self {
+            status: evidence.status_for_observation(observation_cycle),
+            prediction_cycle: evidence.prediction_cycle(),
+            observation_cycle,
+        }
+    }
+}
+
 /// Metadata about internal decision-making during a cycle.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
+    /// Machine-readable provenance for this cycle's prediction-error observation.
+    /// None denotes older records or paths that have not attached evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_evidence: Option<PredictionEvidenceTelemetry>,
+
     /// Whether the surprise exploration bridge triggered exploration this cycle
     pub surprise_triggered: bool,
 
