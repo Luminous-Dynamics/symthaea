@@ -693,12 +693,11 @@ impl NixOSExecutor {
 
         let start = std::time::Instant::now();
 
-        let result = Command::new(&cmd)
-            .args(&args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await;
+        // Keep the confirmed path on the same injectable process boundary as
+        // ordinary execution. Permit-path tests must never fall through to a
+        // real OS process, and every dispatch seam must be observable by the
+        // runner used for enforcement qualification.
+        let result = self.runner.run(&cmd, &args).await;
 
         let elapsed = start.elapsed().as_millis() as u64;
 
