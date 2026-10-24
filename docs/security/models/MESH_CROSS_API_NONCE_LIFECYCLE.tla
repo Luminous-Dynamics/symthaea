@@ -30,6 +30,10 @@ FragmentNonce ==
 PacketPair == <<PacketKey, PacketNonce>>
 FragmentPair == <<FragmentKey, FragmentNonce>>
 
+\* These predicates guard against accidentally weakening the test setup.
+NonceLayoutsOverlap == PacketNonce = FragmentNonce
+PurposeKeysDistinct == PacketKey # FragmentKey
+
 Init ==
   /\ sentChannels = {}
   /\ sentPairs = {}
