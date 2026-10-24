@@ -893,6 +893,10 @@ fn run(cli: Cli) -> Result<(), String> {
         &cli.expected_task_manifest_sha256,
     )?;
     validate_manifest_bindings(&primary, &regrade, &manifest)?;
+    if let Some(parent) = cli.report_out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create output directory {}: {error}", parent.display()))?;
+    }
     ensure_output_is_distinct(
         &cli.report_out,
         &[&cli.primary_report, &cli.regrade_report, &cli.task_manifest],
@@ -902,10 +906,6 @@ fn run(cli: Cli) -> Result<(), String> {
         &regrade,
         &cli.expected_task_manifest_sha256,
     )?;
-    if let Some(parent) = cli.report_out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("cannot create output directory {}: {error}", parent.display()))?;
-    }
     let mut bytes = serde_json::to_vec_pretty(&report)
         .map_err(|error| format!("cannot serialize regrade audit report: {error}"))?;
     bytes.push(b'\n');
