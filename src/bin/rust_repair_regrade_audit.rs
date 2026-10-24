@@ -772,6 +772,41 @@ fn validate_manifest_bindings(
     Ok(())
 }
 
+fn canonical_output_destination(path: &Path) -> Result<PathBuf, String> {
+    if path.exists() {
+        if path.is_dir() {
+            return Err(format!("report output {} is a directory", path.display()));
+        }
+        return fs::canonicalize(path)
+            .map_err(|error| format!("cannot resolve output {}: {error}", path.display()));
+    }
+    let parent = path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("cannot resolve output directory {}: {error}", parent.display()))?;
+    let file_name = path.file_name()
+        .ok_or_else(|| format!("report output {} has no file name", path.display()))?;
+    Ok(canonical_parent.join(file_name))
+}
+
+fn ensure_output_is_distinct(
+    output: &Path,
+    protected_inputs: &[&Path],
+) -> Result<(), String> {
+    let canonical_output = canonical_output_destination(output)?;
+    for input in protected_inputs {
+        let canonical_input = fs::canonicalize(input)
+            .map_err(|error| format!("cannot resolve protected input {}: {error}", input.display()))?;
+        if canonical_output == canonical_input {
+            return Err(format!(
+                "report output {} aliases protected input {}",
+                output.display(),
+                input.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn run(cli: Cli) -> Result<(), String> {
     let primary = read_pinned_report(
         &cli.primary_report,
@@ -788,6 +823,10 @@ fn run(cli: Cli) -> Result<(), String> {
         &cli.expected_task_manifest_sha256,
     )?;
     validate_manifest_bindings(&primary, &regrade, &manifest)?;
+    ensure_output_is_distinct(
+        &cli.report_out,
+        &[&cli.primary_report, &cli.regrade_report, &cli.task_manifest],
+    )?;
     let report = build_report(
         &primary,
         &regrade,
@@ -943,6 +982,37 @@ mod tests {
         assert!(read_pinned_manifest(&path, &sha256_bytes(&corrupted_bytes))
             .unwrap_err()
             .contains("task_records_sha256 differs"));
+    }
+
+    #[test]
+    fn output_cannot_overwrite_primary_regrade_or_manifest_inputs() {
+        let temp = tempfile::tempdir().unwrap();
+        let primary = temp.path().join("primary.json");
+        let regrade = temp.path().join("regrade.json");
+        let manifest = temp.path().join("manifest.json");
+        fs::write(&primary, b"primary").unwrap();
+        fs::write(&regrade, b"regrade").unwrap();
+        fs::write(&manifest, b"manifest").unwrap();
+        assert!(ensure_output_is_distinct(&primary, &[&primary, &regrade, &manifest])
+            .unwrap_err()
+            .contains("aliases protected input"));
+        let output = temp.path().join("audit.json");
+        assert!(ensure_output_is_distinct(&output, &[&primary, &regrade, &manifest]).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_symlink_cannot_alias_an_input() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().unwrap();
+        let primary = temp.path().join("primary.json");
+        fs::write(&primary, b"primary").unwrap();
+        let alias = temp.path().join("audit.json");
+        symlink(&primary, &alias).unwrap();
+        assert!(ensure_output_is_distinct(&alias, &[&primary])
+            .unwrap_err()
+            .contains("aliases protected input"));
     }
 
     #[test]
