@@ -47,3 +47,8 @@ Run:
 This generator reads only family titles in the frozen manifest. It strips HTML markup/entities, tokenizes Unicode words, removes a fixed stopword list, computes title-token Jaccard overlap plus rarity-weighted overlap, and records candidate-level shared tokens and a digest of the compared title evidence. The threshold configuration is part of the emitted report, so the screen can be reproduced.
 
 All rows are labelled `title_similarity_only` and `unreviewed`, regardless of score. It is a review-queue heuristic, not a semantic dependency detector, leakage finding, or benchmark result. Do not promote candidates to hard edges without inspecting source artifacts and recording independent adjudication. The generator deliberately does not emit the relationship inventory consumed by the quarantine analyzer; that conversion is a separate, reviewed decision.
+## Artifact-path candidate triage
+
+A second generator, `discover_artifact_path_candidates`, screens the family manifest's `linked_paths` separately from the title-only candidate generator. Its report records the paths whose token sets contain rare shared terms, the split labels, overlap metrics and an evidence digest. The report schema is `family-artifact-path-candidate-discovery.schema.json`.
+
+The artifact-path channel is deliberately independent: a family's linked manuscripts are source/provenance context and may share broad mathematical vocabulary without establishing any dependency. Each result is labelled `artifact_path_similarity_only` and `unreviewed`. This channel may improve recall but can sharply increase review load, so measure reviewed precision/recall before merging it with title-based rankings. The frozen split and hard-edge inventory remain untouched.
