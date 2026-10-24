@@ -1,26 +1,25 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! HDC XOR Binding Proof Benchmark
+//! HDC XOR Binding Integrity-Proof Benchmark
 //!
-//! Proves a 16,384-bit Hyperdimensional XOR binding operation across:
+//! Benchmarks a 16,384-bit HDC XOR integrity relation with Binius64, and prints a model-only Winterfell estimate.
 //! 1. **Binius64** — Binary tower field STARK (XOR = native field addition, FREE).
-//!    REAL prover + verifier: every Binius number here is a measured cryptographic proof.
+//!    Real prover + verifier; runtime timings and proof bytes are measured for Binius only.
 //! 2. **Winterfell** — Prime field STARK (XOR requires constraint decomposition).
 //!    **ANALYTIC ESTIMATE ONLY**: this crate implements NO Winterfell AIR and never
 //!    invokes a Winterfell prover or verifier. The Winterfell numbers are computed from
 //!    a constraint-count model (~50us/constraint prove, ~2us/constraint verify) — they
-//!    are NOT measured proving results. A real, measured Winterfell 16,384-bit XOR
-//!    circuit lives separately in
-//!    `crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs` (monorepo root).
+//!    are NOT measured proving results. This standalone artifact contains no executable
+//!    Winterfell XOR circuit, so its output cannot establish a cross-backend comparison.
 //!
 //! This benchmark generates the core data for the paper:
-//! "Binary-Field STARKs for Hyperdimensional Computing"
+//! "Binary-Field Proofs for Hyperdimensional Computing"
 //!
 //! ## Key Insight
 //!
 //! In Binius (GF(2^k)), XOR is field addition — zero AND constraints.
 //! In prime-field STARKs, XOR on N bits requires O(N) constraints for bit decomposition.
-//! For 16,384-bit HDC vectors, this is the difference between ~0 and ~65,536 constraints.
+//! This is an algebraic observation, not a measured cross-backend comparison; this crate does not run a Winterfell prover.
 //!
 //! ## Metrics Captured
 //!
@@ -30,6 +29,11 @@
 //! - Verifier time (ms) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 //! - Proof size (bytes) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 
+mod bench_inputs;
+mod boolean_gadgets;
+
+#[cfg(test)]
+mod spartan_privacy;
 mod bundling;
 mod cfc_temporal;
 mod fl_triple_stack;
@@ -63,7 +67,7 @@ fn bench_binius_hdc_xor() -> BenchResult {
     let builder = CircuitBuilder::new();
     let hv_dim_words = 256; // 16,384 bits / 64 bits per word
 
-    // Input wires: two HDC vectors (private witness)
+    // Input wires: witness vectors (Binius64 does not guarantee witness privacy)
     let vec_a: Vec<_> = (0..hv_dim_words).map(|_| builder.add_witness()).collect();
     let vec_b: Vec<_> = (0..hv_dim_words).map(|_| builder.add_witness()).collect();
 
@@ -98,10 +102,19 @@ fn bench_binius_hdc_xor() -> BenchResult {
     // Fill witness with random HDC vectors
     let mut witness = circuit.new_witness_filler();
     let mut expected_xor = vec![0u64; hv_dim_words];
+    // Fixed fixtures make the same synthetic relation reproducible between runs.
+    let a_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_HDC_XOR_A,
+        hv_dim_words,
+    );
+    let b_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_HDC_XOR_B,
+        hv_dim_words,
+    );
 
     for i in 0..hv_dim_words {
-        let a_val: u64 = rand::random();
-        let b_val: u64 = rand::random();
+        let a_val = a_values[i];
+        let b_val = b_values[i];
         witness[vec_a[i]] = Word(a_val);
         witness[vec_b[i]] = Word(b_val);
         expected_xor[i] = a_val ^ b_val;
@@ -159,7 +172,7 @@ fn bench_binius_hdc_xor() -> BenchResult {
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
     BenchResult {
         backend: "Binius64 (GF(2^64))".to_string(),
@@ -177,9 +190,9 @@ fn bench_binius_hdc_xor() -> BenchResult {
 // ANALYTIC ESTIMATE ONLY — no real prover. This function implements no
 // AIR and never invokes Winterfell. All numbers it reports are derived
 // from a constraint-count model, not from running a prover. Do NOT cite
-// them as measured proving results. A real, measured Winterfell
-// 16,384-bit XOR circuit exists separately in
-// crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs (monorepo root).
+// them as measured proving results. This standalone artifact contains
+// no executable Winterfell XOR circuit, so its output cannot establish
+// a cross-backend comparison.
 // ═══════════════════════════════════════════════════════════════════
 
 fn bench_winterfell_hdc_xor() -> BenchResult {
@@ -266,11 +279,13 @@ struct BenchResult {
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║  HDC XOR Binding — ZKP Backend Comparison Benchmark         ║");
+    println!("║  HDC XOR Binding — Proof Backend Comparison Benchmark     ║");
     println!("║  Paper: \"Binary-Field STARKs for Hyperdimensional Computing\"║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!("Operation: XOR binding of two 16,384-bit BinaryHV vectors");
+    println!("Security scope: computational integrity only; this Binius64 backend is not zero-knowledge.");
+    println!("Do not treat witness inputs as confidential under this harness.");
     println!("This is the fundamental operation in Hyperdimensional Computing.");
     println!();
     println!("Backends: Binius = REAL prover+verifier (measured).");
@@ -307,35 +322,10 @@ fn main() {
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    if winterfell_result.constraint_count > 0 {
-        let constraint_ratio = winterfell_result.constraint_count as f64
-            / binius_result.constraint_count.max(1) as f64;
-        let prove_ratio = winterfell_result.prove_time_ms / binius_result.prove_time_ms.max(0.001);
-
-        println!();
-        println!(
-            "Key finding: Binius uses {}x fewer constraints for HDC XOR",
-            if binius_result.constraint_count == 0 {
-                "∞".to_string()
-            } else {
-                format!("{:.0}", constraint_ratio)
-            }
-        );
-        println!(
-            "Key finding: Binius proves an estimated {:.1}x faster for HDC XOR",
-            prove_ratio
-        );
-        println!("(measured Binius time vs ANALYTIC ESTIMATE of Winterfell time —");
-        println!("the Winterfell side was never actually run)");
-        println!();
-        println!("Conclusion: XOR binding (the core HDC operation) is algebraically");
-        println!("FREE in binary-field STARKs — native GF(2) addition requires zero");
-        println!(
-            "non-linear constraints, while prime-field STARKs need an estimated {} constraints",
-            winterfell_result.constraint_count
-        );
-        println!("for the same operation on 16,384-bit vectors.");
-    }
+    println!();
+    println!("Comparison status: Winterfell values are analytical estimates, not measurements.");
+    println!("Do not interpret the displayed comparison table as a measured speedup or constraint reduction.");
+    println!("The supported implementation result is a generated and verified Binius XOR proof.");
 
     // HDC Bundling
     println!("\n\n{}", "=".repeat(60));
@@ -364,120 +354,118 @@ fn main() {
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    println!("\nKey insight: Bundling costs O(N × D) AND constraints in Binius.");
-    println!("XOR vote counting is FREE. Only the comparison/reduction uses AND gates.");
+    println!("\nKey insight: Strict majority uses a bit-sliced counter plus threshold comparison; its gate count must be measured from the corrected circuit.");
+    println!("Re-run this benchmark before using any post-correction timing or constraint count.");
 
     // Hamming similarity
     println!("\n\n{}", "=".repeat(60));
-    println!("HDC HAMMING SIMILARITY BENCHMARK");
+    println!("HDC HAMMING DISTANCE PROOF BENCHMARK");
     println!("{}", "=".repeat(60));
 
     let hamming = hamming::bench_hamming(256); // 256 words = 16,384 bits
 
     println!(
-        "\n  Hamming similarity: {} AND constraints for {}-bit vectors",
+        "\n  Hamming distance circuit: {} AND constraints for {}-bit vectors",
         hamming.and_constraints,
         hamming.dim_words * 64
     );
-    println!("  XOR diff computation: FREE. Only accumulation costs AND.");
+    println!("  Circuit constrains popcount(XOR) and sums counts; re-run before comparing historical timings.");
 
-    // CfC temporal proofs
+    // Packed-bit temporal recurrence proofs
     println!("\n\n{}", "=".repeat(60));
-    println!("CfC TEMPORAL PROOF BENCHMARKS");
+    println!("BITWISE TEMPORAL RECURRENCE PROOF BENCHMARKS");
     println!("{}", "=".repeat(60));
 
     let cfc_small = cfc_temporal::bench_cfc_temporal(8, 10); // 8 neurons, 10 steps
     let cfc_medium = cfc_temporal::bench_cfc_temporal(64, 100); // 64 neurons, 100 steps
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║              CfC TEMPORAL PROOF SUMMARY                      ║");
+    println!("║          BITWISE GATED RECURRENCE SUMMARY                    ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║ Config           │ Constraints │ Prove (ms) │ Proof (KB) ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!(
-        "║  8N × 10T        │ {:>11} │ {:>10.1} │ {:>10.1} ║",
+        "║  8W × 10T        │ {:>11} │ {:>10.1} │ {:>10.1} ║",
         cfc_small.and_constraints,
         cfc_small.prove_time_ms,
         cfc_small.proof_size_bytes as f64 / 1024.0
     );
     println!(
-        "║ 64N × 100T       │ {:>11} │ {:>10.1} │ {:>10.1} ║",
+        "║ 64W × 100T       │ {:>11} │ {:>10.1} │ {:>10.1} ║",
         cfc_medium.and_constraints,
         cfc_medium.prove_time_ms,
         cfc_medium.proof_size_bytes as f64 / 1024.0
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    println!("\nKey insight: CfC closed-form h(t) = h + σ*(x_inf - h) requires");
-    println!("exactly 1 AND constraint per neuron per timestep in Binius.");
-    println!("XOR additions (delta computation, state update) are FREE.");
-    println!("LTC with RK4 would need ~16x more constraints for ODE integration.");
+    println!("These circuits prove a packed-bit recurrence with a witness-supplied gate.");
+    println!("They do not encode numeric fixed-point CfC arithmetic.");
+    println!("Historical timing and LTC/RK4 ratios are not numerical-CfC comparisons.");
 
-    // CfC with sigmoid (Sprint 8.3)
+    // Legacy-named low-byte gate-mask recurrence (not a sigmoid)
     println!("\n\n{}", "=".repeat(60));
-    println!("CfC SIGMOID BENCHMARK");
+    println!("MASKED-GATE TEMPORAL RECURRENCE BENCHMARK");
     println!("{}", "=".repeat(60));
 
-    let sig_result = sigmoid::bench_cfc_with_sigmoid(64, 100);
+    let mask_result = sigmoid::bench_masked_gate_recurrence(64, 100);
 
-    println!("\n  CfC 64N×100T WITH in-circuit sigmoid:");
+    println!("\n  64-word × 100-step low-byte-mask demo:");
     println!(
-        "    {} AND constraints (vs ~7,360 without sigmoid)",
-        sig_result.and_constraints
+        "    {} AND constraints (mask + recurrence gates)",
+        mask_result.and_constraints
     );
-    println!("    Sigmoid adds ~1 AND per neuron per step");
+    println!("    No sigmoid, range check, or numeric CfC arithmetic is encoded.");
 
-    // Triple Stack: HDC + FHE + ZKP
+    // Legacy triple-stack module path: opaque-word XOR relation only
     println!("\n\n{}", "=".repeat(60));
-    println!("TRIPLE STACK: HDC-OTP + BINIUS");
+    println!("OPAQUE-WORD XOR INTEGRITY PROOF");
     println!("{}", "=".repeat(60));
 
-    let triple = triple_stack::bench_triple_stack(256); // 16,384 bits
+    let triple = triple_stack::bench_opaque_xor_relation(256); // 16,384-bit opaque-word XOR relation
 
     println!(
-        "\n  Triple stack: {} AND constraints for {}-bit encrypted binding",
+        "\n  XOR relation: {} AND constraints for {}-bit packed-word output",
         triple.and_constraints,
         triple.dim_words * 64
     );
-    println!("  SAME as plaintext XOR binding — encryption adds ZERO proof overhead");
+    println!("  Proves c = a XOR b for opaque words; it does not prove OTP encryption or mask generation.");
 
-    // FL Triple Stack
+    // Strict bitwise majority over witness packed-word inputs. This is a Boolean
+    // circuit demo, not encrypted-gradient aggregation or a federated-learning protocol.
     println!("\n\n{}", "=".repeat(60));
-    println!("FL TRIPLE STACK: ENCRYPTED GRADIENT AGGREGATION");
+    println!("BITWISE MAJORITY PROOF BENCHMARK (OPAQUE WORDS)");
     println!("{}", "=".repeat(60));
 
-    let fl_3 = fl_triple_stack::bench_fl_triple_stack(3, 64); // 3 participants, 4096 bits
-    let fl_8 = fl_triple_stack::bench_fl_triple_stack(8, 64); // 8 participants, 4096 bits
-    let fl_16 = fl_triple_stack::bench_fl_triple_stack(16, 64); // 16 participants, 4096 bits
+    let majority_3 = fl_triple_stack::bench_bitwise_majority(3, 64);
+    let majority_8 = fl_triple_stack::bench_bitwise_majority(8, 64);
+    let majority_16 = fl_triple_stack::bench_bitwise_majority(16, 64);
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║            FL TRIPLE STACK SUMMARY                           ║");
+    println!("║              BITWISE MAJORITY PROOF SUMMARY                  ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ Participants │ AND Constr. │ Prove (ms) │ Proof (KB)       ║");
+    println!("║ Inputs × 4Kbit │ AND Constraints │ Prove (ms) │ Proof (KB)  ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!(
-        "║  3 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
-        fl_3.and_constraints,
-        fl_3.prove_time_ms,
-        fl_3.proof_size_bytes as f64 / 1024.0
+        "║  3 × 4Kbit     │ {:>14} │ {:>10.1} │ {:>10.1}  ║",
+        majority_3.and_constraints,
+        majority_3.prove_time_ms,
+        majority_3.proof_size_bytes as f64 / 1024.0
     );
     println!(
-        "║  8 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
-        fl_8.and_constraints,
-        fl_8.prove_time_ms,
-        fl_8.proof_size_bytes as f64 / 1024.0
+        "║  8 × 4Kbit     │ {:>14} │ {:>10.1} │ {:>10.1}  ║",
+        majority_8.and_constraints,
+        majority_8.prove_time_ms,
+        majority_8.proof_size_bytes as f64 / 1024.0
     );
     println!(
-        "║ 16 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
-        fl_16.and_constraints,
-        fl_16.prove_time_ms,
-        fl_16.proof_size_bytes as f64 / 1024.0
+        "║ 16 × 4Kbit     │ {:>14} │ {:>10.1} │ {:>10.1}  ║",
+        majority_16.and_constraints,
+        majority_16.prove_time_ms,
+        majority_16.proof_size_bytes as f64 / 1024.0
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
-
-    println!("\n  Key: ALL XOR (encryption + aggregation counting) is FREE.");
-    println!("  Only majority-vote comparison costs AND constraints.");
-    println!("  Encryption adds ZERO proof overhead (OTP = XOR = field addition).");
+    println!("Tie policy: an output bit is 1 only when strictly more than half the inputs have it set.");
+    println!("No OTP, numeric-gradient, or federated-learning semantics are included.");
 
     // Output JSON for paper data
     println!("\n--- JSON (for paper) ---");
@@ -490,7 +478,9 @@ fn main() {
                 "prove_time_ms": binius_result.prove_time_ms,
                 "verify_time_ms": binius_result.verify_time_ms,
                 "proof_size_bytes": binius_result.proof_size_bytes,
-                "real_proof": true
+                "real_proof": true,
+                "zero_knowledge": false,
+                "privacy_note": "the standard vendored Binius64 backend does not guarantee witness confidentiality"
             },
             "winterfell": {
                 "constraints": winterfell_result.constraint_count,

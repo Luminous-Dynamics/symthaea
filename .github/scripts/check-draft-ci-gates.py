@@ -41,6 +41,7 @@ GOVERNANCE_DRAFT_GUARD = (
 )
 
 DIRECT_GENERIC = {
+    "hdc-zkp-bench",
     "fmt",
     "cls-field-count",
     "workspace-targets",

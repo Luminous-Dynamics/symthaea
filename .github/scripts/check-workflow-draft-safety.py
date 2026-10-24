@@ -192,7 +192,11 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # A ready_for_review trigger is needed only when a runner-capable job
+    # could actually be admitted by a pull_request event. Explicitly push/manual/
+    # schedule-only roots cannot allocate a PR runner, so they should not force
+    # a ready_for_review hook (and the self-test below checks that case).
+    if draft_guarded:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
