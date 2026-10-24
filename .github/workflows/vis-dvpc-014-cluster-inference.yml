@@ -1,0 +1,43 @@
+name: VIS-DVPC-014 cluster-level paired inference
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-cluster-inference.rs"
+      - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
+      - "docs/research/VIS_DVPC_013_PREREGISTRATION_TEMPLATE_V1.md"
+      - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-cluster-inference.rs"
+      - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
+      - "docs/research/VIS_DVPC_013_PREREGISTRATION_TEMPLATE_V1.md"
+      - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Compile and run cluster inference tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014-tests
+          /tmp/vis-dvpc-014-tests
+
+      - name: Build standalone analyzer
+        run: rustc --edition=2024 -O tools/vision-dvpc-cluster-inference.rs -o /tmp/vis-dvpc-014
+
+      - name: Check formatting after executable checks
+        if: always()
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-cluster-inference.rs
