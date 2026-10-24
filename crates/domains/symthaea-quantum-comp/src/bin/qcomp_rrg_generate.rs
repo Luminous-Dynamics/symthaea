@@ -45,6 +45,7 @@ fn run(args: &[String]) -> Result<(), String> {
     println!("c generator symthaea-qcomp-random-regular-v1");
     println!("c seed {}", report.config.seed);
     println!("c rejection_attempts {}", report.attempts);
+    println!("c max_attempts {}", report.config.max_attempts);
     println!("c construction_model configuration-model-conditioned-on-simple-graph");
     println!("c prng seeded-xorshift64star-noncryptographic");
     println!("p edge {} {}", graph.vertex_count(), graph.edges().len());
