@@ -387,8 +387,8 @@
                         "additionalProperties": false,
                         "required": [
                           "status",
-                          "independent_reviewer_count",
-                          "receipt_sha256"
+                          "receipt_sha256",
+                          "reviewers"
                         ],
                         "properties": {
                           "status": {
@@ -398,12 +398,37 @@
                               "unknown"
                             ]
                           },
-                          "independent_reviewer_count": {
-                            "type": "integer",
-                            "minimum": 0
-                          },
                           "receipt_sha256": {
                             "$ref": "#/$defs/sha256"
+                          },
+                          "reviewers": {
+                            "type": "array",
+                            "minItems": 0,
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "reviewer_id",
+                                "decision",
+                                "evidence_sha256"
+                              ],
+                              "properties": {
+                                "reviewer_id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "decision": {
+                                  "enum": [
+                                    "matches_intended_claim",
+                                    "mismatch",
+                                    "unknown"
+                                  ]
+                                },
+                                "evidence_sha256": {
+                                  "$ref": "#/$defs/sha256"
+                                }
+                              }
+                            }
                           }
                         }
                       },
@@ -556,6 +581,10 @@
                                 },
                                 "independent_reviewer_count": {
                                   "minimum": 2
+                                },
+                                "reviewers": {
+                                  "type": "array",
+                                  "minItems": 2
                                 }
                               }
                             },
