@@ -30,7 +30,7 @@ Primary metrics:
 - **Fixture contract pass rate** = correctly resolved fixtures / valid declared fixtures.
 - **Input-order invariance** = event-slice permutations with the same normalized resolution / total permutations examined. Normalize away `event_index`, because that index legitimately changes when the slice is permuted.
 - **Scope non-transfer** = cases where changing only subject, action or purpose appropriately removes an event from scope / scoped counterfactual pairs.
-- **Ambiguity preservation** = cases with missing scope, non-asserted modality, missing order or duplicate order that produce the expected Unknown outcome / such ambiguity fixtures.
+- **Ambiguity preservation** = cases with potentially relevant incomplete scope, quoted/reported/conditional/hypothetical modality, missing order or duplicate order that produce the expected Unknown outcome / such ambiguity fixtures. Interrogative events are explicitly not evidence of a consent transition and must be ignored rather than poisoning an otherwise determinate assertion.
 - **Relevant-fact directionality** = pairs where changing one decisive event changes the candidate outcome in the predeclared direction / valid decisive-fact pairs.
 
 The development command is:
@@ -39,7 +39,7 @@ The development command is:
 cargo run --example consent_event_resolution_bench
 ```
 
-The current runner contains 12 hand-authored synthetic fixtures, permutations of each fixture's input slice, and four decisive counterfactual pairs. It is a smoke/contract probe, not a blinded benchmark. Do not treat its fixture percentage as an estimate of real-world safety.
+The current runner contains 12 hand-authored synthetic fixtures, permutations of each fixture's input slice, and five decisive counterfactual pairs. It is a smoke/contract probe, not a blinded benchmark. Do not treat its fixture percentage as an estimate of real-world safety.
 
 ### Expanded deterministic resolver stress matrix
 
@@ -52,6 +52,10 @@ The registered `consent_event_resolution_bench` generates three finite synthetic
 Together, these enumerate **14,400 generated case inputs** and perform **24,192 matrix assertions** (4,608 single-event expected-outcome checks, 5,184 exact-pair expected-outcome checks, 5,184 exact-pair permutation checks, 4,608 mixed-scope expected-outcome checks, and 4,608 mixed-scope permutation checks), before counting hand-authored fixtures, fixture-level permutations and four counterfactual pairs. These counts are mathematical properties of the enumerator, **not a report of executed passes**. The runner has not yet been run in the authoring environment. The expected oracle shares the public input/output types but does not call the resolver's private comparison helpers; independent review is still warranted.
 
 The matrix probes representation contracts under a declared finite set of values. It cannot establish coverage of natural language, correctness of human annotation, trusted event chronology, cryptographic provenance, temporal concurrency, protected dispatcher coverage, or real-world harm. It is a candidate CI smoke probe after compilation succeeds, not a substitute for a sealed holdout.
+
+### Modality-specific non-evidence rule
+
+The resolver now handles `Asked` differently from other non-asserted modalities. An interrogative event is not an assertion that a consent transition occurred, so it is ignored before scope/chronology resolution. A question alone yields `NoRelevantEvidence`; a question with incomplete scope cannot make the current state ambiguous; and an added question cannot contaminate a separate explicit grant. Quoted, reported, conditional, and hypothetical events remain conservative uncertainty when potentially in scope, because they may encode claims or conditions that require separate attribution/temporal resolution. This is a deliberate abstention-utility trade-off and must be covered by tests: the system should neither turn questions into consent evidence nor treat every non-assertive phrase as an equivalent kind of uncertainty.
 
 ### Layer B — natural-language event extraction
 
