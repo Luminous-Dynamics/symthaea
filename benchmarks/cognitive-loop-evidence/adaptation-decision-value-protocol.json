@@ -161,6 +161,7 @@
     "comparison_track"
   ],
   "score_receipt_binding": {
+    "receipt_schema_version": 2,
     "cli_flag": "--receipt",
     "required_identity_matches": [
       "score.dataset_id equals receipt.dataset_id",
@@ -168,7 +169,9 @@
       "score.seed equals receipt.environment_seed",
       "score.shared_stream_sha256 equals receipt.event_ledger_sha256",
       "each of the five score arm repository_head_sha values equals the corresponding receipt arm",
-      "each of the five score arm configuration_digest values equals the corresponding receipt arm"
+      "each of the five score arm configuration_digest values equals the corresponding receipt arm",
+      "for run_kind=replay, every per-cycle task_loss and adaptation_cost_units value equals the corresponding receipt decision record",
+      "each score arm cycle panel exactly matches the receipt stream length and decision ticks"
     ],
     "score_provenance_fields": [
       "source_replay_receipt_sha256",
@@ -177,7 +180,7 @@
       "source_replay_run_kind"
     ],
     "confirmatory_rule": "compare-cognitive-adaptation-panel emits primary_comparison only when all 2800 expected cells exist and every scored record has receipt-link fields with source_replay_run_kind=replay; synthetic-not-measured records suppress the comparison",
-    "limitation": "The panel validates score digests and declared receipt linkage but does not re-execute the replay driver or prove that it executed honestly; retain raw receipts and independently audit the runner."
+    "limitation": "The scorer validates raw schema-v2 receipts and joins the scored per-cycle loss/cost values to receipt decision records. The panel validates score digests and declared receipt linkage but does not independently re-read raw receipts or re-execute the replay driver. Neither step proves honest runner execution or effective oracle sandboxing; retain raw receipts and independently audit the runner."
   },
   "replay_fail_closed_conditions": [
     "Missing, duplicated, reordered, early, or altered exogenous event",
