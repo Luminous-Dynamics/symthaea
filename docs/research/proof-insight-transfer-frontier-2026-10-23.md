@@ -206,3 +206,8 @@ This is a consistency guard only: it cannot establish that the intervention was 
 The proof-state analyzer now separates raw checker success from the primary, semantically qualified exact-target solve rate. Executed rows require a target-bound semantic-gate record covering dual statement-correspondence review, axiom-policy compliance, dependent-successor evidence or reasoned not-applicable status, and mutation controls. The analyzer derives overall gate state from these sub-results rather than trusting a self-reported `passed` label. The report now counts passed, failed, and unknown gates.
 
 This design is informed by the T² study's gap between compilation and dependent-successor testing, and by the 2026 formal-benchmark audit. It is only an evaluator contract until real receipts and model outcomes exist; it does not establish semantic correctness or improve a prover score by itself.
+
+
+### 2026-10-24 update: individual review decisions are part of the gate
+
+The semantic-gate contract now records each statement-correspondence review separately: reviewer ID, decision, and evidence digest. The Rust analyzer rejects duplicate identities, malformed digests, and disagreement hidden behind a claimed consensus status. Disagreement is unresolved unless a separately preregistered adjudication procedure is implemented. This is stricter than trusting an integer such as `independent_reviewer_count: 2`, which alone does not describe who reviewed the statement or whether their decisions agree.
