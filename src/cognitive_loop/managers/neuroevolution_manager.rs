@@ -141,6 +141,7 @@ impl NeuroevolutionManager {
             initialized: false,
             accumulated_psi: Vec::new(),
             accumulated_prediction_error: Vec::new(),
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
             accumulated_confidence: Vec::new(),
             pending_mutations: Vec::new(),
             champion: ChampionSuggestion::default(),
