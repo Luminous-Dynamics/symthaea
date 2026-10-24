@@ -673,7 +673,7 @@ META\tsafety_violations_max\t0\n\
     }
 
     #[test]
-    fn row_order_does_not_change_receipt() {
+    fn row_order_preserves_classification_but_changes_exact_input_commitment() {
         let content = fixture();
         let mut lines: Vec<&str> = content.lines().collect();
         let header = lines.iter().position(|line| line.starts_with("SWEEP_HEADER")).unwrap();
@@ -681,7 +681,13 @@ META\tsafety_violations_max\t0\n\
         let mut rows: Vec<&str> = lines[header + 1..].to_vec();
         rows.reverse();
         let reversed = prefix + &rows.join("\n") + "\n";
-        assert_eq!(execute(&content).unwrap(), execute(&reversed).unwrap());
+        let original_output = execute(&content).unwrap();
+        let reversed_output = execute(&reversed).unwrap();
+        let original_results = original_output.lines().filter(|line| line.starts_with("RESULT\t")).collect::<Vec<_>>();
+        let reversed_results = reversed_output.lines().filter(|line| line.starts_with("RESULT\t")).collect::<Vec<_>>();
+        assert_eq!(original_results, reversed_results);
+        assert_ne!(sha256_hex(content.as_bytes()), sha256_hex(reversed.as_bytes()));
+        assert_ne!(original_output, reversed_output);
     }
 
     #[test]
