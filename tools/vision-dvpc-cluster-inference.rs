@@ -153,7 +153,7 @@ fn parse_table(input: &str) -> Result<Table, String> {
             continue;
         }
         if !found_header {
-            if fields != DELTA_HEADER {
+            if fields.as_slice() != DELTA_HEADER {
                 return Err(invalid(format!(
                     "line {line_number}: exact DELTA header required; unknown/reordered columns fail closed"
                 )));
@@ -284,7 +284,9 @@ fn parse_comparisons(rows: &[Vec<String>]) -> Result<BTreeMap<String, Comparison
             baseline_id: baseline_id.clone(),
             deltas: BTreeMap::new(),
         });
-        if comparison.candidate_id != *candidate_id || comparison.baseline_id != *baseline_id {
+        if comparison.candidate_id.as_str() != candidate_id.as_str()
+            || comparison.baseline_id.as_str() != baseline_id.as_str()
+        {
             return Err(invalid(format!(
                 "comparison {comparison_id} changes candidate/baseline identity across rows"
             )));
