@@ -985,6 +985,7 @@ fn run_trial_with_discrepancy(
         systematic_discrepancy,
         false,
         true,
+        false,
     )
 }
 
@@ -1005,6 +1006,29 @@ fn run_truth_absent_trial(
         0.0,
         true,
         enable_recovery,
+        false,
+    )
+}
+
+/// Operator-held-out recovery track. Its target has a dimensionally valid unary function that
+/// the initial typed algebraic generator does not produce; the recovery policy may explicitly
+/// enable a bounded sine/cosine proposal family after falsification.
+fn run_operator_heldout_trial(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+    enable_recovery: bool,
+) -> TrialOutcome {
+    run_trial_with_mode(
+        seed,
+        config,
+        max_rounds,
+        active_selector,
+        0.0,
+        true,
+        enable_recovery,
+        true,
     )
 }
 
@@ -1016,10 +1040,14 @@ fn run_trial_with_mode(
     systematic_discrepancy: f64,
     truth_absent: bool,
     enable_recovery: bool,
+    operator_held_out: bool,
 ) -> TrialOutcome {
     let pit_mode = active_selector == ActiveSelector::InformationGainWithPrequentialPitAudits;
     if pit_mode && (!config.active_selection || config.smoothing) {
         return unresolved_trial_outcome(POOL_SIZE, true, true, false);
+    }
+    if operator_held_out && (!truth_absent || !config.typed_candidates) {
+        return unresolved_trial_outcome(0, true, false, true);
     }
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
@@ -1035,7 +1063,16 @@ fn run_trial_with_mode(
         .collect();
     let mut reference_sanity_points = probes.clone();
     reference_sanity_points.extend(candidate_pool.iter().cloned());
-    let ground_truth = nontrivial_ground_truth(&mut setup_rng, &reference_sanity_points);
+    let ground_truth = if operator_held_out {
+        let Some(target) =
+            nontrivial_unary_ground_truth(&mut setup_rng, &reference_sanity_points)
+        else {
+            return unresolved_trial_outcome(0, true, false, true);
+        };
+        target
+    } else {
+        nontrivial_ground_truth(&mut setup_rng, &reference_sanity_points)
+    };
     let gt_vals: Vec<f64> = probes
         .iter()
         .map(|point| eval_at(&ground_truth, point).unwrap())
@@ -1136,6 +1173,7 @@ fn run_trial_with_mode(
     let mut monitoring_protocol_invalid = false;
     let mut typed_recovery_restarts = 0usize;
     let mut structured_recovery_candidates = 0usize;
+    let mut unary_function_recovery_candidates = 0usize;
     let mut accepted_recovery_candidates = 0usize;
     let mut awaiting_post_recovery_validation = false;
     let mut post_recovery_validation_measurements = 0usize;
@@ -1410,12 +1448,14 @@ fn run_trial_with_mode(
                 &mut live,
                 &mut rejected_after_alarm,
                 alarmed_index,
+                operator_held_out,
             );
             if recovery.accepted_count == 0 {
                 terminal_pit_alarm = true;
                 break;
             }
             structured_recovery_candidates += recovery.structured_count;
+            unary_function_recovery_candidates += recovery.unary_function_count;
             accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
             awaiting_post_recovery_validation = true;
@@ -1462,12 +1502,14 @@ fn run_trial_with_mode(
                 &mut live,
                 &mut rejected_after_alarm,
                 base_index,
+                operator_held_out,
             );
             if recovery.accepted_count == 0 || live.is_empty() {
                 terminal_pit_alarm = true;
                 break;
             }
             structured_recovery_candidates += recovery.structured_count;
+            unary_function_recovery_candidates += recovery.unary_function_count;
             accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
             awaiting_post_recovery_validation = true;
@@ -1526,6 +1568,7 @@ fn run_trial_with_mode(
         recovery_triggered_on_empty_pool,
         typed_recovery_restarts,
         structured_recovery_candidates,
+        unary_function_recovery_candidates,
         accepted_recovery_candidates,
         post_recovery_validation_measurements,
         terminal_pit_alarm,
