@@ -188,6 +188,10 @@ name = "broca-external-baseline"
 path = "src/bin/broca_external_baseline.rs"
 
 [[bin]]
+name = "broca-vocab-extension-bench"
+path = "src/bin/broca_vocab_extension_bench.rs"
+
+[[bin]]
 name = "broca-checkpoint-compare"
 path = "src/bin/broca_checkpoint_compare.rs"
 

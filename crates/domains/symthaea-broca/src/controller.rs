@@ -264,6 +264,68 @@ pub struct NetworkSnapshot {
     layer_states: Vec<Vec<ContinuousHV>>,
 }
 
+/// Initialization method for adding a token to an already-trained vocabulary.
+///
+/// These choices do not alter the historical `append_token` API. Context-based
+/// methods require caller-supplied constituent/context vectors; they never infer
+/// semantic meaning from the token string itself.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenExtensionInitialization {
+    /// Current compatibility behavior: a deterministic V1 genesis-seeded vector.
+    SeededRandomV1,
+    /// Bundle context vectors, then match the median existing embedding norm.
+    ContextBundleNormMatched,
+    /// Blend a context bundle with a deterministic residual, then norm-match.
+    /// The residual weight must be finite and in [0, 1].
+    ContextBundleNormMatchedWithResidual { residual_weight: f32 },
+}
+
+/// Failure to initialize an appended vocabulary row safely.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenExtensionInitError {
+    MissingContext,
+    ContextDimensionMismatch {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteContext {
+        index: usize,
+    },
+    InvalidResidualWeight,
+    EmptyReferenceVocabulary,
+    DegenerateContext,
+    NonFiniteCandidate,
+}
+
+impl std::fmt::Display for TokenExtensionInitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingContext => {
+                write!(f, "context-based initialization requires at least one context vector")
+            }
+            Self::ContextDimensionMismatch { index, expected, actual } => {
+                write!(f, "context vector {index} has dimension {actual}; expected {expected}")
+            }
+            Self::NonFiniteContext { index } => {
+                write!(f, "context vector {index} contains non-finite coordinates")
+            }
+            Self::InvalidResidualWeight => write!(f, "residual weight must be finite and in [0, 1]"),
+            Self::EmptyReferenceVocabulary => {
+                write!(f, "norm matching requires at least one existing embedding")
+            }
+            Self::DegenerateContext => {
+                write!(f, "context composition has zero or non-finite norm")
+            }
+            Self::NonFiniteCandidate => {
+                write!(f, "candidate embedding contains non-finite coordinates")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TokenExtensionInitError {}
+
 /// Language controller wrapping an HdcLtcUnifiedNetwork + weight-tied token output.
 ///
 /// Forward pass:
@@ -842,6 +904,116 @@ impl LanguageController {
         self.network.reset_momentum();
     }
 
+    /// Append a token using an explicit, fail-closed initialization strategy.
+    ///
+    /// This is an experimental API separate from the legacy `append_token` path.
+    /// Context methods validate every input before mutating the vocabulary, match
+    /// the candidate norm to the median existing row norm, and preserve all old rows.
+    pub fn append_token_with_initialization(
+        &mut self,
+        genesis: &GenesisSeed,
+        name: &str,
+        context_hvs: Option<&[&ContinuousHV]>,
+        initialization: TokenExtensionInitialization,
+    ) -> Result<usize, TokenExtensionInitError> {
+        let candidate = match initialization {
+            TokenExtensionInitialization::SeededRandomV1 => ContinuousHV::from_genesis(
+                genesis,
+                &format!("broca::token_emb::{name}"),
+                HDC_DIMENSION,
+            ),
+            TokenExtensionInitialization::ContextBundleNormMatched
+            | TokenExtensionInitialization::ContextBundleNormMatchedWithResidual { .. } => {
+                let contexts = context_hvs
+                    .filter(|vectors| !vectors.is_empty())
+                    .ok_or(TokenExtensionInitError::MissingContext)?;
+                for (index, context) in contexts.iter().enumerate() {
+                    if context.dim() != HDC_DIMENSION {
+                        return Err(TokenExtensionInitError::ContextDimensionMismatch {
+                            index,
+                            expected: HDC_DIMENSION,
+                            actual: context.dim(),
+                        });
+                    }
+                    if context.values.iter().any(|value| !value.is_finite()) {
+                        return Err(TokenExtensionInitError::NonFiniteContext { index });
+                    }
+                }
+
+                let context_bundle = ContinuousHV::bundle(contexts);
+                let context_norm = context_bundle.norm();
+                if !context_norm.is_finite() || context_norm <= 1e-8 {
+                    return Err(TokenExtensionInitError::DegenerateContext);
+                }
+
+                let composed = match initialization {
+                    TokenExtensionInitialization::ContextBundleNormMatched => context_bundle,
+                    TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+                        residual_weight,
+                    } => {
+                        if !residual_weight.is_finite()
+                            || !(0.0..=1.0).contains(&residual_weight)
+                        {
+                            return Err(TokenExtensionInitError::InvalidResidualWeight);
+                        }
+                        let residual = ContinuousHV::from_genesis(
+                            genesis,
+                            &format!("broca::token_extension_residual::{name}"),
+                            HDC_DIMENSION,
+                        );
+                        // Weight directions, not raw norms: the context mean's
+                        // magnitude shrinks with context count, which would make a
+                        // nominally small residual dominate otherwise.
+                        let context_direction = context_bundle.normalize();
+                        let residual_direction = residual.normalize();
+                        ContinuousHV::weighted_bundle(
+                            &[&context_direction, &residual_direction],
+                            &[1.0 - residual_weight, residual_weight],
+                        )
+                    }
+                    TokenExtensionInitialization::SeededRandomV1 => unreachable!(),
+                };
+
+                let candidate_norm = composed.norm();
+                if !candidate_norm.is_finite() || candidate_norm <= 1e-8 {
+                    return Err(TokenExtensionInitError::DegenerateContext);
+                }
+
+                let mut existing_norms: Vec<f32> = self
+                    .token_embeddings
+                    .iter()
+                    .map(ContinuousHV::norm)
+                    .filter(|norm| norm.is_finite() && *norm > 1e-8)
+                    .collect();
+                if existing_norms.is_empty() {
+                    return Err(TokenExtensionInitError::EmptyReferenceVocabulary);
+                }
+                existing_norms.sort_by(f32::total_cmp);
+                let middle = existing_norms.len() / 2;
+                let target_norm = if existing_norms.len() % 2 == 0 {
+                    (existing_norms[middle - 1] + existing_norms[middle]) * 0.5
+                } else {
+                    existing_norms[middle]
+                };
+                composed.normalize().scale(target_norm)
+            }
+        };
+
+        if candidate.dim() != HDC_DIMENSION
+            || candidate.values.iter().any(|value| !value.is_finite())
+        {
+            return Err(TokenExtensionInitError::NonFiniteCandidate);
+        }
+
+        let inserted_index = self.token_embeddings.len();
+        self.token_embeddings.push(candidate);
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        {
+            self.gpu_embeddings = Self::build_gpu_cache(&self.token_embeddings);
+        }
+        Ok(inserted_index)
+    }
+
     /// Append a new token embedding (for swarm vocabulary extension).
     /// The embedding is algebraically composed from context if `context_hvs` is provided.
     pub fn append_token(
@@ -1357,6 +1529,322 @@ mod tests {
 
         ctrl.reset();
         assert_eq!(ctrl.current_pos(), 0);
+    }
+
+    #[test]
+    fn explicit_seeded_extension_matches_legacy_append_exactly() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut legacy = LanguageController::new(&genesis, &config);
+        let mut explicit = LanguageController::new(&genesis, &config);
+        let old_len = legacy.vocab_size();
+
+        legacy.append_token(&genesis, "extension-control", None);
+        let index = explicit
+            .append_token_with_initialization(
+                &genesis,
+                "extension-control",
+                None,
+                TokenExtensionInitialization::SeededRandomV1,
+            )
+            .expect("seeded extension should succeed");
+
+        assert_eq!(index, old_len);
+        assert_eq!(
+            legacy.token_embeddings()[old_len].values,
+            explicit.token_embeddings()[old_len].values
+        );
+    }
+
+    #[test]
+    fn context_extension_is_norm_matched_and_preserves_old_rows() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut controller = LanguageController::new(&genesis, &config);
+        let original: Vec<Vec<f32>> = controller
+            .token_embeddings()
+            .iter()
+            .map(|row| row.values.clone())
+            .collect();
+        let old_norms: Vec<f32> = controller
+            .token_embeddings()
+            .iter()
+            .map(ContinuousHV::norm)
+            .collect();
+        let mut sorted_norms = old_norms;
+        sorted_norms.sort_by(f32::total_cmp);
+        let expected_norm = if sorted_norms.len() % 2 == 0 {
+            (sorted_norms[sorted_norms.len() / 2 - 1] + sorted_norms[sorted_norms.len() / 2]) * 0.5
+        } else {
+            sorted_norms[sorted_norms.len() / 2]
+        };
+        let contexts = vec![
+            controller.token_embeddings()[1].clone(),
+            controller.token_embeddings()[2].clone(),
+            controller.token_embeddings()[3].clone(),
+        ];
+        let context_refs: Vec<&ContinuousHV> = contexts.iter().collect();
+
+        let index = controller
+            .append_token_with_initialization(
+                &genesis,
+                "context-composed",
+                Some(&context_refs),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            )
+            .expect("context extension should succeed");
+
+        assert_eq!(index, original.len());
+        for (row, expected) in controller.token_embeddings()[..original.len()]
+            .iter()
+            .zip(original)
+        {
+            assert_eq!(
+                row.values.as_slice(),
+                expected.as_slice(),
+                "old token vectors must remain bit-identical"
+            );
+        }
+        let actual_norm = controller.token_embeddings()[index].norm();
+        assert!(
+            (actual_norm - expected_norm).abs() < 0.05,
+            "new norm {actual_norm} should match median existing norm {expected_norm}"
+        );
+        assert!(controller.token_embeddings()[index].values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn context_extension_residual_is_deterministic_and_bounded() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let contexts = vec![
+            base.token_embeddings()[1].clone(),
+            base.token_embeddings()[2].clone(),
+            base.token_embeddings()[3].clone(),
+        ];
+        let context_refs: Vec<&ContinuousHV> = contexts.iter().collect();
+        let strategy = TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+            residual_weight: 0.15,
+        };
+        let mut first = base.clone();
+        let mut second = base.clone();
+
+        let first_index = first
+            .append_token_with_initialization(
+                &genesis,
+                "new-token",
+                Some(&context_refs),
+                strategy,
+            )
+            .expect("first context+residual extension should succeed");
+        let second_index = second
+            .append_token_with_initialization(&genesis, "new-token", Some(&context_refs), strategy)
+            .expect("second context+residual extension should succeed");
+
+        assert_eq!(
+            first.token_embeddings()[first_index].values,
+            second.token_embeddings()[second_index].values,
+            "same genesis, token name, context, and strategy must be deterministic"
+        );
+        assert!(first.token_embeddings()[first_index].values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn name_specific_residual_breaks_duplicate_context_collisions() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let contexts = vec![
+            base.token_embeddings()[1].clone(),
+            base.token_embeddings()[2].clone(),
+        ];
+        let refs: Vec<&ContinuousHV> = contexts.iter().collect();
+
+        let mut bundle_a = base.clone();
+        let mut bundle_b = base.clone();
+        let index_a = bundle_a
+            .append_token_with_initialization(
+                &genesis,
+                "duplicate-a",
+                Some(&refs),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            )
+            .expect("first context bundle should succeed");
+        let index_b = bundle_b
+            .append_token_with_initialization(
+                &genesis,
+                "duplicate-b",
+                Some(&refs),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            )
+            .expect("second context bundle should succeed");
+        assert_eq!(
+            bundle_a.token_embeddings()[index_a].values,
+            bundle_b.token_embeddings()[index_b].values,
+            "same context only cannot distinguish tokens with identical context vectors"
+        );
+
+        let strategy = TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+            residual_weight: 0.15,
+        };
+        let mut residual_a = base.clone();
+        let mut residual_b = base.clone();
+        let index_a = residual_a
+            .append_token_with_initialization(&genesis, "duplicate-a", Some(&refs), strategy)
+            .expect("first residual vector should succeed");
+        let index_b = residual_b
+            .append_token_with_initialization(&genesis, "duplicate-b", Some(&refs), strategy)
+            .expect("second residual vector should succeed");
+        assert!(
+            residual_a.token_embeddings()[index_a]
+                .similarity(&residual_b.token_embeddings()[index_b])
+                < 0.999,
+            "name-specific residuals should avoid exact collapse"
+        );
+    }
+
+    #[test]
+    fn context_extension_rejects_invalid_inputs_without_mutation() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut controller = LanguageController::new(&genesis, &config);
+        let original_len = controller.vocab_size();
+
+        assert_eq!(
+            controller.append_token_with_initialization(
+                &genesis,
+                "missing-context",
+                None,
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            ),
+            Err(TokenExtensionInitError::MissingContext),
+        );
+        assert_eq!(controller.vocab_size(), original_len);
+
+        let wrong_dimension = ContinuousHV::from_vec(vec![1.0; 8]);
+        assert!(matches!(
+            controller.append_token_with_initialization(
+                &genesis,
+                "wrong-dimension",
+                Some(&[&wrong_dimension]),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            ),
+            Err(TokenExtensionInitError::ContextDimensionMismatch { .. })
+        ));
+        assert_eq!(controller.vocab_size(), original_len);
+
+        let non_finite = ContinuousHV::from_vec(vec![f32::NAN; HDC_DIMENSION]);
+        assert!(matches!(
+            controller.append_token_with_initialization(
+                &genesis,
+                "non-finite",
+                Some(&[&non_finite]),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            ),
+            Err(TokenExtensionInitError::NonFiniteContext { .. })
+        ));
+        assert_eq!(controller.vocab_size(), original_len);
+
+        let good_context = controller.token_embeddings()[1].clone();
+        assert_eq!(
+            controller.append_token_with_initialization(
+                &genesis,
+                "bad-residual",
+                Some(&[&good_context]),
+                TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+                    residual_weight: f32::NAN,
+                },
+            ),
+            Err(TokenExtensionInitError::InvalidResidualWeight),
+        );
+        assert_eq!(controller.vocab_size(), original_len);
+    }
+
+    #[test]
+    fn vocabulary_extension_preserves_old_logits_for_fixed_input() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let query = ContinuousHV::from_genesis(
+            &genesis,
+            "vocab_extension_fixed_query",
+            HDC_DIMENSION,
+        );
+        let contexts = vec![
+            base.token_embeddings()[1].clone(),
+            base.token_embeddings()[2].clone(),
+            base.token_embeddings()[3].clone(),
+        ];
+        let context_refs: Vec<&ContinuousHV> = contexts.iter().collect();
+
+        let mut reference = base.clone();
+        reference.reset();
+        let reference_logits = reference.forward_step(&query, 0, 0);
+
+        let strategies = [
+            TokenExtensionInitialization::SeededRandomV1,
+            TokenExtensionInitialization::ContextBundleNormMatched,
+            TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+                residual_weight: 0.15,
+            },
+        ];
+        for (index, strategy) in strategies.into_iter().enumerate() {
+            let mut extended = base.clone();
+            extended
+                .append_token_with_initialization(
+                    &genesis,
+                    &format!("fixed-input-extension-{index}"),
+                    Some(&context_refs),
+                    strategy,
+                )
+                .expect("valid strategy should extend vocabulary");
+            extended.reset();
+            let extended_logits = extended.forward_step(&query, 0, 0);
+
+            assert_eq!(extended.vocab_size(), reference_logits.len() + 1);
+            for (token_id, (before, after)) in reference_logits
+                .iter()
+                .zip(extended_logits[..reference_logits.len()].iter())
+                .enumerate()
+            {
+                assert!(
+                    (before - after).abs() <= 1e-6,
+                    "strategy {strategy:?} changed old-token logit {token_id}: {before} vs {after}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cosine_logits_are_invariant_to_positive_embedding_rescaling() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let query = ContinuousHV::from_genesis(
+            &genesis,
+            "positive-rescale-invariance-query",
+            HDC_DIMENSION,
+        );
+        let baseline_logits = base.compute_logits(&query);
+
+        let mut scaled = base.clone();
+        let mut embeddings = scaled.token_embeddings().to_vec();
+        embeddings[0] = embeddings[0].clone().scale(7.0);
+        scaled.restore_token_embeddings(embeddings);
+        let scaled_logits = scaled.compute_logits(&query);
+
+        assert_eq!(baseline_logits.len(), scaled_logits.len());
+        for (token_id, (before, after)) in baseline_logits
+            .iter()
+            .zip(scaled_logits.iter())
+            .enumerate()
+        {
+            assert!(
+                (before - after).abs() <= 1e-5,
+                "positive rescaling changed cosine logit for token {token_id}: {before} vs {after}"
+            );
+        }
     }
 
     #[test]
