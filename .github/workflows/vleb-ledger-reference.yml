@@ -37,6 +37,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Audit locked fixture hashes and mutation inventory
         run: bash tools/vleb/check-fixture-integrity.sh
+      - name: Install pinned JSON Schema validator
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate fail-closed evidence receipt schema
+        run: python tools/vleb/test_receipt_schema.py
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
