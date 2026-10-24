@@ -777,7 +777,10 @@ mod tests {
     fn send_over_batman_whole_packet() {
         let mesh = DualLayerMesh::new([0; 32]).with_batman(Box::new(LoopbackTransport::batman()));
 
-        let packet = test_packet(MeshUrgency::Critical);
+        // Use a compressible payload so the final envelope is within the
+        // loopback transport's declared Ethernet MTU (1500 bytes).
+        let mut packet = test_packet(MeshUrgency::Critical);
+        packet.wisdom = BinaryHV([0u8; 2048]);
         let route = mesh.send(&packet).unwrap();
         assert_eq!(route, MeshRoute::Batman);
     }
