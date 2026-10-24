@@ -1225,7 +1225,10 @@ mod prediction_evidence_replay_tests {
             service.last_prediction_cycle,
             6,
         );
-        assert_eq!(recovered.status(), crate::cognitive_loop::types::PredictionEvidenceStatus::Valid);
+        assert_eq!(
+            recovered.status(),
+            crate::cognitive_loop::types::PredictionEvidenceStatus::Valid
+        );
         assert_eq!(recovered.value_for_observation(6), Some(0.0));
     }
 
