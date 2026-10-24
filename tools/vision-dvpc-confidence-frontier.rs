@@ -279,6 +279,13 @@ fn parse_receipt(input: &str) -> Result<Receipt, String> {
     if meta["format"] != RECEIPT_VERSION || meta["status"] != PARETO_STATUS {
         return Err(invalid("unsupported PARETO receipt format or status"));
     }
+    if meta["scalarized_score"] != "NONE"
+        || meta["upstream_risk_certificate_verified_here"] != "false"
+        || meta["performance_claim"] != "NONE"
+        || meta["frontier_objectives"] != "MAXIMIZE_UTILITY_DELTA;MINIMIZE_ACTUAL_LATENCY;MINIMIZE_ACTUAL_ENERGY"
+    {
+        return Err(invalid("PARETO receipt has unexpected analysis semantics or non-claim fields"));
+    }
     if !matches!(meta["split"].as_str(), "test" | "private_test") {
         return Err(invalid("PARETO split must be test or private_test"));
     }
@@ -462,12 +469,16 @@ fn classify(receipt: &Receipt, bands: &Bands) -> Vec<Classified> {
                 continue;
             }
             let other_band = bands.values[&other.key()];
+            if exact_equivalent(other, other_band, point, band) {
+                if other.key() < point.key() {
+                    equivalent_predecessor = Some(other.label());
+                }
+                continue;
+            }
             if certainly_dominates(other, other_band, point, band) {
                 certified_dominators.push(other.label());
             } else if possibly_dominates(other, other_band, point, band) {
                 possible_dominators.push(other.label());
-            } else if other.key() < point.key() && exact_equivalent(other, other_band, point, band) {
-                equivalent_predecessor = Some(other.label());
             }
         }
         certified_dominators.sort();
@@ -537,11 +548,11 @@ fn analyze(
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tduplicate_equivalent_count\t{}", status_count("DUPLICATE_EQUIVALENT"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tinfeasible_count\t{}", status_count("INFEASIBLE"));
     let _ = writeln!(output, "CONFIDENCE_FRONTIER\tperformance_claim\tNONE");
-    let _ = writeln!(output, "CONFIDENCE_RESULT_HEADER\tbudget_point_id\tpolicy_id\tstatus\tutility_estimate\tutility_lcb\tutility_ucb\tactual_all_in_latency_us\tactual_all_in_energy_uj\tupstream_point_status\treason\tdominated_by");
+    let _ = writeln!(output, "CONFIDENCE_RESULT_HEADER\tbudget_point_id\tpolicy_id\tstatus\tutility_estimate\tutility_lcb\tutility_ucb\tactual_all_in_latency_us\tactual_all_in_energy_uj\tlatency_budget_us\tenergy_budget_uj\tupstream_point_status\tupstream_reasons\treason\tupstream_point_dominated_by");
     for item in &classified {
         let _ = writeln!(
             output,
-            "CONFIDENCE_RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "CONFIDENCE_RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             item.point.budget_point_id,
             item.point.policy_id,
             item.status,
@@ -550,9 +561,14 @@ fn analyze(
             number(item.band.upper),
             item.point.latency,
             item.point.energy,
+            item.point.latency_budget,
+            item.point.energy_budget,
             item.point.upstream_status,
+            item.point.reasons,
             item.reason,
+            item.point.dominated_by,
             item.dominated_by,
+
         );
     }
     Ok(output)
@@ -685,8 +701,8 @@ mod tests {
             Spec { budget: "p10", policy: "full", status: "FEASIBLE_DOMINATED", utility: 0.30, latency: 20, energy: 20, reasons: "-" },
         ]);
         let out = execute(&p, &[("p10", "cheap", 0.45, 0.55), ("p10", "full", 0.20, 0.35)]).unwrap();
-        assert!(out.contains("CONFIDENCE_RESULT\tp10\tcheap\tCERTIFIED_NONDOMINATED"));
-        assert!(out.contains("CONFIDENCE_RESULT\tp10\tfull\tCERTIFIED_DOMINATED"));
+        assert!(out.contains("CONFIDENCE_RESULT\tp10\tcheap\tBAND_NONDOMINATED"));
+        assert!(out.contains("CONFIDENCE_RESULT\tp10\tfull\tBAND_DOMINATED"));
     }
 
     #[test]
@@ -696,7 +712,7 @@ mod tests {
             Spec { budget: "p10", policy: "baseline", status: "FEASIBLE_DOMINATED", utility: 0.40, latency: 20, energy: 20, reasons: "-" },
         ]);
         let out = execute(&p, &[("p10", "candidate", 0.20, 0.70), ("p10", "baseline", 0.30, 0.80)]).unwrap();
-        assert!(out.contains("CONFIDENCE_RESULT\tp10\tcandidate\tCERTIFIED_NONDOMINATED"));
+        assert!(out.contains("CONFIDENCE_RESULT\tp10\tcandidate\tBAND_NONDOMINATED"));
         assert!(out.contains("CONFIDENCE_RESULT\tp10\tbaseline\tUNRESOLVED"));
     }
 
@@ -707,8 +723,8 @@ mod tests {
             Spec { budget: "p10", policy: "low-energy", status: "FEASIBLE_DOMINATED", utility: 0.20, latency: 20, energy: 10, reasons: "-" },
         ]);
         let out = execute(&p, &[("p10", "low-latency", 0.45, 0.55), ("p10", "low-energy", 0.10, 0.30)]).unwrap();
-        assert!(out.contains("CONFIDENCE_RESULT\tp10\tlow-latency\tCERTIFIED_NONDOMINATED"));
-        assert!(out.contains("CONFIDENCE_RESULT\tp10\tlow-energy\tCERTIFIED_NONDOMINATED"));
+        assert!(out.contains("CONFIDENCE_RESULT\tp10\tlow-latency\tBAND_NONDOMINATED"));
+        assert!(out.contains("CONFIDENCE_RESULT\tp10\tlow-energy\tBAND_NONDOMINATED"));
     }
 
     #[test]
@@ -729,7 +745,7 @@ mod tests {
             Spec { budget: "p10", policy: "b", status: "FEASIBLE_DOMINATED", utility: 0.50, latency: 10, energy: 10, reasons: "-" },
         ]);
         let out = execute(&p, &[("p10", "a", 0.40, 0.60), ("p10", "b", 0.40, 0.60)]).unwrap();
-        assert!(out.contains("CONFIDENCE_RESULT\tp10\ta\tCERTIFIED_NONDOMINATED"));
+        assert!(out.contains("CONFIDENCE_RESULT\tp10\ta\tBAND_NONDOMINATED"));
         assert!(out.contains("CONFIDENCE_RESULT\tp10\tb\tDUPLICATE_EQUIVALENT"));
     }
 
