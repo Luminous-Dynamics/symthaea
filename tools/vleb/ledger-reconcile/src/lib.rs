@@ -172,9 +172,15 @@ pub fn reconcile_csv(input: &str) -> Result<LedgerReport, LedgerError> {
             }
         };
 
+        if row[3].is_empty() || !row[3].bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(LedgerError::new(format!(
+                "row {} amount_minor must contain only ASCII digits",
+                row_index + 1
+            )));
+        }
         let amount_minor = row[3].parse::<u64>().map_err(|_| {
             LedgerError::new(format!(
-                "row {} amount_minor must be a positive unsigned integer",
+                "row {} amount_minor is outside the supported unsigned integer range",
                 row_index + 1
             ))
         })?;
