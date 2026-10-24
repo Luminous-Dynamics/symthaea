@@ -1,0 +1,13 @@
+[package]
+name = "broca-task-eval-stats"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free grouped paired-bootstrap summaries for Liquid Broca task evaluation"
+
+[[bin]]
+name = "broca-task-eval-stats"
+path = "src/main.rs"
+
+[workspace]
