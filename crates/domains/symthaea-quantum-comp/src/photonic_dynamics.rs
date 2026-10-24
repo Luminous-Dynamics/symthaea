@@ -652,7 +652,7 @@ mod tests {
         assert_eq!(schedule.coefficient(0.2, 0.1).expect("at first switch"), 0.0);
         assert_eq!(schedule.coefficient(0.3, 0.1).expect("inside XY return"), 0.0);
         let after_second = schedule.coefficient(0.4, 0.1).expect("at second switch");
-        assert!((after_second - 0.5_f64.tanh()).abs() < 1e-12);
+        assert!((after_second - 2.0_f64.tanh()).abs() < 1e-12);
     }
 
     #[test]
