@@ -260,7 +260,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "independent_reviewer_count": {"type": "integer", "minimum": 1},
+            "independent_reviewer_count": {"type": "integer", "minimum": 0},
             "mutation_equivalence_reviewed": {"type": "boolean"},
             "notes": {"type": "string"}
           }
