@@ -541,6 +541,41 @@ mod tests {
     }
 
     #[test]
+    fn one_missing_seed_scenario_cell_suppresses_primary_comparison() {
+        let mut input = empty_panel();
+        for dataset_id in input.expected_dataset_ids.clone() {
+            for seed in input.expected_seed_ids.clone() {
+                for scenario_id in input.expected_scenario_ids.clone() {
+                    if dataset_id == "dataset-g" && seed == 49 && scenario_id == REQUIRED_SCENARIO_IDS[7] {
+                        continue;
+                    }
+                    input.runs.push(score(&dataset_id, seed, &scenario_id));
+                }
+            }
+        }
+        let result = evaluate(input).expect("incomplete grid returns coverage report");
+        assert!(!result.complete_coverage_gate_pass);
+        assert_eq!(result.observed_run_count, 2_799);
+        assert_eq!(result.missing_cell_count, 1);
+        assert_eq!(result.missing_cells[0].dataset_id, "dataset-g");
+        assert_eq!(result.missing_cells[0].seed, 49);
+        assert_eq!(result.missing_cells[0].scenario_id, REQUIRED_SCENARIO_IDS[7]);
+        assert!(result.primary_comparison.is_none());
+    }
+
+    #[test]
+    fn rejects_scores_from_another_access_track() {
+        let mut input = empty_panel();
+        let mut record = score("dataset-a", 0, REQUIRED_SCENARIO_IDS[0]);
+        record.comparison_track = "observed-outcome".to_owned();
+        let mut copy = record.clone();
+        copy.result_sha256 = None;
+        record.result_sha256 = Some(sha256_hex(&serde_json::to_vec(&copy).unwrap()));
+        input.runs.push(record);
+        assert!(evaluate(input).unwrap_err().to_string().contains("comparison_track differs"));
+    }
+
+    #[test]
     fn rejects_duplicate_panel_cells() {
         let mut input = empty_panel();
         input.runs = vec![
