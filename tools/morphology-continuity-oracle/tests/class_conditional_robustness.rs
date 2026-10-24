@@ -1,7 +1,7 @@
 //! Robust action selection from class-conditional calibration counts.
 //!
 //! Each row records the outcomes observed for one known ground-truth class. The test constructs
-//! a simultaneous 95% Bonferroni-Wilson confidence region for all nine confusion-matrix cells,
+//! a nominal simultaneous 95% Bonferroni-Wilson confidence region for all nine confusion-matrix cells,
 //! intersects each row with the probability simplex, and evaluates the deployed policy against
 //! every vertex of that feasible matrix set. Because the fixed-policy risk is linear in the true
 //! confusion matrix, its maximum over this polytope occurs at a vertex. This is a finite synthetic
