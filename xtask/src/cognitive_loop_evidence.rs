@@ -36,10 +36,11 @@ const REQUIRED_KDD_FAMILIES: [&str; 14] = [
     "ABCD (error stream and ABCD(X) feature stream)",
     "STUDD+ADWIN",
 ];
-const REQUIRED_DRIFT_DETECTORS: [&str; 24] = [
+const REQUIRED_DRIFT_DETECTORS: [&str; 25] = [
     "fixed-threshold",
     "ewma-control-chart",
     "page-hinkley",
+    "predictive-rank-martingale-portfolio",
     "adwin",
     "kswin",
     "discriminative-drift-detector",
