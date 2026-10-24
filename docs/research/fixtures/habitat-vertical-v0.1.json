@@ -1,0 +1,1234 @@
+{
+  "schema_version": "0.1.0",
+  "program_id": "HABITAT-VERTICAL-001",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8051",
+  "product_parent": "https://github.com/Luminous-Dynamics/symthaea/issues/8039",
+  "fixture_kind": "synthetic_protocol_fixture",
+  "evidence_status": "synthetic_only",
+  "created_utc_date": "2026-10-18",
+  "claim_ceiling": "No physical supply, factory readiness, product quality, safety, cost, yield, environmental advantage, or production capability is established.",
+  "scenario_name": "SYNTHETIC-TOPPER-CELL-V0",
+  "design_intent": {
+    "product_family": "replaceable mattress topper cover-and-layer assembly",
+    "product_revision": "SYNTHETIC-DESIGN-REV-A",
+    "bill_of_materials_revision": "SYNTHETIC-BOM-REV-A",
+    "process_plan_revision": "SYNTHETIC-ROUTING-REV-A",
+    "intended_use": "benchmark data-model and qualification behavior only",
+    "real_materials_selected": false,
+    "physical_fixture_exists": false,
+    "factory_or_supplier_verified": false
+  },
+  "boundary": {
+    "included": [
+      "supplier and material-lot identity",
+      "inbound transport and receiving",
+      "inspection and quarantine",
+      "textile cutting and sewing",
+      "manual low-energy assembly",
+      "final inspection and packaging",
+      "factory layout/utility assumptions",
+      "delivery, repair, return, and recovery events",
+      "synthetic cost, energy, material-balance, and disruption fields"
+    ],
+    "excluded": [
+      "real supplier offers or material properties",
+      "physical manufacturing or calibrated observations",
+      "comfort or human-subject outcomes",
+      "hazardous processes",
+      "safety certification or regulatory compliance",
+      "autonomous machine authority",
+      "measured lifecycle assessment"
+    ]
+  },
+  "existing_owners": [
+    {
+      "id": "MFG-PROC-000",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5686",
+      "owns": "engineering process semantics and qualification"
+    },
+    {
+      "id": "MFG-LIFE-000",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5705",
+      "owns": "lifecycle/circularity semantics"
+    },
+    {
+      "id": "BUILT-ENV-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6032",
+      "owns": "site/facility realization profile"
+    },
+    {
+      "id": "BUILT-CX-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6037",
+      "owns": "commissioning evidence profile"
+    },
+    {
+      "id": "BUILT-ROB-PILOT-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6040",
+      "owns": "bounded microfactory/workcell digital-thread demonstrator"
+    },
+    {
+      "id": "FACTORY-OPS-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7677",
+      "owns": "deterministic capability-constrained scheduling direction"
+    },
+    {
+      "id": "MFG-EVID-001",
+      "url": "https://github.com/Luminous-Dynamics/mycelix/issues/3084",
+      "owns": "product revision, manufactured unit, lot lineage, and qualification evidence"
+    },
+    {
+      "id": "MFG-PROC-001",
+      "url": "https://github.com/Luminous-Dynamics/mycelix/issues/3085",
+      "owns": "distributed process registry, resource offers, routings, and production records"
+    },
+    {
+      "id": "LOG-COMMONS-001",
+      "url": "https://github.com/Luminous-Dynamics/mycelix/issues/4900",
+      "owns": "federated logistics and participant-owned operational facts"
+    }
+  ],
+  "hypothetical_factory": {
+    "facility_id": "SYNTHETIC-MICROFACTORY-01",
+    "status": "concept_only",
+    "location": "unspecified; region is an input, not a hard-coded assumption",
+    "zones": [
+      {
+        "zone_id": "Z-RECEIVING",
+        "purpose": "incoming custody, count, identity check"
+      },
+      {
+        "zone_id": "Z-QUARANTINE",
+        "purpose": "hold lots awaiting identity/grade/inspection disposition"
+      },
+      {
+        "zone_id": "Z-TEXTILE",
+        "purpose": "textile cutting and sewing"
+      },
+      {
+        "zone_id": "Z-ASSEMBLY",
+        "purpose": "manual low-energy layer/cover assembly"
+      },
+      {
+        "zone_id": "Z-INSPECTION",
+        "purpose": "dimensional and product-specific checks"
+      },
+      {
+        "zone_id": "Z-PACKOUT",
+        "purpose": "packaging and dispatch"
+      },
+      {
+        "zone_id": "Z-REPAIR-RETURNS",
+        "purpose": "return triage, repair and refurbishment"
+      },
+      {
+        "zone_id": "Z-RECOVERY",
+        "purpose": "segregated material recovery or disposal"
+      },
+      {
+        "zone_id": "Z-MAINTENANCE",
+        "purpose": "tool maintenance and calibration controls"
+      }
+    ],
+    "facility_design_inputs": {
+      "floorplan": "not supplied",
+      "site_and_geotechnical_evidence": "required_before_real_site_design",
+      "fire_egress_review": "required_by_qualified_local_professionals",
+      "electrical_profile": "to be measured or declared by design",
+      "ventilation_dust_noise_profile": "to be assessed for selected processes and materials",
+      "water_profile": "not assumed required; assess selected processes",
+      "ergonomic_review": "required before physical operation",
+      "local_code_and_permit_review": "not completed",
+      "commissioning_state": "not_started"
+    },
+    "utility_measurements": {
+      "electricity_kwh_per_shift": null,
+      "process_energy_kwh_per_accepted_unit": null,
+      "facility_base_load_kwh_per_shift": null,
+      "water_liters_per_shift": null,
+      "wastewater_liters_per_shift": null,
+      "status": "not_measured"
+    }
+  },
+  "synthetic_suppliers": [
+    {
+      "supplier_id": "SYN-SUP-FABRIC-01",
+      "region": "synthetic-region-A",
+      "offer_status": "synthetic_only",
+      "capability_status": "unqualified",
+      "commercial_offer_status": "not_a_real_offer"
+    },
+    {
+      "supplier_id": "SYN-SUP-LAYER-01",
+      "region": "synthetic-region-B",
+      "offer_status": "synthetic_only",
+      "capability_status": "unqualified",
+      "commercial_offer_status": "not_a_real_offer"
+    },
+    {
+      "supplier_id": "SYN-SUP-TRIM-01",
+      "region": "synthetic-region-A",
+      "offer_status": "synthetic_only",
+      "capability_status": "unqualified",
+      "commercial_offer_status": "not_a_real_offer"
+    }
+  ],
+  "synthetic_material_lots": [
+    {
+      "lot_id": "SYN-LOT-FABRIC-001",
+      "supplier_id": "SYN-SUP-FABRIC-01",
+      "material_subject": "SYN-FABRIC-GRADE-A",
+      "grade_evidence": "synthetic_fixture_only",
+      "received_quantity": {
+        "value": 12,
+        "unit": "piece_equivalent"
+      },
+      "inspection_disposition": "synthetic_accept_for_graph_test_only"
+    },
+    {
+      "lot_id": "SYN-LOT-LAYER-001",
+      "supplier_id": "SYN-SUP-LAYER-01",
+      "material_subject": "SYN-LAYER-GRADE-A",
+      "grade_evidence": "synthetic_fixture_only",
+      "received_quantity": {
+        "value": 12,
+        "unit": "piece_equivalent"
+      },
+      "inspection_disposition": "synthetic_accept_for_graph_test_only"
+    },
+    {
+      "lot_id": "SYN-LOT-TRIM-001",
+      "supplier_id": "SYN-SUP-TRIM-01",
+      "material_subject": "SYN-TRIM-GRADE-A",
+      "grade_evidence": "synthetic_fixture_only",
+      "received_quantity": {
+        "value": 12,
+        "unit": "piece_equivalent"
+      },
+      "inspection_disposition": "synthetic_accept_for_graph_test_only"
+    },
+    {
+      "lot_id": "SYN-LOT-UNRELATED-099",
+      "supplier_id": "SYN-SUP-FABRIC-01",
+      "material_subject": "SYN-FABRIC-CONTROL-GRADE",
+      "grade_evidence": "synthetic_fixture_only",
+      "received_quantity": {
+        "value": 1,
+        "unit": "piece_equivalent"
+      },
+      "inspection_disposition": "synthetic_control_only",
+      "traceability_role": "unrelated_control"
+    }
+  ],
+  "synthetic_resources": [
+    {
+      "resource_id": "SYN-CUT-01",
+      "resource_class": "textile_cutter",
+      "capability_profile": "SYN-CUT-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "qualified_skills": [
+        "textile_cutting"
+      ]
+    },
+    {
+      "resource_id": "SYN-SEW-01",
+      "resource_class": "sewing_station",
+      "capability_profile": "SYN-SEW-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "qualified_skills": [
+        "sewing"
+      ]
+    },
+    {
+      "resource_id": "SYN-ASSEMBLY-01",
+      "resource_class": "manual_assembly_bench",
+      "capability_profile": "SYN-ASSEMBLY-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "qualified_skills": [
+        "assembly"
+      ]
+    },
+    {
+      "resource_id": "SYN-INSPECT-01",
+      "resource_class": "inspection_station",
+      "capability_profile": "SYN-INSPECT-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "qualified_skills": [
+        "inspection",
+        "measurement"
+      ]
+    },
+    {
+      "resource_id": "SYN-PACK-01",
+      "resource_class": "packaging_station",
+      "capability_profile": "SYN-PACK-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "qualified_skills": [
+        "packaging"
+      ]
+    },
+    {
+      "resource_id": "SYN-RECEIVE-01",
+      "resource_class": "receiving_and_identity_check_station",
+      "capability_profile": "SYN-RECEIVE-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "qualified_skills": [
+        "receiving"
+      ]
+    }
+  ],
+  "synthetic_process_graph": [
+    {
+      "operation_id": "OP-10-RECEIVE",
+      "process": "receiving_and_identity_check",
+      "predecessors": [],
+      "input_lots": [
+        "SYN-LOT-FABRIC-001",
+        "SYN-LOT-LAYER-001",
+        "SYN-LOT-TRIM-001"
+      ],
+      "required_skills": [
+        "receiving"
+      ],
+      "required_resource": "SYN-RECEIVE-01",
+      "duration_seconds": 300,
+      "output_state": "received_lots_pending_disposition"
+    },
+    {
+      "operation_id": "OP-20-INCOMING-QA",
+      "process": "incoming_inspection_and_quarantine_disposition",
+      "predecessors": [
+        "OP-10-RECEIVE"
+      ],
+      "input_lots": [
+        "SYN-LOT-FABRIC-001",
+        "SYN-LOT-LAYER-001",
+        "SYN-LOT-TRIM-001"
+      ],
+      "required_skills": [
+        "inspection",
+        "measurement"
+      ],
+      "required_resource": "SYN-INSPECT-01",
+      "duration_seconds": 600,
+      "output_state": "synthetic_fixture_lots_only"
+    },
+    {
+      "operation_id": "OP-30-CUT",
+      "process": "textile_cutting",
+      "predecessors": [
+        "OP-20-INCOMING-QA"
+      ],
+      "input_lots": [
+        "SYN-LOT-FABRIC-001"
+      ],
+      "required_skills": [
+        "textile_cutting"
+      ],
+      "required_resource": "SYN-CUT-01",
+      "duration_seconds": 900,
+      "output_state": "cut_cover_panels_synthetic"
+    },
+    {
+      "operation_id": "OP-40-SEW",
+      "process": "cover_sewing",
+      "predecessors": [
+        "OP-30-CUT"
+      ],
+      "input_lots": [
+        "SYN-LOT-FABRIC-001",
+        "SYN-LOT-TRIM-001"
+      ],
+      "required_skills": [
+        "sewing"
+      ],
+      "required_resource": "SYN-SEW-01",
+      "duration_seconds": 1800,
+      "output_state": "sewn_cover_synthetic"
+    },
+    {
+      "operation_id": "OP-50-ASSEMBLE",
+      "process": "manual_layer_and_cover_assembly",
+      "predecessors": [
+        "OP-20-INCOMING-QA",
+        "OP-40-SEW"
+      ],
+      "input_lots": [
+        "SYN-LOT-LAYER-001"
+      ],
+      "required_skills": [
+        "assembly"
+      ],
+      "required_resource": "SYN-ASSEMBLY-01",
+      "duration_seconds": 900,
+      "output_state": "assembled_candidate_synthetic"
+    },
+    {
+      "operation_id": "OP-60-FINAL-QA",
+      "process": "final_inspection",
+      "predecessors": [
+        "OP-50-ASSEMBLE"
+      ],
+      "input_lots": [],
+      "required_skills": [
+        "inspection",
+        "measurement"
+      ],
+      "required_resource": "SYN-INSPECT-01",
+      "duration_seconds": 600,
+      "required_hold_point": true,
+      "output_state": "synthetic_acceptance_candidate"
+    },
+    {
+      "operation_id": "OP-70-PACK",
+      "process": "packaging_and_dispatch_record",
+      "predecessors": [
+        "OP-60-FINAL-QA"
+      ],
+      "input_lots": [],
+      "required_skills": [
+        "packaging"
+      ],
+      "required_resource": "SYN-PACK-01",
+      "duration_seconds": 300,
+      "output_state": "synthetic_packed_unit"
+    }
+  ],
+  "lifecycle_edges": [
+    {
+      "edge_id": "LIFE-01",
+      "from": "accepted_article",
+      "to": "use_and_care",
+      "evidence_required": [
+        "article_identity",
+        "care_instructions"
+      ]
+    },
+    {
+      "edge_id": "LIFE-02",
+      "from": "use_and_care",
+      "to": "repair_or_return",
+      "evidence_required": [
+        "condition_observation",
+        "repair_request_or_return_event"
+      ]
+    },
+    {
+      "edge_id": "LIFE-03",
+      "from": "repair_or_return",
+      "to": "repaired_refurbished_reused_or_rejected",
+      "evidence_required": [
+        "triage",
+        "parts_and_skill_availability",
+        "post_repair_inspection"
+      ]
+    },
+    {
+      "edge_id": "LIFE-04",
+      "from": "end_of_service",
+      "to": "recovery_or_disposal",
+      "evidence_required": [
+        "material_composition",
+        "actual_route_acceptance",
+        "quantity_and_disposition"
+      ]
+    }
+  ],
+  "proposed_targets": [
+    {
+      "id": "COST-01",
+      "metric": "delivered_cost_ratio_to_named_reference",
+      "target_operator": "<=",
+      "target_value": 0.8,
+      "unit": "ratio",
+      "status": "proposed_not_measured",
+      "fail_closed": "Reference or any material cost component missing => not_evaluable."
+    },
+    {
+      "id": "FLOW-01",
+      "metric": "lead_time_or_wip_reduction_after_baseline",
+      "target_range_percent": [
+        15,
+        20
+      ],
+      "status": "proposed_not_measured",
+      "fail_closed": "No valid baseline or mismatched service/quality => not_evaluable."
+    },
+    {
+      "id": "ENERGY-01",
+      "metric": "energy_per_accepted_unit_reduction_after_baseline",
+      "target_value_percent": 15,
+      "status": "exploration_target_not_requirement",
+      "fail_closed": "No energy measurement/model provenance or accepted-unit denominator => not_evaluable."
+    },
+    {
+      "id": "TRACE-01",
+      "metric": "selected_critical_input_lot_genealogy_completeness",
+      "target_percent": 100,
+      "status": "bounded_pilot_gate",
+      "fail_closed": "Any missing critical lot-to-article/scrap link blocks the traceability gate."
+    },
+    {
+      "id": "CONTAIN-01",
+      "metric": "seeded_lot_containment_query_latency",
+      "target_seconds": 5,
+      "synthetic_edge_count": 10000,
+      "status": "benchmark_target_not_measured",
+      "fail_closed": "Must also exactly return all and only descendants; speed alone is not a pass."
+    },
+    {
+      "id": "REPAIR-01",
+      "metric": "common_component_replacement_time",
+      "target_seconds": 600,
+      "status": "inherited_proposed_target_from_sleep-product-001",
+      "fail_closed": "No parts/tools/skill availability or verified post-repair inspection => no repair qualification."
+    }
+  ],
+  "metric_definitions": [
+    {
+      "id": "DELIVERED_COST_PER_ACCEPTED_UNIT",
+      "formula": "total attributed material + yield loss + labor + tooling/capacity + QA + maintenance + facility/utilities + packaging + freight + return/warranty cost / accepted units",
+      "unit": "currency per accepted unit",
+      "notes": "Declare allocation method, currency/date and exclusions; no inferred lifetime savings."
+    },
+    {
+      "id": "ENERGY_PER_ACCEPTED_UNIT",
+      "formula": "measured or modeled energy inside declared boundary / accepted functional units within same boundary",
+      "unit": "kWh per accepted unit",
+      "notes": "Distinguish process energy and facility base load; rejected units do not enter denominator."
+    },
+    {
+      "id": "FIRST_PASS_YIELD",
+      "formula": "units accepted at first pass / units entering final acceptance",
+      "unit": "ratio",
+      "notes": "Define the cohort and rework treatment; do not omit scrapped units."
+    },
+    {
+      "id": "LOT_GENEALOGY_COMPLETENESS",
+      "formula": "selected critical received lots linked to all descendant accepted units and recorded scrap/rework / all selected critical received lots",
+      "unit": "ratio",
+      "notes": "Report missing/ambiguous links separately; completeness alone does not prove material grade."
+    },
+    {
+      "id": "RECOVERY_RATE",
+      "formula": "mass verified as actually accepted by a named recovery route / mass eligible for end-of-life disposition in the declared cohort",
+      "unit": "ratio",
+      "notes": "Separate repair, reuse, refurbishment, material recycling and disposal."
+    },
+    {
+      "id": "ON_TIME_IN_FULL",
+      "formula": "orders delivered by the declared due date with full accepted quantity / orders due",
+      "unit": "ratio",
+      "notes": "State cancellations, partials, and due-date changes."
+    }
+  ],
+  "disruptions": [
+    {
+      "id": "SC-01-SUPPLIER-REJECTION",
+      "event": "critical material lot fails incoming inspection",
+      "required_outputs": [
+        "affected_orders",
+        "alternate_supply_qualification_state",
+        "schedule_and_cost_impact",
+        "containment_lineage"
+      ]
+    },
+    {
+      "id": "SC-02-GRADE-SUBSTITUTION",
+      "event": "alternate supplier advertises same label but a different unqualified grade",
+      "required_outputs": [
+        "blocked_or_requalified_disposition",
+        "design_process_impact",
+        "approval_evidence"
+      ]
+    },
+    {
+      "id": "SC-03-TRANSPORT-DELAY",
+      "event": "inbound lot arrives after production start",
+      "required_outputs": [
+        "material_availability_conflict",
+        "schedule_replan",
+        "service_impact"
+      ]
+    },
+    {
+      "id": "SC-04-EQUIPMENT-OUTAGE",
+      "event": "required cutting or sewing resource unavailable mid-plan",
+      "required_outputs": [
+        "infeasibility_or_alternate_capability_check",
+        "backlog",
+        "recovery_time"
+      ]
+    },
+    {
+      "id": "SC-05-POWER-COMMON-MODE",
+      "event": "power interruption affects production and final inspection",
+      "required_outputs": [
+        "shared_dependency",
+        "blocked_inspection_state",
+        "recovery_and_requalification_needs"
+      ]
+    },
+    {
+      "id": "SC-06-SKILL-ABSENCE",
+      "event": "only qualified operator for a required operation is unavailable",
+      "required_outputs": [
+        "skill_constraint_failure",
+        "training_or_alternate_staff_requirements"
+      ]
+    },
+    {
+      "id": "SC-07-DEMAND-MIX-CHANGE",
+      "event": "order mix changes between topper sizes/configurations",
+      "required_outputs": [
+        "setup_and_material_impact",
+        "schedule",
+        "lead_time_and_wip_change"
+      ]
+    },
+    {
+      "id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "event": "returned product needs a spare that is out of stock",
+      "required_outputs": [
+        "repair_not_completed",
+        "service_delay",
+        "replacement_or_recovery_options"
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "case_id": "NC-01-GRADE-UNKNOWN",
+      "scenario": "Lot identity exists but exact material grade/source document is missing.",
+      "expected_disposition": "not_evaluable_for_material_specific_claim",
+      "invariant": "Lot identity does not establish grade."
+    },
+    {
+      "case_id": "NC-02-SAME-LABEL-DIFFERENT-GRADE",
+      "scenario": "Alternate supplier has same marketing label but a different unqualified grade.",
+      "expected_disposition": "blocked_pending_requalification",
+      "invariant": "Supplier substitution cannot inherit qualification by label."
+    },
+    {
+      "case_id": "NC-03-UNOBSERVED-TRANSFORMATION",
+      "scenario": "Operation is marked completed but the required postcondition measurement is absent.",
+      "expected_disposition": "not_qualified",
+      "invariant": "A production event does not prove the intended state transformation."
+    },
+    {
+      "case_id": "NC-04-LOT-DESCENDANT-CONTAINMENT",
+      "scenario": "Rejected lot reaches two finished units and one rework branch.",
+      "expected_disposition": "exact_affected_descendant_set_required",
+      "invariant": "Containment returns all and only descendant articles and WIP."
+    },
+    {
+      "case_id": "NC-05-STALE-RESOURCE",
+      "scenario": "Resource capability or calibration has expired.",
+      "expected_disposition": "infeasible_or_indeterminate",
+      "invariant": "Stale capability cannot be treated as current qualification."
+    },
+    {
+      "case_id": "NC-06-MISSING-SKILL-OR-HOLD",
+      "scenario": "Routing lacks a required qualified skill or inspection hold point.",
+      "expected_disposition": "schedule_infeasible",
+      "invariant": "All required operations, capabilities and gates must be scheduled."
+    },
+    {
+      "case_id": "NC-07-INCOMPLETE-COST",
+      "scenario": "Cost model excludes labor, yield loss, freight, maintenance or returns.",
+      "expected_disposition": "not_evaluable_for_delivered_cost",
+      "invariant": "Ex-factory material price is not delivered cost."
+    },
+    {
+      "case_id": "NC-08-WRONG-ENERGY-DENOMINATOR",
+      "scenario": "Energy per unit divides by all attempted units, including rejected output.",
+      "expected_disposition": "invalid_metric",
+      "invariant": "Accepted-functional-unit denominator must be defined and consistent."
+    },
+    {
+      "case_id": "NC-09-COMMON-MODE-UTILITY",
+      "scenario": "Power interruption disables production and inspection/calibration together.",
+      "expected_disposition": "common_mode_must_be_reported",
+      "invariant": "Independent subsystem counts must not hide shared utility dependencies."
+    },
+    {
+      "case_id": "NC-10-RECYCLED-UNKNOWN",
+      "scenario": "Input described as recycled but provenance, grade or contamination state is unknown.",
+      "expected_disposition": "no_verified_recycled_content_or_lca_claim",
+      "invariant": "Marketing label does not establish source or environmental performance."
+    },
+    {
+      "case_id": "NC-11-NO-RECOVERY-ROUTE",
+      "scenario": "Nominally recyclable mixed construction has no local route accepting actual grade/condition.",
+      "expected_disposition": "no_demonstrated_recovery",
+      "invariant": "Potential recyclability does not mean recovery happened or can happen locally."
+    },
+    {
+      "case_id": "NC-12-FACILITY-OMISSIONS",
+      "scenario": "Layout rendering omits required ventilation, guarding, egress or professional review.",
+      "expected_disposition": "facility_approval_not_evaluable",
+      "invariant": "Visual plausibility is not safety/code/commissioning evidence."
+    },
+    {
+      "case_id": "NC-13-STALE-DESIGN-QUALIFICATION",
+      "scenario": "New design changes seam/layer/fastener or source grade while old qualification is reused.",
+      "expected_disposition": "requalification_required",
+      "invariant": "Qualification applies only to its declared exact configuration and change envelope."
+    },
+    {
+      "case_id": "NC-14-STOCK-DISCREPANCY",
+      "scenario": "Inventory event says stock exists but receiving finds none.",
+      "expected_disposition": "hold_and_preserve_discrepancy",
+      "invariant": "Stale stock cannot silently satisfy material availability."
+    },
+    {
+      "case_id": "NC-15-CONFIDENTIAL-SUPPLIER",
+      "scenario": "Supplier withholds commercial detail needed by a cost claim but shares allowed provenance.",
+      "expected_disposition": "share_only_authorized_facts_and_mark_cost_unknown",
+      "invariant": "Privacy may limit disclosure, not justify inventing missing evidence."
+    },
+    {
+      "case_id": "NC-16-REPAIRABLE-NO-SPARE",
+      "scenario": "Returned product is labeled repairable but no spare, skill or capacity is available.",
+      "expected_disposition": "repair_not_completed",
+      "invariant": "Design repairability is not a completed repair event."
+    },
+    {
+      "case_id": "NC-17-EVENT-PHYSICAL-CONFLICT",
+      "scenario": "Signed delivery/inventory event conflicts with physical receipt measurement.",
+      "expected_disposition": "unresolved_discrepancy",
+      "invariant": "Preserve source events and avoid automatically preferring a signature over measurement."
+    },
+    {
+      "case_id": "NC-18-SYNTHETIC-AS-MEASURED",
+      "scenario": "Synthetic values are presented as real production or physical measurements.",
+      "expected_disposition": "evidence_integrity_failure",
+      "invariant": "Synthetic, modeled, measured, human-evaluated and replicated statuses remain distinct."
+    },
+    {
+      "case_id": "NC-19-COST-CATEGORY-MISSING",
+      "scenario": "A synthetic cost scenario omits a mandatory cost category.",
+      "expected_disposition": "not_evaluable_for_delivered_cost",
+      "invariant": "A scenario cannot pass on a partial cost stack."
+    },
+    {
+      "case_id": "NC-20-COST-ZERO-OUTPUT",
+      "scenario": "A scenario reports zero accepted units.",
+      "expected_disposition": "invalid_cost_denominator",
+      "invariant": "Cost per accepted unit is undefined without a positive accepted-unit count."
+    },
+    {
+      "case_id": "NC-21-COST-CURRENCY-MISMATCH",
+      "scenario": "Candidate and reference costs use different unconverted currencies.",
+      "expected_disposition": "comparison_not_evaluable",
+      "invariant": "A ratio requires the same currency and declared time/price basis."
+    },
+    {
+      "case_id": "NC-22-MASS-BALANCE-UNACCOUNTED",
+      "scenario": "A mass-balance case omits 2 percent of input mass but claims zero unaccounted mass.",
+      "expected_disposition": "mass_balance_invalid",
+      "invariant": "Input mass must reconcile to accepted output, scrap, WIP, residue and explicitly reported unaccounted mass within a declared tolerance."
+    }
+  ],
+  "verification_status": {
+    "schema_parse": "json_parse_checked; Rust test suite not run",
+    "process_plan_execution": "not_run",
+    "independent_qualifier": "implemented_not_executed",
+    "physical_measurements": "none",
+    "facility_commissioning": "not_started",
+    "human_evaluation": "none",
+    "independent_replication": "none"
+  },
+  "traceability_nodes": [
+    {
+      "node_id": "SYN-LOT-FABRIC-001",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "SYN-LOT-LAYER-001",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "SYN-LOT-TRIM-001",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "SYN-LOT-UNRELATED-099",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "OP-10-RECEIVE",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-20-INCOMING-QA",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-30-CUT",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-40-SEW",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-50-ASSEMBLE",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-60-FINAL-QA",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-70-PACK",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-SEWN-COVER-A",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-SEWN-COVER-B",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-ASSEMBLED-TOPPER-A",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-ASSEMBLED-TOPPER-B",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-ARTICLE-ACCEPTED-A",
+      "node_kind": "accepted_article"
+    },
+    {
+      "node_id": "SYN-ARTICLE-ACCEPTED-B",
+      "node_kind": "accepted_article"
+    },
+    {
+      "node_id": "SYN-UNIT-PACKED-A",
+      "node_kind": "packaged_unit"
+    },
+    {
+      "node_id": "SYN-UNIT-PACKED-B",
+      "node_kind": "packaged_unit"
+    },
+    {
+      "node_id": "SYN-UNRELATED-ASSEMBLY-CONTROL",
+      "node_kind": "control_operation"
+    },
+    {
+      "node_id": "SYN-UNRELATED-ARTICLE-CONTROL",
+      "node_kind": "control_article"
+    },
+    {
+      "node_id": "SYN-UNRELATED-PACKED-CONTROL",
+      "node_kind": "control_packaged_unit"
+    }
+  ],
+  "traceability_edges": [
+    {
+      "edge_id": "TR-001",
+      "from_id": "SYN-LOT-FABRIC-001",
+      "to_id": "OP-10-RECEIVE",
+      "relation": "received_by"
+    },
+    {
+      "edge_id": "TR-002",
+      "from_id": "SYN-LOT-LAYER-001",
+      "to_id": "OP-10-RECEIVE",
+      "relation": "received_by"
+    },
+    {
+      "edge_id": "TR-003",
+      "from_id": "SYN-LOT-TRIM-001",
+      "to_id": "OP-10-RECEIVE",
+      "relation": "received_by"
+    },
+    {
+      "edge_id": "TR-004",
+      "from_id": "OP-10-RECEIVE",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "precedes_in_process"
+    },
+    {
+      "edge_id": "TR-005",
+      "from_id": "SYN-LOT-FABRIC-001",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "inspected_by"
+    },
+    {
+      "edge_id": "TR-006",
+      "from_id": "SYN-LOT-LAYER-001",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "inspected_by"
+    },
+    {
+      "edge_id": "TR-007",
+      "from_id": "SYN-LOT-TRIM-001",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "inspected_by"
+    },
+    {
+      "edge_id": "TR-008",
+      "from_id": "SYN-LOT-FABRIC-001",
+      "to_id": "OP-30-CUT",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-009",
+      "from_id": "OP-30-CUT",
+      "to_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-010",
+      "from_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "to_id": "OP-40-SEW",
+      "relation": "input_to"
+    },
+    {
+      "edge_id": "TR-011",
+      "from_id": "SYN-LOT-TRIM-001",
+      "to_id": "OP-40-SEW",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-012",
+      "from_id": "OP-40-SEW",
+      "to_id": "SYN-WIP-SEWN-COVER-A",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-013",
+      "from_id": "OP-40-SEW",
+      "to_id": "SYN-WIP-SEWN-COVER-B",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-014",
+      "from_id": "SYN-WIP-SEWN-COVER-A",
+      "to_id": "OP-50-ASSEMBLE",
+      "relation": "input_to"
+    },
+    {
+      "edge_id": "TR-015",
+      "from_id": "SYN-WIP-SEWN-COVER-B",
+      "to_id": "OP-50-ASSEMBLE",
+      "relation": "input_to"
+    },
+    {
+      "edge_id": "TR-016",
+      "from_id": "SYN-LOT-LAYER-001",
+      "to_id": "OP-50-ASSEMBLE",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-017",
+      "from_id": "OP-50-ASSEMBLE",
+      "to_id": "SYN-WIP-ASSEMBLED-TOPPER-A",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-018",
+      "from_id": "OP-50-ASSEMBLE",
+      "to_id": "SYN-WIP-ASSEMBLED-TOPPER-B",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-019",
+      "from_id": "SYN-WIP-ASSEMBLED-TOPPER-A",
+      "to_id": "OP-60-FINAL-QA",
+      "relation": "inspection_subject"
+    },
+    {
+      "edge_id": "TR-020",
+      "from_id": "SYN-WIP-ASSEMBLED-TOPPER-B",
+      "to_id": "OP-60-FINAL-QA",
+      "relation": "inspection_subject"
+    },
+    {
+      "edge_id": "TR-021",
+      "from_id": "OP-60-FINAL-QA",
+      "to_id": "SYN-ARTICLE-ACCEPTED-A",
+      "relation": "accepted_as"
+    },
+    {
+      "edge_id": "TR-022",
+      "from_id": "OP-60-FINAL-QA",
+      "to_id": "SYN-ARTICLE-ACCEPTED-B",
+      "relation": "accepted_as"
+    },
+    {
+      "edge_id": "TR-023",
+      "from_id": "SYN-ARTICLE-ACCEPTED-A",
+      "to_id": "OP-70-PACK",
+      "relation": "packaging_input"
+    },
+    {
+      "edge_id": "TR-024",
+      "from_id": "SYN-ARTICLE-ACCEPTED-B",
+      "to_id": "OP-70-PACK",
+      "relation": "packaging_input"
+    },
+    {
+      "edge_id": "TR-025",
+      "from_id": "OP-70-PACK",
+      "to_id": "SYN-UNIT-PACKED-A",
+      "relation": "packages"
+    },
+    {
+      "edge_id": "TR-026",
+      "from_id": "OP-70-PACK",
+      "to_id": "SYN-UNIT-PACKED-B",
+      "relation": "packages"
+    },
+    {
+      "edge_id": "TR-027",
+      "from_id": "SYN-LOT-UNRELATED-099",
+      "to_id": "SYN-UNRELATED-ASSEMBLY-CONTROL",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-028",
+      "from_id": "SYN-UNRELATED-ASSEMBLY-CONTROL",
+      "to_id": "SYN-UNRELATED-ARTICLE-CONTROL",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-029",
+      "from_id": "SYN-UNRELATED-ARTICLE-CONTROL",
+      "to_id": "SYN-UNRELATED-PACKED-CONTROL",
+      "relation": "packages"
+    }
+  ],
+  "expected_containment_queries": [
+    {
+      "source_lot_id": "SYN-LOT-FABRIC-001",
+      "expected_descendants": [
+        "OP-10-RECEIVE",
+        "OP-20-INCOMING-QA",
+        "OP-30-CUT",
+        "OP-40-SEW",
+        "OP-50-ASSEMBLE",
+        "OP-60-FINAL-QA",
+        "OP-70-PACK",
+        "SYN-ARTICLE-ACCEPTED-A",
+        "SYN-ARTICLE-ACCEPTED-B",
+        "SYN-UNIT-PACKED-A",
+        "SYN-UNIT-PACKED-B",
+        "SYN-WIP-ASSEMBLED-TOPPER-A",
+        "SYN-WIP-ASSEMBLED-TOPPER-B",
+        "SYN-WIP-COVER-PANELS-BATCH-001",
+        "SYN-WIP-SEWN-COVER-A",
+        "SYN-WIP-SEWN-COVER-B"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    },
+    {
+      "source_lot_id": "SYN-LOT-TRIM-001",
+      "expected_descendants": [
+        "OP-10-RECEIVE",
+        "OP-20-INCOMING-QA",
+        "OP-40-SEW",
+        "OP-50-ASSEMBLE",
+        "OP-60-FINAL-QA",
+        "OP-70-PACK",
+        "SYN-ARTICLE-ACCEPTED-A",
+        "SYN-ARTICLE-ACCEPTED-B",
+        "SYN-UNIT-PACKED-A",
+        "SYN-UNIT-PACKED-B",
+        "SYN-WIP-ASSEMBLED-TOPPER-A",
+        "SYN-WIP-ASSEMBLED-TOPPER-B",
+        "SYN-WIP-SEWN-COVER-A",
+        "SYN-WIP-SEWN-COVER-B"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    },
+    {
+      "source_lot_id": "SYN-LOT-LAYER-001",
+      "expected_descendants": [
+        "OP-10-RECEIVE",
+        "OP-20-INCOMING-QA",
+        "OP-50-ASSEMBLE",
+        "OP-60-FINAL-QA",
+        "OP-70-PACK",
+        "SYN-ARTICLE-ACCEPTED-A",
+        "SYN-ARTICLE-ACCEPTED-B",
+        "SYN-UNIT-PACKED-A",
+        "SYN-UNIT-PACKED-B",
+        "SYN-WIP-ASSEMBLED-TOPPER-A",
+        "SYN-WIP-ASSEMBLED-TOPPER-B"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    },
+    {
+      "source_lot_id": "SYN-LOT-UNRELATED-099",
+      "expected_descendants": [
+        "SYN-UNRELATED-ARTICLE-CONTROL",
+        "SYN-UNRELATED-ASSEMBLY-CONTROL",
+        "SYN-UNRELATED-PACKED-CONTROL"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    }
+  ],
+  "synthetic_cost_scenarios": [
+    {
+      "scenario_id": "COST-REF-ARITHMETIC-01",
+      "role": "reference",
+      "currency": "SYNTHETIC_MINOR_UNIT",
+      "accepted_units": 10,
+      "cost_components": [
+        {
+          "category": "materials",
+          "amount_minor_units": 100000
+        },
+        {
+          "category": "yield_loss_scrap_rework",
+          "amount_minor_units": 20000
+        },
+        {
+          "category": "inbound_freight_duties",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "labor_training",
+          "amount_minor_units": 40000
+        },
+        {
+          "category": "consumables_tooling",
+          "amount_minor_units": 10000
+        },
+        {
+          "category": "equipment_capacity_depreciation",
+          "amount_minor_units": 18000
+        },
+        {
+          "category": "qa_metrology_calibration",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "facility_utilities",
+          "amount_minor_units": 10000
+        },
+        {
+          "category": "packaging_warehousing",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "outbound_freight_returns_warranty",
+          "amount_minor_units": 10000
+        },
+        {
+          "category": "maintenance_spares",
+          "amount_minor_units": 5000
+        },
+        {
+          "category": "reverse_logistics_end_of_life",
+          "amount_minor_units": 13000
+        }
+      ],
+      "expected_total_minor_units": 250000,
+      "status": "synthetic_known_answer_only",
+      "note": "Arbitrary arithmetic-control data; not a quote, forecast, measured production cost, or target achievement."
+    },
+    {
+      "scenario_id": "COST-CANDIDATE-ARITHMETIC-01",
+      "role": "candidate",
+      "currency": "SYNTHETIC_MINOR_UNIT",
+      "accepted_units": 10,
+      "cost_components": [
+        {
+          "category": "materials",
+          "amount_minor_units": 82000
+        },
+        {
+          "category": "yield_loss_scrap_rework",
+          "amount_minor_units": 18000
+        },
+        {
+          "category": "inbound_freight_duties",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "labor_training",
+          "amount_minor_units": 32000
+        },
+        {
+          "category": "consumables_tooling",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "equipment_capacity_depreciation",
+          "amount_minor_units": 14000
+        },
+        {
+          "category": "qa_metrology_calibration",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "facility_utilities",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "packaging_warehousing",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "outbound_freight_returns_warranty",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "maintenance_spares",
+          "amount_minor_units": 4000
+        },
+        {
+          "category": "reverse_logistics_end_of_life",
+          "amount_minor_units": 12000
+        }
+      ],
+      "expected_total_minor_units": 210000,
+      "status": "synthetic_known_answer_only",
+      "note": "Arbitrary arithmetic-control data; not a quote, forecast, measured production cost, or target achievement."
+    }
+  ],
+  "synthetic_cost_comparison": {
+    "candidate_scenario_id": "COST-CANDIDATE-ARITHMETIC-01",
+    "reference_scenario_id": "COST-REF-ARITHMETIC-01",
+    "target_ratio_basis_points": 8000,
+    "expected_ratio_basis_points_floor": 8400,
+    "expected_target_met": false,
+    "status": "synthetic_known_answer_only",
+    "note": "The arithmetic example deliberately does not meet the proposed 80% delivered-cost target. It demonstrates calculation only and establishes no real-world cost comparison."
+  },
+  "synthetic_material_balance_cases": [
+    {
+      "case_id": "MASS-BALANCE-ARITHMETIC-01",
+      "stream_id": "SYN-TEXTILE-STREAM-01",
+      "mass_unit": "mg",
+      "accounting_boundary": "one synthetic material stream across a frozen operation cohort",
+      "input_mass_mg": 10000000,
+      "accepted_output_mass_mg": 8500000,
+      "scrap_mass_mg": 700000,
+      "rework_wip_mass_mg": 500000,
+      "process_residue_mass_mg": 300000,
+      "reported_unaccounted_mass_mg": 0,
+      "tolerance_mg": 1000,
+      "expected_closure_basis_points_floor": 10000,
+      "status": "synthetic_known_answer_only",
+      "note": "Arithmetic control only. Not a measured plant mass balance or a claim about textile process yields."
+    }
+  ]
+}

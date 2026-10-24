@@ -1,0 +1,423 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "HABITAT-COUNTERFACTUAL-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "source_contract": {
+    "path": "docs/research/fixtures/habitat-vertical-v0.1.json",
+    "schema_version": "0.1.0",
+    "disruption_ids": [
+      "SC-01-SUPPLIER-REJECTION",
+      "SC-02-GRADE-SUBSTITUTION",
+      "SC-03-TRANSPORT-DELAY",
+      "SC-04-EQUIPMENT-OUTAGE",
+      "SC-05-POWER-COMMON-MODE",
+      "SC-06-SKILL-ABSENCE",
+      "SC-07-DEMAND-MIX-CHANGE",
+      "SC-08-REPAIR-SPARE-SHORTAGE"
+    ],
+    "relation": "scenario_id set must exactly match source_contract disruption_ids and the source fixture's disruptions[].id"
+  },
+  "evidence_status": "synthetic_contract_only_not_executed",
+  "claim_ceiling": "No numeric production results, supplier qualification, facility capability, safety approval, repair success, physical measurements, savings or resilience improvement are established by this campaign definition.",
+  "comparison_protocol": {
+    "status": "blocked_policy_and_adapter_not_bound",
+    "owner_refs": [
+      "Symthaea MFG-VALUE-001 #7608",
+      "Symthaea FACTORY-OPS-001 #7677",
+      "Symthaea MFG-PROC-000 #5686",
+      "Mycelix MFG-EVID-001 #3084",
+      "Mycelix MFG-PROC-001 #3085"
+    ],
+    "policy_arms": [
+      {
+        "arm_id": "baseline",
+        "policy_identity_status": "unbound",
+        "policy_revision": null
+      },
+      {
+        "arm_id": "candidate",
+        "policy_identity_status": "unbound",
+        "policy_revision": null
+      }
+    ],
+    "fairness_rules": [
+      "Freeze the same demand, BOM/product revision, material-lot evidence, resource/worker calendars, cost basis and disruption injection for both arms.",
+      "Change only the policy under comparison within a paired case; log any necessary adapters and assumptions.",
+      "Pin exact baseline/candidate policy revision, scheduler version, source manifest digest and evaluator revision before scoring.",
+      "Unknown, blocked and not-evaluable outcomes must remain distinct from feasible outcomes and from numeric zero.",
+      "Publish case-wise deltas and distributions; no aggregate can conceal an unsafe or infeasible case.",
+      "If stochastic policies are introduced, predeclare seed count and use paired common seeds; do not infer a zero-width uncertainty interval from one run."
+    ],
+    "scheduler_adapter_status": "not_implemented_for_this_fixture",
+    "quantitative_comparison_status": "not_run"
+  },
+  "scorecard": {
+    "metrics": [
+      {
+        "id": "accepted_units_by_horizon",
+        "unit": "accepted units",
+        "direction": "higher_is_better"
+      },
+      {
+        "id": "lost_accepted_unit_hours",
+        "unit": "accepted-unit hours",
+        "direction": "lower_is_better"
+      },
+      {
+        "id": "end_to_end_lead_time",
+        "unit": "minutes",
+        "direction": "lower_is_better"
+      },
+      {
+        "id": "backlog_unit_hours",
+        "unit": "unit hours",
+        "direction": "lower_is_better"
+      },
+      {
+        "id": "cost_per_accepted_unit",
+        "unit": "source-declared currency per accepted unit",
+        "direction": "lower_is_better"
+      },
+      {
+        "id": "energy_per_accepted_unit",
+        "unit": "kWh per accepted unit",
+        "direction": "lower_is_better"
+      },
+      {
+        "id": "recovery_time",
+        "unit": "minutes from disruption to declared recovery condition",
+        "direction": "lower_is_better"
+      },
+      {
+        "id": "genealogy_correctness",
+        "unit": "exact affected and unaffected identity sets",
+        "direction": "all_and_only"
+      },
+      {
+        "id": "hard_gate_violations",
+        "unit": "count",
+        "direction": "must_equal_zero"
+      },
+      {
+        "id": "not_evaluable_fields",
+        "unit": "count with explicit reasons",
+        "direction": "report_separately"
+      }
+    ],
+    "safety_and_conformance_gate": "zero hard-gate violations; not compensable by cost, throughput or resilience gains",
+    "research_hypothesis": {
+      "primary_metric": "lost_accepted_unit_hours",
+      "target_direction": "at_least_10_percent_lower_for_candidate_than_frozen_baseline_across_runnable_cases",
+      "status": "proposed_not_tested",
+      "qualification": "Use only after baseline, scenario feasibility, functional unit, time horizon and aggregation are pre-registered. Report every case and guardrail independently. This is a project hypothesis, not an industry norm or achieved result."
+    },
+    "required_result_states": [
+      "Better",
+      "Worse",
+      "Inconclusive",
+      "NotEvaluable",
+      "Blocked"
+    ]
+  },
+  "scenarios": [
+    {
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "intervention": {
+        "kind": "reject_material_lot",
+        "target_id": "SYN-LOT-FABRIC-001",
+        "cause": "incoming_inspection_failure",
+        "magnitude_status": "qualitative_synthetic_intervention"
+      },
+      "expected_disposition": "block_rejected_lot_from_new_accepted_articles_and_report_affected_descendants",
+      "hard_invariants": [
+        "No accepted article may consume the rejected lot after the rejection event.",
+        "Containment must include all and only graph descendants of the seeded lot.",
+        "Unrelated control-lot descendants remain outside containment."
+      ],
+      "required_outputs": [
+        "affected_orders",
+        "alternate_supply_qualification_state",
+        "schedule_and_cost_impact",
+        "containment_lineage"
+      ],
+      "execution_blockers": [
+        "No executable baseline/candidate policy binding.",
+        "Supplier alternate-capacity and purchase/arrival terms are not represented as qualified live offers."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "intervention": {
+        "kind": "offer_unqualified_substitute_grade",
+        "target_product_label": "same_marketing_label",
+        "grade_state": "unqualified_different_grade",
+        "magnitude_status": "qualitative_synthetic_intervention"
+      },
+      "expected_disposition": "block_substitution_pending_grade_and_process_requalification",
+      "hard_invariants": [
+        "Marketing-label equality cannot satisfy grade or process qualification.",
+        "Affected design/BOM/process revisions remain explicitly linked to the qualification decision.",
+        "No cost or lead-time benefit is credited before qualification."
+      ],
+      "required_outputs": [
+        "blocked_or_requalified_disposition",
+        "design_process_impact",
+        "approval_evidence"
+      ],
+      "execution_blockers": [
+        "No alternate material-grade performance envelope or qualification evidence is present."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "intervention": {
+        "kind": "delay_inbound_lot",
+        "target_id": "SYN-LOT-LAYER-001",
+        "delay_minutes": 480,
+        "magnitude_status": "synthetic_parameter_not_observed"
+      },
+      "expected_disposition": "surface_material_availability_conflict_then_replan_or_report_infeasible",
+      "hard_invariants": [
+        "An unarrived lot cannot satisfy material availability.",
+        "A revised plan must preserve predecessors, capabilities, inspection holds and all hard constraints.",
+        "Unknown arrival time must remain unknown rather than be treated as zero delay."
+      ],
+      "required_outputs": [
+        "material_availability_conflict",
+        "schedule_replan",
+        "service_impact"
+      ],
+      "execution_blockers": [
+        "The benchmark schema has no executed scheduler adapter or clock/calendar binding."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "intervention": {
+        "kind": "unavailable_resource",
+        "target_id": "SYN-SEW-01",
+        "duration_minutes": 240,
+        "magnitude_status": "synthetic_parameter_not_observed"
+      },
+      "expected_disposition": "replan_only_to_a_qualified_available_resource_otherwise_report_infeasible",
+      "hard_invariants": [
+        "No overlapping use of the unavailable resource is scheduled during the outage.",
+        "A substitute must satisfy the required capability and qualification envelope.",
+        "Recovery time starts from the declared outage event and ends at the declared restored service condition."
+      ],
+      "required_outputs": [
+        "infeasibility_or_alternate_capability_check",
+        "backlog",
+        "recovery_time"
+      ],
+      "execution_blockers": [
+        "A second qualified sewing resource and maintenance/restart semantics are not represented."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "intervention": {
+        "kind": "shared_utility_outage",
+        "affected_resource_ids": [
+          "SYN-CUT-01",
+          "SYN-SEW-01",
+          "SYN-INSPECT-01"
+        ],
+        "duration_minutes": 60,
+        "magnitude_status": "synthetic_parameter_not_observed"
+      },
+      "expected_disposition": "block_production_and_acceptance_until_utility_restoration_and_required_checks",
+      "hard_invariants": [
+        "Production availability and inspection/calibration availability share the declared utility dependency.",
+        "No article is accepted while a required inspection or measurement step is unavailable.",
+        "Restoration cannot silently clear stale calibration or other required requalification states."
+      ],
+      "required_outputs": [
+        "shared_dependency",
+        "blocked_inspection_state",
+        "recovery_and_requalification_needs"
+      ],
+      "execution_blockers": [
+        "Facility utility dependency graph, calibration expiry and recovery checks are not executable in this consumer."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "intervention": {
+        "kind": "remove_qualified_skill_availability",
+        "skill_id": "sewing",
+        "duration_minutes": 480,
+        "magnitude_status": "synthetic_parameter_not_observed"
+      },
+      "expected_disposition": "block_operations_requiring_unavailable_qualified_skill",
+      "hard_invariants": [
+        "A resource capability does not imply an available qualified worker.",
+        "Training or reassignment is not instantaneous and cannot bypass qualification.",
+        "No operation is scheduled without both resource capability and worker-skill coverage."
+      ],
+      "required_outputs": [
+        "skill_constraint_failure",
+        "training_or_alternate_staff_requirements"
+      ],
+      "execution_blockers": [
+        "Worker roster, shift calendar, qualification currency and training duration are not represented as runnable inputs."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "intervention": {
+        "kind": "change_variant_mix",
+        "changed_dimension": "topper_configuration_or_size_mix",
+        "magnitude_status": "qualitative_synthetic_intervention"
+      },
+      "expected_disposition": "not_evaluable_until_variant_bom_and_changeover_models_are_bound",
+      "hard_invariants": [
+        "Demand variants cannot use absent or incompatible BOM/process routes.",
+        "Setup and material impacts are reported only when sourced from a declared model.",
+        "No lead-time or WIP improvement is claimed from a single-variant process graph."
+      ],
+      "required_outputs": [
+        "setup_and_material_impact",
+        "schedule",
+        "lead_time_and_wip_change"
+      ],
+      "execution_blockers": [
+        "Current reference fixture is a single process-route slice without explicit variant BOMs, setup matrices or product-mix demand."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    },
+    {
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "intervention": {
+        "kind": "remove_required_repair_spare",
+        "spare_state": "out_of_stock",
+        "magnitude_status": "qualitative_synthetic_intervention"
+      },
+      "expected_disposition": "repair_not_completed_until_spare_skill_capacity_and_acceptance_checks_are_available",
+      "hard_invariants": [
+        "A repairable design is not a completed repair.",
+        "No spare, repair capacity or required skill may be assumed from an absent inventory record.",
+        "Replacement, continued service and end-of-life alternatives remain separate dispositions."
+      ],
+      "required_outputs": [
+        "repair_not_completed",
+        "service_delay",
+        "replacement_or_recovery_options"
+      ],
+      "execution_blockers": [
+        "The fixture has no repair work order, spare inventory, repair-cell capacity or repair acceptance profile."
+      ],
+      "execution_state": "specified_not_simulated",
+      "numeric_results": null,
+      "report_metrics": [
+        "accepted_units_by_horizon",
+        "lost_accepted_unit_hours",
+        "end_to_end_lead_time",
+        "backlog_unit_hours",
+        "cost_per_accepted_unit",
+        "energy_per_accepted_unit",
+        "recovery_time",
+        "genealogy_correctness",
+        "hard_gate_violations",
+        "not_evaluable_fields"
+      ]
+    }
+  ]
+}

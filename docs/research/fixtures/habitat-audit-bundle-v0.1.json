@@ -1,0 +1,133 @@
+{
+  "schema_version": "0.1.0",
+  "bundle_id": "HABITAT-AUDIT-BUNDLE-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "evidence_status": "synthetic_audit_manifest",
+  "claim_ceiling": "SHA-256 fingerprints bind this bundle to exact UTF-8 fixture bytes but do not authenticate authors, instrument readings, supplier records, physical events, or attestations. The bundle contains only synthetic fixtures and does not establish factory readiness, product conformity, safety, commercial savings, or environmental performance.",
+  "fingerprint_policy": {
+    "algorithm": "SHA-256",
+    "input_encoding": "UTF-8 exact file bytes",
+    "canonicalization": "none; fingerprints cover exact bytes including JSON whitespace and final newline",
+    "interpretation": "fingerprint match demonstrates byte identity only; it is not a signature, source authentication, trusted timestamp, or proof that source data is true"
+  },
+  "artifacts": [
+    {
+      "artifact_id": "product_process_fixture",
+      "path": "docs/research/fixtures/habitat-vertical-v0.1.json",
+      "sha256": "37dabe5c00ad446740f2dae1d16655ba98fae661ce34becf0a96cf619ecbe370",
+      "byte_length": 39483,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_only"
+    },
+    {
+      "artifact_id": "event_replay_fixture",
+      "path": "docs/research/fixtures/habitat-event-replay-v0.1.json",
+      "sha256": "1d5ca9c7bd569644dd213c9b4620626fe9dcbd236ef54e2fcebcc855064c82db",
+      "byte_length": 19728,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_contract_only_not_executed"
+    },
+    {
+      "artifact_id": "material_ledger_fixture",
+      "path": "docs/research/fixtures/habitat-material-ledger-v0.1.json",
+      "sha256": "1a3e9644f4db4e197c03620f7bba680bce5597c4f4d029af0ae7fa621a46b987",
+      "byte_length": 14098,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_contract_only_not_executed"
+    },
+    {
+      "artifact_id": "measurement_gate_fixture",
+      "path": "docs/research/fixtures/habitat-measurement-gate-v0.1.json",
+      "sha256": "8d65dab59f89a405e4ed78f51941d59d8eabd62b8da0aaa69e78d4a6f050d7cd",
+      "byte_length": 12546,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_decision_rule_challenge_only"
+    },
+    {
+      "artifact_id": "recall_response_fixture",
+      "path": "docs/research/fixtures/habitat-recall-closure-v0.1.json",
+      "sha256": "6c9ec229b6c73856dc4334f6f26077a0918c3bb9e6f102d66cd8224613aa83b8",
+      "byte_length": 3119,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_rehearsal_contract_only_not_executed"
+    },
+    {
+      "artifact_id": "quantity_genealogy_fixture",
+      "path": "docs/research/fixtures/habitat-quantity-genealogy-v0.1.json",
+      "sha256": "f57b9fd0e00fe0633b8cece7e9ef0e84be6e6d0465bcc5c9e64f2930e2827c57",
+      "byte_length": 10935,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_quantity_genealogy_challenge_only_not_executed"
+    }
+  ],
+  "expected_results": {
+    "structural_fixture": {
+      "valid": true,
+      "evidence_status": "synthetic_only"
+    },
+    "event_replay": {
+      "unique_event_count": 22,
+      "duplicate_delivery_count": 0,
+      "evidence_status": "synthetic_contract_only_not_executed"
+    },
+    "material_ledger": {
+      "account_count": 16,
+      "transaction_count": 9,
+      "opening_mass_mg": 1000000,
+      "closing_mass_mg": 1000000,
+      "nonzero_closing_account_count": 8,
+      "evidence_status": "synthetic_contract_only_not_executed"
+    },
+    "measurement_gate": {
+      "case_count": 13,
+      "disposition_counts": {
+        "Conforming": 1,
+        "Nonconforming": 1,
+        "Indeterminate": 1,
+        "Blocked": 5,
+        "NotEvaluable": 5
+      },
+      "evidence_status": "synthetic_decision_rule_challenge_only"
+    },
+    "recall_closure": {
+      "affected_terminal_count": 2,
+      "target_count": 3,
+      "response_record_count": 3,
+      "confirmed_contained_count": 1,
+      "unresolved_affected_count": 1,
+      "false_positive_control_count": 0,
+      "closure_status": "OPEN_UNRESOLVED",
+      "evidence_status": "synthetic_rehearsal_contract_only_not_executed"
+    },
+    "quantity_genealogy": {
+      "operation_count": 8,
+      "initial_mass_mg": 2700,
+      "ending_mass_mg": 2700,
+      "terminal_count": 3,
+      "affected_terminal_count": 2,
+      "affected_terminal_ids": [
+        "PACKED-ARTICLE-A",
+        "PACKED-ARTICLE-B"
+      ],
+      "evidence_status": "synthetic_quantity_genealogy_challenge_only_not_executed"
+    }
+  },
+  "required_cross_layer_invariants": [
+    "Each artifact ID and path appears exactly once and is pinned to its byte length and SHA-256 digest.",
+    "The event log independently passes structural and causal replay against the base traceability fixture.",
+    "Every material-ledger source event and operation reference resolves against the event log and process fixture.",
+    "Every ledger transaction conserves the declared component stream and replays to the frozen account balances.",
+    "Every measurement case matches the expected interval/certificate/unit disposition.",
+    "The four component validators' summaries match this manifest's expected results.",
+    "A fingerprint match does not upgrade synthetic evidence to physically observed evidence.",
+    "The recall-response drill derives the affected terminal set from the validated event stream, reconciles one response per terminal target, and does not call an unresolved drill closed.",
+    "The quantity-genealogy fixture explicitly allocates source quantities across split, partial-consumption, merge and terminal-product steps; operation quantities and opening-source lineage totals reconcile."
+  ],
+  "known_limitations": [
+    "No digital signature, key management, source authentication, trusted timestamp or transparency log is implemented.",
+    "No physical measurements, supplier attestations, calibrated conversion from piece_equivalent to mg or actual product BOM are present.",
+    "The event log, quantity ledger and measurement records are synthetic challenge inputs, not production records.",
+    "Recall target and response records are synthetic; closure status is an oracle result and not evidence of a real recall, containment, or customer notification.",
+    "Quantity genealogy remains a synthetic same-unit stream; explicit source allocations do not authenticate actual material transfers or infer unmeasured mixing ratios."
+  ]
+}

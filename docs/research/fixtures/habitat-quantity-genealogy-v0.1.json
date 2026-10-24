@@ -1,0 +1,424 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "HABITAT-QUANTITY-GENEALOGY-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "evidence_status": "synthetic_quantity_genealogy_challenge_only_not_executed",
+  "mass_unit": "mg",
+  "source_suspect_lot_id": "LOT-SUSPECT-FIBER",
+  "claim_ceiling": "All inventory, transfers, allocations and terminal products are synthetic. Exact lineage here is not evidence of real physical genealogy, source authenticity, or recall execution. Each transfer must declare explicit source allocation; the validator never infers mixing proportions.",
+  "initial_inventory": [
+    {
+      "material_id": "LOT-SUSPECT-FIBER",
+      "material_kind": "source_lot",
+      "opening_mg": 1000,
+      "unit": "mg"
+    },
+    {
+      "material_id": "LOT-CLEAN-FIBER",
+      "material_kind": "source_lot",
+      "opening_mg": 200,
+      "unit": "mg"
+    },
+    {
+      "material_id": "LOT-CLEAN-LAYER",
+      "material_kind": "source_lot",
+      "opening_mg": 1000,
+      "unit": "mg"
+    },
+    {
+      "material_id": "LOT-CONTROL-FIBER",
+      "material_kind": "source_lot",
+      "opening_mg": 500,
+      "unit": "mg"
+    }
+  ],
+  "operations": [
+    {
+      "operation_id": "QG-01-SPLIT",
+      "operation_kind": "split",
+      "inputs": [
+        {
+          "material_id": "LOT-SUSPECT-FIBER",
+          "quantity_mg": 700,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "CUT-SEGMENT-A",
+          "quantity_mg": 400,
+          "unit": "mg",
+          "material_kind": "offcut_segment"
+        },
+        {
+          "material_id": "CUT-SEGMENT-B",
+          "quantity_mg": 250,
+          "unit": "mg",
+          "material_kind": "offcut_segment"
+        },
+        {
+          "material_id": "SCRAP-SUSPECT",
+          "quantity_mg": 50,
+          "unit": "mg",
+          "material_kind": "scrap"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "LOT-SUSPECT-FIBER",
+          "output_material_id": "CUT-SEGMENT-A",
+          "quantity_mg": 400,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 400
+            }
+          ]
+        },
+        {
+          "input_material_id": "LOT-SUSPECT-FIBER",
+          "output_material_id": "CUT-SEGMENT-B",
+          "quantity_mg": 250,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 250
+            }
+          ]
+        },
+        {
+          "input_material_id": "LOT-SUSPECT-FIBER",
+          "output_material_id": "SCRAP-SUSPECT",
+          "quantity_mg": 50,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-02-PARTIAL-MERGE",
+      "operation_kind": "merge",
+      "inputs": [
+        {
+          "material_id": "CUT-SEGMENT-A",
+          "quantity_mg": 300,
+          "unit": "mg"
+        },
+        {
+          "material_id": "LOT-CLEAN-FIBER",
+          "quantity_mg": 200,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "MIXED-COVER",
+          "quantity_mg": 500,
+          "unit": "mg",
+          "material_kind": "mixed_material"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "CUT-SEGMENT-A",
+          "output_material_id": "MIXED-COVER",
+          "quantity_mg": 300,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 300
+            }
+          ]
+        },
+        {
+          "input_material_id": "LOT-CLEAN-FIBER",
+          "output_material_id": "MIXED-COVER",
+          "quantity_mg": 200,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-CLEAN-FIBER",
+              "quantity_mg": 200
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-03-ASSEMBLE-A",
+      "operation_kind": "merge",
+      "inputs": [
+        {
+          "material_id": "MIXED-COVER",
+          "quantity_mg": 500,
+          "unit": "mg"
+        },
+        {
+          "material_id": "LOT-CLEAN-LAYER",
+          "quantity_mg": 500,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "ARTICLE-A",
+          "quantity_mg": 1000,
+          "unit": "mg",
+          "material_kind": "article"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "MIXED-COVER",
+          "output_material_id": "ARTICLE-A",
+          "quantity_mg": 500,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 300
+            },
+            {
+              "source_lot_id": "LOT-CLEAN-FIBER",
+              "quantity_mg": 200
+            }
+          ]
+        },
+        {
+          "input_material_id": "LOT-CLEAN-LAYER",
+          "output_material_id": "ARTICLE-A",
+          "quantity_mg": 500,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-CLEAN-LAYER",
+              "quantity_mg": 500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-04-PACK-A",
+      "operation_kind": "pack",
+      "inputs": [
+        {
+          "material_id": "ARTICLE-A",
+          "quantity_mg": 1000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "PACKED-ARTICLE-A",
+          "quantity_mg": 1000,
+          "unit": "mg",
+          "material_kind": "packaged_unit"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "ARTICLE-A",
+          "output_material_id": "PACKED-ARTICLE-A",
+          "quantity_mg": 1000,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 300
+            },
+            {
+              "source_lot_id": "LOT-CLEAN-FIBER",
+              "quantity_mg": 200
+            },
+            {
+              "source_lot_id": "LOT-CLEAN-LAYER",
+              "quantity_mg": 500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-05-ASSEMBLE-B",
+      "operation_kind": "merge",
+      "inputs": [
+        {
+          "material_id": "CUT-SEGMENT-B",
+          "quantity_mg": 250,
+          "unit": "mg"
+        },
+        {
+          "material_id": "LOT-CLEAN-LAYER",
+          "quantity_mg": 250,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "ARTICLE-B",
+          "quantity_mg": 500,
+          "unit": "mg",
+          "material_kind": "article"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "CUT-SEGMENT-B",
+          "output_material_id": "ARTICLE-B",
+          "quantity_mg": 250,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 250
+            }
+          ]
+        },
+        {
+          "input_material_id": "LOT-CLEAN-LAYER",
+          "output_material_id": "ARTICLE-B",
+          "quantity_mg": 250,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-CLEAN-LAYER",
+              "quantity_mg": 250
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-06-PACK-B",
+      "operation_kind": "pack",
+      "inputs": [
+        {
+          "material_id": "ARTICLE-B",
+          "quantity_mg": 500,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "PACKED-ARTICLE-B",
+          "quantity_mg": 500,
+          "unit": "mg",
+          "material_kind": "packaged_unit"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "ARTICLE-B",
+          "output_material_id": "PACKED-ARTICLE-B",
+          "quantity_mg": 500,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-SUSPECT-FIBER",
+              "quantity_mg": 250
+            },
+            {
+              "source_lot_id": "LOT-CLEAN-LAYER",
+              "quantity_mg": 250
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-07-CONTROL",
+      "operation_kind": "transform",
+      "inputs": [
+        {
+          "material_id": "LOT-CONTROL-FIBER",
+          "quantity_mg": 500,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "ARTICLE-CONTROL",
+          "quantity_mg": 500,
+          "unit": "mg",
+          "material_kind": "article"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "LOT-CONTROL-FIBER",
+          "output_material_id": "ARTICLE-CONTROL",
+          "quantity_mg": 500,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-CONTROL-FIBER",
+              "quantity_mg": 500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "operation_id": "QG-08-PACK-CONTROL",
+      "operation_kind": "pack",
+      "inputs": [
+        {
+          "material_id": "ARTICLE-CONTROL",
+          "quantity_mg": 500,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "material_id": "PACKED-UNRELATED-CONTROL",
+          "quantity_mg": 500,
+          "unit": "mg",
+          "material_kind": "packaged_unit"
+        }
+      ],
+      "allocations": [
+        {
+          "input_material_id": "ARTICLE-CONTROL",
+          "output_material_id": "PACKED-UNRELATED-CONTROL",
+          "quantity_mg": 500,
+          "lineage": [
+            {
+              "source_lot_id": "LOT-CONTROL-FIBER",
+              "quantity_mg": 500
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expected_results": {
+    "operation_count": 8,
+    "initial_mass_mg": 2700,
+    "ending_mass_mg": 2700,
+    "terminal_count": 3,
+    "affected_terminal_ids": [
+      "PACKED-ARTICLE-A",
+      "PACKED-ARTICLE-B"
+    ],
+    "remaining_balance_mg": {
+      "LOT-SUSPECT-FIBER": 300,
+      "CUT-SEGMENT-A": 100,
+      "SCRAP-SUSPECT": 50,
+      "LOT-CLEAN-LAYER": 250,
+      "PACKED-ARTICLE-A": 1000,
+      "PACKED-ARTICLE-B": 500,
+      "PACKED-UNRELATED-CONTROL": 500
+    },
+    "source_lineage_total_mg": {
+      "LOT-SUSPECT-FIBER": 1000,
+      "LOT-CLEAN-FIBER": 200,
+      "LOT-CLEAN-LAYER": 1000,
+      "LOT-CONTROL-FIBER": 500
+    }
+  },
+  "benchmark_targets": {
+    "exact_source_attribution": "100_percent_of_tracked_mass_preserved_across_every_split_merge_partial_consumption_and_terminal_unit",
+    "overdraw": "zero_inputs_consumed_beyond_available_quantity",
+    "false_positive_recall": "zero_clean_terminal_units marked affected in frozen oracle",
+    "unknown_or_missing_lineage": "fail_closed",
+    "cross_unit_conversion": "blocked unless calibrated conversion is separately qualified",
+    "performance": "10k operations and 100k allocation edges; proposed p95 under 5 seconds on pinned hardware, not measured"
+  }
+}

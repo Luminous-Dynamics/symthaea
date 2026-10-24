@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-habitat-vertical-bench"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Synthetic-only structural qualifier for the household-goods factory-to-product benchmark"
+
+[dependencies]
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+symthaea-graph-theory = { path = "../symthaea-graph-theory" }
+
+[[bin]]
+name = "validate-habitat-vertical"
+path = "src/main.rs"
