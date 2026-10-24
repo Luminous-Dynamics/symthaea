@@ -457,7 +457,7 @@ fn run(options: Options) -> Result<(), String> {
     println!("candidate,baseline,cases,independent_groups,candidate_wins,baseline_wins,ties,mean_task_success_lift_pp,ci95_low_pp,ci95_high_pp,bootstrap_resamples,bootstrap_seed,method");
     for row in contrasts {
         println!(
-            "{},{},{},{},{},{},{},{:.4},{:.4},{:.4},{},{},grouped_paired_percentile_bootstrap",
+            "{},{},{},{},{},{},{},{:.4},{:.4},{:.4},{},{},grouped_paired_percentile_bootstrap_unadjusted",
             row.candidate,
             row.baseline,
             dataset.cases.len(),
