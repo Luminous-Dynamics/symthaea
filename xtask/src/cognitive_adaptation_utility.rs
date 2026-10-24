@@ -22,9 +22,26 @@ pub struct CounterfactualUtilityInput {
     pub seed: u64,
     pub task_loss_metric_id: String,
     pub task_loss_unit: String,
+    /// Registered half-open cycle windows and recovery criterion, frozen before scoring.
+    pub evaluation_windows: EvaluationWindows,
     pub no_adapt: CounterfactualArm,
     pub detector_triggered: CounterfactualArm,
     pub oracle_timed: CounterfactualArm,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluationWindows {
+    /// Half-open stable pre-shift baseline window [start, end).
+    pub pre_shift_start_cycle: u64,
+    pub pre_shift_end_cycle: u64,
+    /// Half-open post-shift evaluation window [start, end); transition cycles may be omitted.
+    pub post_shift_start_cycle: u64,
+    pub post_shift_end_cycle: u64,
+    /// Absolute task-loss threshold fixed before evaluation, in task_loss_unit.
+    pub recovery_loss_threshold: f64,
+    /// Number of consecutive post-shift observations at/below threshold to declare recovery.
+    pub recovery_consecutive_cycles: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -58,6 +75,15 @@ pub struct ArmUtilityMetrics {
     pub cycle_count: usize,
     pub cumulative_task_loss: f64,
     pub mean_task_loss: f64,
+    pub pre_shift_mean_task_loss: f64,
+    pub post_shift_mean_task_loss: f64,
+    pub post_shift_cumulative_task_loss: f64,
+    /// Sum of max(task_loss - declared recovery threshold, 0) over post-shift cycles.
+    pub post_shift_loss_area_above_threshold: f64,
+    /// Absolute first cycle of the first recovery-length run below the registered threshold.
+    pub recovery_cycle: Option<u64>,
+    /// Recovery cycle minus post_shift_start_cycle; absent when recovery was not observed.
+    pub recovery_delay_cycles: Option<u64>,
     pub total_adaptation_cost_units: f64,
 }
 
@@ -79,8 +105,12 @@ pub struct CounterfactualUtilityScore {
     pub oracle_timed: ArmUtilityMetrics,
     /// Positive means detector-triggered adaptation lowers task loss vs no adaptation.
     pub detector_task_loss_improvement_vs_no_adapt: f64,
-    /// Positive means detector-triggered adaptation has more task loss than oracle timing.
+    /// Positive means detector-triggered adaptation has more whole-stream loss than oracle timing.
     pub detector_task_loss_regret_vs_oracle_timed: f64,
+    /// Positive means detector-triggered adaptation lowers post-shift loss vs no adaptation.
+    pub detector_post_shift_task_loss_improvement_vs_no_adapt: f64,
+    /// Positive means detector-triggered adaptation has more post-shift loss than oracle timing.
+    pub detector_post_shift_task_loss_regret_vs_oracle_timed: f64,
     /// Positive means the detector policy costs more resources than no adaptation.
     pub detector_adaptation_cost_delta_vs_no_adapt: f64,
     /// True when no adaptation is no worse on task loss and uses strictly fewer resources.
@@ -156,19 +186,26 @@ pub fn score_counterfactual_utility(
         );
     }
 
+    validate_evaluation_windows(&input.evaluation_windows, cycle_count as u64)?;
     let canonical_input_sha256 = hex_sha256(&serde_json::to_vec(&input)?);
-    let no_adapt = arm_metrics(&input.no_adapt)?;
-    let detector_triggered = arm_metrics(&input.detector_triggered)?;
-    let oracle_timed = arm_metrics(&input.oracle_timed)?;
+    let no_adapt = arm_metrics(&input.no_adapt, &input.evaluation_windows)?;
+    let detector_triggered = arm_metrics(&input.detector_triggered, &input.evaluation_windows)?;
+    let oracle_timed = arm_metrics(&input.oracle_timed, &input.evaluation_windows)?;
 
-    let improvement =
-        no_adapt.mean_task_loss - detector_triggered.mean_task_loss;
-    let regret =
-        detector_triggered.mean_task_loss - oracle_timed.mean_task_loss;
+    let improvement = no_adapt.mean_task_loss - detector_triggered.mean_task_loss;
+    let regret = detector_triggered.mean_task_loss - oracle_timed.mean_task_loss;
+    let post_shift_improvement =
+        no_adapt.post_shift_mean_task_loss - detector_triggered.post_shift_mean_task_loss;
+    let post_shift_regret =
+        detector_triggered.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
     let cost_delta =
         detector_triggered.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
     ensure!(
-        improvement.is_finite() && regret.is_finite() && cost_delta.is_finite(),
+        improvement.is_finite()
+            && regret.is_finite()
+            && post_shift_improvement.is_finite()
+            && post_shift_regret.is_finite()
+            && cost_delta.is_finite(),
         "counterfactual metric calculation overflowed"
     );
 
@@ -187,7 +224,7 @@ pub fn score_counterfactual_utility(
         };
 
     let mut result = CounterfactualUtilityScore {
-        metric_version: "counterfactual-adaptation-utility-v1".to_owned(),
+        metric_version: "counterfactual-adaptation-utility-v2".to_owned(),
         canonical_input_sha256,
         result_sha256: None,
         dataset_id: input.dataset_id,
@@ -202,6 +239,8 @@ pub fn score_counterfactual_utility(
         oracle_timed,
         detector_task_loss_improvement_vs_no_adapt: improvement,
         detector_task_loss_regret_vs_oracle_timed: regret,
+        detector_post_shift_task_loss_improvement_vs_no_adapt: post_shift_improvement,
+        detector_post_shift_task_loss_regret_vs_oracle_timed: post_shift_regret,
         detector_adaptation_cost_delta_vs_no_adapt: cost_delta,
         detector_dominated_by_no_adapt: detector_triggered.mean_task_loss
             >= no_adapt.mean_task_loss
@@ -243,7 +282,10 @@ fn validate_arm(arm: &mut CounterfactualArm, context: &str) -> anyhow::Result<()
     Ok(())
 }
 
-fn arm_metrics(arm: &CounterfactualArm) -> anyhow::Result<ArmUtilityMetrics> {
+fn arm_metrics(
+    arm: &CounterfactualArm,
+    windows: &EvaluationWindows,
+) -> anyhow::Result<ArmUtilityMetrics> {
     let cumulative_task_loss = checked_sum(
         arm.observations.iter().map(|o| o.task_loss),
         &format!("{} cumulative task loss", arm.name),
@@ -258,6 +300,38 @@ fn arm_metrics(arm: &CounterfactualArm) -> anyhow::Result<ArmUtilityMetrics> {
         "{} mean task loss is not finite",
         arm.name
     );
+
+    let pre_start = windows.pre_shift_start_cycle as usize;
+    let pre_end = windows.pre_shift_end_cycle as usize;
+    let post_start = windows.post_shift_start_cycle as usize;
+    let post_end = windows.post_shift_end_cycle as usize;
+    let pre = &arm.observations[pre_start..pre_end];
+    let post = &arm.observations[post_start..post_end];
+    let pre_shift_mean_task_loss =
+        checked_sum(pre.iter().map(|o| o.task_loss), "pre-shift task loss")? / pre.len() as f64;
+    let post_shift_cumulative_task_loss =
+        checked_sum(post.iter().map(|o| o.task_loss), "post-shift cumulative task loss")?;
+    let post_shift_mean_task_loss =
+        post_shift_cumulative_task_loss / post.len() as f64;
+    let post_shift_loss_area_above_threshold = checked_sum(
+        post.iter().map(|o| (o.task_loss - windows.recovery_loss_threshold).max(0.0)),
+        "post-shift loss area above recovery threshold",
+    )?;
+    let hold = windows.recovery_consecutive_cycles as usize;
+    let recovery_offset = post.windows(hold).position(|segment| {
+        segment.iter().all(|o| o.task_loss <= windows.recovery_loss_threshold)
+    });
+    let recovery_cycle = recovery_offset.map(|offset| post[offset].cycle_index);
+    let recovery_delay_cycles = recovery_cycle.map(|cycle| cycle - windows.post_shift_start_cycle);
+
+    ensure!(
+        pre_shift_mean_task_loss.is_finite()
+            && post_shift_cumulative_task_loss.is_finite()
+            && post_shift_mean_task_loss.is_finite()
+            && post_shift_loss_area_above_threshold.is_finite(),
+        "{} phase-specific metric calculation overflowed",
+        arm.name
+    );
     Ok(ArmUtilityMetrics {
         name: arm.name.clone(),
         version: arm.version.clone(),
@@ -267,8 +341,44 @@ fn arm_metrics(arm: &CounterfactualArm) -> anyhow::Result<ArmUtilityMetrics> {
         cycle_count: arm.observations.len(),
         cumulative_task_loss,
         mean_task_loss,
+        pre_shift_mean_task_loss,
+        post_shift_mean_task_loss,
+        post_shift_cumulative_task_loss,
+        post_shift_loss_area_above_threshold,
+        recovery_cycle,
+        recovery_delay_cycles,
         total_adaptation_cost_units,
     })
+}
+
+fn validate_evaluation_windows(windows: &EvaluationWindows, cycle_count: u64) -> anyhow::Result<()> {
+    ensure!(
+        windows.pre_shift_start_cycle < windows.pre_shift_end_cycle,
+        "pre-shift window must be non-empty"
+    );
+    ensure!(
+        windows.post_shift_start_cycle < windows.post_shift_end_cycle,
+        "post-shift window must be non-empty"
+    );
+    ensure!(
+        windows.pre_shift_end_cycle <= windows.post_shift_start_cycle,
+        "pre-shift and post-shift windows must not overlap"
+    );
+    ensure!(
+        windows.post_shift_end_cycle <= cycle_count,
+        "evaluation windows must lie within the common cycle panel"
+    );
+    ensure!(
+        windows.recovery_loss_threshold.is_finite() && windows.recovery_loss_threshold >= 0.0,
+        "recovery_loss_threshold must be finite and non-negative"
+    );
+    ensure!(
+        windows.recovery_consecutive_cycles > 0
+            && windows.recovery_consecutive_cycles
+                <= windows.post_shift_end_cycle - windows.post_shift_start_cycle,
+        "recovery_consecutive_cycles must fit within the post-shift window"
+    );
+    Ok(())
 }
 
 fn checked_sum(values: impl Iterator<Item = f64>, label: &str) -> anyhow::Result<f64> {
@@ -342,7 +452,7 @@ mod tests {
 
     fn fixture() -> CounterfactualUtilityInput {
         CounterfactualUtilityInput {
-            schema_version: 1,
+            schema_version: 2,
             dataset_id: "dataset-a".to_owned(),
             stream_id: "stream-17".to_owned(),
             scenario_id: "gradual-drift-recovery".to_owned(),
@@ -350,6 +460,14 @@ mod tests {
             seed: 17,
             task_loss_metric_id: "one-step-prediction-loss".to_owned(),
             task_loss_unit: "normalized-loss".to_owned(),
+            evaluation_windows: EvaluationWindows {
+                pre_shift_start_cycle: 0,
+                pre_shift_end_cycle: 1,
+                post_shift_start_cycle: 1,
+                post_shift_end_cycle: 4,
+                recovery_loss_threshold: 0.35,
+                recovery_consecutive_cycles: 2,
+            },
             no_adapt: arm("no-adapt", &[0.1, 0.5, 0.9, 0.7], &[0.0; 4]),
             detector_triggered: arm(
                 "detector-triggered",
@@ -372,6 +490,13 @@ mod tests {
         assert!((result.oracle_timed.mean_task_loss - 0.175).abs() < 1e-12);
         assert!((result.detector_task_loss_improvement_vs_no_adapt - 0.275).abs() < 1e-12);
         assert!((result.detector_task_loss_regret_vs_oracle_timed - 0.1).abs() < 1e-12);
+        assert!((result.detector_post_shift_task_loss_improvement_vs_no_adapt - (11.0 / 30.0)).abs() < 1e-12);
+        assert!((result.detector_post_shift_task_loss_regret_vs_oracle_timed - (2.0 / 15.0)).abs() < 1e-12);
+        assert!((result.detector_triggered.post_shift_mean_task_loss - (1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(result.no_adapt.recovery_cycle, None);
+        assert_eq!(result.detector_triggered.recovery_cycle, Some(2));
+        assert_eq!(result.detector_triggered.recovery_delay_cycles, Some(1));
+        assert_eq!(result.oracle_timed.recovery_cycle, Some(1));
         assert!((result.detector_triggered.total_adaptation_cost_units - 0.7).abs() < 1e-12);
         assert!(!result.detector_dominated_by_no_adapt);
         assert_eq!(result.result_sha256.as_ref().map(String::len), Some(64));
@@ -389,6 +514,21 @@ mod tests {
         let result = score_counterfactual_utility(input).expect("valid input");
         assert!(result.detector_dominated_by_no_adapt);
         assert_eq!(result.adaptation_cost_units_per_task_loss_unit_reduced, None);
+    }
+
+    #[test]
+    fn rejects_empty_overlapping_or_out_of-range_evaluation_windows() {
+        let mut empty = fixture();
+        empty.evaluation_windows.post_shift_start_cycle = 4;
+        assert!(score_counterfactual_utility(empty).unwrap_err().to_string().contains("post-shift window must be non-empty"));
+
+        let mut overlapping = fixture();
+        overlapping.evaluation_windows.pre_shift_end_cycle = 3;
+        assert!(score_counterfactual_utility(overlapping).unwrap_err().to_string().contains("must not overlap"));
+
+        let mut out_of_range = fixture();
+        out_of_range.evaluation_windows.post_shift_end_cycle = 5;
+        assert!(score_counterfactual_utility(out_of_range).unwrap_err().to_string().contains("within the common cycle panel"));
     }
 
     #[test]
