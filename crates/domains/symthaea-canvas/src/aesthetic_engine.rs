@@ -131,8 +131,11 @@ impl AestheticEngine {
             .saturating_add(snap.betti_2) as f32;
         let complexity = (snap.cantor_metacognitive_depth * 0.3 + betti_sum * 0.1).clamp(0.0, 1.0);
 
-        // Turbulence: PE^0.5 (emphasize small errors)
-        let turbulence = snap.prediction_error.abs().sqrt().min(1.0);
+        // Turbulence: PE^0.5 (emphasize small errors). Missing PE is
+        // not a zero-error observation and contributes no PE-derived turbulence.
+        let turbulence = snap
+            .prediction_error_sample()
+            .map_or(0.0, |prediction_error| prediction_error.abs().sqrt().min(1.0));
 
         // Energy: direct from arousal
         let energy = snap.arousal.clamp(0.0, 1.0);
@@ -257,6 +260,7 @@ mod tests {
         CognitiveSnapshot {
             consciousness_level: consciousness,
             prediction_error: 0.1,
+            prediction_error_valid: true,
             living_mind_vitality: 0.5,
             living_mind_coherence: 0.5,
             dopamine: 0.5,
