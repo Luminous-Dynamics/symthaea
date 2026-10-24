@@ -940,6 +940,8 @@ mod tests {
             duration_scale: 1.0,
             duration_scale_consistency: 1.0,
             fragment_similarity: 1.0,
+            fragment_rhythmic_shape_similarity: 0.0,
+            fragment_source_start_note: None,
             coverage: 1.0,
             overall_similarity: 1.0,
         };
