@@ -76,6 +76,5 @@
     "replicates": 1000,
     "seed": 20261024
   },
-  "runs": [],
-  "note": "Synthetic incomplete-coverage gate fixture; dataset identifiers are placeholders, this fixture is not measured benchmark evidence."
+  "runs": []
 }
