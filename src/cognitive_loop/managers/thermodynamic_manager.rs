@@ -24,6 +24,7 @@ use super::super::subsystem_trait::{
 use super::super::thermodynamic_integration::{ThermodynamicInput, ThermodynamicIntegration};
 use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
 use crate::consciousness::dissipative_consciousness::ThermodynamicRegime;
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// ThermodynamicManager: CognitiveSubsystem at interval 43.
 ///
@@ -40,6 +41,8 @@ pub struct ThermodynamicManager {
 
     /// Cached memory suppression flag from last cycle.
     last_memory_suppressed: bool,
+    /// Prevents duplicate or out-of-order PE from being charged twice.
+    prediction_error_cursor: PredictionEvidenceCursor,
 }
 
 impl Default for ThermodynamicManager {
@@ -48,6 +51,7 @@ impl Default for ThermodynamicManager {
             integration: ThermodynamicIntegration::default(),
             input: ThermodynamicInput::default(),
             last_memory_suppressed: false,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
         }
     }
 }
@@ -144,12 +148,15 @@ impl CognitiveSubsystem for ThermodynamicManager {
         self.input.coherence = snapshot.coherence;
         // Hold the last admitted PE rather than converting a missing comparison
         // into either a maximum-energy event or an invented zero observation.
-        let prediction_error_sample = snapshot.prediction_error_sample();
+        let prediction_error_sample = self
+            .prediction_error_cursor
+            .admit(snapshot.cycle_number, snapshot.prediction_error_sample());
         if let Some(prediction_error) = prediction_error_sample {
             self.input.prediction_error = prediction_error;
         }
-        // Validity is per-cycle even while the retained numeric value is held for
-        // diagnostics; downstream thermodynamic PE consumers must not replay it.
+        // Validity is per-admission even while the retained numeric value is held
+        // for diagnostics. A repeated or stale cycle is not a fresh physical-cost
+        // observation and must not be charged again.
         self.input.prediction_error_valid = prediction_error_sample.is_some();
         self.input.attention_sensitivity = snapshot.phi_attention_weight;
         self.input.metabolic_stress = snapshot.thermodynamic_load;
@@ -202,6 +209,39 @@ mod tests {
         // No modules set → near-neutral output
         assert!(output.lr_modulation >= 0.9 && output.lr_modulation <= 1.1);
         assert!(output.exploration_delta.abs() < 0.1);
+    }
+
+    #[test]
+    fn duplicate_or_out_of_order_pe_cycle_is_not_charged_again() {
+        let mut manager = ThermodynamicManager::default();
+        let mut snapshot = CycleSnapshot::default();
+        snapshot.cycle_number = 50;
+        snapshot.prediction_error = 0.4;
+        snapshot.prediction_error_valid = 1;
+
+        manager.process(&snapshot);
+        assert!(manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.4);
+
+        manager.process(&snapshot);
+        assert!(!manager.input.prediction_error_valid);
+        assert_eq!(
+            manager.input.prediction_error,
+            0.4,
+            "held numeric PE is diagnostic only when duplicate cycle is rejected"
+        );
+
+        snapshot.cycle_number = 49;
+        snapshot.prediction_error = 0.9;
+        manager.process(&snapshot);
+        assert!(!manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.4);
+
+        snapshot.cycle_number = 51;
+        snapshot.prediction_error = 0.6;
+        manager.process(&snapshot);
+        assert!(manager.input.prediction_error_valid);
+        assert_eq!(manager.input.prediction_error, 0.6);
     }
 
     #[test]
