@@ -710,6 +710,21 @@ mod tests {
     }
 
     #[test]
+    fn output_metadata_preserves_cold_start_missingness_reason() {
+        let mut svc = make_service();
+        let result = svc.cycle("cold-start evidence telemetry regression");
+
+        assert!(!result.prediction_error_valid);
+        let evidence = result
+            .metadata
+            .prediction_evidence
+            .as_ref()
+            .expect("cycle telemetry must expose evidence provenance");
+        assert_eq!(evidence.status, PredictionEvidenceStatus::NoPriorPrediction);
+        assert_eq!(evidence.observation_cycle, svc.stats.total_cycles as u64);
+    }
+
+    #[test]
     fn output_metadata_populates_representative_families() {
         let mut svc = make_service();
         let result = svc.cycle("metadata family regression");
