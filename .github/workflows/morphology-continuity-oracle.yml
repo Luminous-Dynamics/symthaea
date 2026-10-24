@@ -81,6 +81,9 @@ jobs:
       - name: Verify frozen predictive ambiguity allocation request digest
         run: echo "d08391a7e43354a80eb8ee1099b02d7bd7722b017d1da2f6e61ac73fbc0187be  tools/morphology-continuity-oracle/predictive_ambiguity_allocation_v1_6.txt" | sha256sum --check -
 
+      - name: Verify frozen predictive ambiguity monotonicity request digest
+        run: echo "798047d768d02ec83cfc9fa24229f8c96411325fe780c046fde494ff701bc232  tools/morphology-continuity-oracle/predictive_ambiguity_monotonicity_v1_7.txt" | sha256sum --check -
+
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
 
