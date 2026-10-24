@@ -231,6 +231,14 @@ jobs:
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/replay-receipt-validation.json"
 
+      - name: Reject executed replay receipts with missing outcome records
+        run: |
+          jq '.run_kind = "replay"' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-missing-outcomes.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-missing-outcomes.json" --out "$RUNNER_TEMP/replay-missing-outcomes-output.json"; then
+            echo "::error::Executed replay receipt without per-cycle task loss/cost was accepted."
+            exit 1
+          fi
+
       - name: Reject future-information leakage in replay receipts
         run: |
           jq '.arms[0].decisions[0].observed_event_ids += ["e1"]' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-future-leak.json"
