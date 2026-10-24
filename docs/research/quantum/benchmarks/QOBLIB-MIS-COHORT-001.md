@@ -108,6 +108,34 @@ QOBLIB gives Symthaea broad heterogeneous graphs and published solver records. T
 
 The public qReduMIS tree is Apache-2.0 and pinned in the companion JSON, along with blob IDs for its two result notebooks and README. It is suitable as a paper-reproduction reference, not as an automatic dependency for Symthaea's Rust production path. One reproducibility gap is recorded explicitly: the pinned result README mentions generator/generate.py, but that path is absent from the pinned tree inspected for this manifest. No generator reconstruction or paper result is claimed here.
 
+## Current state-of-the-art comparison implication (reviewed 2026-10-24)
+
+The 10 September 2026 *Physical Review Research* qReduMIS paper is an important comparator for this project: [Schuetz et al., DOI 10.1103/nh3b-1wv5](https://doi.org/10.1103/nh3b-1wv5). It uses a quantum coprocessor to identify likely frozen vertices inside a repeated exact classical-kernelization loop, rather than asking the QPU to solve the full graph directly. Its evaluation includes up to 231 qubits on Rydberg hardware and 39 random union-jack instances.
+
+Most importantly for experimental design, the paper also reports a *SaReduMIS* arm: the same broader reduction framework powered by classical simulated annealing. With 500 replicas and two annealing steps (a stated total computational budget of 1000, on par with the quantum component budget), that classical variant achieved reported success probability 1 on all 39 union-jack instances in the paper's test bed. The authors therefore explicitly call for future comparisons of qReduMIS against classical ReduMIS and acknowledge the importance of the classical reduction wrapper.
+
+This does not establish SaReduMIS beats qReduMIS in all regimes, and it is not a result on the QOBLIB graphs. It does establish a necessary standard for Symthaea: **the primary causal ablation must keep the reduction wrapper fixed and change only the information/inner-solver source**. A qReduMIS-style arm compared only with standalone QAOA, random picking, or an underpowered heuristic is insufficient.
+
+### Mandatory matched-information ablation
+
+| Arm | Same reduction rules? | Inner signal / solver | Cost that must be charged |
+|---|---|---|---|
+| A | Yes | No informer / deterministic reduction | Reduction and reconstruction compute |
+| B | Yes | Seeded random frozen-node signal | Signal generation and all reduction work |
+| C | Yes | Degree / local graph-structure signal | Feature extraction plus reduction work |
+| D | Yes | Classical simulated annealing | All replicas, annealing, CPU/GPU time and overhead |
+| E | Yes | Classical ILS / population portfolio | Full portfolio compute, worker count and synchronization |
+| F | Yes | Quantum-derived marginal/frozen-node signal | Preprocessing, compilation, queue, calibration, QPU shots/batches, failed attempts, classical post-processing and all reduction work |
+
+For every arm, freeze the original graph digest, reduction operators/order, kernel policy, candidate budget, stopping condition, solution reconstruction and independent verifier. Pair by graph and predeclared replicate; count repeated trials within graph as clustered repeats. Report target-hit probability and cost-to-target curves, not just best objective and not just average final runtime.
+
+### Two distinct benchmark tracks
+
+1. **External portfolio benchmark:** the pinned 50-instance QOBLIB MIS cohort in the companion JSON; report QOBLIB-native fields and preserve the upstream feasibility/optimality distinction.
+2. **Reduction-mechanism benchmark:** a separate random unit-disk / union-jack cohort with frozen generation seeds, hardness strata, and a same-wrapper SaReduMIS/ReduMIS-style classical baseline. Do not pool these instances with QOBLIB as though they came from the same distribution.
+
+For both tracks, keep development choices separate from confirmatory graph families. The public QOBLIB train/validation/test split is only a visible family-leakage control, not a blinded test set. Newly generated seeds and independent graph families are needed for an actual held-out generalization claim.
+
 ## Next executable gates
 
 1. Add a strict DIMACS parser test suite for comments, duplicate edges, self-loops, malformed headers, count mismatch, out-of-range vertices, and the large C4000 file.
