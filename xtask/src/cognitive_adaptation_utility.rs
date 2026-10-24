@@ -905,7 +905,7 @@ mod tests {
             .expect_err("receipt from another stream must fail closed");
         assert!(error.to_string().contains("stream_id differs"));
 
-        let mut wrong_policy = receipt;
+        let mut wrong_policy = receipt.clone();
         wrong_policy.arms[0].configuration_digest = "9".repeat(64);
         let error = bind_replay_receipt(&mut score.clone(), &input, wrong_policy)
             .expect_err("policy configuration mismatch must fail closed");
