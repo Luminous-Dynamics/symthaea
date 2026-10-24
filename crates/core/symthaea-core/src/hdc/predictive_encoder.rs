@@ -207,6 +207,8 @@ pub struct PredictiveHdcEncoder {
     /// Legacy callers of set_prediction() leave this unset and are not accepted
     /// as cycle-bound evidence by encode_at().
     prediction_cycle: Option<u64>,
+    /// Source cycle for the comparison attempted by the last encode call.
+    last_compared_prediction_cycle: Option<u64>,
 
     /// Shortest-horizon raw CfC prediction (bits-saved diagnostics only) —
     /// the registered C1 metric uses this, never the multi-horizon average
@@ -310,6 +312,7 @@ impl PredictiveHdcEncoder {
             attention_weights,
             predicted_hdv: None,
             prediction_cycle: None,
+            last_compared_prediction_cycle: None,
             first_horizon_prediction: None,
             prev_compressed_unit: None,
             bits_resid_var_ema: 0.0,
@@ -340,9 +343,15 @@ impl PredictiveHdcEncoder {
             self.clear_prediction();
         }
 
+        let stale_source_cycle = if stale_prediction {
+            self.prediction_cycle
+        } else {
+            None
+        };
         let result = self.encode(input);
         if stale_prediction {
             self.last_degeneracy = PredictionDegeneracy::StalePrediction;
+            self.last_compared_prediction_cycle = stale_source_cycle;
             self.stats.degenerate_stale_prediction_cycles += 1;
         }
         result
@@ -351,6 +360,7 @@ impl PredictiveHdcEncoder {
     /// Legacy encoder API. Prediction freshness is enforced by encode_at()
     /// wherever a cognitive cycle identifier is available.
     pub fn encode(&mut self, input: &str) -> EncodingResult {
+        self.last_compared_prediction_cycle = self.prediction_cycle;
         self.stats.total_cycles += 1;
 
         // 1. Get base encoding via text encoder (uses pre-cached primitive i8 encodings)
@@ -456,6 +466,11 @@ impl PredictiveHdcEncoder {
         self.prediction_cycle
     }
 
+    /// Source cycle for the comparison attempted by the most recent encode.
+    pub fn last_compared_prediction_cycle(&self) -> Option<u64> {
+        self.last_compared_prediction_cycle
+    }
+
     /// Receive the shortest-horizon raw prediction for the bits-saved
     /// diagnostics (Predictive Compression Program P0). `None` means the
     /// upstream prediction path produced no per-horizon predictions this
@@ -474,6 +489,7 @@ impl PredictiveHdcEncoder {
     pub fn clear_prediction(&mut self) {
         self.predicted_hdv = None;
         self.prediction_cycle = None;
+        self.last_compared_prediction_cycle = None;
         self.first_horizon_prediction = None;
         self.prev_compressed_unit = None;
     }
