@@ -1,0 +1,34 @@
+name: Scientific Discovery Noise Harness
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/scientific-discovery-noise-robustness-v0-1/**"
+      - ".github/workflows/scientific-discovery-noise-harness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scientific-discovery-noise-harness-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    name: Format, tests, and strict Clippy
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/scientific-discovery-noise-robustness-v0-1/Cargo.toml -- --check
+      - name: Run deterministic generator tests
+        run: cargo test --manifest-path research/scientific-discovery-noise-robustness-v0-1/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/scientific-discovery-noise-robustness-v0-1/Cargo.toml --all-targets --locked -- -D warnings
