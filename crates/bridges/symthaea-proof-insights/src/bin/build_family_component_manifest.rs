@@ -23,7 +23,7 @@ struct Component{component_id:String,split_names:Vec<String>,family_ids:Vec<Stri
 #[derive(Debug,Serialize)]
 struct FamilyRow{family_id:String,split:String,component_id:String}
 #[derive(Debug,Serialize)]
-struct Manifest{schema_version:&'static str,upstream_commit:String,source_partition_digest_sha256:String,relationship_inventory_sha256:String,relationship_inventory_status:String,coverage_receipt_sha256:Option<String>,total_family_count:usize,total_component_count:usize,independent_component_count_by_split:Counts,cross_split_component_count:usize,edge_counts:EdgeCounts,families:Vec<FamilyRow>,components:Vec<Component>,qualification_status:String,coverage_receipt_verification_status:&\'static str,qualified_for_confirmatory_resampling:bool,qualification_limitations:Vec<String>}
+struct Manifest{schema_version:&'static str,upstream_commit:String,source_partition_digest_sha256:String,relationship_inventory_sha256:String,relationship_inventory_status:String,coverage_receipt_sha256:Option<String>,total_family_count:usize,total_component_count:usize,independent_component_count_by_split:Counts,cross_split_component_count:usize,edge_counts:EdgeCounts,families:Vec<FamilyRow>,components:Vec<Component>,qualification_status:String,coverage_receipt_verification_status:&'static str,qualified_for_confirmatory_resampling:bool,qualification_limitations:Vec<String>}
 fn sha(b:&[u8])->String{format!("{:x}",Sha256::digest(b))}
 fn digest_ok(s:&str)->bool{s.len()==64&&s.bytes().all(|b|b.is_ascii_hexdigit())}
 fn hard(s:&str)->bool{matches!(s,"exact_duplicate"|"shared_source_artifact"|"formal_dependency"|"reused_lemma"|"equivalent_statement")}
