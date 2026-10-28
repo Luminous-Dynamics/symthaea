@@ -5,7 +5,8 @@ This prototype records a process invocation as a content-addressed witness. It c
 ## Files
 
 - `run_execution_witness.py` runs a pinned invocation from an evaluator-authored plan without a shell, captures stdout/stderr into the evidence root, hashes inputs before/after execution, and writes a receipt containing task/claim identity, repository ID, run ID/attempt, candidate revision, source digest, runtime identity, verifier executable digest, command/environment digests and timing.
-- `execution-witness-receipt.schema.json` defines the receipt shape.
+- `execution-witness-plan.schema.json` defines the evaluator-authored plan contract.
+- `execution-witness-receipt.schema.json` defines the recorded receipt contract.
 - `audit_execution_witness.py` independently checks the receipt against out-of-band pins, the exact plan, input/output bytes, executable digest and evaluator-supplied task/run/source/runtime identity.
 - `test_execution_witness.py` covers positive execution, replay across run attempts, plan/input/output tampering, wrong verifier pins, path traversal, and the distinction between an auditable command with an unexpected exit code and a passing execution contract.
 
