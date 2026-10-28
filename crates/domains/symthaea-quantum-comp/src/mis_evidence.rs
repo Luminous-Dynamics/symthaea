@@ -646,4 +646,64 @@ mod tests {
             Err(MisEvidenceError::InvalidVerifierDigest)
         ));
     }
+    #[test]
+    fn exhaustive_small_graphs_match_independent_conflict_oracle() {
+        // Exhaust every simple undirected graph through four vertices and every
+        // candidate subset. This checks the verifier against a separate bit-mask
+        // oracle rather than reusing its parser or conflict-count implementation.
+        for vertex_count in 1usize..=4 {
+            let mut possible_edges = Vec::new();
+            for u in 0..vertex_count {
+                for v in (u + 1)..vertex_count {
+                    possible_edges.push((u, v));
+                }
+            }
+
+            for edge_mask in 0usize..(1usize << possible_edges.len()) {
+                let selected_edges: Vec<(usize, usize)> = possible_edges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, &edge)| ((edge_mask >> bit) & 1 == 1).then_some(edge))
+                    .collect();
+                let mut graph = format!(
+                    "SYMTHEA-MIS-GRAPH-V1\\nvertices {vertex_count}\\nedges {}\\n",
+                    selected_edges.len()
+                );
+                for (u, v) in &selected_edges {
+                    graph.push_str(&format!("{u} {v}\\n"));
+                }
+                let graph = graph.into_bytes();
+
+                for vertex_mask in 0usize..(1usize << vertex_count) {
+                    let vertices: Vec<usize> = (0..vertex_count)
+                        .filter(|vertex| (vertex_mask >> vertex) & 1 == 1)
+                        .collect();
+                    let candidate_bytes = candidate(&vertices);
+                    let mut oracle_conflicts = 0usize;
+                    for &(u, v) in &selected_edges {
+                        if ((vertex_mask >> u) & 1 == 1) && ((vertex_mask >> v) & 1 == 1) {
+                            oracle_conflicts += 1;
+                        }
+                    }
+
+                    let evidence =
+                        verify_mis_candidate(&graph, &candidate_bytes, 1, VERIFIER).unwrap();
+                    assert_eq!(evidence.conflict_count(), oracle_conflicts);
+                    assert_eq!(
+                        evidence.verdict(),
+                        if oracle_conflicts == 0 {
+                            MisEvidenceVerdict::VerifiedIndependentSet
+                        } else {
+                            MisEvidenceVerdict::VerifiedConflict
+                        }
+                    );
+                    assert_eq!(
+                        evidence.reaches_target(),
+                        oracle_conflicts == 0 && !vertices.is_empty()
+                    );
+                }
+            }
+        }
+    }
+
 }
