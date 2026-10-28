@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -29,7 +30,7 @@ WITNESS_KINDS = (
 RESULTS = ("supports", "contradicts", "inconclusive")
 ENV_ALLOWLIST = (
     "PATH", "HOME", "TMPDIR", "TEMP", "LANG", "LC_ALL", "TZ",
-    "CARGO_HOME", "RUSTUP_HOME", "PYTHONPATH", "SYSTEMROOT", "WINDIR",
+    "CARGO_HOME", "RUSTUP_HOME", "SYSTEMROOT", "WINDIR",
 )
 
 
@@ -121,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("a verifier command must follow --")
         if len(args.verifier_sha256) != 64 or any(ch not in "0123456789abcdef" for ch in args.verifier_sha256):
             raise ValueError("verifier SHA-256 must be 64 lowercase hexadecimal characters")
-        if not args.claim_id or len(args.claim_id) > 128:
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{1,127}", args.claim_id):
             raise ValueError("claim ID is invalid")
 
         root = args.artifact_root.resolve(strict=True)
@@ -137,8 +138,12 @@ def main(argv: list[str] | None = None) -> int:
         stderr_path = safe_path(root, args.stderr_path, must_exist=False)
         if len({receipt_path, stdout_path, stderr_path}) != 3:
             raise ValueError("receipt, stdout and stderr paths must be distinct")
-        if receipt_path in (source, cwd) or stdout_path == source or stderr_path == source:
-            raise ValueError("receipt/output paths may not overwrite the source or working directory")
+        if receipt_path == cwd or stdout_path == cwd or stderr_path == cwd:
+            raise ValueError("receipt/output paths may not name the working directory")
+        if receipt_path.exists() or stdout_path.exists() or stderr_path.exists():
+            raise ValueError("receipt and stream outputs must not exist before the invocation")
+        if receipt_path == source or stdout_path == source or stderr_path == source:
+            raise ValueError("receipt/output paths may not overwrite the source")
 
         if not args.runtime_image_id.startswith("sha256:") or len(args.runtime_image_id) != 71 or any(
             char not in "0123456789abcdef" for char in args.runtime_image_id[7:]
@@ -157,10 +162,15 @@ def main(argv: list[str] | None = None) -> int:
 
         output_values = [("stdout", args.stdout_path), ("stderr", args.stderr_path)]
         output_values.extend(("artifact", value) for value in args.output_artifacts)
-        if any(value in {args.receipt_path, args.source_path} for _, value in output_values):
-            raise ValueError("output artifacts may not overwrite the receipt or source")
+        input_paths = {row["path"] for row in input_rows}
+        if any(value in {args.receipt_path, args.source_path} or value in input_paths for _, value in output_values):
+            raise ValueError("output artifacts may not overwrite the receipt, source, or any declared input")
         if len({value for _, value in output_values}) != len(output_values):
             raise ValueError("output artifact paths must be unique")
+        for _, value in output_values:
+            path = safe_path(root, value, must_exist=False)
+            if path.exists():
+                raise ValueError(f"output artifact must not exist before invocation: {value}")
 
         clean_env = {name: os.environ[name] for name in ENV_ALLOWLIST if name in os.environ}
         env_sha = digest(json.dumps(clean_env, sort_keys=True, separators=(",", ":")).encode())
@@ -236,7 +246,11 @@ def main(argv: list[str] | None = None) -> int:
                 "signal": signal_name,
                 "timed_out": timed_out,
             },
-            "observed_result": "inconclusive" if timed_out else args.observed_result,
+            "observed_result": (
+                "inconclusive"
+                if timed_out or signal_name is not None or (exit_code != 0 and args.observed_result == "supports")
+                else args.observed_result
+            ),
         }
         receipt_path.parent.mkdir(parents=True, exist_ok=True)
         receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
