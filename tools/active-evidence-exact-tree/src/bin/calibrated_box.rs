@@ -163,7 +163,6 @@ const COVERAGE_GRID: [f64; 11] = [
 
 /// Stable normalized Binomial(n,p) probability masses, generated outward from a mode.
 /// This is used to enumerate exact finite-grid coverage without sampling Monte Carlo trials.
-#[cfg(test)]
 fn binomial_pmf(n: usize, p: f64) -> Vec<f64> {
     let mut mass = vec![0.0; n + 1];
     if p <= 0.0 {
@@ -197,7 +196,6 @@ fn binomial_pmf(n: usize, p: f64) -> Vec<f64> {
     mass
 }
 
-#[cfg(test)]
 fn cell_coverage(n: usize, true_probability: f64) -> f64 {
     let radius = interval_radius(n);
     binomial_pmf(n, true_probability)
@@ -328,6 +326,28 @@ fn evaluate(tree: &Tree, truth: Matrix) -> Metrics {
     total
 }
 
+fn print_coverage_csv() {
+    println!("n_per_cell,true_probability,cell_coverage,minimum_grid_cell_coverage,union_bound_lower_12_cells,per_cell_target");
+    for n in SAMPLE_SIZES {
+        let values: Vec<(f64, f64)> = COVERAGE_GRID
+            .iter()
+            .copied()
+            .map(|p| (p, cell_coverage(n, p)))
+            .collect();
+        let minimum = values
+            .iter()
+            .map(|(_, coverage)| *coverage)
+            .fold(f64::INFINITY, f64::min);
+        let union_bound = 1.0 - CELLS * (1.0 - minimum);
+        let per_cell_target = 1.0 - ALPHA / CELLS;
+        for (true_probability, coverage) in values {
+            println!(
+                "{n},{true_probability:.12},{coverage:.12},{minimum:.12},{union_bound:.12},{per_cell_target:.12}"
+            );
+        }
+    }
+}
+
 fn print_csv() {
     println!("n_per_cell,confidence_radius,scenario,expected_loss,expected_decision_regret,expected_query_cost,expected_query_count,worst_case_box_regret,worst_case_box_expected_cost,worst_case_box_expected_queries,planned_first_query");
     let trees = enumerate_trees(PRIOR, 0b1111, 3);
@@ -356,16 +376,24 @@ fn print_csv() {
 
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
-    if let Some(argument) = args.next() {
-        if argument == "--help" || argument == "-h" {
-            eprintln!("Usage: cargo run --bin calibrated_box --");
-            return ExitCode::SUCCESS;
+    match args.next() {
+        None => {
+            print_csv();
+            ExitCode::SUCCESS
         }
-        eprintln!("unexpected argument: {argument}");
-        return ExitCode::from(2);
+        Some(argument) if argument == "--coverage-grid" && args.next().is_none() => {
+            print_coverage_csv();
+            ExitCode::SUCCESS
+        }
+        Some(argument) if argument == "--help" || argument == "-h" => {
+            eprintln!("Usage: cargo run --bin calibrated_box -- [--coverage-grid]");
+            ExitCode::SUCCESS
+        }
+        Some(argument) => {
+            eprintln!("unexpected argument: {argument}");
+            ExitCode::from(2)
+        }
     }
-    print_csv();
-    ExitCode::SUCCESS
 }
 
 #[cfg(test)]
