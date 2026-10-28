@@ -311,3 +311,14 @@ The concentration bound assumes independent event episodes from one fixed distri
 Twenty-six unit tests and eleven public-API integration-oracle fixtures are defined for the finite-sample calibration module. No Rust tests or example execution are claimed.
 
 Follow-up: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787).
+
+
+## Sequential calibration freshness and drift alarms (28 October 2026)
+
+The new [AOCF-001 online calibration freshness benchmark](./AVIATION_ONLINE_CALIBRATION_FRESHNESS.md) adds `aviation_online_drift.rs`: a frozen-reference mixture likelihood-ratio monitor over a predeclared categorical alternative ensemble. It accumulates a log e-value, applies a fixed `ln(1/alpha)` threshold, refuses duplicate/out-of-order metadata, and latches either a drift alarm or a separate out-of-support alarm. The synthetic calibration example now emits this monitor's status and evidence into its run manifest.
+
+The anytime-valid false-alarm statement requires independent observations from the exact nominal distribution. The monitor is not guaranteed under serial dependence, omitted event categories or arbitrary drift. A signal should force review/recalibration/abstention under a declared policy; it should not autonomously alter a radius or dispatch choice.
+
+Nineteen unit tests and five public-API integration fixtures are defined for this monitor, but not compiled or executed. Industry research comparators include predictive-rank martingales, online conformal drift detection and rolling airport taxi-time calibration. See AOCF-001 for test protocols and citations.
+
+Follow-up: [AVIATION-ENTERPRISE-011 #8795](https://github.com/Luminous-Dynamics/symthaea/issues/8795).
