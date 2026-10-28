@@ -155,7 +155,8 @@ pub struct ReportBodyV1 {
     pub vanilla: ArmSummaryV1,
     pub code_assisted: ArmSummaryV1,
     pub comparison: ComparisonSummaryV1,
-    /// Secondary aggregate grouped by module and declared task strata; do not let a pooled mean hide reversals.
+    /// Secondary aggregate grouped by module and declared task strata.
+    /// Do not let a pooled mean hide reversals.
     pub by_stratum: Vec<StratumSummaryV1>,
     pub paired_trials: Vec<PairedTrialV1>,
     pub import_problems: Vec<ImportProblemV1>,
@@ -587,11 +588,29 @@ fn signed_delta(a: Option<u64>, b: Option<u64>) -> Option<i64> {
 }
 
 fn summarize_stratum(key: StratumKey, rows: &[&PairedTrialV1]) -> StratumSummaryV1 {
-    let rmsle = rows.iter().filter_map(|row| row.rmsle_delta_tool_minus_vanilla).collect::<Vec<_>>();
-    let accuracy = rows.iter().filter_map(|row| row.exact_accuracy_delta_tool_minus_vanilla).collect::<Vec<_>>();
-    let experiments = rows.iter().filter_map(|row| row.experiments_delta_tool_minus_vanilla).map(|value| value as f64).collect::<Vec<_>>();
-    let rounds = rows.iter().filter_map(|row| row.rounds_delta_tool_minus_vanilla).map(|value| value as f64).collect::<Vec<_>>();
-    let tokens = rows.iter().filter_map(|row| row.tokens_delta_tool_minus_vanilla).map(|value| value as f64).collect::<Vec<_>>();
+    let rmsle = rows
+        .iter()
+        .filter_map(|row| row.rmsle_delta_tool_minus_vanilla)
+        .collect::<Vec<_>>();
+    let accuracy = rows
+        .iter()
+        .filter_map(|row| row.exact_accuracy_delta_tool_minus_vanilla)
+        .collect::<Vec<_>>();
+    let experiments = rows
+        .iter()
+        .filter_map(|row| row.experiments_delta_tool_minus_vanilla)
+        .map(|value| value as f64)
+        .collect::<Vec<_>>();
+    let rounds = rows
+        .iter()
+        .filter_map(|row| row.rounds_delta_tool_minus_vanilla)
+        .map(|value| value as f64)
+        .collect::<Vec<_>>();
+    let tokens = rows
+        .iter()
+        .filter_map(|row| row.tokens_delta_tool_minus_vanilla)
+        .map(|value| value as f64)
+        .collect::<Vec<_>>();
     StratumSummaryV1 {
         module_name: key.module_name,
         noise_level: f64::from_bits(key.noise_bits),
@@ -599,10 +618,15 @@ fn summarize_stratum(key: StratumKey, rows: &[&PairedTrialV1]) -> StratumSummary
         model_system: key.model_system,
         law_version: key.law_version,
         expected_pairs: rows.len(),
-        both_observed_pairs: rows.iter().filter(|row| row.vanilla.is_some() && row.code_assisted.is_some()).count(),
+        both_observed_pairs: rows
+            .iter()
+            .filter(|row| row.vanilla.is_some() && row.code_assisted.is_some())
+            .count(),
         both_completed_pairs: rows.iter().filter(|row| matches!(
             (&row.vanilla, &row.code_assisted),
-            (Some(vanilla), Some(tool)) if vanilla.status == TrialStatus::Completed && tool.status == TrialStatus::Completed
+            (Some(vanilla), Some(tool))
+                if vanilla.status == TrialStatus::Completed
+                    && tool.status == TrialStatus::Completed
         )).count(),
         rmsle_pair_count: rmsle.len(),
         mean_rmsle_delta_tool_minus_vanilla: mean(rmsle.into_iter()),
