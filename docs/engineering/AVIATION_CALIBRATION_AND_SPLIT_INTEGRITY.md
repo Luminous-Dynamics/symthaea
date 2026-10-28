@@ -1,0 +1,97 @@
+# Aviation Calibration and Split-Integrity Protocol (ACSP-001)
+
+**Status:** split-audit implementation and tests defined on the AECB research branch; Rust tests have not been executed in this environment.  
+**Implementation:** `crates/domains/symthaea-operations-research/src/aviation_calibration_protocol.rs`  
+**Related benchmark:** [distributionally robust recovery](./AVIATION_DISTRIBUTIONALLY_ROBUST_BENCHMARK.md), [public-data evaluation](./AVIATION_PUBLIC_DATA_EVALUATION_PROTOCOL.md).
+
+## Why this layer exists
+
+A robust decision can look superior for the wrong reason if related disruption episodes leak across partitions, timestamps allow future information into model development, or the uncertainty radius is tuned on final-test outcomes. ACSP-001 adds a fail-closed metadata audit before any robustness claim is scored.
+
+This is a *measurement-integrity control*, not an aviation optimizer. It does not estimate disruption probabilities, calculate conformal quantiles, guarantee exchangeability, or prove that the dataset or supplied metadata is truthful.
+
+## Implemented controls
+
+The Rust module includes:
+
+- Unique row IDs and non-empty event-cluster IDs.
+- A cluster-disjointness check: one disruption episode or dependence cluster cannot appear in more than one of Training, Calibration, Validation, Test.
+- Per-partition row counts, distinct event-cluster counts and time bounds.
+- Minimum distinct-cluster requirements; undersized partitions return Indeterminate instead of silently passing.
+- Optional strict chronological separation, requiring each split's latest timestamp to precede the next split's earliest timestamp. This can be disabled for explicitly grouped out-of-distribution holdouts where chronology is not the intended split.
+- Missing event-time evidence returns Indeterminate.
+- A separate tuning-provenance check rejects any declared parameter/model/threshold selection that used Test, and rejects duplicate/empty artifact IDs or an empty tuning manifest.
+
+The report is based on input metadata. A passing audit does not prove that distinct cluster IDs truly represent independent events or that no one inspected test outputs outside the recorded manifest.
+
+## Preregistered split policy
+
+For a time-generalization experiment, use a chronology-separated layout:
+
+1. **Training:** fit predictive components and feature transformations.
+2. **Calibration:** estimate uncertainty and calibrate probability/risk diagnostics.
+3. **Validation:** choose among the predeclared radius/model/threshold grid and evaluate development-only trade-offs.
+4. **Test:** evaluate the frozen decision rule once on a temporally later, previously untouched block.
+
+For an OOD-family experiment, hold out complete disruption families or clusters; use the grouped split mode and report the temporal composition explicitly. Run time and OOD generalization as separate experiments rather than silently mixing their claims.
+
+Every row should have a stable source-row ID, event-cluster ID, event time, partition, source snapshot reference, and preprocessing/version provenance. The full protocol should also record source snapshot digests and a preregistration/decision receipt outside this module. Digest syntax alone is not proof of data lineage, and the current crate does not cryptographically attest those manifests.
+
+## Current research comparator
+
+Additional relevant comparator: Yang and Jin (ICML 2026), [Multi-Distribution Robust Conformal Prediction](https://proceedings.mlr.press/v306/yang26ad.html), which studies finite-sample coverage across heterogeneous source distributions. It motivates regime-specific calibration rather than pooling all airport/weather conditions under a single unexamined distribution.
+
+Momtaz (2026), *Rolling-Calibrated Conformal Decision Support for Seasonal Airport Taxi-Time Planning under Distribution Shift*, evaluates rolling one-sided conformal calibration on 17 IATA seasons and 722 airports in the EUROCONTROL CODA dataset. The paper distinguishes exchangeability-based conformal guarantees from empirical adaptation under distribution shift and notes the operational trade-off between under-planning and padding. DOI: https://doi.org/10.19139/soic-2310-5070-3782.
+
+That work is a calibration-method comparator, not proof that this split auditor improves prediction intervals. The next fair comparison should reproduce its calibration regime where data licensing permits, then separately test whether a calibrated uncertainty set improves the *downstream recovery decision*.
+
+Other core comparators:
+- Zhang et al. (2026), distributionally robust aircraft sequencing using learning-driven arrival/departure predictions and real Xiamen airport data, Omega 2026. DOI: https://doi.org/10.1016/j.omega.2025.103415.
+- EUROCONTROL CWBO, network-wide weather/capacity triggers and coordinated actions. Published 14 September 2026: https://www.eurocontrol.int/publication/how-capacity-and-weather-based-operations-cwbo-are-building-network-resilience-capacity.
+
+## Required experiment and metrics
+
+Evaluate at least these arms on the same frozen event clusters and action space when comparable:
+
+1. Nominal estimate-then-optimize, using training-fitted probabilities.
+2. Calibrated nominal policy, with radius/quantiles chosen on Calibration/Validation only.
+3. TV-DRO policy / gate over a preregistered radius grid.
+4. A conventional Wasserstein-DRO or published airport sequencing baseline where the same inputs/action space can be supported.
+5. Incumbent/do-nothing and hindsight oracle (upper-bound reference only, never deployable).
+
+Report:
+- feature/split audit statuses and every finding;
+- per-split rows, event clusters and temporal boundaries;
+- nominal expected cost, worst-case expected cost, robustness premium and sign-flip radius;
+- predictive interval/coverage calibration by season, airport-size cohort and disruption regime, where applicable;
+- mean cost, CVaR / tail regression, maximum actor harm, delay propagation, cancellations, utilization, runtime and abstention/rejection rate;
+- confidence intervals clustered by event episode and temporal block, not by row when rows share a disruption;
+- all failed/indeterminate runs and all preregistered deviations.
+
+## Proposed pass criteria (targets, not results)
+
+- 100% rejection of injected cross-partition event-cluster leaks and test-tuning declarations.
+- 100% status/report invariance under input row permutation.
+- 100% non-acceptance for missing time evidence or insufficient cluster counts.
+- 100% agreement with independent fixtures for the split and tuning contract.
+- No final-test-driven radius or threshold changes.
+- Demonstrated reduction in held-out tail cost compared with the best matched baseline, while satisfying a predeclared average-cost and utilization non-inferiority bound.
+- For predictive uncertainty, report empirical coverage and width by time block and regime; do not claim formal coverage under arbitrary distribution shift.
+
+## Finite-sample radius calibration
+
+The adjacent `aviation_probability_calibration.rs` module derives a conservative TV radius from a frozen nominal scenario distribution and observed calibration frequencies. Its regime-envelope API calibrates each declared weather/airport/season regime separately, divides a requested family-wise failure budget across regimes, and returns the largest required radius for a common policy. It separates the empirical TV discrepancy from a union-Hoeffding sampling allowance and reports the declared failure probability, episode count, whether the result saturates at 100%, and the required radius. The preferred event-ledger API validates that each event is assigned to Calibration, has unique record/cluster IDs, and belongs to a frozen regime/scenario support; it derives counts from these episode records before building the simultaneous radius envelope. The synthetic example uses the same Calibration episode IDs for split auditing and radius calibration, then feeds the resulting radius into the DRO evaluator.
+
+This bound assumes independent complete disruption episodes drawn from one fixed finite-support distribution. Airline data can violate that assumption through temporal dependence, seasonality and regime shifts. Use event episodes rather than rows, report subgroup/time-block calibration, and use a predeclared envelope across regimes rather than pooling incompatible distributions. A wide or saturated bound is a meaningful indication that the calibration sample is inadequate.
+
+Tracking: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787). The regime-envelope tests cover the per-regime Bonferroni budget, maximum radius, deterministic ordering and invalid regimes; event-ledger tests verify source partition, unique episode identities and frozen scenario support.
+
+## Runnable contract-composition example
+
+The example `crates/domains/symthaea-operations-research/examples/aviation_calibration_protocol_benchmark.rs` combines split integrity, declared tuning provenance, finite-sample TV-radius calibration, evaluation at the resulting radius, and the TV-radius robustness curve in one small synthetic program. It exits nonzero if the declared split/tuning contract fails and emits a JSON-formatted manifest of partition stats and curve points. It is only a smoke-test fixture; real data wiring, manifest digests, data lineage, model fitting and final evaluation remain outside this example.
+
+## Test status and claim ceiling
+
+Fourteen Rust unit tests and five separate integration-oracle tests are defined in `aviation_calibration_protocol.rs`, but they have not been compiled or run here because the environment lacks `cargo` and `rustc`. Test definitions are not test results. A successful metadata audit is necessary but not sufficient for credible calibration, independent validation, airline savings or operational approval.
+
+Follow-up: [AVIATION-ENTERPRISE-009: calibration and split integrity #8770](https://github.com/Luminous-Dynamics/symthaea/issues/8770). The separate public-API fixtures are in `tests/aviation_calibration_protocol_oracle.rs`.
