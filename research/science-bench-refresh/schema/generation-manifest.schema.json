@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/generation-manifest.schema.json",
+  "title": "Symthaea Science Benchmark Refresh Generation Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation_id",
+    "purpose",
+    "lane",
+    "generator",
+    "evaluator",
+    "seed_commitment_sha256",
+    "task_set_commitment_sha256",
+    "expected_task_count",
+    "task_family_mixture",
+    "policy_freeze",
+    "budget",
+    "analysis_plan_sha256",
+    "post_run_reveal_policy"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_manifest.v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "purpose": {
+      "enum": [
+        "protocol_fixture_not_for_scoring",
+        "qualified_run"
+      ]
+    },
+    "lane": {
+      "enum": [
+        "public_development",
+        "immutable_anchor",
+        "sealed_refresh",
+        "reproducible_open"
+      ]
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revision",
+        "configuration_sha256"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "source_sha256",
+        "oracle_separation"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "oracle_separation": {
+          "enum": [
+            "not_qualified_example",
+            "independent_evaluator_boundary_verified"
+          ]
+        }
+      }
+    },
+    "seed_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "task_set_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "expected_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "task_family_mixture": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "weight",
+          "planned_task_count"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "planned_task_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "policy_freeze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_id",
+        "source_or_policy_sha256",
+        "prompt_sha256",
+        "configuration_sha256",
+        "tool_manifest_sha256"
+      ],
+      "properties": {
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_or_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tool_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_observations",
+        "max_experiments",
+        "max_tool_calls",
+        "max_total_tokens",
+        "max_wall_clock_seconds"
+      ],
+      "properties": {
+        "max_observations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_experiments": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_wall_clock_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "analysis_plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "post_run_reveal_policy": {
+      "enum": [
+        "reveal_seed_and_task_bytes_after_submission",
+        "open_from_start_not_sealed"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "generator": {
+            "properties": {
+              "revision": {
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          },
+          "evaluator": {
+            "properties": {
+              "oracle_separation": {
+                "const": "independent_evaluator_boundary_verified"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane": {
+            "const": "sealed_refresh"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "post_run_reveal_policy": {
+            "const": "reveal_seed_and_task_bytes_after_submission"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane": {
+            "enum": [
+              "public_development",
+              "immutable_anchor",
+              "reproducible_open"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "post_run_reveal_policy": {
+            "const": "open_from_start_not_sealed"
+          }
+        }
+      }
+    }
+  ]
+}
