@@ -45,6 +45,8 @@ pub struct EvidenceSource {
     pub step_index: Option<u64>,
     /// SHA-256 of the exact canonical source bytes emitted by the ingestion adapter.
     pub source_sha256: String,
+    /// RFC 6901 JSON Pointer to the exact string payload inside the source trajectory.
+    pub source_pointer: String,
 }
 
 /// Evidence linked to the numeric ID used by an HDC candidate index.
@@ -88,6 +90,55 @@ pub struct MemoryContextItem {
     pub value: String,
 }
 
+/// Deterministic BM25 retrieval settings for the lexical evidence baseline.
+/// This is a transparent baseline, not a semantic encoder.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bm25Config {
+    /// Term-frequency saturation parameter; must be finite and positive.
+    pub k1: f64,
+    /// Document-length normalization in [0, 1].
+    pub b: f64,
+    /// Maximum number of evidence items returned.
+    pub max_items: usize,
+}
+
+impl Default for Bm25Config {
+    fn default() -> Self {
+        Self {
+            k1: 1.2,
+            b: 0.75,
+            max_items: 5,
+        }
+    }
+}
+
+impl Bm25Config {
+    fn validate(&self) -> Result<(), String> {
+        if !self.k1.is_finite() || self.k1 <= 0.0 {
+            return Err("BM25 k1 must be finite and positive".into());
+        }
+        if !self.b.is_finite() || !(0.0..=1.0).contains(&self.b) {
+            return Err("BM25 b must be finite and in [0, 1]".into());
+        }
+        if self.max_items == 0 {
+            return Err("BM25 max_items must be positive".into());
+        }
+        Ok(())
+    }
+}
+
+/// A scored evidence candidate. Keep this metadata outside the reader context;
+/// the adapter should pass only `context` as a benchmark MemoryContextItem.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LexicalEvidenceHit {
+    pub hdc_id: u64,
+    pub evidence_id: String,
+    pub source: EvidenceSource,
+    pub content_sha256: String,
+    pub bm25_score: f64,
+    pub context: MemoryContextItem,
+}
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -109,6 +160,11 @@ impl EvidenceRecord {
         if !is_sha256(&self.source.source_sha256) {
             return Err("source_sha256 must be 64 lowercase hexadecimal characters".into());
         }
+        if !self.source.source_pointer.starts_with('/')
+            || self.source.source_pointer.trim() == "/"
+        {
+            return Err("source_pointer must identify a non-root JSON value".into());
+        }
         if !is_sha256(&self.content_sha256) {
             return Err("content_sha256 must be 64 lowercase hexadecimal characters".into());
         }
@@ -118,8 +174,10 @@ impl EvidenceRecord {
             }
         }
         match &self.payload {
-            EvidencePayload::Text { value } if value.trim().is_empty() => {
-                return Err("text evidence must be non-empty".into());
+            EvidencePayload::Text { value } => {
+                if value.trim().is_empty() {
+                    return Err("text evidence must be non-empty".into());
+                }
             }
             EvidencePayload::Image { path } => {
                 if path.trim().is_empty() {
@@ -129,7 +187,6 @@ impl EvidenceRecord {
                     return Err("image path must not contain parent-directory traversal".into());
                 }
             }
-            _ => {}
         }
         match &self.lifecycle {
             EvidenceLifecycle::Superseded => {
@@ -150,6 +207,18 @@ impl EvidenceRecord {
         Ok(())
     }
 
+    /// Verify the content digest once before immutable text is added to the
+    /// cached lexical index. This is intentionally separate from structural
+    /// validation so ordinary BM25 queries do not re-hash the full corpus.
+    fn verify_text_content_digest(&self) -> Result<(), String> {
+        if let EvidencePayload::Text { value } = &self.payload {
+            if sha256_hex(value.as_bytes()) != self.content_sha256 {
+                return Err("text content_sha256 mismatch".into());
+            }
+        }
+        Ok(())
+    }
+
     /// Verify the provenance digest against the exact canonical source bytes
     /// supplied by the ingestion adapter. No implicit JSON reserialization is
     /// performed here: the adapter must define and pin its canonical encoding.
@@ -157,6 +226,23 @@ impl EvidenceRecord {
         self.validate()?;
         if sha256_hex(source_bytes) != self.source.source_sha256 {
             return Err("source_sha256 mismatch".into());
+        }
+        let source_json: serde_json::Value = serde_json::from_slice(source_bytes)
+            .map_err(|error| format!("source bytes are not valid JSON: {error}"))?;
+        self.verify_source_value(&source_json)
+    }
+
+    fn verify_source_value(&self, source_json: &serde_json::Value) -> Result<(), String> {
+        let source_value = source_json
+            .pointer(&self.source.source_pointer)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "source_pointer must resolve to a string value".to_string())?;
+        let expected_value = match &self.payload {
+            EvidencePayload::Text { value } => value.as_str(),
+            EvidencePayload::Image { path } => path.as_str(),
+        };
+        if source_value != expected_value {
+            return Err("payload does not match the source string at source_pointer".into());
         }
         Ok(())
     }
@@ -214,6 +300,10 @@ impl EvidenceRecord {
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
     evidence_ids: BTreeMap<String, u64>,
+    // Text is digest-checked and tokenized once at ingestion. Postings keep each
+    // term once per vocabulary key instead of duplicating term strings per doc.
+    lexical_postings: BTreeMap<String, Vec<(u64, usize)>>,
+    lexical_document_lengths: BTreeMap<u64, usize>,
 }
 
 impl EvidenceIndex {
@@ -222,17 +312,88 @@ impl EvidenceIndex {
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
-        // Verify provenance before the record enters the candidate resolver.
-        record.verify_source_bytes(source_bytes)?;
-        if self.records.contains_key(&record.hdc_id) {
-            return Err("duplicate hdc_id; use an explicit lifecycle transition".into());
+        self.insert_batch_atomic(vec![record], source_bytes).map(|_| ())
+    }
+
+    /// Validate the entire ingestion batch before mutating the index.
+    ///
+    /// This prevents a malformed final field or an ID collision from leaving a
+    /// partially indexed trajectory. All records must point into the same exact
+    /// source bytes and begin in the Active lifecycle state.
+    pub fn insert_batch_atomic(
+        &mut self,
+        records: Vec<EvidenceRecord>,
+        source_bytes: &[u8],
+    ) -> Result<usize, String> {
+        let source_sha256 = sha256_hex(source_bytes);
+        let source_json: serde_json::Value = serde_json::from_slice(source_bytes)
+            .map_err(|error| format!("source bytes are not valid JSON: {error}"))?;
+        let mut incoming_hdc_ids = BTreeSet::new();
+        let mut incoming_evidence_ids = BTreeSet::new();
+        let mut pending_lexical: Vec<(u64, Option<(usize, Vec<(String, usize)>)>)> =
+            Vec::with_capacity(records.len());
+
+        for record in &records {
+            if record.lifecycle != EvidenceLifecycle::Active {
+                return Err("new evidence must enter with active lifecycle".into());
+            }
+            record.validate()?;
+            // Cache postings only after content integrity is checked. Text payloads
+            // are immutable afterward; image bytes are re-verified on materialization.
+            record.verify_text_content_digest()?;
+            if record.source.source_sha256 != source_sha256 {
+                return Err("source_sha256 mismatch".into());
+            }
+            record.verify_source_value(&source_json)?;
+
+            let lexical_document = match &record.payload {
+                EvidencePayload::Text { value } => {
+                    // verify_text_content_digest() already bound these exact bytes
+                    // before this immutable posting cache is constructed.
+                    let tokens = tokenize_lexical(value);
+                    if tokens.is_empty() {
+                        None
+                    } else {
+                        let mut terms = BTreeMap::new();
+                        for token in &tokens {
+                            *terms.entry(token.clone()).or_insert(0usize) += 1;
+                        }
+                        Some((tokens.len(), terms.into_iter().collect()))
+                    }
+                }
+                EvidencePayload::Image { .. } => None,
+            };
+            pending_lexical.push((record.hdc_id, lexical_document));
+
+            if self.records.contains_key(&record.hdc_id)
+                || !incoming_hdc_ids.insert(record.hdc_id)
+            {
+                return Err("duplicate hdc_id in store or ingestion batch".into());
+            }
+            if self.evidence_ids.contains_key(&record.evidence_id)
+                || !incoming_evidence_ids.insert(record.evidence_id.clone())
+            {
+                return Err("duplicate evidence_id in store or ingestion batch".into());
+            }
         }
-        if self.evidence_ids.contains_key(&record.evidence_id) {
-            return Err("duplicate evidence_id".into());
+
+        let count = records.len();
+        for record in records {
+            self.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
+            self.records.insert(record.hdc_id, record);
         }
-        self.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
-        self.records.insert(record.hdc_id, record);
-        Ok(())
+        for (hdc_id, document) in pending_lexical {
+            if let Some((length, terms)) = document {
+                self.lexical_document_lengths.insert(hdc_id, length);
+                for (term, term_frequency) in terms {
+                    self.lexical_postings
+                        .entry(term)
+                        .or_default()
+                        .push((hdc_id, term_frequency));
+                }
+            }
+        }
+        Ok(count)
     }
 
     pub fn revoke(&mut self, hdc_id: u64) -> Result<(), String> {
@@ -251,6 +412,46 @@ impl EvidenceIndex {
         record.lifecycle = EvidenceLifecycle::Deleted;
         record.superseded_by = None;
         Ok(())
+    }
+
+    /// Revoke an evidence item by its stable external evidence ID.
+    /// Numeric mapping remains as a tombstone so stale candidates cannot resurrect it.
+    pub fn revoke_evidence(&mut self, evidence_id: &str) -> Result<(), String> {
+        let hdc_id = self
+            .evidence_ids
+            .get(evidence_id)
+            .copied()
+            .ok_or_else(|| "unknown evidence_id".to_string())?;
+        self.revoke(hdc_id)
+    }
+
+    /// Mark evidence deleted while retaining a non-resolvable tombstone.
+    pub fn delete_evidence(&mut self, evidence_id: &str) -> Result<(), String> {
+        let hdc_id = self
+            .evidence_ids
+            .get(evidence_id)
+            .copied()
+            .ok_or_else(|| "unknown evidence_id".to_string())?;
+        self.mark_deleted(hdc_id)
+    }
+
+    /// Supersede evidence by stable IDs, enforcing the existing same-scope rule.
+    pub fn supersede_evidence(
+        &mut self,
+        old_evidence_id: &str,
+        new_evidence_id: &str,
+    ) -> Result<(), String> {
+        let old_hdc_id = self
+            .evidence_ids
+            .get(old_evidence_id)
+            .copied()
+            .ok_or_else(|| "unknown old evidence_id".to_string())?;
+        let new_hdc_id = self
+            .evidence_ids
+            .get(new_evidence_id)
+            .copied()
+            .ok_or_else(|| "unknown replacement evidence_id".to_string())?;
+        self.supersede(old_hdc_id, new_hdc_id)
     }
 
     /// Replace active evidence with another active record in the same scope.
@@ -280,6 +481,136 @@ impl EvidenceIndex {
         old.lifecycle = EvidenceLifecycle::Superseded;
         old.superseded_by = Some(new_evidence_id);
         old.validate()
+    }
+
+
+    /// Search active, in-scope text evidence using deterministic BM25 ranking.
+    ///
+    /// The candidate corpus is filtered by lifecycle, scope, validity window and
+    /// structural validation before document frequency statistics are computed.
+    /// Text digests are verified before they can affect ranking. Images are
+    /// intentionally excluded from this lexical arm. Unknown query terms return
+    /// no hit; ties use ascending HDC ID so repeated runs are reproducible.
+    ///
+    /// This establishes a simple non-semantic baseline before any HDC/text encoder
+    /// is evaluated. It does not use gold answers or benchmark question metadata.
+    pub fn search_bm25(
+        &self,
+        query: &str,
+        scope_id: &str,
+        now_ms: u64,
+        _payload_root: &Path,
+        config: Bm25Config,
+    ) -> Result<Vec<LexicalEvidenceHit>, String> {
+        config.validate()?;
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+
+        let query_terms: BTreeSet<String> = tokenize_lexical(query).into_iter().collect();
+        if query_terms.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Count the eligible lexical corpus and its average length from compact
+        // metadata only. Full text is not tokenized or hashed again per query.
+        let mut document_count = 0usize;
+        let mut total_document_length = 0usize;
+        for (hdc_id, length) in &self.lexical_document_lengths {
+            let Some(record) = self.records.get(hdc_id) else {
+                continue;
+            };
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            document_count += 1;
+            total_document_length += length;
+        }
+        if document_count == 0 {
+            return Ok(Vec::new());
+        }
+        let average_length = total_document_length as f64 / document_count as f64;
+        if !average_length.is_finite() || average_length <= 0.0 {
+            return Ok(Vec::new());
+        }
+
+        // Only postings for query terms are visited. Lifecycle/scope/time
+        // eligibility is applied before document frequency and candidates, so
+        // revoked or out-of-scope postings cannot distort the BM25 statistics.
+        let mut document_frequency: BTreeMap<String, usize> =
+            query_terms.iter().cloned().map(|term| (term, 0)).collect();
+        let mut candidate_term_frequencies: BTreeMap<u64, BTreeMap<String, usize>> =
+            BTreeMap::new();
+        for term in &query_terms {
+            let Some(postings) = self.lexical_postings.get(term) else {
+                continue;
+            };
+            for (hdc_id, term_frequency) in postings {
+                let Some(record) = self.records.get(hdc_id) else {
+                    continue;
+                };
+                if !record.is_eligible_for(scope_id, now_ms) {
+                    continue;
+                }
+                *document_frequency
+                    .get_mut(term)
+                    .expect("query term frequency entry was initialized") += 1;
+                candidate_term_frequencies
+                    .entry(*hdc_id)
+                    .or_default()
+                    .insert(term.clone(), *term_frequency);
+            }
+        }
+
+        let mut hits = Vec::new();
+        for (hdc_id, term_frequencies) in candidate_term_frequencies {
+            let Some(record) = self.records.get(&hdc_id) else {
+                continue;
+            };
+            let Some(length) = self.lexical_document_lengths.get(&hdc_id) else {
+                continue;
+            };
+            let mut score = 0.0f64;
+            for term in &query_terms {
+                let Some(&term_frequency) = term_frequencies.get(term) else {
+                    continue;
+                };
+                let df = *document_frequency.get(term).unwrap_or(&0) as f64;
+                let idf =
+                    (1.0 + (document_count as f64 - df + 0.5) / (df + 0.5)).ln();
+                let tf = term_frequency as f64;
+                let length_norm = config.k1
+                    * (1.0 - config.b + config.b * *length as f64 / average_length);
+                score += idf * (tf * (config.k1 + 1.0)) / (tf + length_norm);
+            }
+
+            if score <= 0.0 || !score.is_finite() {
+                continue;
+            }
+            let EvidencePayload::Text { value } = &record.payload else {
+                continue;
+            };
+            hits.push(LexicalEvidenceHit {
+                hdc_id,
+                evidence_id: record.evidence_id.clone(),
+                source: record.source.clone(),
+                content_sha256: record.content_sha256.clone(),
+                bm25_score: score,
+                context: MemoryContextItem {
+                    kind: MemoryContextType::Text,
+                    value: value.clone(),
+                },
+            });
+        }
+
+        hits.sort_by(|left, right| {
+            right
+                .bm25_score
+                .total_cmp(&left.bm25_score)
+                .then_with(|| left.hdc_id.cmp(&right.hdc_id))
+        });
+        hits.truncate(config.max_items);
+        Ok(hits)
     }
 
     /// Resolve ranked HDC IDs to safe context items. Missing IDs, duplicates,
@@ -322,6 +653,25 @@ impl EvidenceIndex {
     }
 }
 
+
+/// Lowercase Unicode alphanumeric tokens; punctuation and whitespace delimit terms.
+/// Kept intentionally small and deterministic so the baseline has no model dependency.
+fn tokenize_lexical(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for character in text.chars() {
+        if character.is_alphanumeric() {
+            current.extend(character.to_lowercase());
+        } else if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
 fn resolve_image_path(payload_root: &Path, path: &str) -> Result<PathBuf, String> {
     let root = fs::canonicalize(payload_root)
         .map_err(|error| format!("invalid payload root: {error}"))?;
@@ -359,7 +709,12 @@ mod tests {
         sha256_hex(bytes)
     }
 
+    fn source_bytes_for_text(text: &str) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({"evidence": text})).unwrap()
+    }
+
     fn text_record(id: u64, evidence_id: &str, scope: &str, text: &str) -> EvidenceRecord {
+        let source_bytes = source_bytes_for_text(text);
         EvidenceRecord {
             schema_version: EVIDENCE_SCHEMA_VERSION.to_string(),
             evidence_id: evidence_id.to_string(),
@@ -369,7 +724,8 @@ mod tests {
                 trajectory_id: "trajectory-001".to_string(),
                 step_id: Some("step-4".to_string()),
                 step_index: Some(4),
-                source_sha256: hash(b"canonical trajectory bytes"),
+                source_sha256: hash(&source_bytes),
+                source_pointer: "/evidence".to_string(),
             },
             payload: EvidencePayload::Text { value: text.to_string() },
             content_sha256: hash(text.as_bytes()),
@@ -381,6 +737,186 @@ mod tests {
         }
     }
 
+
+    fn insert_text(index: &mut EvidenceIndex, id: u64, text: &str, scope: &str) {
+        index
+            .insert(
+                text_record(id, &format!("evidence-{id}"), scope, text),
+                &source_bytes_for_text(text),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn bm25_ranks_matching_evidence_and_returns_auditable_hits() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 10, "The checkout payment configuration uses a billing panel", "web");
+        insert_text(&mut index, 11, "The account profile has a display name", "web");
+        insert_text(&mut index, 12, "Billing configuration for enterprise invoices", "web");
+
+        let hits = index
+            .search_bm25(
+                "billing configuration",
+                "web",
+                150,
+                Path::new("."),
+                Bm25Config::default(),
+            )
+            .unwrap();
+
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].hdc_id, 12);
+        assert_eq!(hits[1].hdc_id, 10);
+        assert!(hits[0].bm25_score > 0.0);
+        assert_eq!(hits[0].context.kind, MemoryContextType::Text);
+        assert_eq!(hits[0].source.trajectory_id, "trajectory-001");
+    }
+
+    #[test]
+    fn bm25_filters_scope_and_lifecycle_before_scoring() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "private billing billing", "enterprise");
+        insert_text(&mut index, 2, "public billing", "web");
+        insert_text(&mut index, 3, "obsolete billing", "web");
+        index.revoke(3).unwrap();
+
+        let hits = index
+            .search_bm25("billing", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].hdc_id, 2);
+    }
+
+    #[test]
+    fn bm25_is_deterministic_for_ties_and_empty_or_unknown_queries() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 9, "cart opens overlay", "web");
+        insert_text(&mut index, 4, "cart opens overlay", "web");
+
+        let first = index
+            .search_bm25("cart", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        let second = index
+            .search_bm25("cart", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.iter().map(|hit| hit.hdc_id).collect::<Vec<_>>(), vec![4, 9]);
+        assert!(index
+            .search_bm25("   !!! ", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap()
+            .is_empty());
+        assert!(index
+            .search_bm25("nonexistentterm", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn bm25_rejects_invalid_configuration_and_tampered_candidate_text() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "trusted invoice route", "web");
+        let invalid = Bm25Config { k1: 1.2, b: 1.1, max_items: 5 };
+        assert!(index
+            .search_bm25("invoice", "web", 150, Path::new("."), invalid)
+            .is_err());
+        assert!(index
+            .search_bm25(
+                "invoice",
+                "web",
+                150,
+                Path::new("."),
+                Bm25Config { max_items: 0, ..Bm25Config::default() },
+            )
+            .is_err());
+
+        let mut corrupt = text_record(2, "corrupt-evidence", "web", "invoice route");
+        corrupt.content_sha256 = hash(b"tampered text");
+        assert!(index
+            .insert(corrupt, &source_bytes_for_text("invoice route"))
+            .is_err());
+        let hits = index
+            .search_bm25("invoice", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].hdc_id, 1);
+    }
+
+
+    #[test]
+    fn rejects_payload_not_present_at_its_source_pointer() {
+        let mut index = EvidenceIndex::new();
+        let record = text_record(21, "evidence-source-pointer", "web", "trusted source string");
+        let mismatched_source = serde_json::to_vec(&serde_json::json!({
+            "evidence": "different string"
+        })).unwrap();
+        assert!(index.insert(record.clone(), &mismatched_source).is_err());
+        assert!(index
+            .insert(record, &source_bytes_for_text("trusted source string"))
+            .is_ok());
+    }
+
+    #[test]
+    fn ordinary_insert_rejects_pre_revoked_or_deleted_records() {
+        let mut index = EvidenceIndex::new();
+        let mut record = text_record(22, "evidence-revoked", "web", "blocked evidence");
+        record.lifecycle = EvidenceLifecycle::Revoked;
+        assert!(index
+            .insert(record, &source_bytes_for_text("blocked evidence"))
+            .is_err());
+    }
+
+
+    #[test]
+    fn evidence_id_lifecycle_transitions_are_query_visible_and_stable() {
+        let mut index = EvidenceIndex::new();
+        let old = text_record(101, "old-evidence", "web", "billing panel moved");
+        let new = text_record(102, "new-evidence", "web", "billing panel now here");
+        index.insert(old, &source_bytes_for_text("billing panel moved")).unwrap();
+        index.insert(new, &source_bytes_for_text("billing panel now here")).unwrap();
+
+        index.supersede_evidence("old-evidence", "new-evidence").unwrap();
+        let hits = index
+            .search_bm25("billing panel", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        assert!(hits.iter().all(|hit| hit.evidence_id != "old-evidence"));
+
+        index.revoke_evidence("new-evidence").unwrap();
+        assert!(index
+            .search_bm25("billing panel", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap()
+            .is_empty());
+        index.delete_evidence("new-evidence").unwrap();
+        assert!(index.revoke_evidence("new-evidence").is_err());
+    }
+
+
+    #[test]
+    fn batch_ingestion_is_atomic_when_the_final_source_pointer_is_invalid() {
+        let mut index = EvidenceIndex::new();
+        let source_value = serde_json::json!({
+            "evidence": "first source string",
+            "second": "different string"
+        });
+        let source_bytes = serde_json::to_vec(&source_value).unwrap();
+        let source_digest = hash(&source_bytes);
+
+        let mut valid = text_record(31, "evidence-valid", "web", "first source string");
+        valid.source.source_sha256 = source_digest.clone();
+        let mut invalid = text_record(32, "evidence-invalid", "web", "expected source string");
+        invalid.source.source_sha256 = source_digest;
+        invalid.source.source_pointer = "/second".to_string();
+
+        assert!(index
+            .insert_batch_atomic(vec![valid.clone(), invalid], &source_bytes)
+            .is_err());
+        // The valid first item must not be indexed before the second was checked.
+        assert!(index.records.is_empty());
+        assert!(index.lexical_postings.is_empty());
+        assert!(index.lexical_document_lengths.is_empty());
+        assert!(index.insert(valid, &source_bytes).is_ok());
+    }
     #[test]
     fn serializes_context_items_to_official_type_value_shape() {
         let item = MemoryContextItem {
@@ -396,8 +932,8 @@ mod tests {
     #[test]
     fn resolves_text_with_digest_and_preserves_hit_order() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-a", "web", "cart icon opens cart"), b"canonical trajectory bytes").unwrap();
-        index.insert(text_record(8, "evidence-b", "web", "checkout uses address panel"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(7, "evidence-a", "web", "cart icon opens cart"), &source_bytes_for_text("cart icon opens cart")).unwrap();
+        index.insert(text_record(8, "evidence-b", "web", "checkout uses address panel"), &source_bytes_for_text("checkout uses address panel")).unwrap();
         let items = index.resolve(&[8, 7, 8, 404], "web", 150, Path::new("."), 3).unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].value, "checkout uses address panel");
@@ -411,7 +947,7 @@ mod tests {
         let mut record = text_record(7, "evidence-a", "enterprise", "admin panel uses roles");
         record.valid_from_unix_ms = Some(200);
         record.valid_until_unix_ms = Some(300);
-        index.insert(record, b"canonical trajectory bytes").unwrap();
+        index.insert(record, &source_bytes_for_text("admin panel uses roles")).unwrap();
         assert!(index.resolve(&[7], "web", 250, Path::new("."), 10).unwrap().is_empty());
         assert!(index.resolve(&[7], "enterprise", 199, Path::new("."), 10).unwrap().is_empty());
         assert!(index.resolve(&[7], "enterprise", 300, Path::new("."), 10).unwrap().is_empty());
@@ -421,28 +957,28 @@ mod tests {
     #[test]
     fn revoked_and_deleted_records_never_resolve_or_reinsert() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-a", "web", "old route"), b"canonical trajectory bytes").unwrap();
-        index.insert(text_record(8, "evidence-b", "web", "new route"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(7, "evidence-a", "web", "old route"), &source_bytes_for_text("old route")).unwrap();
+        index.insert(text_record(8, "evidence-b", "web", "new route"), &source_bytes_for_text("new route")).unwrap();
         index.revoke(7).unwrap();
         index.mark_deleted(8).unwrap();
         assert!(index.resolve(&[7, 8], "web", 150, Path::new("."), 10).unwrap().is_empty());
-        assert!(index.insert(text_record(7, "evidence-c", "web", "resurrected route"), b"canonical trajectory bytes").is_err());
+        assert!(index.insert(text_record(7, "evidence-c", "web", "resurrected route"), &source_bytes_for_text("resurrected route")).is_err());
         assert!(index.revoke(8).is_err());
     }
 
     #[test]
     fn supersession_hides_old_record_and_requires_same_scope() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-old", "web", "old selector"), b"canonical trajectory bytes").unwrap();
-        index.insert(text_record(8, "evidence-new", "web", "new selector"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(7, "evidence-old", "web", "old selector"), &source_bytes_for_text("old selector")).unwrap();
+        index.insert(text_record(8, "evidence-new", "web", "new selector"), &source_bytes_for_text("new selector")).unwrap();
         index.supersede(7, 8).unwrap();
         let items = index.resolve(&[7, 8], "web", 150, Path::new("."), 10).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].value, "new selector");
 
         let mut other = EvidenceIndex::new();
-        other.insert(text_record(1, "web-record", "web", "web payload"), b"canonical trajectory bytes").unwrap();
-        other.insert(text_record(2, "enterprise-record", "enterprise", "enterprise payload"), b"canonical trajectory bytes").unwrap();
+        other.insert(text_record(1, "web-record", "web", "web payload"), &source_bytes_for_text("web payload")).unwrap();
+        other.insert(text_record(2, "enterprise-record", "enterprise", "enterprise payload"), &source_bytes_for_text("enterprise payload")).unwrap();
         assert!(other.supersede(1, 2).is_err());
     }
 
@@ -452,24 +988,28 @@ mod tests {
         let record = text_record(9, "evidence-provenance", "web", "source-bound evidence");
         assert!(index.insert(record.clone(), b"tampered source bytes").is_err());
         // A failed insert must not reserve either ID.
-        assert!(index.insert(record, b"canonical trajectory bytes").is_ok());
+        assert!(index.insert(record, &source_bytes_for_text("source-bound evidence")).is_ok());
     }
 
     #[test]
     fn refuses_duplicate_vector_and_evidence_ids() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-a", "web", "payload"), b"canonical trajectory bytes").unwrap();
-        assert!(index.insert(text_record(7, "evidence-b", "web", "other payload"), b"canonical trajectory bytes").is_err());
-        assert!(index.insert(text_record(8, "evidence-a", "web", "other payload"), b"canonical trajectory bytes").is_err());
+        index.insert(text_record(7, "evidence-a", "web", "payload"), &source_bytes_for_text("payload")).unwrap();
+        assert!(index.insert(text_record(7, "evidence-b", "web", "other payload"), &source_bytes_for_text("other payload")).is_err());
+        assert!(index.insert(text_record(8, "evidence-a", "web", "other payload"), &source_bytes_for_text("other payload")).is_err());
     }
 
     #[test]
-    fn tampered_text_digest_fails_closed() {
+    fn tampered_text_digest_is_rejected_before_indexing() {
         let mut index = EvidenceIndex::new();
         let mut record = text_record(7, "evidence-a", "web", "trusted text");
         record.content_sha256 = hash(b"different text");
-        index.insert(record, b"canonical trajectory bytes").unwrap();
-        assert!(index.resolve(&[7], "web", 150, Path::new("."), 10).is_err());
+        assert!(index
+            .insert(record, &source_bytes_for_text("trusted text"))
+            .is_err());
+        assert!(index.records.is_empty());
+        assert!(index.lexical_postings.is_empty());
+        assert!(index.lexical_document_lengths.is_empty());
     }
 
     #[test]

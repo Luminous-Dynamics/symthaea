@@ -79,6 +79,10 @@ getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 uuid = { version = "1", features = ["rng-getrandom"] }
 
 [[bin]]
+name = "broca-lme-worker"
+path = "src/bin/broca_lme_worker.rs"
+
+[[bin]]
 name = "broca-train"
 path = "src/bin/broca_train.rs"
 
