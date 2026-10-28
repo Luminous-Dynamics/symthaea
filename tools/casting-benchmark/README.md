@@ -305,7 +305,7 @@ python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_
 
 `CASTING-MF-COMPOSITION-001` crosses the six existing mismatch families independently: one family supplies the low/medium objective values, while another supplies the low/medium constraint margin. At high fidelity, both components resolve to the same analytic truth. Diagonal cells are required to match the existing single-family scenario exactly; off-diagonal cells test combinations in which objective ranking errors and feasibility errors arise from different mechanisms.
 
-This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The preregistered default covers 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs.
+This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The original five-policy compositional matrix covered 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs. With the decision-impact challenger below, the current six-policy matrix contains 5,832 runs.
 
 Run a fast crossed subset:
 
