@@ -155,6 +155,7 @@ impl ActiveInferenceBridge {
         let avg_brier = calibration_summary.global_brier;
         let prediction_error =
             (avg_brier as f32 * self.config.prediction_error_weight).clamp(0.0, 1.0);
+        let prediction_error_valid = avg_brier.is_finite() && prediction_error.is_finite();
 
         // 2. UNCERTAINTY: From ECE (Expected Calibration Error)
         // High ECE = high systematic miscalibration = high uncertainty
@@ -188,6 +189,7 @@ impl ActiveInferenceBridge {
 
         PrincipledSignals {
             prediction_error,
+            prediction_error_valid,
             uncertainty,
             coherence,
             confidence,
