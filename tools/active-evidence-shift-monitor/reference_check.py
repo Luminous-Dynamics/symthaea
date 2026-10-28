@@ -659,7 +659,7 @@ def eprocess_family_self_test():
             raise ValueError(f"{family} did not expose nominal-rate misspecification")
         for scenario in EPROCESS_FAMILY_SCENARIOS:
             row = indexed[(family, scenario)]
-            if scenario.startswith("step_"):
+            if scenario.startswith("step_") or scenario == "within_band_transition_049_to_051":
                 total = (
                     float(row["false_alarm_probability"])
                     + float(row["detection_probability"])
