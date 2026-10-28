@@ -121,6 +121,28 @@ pub struct ComparisonSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StratumSummaryV1 {
+    pub module_name: String,
+    pub noise_level: f64,
+    pub equation_difficulty: String,
+    pub model_system: String,
+    pub law_version: String,
+    pub expected_pairs: usize,
+    pub both_observed_pairs: usize,
+    pub both_completed_pairs: usize,
+    pub rmsle_pair_count: usize,
+    pub mean_rmsle_delta_tool_minus_vanilla: Option<f64>,
+    pub exact_accuracy_pair_count: usize,
+    pub mean_exact_accuracy_delta_tool_minus_vanilla: Option<f64>,
+    pub experiment_count_pair_count: usize,
+    pub mean_experiments_delta_tool_minus_vanilla: Option<f64>,
+    pub rounds_pair_count: usize,
+    pub mean_rounds_delta_tool_minus_vanilla: Option<f64>,
+    pub tokens_pair_count: usize,
+    pub mean_tokens_delta_tool_minus_vanilla: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReportBodyV1 {
     pub schema: String,
     pub upstream_repository: String,
@@ -133,6 +155,8 @@ pub struct ReportBodyV1 {
     pub vanilla: ArmSummaryV1,
     pub code_assisted: ArmSummaryV1,
     pub comparison: ComparisonSummaryV1,
+    /// Secondary aggregate grouped by module and declared task strata; do not let a pooled mean hide reversals.
+    pub by_stratum: Vec<StratumSummaryV1>,
     pub paired_trials: Vec<PairedTrialV1>,
     pub import_problems: Vec<ImportProblemV1>,
     pub metric_semantics: Vec<String>,
@@ -159,6 +183,28 @@ pub struct ArtifactInput {
     pub path: String,
     /// Exact bytes as read from the source artifact.
     pub raw_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct StratumKey {
+    module_name: String,
+    noise_bits: u64,
+    equation_difficulty: String,
+    model_system: String,
+    law_version: String,
+}
+
+impl StratumKey {
+    fn from_expected(expected: &ExpectedPairV1) -> Result<Self, String> {
+        let key = expected.key()?;
+        Ok(Self {
+            module_name: key.module_name,
+            noise_bits: key.noise_bits,
+            equation_difficulty: key.equation_difficulty,
+            model_system: key.model_system,
+            law_version: key.law_version,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -540,6 +586,37 @@ fn signed_delta(a: Option<u64>, b: Option<u64>) -> Option<i64> {
     left.checked_sub(right)
 }
 
+fn summarize_stratum(key: StratumKey, rows: &[&PairedTrialV1]) -> StratumSummaryV1 {
+    let rmsle = rows.iter().filter_map(|row| row.rmsle_delta_tool_minus_vanilla).collect::<Vec<_>>();
+    let accuracy = rows.iter().filter_map(|row| row.exact_accuracy_delta_tool_minus_vanilla).collect::<Vec<_>>();
+    let experiments = rows.iter().filter_map(|row| row.experiments_delta_tool_minus_vanilla).map(|value| value as f64).collect::<Vec<_>>();
+    let rounds = rows.iter().filter_map(|row| row.rounds_delta_tool_minus_vanilla).map(|value| value as f64).collect::<Vec<_>>();
+    let tokens = rows.iter().filter_map(|row| row.tokens_delta_tool_minus_vanilla).map(|value| value as f64).collect::<Vec<_>>();
+    StratumSummaryV1 {
+        module_name: key.module_name,
+        noise_level: f64::from_bits(key.noise_bits),
+        equation_difficulty: key.equation_difficulty,
+        model_system: key.model_system,
+        law_version: key.law_version,
+        expected_pairs: rows.len(),
+        both_observed_pairs: rows.iter().filter(|row| row.vanilla.is_some() && row.code_assisted.is_some()).count(),
+        both_completed_pairs: rows.iter().filter(|row| matches!(
+            (&row.vanilla, &row.code_assisted),
+            (Some(vanilla), Some(tool)) if vanilla.status == TrialStatus::Completed && tool.status == TrialStatus::Completed
+        )).count(),
+        rmsle_pair_count: rmsle.len(),
+        mean_rmsle_delta_tool_minus_vanilla: mean(rmsle.into_iter()),
+        exact_accuracy_pair_count: accuracy.len(),
+        mean_exact_accuracy_delta_tool_minus_vanilla: mean(accuracy.into_iter()),
+        experiment_count_pair_count: experiments.len(),
+        mean_experiments_delta_tool_minus_vanilla: mean(experiments.into_iter()),
+        rounds_pair_count: rounds.len(),
+        mean_rounds_delta_tool_minus_vanilla: mean(rounds.into_iter()),
+        tokens_pair_count: tokens.len(),
+        mean_tokens_delta_tool_minus_vanilla: mean(tokens.into_iter()),
+    }
+}
+
 pub fn audit(
     manifest_bytes: &[u8],
     mut vanilla_artifacts: Vec<ArtifactInput>,
@@ -717,6 +794,18 @@ pub fn audit(
         mean_tokens_delta_tool_minus_vanilla: mean(token_deltas.into_iter()),
     };
 
+    let mut grouped: BTreeMap<StratumKey, Vec<&PairedTrialV1>> = BTreeMap::new();
+    for paired in &paired_trials {
+        grouped
+            .entry(StratumKey::from_expected(&paired.expected)?)
+            .or_default()
+            .push(paired);
+    }
+    let by_stratum = grouped
+        .into_iter()
+        .map(|(key, rows)| summarize_stratum(key, &rows))
+        .collect();
+
     let body = ReportBodyV1 {
         schema: REPORT_SCHEMA.to_owned(),
         upstream_repository: manifest.upstream_repository,
@@ -729,6 +818,7 @@ pub fn audit(
         vanilla: vanilla_summary,
         code_assisted: tool_summary,
         comparison,
+        by_stratum,
         paired_trials,
         import_problems,
         metric_semantics: vec![
@@ -923,6 +1013,19 @@ mod tests {
         assert_eq!(report.body.comparison.exact_accuracy_pair_count, 1);
         assert_eq!(report.body.comparison.mean_exact_accuracy_delta_tool_minus_vanilla, Some(1.0));
         assert_eq!(report.body.comparison.mean_experiments_delta_tool_minus_vanilla, Some(-1.0));
+        assert_eq!(report.body.by_stratum.len(), 2);
+        let first_stratum = report.body.by_stratum.iter()
+            .find(|stratum| stratum.equation_difficulty == "easy")
+            .unwrap();
+        assert_eq!(first_stratum.expected_pairs, 1);
+        assert_eq!(first_stratum.rmsle_pair_count, 1);
+        assert_eq!(first_stratum.mean_rmsle_delta_tool_minus_vanilla, Some(-0.3));
+        let second_stratum = report.body.by_stratum.iter()
+            .find(|stratum| stratum.equation_difficulty == "hard")
+            .unwrap();
+        assert_eq!(second_stratum.expected_pairs, 1);
+        assert_eq!(second_stratum.both_observed_pairs, 0);
+        assert_eq!(second_stratum.rmsle_pair_count, 0);
     }
 
     #[test]
