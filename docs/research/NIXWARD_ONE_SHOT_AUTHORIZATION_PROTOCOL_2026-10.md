@@ -76,6 +76,18 @@ It generates 10,000 deterministic scenario trials across valid authorization, co
 
 This is intentionally a *microbenchmark of the ledger*, not an end-to-end agent benchmark. It does not measure process launch, policy-generation latency, real system side effects, expiry under a production clock, or the repository-wide bypass surface. The authored harness has not been compiled or run in this environment; no latency number is claimed yet.
 
+## Retained-state occupancy benchmark
+
+A separate example, `crates/core/nixward/examples/one_shot_authorization_occupancy_bench.rs`, measures issue and consume latency at retained-ledger populations of 1, 1,000, 10,000 and 100,000 issued permits. At each profile it keeps the base permit handles alive, records 100 additional issue latencies as the population grows from N through N+99, then consumes those 100 permits after the issued-record count has reached N+100. It emits every sample, profile setup time, and p50/p95/p99 for issue and consume. It is designed to expose occupancy-dependent latency that the fresh-ledger microbenchmark intentionally excludes.
+
+Run with:
+
+```sh
+cargo run -p nixward --example one_shot_authorization_occupancy_bench --release
+```
+
+This benchmark does **not** yet measure allocator bytes/RSS, cleanup, retention bounds, capacity exhaustion, races, or crash/restart behavior; the ledger has no newly asserted bounded-state contract. Its output is source-authored but unmeasured until the exact-head executable is built and run. In particular, do not infer memory bounds or safe pruning from latency alone. The next lifecycle lane must pair occupancy measurements with allocation instrumentation, explicit capacity/overload semantics, expiry and cleanup race tests, and replay/restart invariants tracked in [NIXWARD-AUTH-LIFECYCLE-001 #8657](https://github.com/Luminous-Dynamics/symthaea/issues/8657).
+
 ## Benchmark plan: attack resistance *and* utility
 
 Use frozen paired cases with an identical command/policy context across a baseline path and the gated path. Separate these events; do not collapse them into one “safety score”:
