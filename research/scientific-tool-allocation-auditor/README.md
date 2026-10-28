@@ -13,6 +13,16 @@ cargo test --locked --manifest-path research/scientific-tool-allocation-auditor/
 cargo run --locked --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml -- MANIFEST.json TRIALS.jsonl
 ```
 
+For a no-run smoke check using the checked-in empty-trial fixture:
+
+```sh
+cargo run --locked --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml -- \
+  research/scientific-tool-allocation-auditor/fixtures/manifest.json \
+  research/scientific-tool-allocation-auditor/fixtures/trials.jsonl
+```
+
+This fixture intentionally contains zero trial rows. The expected report has two assigned cells, two missing cells, zero completed runs per arm, and no completed-conditional recovery rate. It is an input/denominator test, not an experimental result.
+
 The CLI emits a deterministic JSON report with:
 - every manifest-assigned task/seed/treatment cell and missing cells;
 - terminal outcome counts, retaining infrastructure failures, budget violations, invalid and not-evaluable rows;
