@@ -1472,6 +1472,27 @@ mod tests {
     }
 
     #[test]
+    fn latency_ratio_uses_direct_clock_not_sum_of_overlapping_stage_diagnostics() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "pair", 1, 5, costs(100.0), EnergyRecord::not_measured())],
+        );
+        let mut candidate_trial =
+            verified_trial("c", "pair", 1, 5, costs(50.0), EnergyRecord::not_measured());
+        // Simulate overlapping stage timers whose sum exceeds elapsed wall-clock time.
+        candidate_trial.costs = costs(500.0);
+        assert_eq!(candidate_trial.costs.sum_all_stage_costs_ms(), Some(500.0));
+        assert_eq!(candidate_trial.deployment_elapsed_ms, Some(50.0));
+        let candidate = report("candidate", "trajectory", vec![candidate_trial]);
+
+        let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
+        assert_eq!(result.pairs[0].baseline_all_in_ms, Some(100.0));
+        assert_eq!(result.pairs[0].candidate_all_in_ms, Some(50.0));
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
+    }
+
+    #[test]
     fn unknown_queue_stage_does_not_suppress_directly_observed_latency() {
         let baseline = report(
             "baseline",
