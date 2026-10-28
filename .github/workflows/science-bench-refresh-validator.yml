@@ -56,3 +56,106 @@ jobs:
           sealed_exit=$?
           set -e
           test "$sealed_exit" -eq 4
+
+      - name: Commit-reveal round trip and mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="research/science-bench-refresh/fixtures/generation-manifest.example.json"
+          zero="$(printf '%064d' 0)"
+          a="$(printf '%064d' 0 | tr '0' 'a')"
+          b="$(printf '%064d' 0 | tr '0' 'b')"
+          c_hash="$(printf '%064d' 0 | tr '0' 'c')"
+          d="$(printf '%064d' 0 | tr '0' 'd')"
+          e="$(printf '%064d' 0 | tr '0' 'e')"
+          f="$(printf '%064d' 0 | tr '0' 'f')"
+          revision="$(printf '%040d' 0 | tr '0' 'b')"
+
+          jq \
+            --arg zero "$zero" --arg a "$a" --arg b "$b" \
+            --arg c "$c_hash" --arg d "$d" --arg e "$e" --arg f "$f" \
+            --arg revision "$revision" '
+              .purpose = "qualified_run" |
+              .generator.revision = $revision |
+              .generator.configuration_sha256 = $a |
+              .evaluator.source_sha256 = $b |
+              .evaluator.oracle_separation = "independent_evaluator_boundary_verified" |
+              .policy_freeze.source_or_policy_sha256 = $c |
+              .policy_freeze.prompt_sha256 = $d |
+              .policy_freeze.configuration_sha256 = $e |
+              .policy_freeze.tool_manifest_sha256 = $a |
+              .analysis_plan_sha256 = $f |
+              .protocol_commitment_sha256 = $zero |
+              .seed_commitment_sha256 = $zero |
+              .task_set_commitment_sha256 = $zero
+            ' "$manifest" > /tmp/sbr-draft-manifest.json
+
+          # This known, low-entropy seed is strictly an integration-test vector.
+          # Real sealed runs must use >=256 bits from a cryptographically secure source.
+          printf 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' > /tmp/sbr-seed.bin
+          jq -n '{
+            schema: "symthaea.science_bench_refresh_task_set.v1",
+            generation_id: "example-only-not-for-scoring-0001",
+            tasks: [
+              {task_id:"t01",family_id:"semantic_invariance",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t02",family_id:"semantic_invariance",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t03",family_id:"sampling_noise_shift",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t04",family_id:"sampling_noise_shift",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t05",family_id:"confounding_null",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t06",family_id:"confounding_null",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t07",family_id:"identifiability_abstention",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t08",family_id:"identifiability_abstention",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}}
+            ]
+          }' > /tmp/sbr-task-set.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            protocol-commit /tmp/sbr-draft-manifest.json > /tmp/sbr-protocol.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            artifact-commit /tmp/sbr-draft-manifest.json seed /tmp/sbr-seed.bin > /tmp/sbr-seed-commit.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            artifact-commit /tmp/sbr-draft-manifest.json task-set /tmp/sbr-task-set.json > /tmp/sbr-task-commit.json
+
+          protocol="$(jq -r '.protocol_commitment_sha256' /tmp/sbr-protocol.json)"
+          seed_commit="$(jq -r '.artifact_commitment_sha256' /tmp/sbr-seed-commit.json)"
+          task_commit="$(jq -r '.artifact_commitment_sha256' /tmp/sbr-task-commit.json)"
+          jq --arg protocol "$protocol" --arg seed "$seed_commit" --arg tasks "$task_commit" '
+            .protocol_commitment_sha256 = $protocol |
+            .seed_commitment_sha256 = $seed |
+            .task_set_commitment_sha256 = $tasks
+          ' /tmp/sbr-draft-manifest.json > /tmp/sbr-final-manifest.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            /tmp/sbr-final-manifest.json --require-sealed > /tmp/sbr-validation.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-final-manifest.json /tmp/sbr-seed.bin /tmp/sbr-task-set.json > /tmp/sbr-reveal.json
+          grep -q '"verified": true' /tmp/sbr-reveal.json
+          grep -q '"task_set_contract_valid": true' /tmp/sbr-reveal.json
+
+          cp /tmp/sbr-seed.bin /tmp/sbr-mutated-seed.bin
+          printf 'B' | dd of=/tmp/sbr-mutated-seed.bin bs=1 seek=0 conv=notrunc status=none
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-final-manifest.json /tmp/sbr-mutated-seed.bin /tmp/sbr-task-set.json > /tmp/sbr-mutated-seed-report.json
+          seed_exit=$?
+          set -e
+          test "$seed_exit" -eq 5
+          grep -q '"seed_commitment_matches": false' /tmp/sbr-mutated-seed-report.json
+
+          jq '.tasks[0].policy_input.observations = [{"x": 1, "y": 999}]' \
+            /tmp/sbr-task-set.json > /tmp/sbr-mutated-task-set.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-final-manifest.json /tmp/sbr-seed.bin /tmp/sbr-mutated-task-set.json > /tmp/sbr-mutated-task-report.json
+          task_exit=$?
+          set -e
+          test "$task_exit" -eq 5
+          grep -q '"task_set_commitment_matches": false' /tmp/sbr-mutated-task-report.json
+
+          jq '.budget.max_total_tokens += 1' /tmp/sbr-final-manifest.json > /tmp/sbr-mutated-manifest.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            /tmp/sbr-mutated-manifest.json > /tmp/sbr-mutated-manifest-report.json
+          manifest_exit=$?
+          set -e
+          test "$manifest_exit" -eq 2
+          grep -q 'does not match the frozen manifest context' /tmp/sbr-mutated-manifest-report.json
