@@ -340,7 +340,7 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     } else if manifest.lane == "public_development" {
         "public development tasks are not confirmatory scoring evidence".to_owned()
     } else if manifest_declares_sealed_generalization_profile {
-        "eligible under the declared sealed-refresh contract; actual runner isolation still requires independent evidence".to_owned()
+        "manifest declares a sealed-refresh profile; this validator cannot establish actual runner isolation".to_owned()
     } else if manifest.lane == "reproducible_open" {
         "scoring may be reported as open/reproducible, but this lane is not sealed generalization evidence".to_owned()
     } else if manifest.lane == "immutable_anchor" {
