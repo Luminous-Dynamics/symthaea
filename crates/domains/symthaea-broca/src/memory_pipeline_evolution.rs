@@ -471,7 +471,10 @@ pub fn assess_promotion(
         });
     }
 
-    if observed_lift >= -policy.non_inferiority_margin_pp
+    // Non-inferiority must be supported by the paired confidence bound, not
+    // merely by the point estimate; otherwise a noisy, harmful candidate can
+    // pass the cost gate.
+    if ci_lower >= -policy.non_inferiority_margin_pp
         && cost_ratio <= policy.max_cost_ratio_for_efficiency_win
     {
         return Ok(PromotionAssessment {
@@ -616,10 +619,26 @@ mod tests {
         let receipt = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
         receipt.accuracy = 0.595;
         receipt.paired_lift_pp = Some(-0.5);
-        receipt.paired_ci95_lower_pp = Some(-2.0);
+        receipt.paired_ci95_lower_pp = Some(-0.8);
         receipt.lifecycle_cost_units = 70.0;
         let result = assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).unwrap();
         assert_eq!(result.outcome, PromotionOutcome::EfficiencyWin);
+    }
+
+
+    #[test]
+    fn efficiency_route_rejects_point_estimate_noninferiority_without_ci_support() {
+        let mut trace = matched_trace();
+        let receipt = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        receipt.accuracy = 0.595;
+        receipt.paired_lift_pp = Some(-0.5);
+        receipt.paired_ci95_lower_pp = Some(-1.2);
+        receipt.lifecycle_cost_units = 50.0;
+        let result = assess_promotion(
+            &trace, "trial", "baseline", "trial-heldout", "baseline-heldout",
+            PromotionPolicy::default(),
+        ).unwrap();
+        assert_eq!(result.outcome, PromotionOutcome::Rejected);
     }
 
     #[test]
