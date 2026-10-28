@@ -156,6 +156,14 @@
       "source_paper": "https://doi.org/10.1016/j.neucom.2025.131674",
       "source_repository": "https://github.com/fernandezdaniel/MOBOCMF",
       "status": "public-code-version-and-environment-lock-required"
+    },
+    {
+      "id": "mf_scbo",
+      "family": "high_dimensional_multi_fidelity_constrained_bayesian_optimization",
+      "required": true,
+      "source_paper": "https://arxiv.org/abs/2609.29941",
+      "source_repository": "https://github.com/Nemo-Virtual-Lab/MF-SCBO",
+      "status": "public-code-version-and-environment-lock-required"
     }
   ],
   "baseline_lock": {
@@ -359,6 +367,7 @@
       "botorch_mf_hvkg",
       "botorch_momf",
       "mf_jesmoc",
+      "mf_scbo",
       "decision_value_of_information",
       "adaptive_budget",
       "high_only",
@@ -372,7 +381,8 @@
       "Retain failed, crashed, aborted and refused runs; do not silently drop them.",
       "Freeze environment and immutable source/package revisions before running comparisons.",
       "Do not compare results from the synthetic casting-like suite directly to COCO scores or claim physical foundry validity.",
-      "Run the public MF-JESMOC implementation with a pinned commit and environment lock; retain its originally reported protocol separately from the matched-budget casting stress protocol."
+      "Run the public MF-JESMOC implementation with a pinned commit and environment lock; retain its originally reported protocol separately from the matched-budget casting stress protocol.",
+      "Run MF-SCBO with a pinned repository commit, dependency lock and documented fidelity mapping; distinguish its high-dimensional/non-nested design assumptions from the current paired finite-pool casting-like diagnostic."
     ],
     "primary_metrics": [
       "feasible high-fidelity hypervolume vs cumulative fidelity cost",
@@ -382,6 +392,28 @@
       "wall-clock time, memory and optimizer overhead"
     ],
     "statistical_gate": "At least 20 paired seeds (target 30), per-cell effects and confidence intervals, correction for multiple comparisons; three-seed defaults are diagnostic only.",
-    "research_rationale": "MF-JESMOC is a directly relevant constrained multi-objective multi-fidelity method using deep Gaussian processes and cost-normalized joint-entropy reduction. It is included as a required external comparator; published claims are not treated as evidence for this repository."
+    "research_rationale": "MF-JESMOC is a directly relevant constrained multi-objective multi-fidelity method using deep Gaussian processes and cost-normalized joint-entropy reduction. It is included as a required external comparator; published claims are not treated as evidence for this repository. MF-SCBO (preprint posted 24 September 2026) is a new relevant baseline for constrained multi-fidelity BO with multiple fidelity levels and non-nested sampling; it should be checked for applicability rather than assumed to be directly comparable."
+  },
+  "promotion_risk_control": {
+    "status": "implemented_audit_gate_not_yet_executed",
+    "risk_event": "A candidate is predicted feasible by the frozen promotion rule but its high-fidelity validation margin is negative.",
+    "confidence_method": "One-sided exact Clopper-Pearson binomial upper confidence bound at 95%.",
+    "target_false_feasible_rate": 0.05,
+    "certification_rule": "The upper confidence bound must be at or below 0.05 on a predeclared independent held-out validation set representative of the intended deployment context.",
+    "minimum_sample_note": "With zero false-feasible events, at least 59 independent eligible validations are needed for a one-sided 95% upper bound at or below 5%; 8 clean observations only bound the rate by about 31.2%.",
+    "non_independence_rule": "Outcomes selected adaptively by the optimizer are descriptive only and cannot certify that optimizer's risk. Do not label their confidence bound as a safety guarantee.",
+    "shift_rule": "Exchangeability/representativeness is an assumption, not established by a binomial interval. Stratify and test by held-out mismatch family, process regime, geometry/material context, and detected distribution shift; on unsupported shift, abstain or reacquire calibration.",
+    "failure_modes": [
+      "No eligible validation observations",
+      "Insufficient sample size",
+      "Observed failures cause the confidence bound to exceed target",
+      "Validation population is not representative or exchangeability is implausible"
+    ],
+    "outputs": [
+      "Observed false-feasible count and denominator",
+      "One-sided exact upper confidence bound",
+      "Independent-versus-optimization-trace provenance",
+      "Fail-closed allow/abstain decision"
+    ]
   }
 }
