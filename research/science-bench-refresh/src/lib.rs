@@ -22,7 +22,6 @@ pub struct GenerationManifestV1 {
     pub lane: String,
     pub generator: GeneratorV1,
     pub evaluator: EvaluatorV1,
-    pub seed_commitment_sha256: String,
     pub protocol_commitment_sha256: String,
     pub seed_commitment_sha256: String,
     pub task_set_commitment_sha256: String,
@@ -34,7 +33,7 @@ pub struct GenerationManifestV1 {
     pub post_run_reveal_policy: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GeneratorV1 {
     pub repository: String,
@@ -42,7 +41,7 @@ pub struct GeneratorV1 {
     pub configuration_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvaluatorV1 {
     pub version: String,
@@ -50,7 +49,7 @@ pub struct EvaluatorV1 {
     pub oracle_separation: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskFamilyV1 {
     pub family_id: String,
@@ -58,7 +57,7 @@ pub struct TaskFamilyV1 {
     pub planned_task_count: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PolicyFreezeV1 {
     pub subject_id: String,
@@ -68,7 +67,7 @@ pub struct PolicyFreezeV1 {
     pub tool_manifest_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BudgetV1 {
     pub max_observations: u64,
@@ -166,7 +165,7 @@ fn protocol_commitment_for_manifest(
     hasher.update(b"protocol.v1\0");
     hasher.update(context_len.to_be_bytes());
     hasher.update(&context);
-    Ok(hex_digest(hasher.finalize().as_slice()))
+    Ok(hex_digest(&hasher.finalize()))
 }
 
 fn hex_digest(bytes: &[u8]) -> String {
@@ -301,13 +300,7 @@ pub fn verify_reveal(
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut output = String::with_capacity(64);
-    for byte in digest {
-        use std::fmt::Write as _;
-        let _ = write!(&mut output, "{byte:02x}");
-    }
-    output
+    hex_digest(&Sha256::digest(bytes))
 }
 
 fn is_lower_hex(value: &str, expected_len: usize) -> bool {
@@ -540,12 +533,14 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
         issues.push("budget.max_wall_clock_seconds must be greater than zero".to_owned());
     }
 
-    match protocol_commitment_for_manifest(&manifest) {
-        Ok(computed) if computed != manifest.protocol_commitment_sha256 => {
-            issues.push("protocol_commitment_sha256 does not match the frozen manifest context".to_owned());
+    if is_qualified || !is_zero_digest(&manifest.protocol_commitment_sha256) {
+        match protocol_commitment_for_manifest(&manifest) {
+            Ok(computed) if computed != manifest.protocol_commitment_sha256 => {
+                issues.push("protocol_commitment_sha256 does not match the frozen manifest context".to_owned());
+            }
+            Ok(_) => {}
+            Err(error) => issues.push(format!("cannot recompute protocol commitment: {error}")),
         }
-        Ok(_) => {}
-        Err(error) => issues.push(format!("cannot recompute protocol commitment: {error}")),
     }
 
     let valid = issues.is_empty();
@@ -602,7 +597,7 @@ mod tests {
         } else {
             "open_from_start_not_sealed"
         };
-        json!({
+        let mut value = json!({
             "schema": MANIFEST_SCHEMA,
             "generation_id": "test-generation-0001",
             "purpose": "qualified_run",
@@ -617,8 +612,9 @@ mod tests {
                 "source_sha256": digest('c'),
                 "oracle_separation": "independent_evaluator_boundary_verified"
             },
-            "seed_commitment_sha256": digest('d'),
-            "task_set_commitment_sha256": digest('e'),
+            "protocol_commitment_sha256": digest('0'),
+            "seed_commitment_sha256": digest('0'),
+            "task_set_commitment_sha256": digest('0'),
             "expected_task_count": 2,
             "task_family_mixture": [
                 {"family_id": "family-a", "weight": 0.5, "planned_task_count": 1},
@@ -640,7 +636,29 @@ mod tests {
             },
             "analysis_plan_sha256": digest('5'),
             "post_run_reveal_policy": reveal_policy
-        })
+        });
+        let seed = test_seed();
+        let task_set = test_task_set();
+        let raw = serde_json::to_vec(&value).expect("manifest serializes");
+        let protocol = compute_protocol_commitment(&raw).expect("protocol commitment computes");
+        value["protocol_commitment_sha256"] = json!(protocol);
+        let raw = serde_json::to_vec(&value).expect("manifest serializes");
+        value["seed_commitment_sha256"] = json!(
+            compute_artifact_commitment(&raw, "seed", &seed).expect("seed commitment computes")
+        );
+        value["task_set_commitment_sha256"] = json!(
+            compute_artifact_commitment(&raw, "task-set", &task_set)
+                .expect("task-set commitment computes")
+        );
+        value
+    }
+
+    fn test_seed() -> Vec<u8> {
+        vec![0x5a; 32]
+    }
+
+    fn test_task_set() -> Vec<u8> {
+        br#"{"schema":"symthaea.science_bench_refresh_task_set.v1","generation_id":"test-generation-0001","tasks":[]}"#.to_vec()
     }
 
     fn validate_value(value: &Value) -> Result<ValidationReportV1, String> {
