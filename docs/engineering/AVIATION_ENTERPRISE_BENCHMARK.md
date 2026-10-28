@@ -308,6 +308,6 @@ The exported `aviation_probability_calibration.rs` module turns held-out Calibra
 
 The concentration bound assumes independent event episodes from one fixed distribution. It is not valid as a blanket guarantee under arbitrary operational drift, temporal dependence or omitted scenario classes. A small calibration set can produce a 100% TV radius, exposing insufficient evidence rather than justifying a lower confidence level. The research spec recommends regime/time-block diagnostics and a predeclared envelope when pooling is not defensible.
 
-Fourteen unit tests and five public-API integration-oracle fixtures are defined for this module. No Rust tests or example execution are claimed.
+Nineteen unit tests and seven public-API integration-oracle fixtures are defined for the finite-sample calibration module. No Rust tests or example execution are claimed.
 
 Follow-up: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787).
