@@ -234,7 +234,7 @@ fn build_synthetic_run(scenario: &str, ticks: usize, seed: u64) -> anyhow::Resul
         dataset_id: DATASET_ID.to_owned(),
         stream_id,
         scenario_id: scenario.to_owned(),
-        comparison_track: "valid-pe-only".to_owned(),
+        comparison_track: "observed-outcome".to_owned(),
         shared_stream_sha256: event_ledger_sha256,
         seed,
         task_loss_metric_id: "synthetic-squared-error".to_owned(),
@@ -379,7 +379,7 @@ fn simulate_policy(
                 snapshot: estimate,
                 candidate,
                 stage_tick: tick,
-                next_evaluation_tick: tick + 1,
+                next_evaluation_tick: tick,
                 shadow_evaluations: Vec::new(),
                 verification_passed: None,
             });
