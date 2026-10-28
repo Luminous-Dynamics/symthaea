@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from pathlib import Path
 from dataclasses import asdict
 from typing import Iterable
 
@@ -34,6 +35,23 @@ from multifidelity_scenario_suite import (
 )
 
 BENCHMARK_ID = "CASTING-MF-COMPOSITION-001"
+SOURCE_PATHS = (
+    "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+    "tools/casting-benchmark/score_compositional_bakeoff.py",
+    "tools/casting-benchmark/multifidelity_scenario_suite.py",
+    "tools/casting-benchmark/multifidelity_stress.py",
+    "docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json",
+    "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json",
+)
+
+
+def source_lock() -> dict[str, str]:
+    """Capture source/manifest bytes before any optimizer evaluations occur."""
+    root = Path(__file__).resolve().parents[2]
+    return {
+        relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        for relative in SOURCE_PATHS
+    }
 
 
 class CompositionalScenarioWorld:
@@ -218,6 +236,7 @@ def run_sweep(
     seed_values = tuple(seeds)
     policy_values = tuple(POLICIES) if policies is None else tuple(policies)
     costs = normalize_fidelity_costs(fidelity_costs)
+    locked_sources = source_lock()
     for values, name in (
         (objectives, "objective_families"),
         (constraints, "constraint_families"),
@@ -265,6 +284,7 @@ def run_sweep(
         "design_count": design_count,
         "cost_budget": cost_budget,
         "fidelity_costs": costs,
+        "source_sha256": locked_sources,
         "run_count": len(runs),
         "paired_runs": runs,
         "warning": (
