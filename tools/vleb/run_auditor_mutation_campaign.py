@@ -42,9 +42,9 @@ MUTATIONS: tuple[dict[str, str], ...] = (
         "replacement": "if False:",
     },
     {
-        "id": "unexpected_task_rejection",
+        "id": "unexpected_task_diagnostic",
         "family": "cohort_manifest_integrity",
-        "description": "accept reports for task IDs outside the locked inventory",
+        "description": "remove the explicit out-of-cohort diagnostic; the exact locked-inventory check remains a secondary defense",
         "anchor": "if task_id not in expected_task_ids:",
         "replacement": "if False:",
     },
@@ -321,7 +321,9 @@ def main(argv: list[str] | None = None) -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
-    return 0 if result.get("baseline_passed") is True and result.get("mutation_kill_rate_pct") == 100.0 and result.get("survived_count") == 0 and result.get("invalid_count") == 0 else 1
+    family_summary = result.get("family_summary", {})
+    all_families_complete = bool(family_summary) and all(row.get("complete") is True for row in family_summary.values())
+    return 0 if result.get("baseline_passed") is True and result.get("mutation_kill_rate_pct") == 100.0 and result.get("survived_count") == 0 and result.get("invalid_count") == 0 and all_families_complete else 1
 
 
 if __name__ == "__main__":
