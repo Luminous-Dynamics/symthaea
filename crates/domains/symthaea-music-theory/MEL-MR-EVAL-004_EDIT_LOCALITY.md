@@ -74,3 +74,14 @@ Do not claim superiority to commercial systems from symbolic edit-locality accur
 ## Execution boundary
 
 The fixture schema, family split and oracle consistency are checked independently. Rust unit tests replay the corpus and round-trip receipts, but have not been compiled or executed here because the environment lacks `cargo`, `rustc`, and `rustfmt`. Exact-head workflow records must be inspected before treating any CI result as a pass. A skipped workflow is not a pass.
+
+
+## Adversarial extension 1.1
+
+The companion `MEL-EDIT-LOCALITY-ADVERSARIAL-1.1` set adds 84 cases across the same 12 family-held-out motifs: compound onset + duration collateral damage, onset tolerance at/just above the boundary, duration log-ratio just below/above tolerance, multi-axis collateral during a correct local pitch edit, and under-edit plus collateral damage. It has 24 expected accepts and 60 expected rejects. The Rust corpus replay test now includes both versions, expecting 216 total cases (84 accepts / 132 rejects). Fixture/schema/oracle checks do not count as Rust execution.
+
+## Content-bound receipt envelope
+
+`edit_locality_attestation.rs` wraps the base evidence in `BoundEditLocalityEvidence`, adding role-separated SHA-256 commitments to source and target event sequences. The versioned binary encoding binds event order/count, signed MIDI pitches, and the exact IEEE-754 bit patterns for onsets/durations using explicit little-endian fields and a domain-separation prefix. `replay_edit_locality_bound` re-executes the verifier and requires exact receipt equality, so a valid receipt cannot be silently reused with altered source, target, request, tolerances, or residual results.
+
+These digests establish content integrity only. They are not signatures, identity assertions, trusted timestamps, or proof of who produced the music. A stronger provenance claim would require an authenticated signer/key policy and a separately reviewed canonical protocol. Byte-level binding also intentionally treats numerically equal values with different floating-point encodings (for example +0.0 and -0.0) as different content; accepted events already reject negative onsets and use positive durations, but callers should preserve the exact serialized values for replay.
