@@ -46,12 +46,15 @@ The output probabilities should sum to one. The null test checks that the single
     cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > /tmp/shift-monitor.csv
     cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --sentinel-budget-csv > /tmp/sentinel-budget.csv
     cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --eprocess-family-csv > /tmp/eprocess-family.csv
+    cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --cusum-baseline-csv > /tmp/cusum-baseline.csv
     python3 tools/active-evidence-shift-monitor/reference_check.py --self-test
     python3 tools/active-evidence-shift-monitor/reference_check.py /tmp/shift-monitor.csv
     python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget-self-test
     python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget /tmp/sentinel-budget.csv
     python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family-self-test
     python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family /tmp/eprocess-family.csv
+    python3 tools/active-evidence-shift-monitor/reference_check.py --cusum-self-test
+    python3 tools/active-evidence-shift-monitor/reference_check.py --cusum /tmp/cusum-baseline.csv
 
 ## Exploratory Python reference results
 
@@ -68,6 +71,17 @@ At horizon 500, the time-uniform monitor had pre-change false-alarm probability 
 The alpha-spending method is extremely conservative here; that is a measurable engineering trade-off, not a reason to abandon anytime validity. A variance-adaptive empirical-Bernstein confidence sequence is a natural next comparison:
 - Howard et al. (2021), *Time-uniform, nonparametric, nonasymptotic confidence sequences*: https://doi.org/10.1214/20-AOS1991
 - Waudby-Smith and Ramdas (2024), *Estimating means of bounded random variables by betting*: https://doi.org/10.1093/jrsssb/qkad009
+
+
+## Finite-horizon CUSUM comparator
+
+A separate `--cusum-baseline-csv` lane adds direction-specific reflected Bernoulli CUSUM arms. Each arm increments the score by 12/25 for an evidence event and subtracts 13/25 for a non-event; for lower shifts, a failure is the evidence event. The 0.52 event-rate edge of the declared null interval therefore has zero expected score increment.
+
+The threshold is the *smallest integer threshold* whose exact dynamic-program alarm probability over 1,000 observations is at most half the per-cell error allocation. The upper arm is calibrated at p=0.52; the lower arm is its symmetric failure-rate transform at p=0.48. For any predictable Bernoulli conditional rate inside [0.48, 0.52], each directional event probability is at most 0.52. A coupling argument makes the corresponding CUSUM alarm event no more likely than under the calibration boundary; Bonferroni across the two directions bounds the two-sided finite-horizon family alarm probability by the per-cell allocation. This calibration applies only through the preregistered 1,000-observation horizon; it is not an infinite-horizon guarantee.
+
+The output reports both directions separately, with scenario class, calibration threshold, per-direction alpha, scenario/pre-change alarm probability, post-shift power, conditional delay, and survival. It does not combine directional powers into a fictitious two-sided score: joint detection power would require a separate joint-state calculation. Use this as a faithful first comparator, not a claim of superiority. For industry ranking, thresholds must ultimately be compared at matched false-alarm operating points against version-pinned CUSUM/EWMA/Page–Hinkley/ADWIN and distribution-sensitive detectors, as tracked in [issue #8818](https://github.com/Luminous-Dynamics/symthaea/issues/8818).
+
+The independent Python reference reproduces the exact CUSUM dynamic program, checks the minimum calibration threshold, tests both directions and accepted-band schedules, and rejects mutated output. Rust compilation and exact-head CI status are reported separately from the independent Python calculations.
 
 ## Limits
 
