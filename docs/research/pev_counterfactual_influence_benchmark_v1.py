@@ -140,6 +140,8 @@ def audit_trial(trial: dict) -> dict:
             errors.append("VALID_BRANCH_VALUE_NONFINITE")
     all_runs = [(f"{tid}/invalid[{i}]", r) for i, r in enumerate(variants)] + [(valid_label, valid)]
     base_names = set(base_consumers)
+    if not set(target).issubset(base_names): errors.append("TARGET_CONSUMER_MISSING")
+    if not set(protected).issubset(base_names): errors.append("PROTECTED_CONSUMER_MISSING")
     if base_names != set(valid_consumers): errors.append("CONSUMER_SET_CHANGED_VALID_COUNTERFACTUAL")
     for label, run in all_runs:
         if run.get("trial_id") != tid: errors.append(f"{label}: TRIAL_ID_MISMATCH")
@@ -207,6 +209,8 @@ def self_test(cases: int = 100_000, seed: int = 20261028) -> dict:
     mutations["counterfactual_input_mismatch"] = (m, "COUNTERFACTUAL_INPUT_DIGEST_MISMATCH")
     m = json.loads(json.dumps(base)); m["invalid_variants"][0]["gate_and_outcome_digest"] = "outcome-was-suppressed"
     mutations["independent_outcome_suppression"] = (m, "COUNTERFACTUAL_GATE_AND_OUTCOME_DIGEST_MISMATCH")
+    m = json.loads(json.dumps(base)); m["target_consumers"] = ["consumer-that-does-not-exist"]
+    mutations["missing_target_consumer"] = (m, "TARGET_CONSUMER_MISSING")
     checked = {}
     for name, (mutated, expected) in mutations.items():
         result = audit_trial(mutated)
