@@ -315,6 +315,53 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.bundle.manifest["provenance"]["signer_workflow"] = ".github/workflows/untrusted.yml"
         self.assert_issue(self.bundle.audit(repin_for_test=True), "confirmatory_signer_mismatch")
 
+    def test_confirmatory_self_hosted_runner_is_rejected_by_schema(self) -> None:
+        self.bundle.manifest["run_kind"] = "confirmatory"
+        self.bundle.manifest["task"]["exposure"] = "private_confirmatory"
+        self.bundle.manifest["task"]["independent_reviewer_count"] = 1
+        self.bundle.manifest["task"]["baseline_empty_patch_failed"] = True
+        self.bundle.manifest["task"]["reference_solution_passed"] = True
+        self.bundle.manifest["provenance"]["attestation_required"] = True
+        self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
+        self.bundle.manifest["runtime"]["runner_environment"] = "self_hosted"
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "schema_invalid")
+
+    def test_confirmatory_cli_pins_certificate_and_disallows_self_hosted_runners(self) -> None:
+        self.bundle.manifest["run_kind"] = "confirmatory"
+        self.bundle.manifest["task"]["exposure"] = "private_confirmatory"
+        self.bundle.manifest["task"]["independent_reviewer_count"] = 1
+        self.bundle.manifest["task"]["baseline_empty_patch_failed"] = True
+        self.bundle.manifest["task"]["reference_solution_passed"] = True
+        self.bundle.manifest["provenance"]["attestation_required"] = True
+        self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
+        attestation = synthetic_attestation(self.bundle.manifest)
+        audit_result = jbytes({"eligible": True, "verdict": "pass", "issues": []})
+
+        def fake_run(argv: list[str], **kwargs: Any) -> Mock:
+            if argv[0] == "gh":
+                return Mock(returncode=0, stdout=attestation)
+            return Mock(returncode=0, stdout=audit_result)
+
+        with patch.object(verifier.subprocess, "run", side_effect=fake_run) as mocked_run:
+            result = self.bundle.audit(verify_attestation=True, repin_for_test=True)
+
+        self.assertTrue(result["eligible"], result["issues"])
+        attestation_argv = mocked_run.call_args_list[0].args[0]
+        for flag in (
+            "--cert-identity",
+            "--cert-oidc-issuer",
+            "--deny-self-hosted-runners",
+            "--source-digest",
+            "--source-ref",
+            "--signer-workflow",
+            "--predicate-type",
+        ):
+            self.assertIn(flag, attestation_argv)
+        self.assertIn(
+            "https://github.com/Luminous-Dynamics/symthaea/.github/workflows/vleb-confirmatory.yml@refs/heads/main",
+            attestation_argv,
+        )
+
 
     def test_attestation_certificate_and_subject_positive_control(self) -> None:
         raw = synthetic_attestation(self.bundle.manifest)
