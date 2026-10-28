@@ -248,6 +248,18 @@ impl DualLayerMesh {
     pub fn send(&self, packet: &WisdomPacket) -> Result<MeshRoute, MeshError> {
         let route = self.route(packet.urgency).ok_or(MeshError::NoTransport)?;
 
+        // The current V1 transform order encrypts the whole compressed envelope
+        // first and then optionally encrypts every LoRa fragment with the same
+        // key and a second nonce namespace. The receiver's fragment path does
+        // not symmetrically remove both layers, and the extra nonce/tag exceeds
+        // the standard V1 frame budget. Fail before packet serialization,
+        // encryption, or the first transport write until a qualified V2 profile
+        // explicitly defines transform order, key separation, and MTU sizing.
+        #[cfg(feature = "mesh-encryption")]
+        if route == MeshRoute::LoRa && self.fragment_encryption {
+            return Err(MeshError::UnsupportedEncryptionProfile);
+        }
+
         // Compress the packet into an envelope (1-byte header + payload).
         // COMPRESS_NONE if compression doesn't help; COMPRESS_LZ4 if it does.
         let raw = packet.to_bytes();
@@ -665,6 +677,57 @@ mod tests {
     }
 
     // -- Sending --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn unsupported_fragment_encryption_with_key_fails_before_any_write() {
+        let (tx, rx) = BiLoopbackTransport::pair("A (lora)", "B (lora)", LORA_MTU);
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(tx))
+            .with_encryption_key([0x42; 32])
+            .with_fragment_encryption(true);
+        let packet = test_packet(MeshUrgency::Cruise);
+
+        assert!(matches!(
+            mesh.send(&packet),
+            Err(MeshError::UnsupportedEncryptionProfile)
+        ));
+        let mut buf = [0u8; LORA_MTU];
+        assert!(matches!(rx.recv_raw(&mut buf), Err(MeshError::Io(_))));
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn unsupported_fragment_encryption_without_key_has_no_plaintext_fallback() {
+        let (tx, rx) = BiLoopbackTransport::pair("A (lora)", "B (lora)", LORA_MTU);
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(tx))
+            .with_fragment_encryption(true);
+        let packet = test_packet(MeshUrgency::Cruise);
+
+        assert!(matches!(
+            mesh.send(&packet),
+            Err(MeshError::UnsupportedEncryptionProfile)
+        ));
+        let mut buf = [0u8; LORA_MTU];
+        assert!(matches!(rx.recv_raw(&mut buf), Err(MeshError::Io(_))));
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn fragment_encryption_flag_does_not_block_non_lora_route() {
+        let (tx, rx) = BiLoopbackTransport::pair("A (batman)", "B (batman)", 4096);
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_batman(Box::new(tx))
+            .with_encryption_key([0x42; 32])
+            .with_fragment_encryption(true);
+        let packet = test_packet(MeshUrgency::Critical);
+
+        assert_eq!(mesh.send(&packet).unwrap(), MeshRoute::Batman);
+        let mut buf = [0u8; WISDOM_PACKET_SIZE + 128];
+        let n = rx.recv_raw(&mut buf).expect("non-LoRa route still transmits");
+        assert!(n > 0);
+    }
 
     #[test]
     fn send_over_lora_fragments() {
