@@ -230,6 +230,7 @@ def run_one(
         "observed_high_fidelity_hypervolume": observed_hv,
         "normalized_hypervolume_fraction": observed_hv / true_hv if true_hv > 0.0 else 0.0,
         "promotion_records": promotions,
+        "decision_value_trace": getattr(evaluator, "decision_value_trace", []),
         "predicted_feasible_promotion_count": predicted_feasible,
         "false_promotion_count": false_promotions,
         "false_promotion_rate": false_promotions / predicted_feasible if predicted_feasible else None,
