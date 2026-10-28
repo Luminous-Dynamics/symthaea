@@ -417,9 +417,10 @@ fn parse_artifact(
         issues.push(issue);
     }
     if normalized_nonfinite_tokens > 0 {
-        issues.push(format!(
-            "normalized {normalized_nonfinite_tokens} Python-style non-finite JSON token(s); null metrics remain unavailable"
-        ));
+        issues.push(format!(concat!(
+            "normalized {normalized_nonfinite_tokens} Python-style non-finite JSON token(s); ",
+            "null metrics remain unavailable"
+        )));
     }
 
     let evaluation = value.get("evaluation").and_then(Value::as_object);
@@ -527,7 +528,9 @@ fn summarize_arm(
             complete.iter().map(|trial| trial.num_experiments),
         ),
         sum_reported_rounds_completed: sum_optional(complete.iter().map(|trial| trial.rounds)),
-        sum_reported_tokens_completed: sum_optional(complete.iter().map(|trial| trial.total_tokens)),
+        sum_reported_tokens_completed: sum_optional(
+            complete.iter().map(|trial| trial.total_tokens),
+        ),
     }
 }
 
@@ -729,13 +732,38 @@ pub fn audit(
         paired_trials,
         import_problems,
         metric_semantics: vec![
-            "evaluation.rmsle is preserved as upstream RMSLE; it is not converted to NRMSE.".to_owned(),
-            "Upstream RMSLE masks NaN points and applies absolute values before log1p; this importer does not recompute it.".to_owned(),
-            "evaluation.exact_accuracy is the upstream trial-level output of an LLM symbolic-equivalence judge, not a formal proof.".to_owned(),
-            "This importer trusts the upstream agent_backend label; it does not authenticate that code execution or a tool actually occurred.".to_owned(),
-            "False-confidence and premature-commitment metrics are not provided by this native artifact schema and are not inferred.".to_owned(),
+            concat!(
+                "evaluation.rmsle is preserved as upstream RMSLE; ",
+                "it is not converted to NRMSE."
+            )
+            .to_owned(),
+            concat!(
+                "Upstream RMSLE masks NaN points and applies absolute values before log1p; ",
+                "this importer does not recompute it."
+            )
+            .to_owned(),
+            concat!(
+                "evaluation.exact_accuracy is the upstream trial-level output of an LLM ",
+                "symbolic-equivalence judge, not a formal proof."
+            )
+            .to_owned(),
+            concat!(
+                "This importer trusts the upstream agent_backend label; it does not authenticate ",
+                "that code execution or a tool actually occurred."
+            )
+            .to_owned(),
+            concat!(
+                "False-confidence and premature-commitment metrics are not provided by this ",
+                "native artifact schema and are not inferred."
+            )
+            .to_owned(),
         ],
-        claim_boundary: "Native NewtonBench artifact import and matched scorecard only. No experiment was executed by this importer; source-reported backend labels and judge outputs are not independently authenticated.".to_owned(),
+        claim_boundary: concat!(
+            "Native NewtonBench artifact import and matched scorecard only. No experiment was ",
+            "executed by this importer; source-reported backend labels and judge outputs are ",
+            "not independently authenticated."
+        )
+        .to_owned(),
     };
     let receipt_sha256 = sha256_hex(
         &serde_json::to_vec(&body)
