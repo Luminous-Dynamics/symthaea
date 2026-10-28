@@ -454,7 +454,7 @@ mod tests {
         let feature = feature(AuditStatus::Accept);
         let split = split(SplitAuditStatus::Accept);
         let plan = verification(VerificationStatus::Verified);
-        let drift = drift(DriftMonitorStatus::InControl);
+        let drift = drift_report_with_timestamp(Some(990));
         let distributional = distributional(true);
         let network = network(true);
         let report = assess_decision_readiness(DecisionReadinessInput {
@@ -469,7 +469,6 @@ mod tests {
             calibration_created_at_epoch_seconds: 100,
             decision_time_epoch_seconds: 1_000,
             max_calibration_age_seconds: 100,
-            latest_monitor_observation_epoch_seconds: Some(990),
             max_monitor_observation_age_seconds: 20,
         });
         assert_eq!(report.blockers, vec![DecisionReadinessBlock::CalibrationExpired]);
@@ -534,7 +533,7 @@ mod tests {
         let feature = feature(AuditStatus::Accept);
         let split = split(SplitAuditStatus::Accept);
         let plan = verification(VerificationStatus::Verified);
-        let drift = drift(DriftMonitorStatus::InControl);
+        let drift = drift_report_with_timestamp(Some(250));
         let distributional = distributional(true);
         let network = network(true);
         let report = assess_decision_readiness(DecisionReadinessInput {
@@ -549,7 +548,6 @@ mod tests {
             calibration_created_at_epoch_seconds: 300,
             decision_time_epoch_seconds: 200,
             max_calibration_age_seconds: 0,
-            latest_monitor_observation_epoch_seconds: Some(250),
             max_monitor_observation_age_seconds: 0,
         });
         assert!(report.blockers.contains(&DecisionReadinessBlock::InvalidFreshnessPolicy));
