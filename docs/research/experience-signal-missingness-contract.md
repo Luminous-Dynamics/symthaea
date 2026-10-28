@@ -17,7 +17,7 @@ This branch introduces an explicit validity bit for `PrincipledSignals`, with `p
 5. When PE is invalid, independent uncertainty and coherence channels remain active. Weighted scores renormalize over their available channels rather than substituting a fabricated PE.
 6. Smoothing may retain the last numeric PE for diagnostics, but must clear validity for the current invalid event. The next valid PE starts a fresh PE series rather than smoothing against stale held evidence.
 7. `compute_prediction_error` returns `None` for an empty input, non-finite input scores, or a non-finite result. Its established score convention (one minus arithmetic mean) is unchanged for valid inputs.
-8. Downstream state updates that require measured PE must accept optional evidence and skip their PE-dependent branch when evidence is absent; other independent signal updates continue.
+8. Downstream state updates that require measured PE must accept optional evidence and skip their PE-dependent branch when evidence is absent; other independent signal updates continue. In Wisdom, the autopoietic monitor must still record finite coherence and cycle accounting when PE is unavailable, use a neutral 0.5 PE prior only for aggregate display/closure calculation, expose PE observation count, and never insert that prior into the measured-error history.
 
 ## Compatibility boundary
 
@@ -36,7 +36,7 @@ The live cognitive-loop bridge currently has only a scalar `prediction_error` ar
 - Invalid PE must not dominate the named signal or leak into experience record learning-value.
 - Smoothing an invalid event after valid PE may hold the last numeric value, but the validity flag must be false; a subsequent valid value must be admitted without blending against stale PE.
 - Old JSON without a validity field must deserialize with PE unavailable.
-- Uncertainty/coherence decisions must remain active when PE is unavailable.
+- Uncertainty/coherence decisions and coherence-only autopoietic cycle monitoring must remain active when PE is unavailable; PE history stays unchanged.
 - Test per case and in a deterministic mixed trace; do not pool missingness cases with valid measurements.
 
 ## Proposed benchmark metrics
