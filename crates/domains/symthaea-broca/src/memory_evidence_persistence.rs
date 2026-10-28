@@ -980,4 +980,59 @@ mod tests {
         assert!(store.prune_history(1).is_err());
         assert!(dir.exists(), "corrupt CURRENT must prevent retention deletion");
     }
+
+    #[test]
+    fn committed_query_uses_one_typed_generation_and_filters_scope() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        let query_hv = BinaryHV::random(7);
+        hdc.append(7, &query_hv).unwrap();
+        hdc.append(8, &BinaryHV::random(8)).unwrap();
+
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "correct route"), b"canonical trajectory bytes").unwrap();
+        let mut enterprise_only = active_evidence(8, "enterprise-only route");
+        enterprise_only.scope_id = "enterprise".into();
+        evidence.insert(enterprise_only, b"canonical trajectory bytes").unwrap();
+
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+        let result = disk.query_committed_context(
+            &query_hv, 2, "web", 150, Path::new("."), 5,
+        ).unwrap().expect("typed committed generation should be queryable");
+
+        assert_eq!(result.generation, 1);
+        assert_eq!(result.candidates.len(), 2);
+        assert_eq!(result.candidates[0].0, 7);
+        assert_eq!(result.context.len(), 1);
+        assert_eq!(result.context[0].value, "correct route");
+    }
+
+    #[test]
+    fn committed_query_refuses_opaque_fixture_generation() {
+        let root = tempdir().unwrap();
+        let disk = EvidenceDiskStore::open(root.path()).unwrap();
+        let evidence = sample_index("fixture-only text");
+        disk.commit(b"not a real HDC index", &evidence).unwrap();
+
+        let error = disk.query_committed_context(
+            &BinaryHV::random(7), 4, "web", 150, Path::new("."), 5,
+        ).unwrap_err();
+        assert!(error.contains("typed HDC identity"));
+    }
+
+    #[test]
+    fn committed_query_distinguishes_uninitialized_store_from_corruption() {
+        let root = tempdir().unwrap();
+        let disk = EvidenceDiskStore::open(root.path()).unwrap();
+        assert!(disk.query_committed_context(
+            &BinaryHV::random(7), 4, "web", 150, Path::new("."), 5,
+        ).unwrap().is_none());
+        fs::write(root.path().join(CURRENT_FILE), b"{broken").unwrap();
+        assert!(disk.query_committed_context(
+            &BinaryHV::random(7), 4, "web", 150, Path::new("."), 5,
+        ).is_err());
+    }
+
 }
