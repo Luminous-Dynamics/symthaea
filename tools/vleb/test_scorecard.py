@@ -92,6 +92,18 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     last_secure = data.get("industry_comparators", {}).get("last_secure_code_benchmark", {})
     if last_secure.get("task_count") != 450 or last_secure.get("reported_best_joint_functional_security_success_pct") != 25.1:
         errors.append("last_secure_benchmark_reference_drift")
+    trace_target = data.get("proposed_targets", {}).get("requirement_to_test_traceability_coverage_pct", {})
+    if trace_target.get("target") != 100 or trace_target.get("status") != "target_not_measured":
+        errors.append("requirement_to_test_traceability_target_drift")
+    trace_current = data.get("current_measurements", {}).get("requirement_to_test_traceability_coverage_pct", {})
+    if trace_current.get("value") is not None or trace_current.get("eligible") is not False:
+        errors.append("requirement_to_test_traceability_score_fabricated")
+    trace_definition = data.get("metric_definitions", {}).get("requirement_to_test_traceability", {})
+    if trace_definition.get("composite_weighted_score") is not False:
+        errors.append("requirement_to_test_traceability_must_not_use_weighted_score")
+    if not any("never remove a requirement or test" in rule for rule in trace_definition.get("denominator_rules", [])):
+        errors.append("requirement_to_test_traceability_denominator_drift")
+
     claim_metric = data.get("current_measurements", {}).get("source_claim_false_support_rate_pct", {})
     if claim_metric.get("value") is not None or claim_metric.get("eligible") is not False:
         errors.append("source_claim_false_support_rate_fabricated")

@@ -219,6 +219,19 @@
         "bind exit status, toolchain/runtime identity, run ID and run attempt",
         "reject cross-task, cross-source and cross-run replay"
       ]
+    },
+    "requirement_to_test_traceability_coverage_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "For every scored task, each task statement, invariant, allowed behavior change, and declared observable effect has a unique requirement trace, and the union of trace-mapped logical test IDs equals the frozen required-test inventory.",
+      "requirements": [
+        "requirement-to-test source text matches the frozen contract exactly",
+        "no duplicate requirement IDs or duplicate source mappings",
+        "every trace references only declared logical test IDs",
+        "every required logical test is traced to at least one requirement",
+        "all traced observables belong to the task observable inventory",
+        "independent task/receipt auditor passes at the exact scored head"
+      ]
     }
   },
   "current_measurements": {
@@ -283,6 +296,12 @@
       "eligible": false,
       "status": "draft_not_validated",
       "reason": "The draft run-manifest gate is wired in PR #8707, but its current exact-head CI has not passed and the gate does not yet rerun or cryptographically verify evaluator-bound witness receipts."
+    },
+    "requirement_to_test_traceability_coverage_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The traceability schema and auditor gate are draft work in PR #8801. No locked confirmatory cohort has passed exact-head CI and independent task admission."
     }
   },
   "metric_definitions": {
@@ -347,6 +366,21 @@
         "runtime claim with static-index-only evidence",
         "claim whose witness receipt is absent, stale or replayed across tasks/runs"
       ]
+    },
+    "requirement_to_test_traceability": {
+      "formula": "traceable declared contract source items and trace-mapped required test IDs / total declared source items and required test IDs",
+      "pass_requirements": [
+        "coverage of task statement, every invariant, allowed behavior change, and observable effect is exactly complete",
+        "each source item is mapped once and only once",
+        "no trace references undeclared tests or observables",
+        "all required test IDs are represented in the trace inventory and in the executable test map"
+      ],
+      "denominator_rules": [
+        "freeze task contract and requirement IDs before candidate evaluation",
+        "never remove a requirement or test after observing candidate results",
+        "report missing trace rows and unmapped tests separately; headline admission requires both dimensions to be complete"
+      ],
+      "composite_weighted_score": false
     }
   }
 }
