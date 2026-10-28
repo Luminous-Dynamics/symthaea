@@ -311,7 +311,7 @@ fn validate(root: &Path, registry: &Registry, registry_digest: &str) -> Result<S
 fn is_safe_relative_path(value: &str) -> bool {
     let path = Path::new(value);
     !value.trim().is_empty()
-        && !value.contains('\\\\')
+        && !value.contains('\\')
         && !value.contains(':')
         && !value.split('/').any(|part| part.is_empty() || part == "." || part == "..")
         && !path.is_absolute()
