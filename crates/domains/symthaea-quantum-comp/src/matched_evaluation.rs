@@ -850,10 +850,10 @@ impl Error for MatchedEvaluationError {}
 /// Compare a baseline and candidate under a strict paired protocol.
 ///
 /// Every pair must be present in both arms with matching seeds. Target hits are
-/// derived only from independently verified feasible candidates. Speedup ratios
-/// are only computed when both methods hit the same target and have complete
-/// positive all-in costs. A failed target remains in the hit-rate counts and does
-/// not receive an invented runtime ratio.
+/// derived only from independently verified feasible candidates. Deployment and
+/// standardized algorithm ratios use directly observed positive monotonic-clock
+/// intervals, never sums of stage diagnostics. A failed target remains in the
+/// hit-rate counts and does not receive an invented runtime ratio.
 pub fn compare_matched_arms(
     baseline: &MatchedArmReport,
     candidate: &MatchedArmReport,
