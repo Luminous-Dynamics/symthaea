@@ -217,6 +217,12 @@ def main(argv: list[str] | None = None) -> int:
             if row not in input_rows:
                 input_rows.append(row)
 
+        verifier_input_row = next(
+            row for row in input_rows if row["path"] == args.verifier_path
+        )
+        if verifier_input_row["sha256"] != actual_verifier_sha256:
+            raise ValueError("verifier bytes changed while preparing the pinned invocation")
+
         output_values = [
             ("stdout", args.stdout_path),
             ("stderr", args.stderr_path),
