@@ -24,6 +24,7 @@ def make_model(rng, n_states, horizon, n_actions, n_observations):
 
 
 def make_policy(rng, n_actions):
+    # A complete deterministic policy tree represented by a stable history->action map.
     table = {}
     def policy(history):
         if history not in table:
@@ -42,6 +43,7 @@ class PriorRiskLinearityTests(unittest.TestCase):
             n_observations = rng.randint(2, 3)
             model = make_model(rng, n_states, horizon, n_actions, n_observations)
             learner = draw_simplex(rng, n_states)
+            # Strict positivity avoids infinite CE from a learner prior support hole.
             learner = tuple(0.9 * x + 0.1 / n_states for x in learner)
             q1, q2 = draw_simplex(rng, n_states), draw_simplex(rng, n_states)
             alpha = rng.random()
@@ -60,10 +62,11 @@ class PriorRiskLinearityTests(unittest.TestCase):
         for _ in range(100):
             n_states = rng.randint(2, 6)
             horizon = rng.randint(1, 3)
-            model = make_model(rng, n_states, horizon, 2, 2)
+            n_actions, n_obs = 2, 2
+            model = make_model(rng, n_states, horizon, n_actions, n_obs)
             learner = tuple(0.8 * x + 0.2 / n_states for x in draw_simplex(rng, n_states))
             classes = [i % max(1, n_states // 2) for i in range(n_states)]
-            policy = make_policy(rng, 2)
+            policy = make_policy(rng, n_actions)
             vertices = [draw_simplex(rng, n_states) for _ in range(rng.randint(2, 5))]
             weights = draw_simplex(rng, len(vertices))
             q_mix = tuple(sum(weights[j] * vertices[j][i] for j in range(len(vertices))) for i in range(n_states))
