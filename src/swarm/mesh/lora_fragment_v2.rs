@@ -414,7 +414,12 @@ mod tests {
             assert!(frames.last().unwrap().is_fec());
 
             for lost_index in 0..(frames.len() - 1) {
-                let mut assembler = FragmentAssemblerV2::new(&frames[0]).unwrap();
+                let first_received = frames
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, frame)| (index != lost_index).then_some(frame))
+                    .expect("at least one fragment remains");
+                let mut assembler = FragmentAssemblerV2::new(first_received).unwrap();
                 for (index, frame) in frames.iter().enumerate() {
                     if index == lost_index {
                         continue;
