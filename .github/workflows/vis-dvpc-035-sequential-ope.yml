@@ -40,12 +40,13 @@ jobs:
         run: |
           rustc --edition=2024 -O tools/vision-dvpc-sequential-ope.rs -o /tmp/vis-dvpc-035
           /tmp/vis-dvpc-035 --sweep | tee /tmp/vis-dvpc-035-results.tsv
-          test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-035-results.tsv)" = "180"
+          test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-035-results.tsv)" = "225"
           grep -Fq 'NOT_IDENTIFIED' /tmp/vis-dvpc-035-results.tsv
           grep -Fq 'confidence_intervals' /tmp/vis-dvpc-035-results.tsv
           grep -Fq 'SUPPRESSED' /tmp/vis-dvpc-035-results.tsv
           grep -Fq '0.437500000000' /tmp/vis-dvpc-035-results.tsv
           grep -Fq '0.281250000000' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'rotating_logger' /tmp/vis-dvpc-035-results.tsv
           grep -Fq 'ALPHA_SPENDING_HOEFFDING_CS' /tmp/vis-dvpc-035-results.tsv
           grep -Fq 'ASSUMPTION_VIOLATION_DESCRIPTIVE_ONLY' /tmp/vis-dvpc-035-results.tsv
           grep -Fq 'published_off_policy_confidence_sequence_algorithm' /tmp/vis-dvpc-035-results.tsv
