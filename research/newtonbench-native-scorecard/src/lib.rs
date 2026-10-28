@@ -285,6 +285,13 @@ fn valid_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn valid_git_commit_sha(value: &str) -> bool {
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn validate_manifest(manifest: &ManifestV1) -> Result<BTreeMap<TrialKey, ExpectedPairV1>, String> {
     if manifest.schema != MANIFEST_SCHEMA {
         return Err(format!("unsupported manifest schema: {}", manifest.schema));
@@ -303,6 +310,14 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<BTreeMap<TrialKey, Expecte
     }
     if manifest.vanilla_backend == manifest.tool_backend {
         return Err("vanilla_backend and tool_backend must be distinct".to_owned());
+    }
+    if manifest.upstream_revision != "fixture-only"
+        && !valid_git_commit_sha(&manifest.upstream_revision)
+    {
+        return Err(
+            "upstream_revision must be a 40-character lowercase Git commit SHA; use fixture-only only in synthetic fixtures"
+                .to_owned(),
+        );
     }
     if !valid_digest(&manifest.runner_configuration_sha256) {
         return Err("runner_configuration_sha256 must be lowercase SHA-256".to_owned());
@@ -1250,6 +1265,21 @@ mod tests {
         assert!(normalized.contains(r#""b":null"#));
         assert!(normalized.contains(r#""c":null"#));
         assert!(serde_json::from_str::<Value>(&normalized).is_ok());
+    }
+
+    #[test]
+    fn requires_pinned_upstream_revision_except_for_explicit_synthetic_fixture() {
+        let mut invalid = manifest();
+        invalid.upstream_revision = "main".to_owned();
+        assert!(
+            validate_manifest(&invalid)
+                .unwrap_err()
+                .contains("40-character lowercase Git commit SHA")
+        );
+
+        let mut pinned = manifest();
+        pinned.upstream_revision = "a".repeat(40);
+        assert!(validate_manifest(&pinned).is_ok());
     }
 
     #[test]
