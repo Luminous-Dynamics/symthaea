@@ -1446,11 +1446,11 @@ mod tests {
     }
 
     #[test]
-    fn missing_stage_cost_is_unknown_not_a_free_speedup() {
+    fn missing_stage_diagnostic_does_not_erase_observed_wall_clock() {
         let baseline_costs = costs(100.0);
         let mut candidate_costs = costs(50.0);
         candidate_costs.acquisition_ms = None;
-        assert_eq!(candidate_costs.all_in_total_ms(), None);
+        assert_eq!(candidate_costs.sum_all_stage_costs_ms(), None);
 
         let baseline = report(
             "baseline",
@@ -1465,14 +1465,14 @@ mod tests {
 
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.both_target_hits, 1);
-        assert_eq!(result.both_hit_deployment_timed_pairs, 0);
-        assert_eq!(result.candidate_untimed_target_hits, 1);
-        assert_eq!(result.median_time_speedup_given_both_hit, None);
-        assert_eq!(result.pairs[0].candidate_all_in_ms, None);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 1);
+        assert_eq!(result.candidate_untimed_target_hits, 0);
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
+        assert_eq!(result.pairs[0].candidate_all_in_ms, Some(50.0));
     }
 
     #[test]
-    fn unknown_queue_delay_suppresses_deployment_latency_but_not_standardized_runtime() {
+    fn unknown_queue_stage_does_not_suppress_directly_observed_latency() {
         let baseline = report(
             "baseline",
             "classical",
@@ -1480,6 +1480,7 @@ mod tests {
         );
         let mut candidate_costs = costs(50.0);
         candidate_costs.queue_wait_ms = None;
+        assert_eq!(candidate_costs.sum_all_stage_costs_ms(), None);
         let candidate = report(
             "candidate",
             "trajectory",
@@ -1488,12 +1489,12 @@ mod tests {
 
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.both_target_hits, 1);
-        assert_eq!(result.both_hit_deployment_timed_pairs, 0);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 1);
         assert_eq!(result.both_hit_algorithm_timed_pairs, 1);
-        assert_eq!(result.median_time_speedup_given_both_hit, None);
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
-        assert_eq!(result.pairs[0].candidate_all_in_ms, None);
-        assert!(result.pairs[0].candidate_algorithm_runtime_ms.is_some());
+        assert_eq!(result.pairs[0].candidate_all_in_ms, Some(50.0));
+        assert_eq!(result.pairs[0].candidate_algorithm_runtime_ms, Some(42.5));
     }
 
     #[test]
@@ -1641,7 +1642,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_inconsistent_verified_candidate_and_zero_cost_records() {
+    fn rejects_inconsistent_verified_candidate_but_allows_zero_resolution_stage_diagnostics() {
         let mut trial = verified_trial("b", "pair", 1, 5, costs(1.0), EnergyRecord::not_measured());
         trial.conflict_count = Some(1);
         let bad = report("baseline", "classical", vec![trial]);
@@ -1667,10 +1668,9 @@ mod tests {
             "classical",
             vec![verified_trial("b", "pair", 1, 5, zero, EnergyRecord::not_measured())],
         );
-        assert!(matches!(
-            bad_zero.validate(),
-            Err(MatchedEvaluationError::InvalidAllInCost { .. })
-        ));
+        assert!(bad_zero.validate().is_ok());
+        assert_eq!(bad_zero.trials[0].costs.sum_all_stage_costs_ms(), Some(0.0));
+        assert_eq!(bad_zero.trials[0].deployment_elapsed_ms, Some(100.0));
     }
 
 
