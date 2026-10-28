@@ -42,6 +42,8 @@ class ManifestBundle:
             "protocol": "protocol.md",
             "patch": "candidate.patch",
             "auditor": "audit_receipt.py",
+            "task_schema": "task-contract.schema.json",
+            "receipt_schema": "evidence-receipt.schema.json",
             "catalog": "mutations.json",
             "results": "mutation-results.json",
             "bundle": "evidence-bundle.zip",
@@ -52,6 +54,8 @@ class ManifestBundle:
             "protocol": b"VLEB frozen protocol\n",
             "patch": b"synthetic candidate patch\n",
             "auditor": b"synthetic auditor source\n",
+            "task_schema": jbytes({"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}),
+            "receipt_schema": jbytes({"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}),
             "catalog": jbytes({"mutations": ["M1", "M2", "M3", "M4"]}),
             "results": jbytes({"killed": 4, "survived": 0, "unresolved": 0}),
             "bundle": b"synthetic evidence bundle bytes\n",
@@ -74,7 +78,14 @@ class ManifestBundle:
         self.manifest["protocol"] = {"path": self.paths["protocol"], "sha256": h["protocol"]}
         self.manifest["candidate"]["patch_path"] = self.paths["patch"]
         self.manifest["candidate"]["patch_sha256"] = h["patch"]
-        self.manifest["auditor"].update({"source_path": self.paths["auditor"], "source_sha256": h["auditor"]})
+        self.manifest["auditor"].update({
+            "source_path": self.paths["auditor"],
+            "source_sha256": h["auditor"],
+            "task_schema_path": self.paths["task_schema"],
+            "task_schema_sha256": h["task_schema"],
+            "receipt_schema_path": self.paths["receipt_schema"],
+            "receipt_schema_sha256": h["receipt_schema"],
+        })
         self.manifest["mutation_campaign"].update({
             "catalog_path": self.paths["catalog"],
             "catalog_sha256": h["catalog"],
