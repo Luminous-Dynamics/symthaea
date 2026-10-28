@@ -156,12 +156,14 @@ fn interval_radius(n: usize) -> f64 {
     ((2.0 * CELLS / ALPHA).ln() / (2.0 * n as f64)).sqrt()
 }
 
+#[cfg(test)]
 const COVERAGE_GRID: [f64; 11] = [
     0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0,
 ];
 
 /// Stable normalized Binomial(n,p) probability masses, generated outward from a mode.
 /// This is used to enumerate exact finite-grid coverage without sampling Monte Carlo trials.
+#[cfg(test)]
 fn binomial_pmf(n: usize, p: f64) -> Vec<f64> {
     let mut mass = vec![0.0; n + 1];
     if p <= 0.0 {
@@ -195,10 +197,11 @@ fn binomial_pmf(n: usize, p: f64) -> Vec<f64> {
     mass
 }
 
+#[cfg(test)]
 fn cell_coverage(n: usize, true_probability: f64) -> f64 {
     let radius = interval_radius(n);
     binomial_pmf(n, true_probability)
-        .iter()
+        .into_iter()
         .enumerate()
         .filter(|(successes, _)| {
             let estimate = *successes as f64 / n as f64;
