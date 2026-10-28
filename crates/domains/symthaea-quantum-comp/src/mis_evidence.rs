@@ -92,8 +92,10 @@ fn validate_context_id(value: &str) -> Result<(), MisEvidenceError> {
 /// A non-forgeable-by-safe-API result of checking canonical graph and candidate bytes.
 ///
 /// Fields are private so callers cannot manufacture a successful receipt by filling
-/// metadata fields. Construct this value with `verify_mis_candidate` or validate a
-/// persisted receipt with `verify_mis_candidate_with_receipt`.
+/// metadata fields. Construct generic evidence with `verify_mis_candidate`, trial-scoped
+/// evidence with `verify_mis_candidate_for_trial`, or validate persisted receipt bytes with
+/// the corresponding `*_with_receipt` function. Generic evidence is not accepted by the
+/// matched experiment evaluator because it has no trial context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedMisCandidate {
     instance_sha256: String,
@@ -711,19 +713,19 @@ mod tests {
             evidence_a.receipt_bytes(),
         ).is_err());
 
-        let mut changed_pair = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-2", 7).unwrap();
+        let context_other_pair = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-2", 7).unwrap();
         let changed_pair_evidence =
-            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, changed_pair.clone()).unwrap();
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, context_other_pair).unwrap();
         assert_ne!(evidence_a.receipt_sha256(), changed_pair_evidence.receipt_sha256());
 
-        changed_pair = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-1", 8).unwrap();
+        let context_other_seed = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-1", 8).unwrap();
         let changed_seed_evidence =
-            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, changed_pair.clone()).unwrap();
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, context_other_seed).unwrap();
         assert_ne!(evidence_a.receipt_sha256(), changed_seed_evidence.receipt_sha256());
 
-        changed_pair = MisEvidenceContext::new("d".repeat(64).as_str(), "trial-a", "pair-1", 7).unwrap();
+        let context_other_protocol = MisEvidenceContext::new(&"d".repeat(64), "trial-a", "pair-1", 7).unwrap();
         let changed_protocol_evidence =
-            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, changed_pair).unwrap();
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, context_other_protocol).unwrap();
         assert_ne!(evidence_a.receipt_sha256(), changed_protocol_evidence.receipt_sha256());
     }
 
