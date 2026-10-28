@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MEL-MR-EVAL-003 Compositional Motif Case",
+  "type": "object",
+  "required": [
+    "case_id",
+    "dataset_version",
+    "split",
+    "source_family_id",
+    "source_events",
+    "target_events",
+    "actual_transform",
+    "claimed_transform",
+    "expected_verdict",
+    "controlled_perturbation",
+    "perturbation_index",
+    "target_start_offset_beats",
+    "provenance"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "const": "MEL-MR-COMPOSITION-SMOKE-1.1"
+    },
+    "split": {
+      "enum": [
+        "development",
+        "calibration",
+        "test",
+        "stress"
+      ]
+    },
+    "source_family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_events": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "target_events": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "actual_transform": {
+      "$ref": "#/$defs/transform"
+    },
+    "claimed_transform": {
+      "$ref": "#/$defs/transform"
+    },
+    "expected_verdict": {
+      "enum": [
+        "accept",
+        "reject",
+        "unsupported"
+      ]
+    },
+    "controlled_perturbation": {
+      "enum": [
+        "none",
+        "duration_only_scale",
+        "single_pitch_outlier",
+        "onset_jitter"
+      ]
+    },
+    "perturbation_index": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "target_start_offset_beats": {
+      "type": "number"
+    },
+    "case_kind": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "provenance": {
+      "const": "deterministic synthetic oracle; not human annotated"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "event": {
+      "type": "object",
+      "required": [
+        "pitch_midi",
+        "onset_beats",
+        "duration_beats"
+      ],
+      "properties": {
+        "pitch_midi": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "onset_beats": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_beats": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "transform": {
+      "type": "object",
+      "required": [
+        "pitch_orientation",
+        "transpose_semitones",
+        "onset_scale",
+        "duration_scale",
+        "selection"
+      ],
+      "properties": {
+        "pitch_orientation": {
+          "enum": [
+            "preserve",
+            "invert"
+          ]
+        },
+        "transpose_semitones": {
+          "type": "integer",
+          "minimum": -24,
+          "maximum": 24
+        },
+        "onset_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8
+        },
+        "duration_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8
+        },
+        "selection": {
+          "type": "object",
+          "required": [
+            "mode",
+            "source_start_index",
+            "note_count"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "full",
+                "contiguous_fragment"
+              ]
+            },
+            "source_start_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "note_count": {
+              "type": "integer",
+              "minimum": 3
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
