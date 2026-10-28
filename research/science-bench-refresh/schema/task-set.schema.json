@@ -41,7 +41,10 @@
             "maxLength": 128
           },
           "policy_input": {
-            "type": "object"
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
           },
           "evaluator_only": {
             "type": "object"
