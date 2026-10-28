@@ -917,7 +917,7 @@
         "description": "Consumes outcome-derived performance/errors when labels are observed; report label delay and availability."
       }
     ],
-    "matching_rule": "Process ground-truth events by ascending matching-window deadline (end_cycle + max_detection_delay_cycles). For each event, match the earliest unused valid-evidence alarm in [start_cycle, deadline]. One alarm matches at most one event. Unmatched alarms are false alarms; unmatched events are missed. Invalid/missing PE sentinels are not observations.",
+    "matching_rule": "Process ground-truth events by ascending matching-window deadline (end_cycle + max_detection_delay_cycles). For each event, match the earliest unused valid-evidence alarm in [start_cycle, deadline]. One alarm matches at most one event. Unmatched alarms are false alarms; unmatched events are missed. invalid/missing PE sentinels are not observations.",
     "metrics": [
       "event-precision",
       "event-recall",
