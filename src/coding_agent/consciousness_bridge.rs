@@ -316,13 +316,26 @@ mod tests {
         assert_eq!(nonfinite.prediction_error_at_decision, None);
 
         let evidence = PredictionErrorEvidence::valid(0.42, Some(10), 11).unwrap();
-        let typed = PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(evidence));
+        let typed = PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(11), Some(evidence));
         assert_eq!(typed.prediction_error_at_decision, Some(f64::from(0.42_f32)));
         let frozen = typed.prediction_evidence_at_decision.as_ref().unwrap();
+        assert_eq!(typed.decision_cycle, Some(11));
         assert_eq!(frozen.observation_cycle(), 11);
         assert_eq!(frozen.prediction_cycle(), Some(10));
 
-        let without_provenance = PendingReasoningOutcome::capture_with_evidence(&reasoning, None);
+        let mismatched = PredictionErrorEvidence::valid(0.71, Some(9), 10).unwrap();
+        let mismatched_pending = PendingReasoningOutcome::capture_with_evidence(
+            &reasoning,
+            Some(11),
+            Some(mismatched),
+        );
+        assert_eq!(mismatched_pending.prediction_error_at_decision, None);
+        assert_eq!(
+            mismatched_pending.prediction_evidence_at_decision.as_ref().unwrap().status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+
+        let without_provenance = PendingReasoningOutcome::capture_with_evidence(&reasoning, None, None);
         assert_eq!(without_provenance.prediction_error_at_decision, None);
         assert!(without_provenance.prediction_evidence_at_decision.is_none());
 
@@ -339,7 +352,7 @@ mod tests {
         );
         assert_eq!(stale.value_for_observation(11), None);
         let stale_pending =
-            PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(stale));
+            PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(11), Some(stale));
         assert_eq!(stale_pending.prediction_error_at_decision, None);
     }
 
