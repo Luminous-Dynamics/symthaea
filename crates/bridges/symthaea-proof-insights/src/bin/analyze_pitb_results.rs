@@ -742,8 +742,26 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     } else {
         None
     };
+    // The confirmatory design requirement is simultaneous across all three
+    // preregistered dependence settings, not a minimum of three unadjusted
+    // per-cell 95% lower bounds.
+    let estimated_power_at_20pp_and_icc_020_lower_simultaneous_95 =
+        if all_worst_case_associations_estimated {
+            twenty_point_scenarios
+                .iter()
+                .map(|scenario| {
+                    simultaneous_power_lower_bound(
+                        scenario.utility_gate_passes,
+                        scenario.study_simulations,
+                    )
+                })
+                .reduce(f64::min)
+        } else {
+            None
+        };
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
-        && estimated_power_at_20pp_and_icc_020_lower_95.is_some_and(|power| power >= 0.80)
+        && estimated_power_at_20pp_and_icc_020_lower_simultaneous_95
+            .is_some_and(|power| power >= 0.80)
         && null_effect_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|rate| rate <= 0.05)
         && weak_null_false_claim_probability_upper_simultaneous_95_max
@@ -794,6 +812,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         weak_null_false_claim_probability_upper_simultaneous_95_max,
         estimated_power_at_20pp_and_icc_020,
         estimated_power_at_20pp_and_icc_020_lower_95,
+        estimated_power_at_20pp_and_icc_020_lower_simultaneous_95,
         power_gate_passed,
         scenarios,
         model_assumptions: vec![
@@ -804,7 +823,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             "Weak-null paired outcomes use a bivariate Bernoulli coupling with the prescribed marginal success rates; the association fraction interpolates joint-success probability from independence to the Frechet upper bound and is not a Pearson correlation. The 36-cell weak-null grid tests false-claim probability when positive and negative family effects cancel on average, under those explicit pair-association and ICC values.".to_string(),
             "This finite family-size stress model does not cover selective missingness, alternative family-size mechanisms, or every dependence structure and is not proof of nominal coverage universally.".to_string(),
             "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
-            "Power estimates and their Monte Carlo standard errors are design simulations only. The strict null has 4 ICCs × 3 association fractions = 12 cells; the heterogeneous weak null has 3 effect SDs × 4 ICCs × 3 association fractions = 36 cells. The one-sided Wilson upper bound uses z=3.08 across all 48 registered null cells, conservatively exceeding the Bonferroni critical value for alpha=0.05/48. These are model-conditional design diagnostics, not measured proof-insight utility or an SOTA comparison.".to_string(),
+            "Power estimates and their Monte Carlo standard errors are design simulations only. The strict null has 4 ICCs × 3 association fractions = 12 cells; the heterogeneous weak null has 3 effect SDs × 4 ICCs × 3 association fractions = 36 cells. The one-sided Wilson upper bound uses z=3.08 across all 48 registered null cells, conservatively exceeding the Bonferroni critical value for alpha=0.05/48. The +20pp/ICC .20 design gate uses the minimum two-sided 95% Bonferroni Wilson lower bound (z=2.394) across all three preregistered association settings. These are model-conditional design diagnostics, not measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
         interpretation,
     };
@@ -813,7 +832,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     serialized.push(b'\n');
     fs::write(out_path, serialized).with_context(|| format!("write power report to {out_path}"))?;
     println!(
-        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} worst_assoc_power20pp_icc020={} worst_assoc_lower95={} strict_null_false_claim_upper_simultaneous95={} weak_null_false_claim_upper_simultaneous95={} gate={}",
+        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} worst_assoc_power20pp_icc020={} worst_assoc_lower95={} worst_assoc_lower_simultaneous95={} strict_null_false_claim_upper_simultaneous95={} weak_null_false_claim_upper_simultaneous95={} gate={}",
         report.selected_baseline_arm,
         report.eligible_validation_target_count,
         report.eligible_validation_family_count,
@@ -826,6 +845,10 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             .unwrap_or_else(|| "infeasible_or_unestimated".to_string()),
         report
             .estimated_power_at_20pp_and_icc_020_lower_95
+            .map(|value| format!("{value:.3}"))
+            .unwrap_or_else(|| "unestimated".to_string()),
+        report
+            .estimated_power_at_20pp_and_icc_020_lower_simultaneous_95
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
         report
@@ -871,6 +894,13 @@ fn wilson_interval_with_z(successes: usize, trials: usize, z: f64) -> (f64, f64)
 // exceeds the one-sided Bonferroni critical value for alpha=.05/48.
 fn simultaneous_null_upper_bound(successes: usize, trials: usize) -> f64 {
     wilson_interval_with_z(successes, trials, 3.08).1
+}
+
+// Conservative two-sided 95% Bonferroni lower Wilson bound across the three
+// preregistered paired-outcome-association settings for the +20pp / ICC .20
+// design gate. z=2.394 exceeds Phi^-1(1 - .05/(2*3)).
+fn simultaneous_power_lower_bound(successes: usize, trials: usize) -> f64 {
+    wilson_interval_with_z(successes, trials, 2.394).0
 }
 
 fn simulate_power_scenario(
@@ -2310,20 +2340,36 @@ fn validate_power_report(
     } else {
         None
     };
+    let recomputed_worst_simultaneous_lower = if all_worst_case_associations_estimated {
+        worst_case_scenarios
+            .iter()
+            .map(|scenario| {
+                simultaneous_power_lower_bound(
+                    scenario.utility_gate_passes,
+                    scenario.study_simulations,
+                )
+            })
+            .reduce(f64::min)
+    } else {
+        None
+    };
     if !same_optional_probability(
         report.estimated_power_at_20pp_and_icc_020,
         recomputed_worst_power,
     ) || !same_optional_probability(
         report.estimated_power_at_20pp_and_icc_020_lower_95,
         recomputed_worst_lower,
+    ) || !same_optional_probability(
+        report.estimated_power_at_20pp_and_icc_020_lower_simultaneous_95,
+        recomputed_worst_simultaneous_lower,
     ) {
-        bail!("power report headline power must equal the worst registered pairing-association case at +20pp/ICC 0.20");
+        bail!("power report headline power/bounds must equal the worst registered association case at +20pp/ICC 0.20");
     }
 
     let recomputed_gate = report.eligible_validation_family_count
         >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
         && report
-            .estimated_power_at_20pp_and_icc_020_lower_95
+            .estimated_power_at_20pp_and_icc_020_lower_simultaneous_95
             .is_some_and(|value| value >= 0.80)
         && report
             .null_effect_false_claim_probability_upper_simultaneous_95_max
@@ -3459,6 +3505,15 @@ mod tests {
             left.estimated_power_upper_95
                 .is_some_and(|upper| upper >= power)
         );
+    }
+
+    #[test]
+    fn simultaneous_power_lower_bound_is_more_conservative_than_per_cell_bound() {
+        let per_cell = wilson_interval(850, 1_000).0;
+        let simultaneous = simultaneous_power_lower_bound(850, 1_000);
+        assert!(simultaneous < per_cell);
+        assert!(simultaneous > 0.80);
+        assert_eq!(simultaneous_power_lower_bound(0, 0), 0.0);
     }
 
     #[test]
