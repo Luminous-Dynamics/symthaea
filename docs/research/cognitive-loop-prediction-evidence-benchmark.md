@@ -223,3 +223,32 @@ where \(r_i\) is the calibrated reliability of a valid sample, \(n_i\) is an ind
 - **Protocol:** same stream order, task resets, buffer capacity, optimizer/training budget, and seeds for all methods. Use at least 10 paired seeds for the internal study and preserve every failure trace. Report mean and dispersion as well as worst-task outcomes.
 
 This experiment can establish whether reliability-aware replay helps Symthaea's chosen workloads. It cannot establish a general SOTA win without running the external benchmark's complete protocol under comparable conditions.
+
+
+## 11. CodingAgent: confidence gap is not measured prediction error
+
+The coding agent previously computed `prediction_error = 1 - prediction_confidence` in its signal-extraction path, then stored and published that value as prediction error and passed it into pending reasoning outcomes. This conflates two different quantities: a confidence gap and a measured model/observation mismatch. It can also make an invalid numeric compatibility payload appear to be valid evidence at the reasoning boundary.
+
+The coding-agent follow-up takes the measured PE and its validity bit from `CycleResult`; confidence gap is tracked separately. Only valid finite PE enters the PE history. The consciousness event includes an explicit validity flag, so downstream readers can ignore the numeric payload when it is unavailable. Pending decision outcomes carry `Option<f64>` PE, while gate/outcome calibration still records its independently observed result when PE is absent.
+
+### Required counterfactuals
+
+1. On cold start, an invalid CycleResult PE must not be appended to the measured-PE history.
+2. For a valid CycleResult, the downstream signal must equal the cycle's measured PE exactly—not `1 - confidence`.
+3. Holding confidence fixed while changing measured PE changes the PE channel but not confidence gap.
+4. Holding PE fixed while changing confidence changes confidence gap/velocity but not measured PE.
+5. Invalid or non-finite PE remains unavailable in the pending outcome and serialized reasoning event; no finite placeholder is synthesized.
+6. A gate outcome remains recorded when PE is unavailable; missing PE must not suppress unrelated gate/outcome calibration.
+7. Replay of a decision record retains its own gate result and PE availability; later testing cycles must not overwrite decision-time evidence.
+8. Telemetry consumers must respect the validity bit and must not aggregate invalid numeric sentinels as PE.
+
+### Suggested benchmark
+
+Use a paired, deterministic synthetic trace where PE and confidence vary independently. Include cold-start, invalid sentinel, NaN, infinity, high PE/high confidence, low PE/low confidence, and missing-at-decision followed by valid-at-resolution. Report:
+- invalid PE entries admitted to histories (target 0);
+- PE/confidence cross-contamination rate (target 0);
+- decision records with missingness converted to a numeric PE (target 0);
+- gate/outcome observations lost due to missing PE (target 0);
+- reproducibility of decision-time telemetry across intervening testing cycles (target 100% exact match).
+
+These are correctness targets. They do not establish coding-agent task performance or SOTA. After the integrity contract passes, compare task success, compile/test pass rate, regressions introduced, retries, token/compute cost, and latency against a matched stateless or existing-memory baseline.
