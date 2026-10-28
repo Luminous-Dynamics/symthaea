@@ -256,7 +256,8 @@
     "references": [
       "https://link.springer.com/article/10.1007/s11831-025-10392-8",
       "https://doi.org/10.1145/3801959",
-      "https://link.springer.com/article/10.1007/s43939-026-00685-5"
+      "https://link.springer.com/article/10.1007/s43939-026-00685-5",
+      "https://doi.org/10.1007/s11081-026-10078-5"
     ]
   },
   "raw_trace_contract": {
@@ -296,5 +297,30 @@
     "receipt_schema_file": "docs/research/CASTING_BENCHMARK_RECEIPT.schema.json",
     "analysis_lock_file": "docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json",
     "rule": "undefined Run receipts must bind both protocol_sha256 and analysis_lock_sha256 to the exact checked-out files; the scorer rejects run-specific bounds that differ from the frozen suite contract."
+  },
+  "related_method_comparisons": {
+    "consequential_improvement_2026": {
+      "citation": "Aydogdu et al., Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization, Optimization and Engineering 27 (2026), version of record published 27 March 2026.",
+      "doi": "10.1007/s11081-026-10078-5",
+      "comparison_scope": "Auxiliary single-objective scalarization track only; not a direct drop-in comparator for the current multi-objective benchmark.",
+      "methodological_relevance": [
+        "Jointly chooses design location and fidelity level.",
+        "Accounts for deferred high-fidelity validation cost when a low-fidelity evaluation is selected.",
+        "Targets avoiding excessive low-fidelity sampling when high-fidelity validation is ultimately required."
+      ],
+      "limitations_from_source": [
+        "The paper identifies extension to multi-objective optimization and parallel sampling as future work.",
+        "The paper states code and supporting data are available upon reasonable request."
+      ],
+      "lock_status": "blocked_until_author_code_or_independently_verified_reimplementation_and_environment_lock",
+      "acceptance_gates": [
+        "Obtain the authors' implementation or independently rederive and document the acquisition formula; never label the latter as the authors' implementation.",
+        "Pin code revision, all dependency versions, configuration digest and environment lock.",
+        "Compare on a fixed set of scalarization weights with a predeclared handling of constraints.",
+        "Charge the expected deferred high-fidelity confirmation cost for low/medium choices and record actual realized validation spend.",
+        "Report each scalarization separately and do not collapse results into the multi-objective leaderboard."
+      ],
+      "source": "https://link.springer.com/article/10.1007/s11081-026-10078-5"
+    }
   }
 }
