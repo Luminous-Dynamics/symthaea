@@ -111,7 +111,8 @@
         "argv",
         "working_directory",
         "timeout_ms",
-        "environment_sha256"
+        "environment_sha256",
+        "argv_sha256"
       ],
       "properties": {
         "argv": {
@@ -137,6 +138,9 @@
           "minimum": 1
         },
         "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "argv_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
