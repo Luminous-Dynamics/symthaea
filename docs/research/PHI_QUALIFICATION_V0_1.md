@@ -42,7 +42,7 @@ Each result must carry the fields below either directly or through an immutable 
 - `metric_id`: stable, specific name such as `spectral_laplacian_lambda2`, `hdc_mutual_information_partition_proxy`, or `iit4_system_phi_s`.
 - `metric_version`, implementation source revision, executable/build digest, and configuration digest.
 - `claim_level`: Q0–Q3.
-- `theory`: `none`, `IIT3.0`, `IIT4.0`, or another named framework.
+- `theory` and `formalism_profile`: e.g. `none`, `IIT_3_0`, `IIT_4_0_2023`, `IIT_4_0_2026`, or another explicitly versioned framework. “IIT 4.0” alone is insufficient for a reference claim.
 - `quantity`: distinguish system integrated information, mechanism-level small phi, cause–effect-structure quantities, and unrelated topology or utility measures. Do not use a bare `phi` as the only identifier.
 
 ### Model identity
@@ -71,7 +71,7 @@ NaN, infinity, silently clamped inputs, invalid causal models, incomplete search
 
 ### Track A — Formal reference computation
 
-Implement or wrap a pinned and independently checked reference implementation. Keep IIT 3.0 and IIT 4.0 separate: their quantities, partition rules, and cause–effect formalisms are not interchangeable. IIT 4.0 qualification must state whether it computes system integrated information, a cause–effect structure, distinctions/relations, or only a subset. A partial calculation must be labeled partial; it must not be renamed “full IIT 4.0”.
+Implement or wrap a pinned and independently checked reference implementation. Keep `IIT_3_0`, `IIT_4_0_2023` (Albantakis et al. 2023), and `IIT_4_0_2026` (the updated intrinsic-information requirement described by Mayner et al. 2026) separate: their quantities, partition rules, and cause–effect formalisms are not interchangeable. Current PyPhi configuration docs expose these as distinct formalism profiles and note that a preset selects compatible measures and partition schemes, not merely a version string. Pin both the PyPhi package/source revision and the exact preset/profile. IIT 4.0 qualification must state whether it computes system integrated information, a cause–effect structure, distinctions/relations, or only a subset. A partial calculation must be labeled partial; it must not be renamed “full IIT 4.0”.
 
 Start with binary, finite, explicit transition-probability models small enough for exhaustive work. Archive model bytes, exact state, expected values, reference version, and digests. Include degenerate and analytically tractable known-answer cases. The reference implementation is a comparator, not an oracle whose name removes the need to inspect model equivalence.
 
@@ -155,7 +155,7 @@ Do not issue Q2 or Q3 qualification if any required field is missing, source/mod
 
 This proposal should benchmark against reference implementations and established methods, not an invented “industry Phi leaderboard.”
 
-- **PyPhi / IIT reference implementations:** appropriate for the exact IIT version and quantities they actually implement. Pin the version, options, partition scheme and model. The official PyPhi complexity guide documents severe combinatorial limits for IIT 4.0 cause–effect structures, with practical ceilings dependent on the stage, topology and options. This is a reason for carefully validated proxies—not a reason to call a proxy exact.
+- **PyPhi / IIT reference implementations:** appropriate for the exact formalism profile and quantities they actually implement. Pin the package/source revision, `IIT_3_0`, `IIT_4_0_2023` or `IIT_4_0_2026` profile, preset, partition scheme and model. The official PyPhi complexity guide documents severe combinatorial limits for IIT 4.0 cause–effect structures, with practical ceilings dependent on stage, topology and options. This is a reason for carefully validated proxies—not a reason to call a proxy exact. References: https://pyphi.readthedocs.io/en/latest/reference/configuration.html and https://pyphi.readthedocs.io/en/latest/theory/computational-complexity.html
 - **Spectral graph measures:** valid baselines for connectivity and diffusion properties, not formal IIT scores.
 - **Information-theoretic and perturbational baselines:** compare only when the causal/data assumptions match; clearly separate observational measures from intervention-based ones.
 - **Cognitive baselines:** compare with simple heuristics, ablated Symthaea, and compute-matched alternatives on held-out tasks.
@@ -189,7 +189,8 @@ In particular, attention should not assign higher weight because a value is asse
 
 ## References
 
-- Albantakis et al. (2023), “Integrated Information Theory (IIT) 4.0: Formulating the Properties of Phenomenal Existence in Physical Terms”: https://pmc.ncbi.nlm.nih.gov/articles/PMC10581496/
+- Albantakis et al. (2023), “Integrated Information Theory (IIT) 4.0: Formulating the Properties of Phenomenal Existence in Physical Terms”: https://doi.org/10.1371/journal.pcbi.1011465
+- PyPhi configuration reference: distinguishes `IIT_4_0_2023` from `IIT_4_0_2026` and `IIT_3_0`: https://pyphi.readthedocs.io/en/latest/reference/configuration.html
 - PyPhi, “Computational complexity” (IIT 4.0 and IIT 3.0 stage-by-stage limits): https://pyphi.readthedocs.io/en/latest/theory/computational-complexity.html
 - Cogitate Consortium et al. (2025), “Adversarial testing of global neuronal workspace and integrated information theories of consciousness,” Nature: https://doi.org/10.1038/s41586-025-08888-1
 
