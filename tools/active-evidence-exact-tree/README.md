@@ -86,3 +86,25 @@ These are analytical results for five hand-defined measurement matrices and one 
 - The robust ambiguity set is handcrafted and small.
 - Policies are greedy one-step selectors; no globally optimal finite-horizon acquisition algorithm is implemented.
 - There is no training model, external dataset, human annotation workflow, statistical inference over a task population, or production Symthaea integration.
+
+
+## Follow-up: exact finite-horizon robust policy-tree optimizer
+
+A second Rust binary, src/bin/robust_tree.rs, enumerates complete observation-contingent acquisition policy trees rather than choosing each query by a greedy one-step score. For three query rounds and four available queries, it enumerates 3,137 candidate trees, then chooses one fixed tree minimizing the worst expected terminal decision loss over the four declared ambiguity models. Equal worst-case loss is broken by lower worst-case expected query cost. The same observation-contingent tree is evaluated under every model; the adversarial model is not allowed to switch independently at every branch.
+
+Commands:
+
+    cargo test --manifest-path tools/active-evidence-exact-tree/Cargo.toml
+    cargo run --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > /tmp/robust-tree.csv
+    python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py --self-test
+    python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py /tmp/robust-tree.csv
+
+Independent Python reference results at query cap 3:
+- Greedy robust EVSI: worst regret across the four ambiguity models = 1.7780; IID regret = 1.1480 at expected cost 1.000.
+- Finite-horizon robust tree: worst regret across the same four models = 1.6090; IID regret = 1.0752 at expected cost 2.632.
+- Greedy plug-in EVSI: IID regret = 1.0916 at expected cost 3.8737.
+- Under the out-of-set channel flip, the finite-horizon tree still has regret 3.5133, above the no-query baseline 2.3000.
+
+The result is a promising algorithmic hypothesis, not a superiority claim. The optimizer is exact only for this finite 3-hypothesis/4-query fixture and four-model ambiguity set. It minimizes worst-case loss first, then expected cost; it is not constrained to a fixed cumulative-cost budget. The comparison therefore reports both query cap and realized expected costs, and must not be described as a matched-cost SOTA comparison. The selected tree still uses nominal posterior updates and nominal terminal actions, so it is not a fully robust decision/inference system.
+
+The Rust binary and its Rust tests have not yet been compiled or run in this environment because Cargo/rustc/rustfmt are unavailable. The independent Python prototype exhaustively evaluated the same finite problem and reproduced the listed reference witnesses; the Rust-versus-Python CSV check remains pending exact-source execution.
