@@ -16,6 +16,9 @@ const SHIFTED_P: f64 = 0.8;
 const CHANGE_AFTER: usize = 100;
 const HORIZONS: [usize; 4] = [100, 250, 500, 1000];
 const EPS: f64 = 1.0e-12;
+const TOTAL_LABEL_BUDGET: usize = 1000;
+const SHIFT_AFTER_TOTAL_LABELS: usize = 100;
+const SENTINEL_FRACTIONS: [f64; 7] = [0.0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0];
 const BETA_PRIOR_A: f64 = 0.5;
 const BETA_PRIOR_B: f64 = 0.5;
 
@@ -342,6 +345,78 @@ fn print_csv() {
     }
 }
 
+fn print_sentinel_budget_csv() {
+    println!(
+        "sentinel_fraction,total_label_budget,sentinel_labels,adaptive_labels,change_after_sentinel_labels,no_target_shift_alarm_probability,pre_change_false_alarm_probability,true_shift_detection_probability,mean_delay_sentinel_labels,mean_delay_total_label_equivalent,per_cell_alpha"
+    );
+
+    for fraction in SENTINEL_FRACTIONS {
+        let sentinel_labels = (fraction * TOTAL_LABEL_BUDGET as f64).round() as usize;
+        let adaptive_labels = TOTAL_LABEL_BUDGET - sentinel_labels;
+
+        if sentinel_labels == 0 {
+            // With no randomized audit, the only available stream is the adaptively selected
+            // stream. Its 0.74 event rate is a selection effect, not an environment shift.
+            let selected_only = evaluate(
+                Boundary::BetaMixtureEProcess,
+                NOMINAL_P,
+                0.74,
+                None,
+                0,
+                TOTAL_LABEL_BUDGET,
+            );
+            println!(
+                "{:.4},{},{},{},NA,{:.12},NA,NA,NA,NA,{:.12}",
+                fraction,
+                TOTAL_LABEL_BUDGET,
+                sentinel_labels,
+                adaptive_labels,
+                selected_only.false_alarm_probability,
+                PER_CELL_ALPHA
+            );
+            continue;
+        }
+
+        // Use a deterministic audit cadence, so the shift-at-total-label-100 point maps to
+        // a known sentinel count. The audit labels are random draws from the target population.
+        let change_after_sentinel =
+            (fraction * SHIFT_AFTER_TOTAL_LABELS as f64).round() as usize;
+        let stable = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            None,
+            0,
+            sentinel_labels,
+        );
+        let shifted = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            Some(SHIFTED_P),
+            change_after_sentinel,
+            sentinel_labels,
+        );
+        let delay_total_equivalent =
+            shifted.mean_detection_delay.map(|delay| delay / fraction);
+
+        println!(
+            "{:.4},{},{},{},{},{:.12},{:.12},{},{},{},{:.12}",
+            fraction,
+            TOTAL_LABEL_BUDGET,
+            sentinel_labels,
+            adaptive_labels,
+            change_after_sentinel,
+            stable.false_alarm_probability,
+            shifted.false_alarm_probability,
+            csv_optional(Some(shifted.detection_probability)),
+            csv_optional(shifted.mean_detection_delay),
+            csv_optional(delay_total_equivalent),
+            PER_CELL_ALPHA
+        );
+    }
+}
+
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
     match args.next() {
@@ -349,8 +424,12 @@ fn main() -> ExitCode {
             print_csv();
             ExitCode::SUCCESS
         }
+        Some(argument) if argument == "--sentinel-budget-csv" => {
+            print_sentinel_budget_csv();
+            ExitCode::SUCCESS
+        }
         Some(argument) if argument == "--help" || argument == "-h" => {
-            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor --");
+            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv]");
             ExitCode::SUCCESS
         }
         Some(argument) => {
@@ -514,6 +593,49 @@ mod tests {
         assert!(beta.detection_probability > 0.90);
         assert!(hoeffding.detection_probability < 0.40);
         assert!(beta.detection_probability > hoeffding.detection_probability + 0.50);
+    }
+
+    #[test]
+    fn sentinel_budget_frontier_makes_audit_cost_detection_power_explicit() {
+        let selected_only = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            0.74,
+            None,
+            0,
+            TOTAL_LABEL_BUDGET,
+        );
+        let five_percent_stable = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            None,
+            0,
+            50,
+        );
+        let ten_percent_shift = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            Some(SHIFTED_P),
+            10,
+            100,
+        );
+        let twenty_percent_shift = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            Some(SHIFTED_P),
+            20,
+            200,
+        );
+
+        assert!(selected_only.false_alarm_probability > 0.99);
+        assert!(five_percent_stable.false_alarm_probability <= PER_CELL_ALPHA + EPS);
+        assert!(ten_percent_shift.detection_probability > 0.95);
+        assert!(twenty_percent_shift.detection_probability > 0.99);
+        assert!(ten_percent_shift.mean_detection_delay.is_some());
+        assert!(twenty_percent_shift.mean_detection_delay.is_some());
     }
 
     #[test]
