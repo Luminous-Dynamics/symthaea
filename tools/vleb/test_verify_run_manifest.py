@@ -252,6 +252,10 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.bundle.manifest["evidence_bundle"]["sha256"] = sha(bundle_path.read_bytes())
         self.assert_issue(self.bundle.audit(repin_for_test=True), "evidence_bundle_invalid")
 
+    def test_bundle_artifact_count_must_match_zip_inventory(self) -> None:
+        self.bundle.manifest["evidence_bundle"]["artifact_count"] = 99
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "evidence_bundle_inventory_mismatch")
+
     def test_path_traversal_is_rejected_by_schema(self) -> None:
         self.bundle.manifest["protocol"]["path"] = "../protocol.md"
         self.assert_issue(self.bundle.audit(repin_for_test=True), "schema_invalid")
