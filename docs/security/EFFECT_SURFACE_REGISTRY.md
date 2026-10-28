@@ -115,3 +115,14 @@ This is an initial known-surface baseline audited against main commit c6355cc6ff
 6. Treat an exact-head skipped, queued, missing, or non-executed lane as unavailable evidence, never as PASS.
 
 Output fields distinguish records marked qualified from independently verified qualification. Even if `--require-evidence-records` succeeds, the command still reports `security_qualification=NOT_EVALUATED_BY_THIS_COMMAND`. The registry is a discovery and assurance input, not an authority source. Adding a row cannot authorize an effect.
+
+
+## Frozen effect-authorization conformance contract
+
+The companion [`effect-authorization-conformance.v1.json`](effect-authorization-conformance.v1.json) defines 41 versioned test vectors spanning positive utility controls, credential and issuer validation, purpose/audience/domain/resource/action binding, delegation attenuation and revocation, same-live-subject composition, reputation/model-signal non-authority, one-shot replay/concurrency/restart, effect-surface bypasses, pre-state drift, unknown outcomes, and independent postcondition/receipt failures.
+
+This file is a **frozen design contract, not an executable harness, test result, or security qualification**. The baseline fixture and named mutation paths must be mapped to concrete typed test inputs by a later harness. A harness must fail on unrecognized mutation paths; silently ignoring a vector is a corpus execution failure. Per-case setup is explicit for already-consumed and concurrent-use cases.
+
+The scoring contract separates the authorization decision from actual effect-adapter invocation, observed side effect, terminal outcome class, and independent postcondition. It includes positive controls specifically so deny-all cannot score as secure. It requires zero adapter invocations and zero unauthorized side effects for denied/indeterminate cases, exactly one side effect for a valid one-shot action, atomic single-use under a 32-request race, no replay after the declared restart model, and no automatic retry after an unknown outcome. Lifecycle cases where an effect may already have occurred are not incorrectly scored as “zero side effects”; they instead require quarantine/reconciliation and prohibit a success claim without evidence.
+
+Performance campaigns are specified separately for credential verification, recognition, policy decision, durable reservation, dispatch admission, effect handling, postcondition verification, and end-to-end. They must publish p50/p95/p99/p99.9, warm/cold semantics, occupancy points of 1/1K/10K/100K, exact source/toolchain/hardware identity, and complete error/timeout/missing-row counts. These are measurement requirements, not invented performance results or an unmeasured SLO. Never compare an in-memory decision to a durable gateway round trip, and never relax a security gate to improve latency.
