@@ -203,6 +203,25 @@ jobs:
               raise SystemExit("schema fixture must exercise a pass-shaped contract")
           if fixture["null_effect_false_claim_probability_upper_simultaneous_95_max"] > 0.05 or fixture["weak_null_false_claim_probability_upper_simultaneous_95_max"] > 0.05:
               raise SystemExit("synthetic fixture's registered simultaneous bounds should meet the demonstration threshold")
+          strict_null_rows = [row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 0.0]
+          weak_null_rows = fixture["weak_null_scenarios"]
+          expected_strict_rate = max(row["utility_gate_passes"] / fixture["study_simulations"] for row in strict_null_rows)
+          expected_strict_upper = max(row["null_effect_false_claim_probability_upper_simultaneous_95"] for row in strict_null_rows)
+          expected_weak_rate = max(row["estimated_false_claim_probability"] for row in weak_null_rows)
+          expected_weak_upper = max(row["false_claim_probability_upper_simultaneous_95"] for row in weak_null_rows)
+          if abs(fixture["null_effect_false_claim_probability_max"] - expected_strict_rate) > 1e-12:
+              raise SystemExit("strict-null false-claim summary does not match its grid")
+          if abs(fixture["null_effect_false_claim_probability_upper_simultaneous_95_max"] - expected_strict_upper) > 1e-12:
+              raise SystemExit("strict-null simultaneous summary does not match its grid")
+          if abs(fixture["weak_null_false_claim_probability_max"] - expected_weak_rate) > 1e-12:
+              raise SystemExit("weak-null false-claim summary does not match its grid")
+          if abs(fixture["weak_null_false_claim_probability_upper_simultaneous_95_max"] - expected_weak_upper) > 1e-12:
+              raise SystemExit("weak-null simultaneous summary does not match its grid")
+          expected_power = next(row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2)
+          if abs(fixture["estimated_power_at_20pp_and_icc_020"] - expected_power["estimated_utility_gate_power"]) > 1e-12:
+              raise SystemExit("headline power estimate does not match the +20pp/ICC .20 cell")
+          if abs(fixture["estimated_power_at_20pp_and_icc_020_lower_95"] - expected_power["estimated_power_lower_95"]) > 1e-12:
+              raise SystemExit("headline power bound does not match the +20pp/ICC .20 cell")
           bad = copy.deepcopy(fixture)
           bad["weak_null_scenarios"].pop()
           try:
