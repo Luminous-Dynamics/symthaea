@@ -9,6 +9,8 @@ The PR now includes an isolated Rust reference implementation in `src/compositio
 
 **Execution boundary:** those Rust tests have not been compiled or executed in this environment. Exact-head GitHub CI records are skipped. An independent local Python simulation of the intended alignment/verdict rules produced zero mismatches on the 108-case smoke corpus; this is algorithm-level fixture checking, not Rust execution or scientific validation.
 
+The returned evidence is a JSON-serializable receipt containing the exact descriptor and threshold configuration, the target start offset, every matched source/target index pair and its pitch/onset/duration residuals, explicit unmatched indices, per-axis summaries, and failure reasons. Non-finite residual arithmetic returns an input error rather than emitting NaN or infinity into a purported receipt.
+
 Current API scope is deliberately monophonic: events must have strictly increasing onsets. Simultaneous notes, explicit rests, retrograde, ornament operators, audio realization, and historical restoration lineage are not supported by this contract and must not be inferred.
 
 ## Motivation: move beyond a single transformation label
