@@ -243,6 +243,7 @@ struct EvidenceIndexSnapshot {
 /// snapshot (or vice versa). It is an unkeyed consistency manifest, not a
 /// signature: authenticate or externally pin its bytes when storage is hostile.
 pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V3";
+const LEGACY_EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V2";
 
 /// Identity of the actual on-disk HDC store committed alongside evidence.
 /// The CRC checksum checks logical parity; exact HDC file bytes are separately
@@ -281,6 +282,8 @@ pub struct EvidenceCommitManifest {
     /// Present only for the typed production commit path.
     hdc_store_identity: Option<HdcStoreIdentity>,
     /// SHA-256 of the immutable generation-bound lexical inverted index, when present.
+    /// Missing in legacy V2 manifests; those generations rebuild the index from the verified snapshot.
+    #[serde(default)]
     lexical_index_sha256: Option<String>,
 }
 
@@ -291,8 +294,9 @@ impl EvidenceCommitManifest {
         Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, None)
     }
 
-    /// Construct a manifest that commits the actual HDC store's logical identity
-    /// in addition to the exact on-disk file-byte digest.
+    /// Construct a legacy V2 typed manifest that binds the HDC identity but has
+    /// no committed lexical artifact. New production commits must use
+    /// new_with_hdc_identity_and_lexical_index instead.
     pub fn new_with_hdc_identity(
         generation: u64,
         hdc_index_bytes: &[u8],
@@ -300,7 +304,12 @@ impl EvidenceCommitManifest {
         identity: HdcStoreIdentity,
     ) -> Result<Self, String> {
         identity.validate_for_recovery()?;
-        Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity))
+        let mut manifest = Self::new_with_optional_hdc_identity(
+            generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity),
+        )?;
+        manifest.schema_version = LEGACY_EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string();
+        manifest.validate_envelope()?;
+        Ok(manifest)
     }
 
     /// Construct a typed commit manifest that also binds a serialized lexical index.
@@ -317,6 +326,7 @@ impl EvidenceCommitManifest {
         let mut manifest = Self::new_with_hdc_identity(
             generation, hdc_index_bytes, evidence_snapshot_bytes, identity,
         )?;
+        manifest.schema_version = EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string();
         manifest.lexical_index_sha256 = Some(sha256_hex(lexical_index_bytes));
         manifest.validate_envelope()?;
         Ok(manifest)
@@ -371,8 +381,18 @@ impl EvidenceCommitManifest {
     }
 
     fn validate_envelope(&self) -> Result<(), String> {
-        if self.schema_version != EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION {
-            return Err("unsupported evidence commit manifest schema version".into());
+        match self.schema_version.as_str() {
+            EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION => {
+                if self.hdc_store_identity.is_some() && self.lexical_index_sha256.is_none() {
+                    return Err("V3 typed manifest must bind a lexical-index digest".into());
+                }
+            }
+            LEGACY_EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION => {
+                if self.lexical_index_sha256.is_some() {
+                    return Err("legacy V2 manifest cannot declare a lexical-index digest".into());
+                }
+            }
+            _ => return Err("unsupported evidence commit manifest schema version".into()),
         }
         if self.generation == 0 {
             return Err("evidence commit generation must start at 1".into());
@@ -1283,6 +1303,41 @@ mod tests {
         )).unwrap());
         let crafted = serde_json::to_vec(&envelope).unwrap();
         assert!(EvidenceIndex::restore_snapshot(&crafted).is_err());
+    }
+
+    #[test]
+    fn legacy_v2_manifest_remains_verifiable_without_lexical_artifact() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-legacy", "web", "legacy committed evidence"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let snapshot = evidence.snapshot_bytes(5).unwrap();
+        let identity = HdcStoreIdentity {
+            store_generation: 3,
+            live_count: 1,
+            checksum_version: 1,
+            checksum_hex: "0123456789abcdef".into(),
+        };
+        let legacy = EvidenceCommitManifest::new_with_hdc_identity(
+            5, b"canonical hdc bytes", &snapshot, identity,
+        ).unwrap();
+        let mut legacy_value: serde_json::Value =
+            serde_json::from_slice(&legacy.to_json_bytes().unwrap()).unwrap();
+        legacy_value.as_object_mut().unwrap().remove("lexical_index_sha256");
+        let legacy_bytes = serde_json::to_vec(&legacy_value).unwrap();
+
+        let recovered = EvidenceCommitManifest::from_json_bytes(&legacy_bytes).unwrap();
+        recovered.verify(b"canonical hdc bytes", &snapshot).unwrap();
+        recovered.verify_lexical_index(None).unwrap();
+        assert!(recovered.verify_lexical_index(Some(b"unmanifested index")).is_err());
+        assert_eq!(recovered.lexical_index_sha256(), None);
+
+        let mut invalid_v3 = legacy_value;
+        invalid_v3["schema_version"] =
+            serde_json::Value::String(EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.into());
+        assert!(EvidenceCommitManifest::from_json_bytes(&serde_json::to_vec(&invalid_v3).unwrap()).is_err(),
+            "V3 typed manifest without a lexical digest must be rejected");
     }
 
     #[test]
