@@ -70,7 +70,7 @@ expected=(
   "data_clinical.csv"
   "data_plasma_protein.csv"
   "data_rnaseq_count.csv"
-  "intact_dna.csv"
+  "data_intact_dna.csv"
 )
 
 if ! diff -u \
