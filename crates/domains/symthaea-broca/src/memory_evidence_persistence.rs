@@ -820,4 +820,63 @@ mod tests {
         fs::write(dir.join(EVIDENCE_FILE), b"{}").unwrap();
         assert!(store.recover().is_err());
     }
+
+    #[test]
+    fn retention_keeps_current_and_prunes_old_and_unpublished_future_generations() {
+        let root = tempdir().unwrap();
+        let store = EvidenceDiskStore::open(root.path()).unwrap();
+        store.commit(b"index-v1", &sample_index("old state")).unwrap();
+        store.commit(b"index-v2", &sample_index("current state")).unwrap();
+
+        // Publish a complete generation directory but stop before CURRENT.
+        assert!(store.commit_with_fault(
+            b"index-v3-orphan",
+            &sample_index("unpublished state"),
+            Some(CommitFaultPoint::AfterGenerationPublish),
+        ).is_err());
+        let report = store.prune_history(1).unwrap();
+        assert_eq!(report.current_generation, 2);
+        assert_eq!(report.retained_generation_window_start, 2);
+        assert!(report.removed_generation_directories.iter().any(|name| name.contains("generation-00000000000000000001-")));
+        assert!(report.removed_generation_directories.iter().any(|name| name.contains("generation-00000000000000000003-")));
+        assert_eq!(store.recover().unwrap().unwrap().generation, 2);
+
+        let entries = fs::read_dir(root.path().join("generations")).unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(entries.iter().filter(|name| name.starts_with("generation-")).count(), 1);
+    }
+
+    #[test]
+    fn retention_removes_stale_staging_but_never_prunes_current() {
+        let root = tempdir().unwrap();
+        let store = EvidenceDiskStore::open(root.path()).unwrap();
+        assert!(store.commit_with_fault(
+            b"index-first-attempt",
+            &sample_index("staging payload"),
+            Some(CommitFaultPoint::AfterIndexWrite),
+        ).is_err());
+        store.commit(b"index-v1", &sample_index("current state")).unwrap();
+
+        let report = store.prune_history(1).unwrap();
+        assert_eq!(report.removed_staging_directories, 1);
+        assert_eq!(store.recover().unwrap().unwrap().generation, 1);
+        let entries = fs::read_dir(root.path().join("generations")).unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(entries.iter().any(|name| name.starts_with("generation-")));
+        assert!(!entries.iter().any(|name| name.starts_with(".staging-")));
+    }
+
+    #[test]
+    fn retention_rejects_zero_and_corrupt_current_without_deleting_history() {
+        let root = tempdir().unwrap();
+        let store = EvidenceDiskStore::open(root.path()).unwrap();
+        assert!(store.prune_history(0).is_err());
+        store.commit(b"index-v1", &sample_index("current state")).unwrap();
+        let dir = generation_path(root.path(), 1);
+        fs::write(root.path().join(CURRENT_FILE), b"not a current pointer").unwrap();
+        assert!(store.prune_history(1).is_err());
+        assert!(dir.exists(), "corrupt CURRENT must prevent retention deletion");
+    }
 }
