@@ -114,7 +114,31 @@ Independent Python exact-DP results at horizon 1,000 (detection probability and 
 
 The conservative Hoeffding sequence can be markedly slower / lower powered for moderate shifts. The Beta mixture improves detection power for p1=0.40 from about 31% to 94% by horizon 1,000, while remaining under the per-cell alpha allocation in the stationary-null experiment. For p1=0.45/0.55, both detectors struggle, though the Beta mixture is materially better. These results are symmetric for upward/downward shifts because p0=0.5 and the Beta prior is symmetric.
 
-These are exact probabilities for the specified iid Bernoulli step-shift simulator—not a universal ranking. The fixed alternative mixture may be less efficient on gradual drifts, bursts, or shifts whose direction and temporal pattern differ from this setup. The next confirmatory matrix should include gradual ramps, temporary bursts, serial dependence and selection-biased observations, and compare false-alarm budgets at matched detection delay as well as detection at matched false-alarm rate.
+These are exact probabilities for the specified iid Bernoulli step-shift simulator—not a universal ranking. The fixed alternative mixture may be less efficient on gradual drifts, bursts, or shifts whose direction and temporal pattern differ from this setup. A follow-up matrix should add gradual ramps, temporary bursts, serial dependence, and compare false-alarm budgets at matched detection delay as well as detection at matched false-alarm rate. The current revision adds one further mechanism-isolation case: selection-biased observations with no target-population change.
 
 
 A local numerical sanity check compared the Rust Lanczos-style log-gamma formula used by the Beta-mixture e-process against Python's libm-backed lgamma for every (n,S) with 1 ≤ n ≤ 1,000 and 0 ≤ S ≤ n. The maximum absolute log-e-value difference was about 3.64e-12; no crossing/non-crossing decisions differed at the fixed threshold log(240) on this enumerated state grid. This checks the numerical formula, not compilation or end-to-end Rust output parity.
+
+
+## A selector can manufacture an apparent shift
+
+The new `selection_bias_no_environment_shift` scenario tests a failure mode that the iid Bernoulli shift scenarios cannot expose. The target population has two equally common strata with event rates 0.8 and 0.2, so its target rate is p0 = 0.5. An adaptive acquisition policy samples the high-event stratum with probability 0.9 and the low-event stratum with probability 0.1. Its observed event rate is then
+
+```text
+p_selected = 0.9 * 0.8 + 0.1 * 0.2 = 0.74
+```
+
+The target population has not changed; the queried sample mixture has. A monitor that treats adaptively selected labels as a representative stream can therefore interpret the policy's own selection effect as environmental drift. This is a design/estimand problem: the classical e-process false-alarm guarantee assumes its observed stream really follows the declared null, which the selected stream no longer does. It is not a counterexample to Ville's inequality.
+
+Exact dynamic programming at horizon 1,000 gives:
+
+| Observation stream | Target-population change? | Observed Bernoulli rate | Beta-mixture alarm probability |
+|---|---|---:|---:|
+| Randomized sentinel from the target population | No | 0.50 | 0.003059 |
+| Adaptive selected stream (90% high-event stratum) | No | 0.74 | 1.000000 |
+
+The per-cell alpha allocation is 0.004167. The randomized-sentinel stream remains below it in the stationary reference scenario, while the selected stream triggers an apparent shift alarm with essentially unit probability despite no environment change. This exact result is intentionally stark and only applies to the defined two-stratum mixture.
+
+**Paradigm shift:** separate *what changed in the world* from *what the acquisition policy chose to observe*. A detector should use a randomized sentinel/audit stream, known inclusion probabilities with a justified design-based estimator, or explicitly condition its null on the acquisition policy. Adaptive observations and random audits must be tracked as separate evidence channels. Sentinel labels and compute must remain charged to the acquisition budget; this fixture demonstrates the identification problem, not that a specific weighted or adaptive correction is already validated.
+
+The Rust DP, independent Python reference checker, and negative control now include this scenario. They still need exact-head workflow qualification before this is described as Rust-verified evidence.
