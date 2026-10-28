@@ -3,8 +3,8 @@
   "dataset": "QOBLIB Maximum Independent Set",
   "snapshot_date": "2026-10-28",
   "source_url": "https://zib-aopt.github.io/QOBLIB/problem/07/",
-  "source_type": "live website catalog snapshot",
-  "immutable_dataset_revision": null,
+  "source_type": "pinned immutable QOBLIB commit catalog plus Git blob SHA-1 and byte size; graph bytes still require SHA-256 verification at load",
+  "immutable_dataset_revision": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
   "canonical_graph_sha256_by_instance": null,
   "status": "reference-inventory-only-not-preregistered",
   "summary": {
@@ -13,7 +13,8 @@
     "vertices_min": 17,
     "vertices_max": 4000,
     "edges_min": 39,
-    "edges_max": 3997732
+    "edges_max": 3997732,
+    "listed_graph_files": 50
   },
   "interpretation": {
     "best_objective": "Value reported on the QOBLIB MIS catalog page at snapshot time. For status best-known, do not treat this as a proven optimum.",
@@ -33,7 +34,15 @@
       "edges": 454,
       "best_objective": 13,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/aves-sparrow-social.gph",
+        "git_blob_sha1": "433ad3290665909e1ee5c17abfa8c946391938dc",
+        "size_bytes": 3652,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/aves-sparrow-social.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "brock200-1",
@@ -41,7 +50,15 @@
       "edges": 14834,
       "best_objective": 6,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/brock200-1.gph",
+        "git_blob_sha1": "86fb49f62a753e86136d1d219bb3cfb0953025cc",
+        "size_bytes": 132391,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/brock200-1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "brock200-2",
@@ -49,7 +66,15 @@
       "edges": 10024,
       "best_objective": 12,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/brock200-2.gph",
+        "git_blob_sha1": "d1141099281fdd4ba084cee7c7ec7962d9e6cc96",
+        "size_bytes": 89455,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/brock200-2.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "brock200-3",
@@ -57,7 +82,15 @@
       "edges": 12048,
       "best_objective": 9,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/brock200-3.gph",
+        "git_blob_sha1": "20d7385374abf7f395f2872e7e2b8b7b1e113f12",
+        "size_bytes": 107568,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/brock200-3.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "brock200-4",
@@ -65,7 +98,15 @@
       "edges": 13089,
       "best_objective": 8,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/brock200-4.gph",
+        "git_blob_sha1": "ac3e9cf78855466d04349a1e72a94c447cebe329",
+        "size_bytes": 116622,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/brock200-4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "brock400-1",
@@ -73,7 +114,15 @@
       "edges": 20077,
       "best_objective": 27,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/brock400-1.gph",
+        "git_blob_sha1": "8753f7459a9c70b0a3b1cbfec3cfb8a51dca58b2",
+        "size_bytes": 189858,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/brock400-1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "brock800-1",
@@ -81,7 +130,15 @@
       "edges": 112095,
       "best_objective": 23,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/brock800-1.gph",
+        "git_blob_sha1": "8878281d0c299c0b6e8644d4906897d6fa0957ed",
+        "size_bytes": 1090630,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/brock800-1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "C125-9",
@@ -89,7 +146,15 @@
       "edges": 787,
       "best_objective": 34,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/C125-9.gph",
+        "git_blob_sha1": "8a4d512bc71a16a458b6aae3f2820cf6bd04127d",
+        "size_bytes": 6570,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/C125-9.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "C500-9",
@@ -97,7 +162,15 @@
       "edges": 12418,
       "best_objective": 57,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/C500-9.gph",
+        "git_blob_sha1": "ab86bdb0bf11698c9d6dbcc7550166c03b1f8086",
+        "size_bytes": 118902,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/C500-9.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "C4000-5",
@@ -105,7 +178,15 @@
       "edges": 3997732,
       "best_objective": 18,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/C4000-5.gph",
+        "git_blob_sha1": "ef7bc2199ab168029667b1354beb509b25bd5283",
+        "size_bytes": 45759337,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/C4000-5.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "c-fat200-1",
@@ -113,7 +194,15 @@
       "edges": 1534,
       "best_objective": 18,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/c-fat200-1.gph",
+        "git_blob_sha1": "fdc601ac55b67d5eb6f7d21c16b53d5a3d4e8490",
+        "size_bytes": 13684,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/c-fat200-1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "chesapeake",
@@ -121,7 +210,15 @@
       "edges": 170,
       "best_objective": 17,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/chesapeake.gph",
+        "git_blob_sha1": "3e3754fe393d4e239359c872c0b4aa9cbcfc1716",
+        "size_bytes": 1303,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/chesapeake.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "es60fst01",
@@ -129,7 +226,15 @@
       "edges": 159,
       "best_objective": 60,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/es60fst01.gph",
+        "git_blob_sha1": "1e2fe810d783f782df9b18f354d80f5f9c543822",
+        "size_bytes": 1393,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/es60fst01.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "es60fst02",
@@ -137,7 +242,15 @@
       "edges": 280,
       "best_objective": 88,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/es60fst02.gph",
+        "git_blob_sha1": "60b6ffb5b015323eb0f7c9503d1247c39804e27f",
+        "size_bytes": 2558,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/es60fst02.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "es60fst03",
@@ -145,7 +258,15 @@
       "edges": 142,
       "best_objective": 55,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/es60fst03.gph",
+        "git_blob_sha1": "cf1d6e4777f00e98851b0807fe5ae352c6771c5b",
+        "size_bytes": 1220,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/es60fst03.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "es60fst04",
@@ -153,7 +274,15 @@
       "edges": 238,
       "best_objective": 78,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/es60fst04.gph",
+        "git_blob_sha1": "631b72a35a7e31ed3dfbefb7c17d208cb923e153",
+        "size_bytes": 2154,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/es60fst04.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "farm",
@@ -161,7 +290,15 @@
       "edges": 39,
       "best_objective": 10,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/farm.gph",
+        "git_blob_sha1": "ae103bba88413c1a8eafdeddd07ba5fe69fddc8d",
+        "size_bytes": 291,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/farm.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "football",
@@ -169,7 +306,15 @@
       "edges": 118,
       "best_objective": 16,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/football.gph",
+        "git_blob_sha1": "8413a17349b56abacbc9035aab65712e856fae62",
+        "size_bytes": 929,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/football.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "frb45-21-3",
@@ -177,7 +322,15 @@
       "edges": 58245,
       "best_objective": 45,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/frb45-21-3.gph",
+        "git_blob_sha1": "d55c460b982d82adb7b26a64dcf00242ae0623e8",
+        "size_bytes": 567919,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/frb45-21-3.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "frb50-23-3",
@@ -185,7 +338,15 @@
       "edges": 81068,
       "best_objective": 50,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/frb50-23-3.gph",
+        "git_blob_sha1": "6f8038d9582d2c781aac6e1238ea8d32d531ed1d",
+        "size_bytes": 815744,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/frb50-23-3.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "frb53-24-1",
@@ -193,7 +354,15 @@
       "edges": 94227,
       "best_objective": 53,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/frb53-24-1.gph",
+        "git_blob_sha1": "c9f27dd043584aeb65747ea0a14cae6458a15fc0",
+        "size_bytes": 969290,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/frb53-24-1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "frb59-26-2",
@@ -201,7 +370,15 @@
       "edges": 126163,
       "best_objective": 58,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/frb59-26-2.gph",
+        "git_blob_sha1": "cd41c1f2806429644309fdac1194e86f50e42683",
+        "size_bytes": 1333968,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/frb59-26-2.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "frb100-40",
@@ -209,7 +386,15 @@
       "edges": 572774,
       "best_objective": 96,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/frb100-40.gph",
+        "git_blob_sha1": "dd218203d7de1212e90db848ecbaf49a584905c6",
+        "size_bytes": 6562251,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/frb100-40.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "gen200_p0-9_44",
@@ -217,7 +402,15 @@
       "edges": 1990,
       "best_objective": 44,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/gen200_p0-9_44.gph",
+        "git_blob_sha1": "2d4d0e3807864af046b5b3fff44c07da1168ff00",
+        "size_bytes": 17872,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/gen200_p0-9_44.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "hamming6-2",
@@ -225,7 +418,15 @@
       "edges": 1824,
       "best_objective": 2,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/hamming6-2.gph",
+        "git_blob_sha1": "638f948ef513f01681965f2c003e0027e0d94301",
+        "size_bytes": 14094,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/hamming6-2.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "hamming6-4",
@@ -233,7 +434,15 @@
       "edges": 704,
       "best_objective": 12,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/hamming6-4.gph",
+        "git_blob_sha1": "b16bfe4b459aa5e4643545d0083f410707aeb798",
+        "size_bytes": 5448,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/hamming6-4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "hamming10-4",
@@ -241,7 +450,15 @@
       "edges": 89600,
       "best_objective": 40,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/hamming10-4.gph",
+        "git_blob_sha1": "6bf6931f6f8ffd9153f56f8c53e85010f5f03165",
+        "size_bytes": 881546,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/hamming10-4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "ibm32",
@@ -249,7 +466,15 @@
       "edges": 90,
       "best_objective": 13,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/ibm32.gph",
+        "git_blob_sha1": "224c63c2d5ceb258d7bc58c2095c8bac891f0cdd",
+        "size_bytes": 719,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/ibm32.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "insecta-ant-colony1-day38",
@@ -257,7 +482,15 @@
       "edges": 1134,
       "best_objective": 6,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/insecta-ant-colony1-day38.gph",
+        "git_blob_sha1": "b5f3376d0eece5215716ce9ec7a76bda7678571b",
+        "size_bytes": 8894,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/insecta-ant-colony1-day38.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "insecta-ant-colony3-day09",
@@ -265,7 +498,15 @@
       "edges": 8883,
       "best_objective": 9,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/insecta-ant-colony3-day09.gph",
+        "git_blob_sha1": "da7b1c36651ef0ed848e1510d6239ee6e8876f4b",
+        "size_bytes": 76691,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/insecta-ant-colony3-day09.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "johnson8-2-4",
@@ -273,7 +514,15 @@
       "edges": 210,
       "best_objective": 7,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/johnson8-2-4.gph",
+        "git_blob_sha1": "fc8c0994dec39e07c4ed8509cd1aaf0bf6837a67",
+        "size_bytes": 1559,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/johnson8-2-4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "johnson8-4-4",
@@ -281,7 +530,15 @@
       "edges": 1855,
       "best_objective": 5,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/johnson8-4-4.gph",
+        "git_blob_sha1": "5c6ac520d524519794578501c1331afb9a65925c",
+        "size_bytes": 14378,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/johnson8-4-4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "johnson16-2-4",
@@ -289,7 +546,15 @@
       "edges": 5460,
       "best_objective": 15,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/johnson16-2-4.gph",
+        "git_blob_sha1": "7e22ce82421c9e3c2a595e9acab20d6d63095a3c",
+        "size_bytes": 44788,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/johnson16-2-4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "karate",
@@ -297,7 +562,15 @@
       "edges": 78,
       "best_objective": 20,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/karate.gph",
+        "git_blob_sha1": "693d44ec559772f8a6227751a385934cb71b4d94",
+        "size_bytes": 576,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/karate.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "keller4",
@@ -305,7 +578,15 @@
       "edges": 5100,
       "best_objective": 11,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/keller4.gph",
+        "git_blob_sha1": "c35ca3d2012d58d20aaecd12be574ab384a28880",
+        "size_bytes": 44920,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/keller4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "keller6",
@@ -313,7 +594,15 @@
       "edges": 1026582,
       "best_objective": 59,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/keller6.gph",
+        "git_blob_sha1": "4e271ffbe6d55d96b6649da58807381e9577f47f",
+        "size_bytes": 11687749,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/keller6.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "mammalia-kangaroo-interactions",
@@ -321,7 +610,15 @@
       "edges": 91,
       "best_objective": 4,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/mammalia-kangaroo-interactions.gph",
+        "git_blob_sha1": "0300fc23f1fe9cd2c20b11d5f0a487ffca27e187",
+        "size_bytes": 805,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/mammalia-kangaroo-interactions.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "MANN-a9",
@@ -329,7 +626,15 @@
       "edges": 918,
       "best_objective": 3,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/MANN-a9.gph",
+        "git_blob_sha1": "1e3e6b6f8183beb8eb088705dde6f52cd6cd7616",
+        "size_bytes": 6998,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/MANN-a9.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "p_hat1500-1",
@@ -337,7 +642,15 @@
       "edges": 839327,
       "best_objective": 12,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/p_hat1500-1.gph",
+        "git_blob_sha1": "2283fbf1b93b2b3ce5a0a9d0895d5728c046efef",
+        "size_bytes": 8830096,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/p_hat1500-1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "p_hat1500-3",
@@ -345,7 +658,15 @@
       "edges": 277006,
       "best_objective": 94,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/p_hat1500-3.gph",
+        "git_blob_sha1": "ccecf415f24126f3535c97760feb4b92ae3b4003",
+        "size_bytes": 2912292,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/p_hat1500-3.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "R_500_005_1",
@@ -353,7 +674,15 @@
       "edges": 6256,
       "best_objective": 91,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/R_500_005_1.gph",
+        "git_blob_sha1": "0e0d13b86ab5624729cd8cee102fd5aad0e2aa5a",
+        "size_bytes": 59942,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/R_500_005_1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "R_1000_005_1",
@@ -361,7 +690,15 @@
       "edges": 24670,
       "best_objective": 117,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/R_1000_005_1.gph",
+        "git_blob_sha1": "5588d1895ca52bdd88fc9cd49189867761dfd066",
+        "size_bytes": 241580,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/R_1000_005_1.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "sloane_1dc_64",
@@ -369,7 +706,15 @@
       "edges": 543,
       "best_objective": 10,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/sloane_1dc_64.gph",
+        "git_blob_sha1": "e4fa8f731cfe0e94f50f7256519ad0cfdb6bd3a3",
+        "size_bytes": 4240,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/sloane_1dc_64.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "sloane_1dc_128",
@@ -377,7 +722,15 @@
       "edges": 1471,
       "best_objective": 16,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/sloane_1dc_128.gph",
+        "git_blob_sha1": "273d86e55323a9f100142ea02d914edf4f202edc",
+        "size_bytes": 12242,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/sloane_1dc_128.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "sloane_1zc_128",
@@ -385,7 +738,15 @@
       "edges": 1120,
       "best_objective": 18,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/sloane_1zc_128.gph",
+        "git_blob_sha1": "8cc7d2f84a5a77c9920cac476138883efb63a30b",
+        "size_bytes": 9388,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/sloane_1zc_128.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "sloane_2dc_128",
@@ -393,7 +754,15 @@
       "edges": 5173,
       "best_objective": 5,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/sloane_2dc_128.gph",
+        "git_blob_sha1": "7ffb6fe72cf5e4ccf72c29986f0ec23f20cd06c5",
+        "size_bytes": 43073,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/sloane_2dc_128.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "socfb-haverford76",
@@ -401,7 +770,15 @@
       "edges": 59589,
       "best_objective": 282,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/socfb-haverford76.gph",
+        "git_blob_sha1": "e16b622144d215bfaf24e76fb09192f84bf7d89f",
+        "size_bytes": 623695,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/socfb-haverford76.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "socfb-trinity100",
@@ -409,7 +786,15 @@
       "edges": 111996,
       "best_objective": 499,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/socfb-trinity100.gph",
+        "git_blob_sha1": "6fc6e7fad6975c97c79c5735eae7f0dd468db061",
+        "size_bytes": 1248497,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/socfb-trinity100.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "sorrell4",
@@ -417,7 +802,15 @@
       "edges": 504451,
       "best_objective": 24,
       "status": "optimal",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/sorrell4.gph",
+        "git_blob_sha1": "d8c60e415b4d58492c2a566c8903f03306992b27",
+        "size_bytes": 5523709,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/sorrell4.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     },
     {
       "name": "sorrell7",
@@ -425,7 +818,37 @@
       "edges": 39424,
       "best_objective": 198,
       "status": "best-known",
-      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+      "source_file": {
+        "path": "07-independentset/instances/sorrell7.gph",
+        "git_blob_sha1": "532623aa0dec9a79b026b75d8b2156fc5d96d297",
+        "size_bytes": 430964,
+        "download_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/sorrell7.gph",
+        "raw_sha256": null,
+        "canonical_graph_sha256": null
+      }
     }
-  ]
+  ],
+  "repository": {
+    "name": "ZIB-AOPT/QOBLIB",
+    "commit_sha": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+    "commit_date": "2026-10-19T09:52:56Z",
+    "commit_subject": "chore(bkv): update best-known records",
+    "instance_directory": "07-independentset/instances/",
+    "instance_format_spec": {
+      "path": "07-independentset/instances/README.md",
+      "git_blob_sha1": "42ed7a4e19e094d01b556bab8f12e8fd60396846",
+      "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/README.md"
+    },
+    "data_license": "CC-BY-4.0",
+    "license_file_path": "LICENSE.data",
+    "license_url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/LICENSE.data",
+    "code_license": "Apache-2.0"
+  },
+  "canonicalization": {
+    "format": "SYMTHEA-MIS-GRAPH-V1",
+    "source_format": "DIMACS edge graph, 1-based vertices",
+    "transform": "sort undirected edges lexicographically, convert vertices to zero-based, reject duplicate/self-loop/out-of-range edges, emit strict LF canonical bytes",
+    "canonical_graph_sha256_by_instance": "pending loader run from exact source bytes"
+  }
 }
