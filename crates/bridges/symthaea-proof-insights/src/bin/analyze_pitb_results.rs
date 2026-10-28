@@ -3367,6 +3367,32 @@ mod tests {
     }
 
     #[test]
+    fn strict_null_power_grid_spans_registered_pair_association() {
+        let families: Vec<FamilyTargetCount> = (0..24)
+            .map(|index| FamilyTargetCount {
+                family_id: format!("assoc-family-{index:02}"),
+                eligible_target_count: 1 + index % 3,
+            })
+            .collect();
+        for (index, association) in [0.0_f64, 0.5, 0.9].into_iter().enumerate() {
+            let scenario = simulate_power_scenario(
+                &families,
+                0.35,
+                0.0,
+                0.20,
+                association,
+                64,
+                128,
+                20261028 + index as u64,
+            )
+            .expect("registered association scenario should be estimable");
+            assert_eq!(scenario.pair_association_fraction, association);
+            assert_eq!(scenario.status, "estimated");
+            assert!(scenario.null_effect_false_claim_probability_upper_simultaneous_95.is_some());
+        }
+    }
+
+    #[test]
     fn strict_null_scenario_emits_the_simultaneous_upper_bound() {
         let families: Vec<FamilyTargetCount> = (0..24)
             .map(|index| FamilyTargetCount {
@@ -3398,7 +3424,7 @@ mod tests {
             .collect();
         let left = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 0.0, 64, 100, 20261020)
             .expect("synthetic power scenario should run");
-        let right = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 64, 100, 20261020)
+        let right = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 0.0, 64, 100, 20261020)
             .expect("repeating a frozen seed must be deterministic");
         assert_eq!(left.status, "estimated");
         assert_eq!(left.utility_gate_passes, right.utility_gate_passes);
