@@ -747,6 +747,57 @@ mod tests {
     // CodingAgent smoke verification instead. ──
 
     #[test]
+    fn posthoc_retains_immutable_decision_time_pe_evidence() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+
+        let decision_evidence = PredictionErrorEvidence::valid(0.37, Some(4), 5).unwrap();
+        engine.record_posthoc_with_evidence(true, true, Some(decision_evidence));
+        ctx.cycle_id = 6;
+        engine.reason(&ctx);
+
+        {
+            let first = engine.last_event().expect("first posthoc event should exist");
+            let outcome = first
+                .posthoc_outcome
+                .as_ref()
+                .expect("decision-time outcome should be attached");
+            assert_eq!(outcome.prediction_error, Some(f64::from(0.37_f32)));
+            let evidence = outcome
+                .prediction_evidence
+                .as_ref()
+                .expect("typed decision evidence should survive resolution");
+            assert_eq!(evidence.observation_cycle(), 5);
+            assert_eq!(evidence.prediction_cycle(), Some(4));
+        }
+
+        // A later outcome carries its own evidence and cannot rewrite the first event.
+        let later_evidence = PredictionErrorEvidence::valid(0.91, Some(20), 21).unwrap();
+        engine.record_posthoc_with_evidence(false, false, Some(later_evidence));
+        ctx.cycle_id = 7;
+        engine.reason(&ctx);
+
+        let first = engine
+            .recent_events()
+            .iter()
+            .find(|event| event.cycle_id == 6)
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("original outcome remains in history");
+        assert_eq!(
+            first.prediction_evidence.as_ref().unwrap().observation_cycle(),
+            5
+        );
+        let latest = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("later posthoc event should exist");
+        assert_eq!(
+            latest.prediction_evidence.as_ref().unwrap().observation_cycle(),
+            21
+        );
+    }
+
+    #[test]
     fn posthoc_without_valid_pe_preserves_gate_outcome_and_missingness() {
         let mut engine = ConsciousReasoningEngine::new();
         let mut ctx = make_context(0.8, 0.8, 25_000);
