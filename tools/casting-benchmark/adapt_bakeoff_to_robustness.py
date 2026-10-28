@@ -17,7 +17,7 @@ from typing import Any
 from decision_robustness_eval import BENCHMARK_ID as AUDIT_BENCHMARK_ID
 
 ADAPTER_BENCHMARK_ID = "CASTING-DECISION-ROBUSTNESS-ADAPTER-001"
-ADAPTER_SCHEMA_VERSION = "1.1.0"
+ADAPTER_SCHEMA_VERSION = "1.2.0"
 EXPECTED_SWEEP_BENCHMARK = "CASTING-MF-COMPOSITION-001"
 REFERENCE_TOL = 1e-12
 FROZEN_REFERENCE_POINT = (1.2, 1.2)
@@ -171,10 +171,17 @@ def adapt_documents(
         raise ValueError("sweep.run_count does not match paired_runs length")
     if not isinstance(sweep["source_sha256"], dict) or not sweep["source_sha256"]:
         raise ValueError("sweep.source_sha256 must be a non-empty path-to-digest object")
+    repo_root = Path(__file__).resolve().parents[2]
     for path, digest in sweep["source_sha256"].items():
         if not isinstance(path, str) or not path or path.startswith("/") or ".." in Path(path).parts:
             raise ValueError(f"invalid source-lock path: {path!r}")
-        _digest(digest, f"sweep.source_sha256[{path!r}]")
+        expected_digest = _digest(digest, f"sweep.source_sha256[{path!r}]")
+        source_path = repo_root / path
+        if not source_path.is_file():
+            raise ValueError(f"sweep source-lock path does not exist in this checkout: {path}")
+        actual_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        if actual_digest != expected_digest:
+            raise ValueError(f"sweep source digest mismatch for {path}: expected {expected_digest}, found {actual_digest}")
     sweep_costs = _exact(sweep["fidelity_costs"], {"low", "medium", "high"}, "sweep.fidelity_costs")
     for level, value in sweep_costs.items():
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
@@ -190,6 +197,9 @@ def adapt_documents(
             "schema_version", "benchmark_id", "source_sweep_sha256", "selector",
             "candidate_pool_sha256", "reference_point", "selected_candidate_ids",
             "candidate_predictions", "selection_frozen_before_holdout",
+            "manifest_generator_sha256", "nominal_prediction_source",
+            "nominal_prediction_evaluations", "nominal_prediction_fidelity",
+            "nominal_prediction_cost_units",
         },
         "selection_manifest",
     )
@@ -197,6 +207,23 @@ def adapt_documents(
         raise ValueError("selection_manifest schema or benchmark id is unsupported")
     if selection["selection_frozen_before_holdout"] is not True:
         raise ValueError("selection_manifest must declare selection_frozen_before_holdout=true")
+    generator_sha = _digest(selection["manifest_generator_sha256"], "selection_manifest.manifest_generator_sha256")
+    generator_path = Path(__file__).resolve().with_name("prepare_synthetic_robustness_manifests.py")
+    if not generator_path.is_file():
+        raise ValueError("synthetic shift manifest generator is missing from this checkout")
+    actual_generator_sha = hashlib.sha256(generator_path.read_bytes()).hexdigest()
+    if generator_sha != actual_generator_sha:
+        raise ValueError("manifest generator digest does not match the current checkout")
+    nominal_prediction_source = selection["nominal_prediction_source"]
+    if not isinstance(nominal_prediction_source, str) or not nominal_prediction_source.strip():
+        raise ValueError("selection_manifest.nominal_prediction_source must be non-empty")
+    if selection["nominal_prediction_evaluations"] != design_count:
+        raise ValueError("nominal_prediction_evaluations must equal the full candidate pool size")
+    if selection["nominal_prediction_fidelity"] != "low":
+        raise ValueError("this synthetic audit currently requires the frozen low-fidelity reference")
+    expected_prediction_cost = design_count * sweep_costs["low"]
+    if selection["nominal_prediction_cost_units"] != expected_prediction_cost:
+        raise ValueError("nominal prediction cost accounting is inconsistent with pool size and low-fidelity cost")
     if _digest(selection["source_sweep_sha256"], "selection_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("selection_manifest is not bound to these exact sweep bytes")
     selector = _selector(selection["selector"], "selection_manifest.selector")
@@ -243,13 +270,27 @@ def adapt_documents(
         {
             "schema_version", "benchmark_id", "source_sweep_sha256",
             "candidate_pool_sha256", "selector", "shifts", "holdout_role",
+            "manifest_generator_sha256", "evidence_class", "shift_suite_id",
+            "selection_manifest_sha256", "shift_evaluation_count", "shift_cost_accounting",
         },
         "holdout_manifest",
     )
     if holdout["schema_version"] != ADAPTER_SCHEMA_VERSION or holdout["benchmark_id"] != ADAPTER_BENCHMARK_ID:
         raise ValueError("holdout_manifest schema or benchmark id is unsupported")
-    if holdout["holdout_role"] != "independent_post_selection":
-        raise ValueError("holdout_manifest.holdout_role must be independent_post_selection")
+    if holdout["holdout_role"] not in {"independent_post_selection", "synthetic_post_selection_diagnostic"}:
+        raise ValueError("holdout_manifest.holdout_role is not a supported frozen role")
+    if holdout["evidence_class"] != "synthetic" or holdout["holdout_role"] != "synthetic_post_selection_diagnostic":
+        raise ValueError("this adapter accepts synthetic diagnostics only; do not label generated shifts as independent physical validation")
+    if not isinstance(holdout["shift_suite_id"], str) or not holdout["shift_suite_id"].strip():
+        raise ValueError("holdout_manifest.shift_suite_id must be non-empty")
+    if holdout["shift_cost_accounting"] != "synthetic_analytic_not_priced":
+        raise ValueError("synthetic shift observations must not be represented as priced simulator calls")
+    if isinstance(holdout["shift_evaluation_count"], bool) or not isinstance(holdout["shift_evaluation_count"], int):
+        raise ValueError("shift_evaluation_count must be an integer")
+    if _digest(holdout["manifest_generator_sha256"], "holdout_manifest.manifest_generator_sha256") != generator_sha:
+        raise ValueError("selection and holdout manifests must use the same generator digest")
+    if _digest(holdout["selection_manifest_sha256"], "holdout_manifest.selection_manifest_sha256") != hashlib.sha256(selection_raw).hexdigest():
+        raise ValueError("holdout manifest is not bound to these exact selection manifest bytes")
     if _digest(holdout["source_sweep_sha256"], "holdout_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("holdout manifest is not bound to these exact sweep bytes")
     if _digest(holdout["candidate_pool_sha256"], "holdout_manifest.candidate_pool_sha256") != candidate_pool_sha:
@@ -281,10 +322,13 @@ def adapt_documents(
             ],
         })
 
+    if holdout["shift_evaluation_count"] != design_count * len(shifts):
+        raise ValueError("shift_evaluation_count does not match the complete candidate-by-shift matrix")
     evaluations = run.get("evaluations")
     if not isinstance(evaluations, list) or not evaluations:
         raise ValueError("selected sweep run has no evaluation ledger")
     seen_eval_keys = set()
+    high_candidate_ids = set()
     summed_cost = 0
     for i, observation in enumerate(evaluations):
         if not isinstance(observation, dict):
@@ -298,12 +342,20 @@ def adapt_documents(
         if key in seen_eval_keys:
             raise ValueError(f"selected run has duplicate candidate/fidelity observation {key}")
         seen_eval_keys.add(key)
-        _objective_pair(observation.get("objectives"), f"selected run evaluation {i}.objectives", reference)
+        if fidelity == "high":
+            high_candidate_ids.add(cid)
+        raw_objectives = observation.get("objectives")
+        if not isinstance(raw_objectives, list) or len(raw_objectives) != 2:
+            raise ValueError(f"selected run evaluation {i}.objectives must contain two values")
+        for j, value in enumerate(raw_objectives):
+            _number(value, f"selected run evaluation {i}.objectives[{j}]")
         _number(observation.get("constraint_margin"), f"selected run evaluation {i}.constraint_margin")
         cost_units = observation.get("cost_units")
         if isinstance(cost_units, bool) or not isinstance(cost_units, int) or cost_units != run_costs[fidelity]:
             raise ValueError(f"selected run evaluation {i}.cost_units disagrees with its fidelity cost")
         summed_cost += cost_units
+    if set(selected_ids) != high_candidate_ids:
+        raise ValueError("selected_candidate_ids must equal exactly the run's high-fidelity candidate IDs")
     declared_spent = _number(run.get("cost_spent"), "selected run cost_spent")
     if abs(summed_cost - declared_spent) > REFERENCE_TOL:
         raise ValueError("selected run cost_spent disagrees with its evaluation ledger")
@@ -311,14 +363,24 @@ def adapt_documents(
         raise ValueError("selected run cost_spent exceeds the declared budget")
     fidelity_costs = run_costs
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "benchmark_id": AUDIT_BENCHMARK_ID,
         "task_id": f'{selector["objective_family"]}__{selector["constraint_family"]}__d{selector["dimension"]}__s{selector["severity"]}',
         "run_id": f'{selector["policy"]}__seed{selector["seed"]}__budget{run.get("cost_budget")}',
         "source_run": {
             "sweep_sha256": sweep_sha,
             "adapter_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
+            "manifest_generator_sha256": generator_sha,
             "candidate_pool_sha256": candidate_pool_sha,
+            "nominal_prediction_source": nominal_prediction_source,
+            "evidence_class": holdout["evidence_class"],
+            "audit_accounting": {
+                "nominal_prediction_evaluations": selection["nominal_prediction_evaluations"],
+                "nominal_prediction_fidelity": selection["nominal_prediction_fidelity"],
+                "nominal_prediction_cost_units": selection["nominal_prediction_cost_units"],
+                "shift_evaluation_count": holdout["shift_evaluation_count"],
+                "shift_cost_accounting": holdout["shift_cost_accounting"],
+            },
             "objective_family": selector["objective_family"],
             "constraint_family": selector["constraint_family"],
             "dimension": selector["dimension"],

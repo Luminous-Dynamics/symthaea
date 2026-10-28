@@ -12,20 +12,23 @@ from decision_robustness_eval import BENCHMARK_ID, score_document, validate_docu
 
 def fixture() -> dict:
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "benchmark_id": BENCHMARK_ID,
         "task_id": "known-answer-1",
         "run_id": "seed-17",
         "split": {
             "selection_frozen_before_holdout": True,
-            "holdout_role": "independent_post_selection",
+            "holdout_role": "synthetic_post_selection_diagnostic",
             "selection_freeze_sha256": "a" * 64,
             "holdout_manifest_sha256": "b" * 64,
         },
         "source_run": {
             "sweep_sha256": "c" * 64,
             "adapter_sha256": "9" * 64,
+            "manifest_generator_sha256": "8" * 64,
             "candidate_pool_sha256": "d" * 64,
+            "nominal_prediction_source": "test_low_fidelity_reference",
+            "evidence_class": "synthetic",
             "objective_family": "local_bias_island",
             "constraint_family": "constraint_boundary",
             "dimension": 2,
@@ -35,6 +38,13 @@ def fixture() -> dict:
             "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
             "cost_budget": 200,
             "cost_spent": 130,
+            "audit_accounting": {
+                "nominal_prediction_evaluations": 2,
+                "nominal_prediction_fidelity": "low",
+                "nominal_prediction_cost_units": 2,
+                "shift_evaluation_count": 4,
+                "shift_cost_accounting": "synthetic_analytic_not_priced",
+            },
         },
         "reference_point": [1.2, 1.2],
         "candidate_set": [

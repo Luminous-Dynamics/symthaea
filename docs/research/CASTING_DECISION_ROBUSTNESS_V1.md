@@ -1,7 +1,7 @@
 # CASTING Decision Robustness Audit v1
 
 **Benchmark ID:** CASTING-DECISION-ROBUSTNESS-001  
-**Status:** research harness and strict bake-off adapter implemented; no production shift manifest / physical evidence supplied  
+**Status:** strict adapter and deterministic synthetic shift-suite generator implemented; real simulator / physical evidence not supplied  
 **Scope:** two-objective constrained optimization with a fixed reference point  
 **Evidence labels:** synthetic / simulator / physical must remain distinct
 
@@ -21,7 +21,7 @@ It complements, rather than replaces, the compositional multi-fidelity bake-off 
 6. Keep one row per task, selection, candidate, and shift in the raw archive. Preserve failed, timed-out, invalid, and refused evaluations as outcomes in the acquisition layer; do not omit failures from the accounting.
 7. Report synthetic stress fixtures, public optimization benchmarks, engineering simulator results, and physical foundry observations as separate evidence classes.
 
-The source selection manifest (adapter schema 1.1.0) must contain `schema_version`, `benchmark_id`, `source_sweep_sha256`, `selector`, `candidate_pool_sha256`, the fixed `[1.2, 1.2]` reference point, `selected_candidate_ids`, one frozen nominal prediction for every candidate in the pool, and the explicit `selection_frozen_before_holdout: true` declaration. The holdout manifest must contain the same selector and source/candidate-pool digests, `holdout_role: independent_post_selection`, and complete observations for every candidate in every named shift. Neither predictions nor shifted observations are inferred or invented by the adapter. The split fields in the input document are declarations, not cryptographic attestations of how data were collected. Reviewers must verify the hashes against controlled artifacts and independently check that the holdout really remained sealed.
+The source selection manifest (adapter schema 1.2.0) must contain schema_version, benchmark_id, source_sweep_sha256, manifest_generator_sha256, selector, candidate_pool_sha256, the fixed [1.2, 1.2] reference point, selected_candidate_ids, one nominal prediction for every candidate, the explicit selection_frozen_before_holdout=true declaration, and nominal-prediction count/fidelity/cost accounting. The holdout manifest must bind the exact selection manifest bytes and the same generator, sweep, selector and candidate-pool digests. It must declare its evidence class and holdout role and include complete observations for every candidate in every named shift. Neither predictions nor shifted observations are inferred or invented by the adapter. The split fields in the input document are declarations, not cryptographic attestations of how data were collected. Reviewers must verify the hashes against controlled artifacts and independently check that the holdout really remained sealed.
 
 ## Required shift families
 
@@ -51,7 +51,7 @@ Finite-pool regret is only regret relative to the declared evaluated pool, not t
 
 ## Known-answer controls
 
-The evaluator test module contains known-answer controls for false-feasible and false-infeasible decisions, finite-pool regret, all-selected zero regret, malformed/incomplete data, source-run identity, evaluator source digest binding, and no-feasible-pool behavior. The adapter test module checks exact sweep-byte binding, adapter-source digest binding, complete candidate and shift coverage, selector ambiguity, non-synthetic rejection, selected IDs, and evaluation cost accounting. There are 13 evaluator test methods and 17 adapter test methods authored; those counts describe test cases, not a run result.
+The evaluator test module contains known-answer controls for false-feasible and false-infeasible decisions, finite-pool regret, all-selected zero regret, malformed/incomplete data, source-run identity, evaluator source digest binding, and no-feasible-pool behavior. The adapter test module checks exact sweep-byte binding, adapter-source digest binding, complete candidate and shift coverage, selector ambiguity, non-synthetic rejection, selected IDs, and evaluation cost accounting. There are 13 evaluator, 17 adapter, and 9 generator test methods authored (39 total); those counts describe test cases, not a run result.
 
 These tests are mechanism checks, not evidence that the optimizer performs well on casting physics. They should run in the repository's locked environment before any benchmark claims.
 
@@ -99,7 +99,7 @@ python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
 
 The adapter only accepts the existing compositional synthetic sweep format today. The selection manifest must bind to the exact bytes of that sweep and its candidate-pool digest. The selected set is explicit and frozen; the full candidate prediction list must contain every ID from `0` through `design_count - 1`. The holdout manifest must repeat the selector and sweep/pool digests and provide every candidate exactly once for each shift. Missing values, duplicate candidate IDs, ambiguous run selectors, or digest mismatches abort conversion.
 
-The nominal prediction table and shifted observations are separate upstream artifacts: this adapter is **not** a shift generator, a casting simulator, or a model that generates predictions. No adapter run has yet been made against an actual saved bake-off JSON plus independent shift manifests. The current-head test methods have not been executed after the adapter/schema integration. The repository CI now includes a standard-library-only job for both test modules and the toy CLI smoke test; a final result must be tied to the exact resulting head SHA. The schema and adapter tests remain synthetic known-answer tests until that end-to-end execution is archived.
+The nominal prediction table and shifted observations are separate upstream artifacts: this adapter is **not** a shift generator, a casting simulator, or a model that generates predictions. No adapter run has yet been made against an actual saved bake-off JSON plus independent shift manifests. The current-head test methods have not been executed after the adapter/schema integration. The repository CI now includes a standard-library-only job for all three test modules plus an end-to-end runner → generator → adapter → evaluator smoke test and the toy CLI check; a final result must be tied to the exact resulting head SHA. The schema and adapter tests remain synthetic known-answer tests until that end-to-end execution is archived.
 
 ## Current literature and comparator additions (reviewed 2026-10-28)
 
@@ -117,3 +117,47 @@ For every algorithm, archive source URL, immutable commit or release, license, d
 ### A falsifiable research hypothesis
 
 At equal *total cost* (fidelity-weighted simulator cost plus policy/solver wall time), adaptive joint action selection plus post-selection shift auditing should improve the lower-tail feasible hypervolume retained under model shifts, while maintaining nominal performance within a predeclared non-inferiority margin. Falsify the hypothesis if it improves only average nominal hypervolume, if its worst-shift results regress beyond the declared margin, or if the overhead erases its evaluation-cost advantage.
+
+## End-to-end synthetic diagnostic
+
+This command sequence builds a small, fully synthetic path from the existing runner output through manifest generation, adapter conversion and scoring. It uses a single policy/task only to validate integration; it is not a competitive benchmark.
+
+\`\`\`sh
+python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \\
+  --objective-families local_bias_island \\
+  --constraint-families constraint_boundary \\
+  --dimensions 2 --severities 0.5 --seeds 17 \\
+  --policies low_screen --design-count 75 > /tmp/casting-sweep.json
+
+python3 tools/casting-benchmark/prepare_synthetic_robustness_manifests.py \\
+  /tmp/casting-sweep.json \\
+  --objective-family local_bias_island \\
+  --constraint-family constraint_boundary \\
+  --dimension 2 --severity 0.5 --seed 17 --policy low_screen \\
+  --selection-output /tmp/casting-selection.json \\
+  --holdout-output /tmp/casting-holdout.json
+
+python3 tools/casting-benchmark/adapt_bakeoff_to_robustness.py \\
+  /tmp/casting-sweep.json /tmp/casting-selection.json /tmp/casting-holdout.json \\
+  --output /tmp/casting-robustness-input.json
+
+python3 tools/casting-benchmark/decision_robustness_eval.py \\
+  /tmp/casting-robustness-input.json --output /tmp/casting-robustness-receipt.json
+
+python3 tools/casting-benchmark/test_decision_robustness_eval.py
+python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
+python3 tools/casting-benchmark/test_prepare_synthetic_robustness_manifests.py
+\`\`\`
+
+The generator normalizes raw synthetic objectives using the frozen affine transformation (objective + 1) / 3 and fixes the reference point at [1.2, 1.2]. Out-of-range values fail closed instead of being clipped. A future real simulator adapter must define and preregister units, uncertainty, objective normalization, shift parameter ranges, solver revisions, wall time and true compute costs before mixing its evidence with this synthetic track.
+
+## Fair baseline comparison: stratify by method assumptions
+
+Recent MF-SCBO work is an important comparator, but its current formulation assumes that constraints do not vary by fidelity; the paper identifies fidelity-dependent constraints as future work (https://arxiv.org/abs/2609.29941). Do not turn that assumption into an unfair "benchmark failure" or quietly hide it. Report two tracks separately:
+
+1. **Shared-constraint applicability track:** all policies receive the same constraint function across fidelities; compare performance inside each method's intended domain.
+2. **Fidelity-dependent constraint stress track:** cheap and high-fidelity constraint outputs can disagree; label this as an out-of-assumption robustness test for methods that assume shared constraints, while testing whether Symthaea can detect and control the mismatch.
+
+Cost comparison must include fidelity-specific oracle cost and wall-clock/compute overhead. The MF-SCBO preprint notes cases where fewer high-fidelity calls did not imply lower total evaluation cost because of additional low-fidelity sampling. Therefore, do not rank methods only by high-fidelity call count; freeze all fidelity cost ratios and report total cost and time together.
+
+This assumption-stratified protocol is essential to a credible SOTA claim: win in the shared-assumption track to demonstrate competitive optimization, then report separate robustness performance under constraint mismatch. Never aggregate both tracks into one hidden average.

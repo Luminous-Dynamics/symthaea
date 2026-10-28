@@ -56,6 +56,42 @@ jobs:
           python3 --version
           python3 tools/casting-benchmark/test_decision_robustness_eval.py
           python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
+          python3 tools/casting-benchmark/test_prepare_synthetic_robustness_manifests.py
+
+          # End-to-end synthetic diagnostic: runner -> frozen selection/shift
+          # manifests -> hash-checking adapter -> independent receipt evaluator.
+          python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \
+            --objective-families local_bias_island \
+            --constraint-families constraint_boundary \
+            --dimensions 2 --severities 0.5 --seeds 17 \
+            --policies low_screen --design-count 75 > /tmp/casting-sweep.json
+          python3 tools/casting-benchmark/prepare_synthetic_robustness_manifests.py \
+            /tmp/casting-sweep.json \
+            --objective-family local_bias_island \
+            --constraint-family constraint_boundary \
+            --dimension 2 --severity 0.5 --seed 17 --policy low_screen \
+            --selection-output /tmp/casting-selection.json \
+            --holdout-output /tmp/casting-holdout.json
+          python3 tools/casting-benchmark/adapt_bakeoff_to_robustness.py \
+            /tmp/casting-sweep.json /tmp/casting-selection.json /tmp/casting-holdout.json \
+            --output /tmp/casting-robustness-input.json
+          python3 tools/casting-benchmark/decision_robustness_eval.py \
+            /tmp/casting-robustness-input.json --output /tmp/casting-robustness-receipt.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("/tmp/casting-robustness-receipt.json").read_text())
+          assert receipt["receipt_label"] == "POST_SELECTION_SHIFT_AUDIT_NOT_PHYSICAL_CERTIFICATION"
+          assert receipt["source_run"]["evidence_class"] == "synthetic"
+          assert receipt["source_run"]["policy"] == "low_screen"
+          assert receipt["metrics"]["candidate_count"] == 75
+          assert receipt["metrics"]["holdout_shift_count"] == 7
+          assert receipt["source_run"]["audit_accounting"]["nominal_prediction_cost_units"] == 75
+          assert receipt["source_run"]["audit_accounting"]["shift_evaluation_count"] == 525
+          assert receipt["source_run"]["audit_accounting"]["shift_cost_accounting"] == "synthetic_analytic_not_priced"
+          print("end-to-end synthetic robustness receipt validated")
+          PY
+
           python3 tools/casting-benchmark/decision_robustness_eval.py \
             tools/casting-benchmark/fixtures/decision_robustness_toy.json \
             --output /tmp/casting-decision-robustness-receipt.json

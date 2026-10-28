@@ -29,6 +29,12 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "policy": "low_screen",
     }
     candidate_pool_sha = "e" * 64
+    generator_sha = hashlib.sha256(
+        (Path(__file__).resolve().parent / "prepare_synthetic_robustness_manifests.py").read_bytes()
+    ).hexdigest()
+    runner_sha = hashlib.sha256(
+        (Path(__file__).resolve().parents[2] / "tools/casting-benchmark/multifidelity_compositional_bakeoff.py").read_bytes()
+    ).hexdigest()
     design_count = 75
     sweep = {
         "benchmark_id": "CASTING-MF-COMPOSITION-001",
@@ -42,7 +48,7 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "design_count": design_count,
         "cost_budget": 200,
         "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
-        "source_sha256": {"tools/casting-benchmark/example.py": "f" * 64},
+        "source_sha256": {"tools/casting-benchmark/multifidelity_compositional_bakeoff.py": runner_sha},
         "run_count": 1,
         "paired_runs": [{
             **selector,
@@ -65,6 +71,11 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "source_sweep_sha256": hashlib.sha256(sweep_raw).hexdigest(),
         "selector": selector,
         "candidate_pool_sha256": candidate_pool_sha,
+        "manifest_generator_sha256": generator_sha,
+        "nominal_prediction_source": "test_low_fidelity_reference",
+        "nominal_prediction_evaluations": design_count,
+        "nominal_prediction_fidelity": "low",
+        "nominal_prediction_cost_units": design_count,
         "reference_point": [1.2, 1.2],
         "selected_candidate_ids": [0],
         "selection_frozen_before_holdout": True,
@@ -83,8 +94,14 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "benchmark_id": ADAPTER_BENCHMARK_ID,
         "source_sweep_sha256": hashlib.sha256(sweep_raw).hexdigest(),
         "candidate_pool_sha256": candidate_pool_sha,
+        "manifest_generator_sha256": "9" * 64,
+        "selection_manifest_sha256": hashlib.sha256(selection_raw).hexdigest(),
         "selector": selector,
-        "holdout_role": "independent_post_selection",
+        "holdout_role": "synthetic_post_selection_diagnostic",
+        "evidence_class": "synthetic",
+        "shift_suite_id": "test-synthetic-shift-suite",
+        "shift_evaluation_count": design_count * 2,
+        "shift_cost_accounting": "synthetic_analytic_not_priced",
         "shifts": [
             {
                 "shift_id": "boundary-shift",
@@ -128,11 +145,14 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         self.assertEqual(len(parsed["candidates"]), 75)
         self.assertEqual(parsed["selected_ids"], {"0"})
         self.assertEqual(len(parsed["shifts"]), 2)
+        self.assertEqual(document["source_run"]["audit_accounting"]["nominal_prediction_cost_units"], 75)
+        self.assertEqual(document["source_run"]["audit_accounting"]["shift_evaluation_count"], 150)
 
     def test_adapter_binds_exact_sweep_and_manifest_bytes(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         converted = adapt_documents(sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw)
         self.assertEqual(converted["source_run"]["sweep_sha256"], hashlib.sha256(sweep_raw).hexdigest())
+        self.assertEqual(converted["source_run"]["manifest_generator_sha256"], hashlib.sha256((Path(__file__).resolve().parent / "prepare_synthetic_robustness_manifests.py").read_bytes()).hexdigest())
         adapter_bytes = Path(adapter.__file__).resolve().read_bytes()
         self.assertEqual(converted["source_run"]["adapter_sha256"], hashlib.sha256(adapter_bytes).hexdigest())
         self.assertEqual(converted["split"]["selection_freeze_sha256"], hashlib.sha256(selection_raw).hexdigest())
@@ -196,7 +216,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
 
     def test_rejects_malformed_source_digest(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
-        sweep["source_sha256"]["tools/casting-benchmark/example.py"] = "bad-digest"
+        sweep["source_sha256"]["tools/casting-benchmark/multifidelity_compositional_bakeoff.py"] = "bad-digest"
         updated_raw = _canonical(sweep)
         selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
         holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
@@ -227,7 +247,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
     def test_rejects_holdout_manifest_with_wrong_role(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         holdout["holdout_role"] = "optimizer_trace"
-        with self.assertRaisesRegex(ValueError, "holdout_role must be independent_post_selection"):
+        with self.assertRaisesRegex(ValueError, "not a supported frozen role"):
             adapt_documents(sweep, sweep_raw, selection, selection_raw, holdout, _canonical(holdout))
 
     def test_rejects_selection_id_outside_candidate_pool(self) -> None:
@@ -239,6 +259,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
     def test_rejects_ambiguous_run_selector(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         sweep["paired_runs"].append(dict(sweep["paired_runs"][0]))
+        sweep["run_count"] = 2
         updated_raw = _canonical(sweep)
         selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
         holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()

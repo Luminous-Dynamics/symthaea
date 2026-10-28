@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 BENCHMARK_ID = "CASTING-DECISION-ROBUSTNESS-001"
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 TOL = 1e-12
 
 
@@ -104,15 +104,21 @@ def validate_document(document: Any) -> dict[str, Any]:
     source_run = _require_exact_keys(
         doc["source_run"],
         {
-            "sweep_sha256", "adapter_sha256", "candidate_pool_sha256", "objective_family",
-            "constraint_family", "dimension", "severity", "seed", "policy",
-            "fidelity_costs", "cost_budget", "cost_spent",
+            "sweep_sha256", "adapter_sha256", "manifest_generator_sha256", "candidate_pool_sha256",
+            "objective_family", "constraint_family", "dimension", "severity", "seed", "policy",
+            "nominal_prediction_source", "evidence_class",
+            "fidelity_costs", "cost_budget", "cost_spent", "audit_accounting",
         },
         "source_run",
     )
     _sha256(source_run["sweep_sha256"], "source_run.sweep_sha256")
     _sha256(source_run["adapter_sha256"], "source_run.adapter_sha256")
+    _sha256(source_run["manifest_generator_sha256"], "source_run.manifest_generator_sha256")
     _sha256(source_run["candidate_pool_sha256"], "source_run.candidate_pool_sha256")
+    if not isinstance(source_run["nominal_prediction_source"], str) or not source_run["nominal_prediction_source"].strip():
+        raise ValueError("source_run.nominal_prediction_source must be non-empty")
+    if source_run["evidence_class"] not in {"synthetic", "simulator", "physical"}:
+        raise ValueError("source_run.evidence_class must be synthetic, simulator, or physical")
     for field in ("objective_family", "constraint_family", "policy"):
         if not isinstance(source_run[field], str) or not source_run[field].strip():
             raise ValueError(f"source_run.{field} must be a non-empty string")
@@ -134,6 +140,22 @@ def validate_document(document: Any) -> dict[str, Any]:
     cost_spent = _finite_number(source_run["cost_spent"], "source_run.cost_spent")
     if cost_budget <= 0 or cost_spent < 0 or cost_spent > cost_budget + TOL:
         raise ValueError("source_run cost accounting is invalid")
+    audit_accounting = _require_exact_keys(
+        source_run["audit_accounting"],
+        {
+            "nominal_prediction_evaluations", "nominal_prediction_fidelity",
+            "nominal_prediction_cost_units", "shift_evaluation_count", "shift_cost_accounting",
+        },
+        "source_run.audit_accounting",
+    )
+    for field in ("nominal_prediction_evaluations", "nominal_prediction_cost_units", "shift_evaluation_count"):
+        value = audit_accounting[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"source_run.audit_accounting.{field} must be a non-negative integer")
+    if audit_accounting["nominal_prediction_fidelity"] != "low":
+        raise ValueError("source_run.audit_accounting.nominal_prediction_fidelity must be low")
+    if not isinstance(audit_accounting["shift_cost_accounting"], str) or not audit_accounting["shift_cost_accounting"]:
+        raise ValueError("source_run.audit_accounting.shift_cost_accounting must be non-empty")
     for field in ("task_id", "run_id"):
         if not isinstance(doc[field], str) or not doc[field].strip():
             raise ValueError(f"{field} must be a non-empty string")
@@ -145,8 +167,10 @@ def validate_document(document: Any) -> dict[str, Any]:
     )
     if split["selection_frozen_before_holdout"] is not True:
         raise ValueError("selection_frozen_before_holdout must be true")
-    if split["holdout_role"] != "independent_post_selection":
-        raise ValueError("holdout_role must be independent_post_selection")
+    if split["holdout_role"] not in {"independent_post_selection", "synthetic_post_selection_diagnostic"}:
+        raise ValueError("holdout_role must be independent_post_selection or synthetic_post_selection_diagnostic")
+    if split["holdout_role"] == "synthetic_post_selection_diagnostic" and doc["source_run"]["evidence_class"] != "synthetic":
+        raise ValueError("synthetic holdout role requires synthetic evidence_class")
     _sha256(split["selection_freeze_sha256"], "split.selection_freeze_sha256")
     _sha256(split["holdout_manifest_sha256"], "split.holdout_manifest_sha256")
 
@@ -221,6 +245,17 @@ def validate_document(document: Any) -> dict[str, Any]:
             extra = sorted(set(evaluations) - expected_ids)
             raise ValueError(f"shift {shift_id} must evaluate every candidate exactly once; missing={missing}, extra={extra}")
         shifts.append({"shift_id": shift_id, "shift_family": shift_family, "evaluations": evaluations})
+
+    if audit_accounting["nominal_prediction_evaluations"] != len(candidates):
+        raise ValueError("audit nominal_prediction_evaluations must equal candidate_count")
+    expected_prediction_cost = len(candidates) * fidelity_costs["low"]
+    if audit_accounting["nominal_prediction_cost_units"] != expected_prediction_cost:
+        raise ValueError("audit nominal_prediction_cost_units disagrees with low-fidelity cost accounting")
+    if audit_accounting["shift_evaluation_count"] != len(candidates) * len(shifts):
+        raise ValueError("audit shift_evaluation_count does not match candidate-by-shift coverage")
+    if split["holdout_role"] == "synthetic_post_selection_diagnostic":
+        if audit_accounting["shift_cost_accounting"] != "synthetic_analytic_not_priced":
+            raise ValueError("synthetic analytic shift observations must be explicitly marked not priced")
 
     return {
         "reference_point": reference, "candidates": candidates,
