@@ -326,50 +326,60 @@ fn evaluate(tree: &Tree, truth: Matrix) -> Metrics {
     total
 }
 
+fn method_name(anytime: bool) -> &'static str {
+    if anytime { "time_uniform" } else { "fixed_sample" }
+}
+
 fn print_coverage_csv() {
-    println!("n_per_cell,true_probability,cell_coverage,minimum_grid_cell_coverage,union_bound_lower_12_cells,per_cell_target");
-    for n in SAMPLE_SIZES {
-        let values: Vec<(f64, f64)> = COVERAGE_GRID
-            .iter()
-            .copied()
-            .map(|p| (p, cell_coverage(n, p)))
-            .collect();
-        let minimum = values
-            .iter()
-            .map(|(_, coverage)| *coverage)
-            .fold(f64::INFINITY, f64::min);
-        let union_bound = 1.0 - CELLS * (1.0 - minimum);
-        let per_cell_target = 1.0 - ALPHA / CELLS;
-        for (true_probability, coverage) in values {
-            println!(
-                "{n},{true_probability:.12},{coverage:.12},{minimum:.12},{union_bound:.12},{per_cell_target:.12}"
-            );
+    println!("interval_method,n_per_cell,true_probability,cell_coverage,minimum_grid_cell_coverage,union_bound_lower_12_cells,per_cell_target");
+    for anytime in [false, true] {
+        for n in SAMPLE_SIZES {
+            let values: Vec<(f64, f64)> = COVERAGE_GRID
+                .iter()
+                .copied()
+                .map(|p| (p, cell_coverage(n, p, anytime)))
+                .collect();
+            let minimum = values
+                .iter()
+                .map(|(_, coverage)| *coverage)
+                .fold(f64::INFINITY, f64::min);
+            let union_bound = 1.0 - CELLS * (1.0 - minimum);
+            let per_cell_target = 1.0 - ALPHA / CELLS;
+            for (true_probability, coverage) in values {
+                println!(
+                    "{},{n},{true_probability:.12},{coverage:.12},{minimum:.12},{union_bound:.12},{per_cell_target:.12}",
+                    method_name(anytime)
+                );
+            }
         }
     }
 }
 
 fn print_csv() {
-    println!("n_per_cell,confidence_radius,scenario,expected_loss,expected_decision_regret,expected_query_cost,expected_query_count,worst_case_box_regret,worst_case_box_expected_cost,worst_case_box_expected_queries,planned_first_query");
+    println!("interval_method,n_per_cell,confidence_radius,scenario,expected_loss,expected_decision_regret,expected_query_cost,expected_query_count,worst_case_box_regret,worst_case_box_expected_cost,worst_case_box_expected_queries,planned_first_query");
     let trees = enumerate_trees(PRIOR, 0b1111, 3);
-    for n in SAMPLE_SIZES {
-        let (tree, worst) = choose_tree(&trees, n);
-        let first = tree
-            .first_query()
-            .map(|query| QUERY_NAMES[query])
-            .unwrap_or("none");
-        for (scenario, matrix) in SCENARIOS {
-            let metrics = evaluate(&tree, matrix);
-            println!(
-                "{n},{:.12},{scenario},{:.12},{:.12},{:.12},{:.12},{:.12},{:.12},{:.12},{first}",
-                interval_radius(n),
-                metrics.loss,
-                metrics.regret,
-                metrics.cost,
-                metrics.queries,
-                worst.regret,
-                worst.cost,
-                worst.queries
-            );
+    for anytime in [false, true] {
+        for n in SAMPLE_SIZES {
+            let (tree, worst) = choose_tree(&trees, n, anytime);
+            let first = tree
+                .first_query()
+                .map(|query| QUERY_NAMES[query])
+                .unwrap_or("none");
+            for (scenario, matrix) in SCENARIOS {
+                let metrics = evaluate(&tree, matrix);
+                println!(
+                    "{},{n},{:.12},{scenario},{:.12},{:.12},{:.12},{:.12},{:.12},{:.12},{:.12},{first}",
+                    method_name(anytime),
+                    interval_radius(n, anytime),
+                    metrics.loss,
+                    metrics.regret,
+                    metrics.cost,
+                    metrics.queries,
+                    worst.regret,
+                    worst.cost,
+                    worst.queries
+                );
+            }
         }
     }
 }
