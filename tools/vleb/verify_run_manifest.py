@@ -544,7 +544,13 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-        verify_attestation = manifest.get("run_kind") == "confirmatory" or manifest.get("provenance", {}).get("attestation_required") is True
+        if not isinstance(manifest, dict):
+            verify_attestation = True
+        else:
+            verify_attestation = (
+                manifest.get("run_kind") == "confirmatory"
+                or manifest.get("provenance", {}).get("attestation_required") is True
+            )
     except (OSError, json.JSONDecodeError, UnicodeError):
         verify_attestation = True
 
