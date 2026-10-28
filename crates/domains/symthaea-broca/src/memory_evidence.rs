@@ -305,7 +305,7 @@ impl EvidenceCommitManifest {
         }
         EvidenceIndex::restore_snapshot(evidence_snapshot_bytes)?;
         if let Some(identity) = &identity {
-            identity.validate()?;
+            identity.validate_for_recovery()?;
         }
         Ok(Self {
             schema_version: EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string(),
