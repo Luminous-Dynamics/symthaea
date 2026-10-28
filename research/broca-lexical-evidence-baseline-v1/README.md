@@ -74,6 +74,18 @@ Only `web` or `enterprise` is allowed for LongMemEval-V2. Defaults are BM25 `k1=
 
 The worker converts the parsed trajectory into a worker-defined stable sorted-key JSON encoding (recursively sorted object keys, preserved array order; not a claim of full RFC 8785 compliance), derives deterministic IDs from that source digest and JSON Pointer, then validates the complete batch atomically. Both public `states` and legacy `content`/`metadata.original_goal` schemas are supported. Each returned text must exactly match the source string selected by its pointer. Root `outcome` and evaluator/question metadata are never candidate fields.
 
+### Lifecycle controls
+
+The worker also supports lifecycle messages. Evidence IDs come from result.audit[*].evidence_id, not from query text or benchmark metadata.
+
+```json
+{"request_id":"4","op":"revoke","evidence_id":"<exact-evidence-id>"}
+{"request_id":"5","op":"delete","evidence_id":"<exact-evidence-id>"}
+{"request_id":"6","op":"supersede","old_evidence_id":"<old-id>","new_evidence_id":"<replacement-id>"}
+```
+
+The Python adapter exposes corresponding revoke_evidence, delete_evidence and supersede_evidence methods. Successful operations are added to the ordered save/load event journal. Replay is fail-closed: unknown events, unknown evidence IDs, checksum mismatches, or journal count mismatches prevent the memory from being treated as loaded. The lexical worker still does not expose an HTTP API, multi-process shared persistence, or an independent signed tamper-proof audit log.
+
 ### Query
 
 ```json
@@ -94,7 +106,7 @@ The adapter must pass only `result.context` to the reader. The separate audit is
 - Maximum evidence items per trajectory: 50,000.
 - Malformed JSON, wrong request IDs, duplicate trajectory IDs, unknown operations, invalid source pointers, digest mismatches, and ID collisions fail closed.
 - A non-empty image query is surfaced as `image_query_received_but_not_used`; no visual capability is claimed.
-- The Rust worker state is process-local. The Python adapter's save/load path persists a digest-bound source-trajectory journal and rebuilds the worker index with the same pinned binary/config; it does not persist a byte-for-byte memory index. Lifecycle mutations such as revoke/delete are not currently exposed by the JSONL worker or persisted across restarts. Logical deletion is not physical secure erasure.
+- The Rust worker's live index is process-local. The Python adapter's save/load path persists a digest-bound event journal and rebuilds the index with the same pinned binary/config; it does not persist a byte-for-byte memory index. After save_memory completes, replay applies inserted trajectories and subsequent revoke/delete/supersede events in order, so saved tombstones remain non-resolvable after worker restart. This is save/load durability, not a crash-safe write-ahead log: mutations remain in the adapter's temporary journal until the harness saves the memory. Logical deletion is not physical secure erasure.
 
 ## Experiment design
 
