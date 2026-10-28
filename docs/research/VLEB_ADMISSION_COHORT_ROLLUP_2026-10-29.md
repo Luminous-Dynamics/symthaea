@@ -66,3 +66,10 @@ For legacy-code comprehension, LegacyCodeBench (January 2026) describes 200 COBO
 - **Performance claim bar:** do not claim VLEB is above SOTA until the cohort gate, exact-head CI, independent rerun, security lane, and preregistered uncertainty analysis have passed. Public benchmark scores are comparators, not a substitute for a measured VLEB result.
 
 This roll-up provides auditable denominators for the admission dimensions. It is not itself a score-admission gate and always emits `score_eligible=false`.
+
+
+## Exact execution binding (follow-up)
+
+Each cohort row now pins the concrete receipt run ID and attempt number, expected checkout revision, immutable runtime image ID, and expected network mode in addition to the audit-report digest and protocol/auditor pins. The independent auditor emits those fields only after checking its receipt and execution environment; the rollup compares them with the evaluator-pinned row. This makes replaying an otherwise valid report from a different run attempt, checkout revision, or runtime image a cohort-integrity error.
+
+This still depends on the protected evaluator being the authority for the cohort-manifest digest and pinned report digest. A JSON report containing identity fields is not by itself a cryptographic attestation; the live confirmatory pipeline must continue to verify the actual GitHub/Sigstore evidence bundle separately.

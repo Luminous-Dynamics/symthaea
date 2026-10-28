@@ -49,6 +49,8 @@ class CohortFixture:
                 "task_id":"task-001","eligible":True,"verdict":"pass",
                 "receipt_sha256":"1"*64,"task_contract_sha256":"2"*64,
                 "protocol_sha256":self.PROTOCOL,"candidate_patch_sha256":"3"*64,"auditor_sha256":self.AUDITOR,
+                "run_id":"run-001","attempt_number":2,"expected_revision":"a"*40,"observed_revision":"a"*40,
+                "expected_image_id":"sha256:"+"c"*64,"runtime_image_id":"sha256:"+"c"*64,"network_mode":"none",
                 "requirement_traceability":{
                     "declared_source_item_count":4,"traced_source_item_count":4,
                     "required_test_count":2,"traced_required_test_count":2,"complete":True
@@ -62,6 +64,8 @@ class CohortFixture:
                 "task_id":"task-002","eligible":False,"verdict":"fail",
                 "receipt_sha256":"4"*64,"task_contract_sha256":"5"*64,
                 "protocol_sha256":self.PROTOCOL,"candidate_patch_sha256":"6"*64,"auditor_sha256":self.AUDITOR,
+                "run_id":"run-002","attempt_number":1,"expected_revision":"b"*40,"observed_revision":"b"*40,
+                "expected_image_id":"sha256:"+"d"*64,"runtime_image_id":"sha256:"+"d"*64,"network_mode":"none",
                 "requirement_traceability":{
                     "declared_source_item_count":2,"traced_source_item_count":1,
                     "required_test_count":5,"traced_required_test_count":4,"complete":False
@@ -82,7 +86,9 @@ class CohortFixture:
                 "task_id":report["task_id"],"audit_report_path":path,"audit_report_sha256":sha(out.read_bytes()),
                 "receipt_sha256":report["receipt_sha256"],"task_contract_sha256":report["task_contract_sha256"],
                 "protocol_sha256":self.PROTOCOL,"candidate_patch_sha256":report["candidate_patch_sha256"],
-                "auditor_sha256":self.AUDITOR
+                "auditor_sha256":self.AUDITOR,"run_id":report["run_id"],"attempt_number":report["attempt_number"],
+                "expected_revision":report["expected_revision"],"expected_image_id":report["expected_image_id"],
+                "expected_network_mode":report["network_mode"]
             }
             rows.append(row)
             self.reports.append((out,report,row))
@@ -213,6 +219,46 @@ class AdmissionCohortTests(unittest.TestCase):
         self.assertEqual(result["expected_task_count"],2)
         self.assertIn("unknown_task_result",{row["code"] for row in result["issues"]})
         self.assertEqual(result["pooled_metrics_population"],"verified_reports_only")
+
+    def test_report_from_different_run_is_rejected(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["run_id"]="another-run"
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("execution_identity_mismatch",{item["code"] for item in result["issues"]})
+
+    def test_report_from_different_attempt_is_rejected(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["attempt_number"]=3
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("execution_identity_mismatch",{item["code"] for item in result["issues"]})
+
+    def test_report_from_different_checkout_revision_is_rejected(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["observed_revision"]="e"*40
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("checkout_revision_mismatch",{item["code"] for item in result["issues"]})
+
+    def test_report_from_different_runtime_image_is_rejected(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["runtime_image_id"]="sha256:"+"e"*64
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("runtime_image_mismatch",{item["code"] for item in result["issues"]})
 
     def test_wrong_trusted_auditor_pin_is_rejected(self)->None:
         result=self.fixture.summarize(expected_auditor_sha256="c"*64)
