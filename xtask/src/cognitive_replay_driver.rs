@@ -51,6 +51,11 @@ pub struct OutcomePlanEntry {
 #[derive(Debug, Clone)]
 pub struct PolicyObservation {
     pub decision_tick: u64,
+    /// Explicit negative-supervision notices delivered only when the evaluator declares a label missing.
+    /// These expose the missingness event, never the hidden target value or future schedule.
+    pub newly_declared_missing_outcomes: Vec<MissingOutcomeNotice>,
+    /// Missing-outcome identities declared no later than this tick.
+    pub eligible_missing_outcome_ids: Vec<String>,
     /// Features that first become available at this tick, not the hidden/future feature schedule.
     pub delivered_features: Vec<FeatureEvent>,
     /// Labels revealed at this tick, after their configured delay.
@@ -60,12 +65,23 @@ pub struct PolicyObservation {
     pub eligible_outcome_ids: Vec<String>,
 }
 
+/// A status-only notification that an expected outcome will not be observed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MissingOutcomeNotice {
+    pub outcome_id: String,
+    pub prediction_tick: u64,
+    pub declared_at_tick: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct PolicyAction {
     pub prediction: f64,
     pub consumed_feature_ids: Vec<String>,
     pub consumed_outcome_ids: Vec<String>,
+    /// Missingness metadata consumed by the policy, distinct from revealed label values.
+    pub consumed_missing_outcome_ids: Vec<String>,
 }
 
 pub trait PolicyAdapter {
@@ -81,10 +97,14 @@ pub struct DriverDecision {
     pub prediction: f64,
     pub delivered_feature_ids: Vec<String>,
     pub delivered_outcome_ids: Vec<String>,
+    /// Missingness status events first declared at this decision tick.
+    pub declared_missing_outcome_ids: Vec<String>,
     pub eligible_feature_ids: Vec<String>,
     pub eligible_outcome_ids: Vec<String>,
+    pub eligible_missing_outcome_ids: Vec<String>,
     pub consumed_feature_ids: Vec<String>,
     pub consumed_outcome_ids: Vec<String>,
+    pub consumed_missing_outcome_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,6 +210,7 @@ impl ReplayScenario {
         let mut decisions = Vec::with_capacity(ticks as usize);
         let mut delivered_feature_ids = BTreeSet::<String>::new();
         let mut delivered_outcome_ids = BTreeSet::<String>::new();
+        let mut declared_missing_outcome_ids = BTreeSet::<String>::new();
 
         for tick in 0..ticks {
             let delivered_features: Vec<FeatureEvent> = self.feature_events.iter()
@@ -226,12 +247,34 @@ impl ReplayScenario {
                 revealed_outcomes.push(reveal.clone());
             }
 
+            let newly_declared_missing_outcomes: Vec<MissingOutcomeNotice> = self.outcome_plan.iter()
+                .filter_map(|entry| match &entry.disposition {
+                    OutcomeDisposition::Missing { declared_at_tick } if *declared_at_tick == tick => {
+                        Some(MissingOutcomeNotice {
+                            outcome_id: entry.outcome_id.clone(),
+                            prediction_tick: entry.prediction_tick,
+                            declared_at_tick: *declared_at_tick,
+                        })
+                    }
+                    _ => None,
+                })
+                .collect();
+            for notice in &newly_declared_missing_outcomes {
+                ensure!(
+                    declared_missing_outcome_ids.insert(notice.outcome_id.clone()),
+                    "driver attempted to declare outcome {} missing more than once",
+                    notice.outcome_id
+                );
+            }
+
             let observation = PolicyObservation {
                 decision_tick: tick,
                 delivered_features: delivered_features.clone(),
                 newly_revealed_outcomes: newly_revealed_outcomes.clone(),
+                newly_declared_missing_outcomes: newly_declared_missing_outcomes.clone(),
                 eligible_feature_ids: delivered_feature_ids.iter().cloned().collect(),
                 eligible_outcome_ids: delivered_outcome_ids.iter().cloned().collect(),
+                eligible_missing_outcome_ids: declared_missing_outcome_ids.iter().cloned().collect(),
             };
             let action = policy.decide(&observation)
                 .with_context(|| format!("policy {} failed at tick {tick}", policy.policy_id()))?;
@@ -248,6 +291,12 @@ impl ReplayScenario {
                 "outcome",
                 tick,
             )?;
+            validate_consumed_ids(
+                &action.consumed_missing_outcome_ids,
+                &observation.eligible_missing_outcome_ids,
+                "missing outcome",
+                tick,
+            )?;
 
             decisions.push(DriverDecision {
                 policy_id: policy.policy_id().to_owned(),
@@ -255,16 +304,19 @@ impl ReplayScenario {
                 prediction: action.prediction,
                 delivered_feature_ids: delivered_features.iter().map(|event| event.event_id.clone()).collect(),
                 delivered_outcome_ids: newly_revealed_outcomes.iter().map(|outcome| outcome.outcome_id.clone()).collect(),
+                declared_missing_outcome_ids: newly_declared_missing_outcomes.iter().map(|notice| notice.outcome_id.clone()).collect(),
                 eligible_feature_ids: observation.eligible_feature_ids,
                 eligible_outcome_ids: observation.eligible_outcome_ids,
+                eligible_missing_outcome_ids: observation.eligible_missing_outcome_ids,
                 consumed_feature_ids: action.consumed_feature_ids,
                 consumed_outcome_ids: action.consumed_outcome_ids,
+                consumed_missing_outcome_ids: action.consumed_missing_outcome_ids,
             });
         }
 
         let feature_stream_sha256 = sha256_hex(&serde_json::to_vec(&self.feature_events)?);
         let mut receipt = ReplayRunReceipt {
-            schema_version: 1,
+            schema_version: 2,
             stream_id: self.stream_id.clone(),
             stream_length_ticks: ticks,
             outcome_plan: self.outcome_plan.clone(),
@@ -282,7 +334,7 @@ impl ReplayScenario {
 
 /// Independently checks that each recorded policy consumption was delivered by that decision tick.
 pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
-    ensure!(receipt.schema_version == 1, "replay driver receipt schema_version must be 1");
+    ensure!(receipt.schema_version == 2, "replay driver receipt schema_version must be 2");
     ensure!(!receipt.stream_id.trim().is_empty(), "stream_id must not be empty");
     ensure!(receipt.stream_length_ticks > 0, "stream_length_ticks must be positive");
     validate_outcome_plan(&receipt.outcome_plan, receipt.stream_length_ticks)?;
@@ -370,6 +422,38 @@ pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
         ensure!(recorded_outcomes == expected_outcomes,
             "eligible outcome set does not match reveal history at tick {tick}");
 
+        let expected_missing_outcomes: BTreeSet<String> = receipt.outcome_plan.iter()
+            .filter_map(|entry| match &entry.disposition {
+                OutcomeDisposition::Missing { declared_at_tick } if *declared_at_tick <= tick => {
+                    Some(entry.outcome_id.clone())
+                }
+                _ => None,
+            })
+            .collect();
+        let recorded_missing_outcomes: BTreeSet<String> =
+            decision.eligible_missing_outcome_ids.iter().cloned().collect();
+        ensure!(
+            recorded_missing_outcomes.len() == decision.eligible_missing_outcome_ids.len(),
+            "duplicate eligible missing-outcome ID at tick {tick}"
+        );
+        ensure!(
+            recorded_missing_outcomes == expected_missing_outcomes,
+            "eligible missing-outcome set does not match declared-missing history at tick {tick}"
+        );
+
+        let newly_declared_missing_outcomes: BTreeSet<String> = receipt.outcome_plan.iter()
+            .filter_map(|entry| match &entry.disposition {
+                OutcomeDisposition::Missing { declared_at_tick } if *declared_at_tick == tick => {
+                    Some(entry.outcome_id.clone())
+                }
+                _ => None,
+            })
+            .collect();
+        ensure!(
+            set_from_vec(&decision.declared_missing_outcome_ids)? == newly_declared_missing_outcomes,
+            "declared-missing outcome set differs from driver outcome plan at tick {tick}"
+        );
+
         let newly_delivered_features: BTreeSet<String> = receipt.feature_events.iter()
             .filter(|event| event.available_at_tick == tick)
             .map(|event| event.event_id.clone())
@@ -393,6 +477,12 @@ pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
 
         validate_consumed_ids(&decision.consumed_feature_ids, &decision.eligible_feature_ids, "feature", tick)?;
         validate_consumed_ids(&decision.consumed_outcome_ids, &decision.eligible_outcome_ids, "outcome", tick)?;
+        validate_consumed_ids(
+            &decision.consumed_missing_outcome_ids,
+            &decision.eligible_missing_outcome_ids,
+            "missing outcome",
+            tick,
+        )?;
     }
     Ok(())
 }
@@ -495,6 +585,7 @@ mod tests {
                 prediction: observation.newly_revealed_outcomes.last().map(|outcome| outcome.value).unwrap_or(0.0),
                 consumed_feature_ids: observation.delivered_features.iter().map(|event| event.event_id.clone()).collect(),
                 consumed_outcome_ids: observation.newly_revealed_outcomes.iter().map(|outcome| outcome.outcome_id.clone()).collect(),
+                consumed_missing_outcome_ids: observation.newly_declared_missing_outcomes.iter().map(|notice| notice.outcome_id.clone()).collect(),
             })
         }
     }
@@ -508,6 +599,7 @@ mod tests {
                 consumed_feature_ids: Vec::new(),
                 // This is a real outcome ID for a future reveal, not an arbitrary unknown ID.
                 consumed_outcome_ids: vec!["outcome-00000000".to_owned()],
+                consumed_missing_outcome_ids: Vec::new(),
             })
         }
     }
@@ -581,6 +673,82 @@ mod tests {
     }
 
     #[test]
+    fn missingness_is_visible_only_after_declaration_and_never_reveals_the_hidden_value() {
+        let targets = vec![10.0, 11.0, 999.0, 13.0, 14.0, 15.0];
+        let plan = vec![
+            OutcomePlanEntry { prediction_tick: 0, outcome_id: "outcome-00000000".into(),
+                disposition: OutcomeDisposition::RevealAt { available_at_tick: 2 } },
+            OutcomePlanEntry { prediction_tick: 1, outcome_id: "outcome-00000001".into(),
+                disposition: OutcomeDisposition::RevealAt { available_at_tick: 3 } },
+            OutcomePlanEntry { prediction_tick: 2, outcome_id: "outcome-00000002".into(),
+                disposition: OutcomeDisposition::Missing { declared_at_tick: 4 } },
+            OutcomePlanEntry { prediction_tick: 3, outcome_id: "outcome-00000003".into(),
+                disposition: OutcomeDisposition::CensoredAt { horizon_tick: 6 } },
+            OutcomePlanEntry { prediction_tick: 4, outcome_id: "outcome-00000004".into(),
+                disposition: OutcomeDisposition::CensoredAt { horizon_tick: 6 } },
+            OutcomePlanEntry { prediction_tick: 5, outcome_id: "outcome-00000005".into(),
+                disposition: OutcomeDisposition::CensoredAt { horizon_tick: 6 } },
+        ];
+        let scenario = ReplayScenario::new_with_outcome_plan(
+            "informative-missingness-test".into(),
+            features(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0]),
+            targets,
+            plan,
+        ).expect("valid outcome-dependent missingness schedule");
+        let mut policy = ConsumeDeliveredPolicy;
+        let receipt = scenario.run(&mut policy).expect("driver run");
+
+        assert!(receipt.decisions[3].eligible_missing_outcome_ids.is_empty());
+        assert!(receipt.decisions[3].declared_missing_outcome_ids.is_empty());
+        assert_eq!(
+            receipt.decisions[4].declared_missing_outcome_ids,
+            vec!["outcome-00000002"]
+        );
+        assert_eq!(
+            receipt.decisions[4].eligible_missing_outcome_ids,
+            vec!["outcome-00000002"]
+        );
+        assert_eq!(
+            receipt.decisions[4].consumed_missing_outcome_ids,
+            vec!["outcome-00000002"]
+        );
+        assert!(!receipt.revealed_outcomes.iter().any(|outcome|
+            outcome.outcome_id == "outcome-00000002" || outcome.value == 999.0));
+        audit_receipt(&receipt).expect("missingness notice must be audited");
+    }
+
+    #[test]
+    fn receipt_audit_rejects_missingness_leakage_before_declaration() {
+        let targets = vec![10.0, 11.0, 999.0, 13.0, 14.0, 15.0];
+        let plan = vec![
+            OutcomePlanEntry { prediction_tick: 0, outcome_id: "outcome-00000000".into(),
+                disposition: OutcomeDisposition::RevealAt { available_at_tick: 2 } },
+            OutcomePlanEntry { prediction_tick: 1, outcome_id: "outcome-00000001".into(),
+                disposition: OutcomeDisposition::RevealAt { available_at_tick: 3 } },
+            OutcomePlanEntry { prediction_tick: 2, outcome_id: "outcome-00000002".into(),
+                disposition: OutcomeDisposition::Missing { declared_at_tick: 4 } },
+            OutcomePlanEntry { prediction_tick: 3, outcome_id: "outcome-00000003".into(),
+                disposition: OutcomeDisposition::CensoredAt { horizon_tick: 6 } },
+            OutcomePlanEntry { prediction_tick: 4, outcome_id: "outcome-00000004".into(),
+                disposition: OutcomeDisposition::CensoredAt { horizon_tick: 6 } },
+            OutcomePlanEntry { prediction_tick: 5, outcome_id: "outcome-00000005".into(),
+                disposition: OutcomeDisposition::CensoredAt { horizon_tick: 6 } },
+        ];
+        let scenario = ReplayScenario::new_with_outcome_plan(
+            "missingness-leak-test".into(),
+            features(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0]),
+            targets,
+            plan,
+        ).expect("valid outcome-dependent missingness schedule");
+        let mut policy = ConsumeDeliveredPolicy;
+        let mut receipt = scenario.run(&mut policy).expect("driver run");
+        receipt.decisions[3].eligible_missing_outcome_ids.push("outcome-00000002".into());
+        seal_receipt(&mut receipt).expect("reseal adversarial receipt");
+        let error = audit_receipt(&receipt).expect_err("early missingness should fail closed");
+        assert!(error.to_string().contains("eligible missing-outcome set does not match declared-missing history"));
+    }
+
+    #[test]
     fn policy_cannot_claim_an_unknown_or_future_outcome() {
         let mut policy = FutureClaimingPolicy;
         let error = scenario(vec![0.0; 6]).run(&mut policy)
@@ -598,6 +766,7 @@ mod tests {
                     prediction: 0.0,
                     consumed_feature_ids: vec!["feature-arrives-later".to_owned()],
                     consumed_outcome_ids: Vec::new(),
+                    consumed_missing_outcome_ids: Vec::new(),
                 })
             }
         }
