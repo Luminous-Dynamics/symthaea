@@ -1286,6 +1286,55 @@ mod tests {
     }
 
     #[test]
+    fn v3_commit_manifest_binds_exact_lexical_index_bytes() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-manifest", "web", "manifest bound lexical document"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let snapshot = evidence.snapshot_bytes(5).unwrap();
+        let lexical_index = LexicalIndex::build(&evidence, 5).unwrap();
+        let lexical_bytes = lexical_index.to_json_bytes().unwrap();
+        let identity = HdcStoreIdentity {
+            store_generation: 3,
+            live_count: 1,
+            checksum_version: 1,
+            checksum_hex: "0123456789abcdef".into(),
+        };
+        let manifest = EvidenceCommitManifest::new_with_hdc_identity_and_lexical_index(
+            5, b"canonical hdc bytes", &snapshot, identity, &lexical_bytes,
+        ).unwrap();
+        manifest.verify(b"canonical hdc bytes", &snapshot).unwrap();
+        manifest.verify_lexical_index(Some(&lexical_bytes)).unwrap();
+        assert!(manifest.verify_lexical_index(Some(b"different lexical index")).is_err());
+        assert!(manifest.verify_lexical_index(None).is_err());
+
+        let encoded = manifest.to_json_bytes().unwrap();
+        let recovered = EvidenceCommitManifest::from_json_bytes(&encoded).unwrap();
+        assert_eq!(recovered.lexical_index_sha256(), Some(sha256_hex(&lexical_bytes).as_str()));
+        recovered.verify_lexical_index(Some(&lexical_bytes)).unwrap();
+    }
+
+    #[test]
+    fn lexical_index_rejects_unknown_schema_and_malformed_postings() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-index-structure", "web", "alpha beta alpha"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let lexical = LexicalIndex::build(&evidence, 2).unwrap();
+        let bytes = lexical.to_json_bytes().unwrap();
+
+        let mut unknown: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        unknown["schema_version"] = serde_json::Value::String("BROCA-LEXICAL-INDEX-V999".into());
+        assert!(LexicalIndex::from_json_bytes(&serde_json::to_vec(&unknown).unwrap()).is_err());
+
+        let mut malformed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        malformed["postings"]["alpha"][0]["term_frequency"] = serde_json::Value::from(0);
+        assert!(LexicalIndex::from_json_bytes(&serde_json::to_vec(&malformed).unwrap()).is_err());
+    }
+
+    #[test]
     fn commit_manifest_binds_matching_vector_index_and_evidence_snapshot() {
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "current route"), b"canonical trajectory bytes").unwrap();
