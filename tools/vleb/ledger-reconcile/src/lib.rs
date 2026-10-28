@@ -392,7 +392,9 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
                 }
                 b'\r' => {
                     if bytes.get(index + 1) != Some(&b'\n') {
-                        return Err(LedgerError::new(format!("bare carriage return at byte {index}")));
+                        return Err(LedgerError::new(format!(
+                            "bare carriage return at byte {index}"
+                        )));
                     }
                     row.push(
                         String::from_utf8(std::mem::take(&mut field))
@@ -463,7 +465,9 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
                 }
                 b'\r' => {
                     if bytes.get(index + 1) != Some(&b'\n') {
-                        return Err(LedgerError::new(format!("bare carriage return at byte {index}")));
+                        return Err(LedgerError::new(format!(
+                            "bare carriage return at byte {index}"
+                        )));
                     }
                     row.push(
                         String::from_utf8(std::mem::take(&mut field))
@@ -611,9 +615,8 @@ mod tests {
     #[test]
     fn amount_tokens_must_be_canonical_ascii_integers() {
         for amount in ["+1", " 1", "1 ", "1.0", "1e2", "١"] {
-            let input = format!(
-                "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,{amount}\n"
-            );
+            let input =
+                format!("transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,{amount}\n");
             assert!(
                 reconcile_csv(&input).is_err(),
                 "amount token {amount:?} should be rejected"
