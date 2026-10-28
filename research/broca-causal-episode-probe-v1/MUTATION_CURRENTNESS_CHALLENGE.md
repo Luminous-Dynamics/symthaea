@@ -84,6 +84,14 @@ Keep the research lanes separate:
 - [MRAgent (ICML 2026)](https://proceedings.mlr.press/v306/ji26d.html): tests active associative reconstruction from evolving intermediate evidence rather than static top-k retrieval.
 - [Mem2ActBench (ACL 2026)](https://aclanthology.org/2026.acl-long.370/): evaluates whether memory improves tool choice and argument grounding in task-oriented agents.
 
+### Competitive snapshot and comparison discipline
+
+- The [official LongMemEval-V2 page](https://xiaowu0162.github.io/longmemeval-v2/) reports AgentRunbook-C V2 Online at 75.6% accuracy and 130.5 s query latency on its small tier, with LAFS gain +2.8231. Its V2 small GPT-5.4-mini medium-reasoning setting is reported separately at 72.73% and 56.68 s. These are different configurations; use the exact row and run manifest.
+- [Supermemory's published LongMemEval-S report](https://supermemory.ai/research/longmembench/) reports 97% Recall@20 over 500 questions with a GPT-4o judge and an aggregation strategy. This is a vendor-published result on LongMemEval-S, and **retrieval Recall@20 is not end-to-end LongMemEval-V2 answer accuracy**. Do not compare the headline percentages directly.
+- The [Agent Memory Leaderboard Cycle 1](https://agentmemoryleaderboard.ai/home) reports MemoraX at 58.02 overall, with 60.00 for temporal/event reasoning and 51.19 for memory governance in that leaderboard's rubric. These dimensions are useful because they expose failure modes not captured by fact recall alone, but they are not LongMemEval percentages.
+
+The Cycle 2 materials deadline currently listed by the leaderboard is **October 31, 2026 at 23:59 UTC+8 (October 31 at 17:59 SAST)**. A submission requires a stable participant-hosted Add/Search API and complete materials. This repository-only probe is not submission-ready; do not claim entry or rush an unqualified endpoint merely to hit the deadline.
+
 A useful field-level hypothesis is that temporal validity should be a hard eligibility predicate before any lexical, dense, or graph-based ranking. Reconstruction can expand only from eligible evidence; a verifier may inspect rejected stale evidence to explain a contradiction, but must not pass it to the answer context as current fact. Test this by holding the retrieval budget and reader fixed and reporting both quality and stale-evidence violation rates.
 
 ## Next architecture implication
