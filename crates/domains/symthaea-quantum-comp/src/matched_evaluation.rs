@@ -1795,7 +1795,7 @@ mod tests {
     }
 
     #[test]
-    fn restricted_mean_tts_does_not_count_uncosted_verified_targets_as_hits() {
+    fn restricted_mean_tts_uses_direct_clock_even_when_stage_diagnostics_are_incomplete() {
         let baseline = report(
             "baseline",
             "classical",
@@ -1803,11 +1803,33 @@ mod tests {
         );
         let mut missing_queue = costs(25.0);
         missing_queue.queue_wait_ms = None;
+        assert_eq!(missing_queue.sum_all_stage_costs_ms(), None);
         let candidate = report(
             "candidate",
             "trajectory",
             vec![verified_trial("c", "p", 1, 5, missing_queue, EnergyRecord::not_measured())],
         );
+
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.baseline_hits_within_horizon, 1);
+        assert_eq!(result.candidate_hits_within_horizon, 1);
+        assert_eq!(result.candidate_untimed_target_hits, 0);
+        assert_eq!(result.pairs[0].candidate_restricted_time_ms, 25.0);
+        assert_eq!(result.candidate_restricted_mean_ms, 25.0);
+        assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn restricted_mean_tts_requires_direct_deployment_clock_even_if_stage_sum_exists() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let candidate_trial = verified_trial("c", "p", 1, 5, costs(25.0), EnergyRecord::not_measured());
+        assert_eq!(candidate_trial.costs.sum_all_stage_costs_ms(), Some(25.0));
+        let mut candidate = report("candidate", "trajectory", vec![candidate_trial]);
+        candidate.trials[0].deployment_elapsed_ms = None;
 
         let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
         assert_eq!(result.baseline_hits_within_horizon, 1);
