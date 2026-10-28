@@ -21,9 +21,9 @@ The primary denominator is the locked cohort after only documented task exclusio
 
 ## Statistical interpretation
 
-The Wilson interval is used instead of a naive normal interval for each binomial rate. The exact McNemar test compares paired binary assured-pass outcomes and conditions on discordant pairs. A fixed task-level aggregation rule must be preregistered (for example, three attempts summarized as pass@3); attempts must not be counted as separate independent tasks.
+The Wilson interval is used instead of a naive normal interval for each binomial rate, but it assumes task-level independence. Each task therefore requires a repository/codebase cluster ID. A seeded cluster bootstrap resamples whole clusters and computes intervals for each candidate's AASSR/raw resolution and the paired AASSR risk difference. Those cluster-bootstrap intervals are the primary uncertainty display when at least two clusters are present; they are null for a single-cluster cohort. The exact McNemar test compares paired binary assured-pass outcomes and conditions on discordant pairs, but its p-value is task-level and is not cluster-adjusted. A fixed task-level aggregation rule must be preregistered (for example, three attempts summarized as pass@3); attempts must not be counted as separate independent tasks.
 
-The script reports effect size and p-value, not only statistical significance. A nonsignificant result is not evidence of equivalence. Equivalence or non-inferiority requires its own preregistered margin and a suitable confidence-interval procedure. If multiple lanes, model variants, or hypotheses are examined, the report must disclose them and address multiplicity; the primary test should remain preregistered.
+The bootstrap replication count and random seed are preregistered in the analysis plan. The script reports task-level effect size and p-value, plus cluster-bootstrap uncertainty, not only statistical significance. A nonsignificant result is not evidence of equivalence. Equivalence or non-inferiority requires its own preregistered margin and a suitable confidence-interval procedure. If multiple lanes, model variants, or hypotheses are examined, the report must disclose them and address multiplicity; the primary test should remain preregistered.
 
 ## Security and validity boundaries
 

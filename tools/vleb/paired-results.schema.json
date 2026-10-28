@@ -12,13 +12,15 @@
     "protocol_sha256": {"$ref": "#/$defs/sha256"},
     "analysis_plan": {
       "type": "object", "additionalProperties": false,
-      "required": ["primary_metric", "pairwise_test", "confidence_level", "attempt_aggregation", "cost_currency"],
+      "required": ["primary_metric", "pairwise_test", "confidence_level", "attempt_aggregation", "cost_currency", "cluster_bootstrap_replicates", "cluster_bootstrap_seed"],
       "properties": {
         "primary_metric": {"const": "assurance_adjusted_semantic_success_rate"},
         "pairwise_test": {"const": "exact_mcnemar_two_sided"},
         "confidence_level": {"type": "number", "minimum": 0.8, "maximum": 0.9999},
         "attempt_aggregation": {"type": "string", "minLength": 1, "maxLength": 512},
-        "cost_currency": {"const": "USD"}
+        "cost_currency": {"const": "USD"},
+        "cluster_bootstrap_replicates": {"type": "integer", "minimum": 1000, "maximum": 100000},
+        "cluster_bootstrap_seed": {"type": "integer", "minimum": 0}
       }
     },
     "candidates": {
@@ -33,9 +35,10 @@
       "type": "array", "minItems": 1,
       "items": {
         "type": "object", "additionalProperties": false,
-        "required": ["task_id", "lane", "candidate_A", "candidate_B", "exclusion"],
+        "required": ["task_id", "cluster_id", "lane", "candidate_A", "candidate_B", "exclusion"],
         "properties": {
           "task_id": {"type": "string", "minLength": 1, "maxLength": 512},
+          "cluster_id": {"type": "string", "minLength": 1, "maxLength": 512},
           "lane": {"type": "string", "minLength": 1, "maxLength": 128},
           "candidate_A": {"$ref": "#/$defs/outcome"},
           "candidate_B": {"$ref": "#/$defs/outcome"},

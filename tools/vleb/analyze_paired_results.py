@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import math
+import random
 import sys
 from collections import Counter
 from pathlib import Path
@@ -93,7 +94,7 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
     if not _is_sha256(data.get("protocol_sha256")):
         errors.append("protocol_sha256:invalid")
     plan = data.get("analysis_plan")
-    plan_keys = {"primary_metric", "pairwise_test", "confidence_level", "attempt_aggregation", "cost_currency"}
+    plan_keys = {"primary_metric", "pairwise_test", "confidence_level", "attempt_aggregation", "cost_currency", "cluster_bootstrap_replicates", "cluster_bootstrap_seed"}
     errors.extend(_check_keys(plan, plan_keys, plan_keys, "analysis_plan"))
     if isinstance(plan, dict):
         if plan.get("primary_metric") != "assurance_adjusted_semantic_success_rate":
@@ -107,6 +108,12 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
             errors.append("analysis_plan:attempt_aggregation_must_be_preregistered")
         if plan.get("cost_currency") != "USD":
             errors.append("analysis_plan:cost_currency_must_be_usd")
+        replicates = plan.get("cluster_bootstrap_replicates")
+        if isinstance(replicates, bool) or not isinstance(replicates, int) or not 1000 <= replicates <= 100000:
+            errors.append("analysis_plan:invalid_cluster_bootstrap_replicates")
+        seed = plan.get("cluster_bootstrap_seed")
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            errors.append("analysis_plan:invalid_cluster_bootstrap_seed")
     candidates = data.get("candidates")
     errors.extend(_check_keys(candidates, {"A", "B"}, {"A", "B"}, "candidates"))
     if isinstance(candidates, dict):
@@ -123,7 +130,7 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
         return errors, []
     seen: set[str] = set()
     normalized: list[dict[str, Any]] = []
-    task_keys = {"task_id", "lane", "candidate_A", "candidate_B", "exclusion"}
+    task_keys = {"task_id", "cluster_id", "lane", "candidate_A", "candidate_B", "exclusion"}
     exclusion_keys = {"reason", "adjudicated_before_unblinding", "adjudication_sha256"}
     for index, task in enumerate(tasks):
         label = f"tasks[{index}]"
@@ -137,6 +144,8 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
             errors.append(f"{label}:duplicate_task_id")
         else:
             seen.add(task_id)
+        if not isinstance(task.get("cluster_id"), str) or not task["cluster_id"].strip():
+            errors.append(f"{label}:invalid_cluster_id")
         if not isinstance(task.get("lane"), str) or not task["lane"].strip():
             errors.append(f"{label}:invalid_lane")
         for candidate_label, key in (("A", "candidate_A"), ("B", "candidate_B")):
@@ -154,7 +163,74 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
         normalized.append(task)
     return errors, normalized
 
-def _metrics(records: list[dict[str, Any]], candidate_key: str, confidence: float, cost_records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _percentile(sorted_values: list[float], probability: float) -> float:
+    """Linearly interpolated percentile, defined for a sorted non-empty sample."""
+    position = probability * (len(sorted_values) - 1)
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return sorted_values[lower]
+    weight = position - lower
+    return sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
+
+
+def _cluster_bootstrap_interval(
+    records: list[dict[str, Any]],
+    candidate_key: str,
+    success_fn,
+    confidence: float,
+    replicates: int,
+    seed: int,
+) -> list[float] | None:
+    clusters = sorted({record["cluster_id"] for record in records})
+    if len(clusters) < 2 or not records:
+        return None
+    by_cluster: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        by_cluster[record["cluster_id"]].append(record)
+    rng = random.Random(seed)
+    estimates: list[float] = []
+    for _ in range(replicates):
+        sampled_clusters = [rng.choice(clusters) for _ in clusters]
+        sample = [record for cluster in sampled_clusters for record in by_cluster[cluster]]
+        estimates.append(sum(success_fn(record[candidate_key]["outcome"]) for record in sample) / len(sample))
+    estimates.sort()
+    alpha = 1.0 - confidence
+    return [
+        _percentile(estimates, alpha / 2.0),
+        _percentile(estimates, 1.0 - alpha / 2.0),
+    ]
+
+
+def _cluster_bootstrap_difference(
+    records: list[dict[str, Any]],
+    confidence: float,
+    replicates: int,
+    seed: int,
+) -> list[float] | None:
+    clusters = sorted({record["cluster_id"] for record in records})
+    if len(clusters) < 2 or not records:
+        return None
+    by_cluster: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        by_cluster[record["cluster_id"]].append(record)
+    rng = random.Random(seed)
+    estimates: list[float] = []
+    for _ in range(replicates):
+        sampled_clusters = [rng.choice(clusters) for _ in clusters]
+        sample = [record for cluster in sampled_clusters for record in by_cluster[cluster]]
+        a_rate = sum(record["candidate_A"]["outcome"] == "assured_pass" for record in sample) / len(sample)
+        b_rate = sum(record["candidate_B"]["outcome"] == "assured_pass" for record in sample) / len(sample)
+        estimates.append(a_rate - b_rate)
+    estimates.sort()
+    alpha = 1.0 - confidence
+    return [
+        _percentile(estimates, alpha / 2.0),
+        _percentile(estimates, 1.0 - alpha / 2.0),
+    ]
+
+
+def _metrics(records: list[dict[str, Any]], candidate_key: str, confidence: float, cost_records: list[dict[str, Any]] | None = None, bootstrap_replicates: int = 1000, bootstrap_seed: int = 0) -> dict[str, Any]:
     outcomes = Counter(record[candidate_key]["outcome"] for record in records)
     n = len(records)
     assured = outcomes["assured_pass"]
@@ -164,13 +240,20 @@ def _metrics(records: list[dict[str, Any]], candidate_key: str, confidence: floa
     # but all cost/time already incurred on assigned tasks remains in economics.
     cost = sum(float(record[candidate_key]["cost_usd"]) for record in economic_records)
     durations = [record[candidate_key]["duration_ms"] for record in economic_records]
+    assured_rate = lambda value: value == "assured_pass"
+    raw_rate = lambda value: value in ("assured_pass", "raw_pass_unverified")
+    cluster_count = len({record["cluster_id"] for record in records})
     return {
         "n": n,
         "outcome_counts": {outcome: outcomes[outcome] for outcome in OUTCOMES},
         "aassr": assured / n if n else None,
         "aassr_wilson_interval": _wilson(assured, n, confidence),
+        "aassr_cluster_bootstrap_interval": _cluster_bootstrap_interval(records, candidate_key, assured_rate, confidence, bootstrap_replicates, bootstrap_seed),
         "raw_resolution_rate": raw / n if n else None,
         "raw_resolution_wilson_interval": _wilson(raw, n, confidence),
+        "raw_resolution_cluster_bootstrap_interval": _cluster_bootstrap_interval(records, candidate_key, raw_rate, confidence, bootstrap_replicates, bootstrap_seed),
+        "cluster_count": cluster_count,
+        "uncertainty_note": "Wilson intervals assume task independence; cluster-bootstrap intervals resample the supplied repository/codebase clusters and are null when fewer than two clusters are present.",
         "unresolved_rate": outcomes["unresolved"] / n if n else None,
         "abstention_rate": outcomes["abstained"] / n if n else None,
         "total_cost_usd": round(cost, 8),
@@ -193,8 +276,10 @@ def analyze(data: Any) -> dict[str, Any]:
     if not scored:
         raise ValueError("invalid paired results: no tasks remain after pre-unblinding exclusions")
 
-    scored_a = _metrics(scored, "candidate_A", confidence, tasks)
-    scored_b = _metrics(scored, "candidate_B", confidence, tasks)
+    bootstrap_replicates = data["analysis_plan"]["cluster_bootstrap_replicates"]
+    bootstrap_seed = data["analysis_plan"]["cluster_bootstrap_seed"]
+    scored_a = _metrics(scored, "candidate_A", confidence, tasks, bootstrap_replicates, bootstrap_seed)
+    scored_b = _metrics(scored, "candidate_B", confidence, tasks, bootstrap_replicates, bootstrap_seed)
     a_only = both = b_only = neither = 0
     for task in scored:
         a_pass = task["candidate_A"]["outcome"] == "assured_pass"
@@ -213,8 +298,8 @@ def analyze(data: Any) -> dict[str, Any]:
         lane_assigned = [task for task in tasks if task["lane"] == lane]
         lane_scored = [task for task in scored if task["lane"] == lane]
         lane_results[lane] = {
-            "candidate_A": _metrics(lane_scored, "candidate_A", confidence, lane_assigned),
-            "candidate_B": _metrics(lane_scored, "candidate_B", confidence, lane_assigned),
+            "candidate_A": _metrics(lane_scored, "candidate_A", confidence, lane_assigned, bootstrap_replicates, bootstrap_seed),
+            "candidate_B": _metrics(lane_scored, "candidate_B", confidence, lane_assigned, bootstrap_replicates, bootstrap_seed),
             "assigned_tasks": len(lane_assigned),
             "scored_tasks": len(lane_scored),
             "pre_unblinding_exclusions": len(lane_assigned) - len(lane_scored),
@@ -233,6 +318,7 @@ def analyze(data: Any) -> dict[str, Any]:
             "scored_tasks": len(scored),
             "pre_unblinding_exclusions": len(excluded),
             "excluded_task_ids": [task["task_id"] for task in excluded],
+            "cluster_ids": sorted({task["cluster_id"] for task in tasks}),
             "task_ids": [task["task_id"] for task in tasks],
         },
         "candidate_A": scored_a,
@@ -244,7 +330,9 @@ def analyze(data: Any) -> dict[str, Any]:
             "neither_assured_pass": neither,
             "aassr_risk_difference_A_minus_B": (a_only - b_only) / len(scored),
             "exact_mcnemar_p_value_two_sided": _exact_mcnemar_p(a_only, b_only),
-            "interpretation": "The exact McNemar test compares paired binary assured-pass outcomes. It does not correct for invalid task admission, multiple unregistered comparisons, or mismatched evaluation protocols.",
+            "cluster_bootstrap_risk_difference_interval_A_minus_B": _cluster_bootstrap_difference(scored, confidence, bootstrap_replicates, bootstrap_seed),
+            "cluster_count": len({task["cluster_id"] for task in scored}),
+            "interpretation": "The exact McNemar p-value is a task-pair test and is not cluster-adjusted. The paired cluster-bootstrap interval resamples repository/codebase clusters. Neither corrects for invalid task admission, multiple unregistered comparisons, or mismatched protocols.",
         },
         "by_lane": lane_results,
         "limitations": [

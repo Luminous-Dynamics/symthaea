@@ -26,6 +26,8 @@ def valid_input() -> dict:
             "primary_metric": "assurance_adjusted_semantic_success_rate",
             "pairwise_test": "exact_mcnemar_two_sided",
             "confidence_level": 0.95,
+            "cluster_bootstrap_replicates": 1000,
+            "cluster_bootstrap_seed": 20261028,
             "attempt_aggregation": "One task-level outcome from exactly three preregistered attempts (pass@3); attempts are not treated as independent tasks.",
             "cost_currency": "USD",
         },
@@ -34,10 +36,10 @@ def valid_input() -> dict:
             "B": {"name": "candidate-agent", "configuration_sha256": sha("c")},
         },
         "tasks": [
-            {"task_id": "T-001", "lane": "repair", "candidate_A": outcome("assured_pass", 0.5), "candidate_B": outcome("fail", 0.2), "exclusion": None},
-            {"task_id": "T-002", "lane": "repair", "candidate_A": outcome("raw_pass_unverified", 0.3), "candidate_B": outcome("assured_pass", 0.4), "exclusion": None},
-            {"task_id": "T-003", "lane": "migration", "candidate_A": outcome("unresolved", 0.7), "candidate_B": outcome("abstained", 0.1), "exclusion": None},
-            {"task_id": "T-004", "lane": "migration", "candidate_A": outcome("fail", 0.2), "candidate_B": outcome("fail", 0.3), "exclusion": None},
+            {"task_id": "T-001", "cluster_id": "repo-A", "lane": "repair", "candidate_A": outcome("assured_pass", 0.5), "candidate_B": outcome("fail", 0.2), "exclusion": None},
+            {"task_id": "T-002", "cluster_id": "repo-A", "lane": "repair", "candidate_A": outcome("raw_pass_unverified", 0.3), "candidate_B": outcome("assured_pass", 0.4), "exclusion": None},
+            {"task_id": "T-003", "cluster_id": "repo-B", "lane": "migration", "candidate_A": outcome("unresolved", 0.7), "candidate_B": outcome("abstained", 0.1), "exclusion": None},
+            {"task_id": "T-004", "cluster_id": "repo-B", "lane": "migration", "candidate_A": outcome("fail", 0.2), "candidate_B": outcome("fail", 0.3), "exclusion": None},
         ],
     }
 
@@ -192,7 +194,7 @@ class PairedResultsTests(unittest.TestCase):
     def test_excluded_only_lane_keeps_assigned_cost_and_reports_zero_scored(self) -> None:
         data = valid_input()
         data["tasks"].append({
-            "task_id": "T-EXCLUDED", "lane": "excluded-only",
+            "task_id": "T-EXCLUDED", "cluster_id": "repo-C", "lane": "excluded-only",
             "candidate_A": outcome("fail", 2.0), "candidate_B": outcome("fail", 3.0),
             "exclusion": {"reason": "preregistered invalid image", "adjudicated_before_unblinding": True, "adjudication_sha256": sha("f")},
         })
@@ -202,6 +204,28 @@ class PairedResultsTests(unittest.TestCase):
         self.assertEqual(lane["scored_tasks"], 0)
         self.assertIsNone(lane["candidate_A"]["aassr"])
         self.assertEqual(lane["candidate_A"]["total_cost_usd"], 2.0)
+
+    def test_cluster_bootstrap_intervals_are_deterministic_and_paired(self) -> None:
+        data = valid_input()
+        first = analyze(data)
+        second = analyze(data)
+        self.assertEqual(first["candidate_A"]["aassr_cluster_bootstrap_interval"], second["candidate_A"]["aassr_cluster_bootstrap_interval"])
+        self.assertIsNotNone(first["paired_aassr_comparison"]["cluster_bootstrap_risk_difference_interval_A_minus_B"])
+        self.assertEqual(first["assignment_accounting"]["cluster_ids"], ["repo-A", "repo-B"])
+
+    def test_cluster_bootstrap_interval_is_null_for_one_cluster(self) -> None:
+        data = valid_input()
+        for task in data["tasks"]:
+            task["cluster_id"] = "single-repository"
+        result = analyze(data)
+        self.assertIsNone(result["candidate_A"]["aassr_cluster_bootstrap_interval"])
+        self.assertIsNone(result["paired_aassr_comparison"]["cluster_bootstrap_risk_difference_interval_A_minus_B"])
+
+    def test_cluster_id_is_mandatory(self) -> None:
+        data = valid_input()
+        del data["tasks"][0]["cluster_id"]
+        with self.assertRaisesRegex(ValueError, "missing_field:cluster_id"):
+            analyze(data)
 
     def test_per_lane_results_are_reported(self) -> None:
         result = analyze(valid_input())
