@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import copy
+import json
 import unittest
+from pathlib import Path
 
+from jsonschema import Draft202012Validator
 from analyze_paired_results import analyze, _exact_mcnemar_p, _wilson
 
 
@@ -39,7 +42,19 @@ def valid_input() -> dict:
     }
 
 
+SCHEMA_PATH = Path(__file__).with_name("paired-results.schema.json")
+
+
 class PairedResultsTests(unittest.TestCase):
+    def test_json_schema_is_valid_and_accepts_positive_control(self) -> None:
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+        self.assertEqual(list(validator.iter_errors(valid_input())), [])
+        unknown = valid_input()
+        unknown["unexpected"] = True
+        self.assertNotEqual(list(validator.iter_errors(unknown)), [])
+
     def test_aassr_excludes_raw_unverified_passes(self) -> None:
         result = analyze(valid_input())
         self.assertEqual(result["candidate_A"]["aassr"], 0.25)
@@ -99,8 +114,25 @@ class PairedResultsTests(unittest.TestCase):
     def test_missing_candidate_outcome_is_rejected(self) -> None:
         data = valid_input()
         del data["tasks"][0]["candidate_B"]
-        with self.assertRaisesRegex(ValueError, "invalid_outcome"):
+        with self.assertRaisesRegex(ValueError, "expected_object"):
             analyze(data)
+
+    def test_unknown_fields_fail_closed(self) -> None:
+        data = valid_input()
+        data["unexpected"] = "silently ignored must not happen"
+        with self.assertRaisesRegex(ValueError, "unknown_field"):
+            analyze(data)
+
+    def test_excluded_task_cost_still_counts_toward_total_economics(self) -> None:
+        data = valid_input()
+        data["tasks"][0]["exclusion"] = {
+            "reason": "pre-registered dependency image unavailable",
+            "adjudicated_before_unblinding": True,
+            "adjudication_sha256": sha("d"),
+        }
+        result = analyze(data)
+        # A's costs across all four assigned episodes: 0.5 + 0.3 + 0.7 + 0.2.
+        self.assertAlmostEqual(result["candidate_A"]["total_cost_usd"], 1.7)
 
     def test_invalid_configuration_digest_is_rejected(self) -> None:
         data = valid_input()

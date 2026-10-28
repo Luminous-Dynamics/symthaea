@@ -56,10 +56,19 @@ def _nearest_rank(values: list[int], quantile: float) -> int | None:
     return ordered[index]
 
 
-def _validate_outcome(record: Any, label: str) -> list[str]:
-    errors: list[str] = []
-    if not isinstance(record, dict):
+def _check_keys(value: Any, allowed: set[str], required: set[str], label: str) -> list[str]:
+    if not isinstance(value, dict):
         return [f"{label}:expected_object"]
+    errors = [f"{label}:unknown_field:{key}" for key in sorted(set(value) - allowed)]
+    errors.extend(f"{label}:missing_field:{key}" for key in sorted(required - set(value)))
+    return errors
+
+
+def _validate_outcome(record: Any, label: str) -> list[str]:
+    allowed = {"outcome", "cost_usd", "duration_ms"}
+    errors = _check_keys(record, allowed, allowed, label)
+    if not isinstance(record, dict):
+        return errors
     if record.get("outcome") not in OUTCOMES:
         errors.append(f"{label}:invalid_outcome")
     cost = record.get("cost_usd")
@@ -73,8 +82,10 @@ def _validate_outcome(record: Any, label: str) -> list[str]:
 
 def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
     errors: list[str] = []
+    root_keys = {"schema_version", "cohort_id", "protocol_sha256", "analysis_plan", "candidates", "tasks"}
+    errors.extend(_check_keys(data, root_keys, root_keys, "root"))
     if not isinstance(data, dict):
-        return ["root:expected_object"], []
+        return errors, []
     if data.get("schema_version") != "vleb-paired-results-v1":
         errors.append("schema_version:unsupported")
     if not isinstance(data.get("cohort_id"), str) or len(data["cohort_id"]) < 3:
@@ -82,9 +93,9 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
     if not _is_sha256(data.get("protocol_sha256")):
         errors.append("protocol_sha256:invalid")
     plan = data.get("analysis_plan")
-    if not isinstance(plan, dict):
-        errors.append("analysis_plan:expected_object")
-    else:
+    plan_keys = {"primary_metric", "pairwise_test", "confidence_level", "attempt_aggregation", "cost_currency"}
+    errors.extend(_check_keys(plan, plan_keys, plan_keys, "analysis_plan"))
+    if isinstance(plan, dict):
         if plan.get("primary_metric") != "assurance_adjusted_semantic_success_rate":
             errors.append("analysis_plan:primary_metric_must_be_aassr")
         if plan.get("pairwise_test") != "exact_mcnemar_two_sided":
@@ -97,23 +108,27 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
         if plan.get("cost_currency") != "USD":
             errors.append("analysis_plan:cost_currency_must_be_usd")
     candidates = data.get("candidates")
-    if not isinstance(candidates, dict) or set(candidates) != {"A", "B"}:
-        errors.append("candidates:must_have_exactly_A_and_B")
-    else:
+    errors.extend(_check_keys(candidates, {"A", "B"}, {"A", "B"}, "candidates"))
+    if isinstance(candidates, dict):
+        candidate_keys = {"name", "configuration_sha256"}
         for label in ("A", "B"):
-            candidate = candidates[label]
-            if not isinstance(candidate, dict) or not isinstance(candidate.get("name"), str) or not candidate["name"].strip() or not _is_sha256(candidate.get("configuration_sha256")):
-                errors.append(f"candidate_{label}:invalid_identity_or_configuration_pin")
+            candidate = candidates.get(label)
+            errors.extend(_check_keys(candidate, candidate_keys, candidate_keys, f"candidate_{label}"))
+            if isinstance(candidate, dict):
+                if not isinstance(candidate.get("name"), str) or not candidate["name"].strip() or not _is_sha256(candidate.get("configuration_sha256")):
+                    errors.append(f"candidate_{label}:invalid_identity_or_configuration_pin")
     tasks = data.get("tasks")
     if not isinstance(tasks, list) or not tasks:
         errors.append("tasks:must_be_nonempty_array")
         return errors, []
     seen: set[str] = set()
     normalized: list[dict[str, Any]] = []
+    task_keys = {"task_id", "lane", "candidate_A", "candidate_B", "exclusion"}
+    exclusion_keys = {"reason", "adjudicated_before_unblinding", "adjudication_sha256"}
     for index, task in enumerate(tasks):
         label = f"tasks[{index}]"
+        errors.extend(_check_keys(task, task_keys, task_keys, label))
         if not isinstance(task, dict):
-            errors.append(f"{label}:expected_object")
             continue
         task_id = task.get("task_id")
         if not isinstance(task_id, str) or not task_id.strip():
@@ -128,9 +143,8 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
             errors.extend(_validate_outcome(task.get(key), f"{label}.{candidate_label}"))
         exclusion = task.get("exclusion")
         if exclusion is not None:
-            if not isinstance(exclusion, dict):
-                errors.append(f"{label}:invalid_exclusion")
-            else:
+            errors.extend(_check_keys(exclusion, exclusion_keys, exclusion_keys, f"{label}.exclusion"))
+            if isinstance(exclusion, dict):
                 if not isinstance(exclusion.get("reason"), str) or not exclusion["reason"].strip():
                     errors.append(f"{label}:exclusion_requires_reason")
                 if exclusion.get("adjudicated_before_unblinding") is not True:
@@ -140,14 +154,16 @@ def _validate_input(data: Any) -> tuple[list[str], list[dict[str, Any]]]:
         normalized.append(task)
     return errors, normalized
 
-
-def _metrics(records: list[dict[str, Any]], candidate_key: str, confidence: float) -> dict[str, Any]:
+def _metrics(records: list[dict[str, Any]], candidate_key: str, confidence: float, cost_records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     outcomes = Counter(record[candidate_key]["outcome"] for record in records)
     n = len(records)
     assured = outcomes["assured_pass"]
     raw = assured + outcomes["raw_pass_unverified"]
-    cost = sum(float(record[candidate_key]["cost_usd"]) for record in records)
-    durations = [record[candidate_key]["duration_ms"] for record in records]
+    economic_records = cost_records if cost_records is not None else records
+    # Correctness denominator can exclude only pre-unblinding-adjudicated tasks,
+    # but all cost/time already incurred on assigned tasks remains in economics.
+    cost = sum(float(record[candidate_key]["cost_usd"]) for record in economic_records)
+    durations = [record[candidate_key]["duration_ms"] for record in economic_records]
     return {
         "n": n,
         "outcome_counts": {outcome: outcomes[outcome] for outcome in OUTCOMES},
@@ -177,8 +193,8 @@ def analyze(data: Any) -> dict[str, Any]:
     if not scored:
         raise ValueError("invalid paired results: no tasks remain after pre-unblinding exclusions")
 
-    scored_a = _metrics(scored, "candidate_A", confidence)
-    scored_b = _metrics(scored, "candidate_B", confidence)
+    scored_a = _metrics(scored, "candidate_A", confidence, tasks)
+    scored_b = _metrics(scored, "candidate_B", confidence, tasks)
     a_only = both = b_only = neither = 0
     for task in scored:
         a_pass = task["candidate_A"]["outcome"] == "assured_pass"
@@ -198,8 +214,8 @@ def analyze(data: Any) -> dict[str, Any]:
     lane_results: dict[str, Any] = {}
     for lane, lane_tasks in sorted(by_lane.items()):
         lane_results[lane] = {
-            "candidate_A": _metrics(lane_tasks, "candidate_A", confidence),
-            "candidate_B": _metrics(lane_tasks, "candidate_B", confidence),
+            "candidate_A": _metrics(lane_tasks, "candidate_A", confidence, [task for task in tasks if task["lane"] == lane]),
+            "candidate_B": _metrics(lane_tasks, "candidate_B", confidence, [task for task in tasks if task["lane"] == lane]),
             "assigned_tasks": len(lane_tasks),
         }
 

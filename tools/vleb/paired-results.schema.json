@@ -37,7 +37,6 @@
         "properties": {
           "task_id": {"type": "string", "minLength": 1, "maxLength": 512},
           "lane": {"type": "string", "minLength": 1, "maxLength": 128},
-          "negative_control": {"type": "boolean"},
           "candidate_A": {"$ref": "#/$defs/outcome"},
           "candidate_B": {"$ref": "#/$defs/outcome"},
           "exclusion": {
