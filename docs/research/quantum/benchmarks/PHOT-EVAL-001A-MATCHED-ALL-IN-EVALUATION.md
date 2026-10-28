@@ -36,6 +36,18 @@ The ratio baseline/candidate is greater than 1 when the candidate uses less of t
 
 The helper script scripts/research/run-photonic-contract-tests.sh compiles the four dependency-free Rust contracts directly with rustc --test rather than invoking Cargo. This provides a fast, narrow test path while the repository's wider workspace-discovery issue is being resolved. It does not replace full crate compilation, cargo fmt, clippy, repository CI, exact MIS integration, or application-level comparison.
 
+## Failure-inclusive restricted-mean time-to-target
+
+`compare_restricted_mean_tts(baseline, candidate, H)` is the primary fixed-horizon metric implementation. It reuses the strict matched-report and receipt validation, then emits one record for every paired attempt.
+
+For each arm/trial, the restricted contribution is:
+- **Verified target reached with all deployment cost stages measured and total time ≤ H:** the measured all-in time.
+- **Everything else:** exactly H, including misses, timeout/crash/abort, unverified candidates, verified hits with incomplete cost, and hits after H.
+
+The summary reports hit rates within H independently of restricted means; counts uncosted target claims and target hits after H; returns paired restricted times; and reports paired mean differences and a baseline/candidate restricted-mean ratio. If neither arm has a verified hit within H, the ratio is `None` rather than a misleading 1.0 “speedup”; both means remain H and both zero hit rates remain explicit. A candidate hit exactly at H counts as a within-horizon hit, while its restricted time contribution is still H.
+
+This is a **fixed-horizon operational score**, not a Kaplan–Meier survival estimate. It is computed per graph instance. Repeated seeds are not independent graphs; cross-instance / graph-family confidence intervals and bootstrap resampling belong in the pre-registered aggregation layer. Conditional successful-run speedups remain secondary.
+
 ## Candidate and verifier-receipt evidence boundary
 
 The stacked follow-up implementation in `mis_evidence.rs` now defines a narrow canonical format for graph bytes and candidate bytes and checks them independently:
