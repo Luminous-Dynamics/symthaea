@@ -25,16 +25,28 @@ The Rust module matched_evaluation.rs defines:
 - An explicit termination state and candidate-verification state for every trial, including failed, timed-out, aborted, unverified, conflicting, and verifier-failed candidates.
 - Target attainment derived only when the same declared independent verifier confirms a conflict-free independent set whose cardinality meets the target.
 - A fixed cost vector for queue wait, acquisition, preprocessing, feature extraction, transfer, amortized compilation/initialization, solve, repair, verification, and receipt persistence.
-- Two non-interchangeable timing conventions: deployment all-in latency includes queue delay and amortized compilation/initialization; standardized algorithm runtime excludes those two fields to match common benchmark submission rules. Both require every stage in the respective convention to be measured.
-- Unknown costs represented as unknown. If any all-in stage is unknown, deployment latency and all-in speedup are unavailable; if any algorithm-runtime stage is unknown, standardized runtime is unavailable. A missing stage is never a zero-cost stage.
+- Two non-interchangeable timing conventions measured with **direct monotonic-clock intervals**: deployment all-in latency starts at request/job entry (including queue wait) and ends when the verified result receipt is persisted; standardized algorithm runtime excludes queue and amortized compile/init and ends at the same verified-result boundary. These measurements are independent fields, not sums of stage durations.
+- Stage-level timings are diagnostic. Components can overlap or run concurrently, so summing them is not a valid end-to-end latency estimate. Missing stage diagnostics do not erase a separately observed wall-clock interval; a missing direct interval remains unknown and cannot be used for a latency ratio or counted as a within-horizon target hit.
 - Energy records with explicit NotMeasured, DeviceOnly, PartialSystem, or FullSystem boundaries. Energy comparisons are emitted only when both successful paired trials have comparable measured boundaries.
-- Per-pair details plus target-hit counts and rates (candidate, baseline, both, either-only, neither), candidate-minus-baseline hit-rate delta, all-in-costed and algorithm-runtime-costed pair counts, uncosted target hits, energy-scope mismatches, and separate medians for all-in latency, standardized runtime, and measured energy ratios.
+- Per-pair details plus target-hit counts and rates (candidate, baseline, both, either-only, neither), candidate-minus-baseline hit-rate delta, directly timed pair counts, target hits without a measured deployment interval, energy-scope mismatches, and separate medians for direct deployment latency, direct standardized runtime, and measured energy ratios.
 
-The ratio baseline/candidate is greater than 1 when the candidate uses less of the measured resource. Ratios are reported only for pairs where both methods attain the same verified target and the relevant cost vectors are complete. These are conditional diagnostics and can be survivor-biased when hard pairs are missed, so they are always accompanied by both arms' hit rates and paired hit-rate delta. Deployment latency and standardized algorithm runtime are reported separately; do not call either one the other. Missed targets remain in target-hit counts and do not receive an invented ratio.
+The ratio baseline/candidate is greater than 1 when the candidate uses less of the measured resource. Time ratios are reported only for pairs where both methods attain the same verified target and both corresponding wall-clock intervals are directly measured. These are conditional diagnostics and can be survivor-biased when hard pairs are missed, so they are always accompanied by both arms' hit rates and paired hit-rate delta. Deployment latency and standardized algorithm runtime are reported separately; do not call either one the other. Stage-cost sums are not a substitute for those clocks. Missed targets remain in hit-rate counts and do not receive an invented successful-run ratio.
 
 ## Standalone smoke runner
 
 The helper script scripts/research/run-photonic-contract-tests.sh compiles the four dependency-free Rust contracts directly with rustc --test rather than invoking Cargo. This provides a fast, narrow test path while the repository's wider workspace-discovery issue is being resolved. It does not replace full crate compilation, cargo fmt, clippy, repository CI, exact MIS integration, or application-level comparison.
+
+## Failure-inclusive restricted-mean time-to-target
+
+`compare_restricted_mean_tts(baseline, candidate, H)` is the primary fixed-horizon metric implementation. It reuses the strict matched-report and receipt validation, then emits one record for every paired attempt.
+
+For each arm/trial, the restricted contribution is:
+- **Verified target reached with all deployment cost stages measured and total time ≤ H:** the measured all-in time.
+- **Everything else:** exactly H, including misses, timeout/crash/abort, unverified candidates, verified hits with incomplete cost, and hits after H.
+
+The summary reports hit rates within H independently of restricted means; counts uncosted target claims and target hits after H; returns paired restricted times; and reports paired mean differences and a baseline/candidate restricted-mean ratio. If neither arm has a verified hit within H, the ratio is `None` rather than a misleading 1.0 “speedup”; both means remain H and both zero hit rates remain explicit. A candidate hit exactly at H counts as a within-horizon hit, while its restricted time contribution is still H.
+
+This is a **fixed-horizon operational score**, not a Kaplan–Meier survival estimate. It is computed per graph instance. Repeated seeds are not independent graphs; cross-instance / graph-family confidence intervals and bootstrap resampling belong in the pre-registered aggregation layer. Conditional successful-run speedups remain secondary.
 
 ## Candidate and verifier-receipt evidence boundary
 

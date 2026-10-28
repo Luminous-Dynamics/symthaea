@@ -76,16 +76,17 @@ impl EnergyRecord {
     }
 }
 
-/// Stage-by-stage wall-clock cost in milliseconds.
+/// Per-stage wall-time or work-duration diagnostics in milliseconds.
 ///
-/// Each field is Option-valued: None means unknown or not measured, while
-/// Some(0.0) means the stage was measured and consumed zero milliseconds at the
-/// chosen clock resolution. The all-in total is unavailable if any stage is
-/// unknown. Zero must never be used as a placeholder for missing data.
+/// These components may overlap, run concurrently, or be measured at different
+/// instrumentation boundaries. They must **not** be summed and presented as
+/// end-to-end latency. Direct monotonic-clock intervals live on
+/// `MatchedTrialRecord` as `deployment_elapsed_ms` and
+/// `standardized_algorithm_elapsed_ms`. Every field is Option-valued: None means
+/// unknown/not measured; Some(0.0) means measured at the chosen resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StageCostsMs {
     /// External queue wait before a solver or sampler becomes available.
-    /// Some(0.0) means measured or known not to apply; None means unknown.
     pub queue_wait_ms: Option<f64>,
     /// Trajectory acquisition / device execution.
     pub acquisition_ms: Option<f64>,
@@ -123,27 +124,25 @@ impl StageCostsMs {
         ]
     }
 
-    /// Returns true when every required cost stage is measured.
+    /// Returns true when every diagnostic stage component is measured.
     pub fn is_complete(&self) -> bool {
         self.values().iter().all(Option::is_some)
     }
 
-    /// Returns the all-in cost in milliseconds, or None if any stage is unknown.
-    ///
-    /// Call validate_trial / MatchedArmReport::validate before treating this as
-    /// audited evidence; a complete all-zero vector is invalid for an actual run.
-    pub fn all_in_total_ms(&self) -> Option<f64> {
+    /// Sum of diagnostic stage components, not an end-to-end latency measurement.
+    /// Returns None if any component is unknown or the sum is non-finite.
+    pub fn sum_all_stage_costs_ms(&self) -> Option<f64> {
         let values = self.values();
         if values.iter().any(Option::is_none) {
             return None;
         }
-        Some(values.into_iter().flatten().sum())
+        let total: f64 = values.into_iter().flatten().sum();
+        total.is_finite().then_some(total)
     }
 
-    /// Runtime used for normalized algorithm comparisons. Excludes queue wait and
-    /// amortized compilation/initialization, following common benchmark reporting
-    /// conventions. Returns None if any included algorithm stage is unknown.
-    pub fn algorithm_runtime_ms(&self) -> Option<f64> {
+    /// Sum of algorithm-stage diagnostic components, excluding queue and
+    /// amortized compile/init. This is not a wall-clock algorithm runtime.
+    pub fn sum_algorithm_stage_costs_ms(&self) -> Option<f64> {
         let values = [
             self.acquisition_ms,
             self.preprocessing_ms,
@@ -157,11 +156,12 @@ impl StageCostsMs {
         if values.iter().any(Option::is_none) {
             return None;
         }
-        Some(values.into_iter().flatten().sum())
+        let total: f64 = values.into_iter().flatten().sum();
+        total.is_finite().then_some(total)
     }
 
-    /// True when every stage used by algorithm_runtime_ms is measured.
-    pub fn is_algorithm_runtime_complete(&self) -> bool {
+    /// True when each component used in the algorithm-stage sum is measured.
+    pub fn has_complete_algorithm_stage_costs(&self) -> bool {
         [
             self.acquisition_ms,
             self.preprocessing_ms,
@@ -197,25 +197,6 @@ impl StageCostsMs {
                         value,
                     });
                 }
-            }
-        }
-
-        if self.is_complete() {
-            let total = self.all_in_total_ms().unwrap_or(f64::NAN);
-            if !total.is_finite() || total <= 0.0 {
-                return Err(MatchedEvaluationError::InvalidAllInCost {
-                    trial_id: trial_id.to_owned(),
-                    value: total,
-                });
-            }
-        }
-        if self.is_algorithm_runtime_complete() {
-            let runtime = self.algorithm_runtime_ms().unwrap_or(f64::NAN);
-            if !runtime.is_finite() || runtime <= 0.0 {
-                return Err(MatchedEvaluationError::InvalidAlgorithmRuntime {
-                    trial_id: trial_id.to_owned(),
-                    value: runtime,
-                });
             }
         }
         Ok(())
@@ -271,7 +252,14 @@ pub struct MatchedTrialRecord {
     pub verification: CandidateVerification,
     /// Number of graph-edge conflicts reported by the verifier, if available.
     pub conflict_count: Option<usize>,
-    /// Stage-by-stage time costs. Missing stages remain unknown.
+    /// Direct monotonic-clock elapsed time from request/job entry (including queue wait)
+    /// through persistence of the verified result. None means not observed.
+    pub deployment_elapsed_ms: Option<f64>,
+    /// Direct monotonic-clock elapsed time for the standardized algorithm interval,
+    /// excluding queue and compile/init and ending at the verified result boundary.
+    /// This is independently measured, not a sum of stage components.
+    pub standardized_algorithm_elapsed_ms: Option<f64>,
+    /// Per-stage cost diagnostics. Components may overlap and are never summed as latency.
     pub costs: StageCostsMs,
     /// Energy measurement and scope.
     pub energy: EnergyRecord,
@@ -442,6 +430,33 @@ impl MatchedTrialRecord {
             }
         }
 
+        for (field, value) in [
+            ("deployment_elapsed_ms", self.deployment_elapsed_ms),
+            ("standardized_algorithm_elapsed_ms", self.standardized_algorithm_elapsed_ms),
+        ] {
+            if let Some(value) = value {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(MatchedEvaluationError::InvalidObservedElapsed {
+                        trial_id: self.trial_id.clone(),
+                        field,
+                        value,
+                    });
+                }
+            }
+        }
+        if let (Some(deployment_ms), Some(algorithm_ms)) = (
+            self.deployment_elapsed_ms,
+            self.standardized_algorithm_elapsed_ms,
+        ) {
+            if algorithm_ms > deployment_ms {
+                return Err(MatchedEvaluationError::AlgorithmElapsedExceedsDeployment {
+                    trial_id: self.trial_id.clone(),
+                    algorithm_ms,
+                    deployment_ms,
+                });
+            }
+        }
+
         self.costs.validate(&self.trial_id)?;
         self.energy.validate()?;
         Ok(())
@@ -547,23 +562,22 @@ pub struct MatchedPairResult {
     pub baseline_target_hit: bool,
     /// Whether the candidate independently verified a target hit.
     pub candidate_target_hit: bool,
-    /// Baseline all-in deployment latency including queue and amortized compile.
-    /// Only available when all stages were measured.
+    /// Directly measured deployment elapsed time, including queue and amortized compile/init.
+    /// This is a monotonic-clock interval, not the sum of stage diagnostics.
     pub baseline_all_in_ms: Option<f64>,
-    /// Candidate all-in deployment latency including queue and amortized compile.
-    /// Only available when all stages were measured.
+    /// Directly measured deployment elapsed time for the candidate.
     pub candidate_all_in_ms: Option<f64>,
-    /// Baseline standardized algorithm runtime excluding queue and compile.
+    /// Directly measured standardized algorithm interval, excluding queue and compile/init.
     pub baseline_algorithm_runtime_ms: Option<f64>,
-    /// Candidate standardized algorithm runtime excluding queue and compile.
+    /// Directly measured standardized algorithm interval for the candidate.
     pub candidate_algorithm_runtime_ms: Option<f64>,
-    /// Baseline time divided by candidate time; only when both hit the target and
-    /// both complete all-in costs are available.
+    /// Baseline/candidate observed deployment elapsed ratio, only when both hit the target
+    /// and both directly measured deployment intervals are available.
     pub time_speedup_baseline_over_candidate: Option<f64>,
-    /// Time winner when both methods hit the target and have complete all-in costs.
+    /// Time winner when both methods hit the target and have both observed deployment intervals.
     pub time_winner: Option<TimeWinner>,
-    /// Baseline/candidate algorithm-runtime ratio, only for both-hit pairs where
-    /// all included algorithm stages are measured. This is distinct from all-in.
+    /// Baseline/candidate observed standardized algorithm interval ratio, only when both hit
+    /// and both algorithm intervals were directly measured.
     pub algorithm_runtime_speedup_baseline_over_candidate: Option<f64>,
     /// Baseline energy joules, if measured.
     pub baseline_energy_joules: Option<f64>,
@@ -601,26 +615,23 @@ pub struct MatchedComparisonSummary {
     pub baseline_only_target_hits: usize,
     /// Pairs where neither method reached the target.
     pub neither_target_hit: usize,
-    /// Both-hit pairs with complete all-in cost vectors for both methods.
-    pub both_hit_costed_pairs: usize,
-    /// Both-hit pairs with complete standardized algorithm-runtime vectors.
-    pub both_hit_algorithm_costed_pairs: usize,
-    /// Target-hit trials whose all-in cost cannot be computed because at least one
-    /// stage is unknown.
-    pub baseline_uncosted_target_hits: usize,
-    /// Target-hit trials whose all-in cost cannot be computed because at least one
-    /// stage is unknown.
-    pub candidate_uncosted_target_hits: usize,
+    /// Both-hit pairs with both direct deployment elapsed intervals observed.
+    pub both_hit_deployment_timed_pairs: usize,
+    /// Both-hit pairs with both direct standardized algorithm intervals observed.
+    pub both_hit_algorithm_timed_pairs: usize,
+    /// Verified target hits whose deployment elapsed interval is unknown.
+    pub baseline_untimed_target_hits: usize,
+    /// Verified target hits whose deployment elapsed interval is unknown.
+    pub candidate_untimed_target_hits: usize,
     /// Number of paired energy comparisons with matching measured boundaries.
     pub comparable_energy_pairs: usize,
     /// Both-hit pairs where measured energy boundaries differ.
     pub mismatched_energy_scope_pairs: usize,
-    /// Median paired baseline/candidate time ratio, restricted to both-hit costed
-    /// pairs. This is a conditional diagnostic, not the primary result; values > 1
-    /// favor the candidate on runtime. Target-hit rates and misses must be reported too.
+    /// Median paired baseline/candidate direct deployment-time ratio, restricted to both-hit
+    /// pairs with both wall-clock intervals observed. This is conditional and secondary.
     pub median_time_speedup_given_both_hit: Option<f64>,
-    /// Median paired baseline/candidate standardized algorithm-runtime ratio,
-    /// excluding compile/queue delay. Conditional on both-hit and measured stages.
+    /// Median paired baseline/candidate directly measured standardized algorithm interval ratio,
+    /// excluding compile/queue delay. Conditional on both-hit and both intervals observed.
     pub median_algorithm_runtime_speedup_given_both_hit: Option<f64>,
     /// Median paired baseline/candidate energy ratio, restricted to both-hit pairs
     /// with matching measured boundaries. This is conditional, not a system-wide
@@ -628,6 +639,73 @@ pub struct MatchedComparisonSummary {
     pub median_energy_speedup_given_both_hit: Option<f64>,
     /// Complete per-pair details so the summary is auditable.
     pub pairs: Vec<MatchedPairResult>,
+}
+
+/// Restricted time-to-target observation for one matched trial.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RestrictedTtsPairResult {
+    /// Pair ID present in both arms.
+    pub pair_id: String,
+    /// The baseline attained the verified target with a measured deployment interval at or before the horizon.
+    pub baseline_hit_within_horizon: bool,
+    /// The candidate attained the verified target with a measured deployment interval at or before the horizon.
+    pub candidate_hit_within_horizon: bool,
+    /// Baseline contribution: directly measured deployment elapsed on a within-horizon hit, otherwise the horizon.
+    pub baseline_restricted_time_ms: f64,
+    /// Candidate contribution: directly measured deployment elapsed on a within-horizon hit, otherwise the horizon.
+    pub candidate_restricted_time_ms: f64,
+}
+
+/// Failure-inclusive restricted-mean time-to-target comparison for one graph instance.
+///
+/// Every attempted pair contributes one value per arm. A target miss, unverified output,
+/// timeout/crash/abort, missing direct deployment timing, or hit after the horizon contributes exactly
+/// the frozen horizon. This is a fixed-horizon operational score, not a Kaplan-Meier
+/// estimate; aggregate it across graph instances/families with the preregistered method.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RestrictedMeanTtsSummary {
+    /// Baseline arm ID.
+    pub baseline_arm_id: String,
+    /// Candidate arm ID.
+    pub candidate_arm_id: String,
+    /// Frozen, positive all-in time horizon in milliseconds.
+    pub horizon_ms: f64,
+    /// Total matched trials, including every miss and failure.
+    pub pair_count: usize,
+    /// Baseline verified target hits with direct deployment timing <= horizon.
+    pub baseline_hits_within_horizon: usize,
+    /// Candidate verified target hits with direct deployment timing <= horizon.
+    pub candidate_hits_within_horizon: usize,
+    /// Baseline within-horizon hit rate over every paired attempt.
+    pub baseline_hit_rate_within_horizon: f64,
+    /// Candidate within-horizon hit rate over every paired attempt.
+    pub candidate_hit_rate_within_horizon: f64,
+    /// Verified baseline target hits with unknown direct deployment timing.
+    pub baseline_untimed_target_hits: usize,
+    /// Verified candidate target hits with unknown direct deployment timing.
+    pub candidate_untimed_target_hits: usize,
+    /// Verified baseline target hits with direct deployment elapsed after the horizon.
+    pub baseline_hits_after_horizon: usize,
+    /// Verified candidate target hits with direct deployment elapsed after the horizon.
+    pub candidate_hits_after_horizon: usize,
+    /// Mean baseline restricted time, with misses capped at the horizon.
+    pub baseline_restricted_mean_ms: f64,
+    /// Mean candidate restricted time, with misses capped at the horizon.
+    pub candidate_restricted_mean_ms: f64,
+    /// Candidate minus baseline restricted mean. Negative favors the candidate.
+    pub paired_mean_difference_candidate_minus_baseline_ms: f64,
+    /// Baseline/candidate restricted-mean ratio. None when neither arm hits within horizon;
+    /// this avoids suggesting speed parity when both methods only hit the horizon cap.
+    /// Values above 1 favor the candidate but must be read with the within-horizon hit rates.
+    pub baseline_over_candidate_restricted_mean_ratio: Option<f64>,
+    /// Number of pairs with lower candidate restricted time.
+    pub candidate_faster_pairs: usize,
+    /// Number of pairs with lower baseline restricted time.
+    pub baseline_faster_pairs: usize,
+    /// Number of pairs tied on restricted time (includes both-miss pairs).
+    pub tied_pairs: usize,
+    /// Per-pair restricted times and hit states for an auditable result.
+    pub pairs: Vec<RestrictedTtsPairResult>,
 }
 
 /// Validation, accounting, or comparison error.
@@ -665,12 +743,12 @@ pub enum MatchedEvaluationError {
     VerifierReceiptMismatch { trial_id: String, field: &'static str },
     /// A stage cost is negative or non-finite.
     InvalidStageCost { trial_id: String, stage: &'static str, value: f64 },
-    /// Complete all-in measured cost is non-finite or non-positive.
-    InvalidAllInCost { trial_id: String, value: f64 },
+    /// A direct monotonic-clock elapsed measurement is non-finite or non-positive.
+    InvalidObservedElapsed { trial_id: String, field: &'static str, value: f64 },
+    /// Standardized algorithm interval exceeds the encompassing deployment interval.
+    AlgorithmElapsedExceedsDeployment { trial_id: String, algorithm_ms: f64, deployment_ms: f64 },
     /// A derived speed ratio overflowed or was non-finite.
     InvalidRatio { quantity: &'static str },
-    /// Complete measured algorithm runtime is non-finite or non-positive.
-    InvalidAlgorithmRuntime { trial_id: String, value: f64 },
     /// Energy is present despite the scope being NotMeasured.
     EnergyValueWithNotMeasuredScope,
     /// A measured energy scope has no joule value.
@@ -695,6 +773,8 @@ pub enum MatchedEvaluationError {
     PairSeedMismatch(String),
     /// Time tie tolerance is negative or non-finite.
     InvalidTieTolerance,
+    /// Restricted time-to-target horizon must be finite and strictly positive.
+    InvalidRestrictedTtsHorizon,
 }
 
 impl fmt::Display for MatchedEvaluationError {
@@ -728,17 +808,17 @@ impl fmt::Display for MatchedEvaluationError {
             Self::InvalidStageCost { trial_id, stage, value } => {
                 write!(f, "trial {trial_id} has invalid {stage} value {value}")
             }
-            Self::InvalidAllInCost { trial_id, value } => write!(
+            Self::InvalidObservedElapsed { trial_id, field, value } => write!(
                 f,
-                "trial {trial_id} has invalid all-in cost {value}; it must be finite and positive"
+                "trial {trial_id} has invalid {field} elapsed value {value}; it must be finite and positive"
+            ),
+            Self::AlgorithmElapsedExceedsDeployment { trial_id, algorithm_ms, deployment_ms } => write!(
+                f,
+                "trial {trial_id} standardized algorithm interval {algorithm_ms} ms exceeds deployment interval {deployment_ms} ms"
             ),
             Self::InvalidRatio { quantity } => write!(
                 f,
                 "derived {quantity} ratio was not finite and positive"
-            ),
-            Self::InvalidAlgorithmRuntime { trial_id, value } => write!(
-                f,
-                "trial {trial_id} has invalid algorithm runtime {value}; it must be finite and positive"
             ),
             Self::EnergyValueWithNotMeasuredScope => {
                 write!(f, "energy value supplied with NotMeasured scope")
@@ -758,6 +838,9 @@ impl fmt::Display for MatchedEvaluationError {
             Self::PairSetMismatch => write!(f, "baseline and candidate pair-ID sets differ"),
             Self::PairSeedMismatch(id) => write!(f, "pair {id} uses different seed identities"),
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
+            Self::InvalidRestrictedTtsHorizon => {
+                write!(f, "restricted time-to-target horizon must be finite and positive")
+            }
         }
     }
 }
@@ -767,10 +850,10 @@ impl Error for MatchedEvaluationError {}
 /// Compare a baseline and candidate under a strict paired protocol.
 ///
 /// Every pair must be present in both arms with matching seeds. Target hits are
-/// derived only from independently verified feasible candidates. Speedup ratios
-/// are only computed when both methods hit the same target and have complete
-/// positive all-in costs. A failed target remains in the hit-rate counts and does
-/// not receive an invented runtime ratio.
+/// derived only from independently verified feasible candidates. Deployment and
+/// standardized algorithm ratios use directly observed positive monotonic-clock
+/// intervals, never sums of stage diagnostics. A failed target remains in the
+/// hit-rate counts and does not receive an invented runtime ratio.
 pub fn compare_matched_arms(
     baseline: &MatchedArmReport,
     candidate: &MatchedArmReport,
@@ -824,10 +907,10 @@ pub fn compare_matched_arms(
     let mut candidate_only_target_hits = 0;
     let mut baseline_only_target_hits = 0;
     let mut neither_target_hit = 0;
-    let mut both_hit_costed_pairs = 0;
-    let mut both_hit_algorithm_costed_pairs = 0;
-    let mut baseline_uncosted_target_hits = 0;
-    let mut candidate_uncosted_target_hits = 0;
+    let mut both_hit_deployment_timed_pairs = 0;
+    let mut both_hit_algorithm_timed_pairs = 0;
+    let mut baseline_untimed_target_hits = 0;
+    let mut candidate_untimed_target_hits = 0;
     let mut comparable_energy_pairs = 0;
     let mut mismatched_energy_scope_pairs = 0;
     let mut time_speedups = Vec::new();
@@ -864,22 +947,24 @@ pub fn compare_matched_arms(
             neither_target_hit += 1;
         }
 
-        let baseline_all_in_ms = baseline_trial.costs.all_in_total_ms();
-        let candidate_all_in_ms = candidate_trial.costs.all_in_total_ms();
-        let baseline_algorithm_runtime_ms = baseline_trial.costs.algorithm_runtime_ms();
-        let candidate_algorithm_runtime_ms = candidate_trial.costs.algorithm_runtime_ms();
+        // Overall latency is a directly observed monotonic-clock interval. Stage components
+        // are diagnostics and may overlap; never sum them to invent an end-to-end runtime.
+        let baseline_all_in_ms = baseline_trial.deployment_elapsed_ms;
+        let candidate_all_in_ms = candidate_trial.deployment_elapsed_ms;
+        let baseline_algorithm_runtime_ms = baseline_trial.standardized_algorithm_elapsed_ms;
+        let candidate_algorithm_runtime_ms = candidate_trial.standardized_algorithm_elapsed_ms;
 
         if baseline_hit && baseline_all_in_ms.is_none() {
-            baseline_uncosted_target_hits += 1;
+            baseline_untimed_target_hits += 1;
         }
         if candidate_hit && candidate_all_in_ms.is_none() {
-            candidate_uncosted_target_hits += 1;
+            candidate_untimed_target_hits += 1;
         }
 
         let (time_speedup, time_winner) = if baseline_hit && candidate_hit {
             match (baseline_all_in_ms, candidate_all_in_ms) {
                 (Some(base_ms), Some(candidate_ms)) => {
-                    both_hit_costed_pairs += 1;
+                    both_hit_deployment_timed_pairs += 1;
                     let ratio = base_ms / candidate_ms;
                     if !ratio.is_finite() || ratio <= 0.0 {
                         return Err(MatchedEvaluationError::InvalidRatio {
@@ -905,7 +990,7 @@ pub fn compare_matched_arms(
         let algorithm_runtime_speedup = if baseline_hit && candidate_hit {
             match (baseline_algorithm_runtime_ms, candidate_algorithm_runtime_ms) {
                 (Some(base_ms), Some(candidate_ms)) => {
-                    both_hit_algorithm_costed_pairs += 1;
+                    both_hit_algorithm_timed_pairs += 1;
                     let ratio = base_ms / candidate_ms;
                     if !ratio.is_finite() || ratio <= 0.0 {
                         return Err(MatchedEvaluationError::InvalidRatio {
@@ -980,10 +1065,10 @@ pub fn compare_matched_arms(
         candidate_only_target_hits,
         baseline_only_target_hits,
         neither_target_hit,
-        both_hit_costed_pairs,
-        both_hit_algorithm_costed_pairs,
-        baseline_uncosted_target_hits,
-        candidate_uncosted_target_hits,
+        both_hit_deployment_timed_pairs,
+        both_hit_algorithm_timed_pairs,
+        baseline_untimed_target_hits,
+        candidate_untimed_target_hits,
         comparable_energy_pairs,
         mismatched_energy_scope_pairs,
         median_time_speedup_given_both_hit: median(&mut time_speedups),
@@ -991,6 +1076,153 @@ pub fn compare_matched_arms(
         median_energy_speedup_given_both_hit: median(&mut energy_speedups),
         pairs,
     })
+}
+
+/// Compare matched arms using a failure-inclusive restricted mean time-to-target.
+///
+/// A pair is a within-horizon hit only if the existing report/receipt validation confirms
+/// the target and the complete deployment all-in latency is measured and <= `horizon_ms`.
+/// Every other outcome contributes `horizon_ms` for that arm. This preserves the full
+/// denominator and prevents conditional speedup from hiding target misses.
+pub fn compare_restricted_mean_tts(
+    baseline: &MatchedArmReport,
+    candidate: &MatchedArmReport,
+    horizon_ms: f64,
+) -> Result<RestrictedMeanTtsSummary, MatchedEvaluationError> {
+    if !horizon_ms.is_finite() || horizon_ms <= 0.0 {
+        return Err(MatchedEvaluationError::InvalidRestrictedTtsHorizon);
+    }
+
+    // Reuse the strict paired-report validation: exact instance/protocol/target/budget/
+    // verifier identity, a complete pair-ID set, matching seeds, and validated receipts.
+    let matched = compare_matched_arms(baseline, candidate, 0.0)?;
+    let pair_count = matched.pair_count;
+    if pair_count == 0 {
+        // compare_matched_arms already rejects empty trial sets; keep this invariant explicit.
+        return Err(MatchedEvaluationError::NoTrials(baseline.arm_id.clone()));
+    }
+
+    let mut pairs = Vec::with_capacity(pair_count);
+    let mut baseline_hits_within_horizon = 0usize;
+    let mut candidate_hits_within_horizon = 0usize;
+    let mut baseline_untimed_target_hits = 0usize;
+    let mut candidate_untimed_target_hits = 0usize;
+    let mut baseline_hits_after_horizon = 0usize;
+    let mut candidate_hits_after_horizon = 0usize;
+    let mut baseline_mean = 0.0f64;
+    let mut candidate_mean = 0.0f64;
+    let mut paired_difference_mean = 0.0f64;
+    let mut candidate_faster_pairs = 0usize;
+    let mut baseline_faster_pairs = 0usize;
+    let mut tied_pairs = 0usize;
+
+    for (index, pair) in matched.pairs.iter().enumerate() {
+        let (baseline_hit, baseline_time, baseline_uncosted, baseline_after) =
+            restricted_time_observation(
+                pair.baseline_target_hit,
+                pair.baseline_all_in_ms,
+                horizon_ms,
+            );
+        let (candidate_hit, candidate_time, candidate_uncosted, candidate_after) =
+            restricted_time_observation(
+                pair.candidate_target_hit,
+                pair.candidate_all_in_ms,
+                horizon_ms,
+            );
+
+        if baseline_hit {
+            baseline_hits_within_horizon += 1;
+        }
+        if candidate_hit {
+            candidate_hits_within_horizon += 1;
+        }
+        if baseline_uncosted {
+            baseline_untimed_target_hits += 1;
+        }
+        if candidate_uncosted {
+            candidate_untimed_target_hits += 1;
+        }
+        if baseline_after {
+            baseline_hits_after_horizon += 1;
+        }
+        if candidate_after {
+            candidate_hits_after_horizon += 1;
+        }
+
+        let n = (index + 1) as f64;
+        baseline_mean += (baseline_time - baseline_mean) / n;
+        candidate_mean += (candidate_time - candidate_mean) / n;
+        let difference = candidate_time - baseline_time;
+        paired_difference_mean += (difference - paired_difference_mean) / n;
+
+        if candidate_time < baseline_time {
+            candidate_faster_pairs += 1;
+        } else if baseline_time < candidate_time {
+            baseline_faster_pairs += 1;
+        } else {
+            tied_pairs += 1;
+        }
+
+        pairs.push(RestrictedTtsPairResult {
+            pair_id: pair.pair_id.clone(),
+            baseline_hit_within_horizon: baseline_hit,
+            candidate_hit_within_horizon: candidate_hit,
+            baseline_restricted_time_ms: baseline_time,
+            candidate_restricted_time_ms: candidate_time,
+        });
+    }
+
+    let any_within_horizon_hit =
+        baseline_hits_within_horizon > 0 || candidate_hits_within_horizon > 0;
+    let baseline_over_candidate_restricted_mean_ratio = if any_within_horizon_hit {
+        let ratio = baseline_mean / candidate_mean;
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return Err(MatchedEvaluationError::InvalidRatio {
+                quantity: "restricted-mean-time-to-target",
+            });
+        }
+        Some(ratio)
+    } else {
+        None
+    };
+
+    Ok(RestrictedMeanTtsSummary {
+        baseline_arm_id: matched.baseline_arm_id,
+        candidate_arm_id: matched.candidate_arm_id,
+        horizon_ms,
+        pair_count,
+        baseline_hits_within_horizon,
+        candidate_hits_within_horizon,
+        baseline_hit_rate_within_horizon: baseline_hits_within_horizon as f64 / pair_count as f64,
+        candidate_hit_rate_within_horizon: candidate_hits_within_horizon as f64 / pair_count as f64,
+        baseline_untimed_target_hits,
+        candidate_untimed_target_hits,
+        baseline_hits_after_horizon,
+        candidate_hits_after_horizon,
+        baseline_restricted_mean_ms: baseline_mean,
+        candidate_restricted_mean_ms: candidate_mean,
+        paired_mean_difference_candidate_minus_baseline_ms: paired_difference_mean,
+        baseline_over_candidate_restricted_mean_ratio,
+        candidate_faster_pairs,
+        baseline_faster_pairs,
+        tied_pairs,
+        pairs,
+    })
+}
+
+fn restricted_time_observation(
+    verified_target_hit: bool,
+    all_in_ms: Option<f64>,
+    horizon_ms: f64,
+) -> (bool, f64, bool, bool) {
+    if !verified_target_hit {
+        return (false, horizon_ms, false, false);
+    }
+    match all_in_ms {
+        None => (false, horizon_ms, true, false),
+        Some(time_ms) if time_ms <= horizon_ms => (true, time_ms, false, false),
+        Some(_) => (false, horizon_ms, false, true),
+    }
 }
 
 fn median(values: &mut [f64]) -> Option<f64> {
@@ -1073,6 +1305,20 @@ mod tests {
             MisEvidenceVerdict::VerifiedConflict =>
                 (CandidateVerification::VerifiedConflict, Some(evidence.conflict_count())),
         };
+        // Synthetic test fixture only: infer deterministic timing values from the
+        // same stage template. Production trial records must use direct clock readings.
+        let deployment_elapsed_ms = stage_costs
+            .sum_all_stage_costs_ms()
+            .filter(|value| *value > 0.0)
+            .or_else(|| stage_costs.solve_ms.map(|value| value / 0.35))
+            .filter(|value| *value > 0.0)
+            .unwrap_or(100.0);
+        let standardized_algorithm_elapsed_ms = stage_costs
+            .sum_algorithm_stage_costs_ms()
+            .filter(|value| *value > 0.0)
+            .or_else(|| stage_costs.solve_ms.map(|value| (value / 0.35) * 0.85))
+            .filter(|value| *value > 0.0)
+            .unwrap_or(deployment_elapsed_ms * 0.8);
         MatchedTrialRecord {
             trial_id: id.to_owned(),
             pair_id: pair.to_owned(),
@@ -1083,6 +1329,8 @@ mod tests {
             verifier_receipt: Some(evidence),
             verification,
             conflict_count: conflicts,
+            deployment_elapsed_ms: Some(deployment_elapsed_ms),
+            standardized_algorithm_elapsed_ms: Some(standardized_algorithm_elapsed_ms.min(deployment_elapsed_ms)),
             costs: stage_costs,
             energy,
         }
@@ -1097,6 +1345,24 @@ mod tests {
         energy: EnergyRecord,
     ) -> MatchedTrialRecord {
         verified_trial_for(id, pair, seed, size, 5, TEST_GRAPH, TEST_VERIFIER, stage_costs, energy)
+    }
+
+    fn timeout_trial(id: &str, pair: &str, seed: u64) -> MatchedTrialRecord {
+        MatchedTrialRecord {
+            trial_id: id.to_owned(),
+            pair_id: pair.to_owned(),
+            seed,
+            termination: TrialTermination::TimedOut,
+            candidate_size: None,
+            candidate_sha256: None,
+            verifier_receipt: None,
+            verification: CandidateVerification::NotReturned,
+            conflict_count: None,
+            deployment_elapsed_ms: None,
+            standardized_algorithm_elapsed_ms: None,
+            costs: StageCostsMs::default(),
+            energy: EnergyRecord::not_measured(),
+        }
     }
 
     fn report(arm_id: &str, method_id: &str, trials: Vec<MatchedTrialRecord>) -> MatchedArmReport {
@@ -1144,6 +1410,8 @@ mod tests {
                     verifier_receipt: None,
                     verification: CandidateVerification::NotReturned,
                     conflict_count: None,
+                    deployment_elapsed_ms: None,
+                    standardized_algorithm_elapsed_ms: None,
                     costs: costs(1_000.0),
                     energy: EnergyRecord::not_measured(),
                 },
@@ -1169,8 +1437,8 @@ mod tests {
         assert_eq!(result.candidate_only_target_hits, 1);
         assert_eq!(result.baseline_only_target_hits, 0);
         assert_eq!(result.neither_target_hit, 0);
-        assert_eq!(result.both_hit_costed_pairs, 1);
-        assert_eq!(result.both_hit_algorithm_costed_pairs, 1);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 1);
+        assert_eq!(result.both_hit_algorithm_timed_pairs, 1);
         assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_energy_speedup_given_both_hit, Some(2.0));
@@ -1178,11 +1446,11 @@ mod tests {
     }
 
     #[test]
-    fn missing_stage_cost_is_unknown_not_a_free_speedup() {
+    fn missing_stage_diagnostic_does_not_erase_observed_wall_clock() {
         let baseline_costs = costs(100.0);
         let mut candidate_costs = costs(50.0);
         candidate_costs.acquisition_ms = None;
-        assert_eq!(candidate_costs.all_in_total_ms(), None);
+        assert_eq!(candidate_costs.sum_all_stage_costs_ms(), None);
 
         let baseline = report(
             "baseline",
@@ -1197,14 +1465,35 @@ mod tests {
 
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.both_target_hits, 1);
-        assert_eq!(result.both_hit_costed_pairs, 0);
-        assert_eq!(result.candidate_uncosted_target_hits, 1);
-        assert_eq!(result.median_time_speedup_given_both_hit, None);
-        assert_eq!(result.pairs[0].candidate_all_in_ms, None);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 1);
+        assert_eq!(result.candidate_untimed_target_hits, 0);
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
+        assert_eq!(result.pairs[0].candidate_all_in_ms, Some(50.0));
     }
 
     #[test]
-    fn unknown_queue_delay_suppresses_deployment_latency_but_not_standardized_runtime() {
+    fn latency_ratio_uses_direct_clock_not_sum_of_overlapping_stage_diagnostics() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "pair", 1, 5, costs(100.0), EnergyRecord::not_measured())],
+        );
+        let mut candidate_trial =
+            verified_trial("c", "pair", 1, 5, costs(50.0), EnergyRecord::not_measured());
+        // Simulate overlapping stage timers whose sum exceeds elapsed wall-clock time.
+        candidate_trial.costs = costs(500.0);
+        assert_eq!(candidate_trial.costs.sum_all_stage_costs_ms(), Some(500.0));
+        assert_eq!(candidate_trial.deployment_elapsed_ms, Some(50.0));
+        let candidate = report("candidate", "trajectory", vec![candidate_trial]);
+
+        let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
+        assert_eq!(result.pairs[0].baseline_all_in_ms, Some(100.0));
+        assert_eq!(result.pairs[0].candidate_all_in_ms, Some(50.0));
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
+    }
+
+    #[test]
+    fn unknown_queue_stage_does_not_suppress_directly_observed_latency() {
         let baseline = report(
             "baseline",
             "classical",
@@ -1212,6 +1501,7 @@ mod tests {
         );
         let mut candidate_costs = costs(50.0);
         candidate_costs.queue_wait_ms = None;
+        assert_eq!(candidate_costs.sum_all_stage_costs_ms(), None);
         let candidate = report(
             "candidate",
             "trajectory",
@@ -1220,12 +1510,12 @@ mod tests {
 
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.both_target_hits, 1);
-        assert_eq!(result.both_hit_costed_pairs, 0);
-        assert_eq!(result.both_hit_algorithm_costed_pairs, 1);
-        assert_eq!(result.median_time_speedup_given_both_hit, None);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 1);
+        assert_eq!(result.both_hit_algorithm_timed_pairs, 1);
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
-        assert_eq!(result.pairs[0].candidate_all_in_ms, None);
-        assert!(result.pairs[0].candidate_algorithm_runtime_ms.is_some());
+        assert_eq!(result.pairs[0].candidate_all_in_ms, Some(50.0));
+        assert_eq!(result.pairs[0].candidate_algorithm_runtime_ms, Some(42.5));
     }
 
     #[test]
@@ -1248,6 +1538,8 @@ mod tests {
                 verifier_receipt: None,
                 verification: CandidateVerification::Unverified,
                 conflict_count: None,
+                deployment_elapsed_ms: Some(1.0),
+                standardized_algorithm_elapsed_ms: Some(0.85),
                 costs: costs(1.0),
                 energy: EnergyRecord::not_measured(),
             }],
@@ -1281,6 +1573,8 @@ mod tests {
                 verifier_receipt: None,
                 verification: CandidateVerification::VerificationFailed,
                 conflict_count: None,
+                deployment_elapsed_ms: Some(50.0),
+                standardized_algorithm_elapsed_ms: Some(42.5),
                 costs: costs(50.0),
                 energy: EnergyRecord::not_measured(),
             }],
@@ -1369,7 +1663,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_inconsistent_verified_candidate_and_zero_cost_records() {
+    fn rejects_inconsistent_verified_candidate_but_allows_zero_resolution_stage_diagnostics() {
         let mut trial = verified_trial("b", "pair", 1, 5, costs(1.0), EnergyRecord::not_measured());
         trial.conflict_count = Some(1);
         let bad = report("baseline", "classical", vec![trial]);
@@ -1395,10 +1689,9 @@ mod tests {
             "classical",
             vec![verified_trial("b", "pair", 1, 5, zero, EnergyRecord::not_measured())],
         );
-        assert!(matches!(
-            bad_zero.validate(),
-            Err(MatchedEvaluationError::InvalidAllInCost { .. })
-        ));
+        assert!(bad_zero.validate().is_ok());
+        assert_eq!(bad_zero.trials[0].costs.sum_all_stage_costs_ms(), Some(0.0));
+        assert_eq!(bad_zero.trials[0].deployment_elapsed_ms, Some(100.0));
     }
 
 
@@ -1468,4 +1761,184 @@ mod tests {
             Err(MatchedEvaluationError::InvalidTieTolerance)
         ));
     }
+    #[test]
+    fn restricted_mean_tts_keeps_misses_and_post_horizon_hits_at_horizon() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![
+                verified_trial("b1", "p1", 1, 5, costs(50.0), EnergyRecord::not_measured()),
+                verified_trial("b2", "p2", 2, 5, costs(100.0), EnergyRecord::not_measured()),
+                verified_trial("b3", "p3", 3, 5, costs(200.0), EnergyRecord::not_measured()),
+                timeout_trial("b4", "p4", 4),
+            ],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![
+                verified_trial("c1", "p1", 1, 5, costs(40.0), EnergyRecord::not_measured()),
+                verified_trial("c2", "p2", 2, 5, costs(60.0), EnergyRecord::not_measured()),
+                MatchedTrialRecord {
+                    trial_id: "c3".into(),
+                    pair_id: "p3".into(),
+                    seed: 3,
+                    termination: TrialTermination::Completed,
+                    candidate_size: Some(99),
+                    candidate_sha256: Some("9".repeat(64)),
+                    verifier_receipt: None,
+                    verification: CandidateVerification::Unverified,
+                    conflict_count: None,
+                    deployment_elapsed_ms: Some(1.0),
+                    standardized_algorithm_elapsed_ms: Some(0.85),
+                    costs: costs(1.0),
+                    energy: EnergyRecord::not_measured(),
+                },
+                timeout_trial("c4", "p4", 4),
+            ],
+        );
+
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.pair_count, 4);
+        assert_eq!(result.baseline_hits_within_horizon, 2);
+        assert_eq!(result.candidate_hits_within_horizon, 2);
+        assert_eq!(result.baseline_hits_after_horizon, 1);
+        assert_eq!(result.candidate_hits_after_horizon, 0);
+        assert_eq!(result.baseline_untimed_target_hits, 0);
+        assert_eq!(result.candidate_untimed_target_hits, 0);
+        assert!((result.baseline_restricted_mean_ms - 87.5).abs() < 1e-9);
+        assert!((result.candidate_restricted_mean_ms - 75.0).abs() < 1e-9);
+        assert!((result.paired_mean_difference_candidate_minus_baseline_ms + 12.5).abs() < 1e-9);
+        assert_eq!(result.candidate_faster_pairs, 2);
+        assert_eq!(result.baseline_faster_pairs, 0);
+        assert_eq!(result.tied_pairs, 2);
+        assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - (87.5 / 75.0)).abs() < 1e-9);
+        assert_eq!(result.pairs[2].baseline_restricted_time_ms, 100.0);
+        assert_eq!(result.pairs[2].candidate_restricted_time_ms, 100.0);
+    }
+
+    #[test]
+    fn restricted_mean_tts_uses_direct_clock_even_when_stage_diagnostics_are_incomplete() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let mut missing_queue = costs(25.0);
+        missing_queue.queue_wait_ms = None;
+        assert_eq!(missing_queue.sum_all_stage_costs_ms(), None);
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("c", "p", 1, 5, missing_queue, EnergyRecord::not_measured())],
+        );
+
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.baseline_hits_within_horizon, 1);
+        assert_eq!(result.candidate_hits_within_horizon, 1);
+        assert_eq!(result.candidate_untimed_target_hits, 0);
+        assert_eq!(result.pairs[0].candidate_restricted_time_ms, 25.0);
+        assert_eq!(result.candidate_restricted_mean_ms, 25.0);
+        assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn restricted_mean_tts_requires_direct_deployment_clock_even_if_stage_sum_exists() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let candidate_trial = verified_trial("c", "p", 1, 5, costs(25.0), EnergyRecord::not_measured());
+        assert_eq!(candidate_trial.costs.sum_all_stage_costs_ms(), Some(25.0));
+        let mut candidate = report("candidate", "trajectory", vec![candidate_trial]);
+        candidate.trials[0].deployment_elapsed_ms = None;
+
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.baseline_hits_within_horizon, 1);
+        assert_eq!(result.candidate_hits_within_horizon, 0);
+        assert_eq!(result.candidate_untimed_target_hits, 1);
+        assert_eq!(result.pairs[0].candidate_restricted_time_ms, 100.0);
+        assert_eq!(result.candidate_restricted_mean_ms, 100.0);
+        assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn restricted_mean_tts_all_miss_comparison_has_no_misleading_time_ratio() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![timeout_trial("b", "p", 1)],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![timeout_trial("c", "p", 1)],
+        );
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.baseline_restricted_mean_ms, 100.0);
+        assert_eq!(result.candidate_restricted_mean_ms, 100.0);
+        assert_eq!(result.baseline_hit_rate_within_horizon, 0.0);
+        assert_eq!(result.candidate_hit_rate_within_horizon, 0.0);
+        assert_eq!(result.baseline_over_candidate_restricted_mean_ratio, None);
+        assert_eq!(result.tied_pairs, 1);
+    }
+
+    #[test]
+    fn restricted_mean_tts_rejects_nonpositive_or_nonfinite_horizons() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("c", "p", 1, 5, costs(40.0), EnergyRecord::not_measured())],
+        );
+        for horizon in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(matches!(
+                compare_restricted_mean_tts(&baseline, &candidate, horizon),
+                Err(MatchedEvaluationError::InvalidRestrictedTtsHorizon)
+            ));
+        }
+    }
+
+    #[test]
+    fn validates_direct_elapsed_measurements_and_nested_interval_order() {
+        let good = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+
+        let mut zero_deployment = good.clone();
+        zero_deployment.trials[0].deployment_elapsed_ms = Some(0.0);
+        assert!(matches!(
+            zero_deployment.validate(),
+            Err(MatchedEvaluationError::InvalidObservedElapsed {
+                field: "deployment_elapsed_ms",
+                ..
+            })
+        ));
+
+        let mut nonfinite_algorithm = good.clone();
+        nonfinite_algorithm.trials[0].standardized_algorithm_elapsed_ms = Some(f64::NAN);
+        assert!(matches!(
+            nonfinite_algorithm.validate(),
+            Err(MatchedEvaluationError::InvalidObservedElapsed {
+                field: "standardized_algorithm_elapsed_ms",
+                ..
+            })
+        ));
+
+        let mut inverted_intervals = good;
+        inverted_intervals.trials[0].deployment_elapsed_ms = Some(40.0);
+        inverted_intervals.trials[0].standardized_algorithm_elapsed_ms = Some(45.0);
+        assert!(matches!(
+            inverted_intervals.validate(),
+            Err(MatchedEvaluationError::AlgorithmElapsedExceedsDeployment { .. })
+        ));
+    }
+
 }
