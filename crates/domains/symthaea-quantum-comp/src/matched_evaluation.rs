@@ -1622,6 +1622,24 @@ mod tests {
 
 
     #[test]
+    fn unscoped_generic_verification_cannot_count_as_an_experiment_target_hit() {
+        let mut trial =
+            verified_trial("trial", "pair", 7, 5, costs(50.0), EnergyRecord::not_measured());
+        let candidate_bytes = candidate_bytes(5);
+        let unscoped = verify_mis_candidate(TEST_GRAPH, &candidate_bytes, 5, TEST_VERIFIER).unwrap();
+        assert!(unscoped.context().is_none());
+        trial.verifier_receipt = Some(unscoped);
+        let report = report("baseline", "classical", vec![trial]);
+        assert!(matches!(
+            report.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch {
+                field: "trial_context",
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn rejects_receipt_swapped_between_trial_ids_even_when_candidate_bytes_match() {
         let first = verified_trial("trial-a", "pair-a", 7, 5, costs(50.0), EnergyRecord::not_measured());
         let second = verified_trial("trial-b", "pair-b", 7, 5, costs(50.0), EnergyRecord::not_measured());
