@@ -220,6 +220,8 @@ def validate_claim(
 
     verdict = claim.get("verdict")
     scope = claim.get("claim_scope")
+    if "supports" in witness_results and "contradicts" in witness_results:
+        issues.append({"code": "witnesses_conflict", "message": "supporting and contradicting witnesses conflict; claim needs adjudication"})
     if verdict == "supported" and "supports" not in witness_results:
         issues.append({"code": "supported_verdict_lacks_supporting_witness", "message": "no witness supports the claim"})
     if verdict == "contradicted" and "contradicts" not in witness_results:
