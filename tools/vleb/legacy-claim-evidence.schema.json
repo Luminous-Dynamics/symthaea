@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vleb-legacy-claim-evidence.schema.json",
+  "title": "VLEB atomic legacy engineering claim evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "claim_id",
+    "claim_type",
+    "claim_text",
+    "claim_scope",
+    "source",
+    "verdict",
+    "witnesses",
+    "unresolved_reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vleb-legacy-claim-v1"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "claim_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{1,127}$"
+    },
+    "claim_type": {
+      "enum": [
+        "identifier_exists",
+        "copybook_reference",
+        "picture_clause",
+        "usage_clause",
+        "record_layout",
+        "control_flow",
+        "numeric_behavior",
+        "transaction_effect",
+        "business_rule",
+        "security_property",
+        "other"
+      ]
+    },
+    "claim_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "claim_scope": {
+      "enum": [
+        "textual_anchor",
+        "static_structure",
+        "runtime_behavior"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "spans"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "spans": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceSpan"
+          }
+        }
+      }
+    },
+    "verdict": {
+      "enum": [
+        "supported",
+        "contradicted",
+        "unresolved"
+      ]
+    },
+    "witnesses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/witness"
+      }
+    },
+    "unresolved_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "sourceSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line_start",
+        "line_end",
+        "column_start",
+        "column_end",
+        "excerpt_sha256"
+      ],
+      "properties": {
+        "line_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column_start": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 72
+        },
+        "column_end": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 72
+        },
+        "excerpt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_id",
+        "kind",
+        "artifact_path",
+        "artifact_sha256",
+        "verifier_id",
+        "verifier_sha256",
+        "observed_result"
+      ],
+      "properties": {
+        "witness_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "source_index",
+            "static_analysis",
+            "compiler",
+            "independent_execution",
+            "independent_expert_review"
+          ]
+        },
+        "artifact_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observed_result": {
+          "enum": [
+            "supports",
+            "contradicts",
+            "inconclusive"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "supported"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "witnesses": {
+            "minItems": 1
+          },
+          "unresolved_reason": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "witnesses"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "contradicted"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "witnesses": {
+            "minItems": 1
+          },
+          "unresolved_reason": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "witnesses"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "unresolved"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "unresolved_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_scope": {
+            "const": "textual_anchor"
+          }
+        },
+        "required": [
+          "claim_scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_type": {
+            "enum": [
+              "identifier_exists",
+              "copybook_reference",
+              "picture_clause",
+              "usage_clause",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "supported"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "witnesses": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "observed_result": {
+                  "const": "supports"
+                }
+              },
+              "required": [
+                "observed_result"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "contradicted"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "witnesses": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "observed_result": {
+                  "const": "contradicts"
+                }
+              },
+              "required": [
+                "observed_result"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

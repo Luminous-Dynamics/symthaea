@@ -1,0 +1,27 @@
+{
+  "schema_version": "vleb-ledger-output-v1",
+  "currency_semantics": "integer_minor_units_unspecified_currency",
+  "accounts": [
+    {
+      "account_id": "AC-100",
+      "credits_minor": 1050,
+      "debits_minor": 250,
+      "net_minor": 800,
+      "unique_transactions": 2
+    },
+    {
+      "account_id": "AC-200",
+      "credits_minor": 999,
+      "debits_minor": 100,
+      "net_minor": 899,
+      "unique_transactions": 2
+    }
+  ],
+  "totals": {
+    "credits_minor": 2049,
+    "debits_minor": 350,
+    "net_minor": 1699,
+    "unique_transactions": 4,
+    "exact_duplicate_rows_ignored": 1
+  }
+}

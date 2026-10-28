@@ -1,0 +1,89 @@
+name: VLEB ledger reference
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/vleb/**"
+      - ".github/workflows/vleb-ledger-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vleb-ledger-reference-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: Check Rust formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/vleb/ledger-reconcile/Cargo.toml -- --check
+      - name: Check COBOL indexer formatting
+        run: cargo fmt --manifest-path tools/vleb/cobol-index/Cargo.toml -- --check
+
+  test:
+    name: Test VLEB ledger contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit locked fixture hashes and mutation inventory
+        run: bash tools/vleb/check-fixture-integrity.sh
+      - name: Install pinned JSON Schema validator
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate task-contract admission controls
+        run: python tools/vleb/test_task_contract_schema.py
+      - name: Validate language capability claim boundaries
+        run: python tools/vleb/test_language_capability_matrix.py
+      - name: Validate atomic legacy claim evidence contracts
+        run: python tools/vleb/test_legacy_claim_evidence.py
+      - name: Audit legacy claim source spans and witness pins
+        run: python tools/vleb/test_audit_legacy_claim.py
+      - name: Validate fail-closed evidence receipt schema
+        run: python tools/vleb/test_receipt_schema.py
+      - name: Test independent receipt auditor and adversarial controls
+        run: python tools/vleb/test_receipt_auditor.py
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+      - name: Test reference implementation and CLI contract
+        run: cargo test --locked --manifest-path tools/vleb/ledger-reconcile/Cargo.toml
+      - name: Test COBOL read-only source indexer
+        run: cargo test --locked --manifest-path tools/vleb/cobol-index/Cargo.toml
+      - name: Run strict Clippy on COBOL source indexer
+        run: cargo clippy --locked --manifest-path tools/vleb/cobol-index/Cargo.toml --all-targets -- -D warnings
+      - name: Validate COBOL index JSON schema and fixture anchors
+        run: python tools/vleb/test_cobol_index_output.py
+      - name: Validate read-only COBOL capability boundaries
+        run: python tools/vleb/test_language_capability_matrix.py
+      - name: Run strict Clippy across all targets
+        run: cargo clippy --locked --manifest-path tools/vleb/ledger-reconcile/Cargo.toml --all-targets -- -D warnings
+      - name: Test semantic mutation generator stability
+        run: python tools/vleb/test_mutation_campaign.py
+      - name: Validate evidence-qualified benchmark scorecard
+        run: python tools/vleb/test_scorecard.py
+      - name: Validate trusted run manifest schema and controls
+        run: python tools/vleb/test_run_manifest.py
+      - name: Test run manifest integrity and provenance checker
+        run: python tools/vleb/test_verify_run_manifest.py
+      - name: Execute preregistered semantic mutation probes
+        run: python tools/vleb/run_mutation_campaign.py --output-dir "$RUNNER_TEMP/vleb-mutation-evidence" --expected-head-sha "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Upload semantic mutation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vleb-mutation-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/vleb-mutation-evidence/
+          if-no-files-found: warn
+          retention-days: 14

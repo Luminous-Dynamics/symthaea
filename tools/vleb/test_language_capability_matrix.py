@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Guard capability claims against evidence inflation in the language matrix."""
+from __future__ import annotations
+
+import json
+import unittest
+from pathlib import Path
+from typing import Any
+
+MATRIX_PATH = Path(__file__).with_name("language-capability-matrix.json")
+STAGES = {
+    "dispatch_recognition": {"supported", "unsupported", "not_audited"},
+    "parser": {"supported", "unsupported", "not_audited"},
+    "generation": {"supported", "unsupported", "not_audited"},
+    "compile_or_runtime": {
+        "backend_declared", "evaluator_backend_declared",
+        "unsupported_in_central_dispatch", "not_audited",
+    },
+    "test_execution": {"supported", "partially_evidenced", "not_run", "not_audited"},
+    "independent_semantic_verification": {"supported", "not_run", "not_audited"},
+    "held_out_benchmark": {"measured", "not_run"},
+}
+
+
+def validate_matrix(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if data.get("schema_version") != "vleb-language-capability-matrix-v1":
+        errors.append("schema_version")
+    source = data.get("source_snapshot", {})
+    if source.get("commit_sha") != "ffac9a0ea3172f0622d9b1a0ab031284722fc70f":
+        errors.append("source_revision_drift")
+    if not source.get("source_file") or not source.get("source_sha256_git_blob"):
+        errors.append("source_evidence_missing")
+
+    rows = data.get("languages", [])
+    names = [row.get("language") for row in rows]
+    if not names or len(names) != len(set(names)):
+        errors.append("language_names_missing_or_duplicate")
+
+    for row in rows:
+        name = row.get("language", "<unnamed>")
+        for stage, accepted in STAGES.items():
+            value = row.get(stage)
+            if value not in accepted:
+                errors.append(f"invalid_stage:{name}:{stage}")
+        if row.get("held_out_benchmark") == "measured":
+            errors.append(f"unsubstantiated_benchmark_claim:{name}")
+        if row.get("dispatch_recognition") == "supported" and not row.get("evidence"):
+            errors.append(f"supported_dispatch_without_evidence:{name}")
+        if row.get("generation") == "supported" and not row.get("evidence"):
+            errors.append(f"supported_generation_without_evidence:{name}")
+
+    lookup = {row["language"]: row for row in rows}
+    for name in ("COBOL", "Assembly / HLASM"):
+        row = lookup.get(name)
+        if row is None:
+            errors.append(f"required_legacy_language_missing:{name}")
+            continue
+        if row.get("dispatch_recognition") != "unsupported":
+            errors.append(f"legacy_dispatch_must_fail_closed:{name}")
+        if row.get("compile_or_runtime") != "unsupported_in_central_dispatch":
+            errors.append(f"legacy_backend_claim_mismatch:{name}")
+        if row.get("generation") != "not_audited":
+            errors.append(f"legacy_generation_overclaim:{name}")
+        if row.get("held_out_benchmark") != "not_run":
+            errors.append(f"legacy_benchmark_overclaim:{name}")
+
+    for name in ("Rust", "Python", "Nix"):
+        row = lookup.get(name)
+        if row is None:
+            errors.append(f"known_dispatch_language_missing:{name}")
+            continue
+        if row.get("dispatch_recognition") != "supported":
+            errors.append(f"known_dispatch_language_mismatch:{name}")
+        if row.get("held_out_benchmark") != "not_run":
+            errors.append(f"known_language_benchmark_overclaim:{name}")
+
+    supplemental = data.get("supplemental_capabilities", [])
+    cobol_indexers = [
+        row for row in supplemental
+        if row.get("component") == "VLEB fixed-format COBOL read-only source indexer"
+    ]
+    if len(cobol_indexers) != 1:
+        errors.append("cobol_indexer_component_missing_or_duplicate")
+    else:
+        component = cobol_indexers[0]
+        if component.get("status") not in ("authored_ci_pending", "validated_in_ci"):
+            errors.append("cobol_indexer_status_invalid")
+        if component.get("score_eligible") is not False:
+            errors.append("cobol_indexer_scored_without_benchmark")
+        if "does not enable COBOL in central execution dispatch" not in component.get("limitations", []):
+            errors.append("cobol_indexer_scope_boundary_missing")
+
+    if data.get("reporting_rule") != "Never collapse recognition, parsing, generation, execution, test execution, independent verification and held-out performance into a single 'language supported' boolean.":
+        errors.append("capability_stage_separation_missing")
+    return errors
+
+
+class LanguageCapabilityMatrixTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.matrix = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
+
+    def test_matrix_claim_boundaries_are_valid(self) -> None:
+        self.assertEqual(validate_matrix(self.matrix), [])
+
+    def test_cobol_and_hlasm_are_not_misreported_as_executable(self) -> None:
+        rows = {r["language"]: r for r in self.matrix["languages"]}
+        for name in ("COBOL", "Assembly / HLASM"):
+            self.assertEqual(rows[name]["dispatch_recognition"], "unsupported")
+            self.assertEqual(rows[name]["generation"], "not_audited")
+            self.assertEqual(rows[name]["held_out_benchmark"], "not_run")
+
+    def test_generation_capability_is_distinct_from_benchmark_performance(self) -> None:
+        data = json.loads(json.dumps(self.matrix))
+        row = next(r for r in data["languages"] if r["language"] == "Rust")
+        row["generation"] = "supported"
+        row["evidence"] = []
+        errors = validate_matrix(data)
+        self.assertNotIn("generation_claim_requires_explicit_review:Rust", errors)
+        self.assertIn("supported_generation_without_evidence:Rust", errors)
+        self.assertIn("supported_dispatch_without_evidence:Rust", errors)
+
+    def test_dispatch_support_does_not_imply_parser_or_generation(self) -> None:
+        rows = {r["language"]: r for r in self.matrix["languages"]}
+        for name in ("Rust", "Python", "Nix"):
+            self.assertEqual(rows[name]["dispatch_recognition"], "supported")
+            self.assertEqual(rows[name]["parser"], "not_audited")
+            self.assertEqual(rows[name]["generation"], "not_audited")
+
+    def test_no_language_has_a_held_out_score_without_a_run(self) -> None:
+        self.assertTrue(all(r["held_out_benchmark"] == "not_run" for r in self.matrix["languages"]))
+
+    def test_tampered_supported_claim_requires_source_evidence(self) -> None:
+        data = json.loads(json.dumps(self.matrix))
+        data["languages"][0]["evidence"] = []
+        self.assertIn("supported_dispatch_without_evidence:Rust", validate_matrix(data))
+
+    def test_matrix_rejects_an_invented_cobol_backend(self) -> None:
+        data = json.loads(json.dumps(self.matrix))
+        row = next(r for r in data["languages"] if r["language"] == "COBOL")
+        row["dispatch_recognition"] = "supported"
+        self.assertIn("legacy_dispatch_must_fail_closed:COBOL", validate_matrix(data))
+
+    def test_source_indexer_does_not_upgrade_execution_or_score_claims(self) -> None:
+        component = self.matrix["supplemental_capabilities"][0]
+        self.assertFalse(component["score_eligible"])
+        self.assertIn("does not compile or execute COBOL", component["limitations"])
+        rows = {r["language"]: r for r in self.matrix["languages"]}
+        self.assertEqual(rows["COBOL"]["dispatch_recognition"], "unsupported")
+        self.assertEqual(rows["COBOL"]["held_out_benchmark"], "not_run")
+
+    def test_indexer_cannot_be_marked_validated_without_ci_state_change(self) -> None:
+        data = json.loads(json.dumps(self.matrix))
+        data["supplemental_capabilities"][0]["status"] = "passed_sota"
+        self.assertIn("cobol_indexer_status_invalid", validate_matrix(data))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
