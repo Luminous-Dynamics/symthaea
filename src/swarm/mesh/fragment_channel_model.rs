@@ -11,8 +11,11 @@
 //! Retry strategies assume perfect aggregated feedback and one retry per
 //! initially lost data fragment. ACK loss, timing, contention, PHY airtime,
 //! hardware energy, and multi-hop effects are intentionally not modelled.
+//! The SX127x PHY airtime equation is an analytical estimate, not measured
+//! latency or energy. ACKs, contention, startup, receive windows, regulatory
+//! scheduling and multihop remain excluded.
 //! The retry results are optimistic upper bounds, not claims about runtime
-//! behavior. Real airtime/energy need a frozen PHY profile and device data.
+//! behavior.
 
 use super::{fragment, FragmentAssembler, HEADER_SIZE, LORA_MTU, PAYLOAD_SIZE};
 
@@ -48,6 +51,14 @@ struct Summary {
     xor_fec_wire_bytes_per_message: usize,
     selective_retry_wire_bytes_per_message_milli: usize,
     hybrid_wire_bytes_per_message_milli: usize,
+    /// Mean PHY time-on-air for data frames alone, excluding feedback and gaps.
+    no_fec_airtime_us_per_message: u64,
+    /// Mean PHY time-on-air for data plus XOR parity.
+    xor_fec_airtime_us_per_message: u64,
+    /// Mean PHY time-on-air including modeled selective retries.
+    selective_retry_airtime_us_per_message: u64,
+    /// Mean PHY time-on-air including XOR parity and modeled retries.
+    hybrid_airtime_us_per_message: u64,
 }
 
 impl Summary {
@@ -135,6 +146,60 @@ fn wire_len(payload_len: u8) -> usize {
     HEADER_SIZE + payload_len as usize
 }
 
+/// Frozen PHY parameters for the SX127x Semtech time-on-air equation.
+/// coding_rate follows the datasheet encoding: 1 = 4/5, ... 4 = 4/8.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LoRaPhyProfile {
+    spreading_factor: u8,
+    bandwidth_hz: u32,
+    coding_rate: u8,
+    preamble_symbols: u16,
+    explicit_header: bool,
+    crc_enabled: bool,
+}
+
+const DEFAULT_LORA_PHY: LoRaPhyProfile = LoRaPhyProfile {
+    spreading_factor: 7,
+    bandwidth_hz: 125_000,
+    coding_rate: 1,
+    preamble_symbols: 8,
+    explicit_header: true,
+    crc_enabled: true,
+};
+
+/// Calculate PHY airtime in microseconds using Semtech SX1276/77/78/79 DS Rev. 7,
+/// section 4.1.1.7. This is a PHY model only: ACKs, turnaround, contention,
+/// radio startup, receive windows, and inter-frame scheduling are not included.
+fn lora_time_on_air_us(payload_len: usize, profile: LoRaPhyProfile) -> u64 {
+    assert!((1..=255).contains(&payload_len), "LoRa PHY payload must be 1..=255 bytes");
+    assert!((7..=12).contains(&profile.spreading_factor), "explicit-header profile requires SF7..=SF12");
+    assert!(profile.bandwidth_hz > 0, "bandwidth must be nonzero");
+    assert!((1..=4).contains(&profile.coding_rate), "coding rate must be 1..=4");
+
+    let sf = u32::from(profile.spreading_factor);
+    let bandwidth_hz = u64::from(profile.bandwidth_hz);
+    let two_to_sf = 1u64 << sf;
+    // Semtech requires low-data-rate optimization when symbol duration > 16 ms.
+    let de = if two_to_sf * 1_000_000 > bandwidth_hz * 16_000 { 1u32 } else { 0u32 };
+    let implicit_header: i64 = if profile.explicit_header { 0 } else { 1 };
+    let crc: i64 = if profile.crc_enabled { 1 } else { 0 };
+    let numerator = 8 * payload_len as i64 - 4 * i64::from(sf) + 28 + 16 * crc
+        - 20 * implicit_header;
+    let denominator = 4 * (i64::from(sf) - 2 * i64::from(de));
+    let ceil_blocks = if numerator > 0 {
+        (numerator + denominator - 1) / denominator
+    } else {
+        0
+    };
+    let payload_symbols = 8 + ceil_blocks * (i64::from(profile.coding_rate) + 4);
+    let quarter_symbol_count = 4 * u64::from(profile.preamble_symbols) + 17
+        + 4 * payload_symbols as u64;
+    // Exact quarter-symbol arithmetic, rounded upward to a microsecond.
+    let numerator_us = u128::from(quarter_symbol_count) * u128::from(two_to_sf) * 1_000_000;
+    let denominator_us = 4 * u128::from(profile.bandwidth_hz);
+    ((numerator_us + denominator_us - 1) / denominator_us) as u64
+}
+
 /// Run four packet-delivery strategies against one exogenous time-slot trace:
 ///
 /// - no FEC/retry: success only if all initial data fragments arrive;
@@ -163,6 +228,16 @@ fn run_benchmark(
     seed: u64,
     trials: usize,
 ) -> Summary {
+    run_benchmark_with_phy(payload, model, seed, trials, DEFAULT_LORA_PHY)
+}
+
+fn run_benchmark_with_phy(
+    payload: &[u8],
+    model: LossModel,
+    seed: u64,
+    trials: usize,
+    phy: LoRaPhyProfile,
+) -> Summary {
     assert!(!payload.is_empty(), "benchmark payload must not be empty");
     assert!(trials > 0, "benchmark requires at least one trial");
     let frames = fragment(0xC0DE, payload);
@@ -178,6 +253,14 @@ fn run_benchmark(
     let xor_fec_wire_bytes_per_message: usize = frames
         .iter()
         .map(|frame| wire_len(frame.payload_len))
+        .sum();
+    let no_fec_airtime_us_per_message: u64 = frames[..data_count]
+        .iter()
+        .map(|frame| lora_time_on_air_us(wire_len(frame.payload_len), phy))
+        .sum();
+    let xor_fec_airtime_us_per_message: u64 = frames
+        .iter()
+        .map(|frame| lora_time_on_air_us(wire_len(frame.payload_len), phy))
         .sum();
 
     assert!(frames
@@ -204,7 +287,13 @@ fn run_benchmark(
         xor_fec_wire_bytes_per_message,
         selective_retry_wire_bytes_per_message_milli: 0,
         hybrid_wire_bytes_per_message_milli: 0,
+        no_fec_airtime_us_per_message,
+        xor_fec_airtime_us_per_message,
+        selective_retry_airtime_us_per_message: 0,
+        hybrid_airtime_us_per_message: 0,
     };
+    let mut selective_airtime_us_total = 0u64;
+    let mut hybrid_airtime_us_total = 0u64;
     let mut selective_frames_total = 0usize;
     let mut hybrid_frames_total = 0usize;
     let mut selective_bytes_total = 0usize;
@@ -260,11 +349,14 @@ fn run_benchmark(
         let mut selective_data_ok = initial_data_ok.clone();
         let mut selective_frames = data_count;
         let mut selective_bytes = no_fec_wire_bytes_per_message;
+        let mut selective_airtime_us = no_fec_airtime_us_per_message;
         let mut retry_slot = data_count + 1;
         for index in 0..data_count {
             if !selective_data_ok[index] {
                 selective_frames += 1;
                 selective_bytes += wire_len(frames[index].payload_len);
+                selective_airtime_us +=
+                    lora_time_on_air_us(wire_len(frames[index].payload_len), phy);
                 selective_data_ok[index] = trace[retry_slot];
                 retry_slot += 1;
             }
@@ -274,6 +366,7 @@ fn run_benchmark(
         }
         selective_frames_total += selective_frames;
         selective_bytes_total += selective_bytes;
+        selective_airtime_us_total += selective_airtime_us;
 
         // Hybrid has already transmitted parity at slot N. If XOR-FEC has
         // reconstructed exactly, do not retransmit. Otherwise request the
@@ -281,12 +374,15 @@ fn run_benchmark(
         let mut hybrid_data_ok = initial_data_ok.clone();
         let mut hybrid_frames = frames.len();
         let mut hybrid_bytes = xor_fec_wire_bytes_per_message;
+        let mut hybrid_airtime_us = xor_fec_airtime_us_per_message;
         if !xor_initial_success {
             let mut retry_slot = data_count + 2;
             for index in 0..data_count {
                 if !hybrid_data_ok[index] {
                     hybrid_frames += 1;
                     hybrid_bytes += wire_len(frames[index].payload_len);
+                    hybrid_airtime_us +=
+                        lora_time_on_air_us(wire_len(frames[index].payload_len), phy);
                     hybrid_data_ok[index] = trace[retry_slot];
                     retry_slot += 1;
                 }
@@ -315,6 +411,7 @@ fn run_benchmark(
         }
         hybrid_frames_total += hybrid_frames;
         hybrid_bytes_total += hybrid_bytes;
+        hybrid_airtime_us_total += hybrid_airtime_us;
     }
 
     // Fixed-point milli-units preserve deterministic, integer-only receipts.
@@ -323,6 +420,9 @@ fn run_benchmark(
     summary.hybrid_frames_per_message_milli = hybrid_frames_total * 1000 / trials;
     summary.selective_retry_wire_bytes_per_message_milli = selective_bytes_total * 1000 / trials;
     summary.hybrid_wire_bytes_per_message_milli = hybrid_bytes_total * 1000 / trials;
+    summary.selective_retry_airtime_us_per_message =
+        selective_airtime_us_total / trials as u64;
+    summary.hybrid_airtime_us_per_message = hybrid_airtime_us_total / trials as u64;
     summary
 }
 
@@ -346,6 +446,60 @@ fn assert_strategies_are_ordered(summary: Summary) {
     assert!(
         summary.hybrid_successes >= summary.xor_fec_successes,
         "hybrid retry must preserve every success that XOR-FEC already had"
+    );
+}
+
+#[test]
+fn semtech_time_on_air_equation_matches_reference_vectors_and_spreading_factor_sweep() {
+    let sf7 = DEFAULT_LORA_PHY;
+    assert_eq!(lora_time_on_air_us(222, sf7), 348_416);
+    assert_eq!(lora_time_on_air_us(130, sf7), 215_296);
+
+    let payload = payload_of_len(2048, 0xA5);
+    let frames = fragment(17, &payload);
+    let data_count = frames.len() - 1;
+    let mut last_data_only_us = 0u64;
+    let mut last_xor_us = 0u64;
+    for sf in 7..=12 {
+        let phy = LoRaPhyProfile { spreading_factor: sf, ..DEFAULT_LORA_PHY };
+        let data_only_us: u64 = frames[..data_count]
+            .iter()
+            .map(|frame| lora_time_on_air_us(wire_len(frame.payload_len), phy))
+            .sum();
+        let xor_us: u64 = frames
+            .iter()
+            .map(|frame| lora_time_on_air_us(wire_len(frame.payload_len), phy))
+            .sum();
+        assert!(data_only_us > last_data_only_us, "data-only airtime must rise with SF");
+        assert!(xor_us > last_xor_us, "FEC airtime must rise with SF");
+        assert!(xor_us > data_only_us, "XOR parity must add PHY airtime");
+        eprintln!(
+            "mesh-airtime-baseline payload=2048 sf={} bw_hz={} cr=4/5 preamble={} explicit_header=true crc=true data_only_us={} xor_fec_us={} data_frames={} xor_frames={} ack_included=false",
+            sf, phy.bandwidth_hz, phy.preamble_symbols, data_only_us, xor_us, data_count, frames.len(),
+        );
+        last_data_only_us = data_only_us;
+        last_xor_us = xor_us;
+    }
+
+    let summary = run_benchmark_with_phy(
+        &payload,
+        LossModel::Iid { loss_per_mille: 100 },
+        0x5EED_1234,
+        1000,
+        DEFAULT_LORA_PHY,
+    );
+    assert!(summary.xor_fec_airtime_us_per_message > summary.no_fec_airtime_us_per_message);
+    assert!(
+        summary.hybrid_airtime_us_per_message >= summary.xor_fec_airtime_us_per_message,
+        "hybrid mean airtime includes parity plus any modeled retries"
+    );
+    eprintln!(
+        "mesh-airtime-iid loss=100‰ seed=0x5eed1234 trials={} mean_airtime_us_per_message_no_fec/xor/selective/hybrid={}/{}/{}/{} ack_airtime_excluded=true",
+        summary.trials,
+        summary.no_fec_airtime_us_per_message,
+        summary.xor_fec_airtime_us_per_message,
+        summary.selective_retry_airtime_us_per_message,
+        summary.hybrid_airtime_us_per_message,
     );
 }
 
