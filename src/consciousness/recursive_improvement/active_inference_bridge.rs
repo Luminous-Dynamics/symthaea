@@ -518,8 +518,10 @@ mod tests {
 
         let signals = bridge.generate_signals(&model);
 
-        // With no data, signals should be neutral
+        // With no data, PE remains a neutral placeholder and is explicitly unavailable.
         assert_eq!(signals.prediction_error, 0.5);
+        assert!(!signals.prediction_error_valid);
+        assert_eq!(signals.prediction_error_value(), None);
         assert_eq!(signals.uncertainty, 0.5);
     }
 
