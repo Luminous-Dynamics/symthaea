@@ -470,8 +470,20 @@
             "properties": {
               "judge_snapshot_status": {
                 "const": "pinned"
+              },
+              "prediction_coverage_audit": {
+                "const": true
+              },
+              "coverage_complete_error": {
+                "const": true
+              },
+              "sign_disagreement_audit": {
+                "const": true
               }
-            }
+            },
+            "required": [
+              "judge_prompt_sha256"
+            ]
           },
           "models": {
             "items": {
