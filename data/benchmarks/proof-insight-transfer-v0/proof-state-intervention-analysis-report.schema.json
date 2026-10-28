@@ -201,6 +201,7 @@
                 "enum": [
                   "not_reported_no_observations",
                   "suppressed_insufficient_independent_components",
+                  "suppressed_degenerate_interval",
                   "reported_descriptive_interval"
                 ]
               },
@@ -258,6 +259,45 @@
                     },
                     "upper": {
                       "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "confidence_interval_95": {
+                  "properties": {
+                    "status": {
+                      "const": "suppressed_degenerate_interval"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              },
+              "required": [
+                "confidence_interval_95"
+              ]
+            },
+            "then": {
+              "properties": {
+                "independent_components": {
+                  "minimum": 20
+                },
+                "estimate": {
+                  "type": "number"
+                },
+                "confidence_interval_95": {
+                  "properties": {
+                    "lower": {
+                      "type": "null"
+                    },
+                    "upper": {
+                      "type": "null"
                     }
                   }
                 }
