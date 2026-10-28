@@ -10,6 +10,7 @@ const RISK_CAP: f64 = 0.05;
 const VALUE_FLOOR: f64 = 0.5;
 const RISK_ALTERNATIVES: [f64; 4] = [0.001, 0.01, 0.025, 0.04];
 const VALUE_LAMBDAS: [f64; 2] = [0.5, 1.0];
+const CLUSTER_RISK_LAMBDAS: [f64; 2] = [0.5, 1.0];
 const EPSILON: f64 = 1e-12;
 const PPM: f64 = 1_000_000.0;
 const PEEKING_LOOKS: [usize; 2] = [72, 120];
@@ -349,7 +350,7 @@ fn cluster_risk_e_value(cluster_rates: &[f64]) -> Result<f64, String> {
     {
         return Err(invalid("cluster risk rates must be nonempty, finite and in [0, 1]"));
     }
-    let logs: Vec<f64> = VALUE_LAMBDAS
+    let logs: Vec<f64> = CLUSTER_RISK_LAMBDAS
         .iter()
         .map(|lambda| {
             cluster_rates
@@ -447,7 +448,7 @@ fn exact_sweep() -> Result<String, String> {
     let mut output = String::from("kind\thorizon\ttruth_ppm\talpha_ppm\tprob_ever_cross\tinterpretation\n");
     let _ = writeln!(
         output,
-        "CONTRACT\talpha_risk={:.6}\talpha_value={:.6}\talpha_joint={:.6}\trisk_cap={:.6}\tvalue_floor={:.6}\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tpeeking_looks=72,120",
+        "CONTRACT\talpha_risk={:.6}\talpha_value={:.6}\talpha_joint={:.6}\trisk_cap={:.6}\tvalue_floor={:.6}\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tcluster_risk_lambdas=0.5,1.0\tpeeking_looks=72,120",
         RISK_ALPHA, VALUE_ALPHA, JOINT_ALPHA, RISK_CAP, VALUE_FLOOR
     );
     let mut risk_count = 0usize;
@@ -642,7 +643,7 @@ mod tests {
         assert!(e100 >= 1.0 / RISK_ALPHA);
         assert!(cluster_risk_e_value(&[]).is_err());
         assert!(cluster_risk_e_value(&[0.0, 1.01]).is_err());
-        for lambda in VALUE_LAMBDAS {
+        for lambda in CLUSTER_RISK_LAMBDAS {
             let low = 1.0 + lambda * (RISK_CAP - 0.0);
             let high = 1.0 + lambda * (RISK_CAP - 0.10);
             let expectation = 0.5 * low + 0.5 * high;
@@ -670,7 +671,7 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.lines().filter(|line| line.starts_with("RISK\t")).count(), 20);
         assert_eq!(first.lines().filter(|line| line.starts_with("VALUE\t")).count(), 20);
-        assert!(first.contains("CONTRACT\talpha_risk=0.025000\talpha_value=0.025000\talpha_joint=0.050000\trisk_cap=0.050000\tvalue_floor=0.500000\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tpeeking_looks=72,120"));
+        assert!(first.contains("CONTRACT\talpha_risk=0.025000\talpha_value=0.025000\talpha_joint=0.050000\trisk_cap=0.050000\tvalue_floor=0.500000\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tcluster_risk_lambdas=0.5,1.0\tpeeking_looks=72,120"));
         assert!(first.contains("PEEKING_CONTROL\t120\t50000\t72,120\t0.032937159528\t0.008924249150\t0.025000"));
         assert!(first.contains("CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000"));
         assert!(first.contains("GATE_CONTROL\tall_clear\tAUTHORIZED"));
