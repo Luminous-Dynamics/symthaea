@@ -1177,14 +1177,19 @@ mod tests {
     }
 
     #[test]
-    fn predictive_rank_martingale_rejects_invalid_alpha_and_incompatible_parameters() {
-        let mut bad_alpha = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
-        bad_alpha.detector.prm_alpha = Some(0.0);
-        assert!(run_scalar_detector(bad_alpha).is_err());
+    fn predictive_rank_martingale_variants_reject_invalid_alpha_and_incompatible_parameters() {
+        for method in [
+            ScalarDetectorMethod::PredictiveRankMartingalePortfolio,
+            ScalarDetectorMethod::PredictiveRankMartingaleOnsPortfolio,
+        ] {
+            let mut bad_alpha = fixture(method);
+            bad_alpha.detector.prm_alpha = Some(0.0);
+            assert!(run_scalar_detector(bad_alpha).is_err());
 
-        let mut bad_params = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
-        bad_params.detector.fixed_threshold = Some(0.4);
-        assert!(run_scalar_detector(bad_params).is_err());
+            let mut bad_params = fixture(method);
+            bad_params.detector.fixed_threshold = Some(0.4);
+            assert!(run_scalar_detector(bad_params).is_err());
+        }
     }
 
     #[test]
