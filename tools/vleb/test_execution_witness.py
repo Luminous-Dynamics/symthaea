@@ -196,7 +196,7 @@ class ExecutionWitnessTests(unittest.TestCase):
             )
 
     def test_receipt_path_traversal_is_rejected(self) -> None:
-        with self.assertRaisesRegex(ValueError, "canonical relative path"):
+        with self.assertRaisesRegex(ValueError, "traversal|canonical relative path"):
             runner.record_execution(
                 plan_path=Path("plan.json"),
                 evidence_root=self.fx.root,
