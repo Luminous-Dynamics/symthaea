@@ -177,15 +177,12 @@ def _prediction(
             base = source_levels["medium"]
             objectives = tuple(base["objectives"][j] + mh_mean[j] for j in range(2))
             margin = base["constraint_margin"] + mh_mean[2]
-            sigma = tuple(math.sqrt(mh_sigma[j] ** 2 + (0.08 * source_distance) ** 2) for j in range(3))
+            sigma = mh_sigma
         else:
             base = source_levels["low"]
             objectives = tuple(base["objectives"][j] + lm_mean[j] + mh_mean[j] for j in range(2))
             margin = base["constraint_margin"] + lm_mean[2] + mh_mean[2]
-            sigma = tuple(
-                math.sqrt(lm_sigma[j] ** 2 + mh_sigma[j] ** 2 + (0.08 * source_distance) ** 2)
-                for j in range(3)
-            )
+            sigma = tuple(math.sqrt(lm_sigma[j] ** 2 + mh_sigma[j] ** 2) for j in range(3))
     if spatial_distance > 0.0:
         sigma = tuple(math.sqrt(sigma[j] ** 2 + (0.08 * spatial_distance) ** 2) for j in range(3))
     return objectives, margin, sigma, spatial_distance
