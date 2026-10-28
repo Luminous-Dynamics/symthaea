@@ -1,12 +1,12 @@
 # Broca evidence persistence and crash-consistency conformance
 
-**Status:** prototype disk-generation coordinator and in-process failpoint tests added in `memory_evidence_persistence.rs`. The code is not compiled in this environment; the 1,000-schedule qualification gate and real power-loss/platform tests remain open. This document is a release gate, not a persistence qualification result.
+**Status:** prototype disk-generation coordinator, a typed real-HDC binding path, and in-process failpoint tests are authored in `memory_evidence_persistence.rs`. The code is not compiled in this environment; the 1,000-schedule qualification gate and real power-loss/platform tests remain open. This document is a release gate, not a persistence qualification result.
 
 ## Invariant
 
 An HDC candidate ID is not evidence. A query may receive a payload only when the candidate index and evidence snapshot belong to the same committed generation and the resolved record passes scope, lifecycle, validity-window and content-digest checks.
 
-The snapshot codec preserves tombstones, binds schema + generation + records into its digest, and rebuilds ID maps. `EvidenceCommitManifest` binds exact serialized HDC-index bytes and exact evidence-snapshot bytes to a nonzero generation. The new disk store stages immutable artifacts, syncs each file, renames the generation directory, reads back and verifies the artifacts, then atomically replaces `CURRENT` last. Recovery checks `CURRENT`, manifest and artifact digests and never falls back to an older generation. Its SHA-256 values are unkeyed consistency checks, not writer authentication. A hostile-storage deployment must verify a signature or externally pinned digest before trusting the manifest.
+The snapshot codec preserves tombstones, binds schema + generation + records into its digest, and rebuilds ID maps. `EvidenceCommitManifest` binds exact serialized HDC-index bytes and exact evidence-snapshot bytes to a nonzero generation. The typed production path additionally records the real HDC store's internal generation and logical checksum, and requires exact parity between live HDC IDs and Active evidence IDs. The disk store stages immutable artifacts, syncs each file, renames the generation directory, reads back and verifies the artifacts through `HdcStoreReader`, then atomically replaces `CURRENT` last. Recovery checks `CURRENT`, manifest and artifact digests and never falls back to an older generation. Its SHA-256 values are unkeyed consistency checks, not writer authentication. A hostile-storage deployment must verify a signature or externally pinned digest before trusting the manifest.
 
 ## Implemented prototype surface
 
@@ -20,14 +20,15 @@ The implementation is intentionally conservative:
 - Multiple threads using one store instance serialize through a mutex, and cross-process writers serialize through an exclusive `.writer.lock` file.
 - A crashed process can leave `.writer.lock`. The store refuses new commits until an operator confirms the writer is dead and reconciles/removes the stale lock. It does not guess that a lock is stale.
 - The filesystem contract is currently Unix directory-fsync + same-filesystem rename. Other platforms fail closed; no cross-platform durability claim is made.
-- The HDC index serializer remains the caller's responsibility: the coordinator hashes the supplied bytes but cannot infer that they semantically correspond to the supplied `EvidenceIndex`. Only call `commit` with a matched pair from the same in-memory generation.
-- The production binding step is tracked in [issue #8699](https://github.com/Luminous-Dynamics/symthaea/issues/8699): accept the actual `HdcStore`, pin its generation and logical checksum, require exact live-ID parity with `Active` evidence records, and revalidate that identity through `HdcStoreReader` on recovery.
+- The production `commit_hdc_store(&mut HdcStore, &EvidenceIndex)` path syncs the canonical HDC store, captures a generation-pinned view, records its internal generation + logical checksum, requires exact equality of live HDC IDs and Active evidence IDs, and copies the canonical bytes into an immutable generation.
+- On recovery, typed commits are opened via `HdcStoreReader` with deterministic ANN-index rebuild; the internal generation, checksum version/value, live count and ID parity are checked against the evidence snapshot. The opaque-byte `commit` method exists only for module tests.
+- The application still must mutate vector and evidence lifecycle state together: delete/revoke/supersede the HDC vector before committing the inactive evidence state. A failed parity check leaves the previous committed generation current.
 
 The in-process fault hooks cover interruption after the HDC-index write, evidence snapshot write, manifest write, generation publication, before `CURRENT` publication, and after `CURRENT` rename. They are deterministic failure-injection tests, **not** process-kill or power-loss tests.
 
 ## Required publish protocol
 
-The persistence coordinator must treat these bytes as one logical commit:
+The persistence coordinator treats these bytes as one logical commit. The implemented `commit_hdc_store` path binds the HDC identity; adapter/query wiring and broader crash qualification remain open:
 
 1. Allocate monotonically increasing generation `g`; stage an HDC index and evidence snapshot in a private generation-specific location. **Implemented** by `EvidenceDiskStore` after verifying the current commit.
 2. Flush the exact index and snapshot bytes to stable storage using same-filesystem temporary files, file sync, and atomic rename where supported. **Implemented for the declared Unix prototype assumptions**; not yet power-loss-qualified.
@@ -51,7 +52,7 @@ The in-memory module does not implement these filesystem steps. Atomic rename al
 
 ## Crash and adversarial matrix
 
-The future disk-backed integration must inject a process crash or forced error at each stage and then restart from the resulting directory.
+The disk-store prototype has deterministic in-process failpoints for commit stages. Qualification must additionally kill a separate process at each stage, restart from the resulting directory, and on supported lab hardware perform power-cut trials; the current failpoints do not qualify those conditions.
 
 | Fixture | Required result |
 |---|---|
@@ -83,4 +84,4 @@ Before claiming persistent-memory integrity:
 - Audit physical deletion separately, including snapshots, journals, backups and filesystem behavior.
 - Measure p50/p95/p99 query latency and write/compaction cost only after correctness gates pass.
 
-These are proposed acceptance targets, not observed results. The current change supplies snapshot and manifest primitives plus unit-test cases; it does not yet pass this integration gate.
+These are proposed acceptance targets, not observed results. The current branch supplies snapshot, manifest and disk-store prototypes plus typed HDC identity-parity checks and authored test cases; the code has not yet passed a Rust compile/test run or the persistence qualification gate.
