@@ -1789,6 +1789,13 @@ mod tests {
             wrong_instance.validate(),
             Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "instance_sha256", .. })
         ));
+
+        let mut wrong_protocol = good.clone();
+        wrong_protocol.protocol_sha256 = "6".repeat(64);
+        assert!(matches!(
+            wrong_protocol.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "protocol_sha256", .. })
+        ));
     }
 
     #[test]
