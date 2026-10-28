@@ -966,9 +966,9 @@ def validate_manifest(
             "issues": [{"code": "manifest_pin_mismatch", "message": "manifest does not match caller-supplied trusted digest"}],
         }
     try:
-        manifest = json.loads(raw_manifest.decode("utf-8"))
-        schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    except (UnicodeError, OSError, json.JSONDecodeError) as exc:
+        manifest = parse_unique_json(raw_manifest)
+        schema = parse_unique_json(schema_path.read_bytes())
+    except (UnicodeError, OSError, ValueError) as exc:
         return {"eligible": False, "verdict": "fail", "observed_manifest_sha256": observed_manifest_sha, "issues": [{"code": "invalid_json", "message": str(exc)}]}
     try:
         Draft202012Validator.check_schema(schema)
