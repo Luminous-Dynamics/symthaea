@@ -15,6 +15,8 @@
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
 //! - [`aviation_data_contract`]: fail-closed feature-availability and claim/evidence gates.
+//! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
+//!   over paired candidate/baseline costs, with read-only reports and robust gates.
 //! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
 //!   with a separately implemented plan verifier and negative controls. This is
 //!   not dispatch, maintenance-release, or airworthiness authority.
