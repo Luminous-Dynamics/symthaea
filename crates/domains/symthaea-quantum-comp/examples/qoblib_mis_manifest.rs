@@ -333,6 +333,37 @@ mod tests {
     }
 
     #[test]
+    fn rejects_pinned_vertex_or_edge_count_mismatch() {
+        let wrong_vertices = format!(
+            "# source_commit={COMMIT}\\n{}",
+            line(
+                "aves-sparrow-social",
+                "07-independentset/instances/aves-sparrow-social.gph",
+                BLOB,
+                3652,
+                51,
+                454
+            )
+        );
+        let (_, entries) = parse_pinned_manifest(&wrong_vertices).unwrap();
+        assert_eq!(entries[0].expected_vertices, 51);
+
+        let wrong_edges = format!(
+            "# source_commit={COMMIT}\\n{}",
+            line(
+                "aves-sparrow-social",
+                "07-independentset/instances/aves-sparrow-social.gph",
+                BLOB,
+                3652,
+                52,
+                453
+            )
+        );
+        let (_, entries) = parse_pinned_manifest(&wrong_edges).unwrap();
+        assert_eq!(entries[0].expected_edges, 453);
+    }
+
+    #[test]
     fn rejects_wrong_filename_and_malformed_blob_id() {
         let wrong_filename = format!(
             "# source_commit={COMMIT}\\n{}",
@@ -340,7 +371,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/another-name.gph",
                 BLOB,
-                3652
+                3652,
+                52,
+                454
             )
         );
         assert!(parse_pinned_manifest(&wrong_filename).is_err());
