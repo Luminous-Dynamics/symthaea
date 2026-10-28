@@ -88,6 +88,6 @@ The task constructors are **synthetic protocol fixtures**, not a qualified physi
 
 ## Current implementation boundary
 
-The Rust validator checks strict manifest shape and unknown-field rejection, digest/revision syntax, protocol-context integrity, domain-separated seed/task commitments, exact-byte reveal verification, denominator and family-weight closure, duplicate family IDs, lane/reveal-policy consistency, and separate manifest-declared profile fields.
+The Rust validator checks strict manifest shape and unknown-field rejection, digest/revision syntax, protocol-context integrity, domain-separated seed/task commitments, exact-byte reveal verification, exact deterministic regeneration from seed/config bytes, task-set generation/denominator/family integrity, duplicate task IDs/families, oracle-key canaries in policy-visible inputs, denominator and family-weight closure, lane/reveal-policy consistency, and separate manifest-declared profile fields.
 
-At the current draft stage, tests are authored but must not be described as passing until current-head exact CI completes. This authoring environment does not include a Rust toolchain, so no local compile/test/Clippy result is claimed.
+At the current draft stage, 45 Rust unit tests are authored across manifest/reveal validation, task-set contract checks, deterministic generation/replay, and CLI argument handling. They must not be described as passing until current-head exact CI completes. This authoring environment does not include a Rust toolchain, so no local compile/test/Clippy result is claimed.
