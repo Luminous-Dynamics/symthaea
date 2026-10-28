@@ -46,8 +46,17 @@ pub struct DatasetReceipt {
     pub cohort_size_reported_by_source: Option<usize>,
     pub captured_at_unix_seconds: u64,
     pub source_commit: String,
+    pub source_archive: SourceArchiveAudit,
     pub files: Vec<FileAudit>,
     pub pairwise_uuid_joins: Vec<JoinAudit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SourceArchiveAudit {
+    /// Filename only; absolute local paths are deliberately not persisted.
+    pub filename: String,
+    pub byte_length: u64,
+    pub sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -317,11 +326,13 @@ pub fn capture_receipt(
     dataset_id: &str,
     data_dir: &Path,
     source_commit: &str,
+    source_archive_path: &Path,
 ) -> Result<DatasetReceipt, String> {
     validate_commit(source_commit)?;
     let manifest = parse_manifest(manifest_path)?;
     let entry = select_dataset(&manifest, dataset_id)?;
     let (files, pairwise_uuid_joins) = scan_dataset(entry, data_dir)?;
+    let source_archive = audit_source_archive(source_archive_path)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)
         .map_err(|e| format!("system clock is before Unix epoch: {e}"))?.as_secs();
 
@@ -333,6 +344,7 @@ pub fn capture_receipt(
         cohort_size_reported_by_source: entry.described_cohort_size,
         captured_at_unix_seconds: now,
         source_commit: source_commit.to_owned(),
+        source_archive,
         files,
         pairwise_uuid_joins,
     })
@@ -343,6 +355,7 @@ pub fn verify_receipt(
     dataset_id: &str,
     data_dir: &Path,
     receipt_path: &Path,
+    source_archive_path: &Path,
 ) -> Result<DatasetReceipt, String> {
     let manifest = parse_manifest(manifest_path)?;
     let entry = select_dataset(&manifest, dataset_id)?;
@@ -364,6 +377,10 @@ pub fn verify_receipt(
     }
     validate_commit(&receipt.source_commit)?;
 
+    let actual_archive = audit_source_archive(source_archive_path)?;
+    if receipt.source_archive != actual_archive {
+        return Err("source archive receipt mismatch: filename, byte length, or SHA-256 changed".to_owned());
+    }
     let (actual_files, actual_joins) = scan_dataset(entry, data_dir)?;
     if receipt.files != actual_files {
         return Err("file receipt mismatch: size, SHA-256, CSV schema, rows, or UUID-set hash changed".to_owned());
@@ -372,6 +389,20 @@ pub fn verify_receipt(
         return Err("pairwise UUID join audit differs from the captured receipt".to_owned());
     }
     Ok(receipt)
+}
+
+fn audit_source_archive(path: &Path) -> Result<SourceArchiveAudit, String> {
+    if !path.is_file() {
+        return Err(format!("source archive does not exist: {}", path.display()));
+    }
+    let filename = path.file_name().and_then(|s| s.to_str())
+        .ok_or_else(|| "source archive path has no UTF-8 filename".to_owned())?
+        .to_owned();
+    validate_plain_filename(&filename)?;
+    let byte_length = fs::metadata(path)
+        .map_err(|e| format!("stat source archive {}: {e}", path.display()))?.len();
+    let sha256 = sha256_file(path)?;
+    Ok(SourceArchiveAudit { filename, byte_length, sha256 })
 }
 
 fn validate_commit(commit: &str) -> Result<(), String> {
@@ -412,6 +443,8 @@ pub fn print_receipt_summary(receipt: &DatasetReceipt) {
     println!("source_url: {}", receipt.source_url);
     println!("source_commit: {}", receipt.source_commit);
     println!("captured_at_unix_seconds: {}", receipt.captured_at_unix_seconds);
+    println!("source_archive: {} ({} bytes, sha256={})",
+        receipt.source_archive.filename, receipt.source_archive.byte_length, receipt.source_archive.sha256);
     println!("files: {}", receipt.files.len());
     for file in &receipt.files {
         print!("  {}: {} bytes sha256={}", file.path, file.byte_length, file.sha256);
