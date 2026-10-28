@@ -311,7 +311,7 @@ fn family_log_e_value(
                 + component_logs
                     .iter()
                     .zip(PORTFOLIO_WEIGHTS)
-                    .map(|(value, weight)| weight * (value - maximum).exp())
+                    .map(|(value, weight)| weight * (*value - maximum).exp())
                     .sum::<f64>()
                     .ln()
         }
