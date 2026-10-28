@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Component, Path};
 
 /// Canonicalization contract. Changing this requires a new version and fixture.
 pub const LME_V2_INGEST_SCHEMA_VERSION: &str = "BROCA-LME-V2-TRAJECTORY-INGEST-V1";
@@ -67,7 +68,7 @@ pub struct LongMemEvalTrajectory {
 pub struct LongMemEvalState {
     pub state_index: u64,
     pub step: Option<Value>,
-    pub url: Option<String>,
+    pub url: String,
     pub action: Option<Value>,
     pub thought: Option<String>,
     pub accessibility_tree: String,
@@ -201,7 +202,10 @@ fn validate_trajectory(trajectory: &LongMemEvalTrajectory) -> Result<(), String>
         if state.screenshot.trim().is_empty() {
             return Err("state screenshot path must be non-empty".into());
         }
-        if state.screenshot.contains("..") {
+        if Path::new(&state.screenshot)
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+        {
             return Err("state screenshot path must not contain parent-directory traversal".into());
         }
         previous_index = Some(state.state_index);
@@ -313,20 +317,16 @@ fn render_state_evidence(
     output.push_str("\nEnvironment: ");
     output.push_str(&trajectory.environment);
 
-    if let Some(start_url) = &trajectory.start_url {
-        output.push_str("\nStart URL: ");
-        output.push_str(start_url);
-    }
+    output.push_str("\nStart URL: ");
+    output.push_str(&trajectory.start_url);
     output.push_str(&format!("\nState index: {}", state.state_index));
 
     if let Some(step) = &state.step {
         output.push_str("\nOriginal step: ");
         output.push_str(&canonicalize_value(step.clone()).to_string());
     }
-    if let Some(url) = &state.url {
-        output.push_str("\nURL: ");
-        output.push_str(url);
-    }
+    output.push_str("\nURL: ");
+    output.push_str(&state.url);
     if let Some(action) = &state.action {
         if !action.is_null() {
             output.push_str("\nAction: ");
@@ -339,11 +339,9 @@ fn render_state_evidence(
             output.push_str(thought);
         }
     }
-    if let Some(tree) = &state.accessibility_tree {
-        if !tree.trim().is_empty() {
-            output.push_str("\nAccessibility tree:\n");
-            output.push_str(tree);
-        }
+    if !state.accessibility_tree.trim().is_empty() {
+        output.push_str("\nAccessibility tree:\n");
+        output.push_str(&state.accessibility_tree);
     }
 
     output
@@ -387,7 +385,7 @@ mod tests {
                 "action": "click add to cart",
                 "thought": null,
                 "accessibility_tree": "button Add to cart",
-                "screenshot": null
+                "screenshot": "screenshots/traj-001/2.png"
             }]
         })
         .to_string()
@@ -419,7 +417,7 @@ mod tests {
     fn source_digest_and_ids_ignore_json_whitespace_and_object_key_order() {
         let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":"https://example.test/","states":[{"state_index":0,"step":1,"url":"https://example.test","action":{"type":"click","target":"x"},"thought":"t","accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}]}"#;
         let second = r#"{
-            "states":[{"screenshot":null,"accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0,"accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}],
+            "states":[{"screenshot":"screenshots/traj-001/2.png","accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0,"accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}],
             "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":"https://example.test/","id":"traj-order"
         }"#;
         let resolver = |_: &str, _: &str| Some("scope".to_string());
