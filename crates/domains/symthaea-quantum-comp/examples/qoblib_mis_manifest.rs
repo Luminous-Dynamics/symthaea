@@ -1,8 +1,7 @@
 //! Hashes and canonicalizes the pinned QOBLIB MIS source set.
 //!
 //! Usage:
-//! `cargo run -p symthaea-quantum-comp --example qoblib_mis_manifest -- \\\
-//!   <qoblib-repository-root> <pinned-files.tsv> <output.tsv>`
+//! `cargo run -p symthaea-quantum-comp --example qoblib_mis_manifest -- <qoblib-repository-root> <pinned-files.tsv> <output.tsv>`
 //!
 //! The QOBLIB checkout must be at the exact commit embedded in the TSV. This tool
 //! validates Git blob SHA-1 and byte size, then computes SHA-256 over the source
@@ -63,7 +62,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     verify_instance_directory_inventory(repository_root, &pinned_files)?;
 
     let mut output = String::from(
-        "# schema=SYMTHEA-QOBLIB-MIS-MANIFEST-V1\n         # source_repo=ZIB-AOPT/QOBLIB\n         # output_columns=instance_name<TAB>source_git_blob_sha1<TAB>source_size_bytes<TAB>source_sha256<TAB>canonical_graph_sha256<TAB>vertices<TAB>edges<TAB>canonical_size_bytes\n",
+        "# schema=SYMTHEA-QOBLIB-MIS-MANIFEST-V1\n# source_repo=ZIB-AOPT/QOBLIB\n# output_columns=instance_name<TAB>source_git_blob_sha1<TAB>source_size_bytes<TAB>source_sha256<TAB>canonical_graph_sha256<TAB>vertices<TAB>edges<TAB>canonical_size_bytes\n",
     );
 
     for pinned in &pinned_files {
@@ -152,6 +151,14 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
         }
         let name = columns[0].to_owned();
         let relative_path = columns[1].to_owned();
+        let expected_filename = format!("{name}.gph");
+        let actual_filename = Path::new(&relative_path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| format!("invalid source path on line {}", line_number + 1))?;
+        if actual_filename != expected_filename {
+            return Err(format!("instance {name} must use filename {expected_filename}").into());
+        }
         let git_blob_sha1 = columns[2].to_owned();
         let size_bytes = columns[3].parse::<u64>()?;
         if name.is_empty()
