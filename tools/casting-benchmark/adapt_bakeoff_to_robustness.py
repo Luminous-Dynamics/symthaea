@@ -249,6 +249,7 @@ def adapt_documents(
             "schema_version", "benchmark_id", "source_sweep_sha256",
             "candidate_pool_sha256", "selector", "shifts", "holdout_role",
             "manifest_generator_sha256", "evidence_class", "shift_suite_id",
+            "selection_manifest_sha256",
         },
         "holdout_manifest",
     )
@@ -262,6 +263,8 @@ def adapt_documents(
         raise ValueError("holdout_manifest.shift_suite_id must be non-empty")
     if _digest(holdout["manifest_generator_sha256"], "holdout_manifest.manifest_generator_sha256") != generator_sha:
         raise ValueError("selection and holdout manifests must use the same generator digest")
+    if _digest(holdout["selection_manifest_sha256"], "holdout_manifest.selection_manifest_sha256") != hashlib.sha256(selection_raw).hexdigest():
+        raise ValueError("holdout manifest is not bound to these exact selection manifest bytes")
     if _digest(holdout["source_sweep_sha256"], "holdout_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("holdout manifest is not bound to these exact sweep bytes")
     if _digest(holdout["candidate_pool_sha256"], "holdout_manifest.candidate_pool_sha256") != candidate_pool_sha:
