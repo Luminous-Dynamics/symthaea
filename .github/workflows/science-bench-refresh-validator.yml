@@ -38,6 +38,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --locked --manifest-path research/science-bench-refresh/Cargo.toml --all-targets -- -D warnings
 
+      - name: Independent Python reference unit tests
+        run: python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_*.py' -v
+
       - name: Fixture is valid but never eligible for scoring
         shell: bash
         run: |
@@ -231,6 +234,28 @@ jobs:
             /tmp/sbr-generated-task-set.json > /tmp/sbr-reference-replay.json
           grep -q '"independent_semantic_match": true' /tmp/sbr-reference-replay.json
           grep -q '"task_count": 8' /tmp/sbr-reference-replay.json
+
+          # The independent oracle must reject a valid-JSON but altered task set.
+          set +e
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin "$config" \
+            /tmp/sbr-mutated-generated-task-set.json > /tmp/sbr-reference-mutated-task.json 2> /tmp/sbr-reference-mutated-task.stderr
+          python_task_exit=$?
+          set -e
+          test "$python_task_exit" -eq 2
+          grep -q 'independent semantic replay differs' /tmp/sbr-reference-mutated-task.stderr
+
+          # A different revealed seed must not reproduce the same Rust artifact.
+          cp /tmp/sbr-gen-seed.bin /tmp/sbr-reference-other-seed.bin
+          printf 'C' | dd of=/tmp/sbr-reference-other-seed.bin bs=1 seek=0 conv=notrunc status=none
+          set +e
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-reference-other-seed.bin "$config" \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-reference-mutated-seed.json 2> /tmp/sbr-reference-mutated-seed.stderr
+          python_seed_exit=$?
+          set -e
+          test "$python_seed_exit" -eq 2
+          grep -q 'independent semantic replay differs' /tmp/sbr-reference-mutated-seed.stderr
 
           # Mutation 1: changing the pinned generator config must fail closed.
           cp "$config" /tmp/sbr-mutated-config.json
