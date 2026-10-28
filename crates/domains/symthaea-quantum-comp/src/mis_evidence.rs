@@ -36,6 +36,59 @@ pub enum MisEvidenceVerdict {
     VerifiedConflict,
 }
 
+/// Experiment identity bound into a verifier receipt.
+///
+/// The IDs are restricted to canonical single-token ASCII so they can be embedded
+/// in receipt bytes without escaping ambiguity. This binds a receipt to a record
+/// identity; it is not proof that the candidate came from the claimed process.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MisEvidenceContext {
+    protocol_sha256: String,
+    trial_id: String,
+    pair_id: String,
+    seed: u64,
+}
+
+impl MisEvidenceContext {
+    /// Construct context after validating the protocol digest and canonical identifiers.
+    pub fn new(
+        protocol_sha256: &str,
+        trial_id: &str,
+        pair_id: &str,
+        seed: u64,
+    ) -> Result<Self, MisEvidenceError> {
+        validate_lower_sha256(protocol_sha256)?;
+        validate_context_id(trial_id)?;
+        validate_context_id(pair_id)?;
+        Ok(Self {
+            protocol_sha256: protocol_sha256.to_owned(),
+            trial_id: trial_id.to_owned(),
+            pair_id: pair_id.to_owned(),
+            seed,
+        })
+    }
+
+    /// Frozen experiment-protocol SHA-256.
+    pub fn protocol_sha256(&self) -> &str { &self.protocol_sha256 }
+    /// Unique attempt identifier for this arm.
+    pub fn trial_id(&self) -> &str { &self.trial_id }
+    /// Paired attempt identifier shared by comparison arms.
+    pub fn pair_id(&self) -> &str { &self.pair_id }
+    /// Declared PRNG seed identity for this attempt.
+    pub fn seed(&self) -> u64 { self.seed }
+}
+
+fn validate_context_id(value: &str) -> Result<(), MisEvidenceError> {
+    if value.is_empty()
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
+        })
+    {
+        return Err(MisEvidenceError::InvalidTrialContext);
+    }
+    Ok(())
+}
+
 /// A non-forgeable-by-safe-API result of checking canonical graph and candidate bytes.
 ///
 /// Fields are private so callers cannot manufacture a successful receipt by filling
@@ -52,6 +105,7 @@ pub struct VerifiedMisCandidate {
     candidate_size: usize,
     conflict_count: usize,
     verdict: MisEvidenceVerdict,
+    context: Option<MisEvidenceContext>,
 }
 
 impl VerifiedMisCandidate {
@@ -73,6 +127,8 @@ impl VerifiedMisCandidate {
     pub fn conflict_count(&self) -> usize { self.conflict_count }
     /// Feasibility verdict from recomputation.
     pub fn verdict(&self) -> MisEvidenceVerdict { self.verdict }
+    /// Context bound into the canonical receipt, absent for generic non-experiment verification.
+    pub fn context(&self) -> Option<&MisEvidenceContext> { self.context.as_ref() }
     /// Whether this verified independent set reaches the frozen target.
     pub fn reaches_target(&self) -> bool {
         self.verdict == MisEvidenceVerdict::VerifiedIndependentSet
@@ -174,6 +230,37 @@ pub fn verify_mis_candidate(
     target_size: usize,
     verifier_sha256: &str,
 ) -> Result<VerifiedMisCandidate, MisEvidenceError> {
+    verify_mis_candidate_internal(graph_bytes, candidate_bytes, target_size, verifier_sha256, None)
+}
+
+/// Verify a candidate and bind its receipt to the exact experiment-trial identity.
+///
+/// An unscoped receipt produced by `verify_mis_candidate` is intentionally insufficient
+/// for a successful `MatchedTrialRecord`. The context is identity binding, not process
+/// attestation or a cryptographic signature.
+pub fn verify_mis_candidate_for_trial(
+    graph_bytes: &[u8],
+    candidate_bytes: &[u8],
+    target_size: usize,
+    verifier_sha256: &str,
+    context: MisEvidenceContext,
+) -> Result<VerifiedMisCandidate, MisEvidenceError> {
+    verify_mis_candidate_internal(
+        graph_bytes,
+        candidate_bytes,
+        target_size,
+        verifier_sha256,
+        Some(context),
+    )
+}
+
+fn verify_mis_candidate_internal(
+    graph_bytes: &[u8],
+    candidate_bytes: &[u8],
+    target_size: usize,
+    verifier_sha256: &str,
+    context: Option<MisEvidenceContext>,
+) -> Result<VerifiedMisCandidate, MisEvidenceError> {
     if target_size == 0 {
         return Err(MisEvidenceError::ZeroTarget);
     }
@@ -203,6 +290,7 @@ pub fn verify_mis_candidate(
         selected_count,
         conflicts,
         verdict,
+        context.as_ref(),
     );
     let receipt_sha256 = sha256_hex(&receipt_bytes);
     Ok(VerifiedMisCandidate {
@@ -215,6 +303,7 @@ pub fn verify_mis_candidate(
         candidate_size: selected_count,
         conflict_count: conflicts,
         verdict,
+        context,
     })
 }
 
@@ -230,6 +319,31 @@ pub fn verify_mis_candidate_with_receipt(
     persisted_receipt_bytes: &[u8],
 ) -> Result<VerifiedMisCandidate, MisEvidenceError> {
     let evidence = verify_mis_candidate(graph_bytes, candidate_bytes, target_size, verifier_sha256)?;
+    if evidence.receipt_bytes() != persisted_receipt_bytes {
+        return Err(MisEvidenceError::ReceiptBytesMismatch);
+    }
+    if sha256_hex(persisted_receipt_bytes) != evidence.receipt_sha256() {
+        return Err(MisEvidenceError::ReceiptDigestMismatch);
+    }
+    Ok(evidence)
+}
+
+/// Re-verify a trial-scoped receipt and fail unless its exact bytes are recomputed.
+pub fn verify_mis_candidate_for_trial_with_receipt(
+    graph_bytes: &[u8],
+    candidate_bytes: &[u8],
+    target_size: usize,
+    verifier_sha256: &str,
+    context: MisEvidenceContext,
+    persisted_receipt_bytes: &[u8],
+) -> Result<VerifiedMisCandidate, MisEvidenceError> {
+    let evidence = verify_mis_candidate_for_trial(
+        graph_bytes,
+        candidate_bytes,
+        target_size,
+        verifier_sha256,
+        context,
+    )?;
     if evidence.receipt_bytes() != persisted_receipt_bytes {
         return Err(MisEvidenceError::ReceiptBytesMismatch);
     }
@@ -390,13 +504,24 @@ fn canonical_receipt_bytes(
     candidate_size: usize,
     conflict_count: usize,
     verdict: MisEvidenceVerdict,
+    context: Option<&MisEvidenceContext>,
 ) -> Vec<u8> {
+    let (context_present, protocol_sha256, trial_id, pair_id, seed) = match context {
+        Some(context) => (
+            "1",
+            context.protocol_sha256(),
+            context.trial_id(),
+            context.pair_id(),
+            context.seed().to_string(),
+        ),
+        None => ("0", "-", "-", "-", "-".to_owned()),
+    };
     let verdict = match verdict {
         MisEvidenceVerdict::VerifiedIndependentSet => "verified-independent-set",
         MisEvidenceVerdict::VerifiedConflict => "verified-conflict",
     };
     format!(
-        "SYMTHEA-MIS-RECEIPT-V1\ninstance_sha256 {instance_sha256}\nverifier_sha256 {verifier_sha256}\ncandidate_sha256 {candidate_sha256}\ntarget_size {target_size}\ncandidate_size {candidate_size}\nconflict_count {conflict_count}\nverdict {verdict}\n"
+        "SYMTHEA-MIS-RECEIPT-V1\ninstance_sha256 {instance_sha256}\nverifier_sha256 {verifier_sha256}\ncandidate_sha256 {candidate_sha256}\ntarget_size {target_size}\ncandidate_size {candidate_size}\nconflict_count {conflict_count}\nverdict {verdict}\ncontext_present {context_present}\nprotocol_sha256 {protocol_sha256}\ntrial_id {trial_id}\npair_id {pair_id}\nseed {seed}\n"
     ).into_bytes()
 }
 
@@ -428,6 +553,7 @@ pub enum MisEvidenceError {
     DimacsEdgeCountMismatch,
     DuplicateDimacsEdge,
     ZeroTarget,
+    InvalidTrialContext,
     ReceiptBytesMismatch,
     ReceiptDigestMismatch,
 }
@@ -460,6 +586,7 @@ impl fmt::Display for MisEvidenceError {
             Self::DimacsEdgeCountMismatch => write!(f, "DIMACS declared edge count does not match edge rows"),
             Self::DuplicateDimacsEdge => write!(f, "DIMACS input contains a duplicate undirected edge"),
             Self::ZeroTarget => write!(f, "target cardinality must be positive"),
+            Self::InvalidTrialContext => write!(f, "trial context IDs must be non-empty canonical single-token ASCII"),
             Self::ReceiptBytesMismatch => write!(f, "persisted receipt bytes differ from recomputed receipt"),
             Self::ReceiptDigestMismatch => write!(f, "persisted receipt digest does not match its bytes"),
         }
