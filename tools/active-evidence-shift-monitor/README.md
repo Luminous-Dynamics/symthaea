@@ -90,3 +90,27 @@ The calculation is exact for the finite Bernoulli state model, not for real-worl
 Methodological references:
 - Waudby-Smith & Ramdas, *Estimating means of bounded random variables by betting*, JRSS B 2024: https://doi.org/10.1093/jrsssb/qkad009
 - Howard et al., *Time-uniform, nonparametric, nonasymptotic confidence sequences*, Annals of Statistics 2021: https://doi.org/10.1214/20-AOS1991
+
+
+## Shift-magnitude sensitivity (added)
+
+The exact DP now runs a grid of ten alternatives after the same 100-observation nominal period: p1 in {0.10, 0.20, 0.30, 0.40, 0.45, 0.55, 0.60, 0.70, 0.80, 0.90}. This checks both downward and upward changes, including weak alternatives close to p0, rather than relying only on the dramatic 0.5→0.8 demonstration.
+
+Independent Python exact-DP results at horizon 1,000 (detection probability and conditional mean delay):
+
+| Post-change p1 | Time-uniform Hoeffding: detection / delay | Beta-mixture e-process: detection / delay |
+|---:|---:|---:|
+| 0.10 | 1.0000 / 103.8 | 0.9975 / 65.2 |
+| 0.20 | 1.0000 / 157.5 | 0.9975 / 94.8 |
+| 0.30 | 1.0000 / 301.4 | 0.9975 / 167.9 |
+| 0.40 | 0.3095 / 720.4 | 0.9428 / 487.2 |
+| 0.45 | 0.0005 / 731.7 | 0.1184 / 639.2 |
+| 0.55 | 0.0005 / 731.7 | 0.1184 / 639.2 |
+| 0.60 | 0.3095 / 720.4 | 0.9428 / 487.2 |
+| 0.70 | 1.0000 / 301.4 | 0.9975 / 167.9 |
+| 0.80 | 1.0000 / 157.5 | 0.9975 / 94.8 |
+| 0.90 | 1.0000 / 103.8 | 0.9975 / 65.2 |
+
+The conservative Hoeffding sequence can be markedly slower / lower powered for moderate shifts. The Beta mixture improves detection power for p1=0.40 from about 31% to 94% by horizon 1,000, while remaining under the per-cell alpha allocation in the stationary-null experiment. For p1=0.45/0.55, both detectors struggle, though the Beta mixture is materially better. These results are symmetric for upward/downward shifts because p0=0.5 and the Beta prior is symmetric.
+
+These are exact probabilities for the specified iid Bernoulli step-shift simulator—not a universal ranking. The fixed alternative mixture may be less efficient on gradual drifts, bursts, or shifts whose direction and temporal pattern differ from this setup. The next confirmatory matrix should include gradual ramps, temporary bursts, serial dependence and selection-biased observations, and compare false-alarm budgets at matched detection delay as well as detection at matched false-alarm rate.
