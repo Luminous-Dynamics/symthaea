@@ -100,6 +100,7 @@ FAKE_WORKER = textwrap.dedent(
     mode = os.environ.get("BROCA_FAKE_WORKER_MODE", "normal")
     scope = None
     trajectory_ids = set()
+    evidence_active = False
 
     def emit(request_id, ok, result=None, error=None):
         response = {"request_id": request_id, "ok": ok}
@@ -137,28 +138,47 @@ FAKE_WORKER = textwrap.dedent(
                     emit(request_id, False, error="duplicate trajectory")
                 else:
                     trajectory_ids.add(trajectory_id)
+                    evidence_active = True
                     emit(request_id, True, {
                         "trajectory_id": trajectory_id,
                         "inserted_evidence_items": 1,
                         "source_sha256": "a" * 64
                     })
+            elif op in {"revoke", "delete"}:
+                evidence_active = False
+                emit(request_id, True, {
+                    "evidence_id": request.get("evidence_id"),
+                    "lifecycle": "revoked" if op == "revoke" else "deleted"
+                })
+            elif op == "supersede":
+                emit(request_id, True, {
+                    "old_evidence_id": request.get("old_evidence_id"),
+                    "new_evidence_id": request.get("new_evidence_id"),
+                    "lifecycle": "superseded"
+                })
             elif op == "query":
                 if mode == "slow_query":
                     time.sleep(1.0)
-                value = "billing panel"
-                digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
-                if mode == "digest_mismatch":
-                    digest = "0" * 64
-                emit(request_id, True, {
-                    "context": [{"type": "text", "value": value}],
-                    "audit": [{
+                if evidence_active:
+                    value = "billing panel"
+                    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+                    if mode == "digest_mismatch":
+                        digest = "0" * 64
+                    context = [{"type": "text", "value": value}]
+                    audit = [{
                         "evidence_id": "e" * 64,
                         "trajectory_id": next(iter(trajectory_ids), "trajectory-1"),
                         "source_pointer": "/states/0/text",
                         "source_sha256": "a" * 64,
                         "content_sha256": digest,
                         "bm25_score": 1.25
-                    }],
+                    }]
+                else:
+                    context = []
+                    audit = []
+                emit(request_id, True, {
+                    "context": context,
+                    "audit": audit,
                     "image_query_received_but_not_used": bool(request.get("query_image"))
                 })
             else:
