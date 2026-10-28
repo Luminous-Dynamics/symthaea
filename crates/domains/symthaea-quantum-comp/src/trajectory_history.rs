@@ -508,6 +508,51 @@ mod tests {
     }
 
     #[test]
+    fn temporal_features_distinguish_trajectories_with_identical_terminal_frequency() {
+        let early = vec![
+            history("early-a", HistoryOutcome::Completed, vec![
+                frame(0.0, &[-1.0]),
+                frame(0.25, &[1.0]),
+                frame(0.75, &[1.0]),
+                frame(1.0, &[1.0]),
+            ]),
+            history("early-b", HistoryOutcome::Completed, vec![
+                frame(0.0, &[-1.0]),
+                frame(0.25, &[1.0]),
+                frame(0.75, &[1.0]),
+                frame(1.0, &[1.0]),
+            ]),
+        ];
+        let late = vec![
+            history("late-a", HistoryOutcome::Completed, vec![
+                frame(0.0, &[-1.0]),
+                frame(0.25, &[-1.0]),
+                frame(0.75, &[-1.0]),
+                frame(1.0, &[1.0]),
+            ]),
+            history("late-b", HistoryOutcome::Completed, vec![
+                frame(0.0, &[-1.0]),
+                frame(0.25, &[-1.0]),
+                frame(0.75, &[-1.0]),
+                frame(1.0, &[1.0]),
+            ]),
+        ];
+        let early_summary = TrajectoryHistorySummary::from_histories(1, &early, 0.0).unwrap();
+        let late_summary = TrajectoryHistorySummary::from_histories(1, &late, 0.0).unwrap();
+        let early_vertex = &early_summary.vertices[0];
+        let late_vertex = &late_summary.vertices[0];
+
+        // Final-spin priors cannot distinguish these cohorts: both select the
+        // only vertex in every completed run. The time-resolved feature can.
+        assert_eq!(early_vertex.terminal_selection_frequency, Some(1.0));
+        assert_eq!(late_vertex.terminal_selection_frequency, Some(1.0));
+        assert_eq!(early_vertex.mean_late_flip_rate, Some(0.0));
+        assert_eq!(late_vertex.mean_late_flip_rate, Some(1.0 / 3.0));
+        assert_eq!(early_vertex.mean_last_flip_time, Some(0.25));
+        assert_eq!(late_vertex.mean_last_flip_time, Some(1.0));
+    }
+
+    #[test]
     fn ambiguous_samples_are_not_imputed_into_spurious_flips() {
         let histories = vec![history("ambiguous-middle", HistoryOutcome::Completed, vec![
             frame(0.0, &[-1.0]), frame(0.5, &[0.0]), frame(1.0, &[1.0]),
