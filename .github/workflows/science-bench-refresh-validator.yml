@@ -225,6 +225,13 @@ jobs:
           grep -q '"task_set_contract_valid": true' /tmp/sbr-regeneration-report.json
           test "$(jq '.tasks | length' /tmp/sbr-generated-task-set.json)" -eq 8
 
+          # Independent stdlib-only reference implementation, not production code.
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin "$config" \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-reference-replay.json
+          grep -q '"independent_semantic_match": true' /tmp/sbr-reference-replay.json
+          grep -q '"task_count": 8' /tmp/sbr-reference-replay.json
+
           # Mutation 1: changing the pinned generator config must fail closed.
           cp "$config" /tmp/sbr-mutated-config.json
           printf ' ' >> /tmp/sbr-mutated-config.json
