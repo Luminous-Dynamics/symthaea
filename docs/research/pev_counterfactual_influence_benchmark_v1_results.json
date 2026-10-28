@@ -5,16 +5,41 @@
   "generated_trials_accepted": 100000,
   "invalid_payload_variants_per_trial": 7,
   "mutation_results": {
-    "counterfactual_input_mismatch": {"expected_error_detected": true, "rejected": true},
-    "duplicate_positive_admission": {"expected_error_detected": true, "rejected": true},
-    "independent_outcome_suppression": {"expected_error_detected": true, "rejected": true},
-    "invalid_payload_changes_protected_state": {"expected_error_detected": true, "rejected": true},
-    "positive_control_missing_admission": {"expected_error_detected": true, "rejected": true},
-    "valid_pe_collateral_state_change": {"expected_error_detected": true, "rejected": true},
-    "valid_pe_noop_learner": {"expected_error_detected": true, "rejected": true}
+    "counterfactual_input_mismatch": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "duplicate_positive_admission": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "independent_outcome_suppression": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "invalid_payload_changes_protected_state": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "missing_target_consumer": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "positive_control_missing_admission": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "valid_pe_collateral_state_change": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "valid_pe_noop_learner": {
+      "expected_error_detected": true,
+      "rejected": true
+    }
   },
-  "mutations_detected": 7,
-  "mutations_injected": 7,
+  "mutations_detected": 8,
+  "mutations_injected": 8,
   "production_symthaea_imported": false,
   "rust_compiled_or_executed": false,
   "scope_note": "Synthetic paired state-digest fixtures only; not production causal verification or task-utility/SOTA evidence.",
