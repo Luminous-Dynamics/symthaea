@@ -22,6 +22,7 @@ The implementation is intentionally conservative:
 - The filesystem contract is currently Unix directory-fsync + same-filesystem rename. Other platforms fail closed; no cross-platform durability claim is made.
 - The production `commit_hdc_store(&mut HdcStore, &EvidenceIndex)` path syncs the canonical HDC store, captures a generation-pinned view, records its internal generation + logical checksum, requires exact equality of live HDC IDs and Active evidence IDs, and copies the canonical bytes into an immutable generation.
 - On recovery, typed commits are opened via `HdcStoreReader` with deterministic ANN-index rebuild; the internal generation, checksum version/value, live count and ID parity are checked against the evidence snapshot. The opaque-byte `commit` method exists only for module tests.
+- `prune_history(retain_generations)` uses the same writer lock, requires a verified CURRENT commit, retains the explicit generation-number window, removes unpublished future generations and orphan `.staging-*` directories, and syncs the generation directory. It preserves all immutable variants for a retained historical generation because no authenticated predecessor chain identifies which variant was once current.
 - The application still must mutate vector and evidence lifecycle state together: delete/revoke/supersede the HDC vector before committing the inactive evidence state. A failed parity check leaves the previous committed generation current.
 
 The in-process fault hooks cover interruption after the HDC-index write, evidence snapshot write, manifest write, generation publication, before `CURRENT` publication, and after `CURRENT` rename. They are deterministic failure-injection tests, **not** process-kill or power-loss tests.
@@ -52,7 +53,7 @@ The in-memory module does not implement these filesystem steps. Atomic rename al
 
 ## Crash and adversarial matrix
 
-The disk-store prototype has deterministic in-process failpoints for commit stages. Qualification must additionally kill a separate process at each stage, restart from the resulting directory, and on supported lab hardware perform power-cut trials; the current failpoints do not qualify those conditions.
+The disk-store prototype has deterministic in-process failpoints for commit stages plus retention tests for current-generation preservation, stale-staging cleanup, unpublished future-generation pruning, and refusal to prune on a corrupt CURRENT pointer. Qualification must additionally kill a separate process at each stage, restart from the resulting directory, and on supported lab hardware perform power-cut trials; the current failpoints do not qualify those conditions.
 
 | Fixture | Required result |
 |---|---|
