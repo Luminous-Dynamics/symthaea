@@ -111,9 +111,9 @@ This is a reference-model smoke test only. It does not compile or run Symthaea, 
 
 ## 8. Implementation path
 
-1. Extend CodingAgent pending outcomes to store the frozen decision-time evidence snapshot/reference; do not synthesize provenance for legacy scalar callers.
-2. Propagate the immutable reference through posthoc resolution and telemetry.
-3. Add focused Rust unit and integration tests for DTA-01 through DTA-10, including the positive control.
+1. **Partial implementation in draft PR #8716:** CodingAgent pending outcomes now carry the typed evidence and explicit decision cycle; posthoc outcomes retain the cycle and evidence. A cycle mismatch is converted to `StaleOrOutOfOrder`, and its scalar PE becomes unavailable. The compatibility scalar-only route remains explicitly provenance-free.
+2. Complete stable event identity / canonical digest and propagate that immutable reference through telemetry. The current cycle binding is not an event-ID or tamper-proof guarantee.
+3. Add/execute focused Rust unit and integration tests for DTA-01 through DTA-10, including positive controls and serialization migration cases. Tests are authored but have not executed.
 4. Add an independent raw-trace auditor and deterministic generated-case test in Rust; keep its scoring separate from model utility.
 5. Validate at the exact commit with formatting, compile, focused tests, relevant full suite, and workflow evidence. Queued, skipped, or stale-head runs are not passes.
 
