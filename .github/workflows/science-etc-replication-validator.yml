@@ -1,0 +1,86 @@
+name: SCI ETC Replication Manifest Validator
+
+on:
+  pull_request:
+    paths:
+      - "research/science-etc-replication/**"
+      - "docs/research/SCI-ETC-REPLICATION-001.md"
+      - ".github/workflows/science-etc-replication-validator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: science-etc-replication-validator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validator:
+    name: Paired replication manifest contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path research/science-etc-replication/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/science-etc-replication/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path research/science-etc-replication/Cargo.toml --all-targets -- -D warnings
+
+      - name: Fixture is valid but never eligible for scoring
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="research/science-etc-replication/fixtures/run-manifest.example.json"
+          cargo run --locked --quiet --manifest-path research/science-etc-replication/Cargo.toml -- "$manifest" > /tmp/etc-replication-report.json
+          grep -q '"valid": true' /tmp/etc-replication-report.json
+          grep -q '"manifest_declares_scoring_eligible": false' /tmp/etc-replication-report.json
+          grep -q '"expected_task_cells_per_budget_profile": 72' /tmp/etc-replication-report.json
+          grep -q '"expected_attempts_per_budget_profile": 576' /tmp/etc-replication-report.json
+
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-etc-replication/Cargo.toml -- "$manifest" --require-qualified > /tmp/etc-replication-required.json
+          qualified_exit=$?
+          set -e
+          test "$qualified_exit" -eq 3
+
+      - name: Hostile mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="research/science-etc-replication/fixtures/run-manifest.example.json"
+
+          jq '.arms[7].acquisition = "variance"' "$manifest" > /tmp/etc-mutated-grid.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-etc-replication/Cargo.toml -- /tmp/etc-mutated-grid.json > /tmp/etc-mutated-grid-report.json
+          grid_exit=$?
+          set -e
+          test "$grid_exit" -eq 2
+          grep -q 'duplicate explore-then-commit combination' /tmp/etc-mutated-grid-report.json
+
+          jq '.budget_profiles.measurement_matched.reject_over_budget_action = false' "$manifest" > /tmp/etc-mutated-budget.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-etc-replication/Cargo.toml -- /tmp/etc-mutated-budget.json > /tmp/etc-mutated-budget-report.json
+          budget_exit=$?
+          set -e
+          test "$budget_exit" -eq 2
+          grep -q 'rejected, not silently truncated' /tmp/etc-mutated-budget-report.json
+
+          jq '.primary_contrasts[0].right_arm_id = "not-a-real-arm"' "$manifest" > /tmp/etc-mutated-contrast.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-etc-replication/Cargo.toml -- /tmp/etc-mutated-contrast.json > /tmp/etc-mutated-contrast-report.json
+          contrast_exit=$?
+          set -e
+          test "$contrast_exit" -eq 2
+          grep -q 'unknown right arm' /tmp/etc-mutated-contrast-report.json
