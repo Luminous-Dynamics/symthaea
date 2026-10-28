@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from run_probe import read_jsonl, resolve_pointer, validate_fixtures
+from score_probe import score_dataset
 
 HERE = Path(__file__).resolve().parent
 FIXTURE_DIR = HERE / "fixtures" / "mutations"
@@ -68,6 +69,30 @@ class MutationFixtureTests(unittest.TestCase):
         proposed_region = self.question_by_id["MCB-008"]
         self.assertIn("/states/0/text", {x["source_pointer"] for x in current_region["forbidden_support"]})
         self.assertIn("/states/0/text", {x["source_pointer"] for x in proposed_region["required_support"]})
+
+    def test_stale_evidence_breaks_safe_chain_even_when_ordinary_chain_is_complete(self) -> None:
+        predictions = []
+        for question in self.questions:
+            audit = [
+                {"trajectory_id": ref["trajectory_id"], "source_pointer": ref["source_pointer"]}
+                for ref in question["required_support"]
+            ]
+            # Adversarial negative control: return the obsolete address alongside
+            # all current support. Ordinary completeness must not hide the violation.
+            if question["question_id"] == "MCB-001":
+                audit.extend(
+                    {"trajectory_id": ref["trajectory_id"], "source_pointer": ref["source_pointer"]}
+                    for ref in question["forbidden_support"]
+                )
+            predictions.append({"question_id": question["question_id"], "audit": audit})
+
+        report = score_dataset(self.questions, predictions, 5)
+        self.assertEqual(report["overall"]["complete_chain_rate_at_k"], 1.0)
+        self.assertEqual(report["overall"]["safe_complete_chain_rate_at_k"], 11 / 12)
+        bad = next(row for row in report["per_question"] if row["question_id"] == "MCB-001")
+        self.assertTrue(bad["complete_chain_at_k"])
+        self.assertFalse(bad["safe_complete_chain_at_k"])
+        self.assertEqual(bad["forbidden_hits_at_k"], 1)
 
     def test_causal_chain_labels_exclude_the_failed_intervention_from_required_support(self) -> None:
         question = self.question_by_id["MCB-009"]
