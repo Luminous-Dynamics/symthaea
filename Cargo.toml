@@ -15,6 +15,9 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Ring 0 exact-head audit found this directory but no Cargo.toml; do not
+    # treat an incomplete verifier directory as a workspace package.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # Source-only directory has no Cargo.toml; see #7048/#8065.
     "crates/core/symthaea-observation-attestation",
     # Orphaned directory containing only an empty examples/unused.rs; the root
