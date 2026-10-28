@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Run one pinned VLEB witness command and record an evaluator-bindable receipt.
+
+This recorder is intended for a trusted, isolated evaluation workflow. The
+caller must independently enforce the declared network/runtime policy and must
+not pass secrets in command arguments. The recorded receipt is not a signature:
+it becomes trustworthy only when its bytes are in the attested evidence bundle
+and the evaluator checks every run, verifier, source, and artifact binding.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+WITNESS_KINDS = (
+    "source_index",
+    "static_analysis",
+    "compiler",
+    "independent_execution",
+    "independent_expert_review",
+)
+RESULTS = ("supports", "contradicts", "inconclusive")
+ENV_ALLOWLIST = (
+    "PATH", "HOME", "TMPDIR", "TEMP", "LANG", "LC_ALL", "TZ",
+    "CARGO_HOME", "RUSTUP_HOME", "PYTHONPATH", "SYSTEMROOT", "WINDIR",
+)
+
+
+def digest(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def safe_path(root: Path, value: str, *, must_exist: bool) -> Path:
+    if not value or "\\" in value or "\x00" in value:
+        raise ValueError("path must be a non-empty canonical POSIX relative path")
+    rel = PurePosixPath(value)
+    if rel.is_absolute() or ".." in rel.parts or str(rel) != value:
+        raise ValueError("absolute, traversal, or ambiguous paths are rejected")
+    base = root.resolve(strict=True)
+    current = base
+    for part in rel.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("symlink paths are rejected")
+    resolved = current.resolve(strict=must_exist)
+    if not resolved.is_relative_to(base):
+        raise ValueError("path escapes artifact root")
+    return resolved
+
+
+def required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"required trusted runner variable {name} is missing")
+    return value
+
+
+def env_context() -> dict[str, Any]:
+    # These values must be injected by the protected workflow, not from the
+    # candidate patch or the agent-controlled command.
+    return {
+        "repository_full_name": required_env("GITHUB_REPOSITORY"),
+        "repository_id": int(required_env("VLEB_REPOSITORY_ID")),
+        "run_id": required_env("GITHUB_RUN_ID"),
+        "run_attempt": int(required_env("GITHUB_RUN_ATTEMPT")),
+        "source_repository_digest": required_env("GITHUB_SHA"),
+        "source_repository_ref": required_env("GITHUB_REF"),
+        "candidate_checkout_revision": required_env("VLEB_CANDIDATE_CHECKOUT_REVISION"),
+        "workflow_sha": required_env("VLEB_WORKFLOW_SHA"),
+        "workflow_ref": required_env("GITHUB_WORKFLOW_REF"),
+    }
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--artifact-root", type=Path, required=True)
+    parser.add_argument("--task-id", required=True)
+    parser.add_argument("--claim-id", required=True)
+    parser.add_argument("--source-path", required=True)
+    parser.add_argument("--verifier-kind", choices=WITNESS_KINDS, required=True)
+    parser.add_argument("--verifier-id", required=True)
+    parser.add_argument("--verifier-sha256", required=True)
+    parser.add_argument("--observed-result", choices=RESULTS, required=True)
+    parser.add_argument("--runtime-image-id", required=True)
+    parser.add_argument("--network-mode", choices=("none", "restricted", "enabled"), required=True)
+    parser.add_argument("--network-mode-observed", choices=("true", "false"), required=True)
+    parser.add_argument("--working-directory", default=".")
+    parser.add_argument("--timeout-ms", type=int, default=120000)
+    parser.add_argument("--receipt-path", required=True)
+    parser.add_argument("--stdout-path", required=True)
+    parser.add_argument("--stderr-path", required=True)
+    parser.add_argument("--input", action="append", default=[], dest="inputs")
+    parser.add_argument("--output-artifact", action="append", default=[], dest="output_artifacts")
+    parser.add_argument("command", nargs=argparse.REMAINDER)
+    args = parser.parse_args(argv)
+    if args.command and args.command[0] == "--":
+        args.command = args.command[1:]
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        args = parse_args(argv)
+        if args.timeout_ms < 1:
+            raise ValueError("timeout must be positive")
+        if not args.command or not args.command[0]:
+            raise ValueError("a verifier command must follow --")
+        if len(args.verifier_sha256) != 64 or any(ch not in "0123456789abcdef" for ch in args.verifier_sha256):
+            raise ValueError("verifier SHA-256 must be 64 lowercase hexadecimal characters")
+        if not args.claim_id or len(args.claim_id) > 128:
+            raise ValueError("claim ID is invalid")
+
+        root = args.artifact_root.resolve(strict=True)
+        source = safe_path(root, args.source_path, must_exist=True)
+        if not source.is_file():
+            raise ValueError("source path must name a regular file")
+        cwd = safe_path(root, args.working_directory, must_exist=True)
+        if not cwd.is_dir():
+            raise ValueError("working directory must be a directory within artifact root")
+
+        receipt_path = safe_path(root, args.receipt_path, must_exist=False)
+        stdout_path = safe_path(root, args.stdout_path, must_exist=False)
+        stderr_path = safe_path(root, args.stderr_path, must_exist=False)
+        if len({receipt_path, stdout_path, stderr_path}) != 3:
+            raise ValueError("receipt, stdout and stderr paths must be distinct")
+        if receipt_path in (source, cwd) or stdout_path == source or stderr_path == source:
+            raise ValueError("receipt/output paths may not overwrite the source or working directory")
+
+        input_rows: list[dict[str, str]] = []
+        for value in [args.source_path, *args.inputs]:
+            path = safe_path(root, value, must_exist=True)
+            if not path.is_file():
+                raise ValueError(f"input is not a regular file: {value}")
+            row = {"path": value, "sha256": digest(path.read_bytes())}
+            if row not in input_rows:
+                input_rows.append(row)
+
+        output_values = [("stdout", args.stdout_path), ("stderr", args.stderr_path)]
+        output_values.extend(("artifact", value) for value in args.output_artifacts)
+        if any(value in {args.receipt_path, args.source_path} for _, value in output_values):
+            raise ValueError("output artifacts may not overwrite the receipt or source")
+        if len({value for _, value in output_values}) != len(output_values):
+            raise ValueError("output artifact paths must be unique")
+
+        clean_env = {name: os.environ[name] for name in ENV_ALLOWLIST if name in os.environ}
+        env_sha = digest(json.dumps(clean_env, sort_keys=True, separators=(",", ":")).encode())
+        timed_out = False
+        signal_name: str | None = None
+        exit_code: int | None = None
+        try:
+            completed = subprocess.run(
+                args.command,
+                cwd=cwd,
+                env=clean_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=args.timeout_ms / 1000,
+            )
+            stdout = completed.stdout
+            stderr = completed.stderr
+            exit_code = completed.returncode
+            if exit_code < 0:
+                try:
+                    signal_name = signal.Signals(-exit_code).name
+                except ValueError:
+                    signal_name = f"SIG{-exit_code}"
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            stdout = exc.stdout or b""
+            stderr = exc.stderr or b""
+
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stderr_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_bytes(stdout)
+        stderr_path.write_bytes(stderr)
+
+        output_rows: list[dict[str, str]] = []
+        for role, value in output_values:
+            path = safe_path(root, value, must_exist=True)
+            if not path.is_file():
+                raise ValueError(f"output is not a regular file: {value}")
+            output_rows.append({"path": value, "sha256": digest(path.read_bytes()), "role": role})
+
+        receipt = {
+            "schema_version": "vleb-witness-execution-receipt-v1",
+            "task_id": args.task_id,
+            "claim_id": args.claim_id,
+            "source_sha256": digest(source.read_bytes()),
+            "run_binding": env_context(),
+            "runtime": {
+                "immutable_image_id": args.runtime_image_id,
+                "network_mode": args.network_mode,
+                "network_mode_observed": args.network_mode_observed == "true",
+            },
+            "producer": {
+                "id": "vleb-record-witness-execution",
+                "source_sha256": digest(Path(__file__).read_bytes()),
+            },
+            "verifier": {
+                "kind": args.verifier_kind,
+                "id": args.verifier_id,
+                "sha256": args.verifier_sha256,
+            },
+            "invocation": {
+                "argv": args.command,
+                "working_directory": args.working_directory,
+                "timeout_ms": args.timeout_ms,
+                "environment_sha256": env_sha,
+            },
+            "inputs": input_rows,
+            "outputs": output_rows,
+            "process": {
+                "exit_code": exit_code,
+                "signal": signal_name,
+                "timed_out": timed_out,
+            },
+            "observed_result": "inconclusive" if timed_out else args.observed_result,
+        }
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(json.dumps({
+            "receipt_path": args.receipt_path,
+            "receipt_sha256": digest(receipt_path.read_bytes()),
+            "process_exit_code": exit_code,
+            "timed_out": timed_out,
+            "observed_result": receipt["observed_result"],
+        }, sort_keys=True))
+        return 0
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        print(json.dumps({"error": str(exc), "receipt_created": False}, sort_keys=True), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
