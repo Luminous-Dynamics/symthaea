@@ -278,6 +278,24 @@ jobs:
           else:
               raise SystemExit("schema must reject a missing strict/power scenario")
           bad = copy.deepcopy(fixture)
+          bad.pop("estimated_power_at_20pp_and_icc_020_lower_simultaneous_95")
+          try:
+              validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("schema must require the simultaneous power lower-bound field")
+
+          bad = copy.deepcopy(fixture)
+          bad.pop("known_exposed_validation_family_ids")
+          try:
+              validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("schema must require the validation exposure quarantine")
+
+          bad = copy.deepcopy(fixture)
           bad["schema_version"] = "pitb.power-report.v1"
           try:
               validator.validate(bad)
