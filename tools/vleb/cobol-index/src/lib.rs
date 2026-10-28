@@ -195,6 +195,11 @@ fn physical_records(input: &str, options: IndexOptions, diagnostics: &mut Vec<Di
         } else {
             ""
         };
+        // COBOL inline comments begin with *> only outside a quoted literal.
+        // Strip them before tokenization so examples in comments cannot become
+        // fake COPY statements, divisions, or data declarations.
+        let source_text = inline_comment_offset(source_text)
+            .map_or(source_text, |comment_start| &source_text[..comment_start]);
         let record = FixedRecord {
             line: line_number,
             text: source_text.to_owned(),
@@ -207,6 +212,40 @@ fn physical_records(input: &str, options: IndexOptions, diagnostics: &mut Vec<Di
         records.push(record);
     }
     records
+}
+
+fn inline_comment_offset(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut index = 0usize;
+    let mut quote: Option<u8> = None;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if let Some(active_quote) = quote {
+            if byte == active_quote {
+                if bytes.get(index + 1) == Some(&active_quote) {
+                    index += 2;
+                } else {
+                    quote = None;
+                    index += 1;
+                }
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+
+        if byte == b'\'' || byte == b'"' {
+            quote = Some(byte);
+            index += 1;
+            continue;
+        }
+        if byte == b'*' && bytes.get(index + 1) == Some(&b'>') {
+            return Some(index);
+        }
+        index += 1;
+    }
+    None
 }
 
 fn tokenizes_to_unterminated_literal(record: &FixedRecord) -> bool {
@@ -892,6 +931,22 @@ mod tests {
         assert!(codes.contains(&"tab_in_fixed_format_record"));
         assert!(codes.contains(&"non_ascii_fixed_format_record"));
         assert!(!result.copy_references.iter().any(|copy| copy.name == "NOT-A-COPY"));
+    }
+
+    #[test]
+    fn inline_comments_do_not_create_fake_source_anchors_and_quotes_are_preserved() {
+        let source = concat!(
+            "       IDENTIFICATION DIVISION. *> DATA DIVISION.\n",
+            "       PROGRAM-ID. INLINE1. *> PROGRAM-ID. FALSEID.\n",
+            "       PROCEDURE DIVISION.\n",
+            "           DISPLAY \"COPY NOT-A-COPY *> STILL-LITERAL.\". *> COPY COMMENT-COPY.\n",
+        );
+        let result = index(source);
+        assert_eq!(result.program_id.as_ref().map(|p| p.name.as_str()), Some("INLINE1"));
+        assert_eq!(result.divisions.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+            vec!["IDENTIFICATION", "PROCEDURE"]);
+        assert!(result.copy_references.is_empty());
+        assert!(!result.diagnostics.iter().any(|d| d.code == "duplicate_program_id"));
     }
 
     #[test]
