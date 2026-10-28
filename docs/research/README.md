@@ -319,6 +319,8 @@ A proposed, evidence-grounded research program focused on public HIV reservoir a
 - [Benchmark protocol](hiv-reservoir-discovery/BENCHMARK_PROTOCOL.md)
 - [Candidate dataset register](hiv-reservoir-discovery/datasets.json)
 - [Falsifiable hypothesis ledger schema](hiv-reservoir-discovery/HYPOTHESIS_LEDGER.schema.json)
+- [Industry and SOTA comparison](hiv-reservoir-discovery/INDUSTRY_AND_SOTA.md)
+- [Initial candidate research questions](hiv-reservoir-discovery/CANDIDATE_HYPOTHESES.md)
 
 ## Further Reading
 
