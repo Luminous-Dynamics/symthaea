@@ -55,6 +55,29 @@ BUDGET_FIELDS = (
     "pre_change_false_alarm_probability", "true_shift_detection_probability",
     "mean_delay_sentinel_labels", "mean_delay_total_label_equivalent", "per_cell_alpha",
 )
+EPROCESS_FAMILY_PRIORS = {
+    "beta_0.5_0.5": (0.5, 0.5),
+    "beta_1_1": (1.0, 1.0),
+    "beta_5_5": (5.0, 5.0),
+    "beta_20_20": (20.0, 20.0),
+}
+EPROCESS_FAMILY_ORDER = (
+    "beta_0.5_0.5",
+    "beta_1_1",
+    "beta_5_5",
+    "beta_20_20",
+    "equal_portfolio_4_priors",
+)
+EPROCESS_FAMILY_SCENARIOS = (
+    "stationary_null",
+    "step_up_055", "step_up_060", "step_up_070", "step_up_080", "step_up_090",
+    "selection_bias_no_environment_shift",
+)
+EPROCESS_FAMILY_FIELDS = (
+    "family", "scenario", "horizon", "change_after", "p0", "stream_pre_p", "p1",
+    "false_alarm_probability", "detection_probability", "mean_detection_delay",
+    "per_cell_alpha", "survival_probability", "log_e_threshold",
+)
 BETA_A = 0.5
 BETA_B = 0.5
 
@@ -350,6 +373,212 @@ def sentinel_budget_self_test():
     print("PASS: audit-budget conservation, zero-sentinel negative control, all sentinel null and pre-change alpha checks, and shift-magnitude power gates")
 
 
+def _beta_log_e_from_parameters(n, successes, p0, a, b, prior_log_beta=None):
+    if prior_log_beta is None:
+        prior_log_beta = log_beta(a, b)
+    return (
+        log_beta(successes + a, n - successes + b)
+        - prior_log_beta
+        - successes * math.log(p0)
+        - (n - successes) * math.log1p(-p0)
+    )
+
+
+def eprocess_family_alarm_tables(horizon=1000):
+    """Precompute every family boundary once for exact DP/reference parity."""
+    threshold = math.log(1.0 / PER_CELL_ALPHA)
+    prior_logs = {name: [None] * (horizon + 1) for name in EPROCESS_FAMILY_PRIORS}
+    normalizers = {
+        name: log_beta(a, b)
+        for name, (a, b) in EPROCESS_FAMILY_PRIORS.items()
+    }
+    for n in range(1, horizon + 1):
+        for name, (a, b) in EPROCESS_FAMILY_PRIORS.items():
+            normalizer = normalizers[name]
+            denominator = math.lgamma(n + a + b)
+            rows = []
+            for successes in range(n + 1):
+                log_marginal = (
+                    math.lgamma(successes + a)
+                    + math.lgamma(n - successes + b)
+                    - denominator
+                )
+                log_null = (
+                    successes * math.log(P0)
+                    + (n - successes) * math.log1p(-P0)
+                )
+                rows.append(log_marginal - normalizer - log_null)
+            prior_logs[name][n] = rows
+
+    log_values = {name: [None] * (horizon + 1) for name in EPROCESS_FAMILY_ORDER}
+    for name in EPROCESS_FAMILY_PRIORS:
+        log_values[name] = prior_logs[name]
+    for n in range(1, horizon + 1):
+        for successes in range(n + 1):
+            components = [
+                prior_logs[name][n][successes]
+                for name in EPROCESS_FAMILY_PRIORS
+            ]
+            maximum = max(components)
+            log_values["equal_portfolio_4_priors"][n] = (
+                log_values["equal_portfolio_4_priors"][n] or [None] * (n + 1)
+            )
+            log_values["equal_portfolio_4_priors"][n][successes] = (
+                maximum
+                + math.log(
+                    sum(0.25 * math.exp(value - maximum) for value in components)
+                )
+            )
+
+    return {
+        family: [
+            None if n == 0 else [value >= threshold for value in log_values[family][n]]
+            for n in range(horizon + 1)
+        ]
+        for family in EPROCESS_FAMILY_ORDER
+    }
+
+
+def simulate_from_alarm_table(alarm_table, scenario, horizon=1000):
+    post_shift_p = SHIFT_PROBABILITIES[scenario]
+    change_after = CHANGE_AFTER if post_shift_p is not None else 0
+    active = [0.0] * (horizon + 1)
+    active[0] = 1.0
+    first_alarm = [0.0] * (horizon + 1)
+
+    for n in range(1, horizon + 1):
+        probability = (
+            PRE_SHIFT_PROBABILITIES[scenario]
+            if post_shift_p is None or n <= change_after
+            else post_shift_p
+        )
+        next_active = [0.0] * (horizon + 1)
+        boundary = alarm_table[n]
+        for successes, mass in enumerate(active[:n]):
+            if mass == 0.0:
+                continue
+            for next_successes, branch_mass in (
+                (successes, mass * (1.0 - probability)),
+                (successes + 1, mass * probability),
+            ):
+                if boundary[next_successes]:
+                    first_alarm[n] += branch_mass
+                else:
+                    next_active[next_successes] += branch_mass
+        active = next_active
+
+    if post_shift_p is None:
+        false_alarm = sum(first_alarm[1:])
+        detection = None
+        delay = None
+    else:
+        false_alarm = sum(first_alarm[1:min(change_after, horizon) + 1])
+        detection = sum(first_alarm[change_after + 1:])
+        delay_mass = sum(
+            (n - change_after) * first_alarm[n]
+            for n in range(change_after + 1, horizon + 1)
+        )
+        delay = delay_mass / detection if detection > 0.0 else None
+    survival = sum(active)
+    return false_alarm, detection, delay, survival
+
+
+def eprocess_family_rows():
+    horizon = 1000
+    tables = eprocess_family_alarm_tables(horizon)
+    rows = []
+    for family in EPROCESS_FAMILY_ORDER:
+        for scenario in EPROCESS_FAMILY_SCENARIOS:
+            false_alarm, detection, delay, survival = simulate_from_alarm_table(
+                tables[family], scenario, horizon
+            )
+            post_shift_p = SHIFT_PROBABILITIES[scenario]
+            rows.append({
+                "family": family,
+                "scenario": scenario,
+                "horizon": str(horizon),
+                "change_after": str(CHANGE_AFTER) if post_shift_p is not None else "NA",
+                "p0": f"{P0:.12f}",
+                "stream_pre_p": f"{PRE_SHIFT_PROBABILITIES[scenario]:.12f}",
+                "p1": f"{post_shift_p:.12f}" if post_shift_p is not None else "NA",
+                "false_alarm_probability": f"{false_alarm:.12f}",
+                "detection_probability": as_text(detection),
+                "mean_detection_delay": as_text(delay),
+                "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
+                "survival_probability": f"{survival:.12f}",
+                "log_e_threshold": f"{math.log(1.0 / PER_CELL_ALPHA):.12f}",
+            })
+    return rows
+
+
+def check_eprocess_family_csv(path):
+    expected = eprocess_family_rows()
+    try:
+        with open(path, newline="", encoding="utf-8") as source:
+            reader = csv.DictReader(source)
+            if tuple(reader.fieldnames or ()) != EPROCESS_FAMILY_FIELDS:
+                raise ValueError(f"e-process family header mismatch: {reader.fieldnames}")
+            actual = list(reader)
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise ValueError(f"cannot read e-process family CSV: {exc}") from exc
+    if len(actual) != len(expected):
+        raise ValueError(f"e-process family row count mismatch: expected {len(expected)}, got {len(actual)}")
+    key_fields = ("family", "scenario", "horizon")
+    text_fields = (
+        "family", "scenario", "horizon", "change_after", "p0", "stream_pre_p", "p1",
+        "detection_probability", "mean_detection_delay",
+    )
+    numeric_fields = (
+        "false_alarm_probability", "per_cell_alpha", "survival_probability",
+        "log_e_threshold",
+    )
+    for line, (got, want) in enumerate(zip(actual, expected), 2):
+        if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
+            raise ValueError(f"e-process family row key mismatch on line {line}")
+        for field in text_fields:
+            if got[field] != want[field]:
+                raise ValueError(f"{field} mismatch on line {line}: {got[field]} != {want[field]}")
+        for field in numeric_fields:
+            try:
+                value = float(got[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid numeric {field} on line {line}") from exc
+            target = float(want[field])
+            if not math.isfinite(value) or abs(value - target) > 5e-10:
+                raise ValueError(f"{field} mismatch on line {line}: {value} != {target}")
+    print(f"PASS: independently recomputed all {len(expected)} e-process family rows")
+
+
+def eprocess_family_self_test():
+    rows = eprocess_family_rows()
+    expected_count = len(EPROCESS_FAMILY_ORDER) * len(EPROCESS_FAMILY_SCENARIOS)
+    if len(rows) != expected_count:
+        raise ValueError(f"e-process family row count mismatch: {len(rows)} != {expected_count}")
+    indexed = {(row["family"], row["scenario"]): row for row in rows}
+    for family in EPROCESS_FAMILY_ORDER:
+        null = indexed[(family, "stationary_null")]
+        selected = indexed[(family, "selection_bias_no_environment_shift")]
+        if float(null["false_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+            raise ValueError(f"{family} exceeds the anytime null alarm budget")
+        if float(selected["false_alarm_probability"]) < 0.99:
+            raise ValueError(f"{family} failed the selection-bias negative control")
+        for scenario in EPROCESS_FAMILY_SCENARIOS:
+            row = indexed[(family, scenario)]
+            if scenario.startswith("step_up_"):
+                total = (
+                    float(row["false_alarm_probability"])
+                    + float(row["detection_probability"])
+                    + float(row["survival_probability"])
+                )
+                if abs(total - 1.0) > 1e-9:
+                    raise ValueError(f"{family} probability mass does not conserve for {scenario}")
+    jeffreys = float(indexed[("beta_0.5_0.5", "step_up_055")]["detection_probability"])
+    portfolio = float(indexed[("equal_portfolio_4_priors", "step_up_055")]["detection_probability"])
+    if portfolio <= jeffreys + 0.04:
+        raise ValueError("fixed prior portfolio did not improve weak-shift power in this fixture")
+    print("PASS: family row count, anytime null budget, selection-bias negative control, mass conservation and weak-shift portfolio gate")
+
+
 def self_test():
     fixed_final = simulate("fixed_time_final_only", "stationary_null", 1000)[0]
     fixed_reused = simulate("fixed_time_reused_each_look", "stationary_null", 1000)[0]
@@ -411,6 +640,12 @@ def main(argv):
         if len(argv) == 3 and argv[1] == "--sentinel-budget":
             check_sentinel_budget_csv(argv[2])
             return 0
+        if len(argv) == 2 and argv[1] == "--eprocess-family-self-test":
+            eprocess_family_self_test()
+            return 0
+        if len(argv) == 3 and argv[1] == "--eprocess-family":
+            check_eprocess_family_csv(argv[2])
+            return 0
         if len(argv) == 2 and argv[1] not in ("-h", "--help"):
             check_csv(argv[1])
             return 0
@@ -418,6 +653,8 @@ def main(argv):
         print("       reference_check.py --self-test")
         print("       reference_check.py --sentinel-budget OUTPUT.csv")
         print("       reference_check.py --sentinel-budget-self-test")
+        print("       reference_check.py --eprocess-family OUTPUT.csv")
+        print("       reference_check.py --eprocess-family-self-test")
         return 2
     except (OSError, UnicodeError, csv.Error, ValueError, AssertionError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
