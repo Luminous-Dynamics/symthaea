@@ -1,0 +1,35 @@
+name: Photonic Research Contract Tests
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-quantum-comp/src/trajectory_prior.rs"
+      - "crates/domains/symthaea-quantum-comp/src/trajectory_history.rs"
+      - "crates/domains/symthaea-quantum-comp/src/trajectory_budget.rs"
+      - "crates/domains/symthaea-quantum-comp/src/matched_evaluation.rs"
+      - "scripts/research/run-photonic-contract-tests.sh"
+      - ".github/workflows/photonic-contract-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-contract-tests:
+    name: Standalone Rust contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Record toolchain
+        run: |
+          rustc --version --verbose
+          rustc --print sysroot
+
+      - name: Compile and run dependency-free contract tests
+        run: bash scripts/research/run-photonic-contract-tests.sh
