@@ -266,6 +266,7 @@ struct PrimaryComparison {
     family_clusters: usize,
     minimum_family_clusters_for_confirmatory_claim: usize,
     minimum_effect_percentage_points: f64,
+    confidence_interval_informative: bool,
     confidence_interval_excludes_zero_positive: bool,
     preregistered_utility_gate_passed: bool,
     gate_decision: String,
@@ -434,22 +435,16 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         config.bootstrap_seed,
     )?;
 
-    let interval_positive = lower > 0.0;
-    let effect_gate = effect >= 0.10;
-    let passed = interval_positive && effect_gate && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
-    let gate_decision = if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
-        "underpowered_too_few_independent_family_clusters"
-    } else if passed {
-        "pass_preregistered_utility_gate"
-    } else {
-        "no_claim_preregistered_utility_gate_not_met"
-    }
-    .to_string();
+    let (interval_informative, interval_positive, passed, gate_reason) =
+        confirmatory_utility_gate(effect, lower, upper, clusters);
+    let gate_decision = gate_reason.to_string();
 
     let interpretation = if passed {
-        "The paired, family-clustered estimate met the preregistered effect and interval gates on this test partition. This is within-benchmark utility only; it is not external/SOTA evidence."
+        "The paired, family-clustered estimate met the preregistered effect and informative-interval gates on this test partition. This is within-benchmark utility only; it is not external/SOTA evidence."
     } else if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
         "The eligible independent-family count is below the v0 floor of 20. Treat this as an underpowered pilot; the floor itself is not evidence of adequate power, so simulation-based power planning is still required."
+    } else if !interval_informative {
+        "The paired cluster-bootstrap interval is zero-width and has no empirical resolution. No utility claim is permitted even if its point estimate exceeds the effect threshold; inspect the component outcomes and collect additional independent evidence."
     } else {
         "The preregistered utility gate was not met. Report the estimate, interval, denominators, and failures; do not claim a win or relax the gate after seeing test outcomes."
     }
@@ -513,6 +508,7 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
             family_clusters: clusters,
             minimum_family_clusters_for_confirmatory_claim: MIN_CONFIRMATORY_FAMILY_CLUSTERS,
             minimum_effect_percentage_points: 10.0,
+            confidence_interval_informative: interval_informative,
             confidence_interval_excludes_zero_positive: interval_positive,
             preregistered_utility_gate_passed: passed,
             gate_decision,
@@ -2061,6 +2057,33 @@ fn compute_family_aggregates(
     Ok(aggregates.into_values().collect())
 }
 
+fn confirmatory_utility_gate(
+    effect: f64,
+    lower: f64,
+    upper: f64,
+    clusters: usize,
+) -> (bool, bool, bool, &'static str) {
+    // A nonzero positive estimate is insufficient when all component-bootstrap
+    // replicates collapse to one value: such an interval has no empirical
+    // resolution and must never pass the confirmatory utility gate.
+    let interval_informative = upper - lower > f64::EPSILON;
+    let interval_positive = interval_informative && lower > 0.0;
+    let effect_gate = effect >= 0.10;
+    let passed = interval_positive
+        && effect_gate
+        && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
+    let decision = if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+        "underpowered_too_few_independent_family_clusters"
+    } else if !interval_informative {
+        "no_claim_degenerate_bootstrap_interval"
+    } else if passed {
+        "pass_preregistered_utility_gate"
+    } else {
+        "no_claim_preregistered_utility_gate_not_met"
+    };
+    (interval_informative, interval_positive, passed, decision)
+}
+
 fn paired_cluster_bootstrap(
     families: &[FamilyAggregate],
     replicates: usize,
@@ -2328,6 +2351,36 @@ mod tests {
         assert!(validate_repo_relative_path("../outside.lean").is_err());
         assert!(validate_repo_relative_path("/absolute/path.lean").is_err());
         assert!(validate_repo_relative_path("lean\\..\\outside.lean").is_err());
+    }
+
+    #[test]
+    fn positive_degenerate_interval_cannot_pass_confirmatory_gate() {
+        let (informative, excludes_zero, passed, decision) =
+            confirmatory_utility_gate(0.25, 0.25, 0.25, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+        assert!(!informative);
+        assert!(!excludes_zero);
+        assert!(!passed);
+        assert_eq!(decision, "no_claim_degenerate_bootstrap_interval");
+    }
+
+    #[test]
+    fn informative_positive_interval_can_pass_only_with_effect_and_cluster_gates() {
+        let (informative, excludes_zero, passed, decision) =
+            confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+        assert!(informative);
+        assert!(excludes_zero);
+        assert!(passed);
+        assert_eq!(decision, "pass_preregistered_utility_gate");
+
+        let (_, _, passed_below_effect, decision_below_effect) =
+            confirmatory_utility_gate(0.09, 0.01, 0.15, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+        assert!(!passed_below_effect);
+        assert_eq!(decision_below_effect, "no_claim_preregistered_utility_gate_not_met");
+
+        let (_, _, passed_underpowered, decision_underpowered) =
+            confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_FAMILY_CLUSTERS - 1);
+        assert!(!passed_underpowered);
+        assert_eq!(decision_underpowered, "underpowered_too_few_independent_family_clusters");
     }
 
     #[test]
