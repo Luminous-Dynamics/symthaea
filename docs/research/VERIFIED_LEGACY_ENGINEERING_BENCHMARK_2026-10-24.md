@@ -239,6 +239,18 @@ Unresolved tasks remain in the assigned denominator. Publish completion rate and
 
 No single weighted aggregate should conceal safety-critical failures. Publish a scorecard with raw denominators and per-lane results.
 
+### Assurance-Adjusted Semantic Success Rate (AASSR)
+
+Use a transparent denominator rather than a composite weighted score:
+
+`AASSR = independently verified passes / all tasks assigned to the locked confirmatory cohort`.
+
+A task is an independently verified pass only when the semantic behavior contract is satisfied, every required test passes, every declared observable is covered by passing differential evidence, the mutation campaign meets its pre-registered task-level gate, evidence hashes and environment identities validate, and the trusted run/receipt audit succeeds. A model's unsupported claim of success does not count.
+
+Keep these companion metrics separate: (1) raw candidate-resolution rate before assurance checks; (2) AASSR; (3) raw-minus-AASSR assurance gap; (4) unresolved, failed, and abstained rates; (5) false acceptance on negative controls; (6) cost per verified pass. Do not re-weight them into a single number. Unresolved tasks and abstentions remain non-passes in the AASSR denominator and are reported separately with reasons. Eligibility/exclusion decisions must be frozen before arm assignment and before scores are examined; post-hoc exclusions are not allowed except documented data corruption adjudicated blind to arm.
+
+For a model comparison, report paired task-level differences and confidence intervals stratified by task family/language/repository; use repository-clustered bootstrap or a preregistered hierarchical model when tasks share codebase lineage. Repeat trials to estimate nondeterminism, but keep primary one-attempt pass@1, repeated-trial reliability, and avg@3 as distinct metrics.
+
 | Metric | Definition / rationale | Proposed initial gate |
 |---|---|---|
 | Verified task resolution | Pass / all assigned eligible tasks, with unresolved shown separately; headline pass@1 only if protocol conditions are met | Establish matched baseline first; no target claim before baseline exists |
