@@ -472,6 +472,7 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     }
     let mut covered_model_ids = BTreeSet::new();
     let mut slice_identities = BTreeSet::new();
+    let mut task_cell_identities = BTreeSet::new();
     for (index, slice) in manifest.task_slices.iter().enumerate() {
         let prefix = format!("task_slices[{index}]");
         if !model_ids.contains(slice.model_id.as_str()) {
@@ -499,6 +500,23 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
         }
         unique_nonempty(&slice.modules, &format!("{prefix}.modules"), &mut issues);
         unique_nonempty(&slice.difficulties, &format!("{prefix}.difficulties"), &mut issues);
+        for module in &slice.modules {
+            for difficulty in &slice.difficulties {
+                let cell = (
+                    slice.model_id.as_str(),
+                    module.as_str(),
+                    difficulty.as_str(),
+                    slice.model_system.as_str(),
+                    slice.law_version.as_str(),
+                    slice.noise_level.to_bits(),
+                );
+                if !task_cell_identities.insert(cell) {
+                    issues.push(format!(
+                        "{prefix} overlaps an already declared model/module/difficulty/system/law/noise task cell"
+                    ));
+                }
+            }
+        }
         if slice.difficulties.iter().any(|value| !matches!(value.as_str(), "easy" | "medium" | "hard")) {
             issues.push(format!("{prefix} has unsupported difficulty"));
         }
