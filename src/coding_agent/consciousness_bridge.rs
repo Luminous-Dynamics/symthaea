@@ -4,7 +4,7 @@
 //! Consciousness bridge: bidirectional signal flow between CodingAgent and
 //! the cognitive loop's reasoning engine.
 
-use crate::cognitive_loop::{CognitiveLoopService, CycleResult};
+use crate::cognitive_loop::{CognitiveLoopService, CycleResult, PredictionErrorEvidence};
 #[cfg(feature = "reasoning_engine")]
 use crate::consciousness::reasoning_engine::CodeReasoningContext;
 
@@ -47,7 +47,7 @@ impl ReasoningFeedback {
 /// intervening Testing-phase cycles would otherwise overwrite the gate/PE state
 /// that belongs to the original decision — see
 /// `feedback_plan_review_rigor_standards.md` item 5.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PendingReasoningOutcome {
     /// Whether a tool gate actually ran at decision time. If `false`, no posthoc
     /// should be recorded at all — "no gate ran" must never be reported as
@@ -55,17 +55,43 @@ pub struct PendingReasoningOutcome {
     pub gate_evaluated: bool,
     pub gate_passed: bool,
     pub reasoning_confidence: f32,
-    /// Measured PE at decision time, absent when the cycle comparison was invalid.
+    /// Compatibility scalar captured at decision time. It is only usable when
+    /// finite; typed evidence below takes precedence for the live integration.
     pub prediction_error_at_decision: Option<f64>,
+    /// Immutable typed PE reference available when this decision was taken.
+    /// None means that source/observation provenance was not available.
+    pub prediction_evidence_at_decision: Option<PredictionErrorEvidence>,
 }
 
 impl PendingReasoningOutcome {
+    /// Compatibility capture for callers that only have a measured scalar.
+    /// This does not invent cycle provenance or an evidence ID.
     pub fn capture(reasoning: &ReasoningFeedback, prediction_error: Option<f64>) -> Self {
         Self {
             gate_evaluated: reasoning.gate_evaluated,
             gate_passed: !reasoning.gate_blocked,
             reasoning_confidence: reasoning.reasoning_confidence,
             prediction_error_at_decision: prediction_error.filter(|value| value.is_finite()),
+            prediction_evidence_at_decision: None,
+        }
+    }
+
+    /// Capture a decision-time evidence object, preserving its original cycle
+    /// identity for later posthoc resolution.
+    pub fn capture_with_evidence(
+        reasoning: &ReasoningFeedback,
+        prediction_evidence: Option<PredictionErrorEvidence>,
+    ) -> Self {
+        let prediction_error_at_decision = prediction_evidence
+            .as_ref()
+            .and_then(|evidence| evidence.value_for_observation(evidence.observation_cycle()))
+            .map(f64::from);
+        Self {
+            gate_evaluated: reasoning.gate_evaluated,
+            gate_passed: !reasoning.gate_blocked,
+            reasoning_confidence: reasoning.reasoning_confidence,
+            prediction_error_at_decision,
+            prediction_evidence_at_decision: prediction_evidence,
         }
     }
 }
