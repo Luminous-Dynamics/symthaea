@@ -607,14 +607,15 @@ mod tests {
     #[test]
     fn large_evidence_stream_stays_in_log_space() {
         let mut monitor = monitor(50_000);
-        for i in 0..100 {
-            let report = monitor.observe(&format!("e{i}"), i, "disruption").unwrap_or_else(|e| {
-                // An alarm intentionally stops ingestion; its log-e report remains finite.
-                assert!(matches!(e, DriftMonitorError::AlreadyAlarmed { .. }));
-                monitor.report()
-            });
-            if report.status != DriftMonitorStatus::InControl { break; }
-        }
+        let first = monitor.observe("e0", 0, "disruption").unwrap();
+        assert!(first.log_e_value.is_finite());
+        let second = monitor.observe("e1", 1, "disruption").unwrap();
+        assert_eq!(second.status, DriftMonitorStatus::DriftAlarm);
+        assert!(second.log_e_value.is_finite());
+        assert!(matches!(
+            monitor.observe("e2", 2, "disruption"),
+            Err(DriftMonitorError::AlreadyAlarmed { .. })
+        ));
         assert!(monitor.report().log_e_value.is_finite());
     }
  
@@ -646,6 +647,52 @@ mod tests {
                 }],
                 50_000,
             ),
+            Err(DriftMonitorError::AlternativeHasZeroProbabilityForNominalSupport { .. })
+        ));
+    }
+
+ 
+    #[test]
+    fn empty_event_id_and_duplicate_alternative_id_are_rejected() {
+        let mut monitor = monitor(50_000);
+        assert_eq!(
+            monitor.observe(" ", 10, "routine"),
+            Err(DriftMonitorError::EmptyEventId)
+        );
+        assert_eq!(monitor.observations_seen(), 0);
+
+        let invalid = OnlineDriftMonitor::new(
+            vec![prob("routine", 900_000), prob("disruption", 100_000)],
+            vec![
+                DriftAlternative {
+                    alternative_id: "same".into(),
+                    mixture_weight_ppm: 500_000,
+                    probabilities: vec![prob("routine", 500_000), prob("disruption", 500_000)],
+                },
+                DriftAlternative {
+                    alternative_id: "same".into(),
+                    mixture_weight_ppm: 500_000,
+                    probabilities: vec![prob("routine", 800_000), prob("disruption", 200_000)],
+                },
+            ],
+            50_000,
+        );
+        assert!(matches!(invalid, Err(DriftMonitorError::DuplicateAlternativeId { .. })));
+    }
+
+    #[test]
+    fn nominal_distribution_must_be_covered_by_each_alternative() {
+        let invalid = OnlineDriftMonitor::new(
+            vec![prob("routine", 900_000), prob("disruption", 100_000)],
+            vec![DriftAlternative {
+                alternative_id: "broken".into(),
+                mixture_weight_ppm: 1_000_000,
+                probabilities: vec![prob("routine", 1_000_000), prob("disruption", 0)],
+            }],
+            50_000,
+        );
+        assert!(matches!(
+            invalid,
             Err(DriftMonitorError::AlternativeHasZeroProbabilityForNominalSupport { .. })
         ));
     }
