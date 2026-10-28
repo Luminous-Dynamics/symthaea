@@ -678,12 +678,16 @@ mod tests {
 
         assert!((evidence.duration_scale - 2.0).abs() < 1e-6);
         assert!((evidence.duration_scale_consistency - 1.0).abs() < 1e-6);
+        assert!((evidence.inter_onset_scale - 2.0).abs() < 1e-6);
+        assert!((evidence.inter_onset_scale_consistency - 1.0).abs() < 1e-6);
         assert!(evidence.meets_threshold(0.85));
 
         let diminution =
             compare_melodic_sequences(&target, &source, ReturnTransformation::Diminished);
         assert!((diminution.duration_scale - 0.5).abs() < 1e-6);
         assert!((diminution.duration_scale_consistency - 1.0).abs() < 1e-6);
+        assert!((diminution.inter_onset_scale - 0.5).abs() < 1e-6);
+        assert!((diminution.inter_onset_scale_consistency - 1.0).abs() < 1e-6);
         assert!(diminution.meets_threshold(0.85));
     }
 
