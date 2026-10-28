@@ -22,7 +22,7 @@ From the Symthaea repository root, after acquiring the registered Dryad files in
       --output /path/to/receipts/dryad_k3j9kd5dw.json \
       --source-commit "$(git rev-parse HEAD)"
 
-The registered filenames must match the source deposit. The receipt is deliberately written outside the dataset directory.
+The registered filenames follow the Dryad landing-page file list. Note that the descriptive README section calls the intact-DNA CSV intact_dna.csv, while the file list calls it data_intact_dna.csv; the downloader intentionally fails closed if the archive does not match the landing-page list. Check and update the registry explicitly if a later source version differs. The receipt is deliberately written outside the dataset directory.
 
 After storing the receipt in a controlled, versioned location, verify it later:
 
