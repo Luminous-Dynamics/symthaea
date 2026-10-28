@@ -792,7 +792,7 @@
     },
     {
       "id": "LIFE-001",
-      "category": "uncertain_outcome",
+      "category": "lifecycle",
       "description": "Adapter times out after invocation where effect may have occurred",
       "fixture": "valid_federated_authorized_operation_v1",
       "setup": {
@@ -813,7 +813,7 @@
     },
     {
       "id": "LIFE-002",
-      "category": "postcondition",
+      "category": "lifecycle",
       "description": "Process exits zero but independent verifier finds the requested postcondition false",
       "fixture": "valid_federated_authorized_operation_v1",
       "setup": {
@@ -838,7 +838,7 @@
     },
     {
       "id": "LIFE-003",
-      "category": "receipt_completeness",
+      "category": "lifecycle",
       "description": "Effect witness exists but independent outcome receipt is missing",
       "fixture": "valid_federated_authorized_operation_v1",
       "setup": {
@@ -863,7 +863,7 @@
     },
     {
       "id": "LIFE-004",
-      "category": "receipt_tamper",
+      "category": "lifecycle",
       "description": "Outcome receipt digest/provenance fails verification after effect",
       "fixture": "valid_federated_authorized_operation_v1",
       "setup": {
