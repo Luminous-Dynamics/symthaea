@@ -249,7 +249,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
             if not any(tests.get(test) == "FAILED" for test in mapped) or b"test result: FAILED" not in raw:
                 issues.append({"code": "baseline_control_not_demonstrated", "message": "baseline must fail a preregistered behavior test"})
         if name == "reference_log":
-            tests = parse_tests(raw)
+            tests = parse_test_log(raw)
             missing = sorted(test for rows in mapping.values() for test in rows if tests.get(test) != "ok")
             if missing or b"test result: ok." not in raw or b"test result: FAILED" in raw:
                 issues.append({"code": "reference_control_not_demonstrated", "message": "reference must pass every mapped test; missing=" + repr(missing)})
@@ -262,7 +262,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
         issues.append({"code": "checkout_identity_mismatch", "message": "receipt revision differs from externally expected revision"})
     if checkout.get("clean_worktree") is not True:
         issues.append({"code": "checkout_not_clean", "message": "tested checkout must be clean after the candidate was materialized"})
-    if not IMAGE.fullmatch(inputs.expected_image_id) or runtime.get("immutable_image_id") != inputs.expected_image:
+    if not IMAGE.fullmatch(inputs.expected_image_id) or runtime.get("immutable_image_id") != inputs.expected_image_id:
         issues.append({"code": "runtime_identity_mismatch", "message": "immutable runtime image differs from external image pin"})
     if runtime.get("network_mode_observed") is not True:
         issues.append({"code": "runtime_network_unobserved", "message": "runtime network policy was not independently observed"})
@@ -316,7 +316,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
         by_test[tid] = row
         raw = checked_artifact(inputs.evidence_root, row.get("log_artifact"), row.get("log_sha256"), f"test result {tid!r}", issues)
         if raw is not None:
-            observed = parse_tests(raw)
+            observed = parse_test_log(raw)
             if b"test result: ok." not in raw or b"test result: FAILED" in raw or any(status != "ok" for status in observed.values()):
                 issues.append({"code": "candidate_test_suite_not_clean", "message": f"test log for {tid!r} has failures or lacks a passing Cargo summary"})
             for execution in mapping.get(tid, []):
