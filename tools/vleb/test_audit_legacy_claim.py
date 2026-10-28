@@ -30,6 +30,8 @@ class ClaimFixture:
         snippet = self.source_raw.splitlines()[0][7:21]
         self.evidence_raw = b'{"copy_references":["BANK-REC"]}\n'
         (self.evidence_root / "index.json").write_bytes(self.evidence_raw)
+        self.execution_receipt_raw = b'{"schema_version":"vleb-witness-execution-receipt-v1"}\n'
+        (self.evidence_root / "index-receipt.json").write_bytes(self.execution_receipt_raw)
         self.claim = {
             "schema_version": "vleb-legacy-claim-v1",
             "task_id": "vleb-cobol-index-pilot",
@@ -54,6 +56,8 @@ class ClaimFixture:
                 "kind": "source_index",
                 "artifact_path": "index.json",
                 "artifact_sha256": sha(self.evidence_raw),
+                "execution_receipt_path": "index-receipt.json",
+                "execution_receipt_sha256": sha(self.execution_receipt_raw),
                 "verifier_id": "test-source-indexer",
                 "verifier_sha256": "d" * 64,
                 "observed_result": "supports",
