@@ -45,7 +45,7 @@ pub struct VerifiedAnytimeQualityEvent {
     /// Exact candidate bytes loaded from candidate_artifact_path.
     pub candidate_bytes: Vec<u8>,
     /// Claimed disposition; verified claims are recomputed below.
-    pub verification: CandidateVerification,
+    pub verifier_disposition: CandidateVerification,
     /// Caller-reported cardinality, diagnostic only if the event is not verified.
     pub reported_cardinality: Option<usize>,
     /// SHA-256 of the exact receipt bytes, if present.
@@ -357,7 +357,7 @@ pub fn compare_verified_anytime_quality(
             }
         }
 
-        let verified_evidence: Option<VerifiedMisCandidate> = match event.verification {
+        let verified_evidence: Option<VerifiedMisCandidate> = match event.verifier_disposition {
             CandidateVerification::VerifiedIndependentSet | CandidateVerification::VerifiedConflict => {
                 let (receipt_bytes, receipt_digest) = match (
                     event.receipt_bytes.as_deref(),
@@ -385,7 +385,7 @@ pub fn compare_verified_anytime_quality(
                 if event.reported_cardinality.is_some_and(|count| count != evidence.candidate_size()) {
                     return Err(VerifiedAnytimeQualityError::ReportedCardinalityMismatch(event.event_id.clone()));
                 }
-                let disposition_matches = match event.verification {
+                let disposition_matches = match event.verifier_disposition {
                     CandidateVerification::VerifiedIndependentSet =>
                         evidence.verdict() == MisEvidenceVerdict::VerifiedIndependentSet
                             && evidence.conflict_count() == 0,
@@ -508,7 +508,7 @@ mod tests {
             candidate_sha256: sha256_hex(&candidate_bytes),
             candidate_artifact_path: format!("candidates/{event_id}.bin"),
             candidate_bytes,
-            verification: if checked.verdict() == MisEvidenceVerdict::VerifiedIndependentSet {
+            verifier_disposition: if checked.verdict() == MisEvidenceVerdict::VerifiedIndependentSet {
                 CandidateVerification::VerifiedIndependentSet
             } else { CandidateVerification::VerifiedConflict },
             reported_cardinality: Some(checked.candidate_size()),
@@ -526,7 +526,7 @@ mod tests {
             candidate_sha256: sha256_hex(&candidate_bytes),
             candidate_artifact_path: format!("candidates/{event_id}.bin"),
             candidate_bytes,
-            verification: CandidateVerification::Unverified,
+            verifier_disposition: CandidateVerification::Unverified,
             reported_cardinality: Some(vertices.len()),
             receipt_sha256: None,
             receipt_artifact_path: None,
