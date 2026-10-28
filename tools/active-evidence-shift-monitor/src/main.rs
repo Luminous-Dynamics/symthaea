@@ -22,8 +22,38 @@ const SENTINEL_FRACTIONS: [f64; 7] = [0.0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0];
 const BUDGET_SHIFT_PROBABILITIES: [f64; 5] = [0.55, 0.60, 0.70, 0.80, 0.90];
 const BETA_PRIOR_A: f64 = 0.5;
 const BETA_PRIOR_B: f64 = 0.5;
+const FAMILY_HORIZON: usize = 1000;
+const PORTFOLIO_WEIGHTS: [f64; 4] = [0.25, 0.25, 0.25, 0.25];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EProcessFamily {
+    Jeffreys,
+    Uniform,
+    BetaFiveFive,
+    BetaTwentyTwenty,
+    EqualPortfolio,
+}
+
+impl EProcessFamily {
+    const ALL: [Self; 5] = [
+        Self::Jeffreys,
+        Self::Uniform,
+        Self::BetaFiveFive,
+        Self::BetaTwentyTwenty,
+        Self::EqualPortfolio,
+    ];
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Jeffreys => "beta_0.5_0.5",
+            Self::Uniform => "beta_1_1",
+            Self::BetaFiveFive => "beta_5_5",
+            Self::BetaTwentyTwenty => "beta_20_20",
+            Self::EqualPortfolio => "equal_portfolio_4_priors",
+        }
+    }
+}
+
 enum Boundary {
     FixedFinalOnly,
     FixedTimeRepeated,
@@ -220,6 +250,86 @@ fn beta_mixture_log_e_value(n: usize, successes: usize, p0: f64) -> f64 {
     ) - log_beta(BETA_PRIOR_A, BETA_PRIOR_B)
         - successes as f64 * p0.ln()
         - (n - successes) as f64 * (-p0).ln_1p()
+}
+
+
+/// Log Beta-Bernoulli mixture likelihood ratio for a fixed Beta(a,b) alternative.
+/// Each fixed-prior ratio is an e-process under iid Bernoulli(p0).
+fn beta_mixture_log_e_value_with_prior(
+    n: usize,
+    successes: usize,
+    p0: f64,
+    a: f64,
+    b: f64,
+) -> f64 {
+    assert!(n > 0 && successes <= n);
+    assert!(p0 > 0.0 && p0 < 1.0);
+    assert!(a > 0.0 && b > 0.0);
+    log_beta(successes as f64 + a, (n - successes) as f64 + b)
+        - log_beta(a, b)
+        - successes as f64 * p0.ln()
+        - (n - successes) as f64 * (-p0).ln_1p()
+}
+
+/// Log e-value for a fixed prior or a predeclared equal-weight portfolio.
+///
+/// A convex mixture of nonnegative e-processes is itself an e-process, so
+/// the fixed four-prior portfolio remains anytime-valid without choosing a
+/// prior after observing the shift.
+fn family_log_e_value(
+    family: EProcessFamily,
+    n: usize,
+    successes: usize,
+    p0: f64,
+) -> f64 {
+    match family {
+        EProcessFamily::Jeffreys => {
+            beta_mixture_log_e_value_with_prior(n, successes, p0, 0.5, 0.5)
+        }
+        EProcessFamily::Uniform => {
+            beta_mixture_log_e_value_with_prior(n, successes, p0, 1.0, 1.0)
+        }
+        EProcessFamily::BetaFiveFive => {
+            beta_mixture_log_e_value_with_prior(n, successes, p0, 5.0, 5.0)
+        }
+        EProcessFamily::BetaTwentyTwenty => {
+            beta_mixture_log_e_value_with_prior(n, successes, p0, 20.0, 20.0)
+        }
+        EProcessFamily::EqualPortfolio => {
+            let component_logs = [
+                beta_mixture_log_e_value_with_prior(n, successes, p0, 0.5, 0.5),
+                beta_mixture_log_e_value_with_prior(n, successes, p0, 1.0, 1.0),
+                beta_mixture_log_e_value_with_prior(n, successes, p0, 5.0, 5.0),
+                beta_mixture_log_e_value_with_prior(n, successes, p0, 20.0, 20.0),
+            ];
+            let maximum = component_logs
+                .iter()
+                .copied()
+                .fold(f64::NEG_INFINITY, f64::max);
+            maximum
+                + component_logs
+                    .iter()
+                    .zip(PORTFOLIO_WEIGHTS)
+                    .map(|(value, weight)| weight * (value - maximum).exp())
+                    .sum::<f64>()
+                    .ln()
+        }
+    }
+}
+
+fn family_alarm_table(
+    family: EProcessFamily,
+    p0: f64,
+    max_horizon: usize,
+) -> Vec<Vec<bool>> {
+    let threshold = (1.0 / PER_CELL_ALPHA).ln();
+    let mut rows = vec![Vec::new(); max_horizon + 1];
+    for n in 1..=max_horizon {
+        rows[n] = (0..=n)
+            .map(|successes| family_log_e_value(family, n, successes, p0) >= threshold)
+            .collect();
+    }
+    rows
 }
 
 /// Exact dynamic program over the number of successes among streams that have not alarmed.
