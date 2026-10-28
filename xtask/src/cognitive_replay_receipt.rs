@@ -141,6 +141,11 @@ pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptV
         ["synthetic-not-measured", "replay"].contains(&receipt.run_kind.as_str()),
         "run_kind must be synthetic-not-measured or replay"
     );
+    ensure!(
+        !receipt.run_id.starts_with("synthetic-not-measured-")
+            || receipt.run_kind == "synthetic-not-measured",
+        "synthetic run_id cannot be relabeled as an executed replay"
+    );
     nonempty(&receipt.dataset_id, "dataset_id")?;
     nonempty(&receipt.stream_id, "stream_id")?;
     validate_digest(&receipt.dataset_artifact_sha256, "dataset_artifact_sha256")?;
