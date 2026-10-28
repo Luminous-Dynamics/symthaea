@@ -7,6 +7,7 @@
 
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
     fs,
@@ -78,10 +79,12 @@ pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Resu
         .with_context(|| format!("read effect-surface registry: {}", registry_path.display()))?;
     let registry: Registry =
         serde_json::from_str(&raw).context("parse effect-surface registry JSON")?;
-    let summary = validate(root, &registry)?;
+    let registry_digest = format!("{:x}", Sha256::digest(raw.as_bytes()));
+    let summary = validate(root, &registry, &registry_digest)?;
 
     println!("registry_id={}", registry.registry_id);
     println!("registry_version={}", registry.version);
+    println!("registry_sha256={registry_digest}");
     println!(
         "registry_baseline={}@{}",
         registry.source_baseline.baseline_ref, registry.source_baseline.baseline_commit
@@ -112,7 +115,7 @@ pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Resu
     Ok(())
 }
 
-fn validate(root: &Path, registry: &Registry) -> Result<Summary> {
+fn validate(root: &Path, registry: &Registry, registry_digest: &str) -> Result<Summary> {
     if registry.registry_id != REGISTRY_ID {
         bail!(
             "unsupported registry_id {:?}; expected {:?}",
@@ -151,8 +154,14 @@ fn validate(root: &Path, registry: &Registry) -> Result<Summary> {
     let mut qualified_entries = 0usize;
 
     for entry in &registry.entries {
-        if entry.id.trim().is_empty() || !ids.insert(entry.id.clone()) {
-            bail!("empty or duplicate effect-surface id: {:?}", entry.id);
+        if entry.id.trim().is_empty()
+            || !entry
+                .id
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+            || !ids.insert(entry.id.clone())
+        {
+            bail!("invalid or duplicate effect-surface id: {:?}", entry.id);
         }
         if entry.source_path.trim().is_empty()
             || entry.entrypoint_symbol.trim().is_empty()
@@ -178,6 +187,52 @@ fn validate(root: &Path, registry: &Registry) -> Result<Summary> {
                 "surface {} must declare at least one effect class and execution mode",
                 entry.id
             );
+        }
+        const EFFECT_CLASSES: &[&str] = &[
+            "process_spawn",
+            "filesystem_read",
+            "filesystem_write",
+            "filesystem_delete",
+            "directory_create",
+            "directory_list",
+            "system_configuration_mutation",
+            "network_io",
+            "device_actuation",
+            "subprocess_control",
+            "other_external_effect",
+        ];
+        if entry
+            .effect_classes
+            .iter()
+            .any(|class| !EFFECT_CLASSES.contains(&class.as_str()))
+        {
+            bail!("surface {} contains an unknown effect class", entry.id);
+        }
+        const EXECUTION_MODES: &[&str] = &[
+            "real",
+            "conditionally_real",
+            "simulated_for_selected_families",
+            "real_filesystem_effects",
+            "conditionally_real_process",
+            "simulated",
+            "dry_run",
+            "observation_only",
+        ];
+        if entry
+            .execution_modes
+            .iter()
+            .any(|mode| !EXECUTION_MODES.contains(&mode.as_str()))
+        {
+            bail!("surface {} contains an unknown execution mode", entry.id);
+        }
+        if !entry.owner_issue.starts_with('#') {
+            bail!("surface {} owner_issue must be a repository issue reference", entry.id);
+        }
+        if !matches!(
+            entry.tests_status.as_str(),
+            "source_review_only" | "not_present" | "executed" | "failed" | "unavailable"
+        ) {
+            bail!("surface {} has unsupported tests_status {:?}", entry.id, entry.tests_status);
         }
         if entry.known_limitations.is_empty()
             || entry.known_limitations.iter().any(|item| item.trim().is_empty())
@@ -221,6 +276,7 @@ fn validate(root: &Path, registry: &Registry) -> Result<Summary> {
             ("qualified", Some(evidence)) => {
                 if !is_sha(&evidence.subject_commit, 40)
                     || !is_sha(&evidence.registry_digest_sha256, 64)
+                    || evidence.registry_digest_sha256 != registry_digest
                     || !is_sha(&evidence.test_receipt_sha256, 64)
                     || evidence.verification_profile.trim().is_empty()
                 {
@@ -255,6 +311,9 @@ fn validate(root: &Path, registry: &Registry) -> Result<Summary> {
 fn is_safe_relative_path(value: &str) -> bool {
     let path = Path::new(value);
     !value.trim().is_empty()
+        && !value.contains('\\\\')
+        && !value.contains(':')
+        && !value.split('/').any(|part| part.is_empty() || part == "." || part == "..")
         && !path.is_absolute()
         && path
             .components()
