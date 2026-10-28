@@ -14,7 +14,7 @@ const EPSILON: f64 = 1e-12;
 const PPM: f64 = 1_000_000.0;
 const PEEKING_LOOKS: [usize; 2] = [72, 120];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum StreamKind {
     Risk,
     Value,
