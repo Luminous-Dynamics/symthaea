@@ -14,7 +14,7 @@
 //! simulate interruption boundaries in-process; true power-loss qualification
 //! must be performed on each claimed filesystem/device configuration.
 
-use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, MemoryContextItem, ResolvedMemoryContextItem};
+use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, LexicalIndex, MemoryContextItem, ResolvedMemoryContextItem};
 use std::collections::BTreeSet;
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, HdcStoreReader};
@@ -30,6 +30,7 @@ const CURRENT_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-CURRENT-V1";
 const INDEX_FILE: &str = "hdc-index.bin";
 const EVIDENCE_FILE: &str = "evidence-snapshot.json";
 const MANIFEST_FILE: &str = "commit-manifest.json";
+const LEXICAL_FILE: &str = "lexical-index.json";
 const CURRENT_FILE: &str = "CURRENT";
 const LOCK_FILE: &str = ".writer.lock";
 
@@ -47,6 +48,8 @@ pub struct RecoveredEvidenceGeneration {
     pub generation: u64,
     pub hdc_index_bytes: Vec<u8>,
     pub evidence_index: EvidenceIndex,
+    /// Present for typed production commits whose manifest binds the lexical artifact.
+    pub lexical_index: Option<LexicalIndex>,
     pub manifest: EvidenceCommitManifest,
 }
 
@@ -105,6 +108,7 @@ impl Drop for WriterLock {
 enum CommitFaultPoint {
     AfterIndexWrite,
     AfterEvidenceWrite,
+    AfterLexicalIndexWrite,
     AfterManifestWrite,
     AfterGenerationPublish,
     BeforeCurrentPublish,
@@ -254,8 +258,10 @@ impl EvidenceDiskStore {
         if recovered.manifest.hdc_store_identity().is_none() {
             return Err("committed text query requires a typed HDC identity; opaque-byte fixtures cannot serve context".into());
         }
-        let candidates = recovered.evidence_index.rank_text(
-            query_text, scope_id, now_ms, candidate_k,
+        let lexical_index = recovered.lexical_index.as_ref()
+            .ok_or_else(|| "typed committed generation has no manifest-bound lexical index".to_string())?;
+        let candidates = recovered.evidence_index.rank_text_indexed(
+            lexical_index, recovered.generation, query_text, scope_id, now_ms, candidate_k,
         )?;
         let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
         let resolved_context = recovered.evidence_index.resolve_with_provenance(
@@ -488,10 +494,19 @@ impl EvidenceDiskStore {
         };
 
         let snapshot_bytes = evidence_index.snapshot_bytes(generation)?;
+        let lexical_index_bytes = if hdc_identity.is_some() {
+            Some(LexicalIndex::build(evidence_index, generation)?.to_json_bytes()?)
+        } else {
+            None
+        };
         let manifest = match hdc_identity {
-            Some(identity) => EvidenceCommitManifest::new_with_hdc_identity(
-                generation, hdc_index_bytes, &snapshot_bytes, identity,
-            )?,
+            Some(identity) => {
+                let lexical_bytes = lexical_index_bytes.as_deref()
+                    .ok_or_else(|| "typed HDC commit is missing its lexical index".to_string())?;
+                EvidenceCommitManifest::new_with_hdc_identity_and_lexical_index(
+                    generation, hdc_index_bytes, &snapshot_bytes, identity, lexical_bytes,
+                )?
+            }
             None => EvidenceCommitManifest::new(generation, hdc_index_bytes, &snapshot_bytes)?,
         };
         let manifest_bytes = manifest.to_json_bytes()?;
@@ -518,6 +533,13 @@ impl EvidenceDiskStore {
             let path = stage.keep();
             return Err(format!("simulated interruption after evidence snapshot write; orphan staging at {}", path.display()));
         }
+        if let Some(lexical_bytes) = lexical_index_bytes.as_deref() {
+            write_new_synced(&stage.path().join(LEXICAL_FILE), lexical_bytes)?;
+            if fault == Some(CommitFaultPoint::AfterLexicalIndexWrite) {
+                let path = stage.keep();
+                return Err(format!("simulated interruption after lexical index write; orphan staging at {}", path.display()));
+            }
+        }
 
         write_new_synced(&stage.path().join(MANIFEST_FILE), &manifest_bytes)?;
         sync_directory(stage.path())?;
@@ -536,9 +558,11 @@ impl EvidenceDiskStore {
                 }
                 // Idempotent retry after a crash between generation rename and CURRENT
                 // publication: reuse only byte-identical, internally valid artifacts.
+                let existing_lexical = read_optional_regular_file(&final_dir.join(LEXICAL_FILE)).ok().flatten();
                 let same = read_regular_file(&final_dir.join(INDEX_FILE)).ok().as_deref() == Some(hdc_index_bytes)
                     && read_regular_file(&final_dir.join(EVIDENCE_FILE)).ok().as_deref() == Some(snapshot_bytes.as_slice())
-                    && read_regular_file(&final_dir.join(MANIFEST_FILE)).ok().as_deref() == Some(manifest_bytes.as_slice());
+                    && read_regular_file(&final_dir.join(MANIFEST_FILE)).ok().as_deref() == Some(manifest_bytes.as_slice())
+                    && existing_lexical.as_deref() == lexical_index_bytes.as_deref();
                 if !same {
                     return Err("generation directory collision with different artifact bytes".into());
                 }
@@ -618,7 +642,25 @@ impl EvidenceDiskStore {
             return Err("manifest generation does not match CURRENT".into());
         }
         manifest.verify(&index_bytes, &snapshot_bytes)?;
+        let lexical_bytes = read_optional_regular_file(&dir.join(LEXICAL_FILE))?;
+        manifest.verify_lexical_index(lexical_bytes.as_deref())?;
         let evidence_index = EvidenceIndex::restore_snapshot(&snapshot_bytes)?;
+        let lexical_index = match lexical_bytes.as_deref() {
+            Some(bytes) => {
+                let index = LexicalIndex::from_json_bytes(bytes)?;
+                index.validate_for_evidence(&evidence_index, pointer.generation)?;
+                Some(index)
+            }
+            None if manifest.hdc_store_identity().is_some() => {
+                // Legacy V2 typed generations predate the manifest-bound lexical
+                // artifact. Their verified evidence snapshot remains authoritative,
+                // so rebuild a deterministic in-memory index for reads. The next
+                // typed commit publishes a V3 generation with the index persisted
+                // and digest-bound; never write this fallback into the old generation.
+                Some(LexicalIndex::build(&evidence_index, pointer.generation)?)
+            }
+            None => None,
+        };
         if let Some(identity) = manifest.hdc_store_identity() {
             identity.validate_for_recovery()?;
             // Integrity validation needs the canonical data reader, not an ANN
@@ -646,6 +688,7 @@ impl EvidenceDiskStore {
             generation: pointer.generation,
             hdc_index_bytes: index_bytes,
             evidence_index,
+            lexical_index,
             manifest,
         })
     }
@@ -1049,6 +1092,127 @@ mod tests {
         assert!(dir.exists(), "corrupt CURRENT must prevent retention deletion");
     }
 
+
+    #[test]
+    fn typed_generation_rejects_missing_or_tampered_lexical_index() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "cart checkout evidence"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        let dir = generation_path(&root.path().join("evidence-generations"), 1);
+        let lexical_path = dir.join(LEXICAL_FILE);
+        let original = fs::read(&lexical_path).unwrap();
+        fs::write(&lexical_path, b"tampered lexical index").unwrap();
+        assert!(disk.recover().is_err(), "tampered lexical index must fail manifest verification");
+
+        fs::write(&lexical_path, &original).unwrap();
+        fs::remove_file(&lexical_path).unwrap();
+        assert!(disk.recover().is_err(), "missing manifest-bound lexical index must fail closed");
+    }
+
+    #[test]
+    fn interruption_after_lexical_index_write_keeps_previous_generation_current() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "first generation"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        hdc.append(8, &BinaryHV::random(8)).unwrap();
+        evidence.insert(active_evidence(8, "second generation"), b"canonical trajectory bytes").unwrap();
+        hdc.sync_all().unwrap();
+        let identity = {
+            let view = hdc.read_view();
+            let checksum = view.content_checksum();
+            HdcStoreIdentity {
+                store_generation: view.generation(),
+                live_count: checksum.live_count,
+                checksum_version: checksum.version,
+                checksum_hex: checksum.hex(),
+            }
+        };
+        let canonical_bytes = fs::read(hdc.path()).unwrap();
+        assert!(disk.commit_with_identity_and_fault(
+            &canonical_bytes,
+            &evidence,
+            Some(identity),
+            Some(CommitFaultPoint::AfterLexicalIndexWrite),
+        ).is_err());
+
+        let recovered = disk.recover().unwrap().unwrap();
+        assert_eq!(recovered.generation, 1, "unpublished lexical artifact must not advance CURRENT");
+        assert_eq!(recovered.evidence_index.active_hdc_ids(), [7_u64].into_iter().collect());
+        assert!(recovered.lexical_index.is_some());
+    }
+
+    #[test]
+    fn legacy_v2_typed_generation_recovers_and_rebuilds_lexical_index_in_memory() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            active_evidence(7, "legacy cart checkout evidence"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+
+        let store_root = root.path().join("evidence-generations");
+        let disk = EvidenceDiskStore::open(&store_root).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        // Convert the typed V3 fixture into the exact legacy V2 shape: the
+        // HDC/evidence manifest fields remain intact, but no lexical digest or
+        // lexical artifact exists in the old generation.
+        let old_dir = generation_path(&store_root, 1);
+        let old_pointer: CurrentPointer =
+            serde_json::from_slice(&fs::read(store_root.join(CURRENT_FILE)).unwrap()).unwrap();
+        let mut manifest_value: serde_json::Value =
+            serde_json::from_slice(&fs::read(old_dir.join(MANIFEST_FILE)).unwrap()).unwrap();
+        manifest_value["schema_version"] = serde_json::Value::String(
+            "BROCA-EVIDENCE-COMMIT-MANIFEST-V2".into(),
+        );
+        manifest_value.as_object_mut().unwrap().remove("lexical_index_sha256");
+        let legacy_manifest = serde_json::to_vec(&manifest_value).unwrap();
+        let legacy_digest = sha256_hex(&legacy_manifest);
+        fs::write(old_dir.join(MANIFEST_FILE), &legacy_manifest).unwrap();
+        fs::remove_file(old_dir.join(LEXICAL_FILE)).unwrap();
+
+        let new_dir = store_root.join("generations").join(generation_directory_name(1, &legacy_digest));
+        fs::rename(&old_dir, &new_dir).unwrap();
+        let legacy_pointer = CurrentPointer {
+            schema_version: CURRENT_SCHEMA_VERSION.into(),
+            generation: old_pointer.generation,
+            manifest_sha256: legacy_digest,
+        };
+        fs::write(store_root.join(CURRENT_FILE), serde_json::to_vec(&legacy_pointer).unwrap()).unwrap();
+
+        let recovered = disk.recover().unwrap().unwrap();
+        assert_eq!(recovered.generation, 1);
+        assert!(recovered.lexical_index.is_some(), "legacy lexical index should be rebuilt from verified snapshot");
+        assert_eq!(recovered.manifest.lexical_index_sha256(), None);
+
+        let result = disk.query_committed_text_context(
+            "cart checkout", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().unwrap();
+        assert_eq!(result.generation, 1);
+        assert_eq!(result.resolved_context[0].item.value, "legacy cart checkout evidence");
+
+        // The next typed write upgrades rather than mutating the legacy generation.
+        assert_eq!(disk.commit_hdc_store(&mut hdc, &evidence).unwrap(), 2);
+        let upgraded = disk.recover().unwrap().unwrap();
+        assert_eq!(upgraded.generation, 2);
+        assert!(upgraded.manifest.lexical_index_sha256().is_some());
+        assert!(upgraded.lexical_index.is_some());
+    }
 
     #[test]
     fn committed_text_query_returns_grounded_lexical_context_with_provenance() {

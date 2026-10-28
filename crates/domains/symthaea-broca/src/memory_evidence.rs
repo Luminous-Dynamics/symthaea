@@ -242,7 +242,8 @@ struct EvidenceIndexSnapshot {
 /// This detects accidentally mixing an old vector index with a newer payload
 /// snapshot (or vice versa). It is an unkeyed consistency manifest, not a
 /// signature: authenticate or externally pin its bytes when storage is hostile.
-pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V2";
+pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V3";
+const LEGACY_EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V2";
 
 /// Identity of the actual on-disk HDC store committed alongside evidence.
 /// The CRC checksum checks logical parity; exact HDC file bytes are separately
@@ -280,6 +281,10 @@ pub struct EvidenceCommitManifest {
     evidence_snapshot_sha256: String,
     /// Present only for the typed production commit path.
     hdc_store_identity: Option<HdcStoreIdentity>,
+    /// SHA-256 of the immutable generation-bound lexical inverted index, when present.
+    /// Missing in legacy V2 manifests; those generations rebuild the index from the verified snapshot.
+    #[serde(default)]
+    lexical_index_sha256: Option<String>,
 }
 
 impl EvidenceCommitManifest {
@@ -289,8 +294,9 @@ impl EvidenceCommitManifest {
         Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, None)
     }
 
-    /// Construct a manifest that commits the actual HDC store's logical identity
-    /// in addition to the exact on-disk file-byte digest.
+    /// Construct a legacy V2 typed manifest that binds the HDC identity but has
+    /// no committed lexical artifact. New production commits must use
+    /// new_with_hdc_identity_and_lexical_index instead.
     pub fn new_with_hdc_identity(
         generation: u64,
         hdc_index_bytes: &[u8],
@@ -298,7 +304,48 @@ impl EvidenceCommitManifest {
         identity: HdcStoreIdentity,
     ) -> Result<Self, String> {
         identity.validate_for_recovery()?;
-        Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity))
+        let mut manifest = Self::new_with_optional_hdc_identity(
+            generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity),
+        )?;
+        manifest.schema_version = LEGACY_EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string();
+        manifest.validate_envelope()?;
+        Ok(manifest)
+    }
+
+    /// Construct a typed commit manifest that also binds a serialized lexical index.
+    pub fn new_with_hdc_identity_and_lexical_index(
+        generation: u64,
+        hdc_index_bytes: &[u8],
+        evidence_snapshot_bytes: &[u8],
+        identity: HdcStoreIdentity,
+        lexical_index_bytes: &[u8],
+    ) -> Result<Self, String> {
+        if lexical_index_bytes.is_empty() {
+            return Err("serialized lexical index bytes must be non-empty".into());
+        }
+        let mut manifest = Self::new_with_hdc_identity(
+            generation, hdc_index_bytes, evidence_snapshot_bytes, identity,
+        )?;
+        manifest.schema_version = EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string();
+        manifest.lexical_index_sha256 = Some(sha256_hex(lexical_index_bytes));
+        manifest.validate_envelope()?;
+        Ok(manifest)
+    }
+
+    pub fn lexical_index_sha256(&self) -> Option<&str> {
+        self.lexical_index_sha256.as_deref()
+    }
+
+    /// Verify whether the optional lexical index is present exactly as declared.
+    pub fn verify_lexical_index(&self, lexical_index_bytes: Option<&[u8]>) -> Result<(), String> {
+        self.validate_envelope()?;
+        match (self.lexical_index_sha256.as_deref(), lexical_index_bytes) {
+            (Some(expected), Some(bytes)) if sha256_hex(bytes) == expected => Ok(()),
+            (Some(_), Some(_)) => Err("lexical index digest does not match commit manifest".into()),
+            (Some(_), None) => Err("committed lexical index is missing".into()),
+            (None, Some(_)) => Err("unmanifested lexical index artifact is present".into()),
+            (None, None) => Ok(()),
+        }
     }
 
     fn new_with_optional_hdc_identity(
@@ -325,6 +372,7 @@ impl EvidenceCommitManifest {
             hdc_index_sha256: sha256_hex(hdc_index_bytes),
             evidence_snapshot_sha256: sha256_hex(evidence_snapshot_bytes),
             hdc_store_identity: identity,
+            lexical_index_sha256: None,
         })
     }
 
@@ -333,8 +381,18 @@ impl EvidenceCommitManifest {
     }
 
     fn validate_envelope(&self) -> Result<(), String> {
-        if self.schema_version != EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION {
-            return Err("unsupported evidence commit manifest schema version".into());
+        match self.schema_version.as_str() {
+            EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION => {
+                if self.hdc_store_identity.is_some() && self.lexical_index_sha256.is_none() {
+                    return Err("V3 typed manifest must bind a lexical-index digest".into());
+                }
+            }
+            LEGACY_EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION => {
+                if self.lexical_index_sha256.is_some() {
+                    return Err("legacy V2 manifest cannot declare a lexical-index digest".into());
+                }
+            }
+            _ => return Err("unsupported evidence commit manifest schema version".into()),
         }
         if self.generation == 0 {
             return Err("evidence commit generation must start at 1".into());
@@ -344,6 +402,9 @@ impl EvidenceCommitManifest {
         }
         if let Some(identity) = &self.hdc_store_identity {
             identity.validate_for_recovery()?;
+        }
+        if self.lexical_index_sha256.as_deref().is_some_and(|digest| !is_sha256(digest)) {
+            return Err("evidence commit manifest contains an invalid lexical-index SHA-256 digest".into());
         }
         Ok(())
     }
@@ -389,10 +450,177 @@ impl EvidenceCommitManifest {
 /// this is not a disk transaction and cannot atomically commit with the HDC
 /// vector index. Callers must coordinate both stores and durably pin/authenticate
 /// the returned snapshot bytes as required by their threat model.
+/// Versioned immutable inverted index derived from one evidence snapshot.
+///
+/// The manifest binds the exact serialized bytes; generation and structural
+/// validation prevent accidentally using an index from another commit.
+pub const LEXICAL_INDEX_SCHEMA_VERSION: &str = "BROCA-LEXICAL-INDEX-V1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LexicalIndex {
+    schema_version: String,
+    generation: u64,
+    /// Text payload ID -> token count. IDs include text records with no tokens.
+    documents: BTreeMap<u64, LexicalDocument>,
+    /// Token -> ascending HDC-ID postings.
+    postings: BTreeMap<String, Vec<LexicalPosting>>,
+    total_token_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LexicalDocument {
+    token_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LexicalPosting {
+    hdc_id: u64,
+    term_frequency: u32,
+}
+
 #[derive(Debug, Default)]
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
     evidence_ids: BTreeMap<String, u64>,
+}
+
+impl LexicalIndex {
+    /// Build an inverted index from verified text payloads in a specific
+    /// evidence generation. This is done during commit, never per query.
+    pub fn build(evidence: &EvidenceIndex, generation: u64) -> Result<Self, String> {
+        if generation == 0 {
+            return Err("lexical index generation must start at 1".into());
+        }
+        let mut documents = BTreeMap::new();
+        let mut postings: BTreeMap<String, Vec<LexicalPosting>> = BTreeMap::new();
+        let mut total_token_count = 0u64;
+
+        for (hdc_id, record) in &evidence.records {
+            let EvidencePayload::Text { value } = &record.payload else {
+                continue;
+            };
+            if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                return Err(format!("cannot index text with invalid content digest at HDC ID {hdc_id}"));
+            }
+            let tokens = lexical_tokens(value);
+            let mut frequencies = BTreeMap::<String, u32>::new();
+            for token in &tokens {
+                let count = frequencies.entry(token.clone()).or_default();
+                *count = count.checked_add(1)
+                    .ok_or_else(|| format!("lexical term frequency overflow at HDC ID {hdc_id}"))?;
+            }
+            let token_count = u64::try_from(tokens.len())
+                .map_err(|_| "lexical document token count overflow".to_string())?;
+            total_token_count = total_token_count.checked_add(token_count)
+                .ok_or_else(|| "lexical index token count overflow".to_string())?;
+            documents.insert(*hdc_id, LexicalDocument { token_count });
+            for (term, term_frequency) in frequencies {
+                postings.entry(term).or_default().push(LexicalPosting {
+                    hdc_id: *hdc_id,
+                    term_frequency,
+                });
+            }
+        }
+
+        let index = Self {
+            schema_version: LEXICAL_INDEX_SCHEMA_VERSION.to_string(),
+            generation,
+            documents,
+            postings,
+            total_token_count,
+        };
+        index.validate_structure()?;
+        Ok(index)
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, String> {
+        self.validate_structure()?;
+        serde_json::to_vec(self).map_err(|error| format!("failed to encode lexical index: {error}"))
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let index: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("invalid lexical index: {error}"))?;
+        index.validate_structure()?;
+        Ok(index)
+    }
+
+    /// Ensure the index is for this exact logical evidence generation and has
+    /// exactly one document entry for each text record (including zero-token text).
+    pub fn validate_for_evidence(&self, evidence: &EvidenceIndex, generation: u64) -> Result<(), String> {
+        self.validate_structure()?;
+        if self.generation != generation {
+            return Err("lexical index generation does not match evidence generation".into());
+        }
+        let expected: BTreeSet<u64> = evidence.records.iter()
+            .filter_map(|(id, record)| matches!(&record.payload, EvidencePayload::Text { .. }).then_some(*id))
+            .collect();
+        let actual: BTreeSet<u64> = self.documents.keys().copied().collect();
+        if expected != actual {
+            return Err("lexical index text-document IDs do not match evidence snapshot".into());
+        }
+        Ok(())
+    }
+
+    fn validate_structure(&self) -> Result<(), String> {
+        if self.schema_version != LEXICAL_INDEX_SCHEMA_VERSION {
+            return Err("unsupported lexical index schema version".into());
+        }
+        if self.generation == 0 {
+            return Err("lexical index generation must start at 1".into());
+        }
+        let mut summed_lengths = 0u64;
+        let mut per_document_frequency = BTreeMap::<u64, u64>::new();
+        for (id, document) in &self.documents {
+            summed_lengths = summed_lengths.checked_add(document.token_count)
+                .ok_or_else(|| "lexical index token count overflow".to_string())?;
+            per_document_frequency.insert(*id, 0);
+        }
+        if summed_lengths != self.total_token_count {
+            return Err("lexical index total token count does not match document lengths".into());
+        }
+        for (term, list) in &self.postings {
+            let canonical_term = lexical_tokens(term);
+            if canonical_term.len() != 1 || canonical_term[0] != *term {
+                return Err("lexical index contains a non-canonical term".into());
+            }
+            if list.is_empty() {
+                return Err("lexical index contains an empty posting list".into());
+            }
+            let mut previous = None;
+            for posting in list {
+                if posting.term_frequency == 0 {
+                    return Err("lexical posting term frequency must be positive".into());
+                }
+                if previous.is_some_and(|id| posting.hdc_id <= id) {
+                    return Err("lexical postings must be strictly ordered by HDC ID".into());
+                }
+                previous = Some(posting.hdc_id);
+                let document = self.documents.get(&posting.hdc_id)
+                    .ok_or_else(|| "lexical posting references an unknown document".to_string())?;
+                if u64::from(posting.term_frequency) > document.token_count {
+                    return Err("lexical term frequency exceeds document token count".into());
+                }
+                let count = per_document_frequency.get_mut(&posting.hdc_id)
+                    .ok_or_else(|| "lexical posting references a non-text document".to_string())?;
+                *count = count.checked_add(u64::from(posting.term_frequency))
+                    .ok_or_else(|| "lexical document frequency sum overflow".to_string())?;
+            }
+        }
+        for (id, document) in &self.documents {
+            if per_document_frequency[id] != document.token_count {
+                return Err("lexical postings do not account for each document token".into());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl EvidenceIndex {
@@ -587,6 +815,118 @@ impl EvidenceIndex {
         old.lifecycle = EvidenceLifecycle::Superseded;
         old.superseded_by = Some(new_evidence_id);
         old.validate()
+    }
+
+    /// BM25 over a previously built inverted index. This avoids re-tokenizing
+    /// and re-hashing every evidence payload on each query. Eligibility and
+    /// corpus statistics are still evaluated against current evidence metadata,
+    /// because lifecycle and validity windows can change between queries.
+    pub(crate) fn rank_text_indexed(
+        &self,
+        index: &LexicalIndex,
+        expected_generation: u64,
+        query_text: &str,
+        scope_id: &str,
+        now_ms: u64,
+        max_candidates: usize,
+    ) -> Result<Vec<(u64, f32)>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if expected_generation == 0 || index.generation != expected_generation {
+            return Err("lexical index generation does not match committed evidence generation".into());
+        }
+        if max_candidates == 0 {
+            return Ok(Vec::new());
+        }
+        let query_terms: BTreeSet<String> = lexical_tokens(query_text).into_iter().collect();
+        if query_terms.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        const K1: f64 = 1.2;
+        const B: f64 = 0.75;
+        let mut eligible_documents = 0usize;
+        let mut total_length = 0u64;
+        for (hdc_id, record) in &self.records {
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            let EvidencePayload::Text { .. } = &record.payload else {
+                continue;
+            };
+            let document = index.documents.get(hdc_id)
+                .ok_or_else(|| format!("lexical index missing eligible text HDC ID {hdc_id}"))?;
+            if document.token_count == 0 {
+                continue;
+            }
+            eligible_documents += 1;
+            total_length = total_length.checked_add(document.token_count)
+                .ok_or_else(|| "eligible lexical token count overflow".to_string())?;
+        }
+        if eligible_documents == 0 {
+            return Ok(Vec::new());
+        }
+        let average_length = total_length as f64 / eligible_documents as f64;
+        if average_length <= 0.0 {
+            return Ok(Vec::new());
+        }
+
+        let eligible = |id: u64| -> bool {
+            self.records.get(&id).is_some_and(|record| record.is_eligible_for(scope_id, now_ms))
+                && index.documents.contains_key(&id)
+                && index.documents.get(&id).is_some_and(|document| document.token_count > 0)
+        };
+        let mut document_frequency = BTreeMap::<String, usize>::new();
+        let mut scores = BTreeMap::<u64, f64>::new();
+        for term in &query_terms {
+            let Some(postings) = index.postings.get(term) else {
+                continue;
+            };
+            let mut df = 0usize;
+            for posting in postings {
+                if !eligible(posting.hdc_id) {
+                    continue;
+                }
+                df += 1;
+                *scores.entry(posting.hdc_id).or_default();
+            }
+            document_frequency.insert(term.clone(), df);
+        }
+
+        // Iterate terms in lexical order so each document's floating-point
+        // accumulation is deterministic and matches the reference implementation.
+        for term in &query_terms {
+            let Some(postings) = index.postings.get(term) else {
+                continue;
+            };
+            let df = *document_frequency.get(term).unwrap_or(&0) as f64;
+            if df == 0.0 {
+                continue;
+            }
+            let n = eligible_documents as f64;
+            let inverse_document_frequency = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+            for posting in postings {
+                if !eligible(posting.hdc_id) {
+                    continue;
+                }
+                let document_length = index.documents[&posting.hdc_id].token_count as f64;
+                let term_frequency = f64::from(posting.term_frequency);
+                let length_norm = 1.0 - B + B * (document_length / average_length);
+                let contribution = inverse_document_frequency
+                    * (term_frequency * (K1 + 1.0))
+                    / (term_frequency + K1 * length_norm);
+                *scores.entry(posting.hdc_id).or_default() += contribution;
+            }
+        }
+        let mut ranked: Vec<(u64, f32)> = scores.into_iter()
+            .filter_map(|(id, score)| (score > 0.0).then_some((id, score as f32)))
+            .collect();
+        ranked.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+        ranked.truncate(max_candidates);
+        Ok(ranked)
     }
 
     /// Deterministic BM25 lexical retrieval over eligible text evidence.
@@ -823,6 +1163,45 @@ mod tests {
 
 
     #[test]
+    fn lexical_index_round_trip_and_indexed_bm25_match_reference_ranking() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(text_record(7, "evidence-relevant", "web", "cart checkout button opens shopping cart"), b"canonical trajectory bytes").unwrap();
+        evidence.insert(text_record(8, "evidence-unrelated", "web", "mountain trails and hiking boots"), b"canonical trajectory bytes").unwrap();
+        let mut expired = text_record(9, "evidence-expired", "web", "cart checkout button opens shopping cart");
+        expired.valid_until_unix_ms = Some(150);
+        evidence.insert(expired, b"canonical trajectory bytes").unwrap();
+        let mut other_scope = text_record(10, "evidence-other-scope", "enterprise", "cart checkout button opens shopping cart");
+        evidence.insert(other_scope.clone(), b"canonical trajectory bytes").unwrap();
+        other_scope.hdc_id = 11;
+        other_scope.evidence_id = "evidence-revoked".into();
+        other_scope.scope_id = "web".into();
+        evidence.insert(other_scope, b"canonical trajectory bytes").unwrap();
+        evidence.revoke(11).unwrap();
+
+        let index = LexicalIndex::build(&evidence, 4).unwrap();
+        let bytes = index.to_json_bytes().unwrap();
+        let restored = LexicalIndex::from_json_bytes(&bytes).unwrap();
+        restored.validate_for_evidence(&evidence, 4).unwrap();
+        assert_eq!(restored.to_json_bytes().unwrap(), bytes);
+
+        let query = "Where is the cart checkout button?";
+        let reference = evidence.rank_text(query, "web", 150, 20).unwrap();
+        let indexed = evidence.rank_text_indexed(&restored, 4, query, "web", 150, 20).unwrap();
+        assert_eq!(indexed, reference, "indexed BM25 must match the reference ranker exactly");
+        assert!(evidence.rank_text_indexed(&restored, 5, query, "web", 150, 20).is_err());
+    }
+
+    #[test]
+    fn lexical_index_rejects_wrong_generation_and_document_set() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(text_record(7, "evidence-text", "web", "lexical index generation test"), b"canonical trajectory bytes").unwrap();
+        let mut index = LexicalIndex::build(&evidence, 3).unwrap();
+        assert!(index.validate_for_evidence(&evidence, 4).is_err());
+        index.documents.remove(&7);
+        assert!(index.validate_for_evidence(&evidence, 3).is_err());
+    }
+
+    #[test]
     fn lexical_bm25_ranks_relevant_text_and_filters_scope_time_and_lifecycle() {
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-relevant", "web", "cart checkout button opens the shopping cart"), b"canonical trajectory bytes").unwrap();
@@ -924,6 +1303,90 @@ mod tests {
         )).unwrap());
         let crafted = serde_json::to_vec(&envelope).unwrap();
         assert!(EvidenceIndex::restore_snapshot(&crafted).is_err());
+    }
+
+    #[test]
+    fn legacy_v2_manifest_remains_verifiable_without_lexical_artifact() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-legacy", "web", "legacy committed evidence"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let snapshot = evidence.snapshot_bytes(5).unwrap();
+        let identity = HdcStoreIdentity {
+            store_generation: 3,
+            live_count: 1,
+            checksum_version: 1,
+            checksum_hex: "0123456789abcdef".into(),
+        };
+        let legacy = EvidenceCommitManifest::new_with_hdc_identity(
+            5, b"canonical hdc bytes", &snapshot, identity,
+        ).unwrap();
+        let mut legacy_value: serde_json::Value =
+            serde_json::from_slice(&legacy.to_json_bytes().unwrap()).unwrap();
+        legacy_value.as_object_mut().unwrap().remove("lexical_index_sha256");
+        let legacy_bytes = serde_json::to_vec(&legacy_value).unwrap();
+
+        let recovered = EvidenceCommitManifest::from_json_bytes(&legacy_bytes).unwrap();
+        recovered.verify(b"canonical hdc bytes", &snapshot).unwrap();
+        recovered.verify_lexical_index(None).unwrap();
+        assert!(recovered.verify_lexical_index(Some(b"unmanifested index")).is_err());
+        assert_eq!(recovered.lexical_index_sha256(), None);
+
+        let mut invalid_v3 = legacy_value;
+        invalid_v3["schema_version"] =
+            serde_json::Value::String(EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.into());
+        assert!(EvidenceCommitManifest::from_json_bytes(&serde_json::to_vec(&invalid_v3).unwrap()).is_err(),
+            "V3 typed manifest without a lexical digest must be rejected");
+    }
+
+    #[test]
+    fn v3_commit_manifest_binds_exact_lexical_index_bytes() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-manifest", "web", "manifest bound lexical document"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let snapshot = evidence.snapshot_bytes(5).unwrap();
+        let lexical_index = LexicalIndex::build(&evidence, 5).unwrap();
+        let lexical_bytes = lexical_index.to_json_bytes().unwrap();
+        let identity = HdcStoreIdentity {
+            store_generation: 3,
+            live_count: 1,
+            checksum_version: 1,
+            checksum_hex: "0123456789abcdef".into(),
+        };
+        let manifest = EvidenceCommitManifest::new_with_hdc_identity_and_lexical_index(
+            5, b"canonical hdc bytes", &snapshot, identity, &lexical_bytes,
+        ).unwrap();
+        manifest.verify(b"canonical hdc bytes", &snapshot).unwrap();
+        manifest.verify_lexical_index(Some(&lexical_bytes)).unwrap();
+        assert!(manifest.verify_lexical_index(Some(b"different lexical index")).is_err());
+        assert!(manifest.verify_lexical_index(None).is_err());
+
+        let encoded = manifest.to_json_bytes().unwrap();
+        let recovered = EvidenceCommitManifest::from_json_bytes(&encoded).unwrap();
+        assert_eq!(recovered.lexical_index_sha256(), Some(sha256_hex(&lexical_bytes).as_str()));
+        recovered.verify_lexical_index(Some(&lexical_bytes)).unwrap();
+    }
+
+    #[test]
+    fn lexical_index_rejects_unknown_schema_and_malformed_postings() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-index-structure", "web", "alpha beta alpha"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let lexical = LexicalIndex::build(&evidence, 2).unwrap();
+        let bytes = lexical.to_json_bytes().unwrap();
+
+        let mut unknown: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        unknown["schema_version"] = serde_json::Value::String("BROCA-LEXICAL-INDEX-V999".into());
+        assert!(LexicalIndex::from_json_bytes(&serde_json::to_vec(&unknown).unwrap()).is_err());
+
+        let mut malformed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        malformed["postings"]["alpha"][0]["term_frequency"] = serde_json::Value::from(0);
+        assert!(LexicalIndex::from_json_bytes(&serde_json::to_vec(&malformed).unwrap()).is_err());
     }
 
     #[test]
