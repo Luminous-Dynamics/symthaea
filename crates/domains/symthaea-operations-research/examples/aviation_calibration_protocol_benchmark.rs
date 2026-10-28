@@ -15,18 +15,17 @@ use symthaea_operations_research::aviation_distributional_robustness::{
     evaluate_tv_robustness_curve, evaluate_tv_robust_cost_delta, ScenarioCostDelta,
 };
 use symthaea_operations_research::aviation_probability_calibration::{
-    calibrate_tv_radius_envelope, CalibrationFrequency, RegimeCalibration,
+    calibrate_tv_radius_from_episodes, CalibrationEpisode, NominalScenarioProbability,
+    RegimeNominalDistribution,
 };
 
 fn main() {
-    let partitions = [
+    let mut records = Vec::new();
+    for (partition, epoch) in [
         (EvaluationPartition::Training, 1_700_000_000_i64),
-        (EvaluationPartition::Calibration, 1_700_010_000_i64),
         (EvaluationPartition::Validation, 1_700_020_000_i64),
         (EvaluationPartition::Test, 1_700_030_000_i64),
-    ];
-    let mut records = Vec::new();
-    for (partition, epoch) in partitions {
+    ] {
         for index in 0..3 {
             records.push(SplitRecord {
                 record_id: format!("{partition:?}-row-{index}"),
@@ -34,6 +33,48 @@ fn main() {
                 event_time_epoch_seconds: Some(epoch + index),
                 partition,
             });
+        }
+    }
+
+    let regime_counts: [(&str, [(&str, u64); 3]); 2] = [
+        ("nominal-weather", [("routine", 60), ("capacity", 30), ("compound-weather", 10)]),
+        ("disruption-heavy", [("routine", 40), ("capacity", 30), ("compound-weather", 30)]),
+    ];
+    let nominal_distributions: Vec<RegimeNominalDistribution> = regime_counts
+        .iter()
+        .map(|(regime_id, _)| RegimeNominalDistribution {
+            regime_id: (*regime_id).into(),
+            probabilities: vec![
+                NominalScenarioProbability { scenario_id: "routine".into(), probability_ppm: 600_000 },
+                NominalScenarioProbability { scenario_id: "capacity".into(), probability_ppm: 300_000 },
+                NominalScenarioProbability { scenario_id: "compound-weather".into(), probability_ppm: 100_000 },
+            ],
+        })
+        .collect();
+
+    let mut calibration_episodes = Vec::new();
+    let mut calibration_index = 0_u64;
+    for (regime_id, outcomes) in regime_counts {
+        for (scenario_id, count) in outcomes {
+            for _ in 0..count {
+                let record_id = format!("calibration-record-{calibration_index}");
+                let event_cluster_id = format!("calibration-episode-{calibration_index}");
+                let event_time = 1_700_010_000_i64 + calibration_index as i64;
+                calibration_episodes.push(CalibrationEpisode {
+                    record_id: record_id.clone(),
+                    event_cluster_id: event_cluster_id.clone(),
+                    regime_id: regime_id.into(),
+                    observed_scenario_id: scenario_id.into(),
+                    partition: EvaluationPartition::Calibration,
+                });
+                records.push(SplitRecord {
+                    record_id,
+                    event_cluster_id,
+                    event_time_epoch_seconds: Some(event_time),
+                    partition: EvaluationPartition::Calibration,
+                });
+                calibration_index += 1;
+            }
         }
     }
 
@@ -63,28 +104,14 @@ fn main() {
         process::exit(1);
     }
 
-    let regimes = [
-        RegimeCalibration {
-            regime_id: "nominal-weather".into(),
-            frequencies: vec![
-                CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: 60 },
-                CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: 30 },
-                CalibrationFrequency { scenario_id: "compound-weather".into(), nominal_probability_ppm: 100_000, observed_count: 10 },
-            ],
-        },
-        RegimeCalibration {
-            regime_id: "disruption-heavy".into(),
-            frequencies: vec![
-                CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: 40 },
-                CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: 30 },
-                CalibrationFrequency { scenario_id: "compound-weather".into(), nominal_probability_ppm: 100_000, observed_count: 30 },
-            ],
-        },
-    ];
-    let calibration = match calibrate_tv_radius_envelope(&regimes, 50_000) {
+    let calibration = match calibrate_tv_radius_from_episodes(
+        &calibration_episodes,
+        &nominal_distributions,
+        50_000,
+    ) {
         Ok(value) => value,
         Err(error) => {
-            eprintln!("TV-radius regime-envelope calibration failed: {error:?}");
+            eprintln!("TV-radius episode calibration failed: {error:?}");
             process::exit(1);
         }
     };
