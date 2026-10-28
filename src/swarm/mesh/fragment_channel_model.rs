@@ -135,16 +135,20 @@ fn wire_len(payload_len: u8) -> usize {
     HEADER_SIZE + payload_len as usize
 }
 
-/// Run four packet-delivery strategies against paired deterministic traces:
+/// Run four packet-delivery strategies against one exogenous time-slot trace:
 ///
 /// - no FEC/retry: success only if all initial data fragments arrive;
 /// - XOR-FEC: existing parity/assembler behavior, without retries;
-/// - selective retry: one retry for each initially lost data fragment;
-/// - hybrid: XOR parity plus those same one-shot retries.
+/// - selective retry: one retry for each initially missing data fragment;
+/// - hybrid: send parity and retry only when initial FEC cannot reconstruct.
 ///
-/// Each trial reserves a parity slot and one possible retry slot per data
-/// fragment in the synthetic time trace. Unused retry slots are idle slots.
-/// Perfect aggregated feedback is assumed by the retry strategies.
+/// The channel's Gilbert-Elliott state evolves on every time slot, regardless
+/// of whether a strategy transmits in that slot. This avoids consuming a fake
+/// parity-frame outcome in the no-parity retry strategy. The schedules are:
+/// initial data at slots 0..N-1; XOR/hybrid parity at N; selective-retry feedback
+/// turnaround at N; hybrid feedback turnaround at N+1; retries then consume
+/// slots in actual send order. Retry strategies assume ideal feedback and at
+/// most one retry per missing data frame; ACK bytes/loss are not modelled.
 fn run_benchmark(
     payload: &[u8],
     model: LossModel,
@@ -156,7 +160,8 @@ fn run_benchmark(
     let frames = fragment(0xC0DE, payload);
     let data_count = frames.len() - 1;
     let fec_index = data_count;
-    let trace_slots = frames.len() + data_count;
+    // Worst case is N data sends + parity slot + feedback turnaround + N retries.
+    let trace_slots = 2 * data_count + 2;
 
     let no_fec_wire_bytes_per_message: usize = frames[..data_count]
         .iter()
@@ -198,48 +203,62 @@ fn run_benchmark(
     let mut hybrid_bytes_total = 0usize;
 
     for _ in 0..trials {
-        // The data-frame outcomes are shared by all strategies. Slots after
-        // the initial data+parity group represent one possible retry per data
-        // fragment; the channel state continues evolving through idle slots.
+        // One shared channel timeline: state transitions happen once per
+        // elapsed slot, including idle slots during feedback turn-around.
+        // trace[t] is the potential delivery result if a frame is sent at t.
         let trace: Vec<bool> = (0..trace_slots)
             .map(|_| frame_delivered(model, &mut rng, &mut in_bad_state))
             .collect();
-        let initial_data_ok = &trace[..data_count];
+        let initial_data_ok = trace[..data_count].to_vec();
         let all_initial_data = initial_data_ok.iter().all(|&delivered| delivered);
 
         if all_initial_data {
             summary.no_fec_successes += 1;
         }
 
+        // Evaluate the actual XOR-FEC assembler after the initial data and
+        // parity slots. This initial outcome also governs whether the hybrid
+        // needs any retransmissions at all.
         let mut xor_assembler =
             FragmentAssembler::new(0xC0DE, frames.len() as u8, payload.len());
-        for (index, frame) in frames.iter().enumerate() {
-            if trace[index] {
-                xor_assembler.feed(frame);
+        for index in 0..data_count {
+            if initial_data_ok[index] {
+                xor_assembler.feed(&frames[index]);
             }
         }
-        if let Some(recovered) = xor_assembler.assemble() {
-            if recovered.as_slice() == payload {
-                summary.xor_fec_successes += 1;
+        let parity_initially_ok = trace[fec_index];
+        if parity_initially_ok {
+            xor_assembler.feed(&frames[fec_index]);
+        }
+        let xor_initial_success = match xor_assembler.assemble() {
+            Some(recovered) if recovered.as_slice() == payload => {
                 if !all_initial_data {
                     summary.xor_fec_recoveries += 1;
                 }
-            } else {
-                summary.xor_fec_incorrect_outputs += 1;
+                true
             }
+            Some(_) => {
+                summary.xor_fec_incorrect_outputs += 1;
+                false
+            }
+            None => false,
+        };
+        if xor_initial_success {
+            summary.xor_fec_successes += 1;
         }
 
-        // One-round selective retry: an ideal aggregated acknowledgement
-        // identifies every initially missing data fragment. Each gets exactly
-        // one retry; ACK loss and ACK byte overhead are out of this model.
-        let mut selective_data_ok = initial_data_ok.to_vec();
+        // Selective retry sends no parity. Slot N is the ACK turnaround gap;
+        // each actually missing data fragment consumes the next retry slot.
+        let mut selective_data_ok = initial_data_ok.clone();
         let mut selective_frames = data_count;
         let mut selective_bytes = no_fec_wire_bytes_per_message;
+        let mut retry_slot = data_count + 1;
         for index in 0..data_count {
             if !selective_data_ok[index] {
                 selective_frames += 1;
                 selective_bytes += wire_len(frames[index].payload_len);
-                selective_data_ok[index] = trace[frames.len() + index];
+                selective_data_ok[index] = trace[retry_slot];
+                retry_slot += 1;
             }
         }
         if selective_data_ok.iter().all(|&delivered| delivered) {
@@ -248,17 +267,21 @@ fn run_benchmark(
         selective_frames_total += selective_frames;
         selective_bytes_total += selective_bytes;
 
-        // Hybrid retry uses the identical retry outcomes, but begins with the
-        // additional XOR parity transmission. It can succeed with all data or
-        // use parity to recover one remaining lost data fragment.
-        let mut hybrid_data_ok = initial_data_ok.to_vec();
+        // Hybrid has already transmitted parity at slot N. If XOR-FEC has
+        // reconstructed exactly, do not retransmit. Otherwise request the
+        // missing data blocks only, in send order after the feedback slot N+1.
+        let mut hybrid_data_ok = initial_data_ok.clone();
         let mut hybrid_frames = frames.len();
         let mut hybrid_bytes = xor_fec_wire_bytes_per_message;
-        for index in 0..data_count {
-            if !hybrid_data_ok[index] {
-                hybrid_frames += 1;
-                hybrid_bytes += wire_len(frames[index].payload_len);
-                hybrid_data_ok[index] = trace[frames.len() + index];
+        if !xor_initial_success {
+            let mut retry_slot = data_count + 2;
+            for index in 0..data_count {
+                if !hybrid_data_ok[index] {
+                    hybrid_frames += 1;
+                    hybrid_bytes += wire_len(frames[index].payload_len);
+                    hybrid_data_ok[index] = trace[retry_slot];
+                    retry_slot += 1;
+                }
             }
         }
 
@@ -269,18 +292,18 @@ fn run_benchmark(
                 hybrid_assembler.feed(&frames[index]);
             }
         }
-        if trace[fec_index] {
+        if parity_initially_ok {
             hybrid_assembler.feed(&frames[fec_index]);
         }
-        if let Some(recovered) = hybrid_assembler.assemble() {
-            if recovered.as_slice() == payload {
+        match hybrid_assembler.assemble() {
+            Some(recovered) if recovered.as_slice() == payload => {
                 summary.hybrid_successes += 1;
                 if !hybrid_data_ok.iter().all(|&delivered| delivered) {
                     summary.hybrid_fec_recoveries += 1;
                 }
-            } else {
-                summary.hybrid_incorrect_outputs += 1;
             }
+            Some(_) => summary.hybrid_incorrect_outputs += 1,
+            None => {}
         }
         hybrid_frames_total += hybrid_frames;
         hybrid_bytes_total += hybrid_bytes;
