@@ -439,24 +439,27 @@ impl FragmentAssembler {
             return None;
         }
 
-        // A recovered final fragment must fit its fixed-size XOR buffer. The
-        // configured expected size can be stale or inconsistent with the
-        // fragment count (for example, if a compressed envelope is reassembled
-        // using the raw WisdomPacket size). Reject inconsistent metadata before
-        // any slice can panic. This is a safety guard; exact encoded-length
-        // binding belongs in the versioned fragment wire format.
-        let final_chunk_start = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
-        let inferred_final_len = self.expected_payload_size.checked_sub(final_chunk_start)?;
-        if inferred_final_len == 0 || inferred_final_len > PAYLOAD_SIZE {
-            return None;
-        }
-        let max_payload_len = data_count.checked_mul(PAYLOAD_SIZE)?;
-        if self.expected_payload_size > max_payload_len {
-            return None;
-        }
-
         // Find the missing data fragment index (if any)
         let missing_idx = self.received[..data_count].iter().position(|&r| !r);
+
+        // Only the missing-final-fragment case relies on expected_payload_size
+        // to determine a recovered slice length. The sender fragments the
+        // encoded envelope, while legacy receiver configuration may still hold
+        // the raw WisdomPacket size. Do not reject fully received compressed
+        // envelopes (whose actual fragment lengths are already known), but fail
+        // closed before slicing when this inferred length cannot fit the XOR
+        // recovery buffer. Exact encoded-length binding belongs in V2 framing.
+        let inferred_final_len = if missing_idx == Some(data_count - 1) {
+            let final_chunk_start = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
+            let inferred = self.expected_payload_size.checked_sub(final_chunk_start)?;
+            let max_payload_len = data_count.checked_mul(PAYLOAD_SIZE)?;
+            if inferred == 0 || inferred > PAYLOAD_SIZE || self.expected_payload_size > max_payload_len {
+                return None;
+            }
+            Some(inferred)
+        } else {
+            None
+        };
 
         // Recover the missing fragment via XOR
         let recovered: Option<[u8; PAYLOAD_SIZE]> = missing_idx.map(|missing| {
@@ -494,9 +497,9 @@ impl FragmentAssembler {
                 if i < data_count - 1 {
                     PAYLOAD_SIZE
                 } else {
-                    // Last data fragment — infer only after validating its
-                    // length against the fixed-size recovery buffer above.
-                    inferred_final_len
+                    // Last data fragment — the bound check above runs only
+                    // when this final fragment is the missing one.
+                    inferred_final_len?
                 }
             } else {
                 self.payload_lens[i] as usize
@@ -604,6 +607,19 @@ mod tests {
     }
 
     // -- Single-loss FEC recovery --
+
+    #[test]
+    fn fully_received_short_envelope_uses_observed_fragment_lengths() {
+        let encoded = vec![0x5A; 1800];
+        let frags = fragment(8, &encoded);
+        let mut assembler = FragmentAssembler::new(8, frags.len() as u8, 2104);
+
+        for frag in &frags {
+            assembler.feed(frag);
+        }
+
+        assert_eq!(assembler.assemble().as_deref(), Some(encoded.as_slice()));
+    }
 
     #[test]
     fn inconsistent_expected_size_fails_closed_without_recovery_slice_panic() {
