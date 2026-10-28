@@ -45,13 +45,16 @@ Deliver a baseline-only compatibility receipt before any policy comparison. If t
 
 1. **Native baseline, no interpreter.** Same task visibility and final submission contract as the benchmark's native unassisted arm.
 2. **Native baseline, interpreter.** Preserve the original tool-enabled comparison as a reference, but not the sole comparator.
-3. **Explore-then-commit, random acquisition.** Structured probe phase, the declared diagnostics, finite hypothesis pool, random feasible selection, and a fresh synthesis call with frozen observations.
-4. **Explore-then-commit, variance acquisition.** Same pipeline as arm 3; change only the acquisition score.
-5. **Explore-then-commit, pairwise acquisition.** Same pipeline and candidate pool; change only the acquisition score.
-6. **Diagnostics-only ablation.** Make the same automatic sensitivity/power-law diagnostics available without introducing the rest of the planner protocol.
-7. **Fresh-synthesis ablation.** Hold observations and remaining budgets fixed, then compare the frozen-observation synthesis to the draft-retaining or native finalization path.
+3. **Explore-then-commit, variance acquisition, no interpreter.**
+4. **Explore-then-commit, pairwise acquisition, no interpreter.**
+5. **Explore-then-commit, random acquisition, no interpreter.**
+6. **Explore-then-commit, variance acquisition, interpreter.**
+7. **Explore-then-commit, pairwise acquisition, interpreter.**
+8. **Explore-then-commit, random acquisition, interpreter.**
 
-Arms 6–7 are diagnostic ablations, not substitutes for the native baselines. Additional ablations are admitted only if each can be budget-matched and its analysis is preregistered.
+The six planner arms share the bootstrap rules, numerical diagnostics, hypothesis pool, batch constraints, candidate input pool and finalization opportunity. Only the acquisition rule and interpreter availability vary as declared. Random acquisition is a required control, not an assumed weak baseline.
+
+After the eight-arm replication, run separate preregistered ablations: diagnostics-only, structured-probe removal, fresh-synthesis removal, draft-retention policy, and batch-diversity removal. Each ablation must be budget-matched and must not replace the native reference arms.
 
 ### Two distinct matching profiles
 
@@ -65,13 +68,13 @@ Do not merge these two profiles into one average. A method may win under a simul
 
 ### Enforce the batch limit in the adapter
 
-All experiment proposals pass through a validated adapter with a hard maximum number of measurements per action and per trial. Reject or truncate? **Reject** malformed/over-budget requests and record the violation; do not silently truncate the action, because that changes the policy's observation and stopping process. Apply the same maximum to every arm. Preserve requested, accepted, and executed counts separately.
+All experiment proposals pass through a validated adapter with a hard maximum number of measurements per action and per trial. Reject malformed or over-budget requests and record the violation; do not silently truncate the action, because that changes the policy's observation and stopping process. Apply the same maximum to every arm. Preserve requested, accepted, and executed counts separately.
 
 ## 5. Randomization, pairing, and analysis
 
 - Use the same task module, difficulty, system type, law version, initial information, and rollout seed across all arms in a paired block.
 - Balance arms across module/order and execution time; randomize the order in which an arm is run to avoid provider/time confounds.
-- Freeze the primary endpoint, practical minimum effect, sample-size/power plan, exclusions, missing-data rules, multiplicity correction and uncertainty method before confirmatory runs.
+- Freeze the primary endpoint, practical minimum effect, sample-size/power plan, exclusions, missing-data rules, multiplicity correction and uncertainty method before confirmatory runs. Because the eight-arm grid yields multiple comparisons, preregister one or a small number of primary contrasts; report the remaining arm comparisons as secondary or control family-wise error.
 - Begin with a small baseline-only pilot to estimate per-module variation and execution failure rates. Use the pilot to power the confirmatory comparison; do not tune the policy on a sealed confirmatory generation.
 - Keep task-level/rollout-level data. Report paired differences and module-stratified effects; do not rely only on pooled means or two unpaired variants averaged into a family.
 - Use independent rollout seeds and equal completed-attempt counts per arm where feasible. A run that never submits an equation remains an outcome, not an omission.
