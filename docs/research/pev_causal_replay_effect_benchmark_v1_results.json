@@ -1,16 +1,29 @@
 {
   "audit_panel_accepted": true,
   "bootstrap_replicates_per_arm": 3000,
+  "intervention_arm_counts": {
+    "invalid_pe_payload": 512,
+    "valid_pe": 512
+  },
+  "invalid_payload_variant_counts": {
+    "('float', '-0x1.0000000000000p+0')": 73,
+    "('float', '0x0.0p+0')": 73,
+    "('float', '0x1.0000000000000p+0')": 73,
+    "('null', None)": 74,
+    "('str', '+Infinity')": 73,
+    "('str', '-Infinity')": 73,
+    "('str', 'NaN')": 73
+  },
   "invalid_pe_placebo_effect": {
-    "bootstrap_ci_high": 0.005847422421875001,
+    "bootstrap_ci_high": -0.00042342859374999833,
     "bootstrap_ci_level": 0.95,
-    "bootstrap_ci_low": -0.0008286091796874981,
+    "bootstrap_ci_low": -0.0070997624023437485,
     "bootstrap_replicates": 3000,
-    "ci_excludes_zero": false,
-    "mean_effect": 0.00249059505859375,
+    "ci_excludes_zero": true,
+    "mean_effect": -0.0036833531445312493,
     "n_pairs": 512,
-    "paired_sd": 0.03846960792573614,
-    "paired_se": 0.0017001325396172361
+    "paired_sd": 0.039050586073495874,
+    "paired_se": 0.001725808388867368
   },
   "mutation_results": {
     "boolean_transition_count": {
@@ -25,6 +38,10 @@
       "detected": true,
       "expected_error": "RUN_ID_DUPLICATE"
     },
+    "incomplete_placebo_payload_coverage": {
+      "detected": true,
+      "expected_error": "INVALID_PAYLOAD_ARM_COVERAGE_INCOMPLETE"
+    },
     "invalid_pe_admitted": {
       "detected": true,
       "expected_error": "INVALID_PE_ADMISSION"
@@ -32,6 +49,10 @@
     "malformed_intervention_type": {
       "detected": true,
       "expected_error": "EXPECTED_INTERVENTION_INVALID"
+    },
+    "non_distinct_post_intervention_path": {
+      "detected": true,
+      "expected_error": "POST_INTERVENTION_PATH_NOT_DISTINCT"
     },
     "outcome_calibration_mismatch": {
       "detected": true,
@@ -53,6 +74,10 @@
       "detected": true,
       "expected_error": "PAIRED_RANDOMNESS_TAPE_DIGEST_MISMATCH"
     },
+    "rejected_pairs_excluded_from_effects": {
+      "detected": true,
+      "expected_error": "failed pair excluded from estimates"
+    },
     "treatment_role_swapped": {
       "detected": true,
       "expected_error": "TREATMENT_INTERVENTION_MISMATCH"
@@ -66,8 +91,8 @@
       "expected_error": "VALID_PE_EVIDENCE_ID_MISSING"
     }
   },
-  "mutations_detected": 13,
-  "mutations_injected": 13,
+  "mutations_detected": 16,
+  "mutations_injected": 16,
   "pairs_per_arm": 512,
   "placebo_ci_inside_equivalence_margin": true,
   "placebo_equivalence_margin": 0.02,
@@ -83,14 +108,14 @@
   "synthetic_ground_truth_valid_pe_effect": 0.08,
   "total_paired_runs": 2048,
   "valid_pe_effect": {
-    "bootstrap_ci_high": 0.0831100012890625,
+    "bootstrap_ci_high": 0.08419991818359375,
     "bootstrap_ci_level": 0.95,
-    "bootstrap_ci_low": 0.07632085958984375,
+    "bootstrap_ci_low": 0.07743304251953126,
     "bootstrap_replicates": 3000,
     "ci_excludes_zero": true,
-    "mean_effect": 0.079807341171875,
+    "mean_effect": 0.08078448826171875,
     "n_pairs": 512,
-    "paired_sd": 0.03932334723832454,
-    "paired_se": 0.001737862843198286
+    "paired_sd": 0.03863265785820396,
+    "paired_se": 0.0017073383966747363
   }
 }
