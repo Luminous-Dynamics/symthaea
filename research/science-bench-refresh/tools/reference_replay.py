@@ -274,6 +274,20 @@ def independently_generate(
     recipes = config.get("recipes")
     if not isinstance(recipes, list):
         raise ValueError("generator config recipes must be a list")
+    canonical_templates = {
+        "semantic_invariance": "Recover the relationship invariant under the declared coordinate transformation.",
+        "sampling_noise_shift": "Recover the relationship under declared measurement noise and report uncertainty.",
+        "confounding_null": "Decide whether the apparent association is a direct effect or explained by a common cause.",
+        "identifiability_abstention": "Determine what is identifiable from the narrow observed domain; state an equivalence class or abstain.",
+    }
+    for recipe in recipes:
+        kind = str(recipe["kind"])
+        family_id = str(recipe["family_id"])
+        if family_id != kind or kind not in canonical_templates:
+            raise ValueError("generator recipe family/kind is not in the audited v1 profile")
+        if recipe.get("instruction") != canonical_templates[kind]:
+            raise ValueError("recipe instruction differs from the frozen, audited policy-visible template")
+
     recipe_by_family = {str(recipe["family_id"]): recipe for recipe in recipes}
     manifest_families = {
         str(family["family_id"]): int(family["planned_task_count"])
