@@ -43,7 +43,7 @@ jobs:
         run: |
           rustc --edition=2024 tools/vision-dvpc-closed-loop-frontier.rs -o /tmp/vis-dvpc-025
           /tmp/vis-dvpc-025 --score | tee /tmp/vis-dvpc-025-frontier.tsv
-          test "$(grep -c '^RESULT[[:space:]]' /tmp/vis-dvpc-025-frontier.tsv)" = "117"
+          test "$(awk -F '\t' '$1 == "RESULT" && $2 != "campaign_id" { n++ } END { print n+0 }' /tmp/vis-dvpc-025-frontier.tsv)" = "117"
           test "$(grep -c '^SUMMARY[[:space:]]' /tmp/vis-dvpc-025-frontier.tsv)" = "9"
           grep '^SUMMARY[[:space:]]forced_adapt[[:space:]]' /tmp/vis-dvpc-025-frontier.tsv | grep 'uncertified_activations=13'
           awk -F '\t' '$1 == "RESULT" && $2 == "C01-positive" && $4 == "decision_value_fixed" { if ($6 != "true" || $7 != "AUTHORIZED" || $8 != "false" || $13 <= 0) exit 1; found=1 } END { if (!found) exit 1 }' /tmp/vis-dvpc-025-frontier.tsv
