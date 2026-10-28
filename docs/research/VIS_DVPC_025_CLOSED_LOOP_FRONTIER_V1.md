@@ -28,7 +28,7 @@ Only declared IID trials or independent-cluster units may contribute. Row-depend
 ## Baselines
 
 - **fixed_fallback:** take no measurement and retain the safe fallback.
-- **forced_adapt:** intentionally bypass the certificate; its false authorizations are reported and it is not a compliant policy.
+- **forced_adapt:** intentionally bypasses the certificate; every activation without a successful gate is reported as uncertified, and it is not a compliant policy.
 - **highest_uncertainty:** choose the highest-uncertainty affordable measurement.
 - **cost_first:** choose the lowest-cost affordable measurement.
 - **decision_value_fixed:** choose by declared marginal test value minus estimated cost, then apply the fixed-sample gate.
