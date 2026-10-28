@@ -489,16 +489,22 @@ mod tests {
     #[test]
     fn conflicting_transaction_id_is_rejected() {
         let error = reconcile_csv(CONFLICT).expect_err("conflicting ID must fail");
-        assert!(error.to_string().contains("conflicting duplicate transaction_id"));
+        assert!(
+            error
+                .to_string()
+                .contains("conflicting duplicate transaction_id")
+        );
     }
 
     #[test]
     fn zero_and_negative_amounts_are_rejected() {
         for amount in ["0", "-1"] {
-            let input = format!(
-                "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,{amount}\n"
+            let input =
+                format!("transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,{amount}\n");
+            assert!(
+                reconcile_csv(&input).is_err(),
+                "amount {amount} should fail"
             );
-            assert!(reconcile_csv(&input).is_err(), "amount {amount} should fail");
         }
     }
 
@@ -511,9 +517,10 @@ mod tests {
     #[test]
     fn wrong_header_and_wrong_field_count_are_rejected() {
         assert!(reconcile_csv("transaction_id,amount\nTX-1,10\n").is_err());
-        assert!(reconcile_csv(
-            "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT\n"
-        ).is_err());
+        assert!(
+            reconcile_csv("transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT\n")
+                .is_err()
+        );
     }
 
     #[test]
@@ -548,7 +555,8 @@ mod tests {
 
     #[test]
     fn quoted_fields_and_crlf_are_supported() {
-        let valid = "transaction_id,account_id,side,amount_minor\r\n\"TX-\"\"1\"\"\",AC-1,CREDIT,5\r\n";
+        let valid =
+            "transaction_id,account_id,side,amount_minor\r\n\"TX-\"\"1\"\"\",AC-1,CREDIT,5\r\n";
         let report = reconcile_csv(valid).expect("valid escaped quote should parse");
         assert_eq!(report.accounts[0].account_id, "AC-1");
         assert_eq!(report.accounts[0].unique_transactions, 1);
@@ -636,17 +644,16 @@ mod tests {
                 seed = seed
                     .wrapping_mul(6_364_136_223_846_793_005)
                     .wrapping_add(1_442_695_040_888_963_407);
-                let side = if seed & 1 == 0 { Side::Credit } else { Side::Debit };
+                let side = if seed & 1 == 0 {
+                    Side::Credit
+                } else {
+                    Side::Debit
+                };
                 seed = seed
                     .wrapping_mul(6_364_136_223_846_793_005)
                     .wrapping_add(1_442_695_040_888_963_407);
                 let amount = (seed % 1_000_000) + 1;
-                generated.push((
-                    format!("TX-{case:02}-{index:04}"),
-                    account_id,
-                    side,
-                    amount,
-                ));
+                generated.push((format!("TX-{case:02}-{index:04}"), account_id, side, amount));
                 if index % 9 == 0 {
                     let duplicate = generated.last().expect("just inserted").clone();
                     generated.push(duplicate);
@@ -669,11 +676,12 @@ mod tests {
             let mut oracle_accounts: BTreeMap<String, (u64, u64, u64)> = BTreeMap::new();
 
             for transaction in &generated {
-                if let Some(previous) = accepted
-                    .iter()
-                    .find(|previous| previous.0 == transaction.0)
+                if let Some(previous) = accepted.iter().find(|previous| previous.0 == transaction.0)
                 {
-                    assert_eq!(previous, transaction, "generator only emits exact duplicates");
+                    assert_eq!(
+                        previous, transaction,
+                        "generator only emits exact duplicates"
+                    );
                     duplicate_count += 1;
                     continue;
                 }
@@ -701,7 +709,10 @@ mod tests {
                 .collect();
             let expected_credits: u64 = expected_accounts.iter().map(|a| a.credits_minor).sum();
             let expected_debits: u64 = expected_accounts.iter().map(|a| a.debits_minor).sum();
-            let expected_unique: u64 = expected_accounts.iter().map(|a| a.unique_transactions).sum();
+            let expected_unique: u64 = expected_accounts
+                .iter()
+                .map(|a| a.unique_transactions)
+                .sum();
 
             let report = reconcile_csv(&csv).expect("generated ledger should reconcile");
             assert_eq!(report.accounts, expected_accounts, "case {case}");
@@ -714,8 +725,7 @@ mod tests {
             );
             assert_eq!(report.unique_transactions, expected_unique, "case {case}");
             assert_eq!(
-                report.exact_duplicate_rows_ignored,
-                duplicate_count,
+                report.exact_duplicate_rows_ignored, duplicate_count,
                 "case {case}"
             );
         }
@@ -728,17 +738,36 @@ mod tests {
             "transaction_id,account_id,side,amount_minor\n\"TX-1,AC-1,CREDIT,1\n",
             "transaction_id,account_id,side,amount_minor\nTX-1,AC-1,CREDIT,\"1",
         ] {
-            assert!(reconcile_csv(input).is_err(), "malformed CSV should fail: {input:?}");
+            assert!(
+                reconcile_csv(input).is_err(),
+                "malformed CSV should fail: {input:?}"
+            );
         }
     }
 
     #[test]
     fn account_totals_sum_to_global_totals() {
         let report = reconcile_csv(INPUT).expect("fixture ledger is valid");
-        let account_credits: u64 = report.accounts.iter().map(|account| account.credits_minor).sum();
-        let account_debits: u64 = report.accounts.iter().map(|account| account.debits_minor).sum();
-        let account_net: i128 = report.accounts.iter().map(|account| account.net_minor).sum();
-        let account_transactions: u64 = report.accounts.iter().map(|account| account.unique_transactions).sum();
+        let account_credits: u64 = report
+            .accounts
+            .iter()
+            .map(|account| account.credits_minor)
+            .sum();
+        let account_debits: u64 = report
+            .accounts
+            .iter()
+            .map(|account| account.debits_minor)
+            .sum();
+        let account_net: i128 = report
+            .accounts
+            .iter()
+            .map(|account| account.net_minor)
+            .sum();
+        let account_transactions: u64 = report
+            .accounts
+            .iter()
+            .map(|account| account.unique_transactions)
+            .sum();
         assert_eq!(account_credits, report.credits_minor);
         assert_eq!(account_debits, report.debits_minor);
         assert_eq!(account_net, report.net_minor);
@@ -751,7 +780,10 @@ mod tests {
         assert_eq!(report.credits_minor, 2049);
         assert_eq!(report.debits_minor, 350);
         assert_eq!(report.net_minor, 1699);
-        assert_eq!(report.net_minor, i128::from(report.credits_minor) - i128::from(report.debits_minor));
+        assert_eq!(
+            report.net_minor,
+            i128::from(report.credits_minor) - i128::from(report.debits_minor)
+        );
     }
 
     #[test]
