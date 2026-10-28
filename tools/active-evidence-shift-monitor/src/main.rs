@@ -105,8 +105,7 @@ fn evaluate(
         };
         let mut next = vec![0.0; horizon + 1];
 
-        for successes in 0..n {
-            let mass = active[successes];
+        for (successes, mass) in active.iter().copied().take(n).enumerate() {
             if mass == 0.0 {
                 continue;
             }
