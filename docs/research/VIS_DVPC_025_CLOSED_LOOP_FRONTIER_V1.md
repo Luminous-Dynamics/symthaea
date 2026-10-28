@@ -13,17 +13,17 @@ This deliberately joins a selection loop and an activation gate in one scorer. E
 ## Frozen fixture
 
 - 13 hand-authored campaigns cover positive opportunity, high uncertainty with low value, ranking reversal, cost inversion, source-to-target shift, row dependence, missing/censored evidence, safe-but-useless evidence, actual cost overrun, negative realized value, independent cluster units, no information, and repeated fixed-sample peeking.
-- Each campaign has three measurement candidates and one activation candidate; the public action table and evaluator-only outcome table are separate hashed files.
+- Each campaign has three measurement candidates and one activation candidate; the public action table and evaluator-only outcome table are separate hashed files. Oracle rows freeze per-observation risk bits and bounded-value samples, validate them against the aggregate summaries, and never place those samples in the visible table.
 - The public table contains estimates, uncertainty, estimated cost, budget, target and the declared type of evidence unit. Realized value, actual cost, sample counts, failures, value summaries, target calibration, provenance and sealed-access controls are evaluator-only.
 - Thirteen campaigns are a known-answer adversarial fixture, not thirteen independent empirical replications. The seeds identify frozen cases; they do not support confidence intervals or population claims.
 
 ## Gate in this version
 
-The mechanism gate uses a one-sided Clopper–Pearson upper bound for failure risk with alpha 0.025, plus a bounded-value Hoeffding lower bound with alpha 0.025. It requires the risk upper bound to be at most 5%, a net-value lower bound of at least 0.5 normalized units (500 milli-units), target calibration, valid provenance, and no sealed access.
+Two gates are compared. The fixed gate uses a one-sided Clopper–Pearson upper bound for failure risk with alpha 0.025 plus a bounded-value Hoeffding lower bound with alpha 0.025. The anytime gate consumes the frozen individual observations in action-return batches and uses the same preregistered risk-mixture likelihood-ratio e-process and bounded-value betting e-process as VIS-DVPC-024; each process must cross 1/alpha = 40. The anytime gate checks at actual batch-arrival boundaries, not fictional unobserved stopping times. Both modes use risk cap 5%, value floor 500 milli-units, target calibration, valid provenance, and no sealed access. The two alpha allocations of 0.025 use a union bound for the combined error budget.
 
 Only declared IID trials or independent-cluster units may contribute. Row-dependent samples and evidence labelled as a repeated fixed-sample peek are excluded rather than counted as independent. Source-to-target mismatch and provenance/sealed-access failures deny activation. Missing results do not become zero-cost successes.
 
-**Composition boundary:** this v1 computes the fixed-sample gate inside the integration scorer. It does not yet invoke the VIS-DVPC-024 e-process implementation as a shared library, nor does it cryptographically verify the synthetic provenance booleans. The peeking control is rejected; it is not evidence that the sequential gate has been integrated. Wiring the anytime-valid and cluster-aware gate implementations into the same campaign adapter remains an explicit next gate.
+**Composition boundary:** the campaign scorer now contains a standalone implementation of the same preregistered e-process formulas used in VIS-DVPC-024, applied to per-observation raw streams and selected action batch boundaries. This avoids counting a fixed-sample interval as valid under repeated peeking. The code is not yet a shared production library with VIS-DVPC-024, and it does not cryptographically verify the synthetic provenance booleans. Independent-cluster labels are explicit test inputs, not proof of independence; no deployment guarantee follows.
 
 ## Baselines
 
@@ -31,8 +31,10 @@ Only declared IID trials or independent-cluster units may contribute. Row-depend
 - **forced_adapt:** intentionally bypass the certificate; its false authorizations are reported and it is not a compliant policy.
 - **highest_uncertainty:** choose the highest-uncertainty affordable measurement.
 - **cost_first:** choose the lowest-cost affordable measurement.
-- **decision_value:** choose by declared marginal test value minus estimated cost.
-- **risk_aware_value:** decision value with a simple predicted-risk penalty and risk-cap filter.
+- **decision_value_fixed:** choose by declared marginal test value minus estimated cost, then apply the fixed-sample gate.
+- **risk_aware_value_fixed:** decision value with a simple predicted-risk penalty/risk-cap filter, then fixed gate.
+- **decision_value_anytime:** same acquisition score but activation requires both anytime-valid e-processes to cross.
+- **risk_aware_value_anytime:** risk-penalized acquisition with the anytime-valid gate.
 
 All baselines get the same visible candidate set, budgets and evaluator outcomes. The scorer does not expose oracle outcomes to the policy before a selected action. The hindsight oracle is deliberately omitted from deployable baseline ranks.
 
@@ -47,9 +49,9 @@ The output is a metric vector, not a single weighted leaderboard score. Keep ris
 ## Known-answer acceptance gates
 
 1. Frozen visible-action and evaluator-only oracle files pass SHA-256 verification.
-2. The scorer emits exactly 78 campaign-policy rows and six policy summaries.
+2. The scorer emits exactly 104 campaign-policy rows and eight policy summaries.
 3. The intentionally unsafe forced_adapt baseline is recorded with 13 false authorizations in the no-evidence fixture.
-4. The decision_value policy authorizes a safe, positive-value campaign and records positive net value.
+4. The fixed decision-value policy authorizes a safe, positive-value campaign and records positive net value. The anytime decision-value policy consumes a second batch, crosses the time-uniform risk/value evidence thresholds, then authorizes without false authorization.
 5. The row-dependent and repeated-fixed-peek controls do not authorize the high-uncertainty baseline.
 6. Actual cost overruns cannot disappear from the ledger.
 7. Tests and scoring run against the exact commit in the dedicated workflow; the workflow publishes raw rows and a source/fixture/output receipt.
@@ -66,7 +68,7 @@ For risk control, the same-distribution assumption cannot be hand-waved: high-pr
 
 ### Advancement criteria beyond this fixture
 
-- Integrate the real VIS-DVPC-024 anytime-valid gate and an independent-cluster gate into the shared campaign loop, not just their synthetic verdicts.
+- Factor the shared e-process logic from VIS-DVPC-024 into a common Rust module and make this scorer call that shared code; then add an independently validated cluster-level e-process adapter instead of relying on the fixture unit label.
 - Replace synthetic provenance booleans with verified, source-bound evidence receipts and negative controls for byte mutation, swapped source/target and stale receipts.
 - Move from summary-only outcomes to immutable raw per-trial outcomes and an independent aggregate verifier; prove the action log contains no unselected oracle rows.
 - Run paired campaigns on the same seeds at multiple predeclared budgets and held-out shift families; resample at the independent task/source/cluster level.
