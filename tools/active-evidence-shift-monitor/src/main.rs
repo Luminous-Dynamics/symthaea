@@ -24,6 +24,9 @@ const BETA_PRIOR_A: f64 = 0.5;
 const BETA_PRIOR_B: f64 = 0.5;
 const FAMILY_HORIZON: usize = 1000;
 const PORTFOLIO_WEIGHTS: [f64; 4] = [0.25, 0.25, 0.25, 0.25];
+const COMPOSITE_NULL_LOWER: f64 = 0.48;
+const COMPOSITE_NULL_UPPER: f64 = 0.52;
+const COMPOSITE_BETTING_FRACTIONS: [f64; 5] = [0.05, 0.1, 0.2, 0.4, 0.8];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum EProcessFamily {
@@ -32,6 +35,7 @@ enum EProcessFamily {
     BetaFiveFive,
     BetaTwentyTwenty,
     EqualPortfolio,
+    CompositeBandBetting,
 }
 
 impl EProcessFamily {
@@ -41,6 +45,7 @@ impl EProcessFamily {
         Self::BetaFiveFive,
         Self::BetaTwentyTwenty,
         Self::EqualPortfolio,
+        Self::CompositeBandBetting,
     ];
 
     fn name(self) -> &'static str {
@@ -50,6 +55,7 @@ impl EProcessFamily {
             Self::BetaFiveFive => "beta_5_5",
             Self::BetaTwentyTwenty => "beta_20_20",
             Self::EqualPortfolio => "equal_portfolio_4_priors",
+            Self::CompositeBandBetting => "composite_band_betting_0.48_0.52",
         }
     }
 }
@@ -311,6 +317,55 @@ fn beta_mixture_log_e_value_with_prior(
         - (n - successes) as f64 * (-p0).ln_1p()
 }
 
+
+/// Composite-null e-process for Bernoulli conditional probabilities inside [lower, upper].
+///
+/// For each fixed lambda, the upper factor 1 + lambda * (X - upper) has conditional
+/// expectation <= 1 whenever p <= upper; the lower factor 1 - lambda * (X - lower)
+/// has conditional expectation <= 1 whenever p >= lower. Every factor is nonnegative
+/// for the configured lambda grid. Mixing the five stake sizes in each direction, then
+/// mixing directions, preserves the supermartingale guarantee for any conditional p_t
+/// in the declared interval. The bounds must be preregistered, not fitted on the test stream.
+fn composite_band_log_e_value(
+    n: usize,
+    successes: usize,
+    lower: f64,
+    upper: f64,
+) -> f64 {
+    assert!(n > 0 && successes <= n);
+    assert!(0.0 <= lower && lower < upper && upper <= 1.0);
+
+    let failures = (n - successes) as f64;
+    let successes = successes as f64;
+    let upper_logs: [f64; 5] = std::array::from_fn(|index| {
+        let lambda = COMPOSITE_BETTING_FRACTIONS[index];
+        successes * (lambda * (1.0 - upper)).ln_1p()
+            + failures * (-lambda * upper).ln_1p()
+    });
+    let lower_logs: [f64; 5] = std::array::from_fn(|index| {
+        let lambda = COMPOSITE_BETTING_FRACTIONS[index];
+        successes * (-lambda * (1.0 - lower)).ln_1p()
+            + failures * (lambda * lower).ln_1p()
+    });
+
+    let log_mean_exp = |values: &[f64; 5]| {
+        let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        maximum
+            + values
+                .iter()
+                .map(|value| (*value - maximum).exp())
+                .sum::<f64>()
+                .ln()
+            - (values.len() as f64).ln()
+    };
+    let upper_log_e = log_mean_exp(&upper_logs);
+    let lower_log_e = log_mean_exp(&lower_logs);
+    let maximum = upper_log_e.max(lower_log_e);
+    maximum + (0.5 * (upper_log_e - maximum).exp()
+        + 0.5 * (lower_log_e - maximum).exp())
+        .ln()
+}
+
 /// Log e-value for a fixed prior or a predeclared equal-weight portfolio.
 ///
 /// A convex mixture of nonnegative e-processes is itself an e-process, so
@@ -335,6 +390,12 @@ fn family_log_e_value(
         EProcessFamily::BetaTwentyTwenty => {
             beta_mixture_log_e_value_with_prior(n, successes, p0, 20.0, 20.0)
         }
+        EProcessFamily::CompositeBandBetting => composite_band_log_e_value(
+            n,
+            successes,
+            COMPOSITE_NULL_LOWER,
+            COMPOSITE_NULL_UPPER,
+        ),
         EProcessFamily::EqualPortfolio => {
             let component_logs = [
                 beta_mixture_log_e_value_with_prior(n, successes, p0, 0.5, 0.5),
