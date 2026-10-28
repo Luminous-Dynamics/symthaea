@@ -556,9 +556,42 @@ def simulate_from_alarm_table(alarm_table, scenario, horizon=1000):
     return false_alarm, detection, delay, survival
 
 
-def eprocess_family_rows():
+def simulate_null_schedule(alarm_table, horizon, probability_at):
+    """Exact DP under a predictable Bernoulli-rate schedule entirely inside the null band."""
+    active = [0.0] * (horizon + 1)
+    active[0] = 1.0
+    first_alarm = [0.0] * (horizon + 1)
+
+    for n in range(1, horizon + 1):
+        probability = probability_at(n)
+        if not 0.0 <= probability <= 1.0:
+            raise ValueError("scheduled Bernoulli probability is outside [0, 1]")
+        next_active = [0.0] * (horizon + 1)
+        boundary = alarm_table[n]
+        for successes, mass in enumerate(active[:n]):
+            if mass == 0.0:
+                continue
+            for next_successes, branch_mass in (
+                (successes, mass * (1.0 - probability)),
+                (successes + 1, mass * probability),
+            ):
+                if boundary[next_successes]:
+                    first_alarm[n] += branch_mass
+                else:
+                    next_active[next_successes] += branch_mass
+        active = next_active
+
+    false_alarm = sum(first_alarm[1:])
+    survival = sum(active)
+    if abs(false_alarm + survival - 1.0) > 1e-9:
+        raise ValueError("probability mass does not conserve in scheduled null DP")
+    return false_alarm, survival
+
+
+def eprocess_family_rows(tables=None):
     horizon = 1000
-    tables = eprocess_family_alarm_tables(horizon)
+    if tables is None:
+        tables = eprocess_family_alarm_tables(horizon)
     rows = []
     for family in EPROCESS_FAMILY_ORDER:
         for scenario in EPROCESS_FAMILY_SCENARIOS:
@@ -626,7 +659,8 @@ def check_eprocess_family_csv(path):
 
 
 def eprocess_family_self_test():
-    rows = eprocess_family_rows()
+    tables = eprocess_family_alarm_tables()
+    rows = eprocess_family_rows(tables)
     expected_count = len(EPROCESS_FAMILY_ORDER) * len(EPROCESS_FAMILY_SCENARIOS)
     if len(rows) != expected_count:
         raise ValueError(f"e-process family row count mismatch: {len(rows)} != {expected_count}")
@@ -667,6 +701,18 @@ def eprocess_family_self_test():
                 )
                 if abs(total - 1.0) > 1e-9:
                     raise ValueError(f"{family} probability mass does not conserve for {scenario}")
+    alternating_alarm, alternating_survival = simulate_null_schedule(
+        tables[COMPOSITE_FAMILY],
+        1000,
+        lambda n: 0.52 if n % 2 == 0 else 0.48,
+    )
+    if alternating_alarm > PER_CELL_ALPHA + EPS:
+        raise ValueError("composite-null e-process exceeded alpha for alternating in-band rates")
+    if not 0.00015 < alternating_alarm < 0.00030:
+        raise ValueError("alternating in-band endpoint power/alarm witness changed unexpectedly")
+    if abs(alternating_alarm + alternating_survival - 1.0) > 1e-9:
+        raise ValueError("alternating in-band schedule did not conserve probability mass")
+
     jeffreys = float(indexed[("beta_0.5_0.5", "step_up_055")]["detection_probability"])
     portfolio = float(indexed[("equal_portfolio_4_priors", "step_up_055")]["detection_probability"])
     if portfolio <= jeffreys + 0.04:
@@ -675,7 +721,7 @@ def eprocess_family_self_test():
     composite_large = float(indexed[(COMPOSITE_FAMILY, "step_up_080")]["detection_probability"])
     if composite_mild < 0.70 or composite_large < 0.99:
         raise ValueError("composite-null power controls were outside their preregistered fixture gates")
-    print("PASS: family row count, point/composite null controls, selection bias, mass conservation and portfolio/power gates")
+    print("PASS: family row count, point/composite null controls, selection bias, within-band step and alternating schedules, mass conservation and portfolio/power gates")
 
 
 def self_test():
