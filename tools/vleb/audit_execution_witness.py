@@ -136,10 +136,12 @@ def audit_execution_receipt(
     receipt_path: Path,
     plan_path: Path,
     schema_path: Path,
+    plan_schema_path: Path,
     evidence_root: Path,
     expected_receipt_sha256: str,
     expected_auditor_sha256: str,
     expected_schema_sha256: str,
+    expected_plan_schema_sha256: str,
     expected_runner_sha256: str,
     expected_plan_sha256: str,
     expected_verifier_sha256: str,
@@ -150,6 +152,7 @@ def audit_execution_receipt(
         "receipt": expected_receipt_sha256,
         "auditor": expected_auditor_sha256,
         "schema": expected_schema_sha256,
+        "plan schema": expected_plan_schema_sha256,
         "runner": expected_runner_sha256,
         "plan": expected_plan_sha256,
         "verifier": expected_verifier_sha256,
@@ -162,8 +165,12 @@ def audit_execution_receipt(
 
     try:
         observed_auditor = digest(Path(__file__).read_bytes())
-        raw_schema = schema_path.read_bytes()
+        schema_real = safe_file(evidence_root, schema_path.as_posix())
+        plan_schema_real = safe_file(evidence_root, plan_schema_path.as_posix())
+        raw_schema = schema_real.read_bytes()
+        raw_plan_schema = plan_schema_real.read_bytes()
         observed_schema = digest(raw_schema)
+        observed_plan_schema = digest(raw_plan_schema)
         receipt_real = safe_file(evidence_root, receipt_path.as_posix())
         plan_real = safe_file(evidence_root, plan_path.as_posix())
         raw_receipt = receipt_real.read_bytes()
@@ -179,6 +186,8 @@ def audit_execution_receipt(
         issues.append({"code": "auditor_pin_mismatch", "message": "running execution receipt auditor differs from evaluator pin"})
     if observed_schema != expected_schema_sha256:
         issues.append({"code": "schema_pin_mismatch", "message": "receipt schema differs from evaluator pin"})
+    if observed_plan_schema != expected_plan_schema_sha256:
+        issues.append({"code": "plan_schema_pin_mismatch", "message": "plan schema differs from evaluator pin"})
     if digest(raw_receipt) != expected_receipt_sha256:
         issues.append({"code": "receipt_pin_mismatch", "message": "receipt bytes differ from evaluator-supplied pin"})
     if issues:
@@ -186,9 +195,15 @@ def audit_execution_receipt(
 
     try:
         schema = json.loads(raw_schema.decode("utf-8", errors="strict"))
+        plan_schema = json.loads(raw_plan_schema.decode("utf-8", errors="strict"))
         receipt = json.loads(raw_receipt.decode("utf-8", errors="strict"))
         plan_sha = digest(raw_plan)
-        plan = validate_plan(json.loads(raw_plan.decode("utf-8", errors="strict")))
+        raw_plan_data = json.loads(raw_plan.decode("utf-8", errors="strict"))
+        Draft202012Validator.check_schema(plan_schema)
+        plan_errors = list(Draft202012Validator(plan_schema, format_checker=FormatChecker()).iter_errors(raw_plan_data))
+        if plan_errors:
+            raise ValueError("plan schema validation failed: " + "; ".join(error.message for error in plan_errors[:5]))
+        plan = validate_plan(raw_plan_data)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         return {
             "schema_version": "vleb-execution-witness-audit-v1",
@@ -336,11 +351,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--plan", type=Path, required=True)
-    parser.add_argument("--schema", type=Path, default=Path(__file__).with_name("execution-witness-receipt.schema.json"))
+    parser.add_argument("--schema", type=Path, default=Path("tools/vleb/execution-witness-receipt.schema.json"))
+    parser.add_argument("--plan-schema", type=Path, default=Path("tools/vleb/execution-witness-plan.schema.json"))
     parser.add_argument("--evidence-root", type=Path, required=True)
     parser.add_argument("--expected-receipt-sha256", required=True)
     parser.add_argument("--expected-auditor-sha256", required=True)
     parser.add_argument("--expected-schema-sha256", required=True)
+    parser.add_argument("--expected-plan-schema-sha256", required=True)
     parser.add_argument("--expected-runner-sha256", required=True)
     parser.add_argument("--expected-plan-sha256", required=True)
     parser.add_argument("--expected-verifier-sha256", required=True)
@@ -374,10 +391,12 @@ def main(argv: list[str] | None = None) -> int:
             receipt_path=args.receipt,
             plan_path=args.plan,
             schema_path=args.schema,
+            plan_schema_path=args.plan_schema,
             evidence_root=args.evidence_root,
             expected_receipt_sha256=args.expected_receipt_sha256,
             expected_auditor_sha256=args.expected_auditor_sha256,
             expected_schema_sha256=args.expected_schema_sha256,
+            expected_plan_schema_sha256=args.expected_plan_schema_sha256,
             expected_runner_sha256=args.expected_runner_sha256,
             expected_plan_sha256=args.expected_plan_sha256,
             expected_verifier_sha256=args.expected_verifier_sha256,
