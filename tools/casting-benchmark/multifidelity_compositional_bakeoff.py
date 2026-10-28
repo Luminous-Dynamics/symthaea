@@ -68,6 +68,7 @@ SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_decision_value_policy.py",
     "tools/casting-benchmark/multifidelity_joint_action_policy.py",
+    "tools/casting-benchmark/promotion_risk_gate.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",

@@ -169,7 +169,8 @@
     "Independent response replay and source-byte digests",
     "Decision-impact acquisition score and uncertainty components for the new candidate policy",
     "Full candidate-level acquisition-score trace for both sequential confirmation decisions",
-    "Joint candidate/fidelity action trace with per-step budget and independent action replay"
+    "Joint candidate/fidelity action trace with per-step budget and independent action replay",
+    "Descriptive false-feasible rate bound with fail-closed independent-validation gate"
   ],
   "acceptance_gates": {
     "execution": "Authored tests must pass locally before any empirical statement; runner artifacts must be retained.",
@@ -180,7 +181,8 @@
     "physical": "No casting-validity claim without validated multiphysics models, documented solver uncertainty, and held-out physical measurements.",
     "decision_value_policy": "The sixth policy uses the frozen 60/8/4 fidelity-call template and preregistered score weights; all acquisition inputs must be derived only from observations available before each high-fidelity call.",
     "zero_mismatch_control": "Severity 0 is included in the formal default matrix and must satisfy exact equality to analytic truth for every family/fidelity, every objective/constraint composition, and a deterministic candidate sample; any discrepancy is a correctness failure.",
-    "joint_action_policy": "The policy must choose one affordable candidate/fidelity action per step, include deferred high-fidelity validation cost in low/medium action ranking, preserve all raw action records, and pass independent replay that rejects altered action choice, score, effective cost, or budget-before. Report as a heuristic until paired multi-seed comparison against locked BoTorch MF-HVKG/MOMF and single-fidelity controls."
+    "joint_action_policy": "The policy must choose one affordable candidate/fidelity action per step, include deferred high-fidelity validation cost in low/medium action ranking, preserve all raw action records, and pass independent replay that rejects altered action choice, score, effective cost, or budget-before. Report as a heuristic until paired multi-seed comparison against locked BoTorch MF-HVKG/MOMF and single-fidelity controls.",
+    "promotion_risk_gate": "Report one-sided exact 95% Clopper-Pearson upper bound for false-feasible promotions. The bound from adaptive optimizer-selected outcomes is diagnostic only and must never certify its own policy; certification requires independent held-out representative validation and the upper bound <= 5%. Under zero observed events this requires at least 59 independent eligible trials. If shift invalidates representativeness, abstain and recalibrate."
   },
   "evidence_label": "COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
   "provenance": {
@@ -188,6 +190,7 @@
       "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
       "tools/casting-benchmark/multifidelity_decision_value_policy.py",
       "tools/casting-benchmark/multifidelity_joint_action_policy.py",
+      "tools/casting-benchmark/promotion_risk_gate.py",
       "tools/casting-benchmark/score_compositional_bakeoff.py",
       "tools/casting-benchmark/multifidelity_scenario_suite.py",
       "tools/casting-benchmark/multifidelity_stress.py",
@@ -261,6 +264,17 @@
         "The scorer must reject any non-zero mismatch value recorded in a zero-severity run."
       ],
       "claim_boundary": "This verifies the benchmark implementation's null control; it does not establish optimizer quality or physical validity."
+    },
+    "promotion_risk_gate": {
+      "target_false_feasible_rate": 0.05,
+      "confidence": 0.95,
+      "expected_properties": [
+        "0 failures / 8 independent trials produces upper bound about 0.3123 and does not certify 5% risk",
+        "0 failures / 58 independent trials does not certify 5% risk",
+        "0 failures / 59 independent trials yields upper bound about 0.04951 and certifies only when explicitly marked independent held-out",
+        "optimizer-trace samples never certify their own promotion risk",
+        "no eligible predictions, invalid counts, or observed rates above target fail closed"
+      ]
     }
   },
   "related_methodology": {

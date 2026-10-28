@@ -379,6 +379,21 @@ Reference: https://doi.org/10.1007/s11081-026-10078-5
 
 See [CASTING_RESEARCH_FRONTIER_2026-10-28.md](../../docs/research/CASTING_RESEARCH_FRONTIER_2026-10-28.md) for a research-backed benchmark ladder, the external methods to lock (MF-HVKG, MOMF, MF-JESMOC), physical-validation requirements, and explicitly aspirational quality-per-cost and false-feasibility targets. These targets are proposed gates, not current results.
 
+## Promotion-risk gate (research addition)
+
+`promotion_risk_gate.py` implements a one-sided exact Clopper–Pearson upper confidence bound for the false-feasible promotion rate and a fail-closed `allow/abstain` decision. This is an **audit utility**, not a safety guarantee. Its CLI requires the observed false-feasible count and the number of high-fidelity validations that the frozen rule predicted feasible:
+
+```sh
+python3 tools/casting-benchmark/promotion_risk_gate.py \
+  --false-feasible 0 --validated-predicted-feasible 8
+```
+
+By default this treats observations as part of the optimization trace and therefore abstains from certifying the policy's own risk. Only when evaluating a frozen rule on a predeclared independent held-out sample should `--independent-held-out` be supplied—and representativeness/exchangeability still needs justification.
+
+For a 5% risk target at 95% one-sided confidence, zero failures among 8 independent validations gives an upper bound of about **31.2%**. Zero failures among 58 still misses the target; zero among 59 yields about **4.95%**. These are binomial calculations, not measured Symthaea results. Under domain shift or adaptively selected observations, do not interpret the bound as a deployment guarantee. The scorer reports a descriptive bound for optimizer traces but always marks its own trace as **not independent validation**.
+
+The protocol now also requires assessing **MF-SCBO** alongside MF-HVKG, MOMF, and MF-JESMOC after pinning public code and environment. MF-SCBO is a recent method for multi-fidelity constrained BO, including arbitrary fidelity levels and non-nested sampling; it is not assumed directly comparable without a locked adapter.
+
 ## Adaptive joint candidate–fidelity acquisition (research candidate)
 
 `multifidelity_joint_action_policy.py` adds `joint_action_cost_aware` as a seventh policy. Unlike DIWA's frozen 60/8/4 allocation, it ranks affordable `(candidate, fidelity)` actions online after a six-call low-fidelity space-filling bootstrap. Its score combines estimated feasible hypervolume gain, constraint-boundary information, frontier uncertainty, paired local fidelity discrepancies, and the proxy cost of later high-fidelity validation. Each call records the budget, selected pair, score, effective cost and validation-cost proxy.

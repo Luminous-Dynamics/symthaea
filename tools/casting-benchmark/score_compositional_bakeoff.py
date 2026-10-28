@@ -47,6 +47,7 @@ SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_decision_value_policy.py",
     "tools/casting-benchmark/multifidelity_joint_action_policy.py",
+    "tools/casting-benchmark/promotion_risk_gate.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
@@ -959,6 +960,78 @@ def _replay_joint_action_run(
             errors.append(f"{label}: policy stopped while an affordable joint action remained")
 
 
+
+DEFAULT_PROMOTION_RISK_TARGET = 0.05
+DEFAULT_PROMOTION_RISK_CONFIDENCE = 0.95
+
+
+def _risk_log_binomial_cdf_at_most(k: int, n: int, p: float) -> float:
+    """Independent verifier implementation of log P[Binomial(n,p) <= k]."""
+    if k < 0:
+        return -math.inf
+    if k >= n:
+        return 0.0
+    if p <= 0.0:
+        return 0.0
+    if p >= 1.0:
+        return -math.inf
+    log_p, log_q = math.log(p), math.log1p(-p)
+    terms = [
+        math.lgamma(n + 1) - math.lgamma(j + 1) - math.lgamma(n - j + 1)
+        + j * log_p + (n - j) * log_q
+        for j in range(k + 1)
+    ]
+    peak = max(terms)
+    return peak + math.log(sum(math.exp(term - peak) for term in terms))
+
+
+def _risk_upper_bound(false_feasible: int, validated_predicted_feasible: int) -> float | None:
+    """One-sided exact 95% binomial upper bound, independently re-derived here."""
+    n, k = validated_predicted_feasible, false_feasible
+    if n <= 0:
+        return None
+    if k <= 0:
+        return -math.expm1(math.log(1.0 - DEFAULT_PROMOTION_RISK_CONFIDENCE) / n)
+    if k >= n:
+        return 1.0
+    target = math.log(1.0 - DEFAULT_PROMOTION_RISK_CONFIDENCE)
+    lo, hi = 0.0, 1.0
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        if _risk_log_binomial_cdf_at_most(k, n, mid) > target:
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
+def _promotion_risk_gate(false_feasible: int, validated_predicted_feasible: int) -> dict:
+    bound = _risk_upper_bound(false_feasible, validated_predicted_feasible)
+    observed = (
+        false_feasible / validated_predicted_feasible
+        if validated_predicted_feasible > 0 else None
+    )
+    # Selected promotions in the optimizer trace are adaptive and cannot
+    # certify the policy's own risk. The bound is descriptive until an
+    # independent held-out validation population is scored by the gate tool.
+    certified = False
+    return {
+        "validated_predicted_feasible_count": validated_predicted_feasible,
+        "false_feasible_count": false_feasible,
+        "observed_false_feasible_rate": observed,
+        "one_sided_confidence": DEFAULT_PROMOTION_RISK_CONFIDENCE,
+        "upper_confidence_bound": bound,
+        "risk_target": DEFAULT_PROMOTION_RISK_TARGET,
+        "validation_source": "optimization_trace_not_independent_validation",
+        "certified": certified,
+        "decision": "abstain",
+        "reason": (
+            "no_validated_predicted_feasible_promotions" if validated_predicted_feasible == 0 else
+            "validation_not_independent_or_exchangeable"
+        ),
+    }
+
+
 def score_document(
     document: dict,
     repo_root: Path | None = None,
@@ -1262,6 +1335,10 @@ def score_document(
             "high_fidelity_call_count": run["high_fidelity_call_count"],
             "false_promotion_count": run["false_promotion_count"],
             "false_promotion_rate": run["false_promotion_rate"],
+            "false_feasible_risk_gate": _promotion_risk_gate(
+                int(run["false_promotion_count"]),
+                int(run["predicted_feasible_promotion_count"]),
+            ),
         })
 
     summaries = []
@@ -1282,6 +1359,20 @@ def score_document(
                 "median_normalized_hypervolume_fraction": statistics.median(hv_values),
                 "mean_normalized_hypervolume_fraction": statistics.fmean(hv_values),
                 "mean_false_promotion_rate": statistics.fmean(false_rates) if false_rates else None,
+                "max_descriptive_false_feasible_upper_bound": max(
+                    (
+                        upper for upper in (
+                            _risk_upper_bound(
+                                int(r["false_promotion_count"]),
+                                int(r["predicted_feasible_promotion_count"]),
+                            )
+                            for r in group
+                        ) if upper is not None
+                    ),
+                    default=None,
+                ),
+                "certified_risk_gate_run_count": 0,
+                "risk_gate_interpretation": "optimization-trace bounds are descriptive only; independent held-out validation is required for certification",
                 "mean_cost_spent": statistics.fmean(float(r["cost_spent"]) for r in group),
                 "mean_high_fidelity_calls": statistics.fmean(float(r["high_fidelity_call_count"]) for r in group),
                 "inference_status": "diagnostic_only_requires_at_least_20_paired_seeds",
