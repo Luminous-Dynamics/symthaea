@@ -347,15 +347,11 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.assert_issue(self.bundle.run_audit(), "execution_map_incomplete")
 
     def test_scored_task_requires_traceability_inventory(self) -> None:
-        self.bundle = AuditBundle()
-        try:
-            task = json.loads(self.bundle.task_path.read_text())
-            del task["behavior_contract"]["requirement_traceability"]
-            self.bundle.write(self.bundle.task_path, jbytes(task))
-            self.bundle.refresh_task_hash()
-            self.assert_issue(self.bundle.run_audit(), "requirement_traceability_missing")
-        finally:
-            self.bundle.close()
+        task = json.loads(self.bundle.task_path.read_text())
+        del task["behavior_contract"]["requirement_traceability"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_traceability_missing")
 
     def test_scored_task_must_trace_every_declared_invariant(self) -> None:
         task = json.loads(self.bundle.task_path.read_text())
