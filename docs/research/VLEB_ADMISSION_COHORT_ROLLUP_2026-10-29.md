@@ -48,3 +48,21 @@ python tools/vleb/summarize_admission_cohort.py \
 ```
 
 The output always states `analysis_only=true` and `score_eligible=false`. It is a cohort diagnostic; protected provenance, receipt validation, oracle review, and task-level eligibility remain separate requirements.
+
+## Industry baseline and what “better than SOTA” should mean
+
+The current public leaderboard is not a safe single target. Scale's September 22, 2026 SWE-Bench Pro V2 release reports a top public score of 99.4% on 642 tasks, but the refresh itself removed 89 invalid tasks and corrected 69 instruction/test conflicts; its protocol includes restricted network access, pristine-image regrading, and the two-sided empty-patch-fails/reference-patch-passes gate ([Scale leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), [release explanation](https://labs.scale.com/blog/swe-bench-pro-v2)). A July 2026 OpenAI audit of the *older* SWE-Bench Pro version separately estimated around 30% of tasks had grading defects ([OpenAI audit](https://openai.com/index/separating-signal-from-noise-coding-evaluations/)). These are different benchmark revisions, not contradictory estimates of one frozen dataset; the lesson is that leaderboard scores need versioned validity evidence.
+
+For legacy-code comprehension, LegacyCodeBench (January 2026) describes 200 COBOL programs across four tiers and reports 88–92% for specialized systems and 86–90% for general models using deterministic claim-based behavioral verification ([benchmark paper](https://kalmantic.github.io/legacycodebench/)). Separately, Agent Security League reports a top listed combination at 87.2% functional correctness but 37.4% security correctness ([benchmark dashboard](https://www.endorlabs.com/research/ai-code-security-benchmark)). Those scores use different tasks and protocols, so VLEB must not compare their raw percentages directly. They do motivate a dual-axis goal: verified functional behavior and secure behavior, with independent evidence quality as a third axis.
+
+### Recommended targets
+
+- **100% task admission integrity:** every scored task has source-to-requirement-to-test traceability, reviewed baseline expectations, baseline-fails/reference-passes controls, verified test execution, and immutable task/evidence digests.
+- **100% per-test baseline alignment:** each mapped concrete test has one frozen expected status, the baseline log matches it, and reference execution passes every required test.
+- **0 silent denominator loss:** every preregistered task is present in the cohort inventory; unavailable/invalid audit evidence invalidates cohort completeness instead of quietly deleting a task.
+- **100% report provenance coverage:** every report is digest-pinned and tied to the expected task, protocol, source/auditor identity, and receipt.
+- **Separate quality dimensions:** publish task-level resolved rate, source-item coverage, test-ID trace coverage, per-test baseline alignment, audit-eligible task rate, mutation adequacy, security correctness, cost per independently verified fix, and failure/abstention rates. Do not collapse these into a single weighted “trust score.”
+- **Statistical comparison:** compare systems on the same locked tasks and budgets, pair results at task level, bootstrap by repository/codebase cluster, disclose model/scaffold/tool/network settings, and report unresolved outcomes rather than dropping them.
+- **Performance claim bar:** do not claim VLEB is above SOTA until the cohort gate, exact-head CI, independent rerun, security lane, and preregistered uncertainty analysis have passed. Public benchmark scores are comparators, not a substitute for a measured VLEB result.
+
+This roll-up provides auditable denominators for the admission dimensions. It is not itself a score-admission gate and always emits `score_eligible=false`.
