@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "example_only": true,
+  "protocol_id": "PHOT-EVAL-005A",
+  "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "trial_id": "synthetic-candidate-trial-001",
+  "pair_id": "synthetic-pair-001",
+  "seed_id": "7",
+  "budget_id": "fixture-budget-1000ms",
+  "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "solver_source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "solver_configuration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "environment_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "graph_vertices": 10,
+  "target_cardinality": 5,
+  "horizon_ms": 1000,
+  "clock_boundary": "request-entry-to-persisted-candidate-and-verification-evidence",
+  "terminal_outcome": "feasible-below-target",
+  "events": [
+    {
+      "event_id": "candidate-event-unverified",
+      "elapsed_deployment_ms": 20,
+      "candidate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "candidate_artifact_path": "candidates/unverified-candidate.bin",
+      "verifier_disposition": "unverified",
+      "reported_cardinality": 8
+    },
+    {
+      "event_id": "candidate-event-verified-2",
+      "elapsed_deployment_ms": 100,
+      "candidate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "candidate_artifact_path": "candidates/verified-cardinality-2.bin",
+      "verifier_disposition": "verified_feasible",
+      "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "receipt_artifact_path": "receipts/verified-cardinality-2.json",
+      "reported_cardinality": 2
+    },
+    {
+      "event_id": "candidate-event-verified-4",
+      "elapsed_deployment_ms": 350,
+      "candidate_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "candidate_artifact_path": "candidates/verified-cardinality-4.bin",
+      "verifier_disposition": "verified_feasible",
+      "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "receipt_artifact_path": "receipts/verified-cardinality-4.json",
+      "reported_cardinality": 4
+    }
+  ]
+}

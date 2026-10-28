@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/docs/research/quantum/benchmarks/PHOT-EVAL-005A-VERIFIED-ANYTIME-TRACE-SCHEMA.json",
+  "title": "PHOT-EVAL-005A Verified Anytime MIS Quality Trace",
+  "description": "Structural schema only. A consumer must load evidence bytes, recompute digests, independently verify feasibility, validate trial-bound receipt context, and enforce cross-field/timestamp invariants from the protocol.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "protocol_sha256",
+    "trial_id",
+    "pair_id",
+    "seed_id",
+    "budget_id",
+    "graph_sha256",
+    "verifier_sha256",
+    "solver_source_sha256",
+    "solver_configuration_sha256",
+    "environment_sha256",
+    "graph_vertices",
+    "target_cardinality",
+    "horizon_ms",
+    "clock_boundary",
+    "terminal_outcome",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "example_only": {
+      "type": "boolean"
+    },
+    "protocol_id": {
+      "const": "PHOT-EVAL-005A"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trial_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "seed_id": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 20,
+      "description": "Canonical base-10 u64 seed identity; leading zeroes are not allowed."
+    },
+    "budget_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "graph_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "verifier_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "solver_source_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "solver_configuration_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "environment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "graph_vertices": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "target_cardinality": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "horizon_ms": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "clock_boundary": {
+      "const": "request-entry-to-persisted-candidate-and-verification-evidence"
+    },
+    "terminal_outcome": {
+      "enum": [
+        "target-hit",
+        "feasible-below-target",
+        "no-feasible-candidate",
+        "timeout",
+        "crash",
+        "abort",
+        "missing-output"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "elapsed_deployment_ms",
+        "candidate_sha256",
+        "candidate_artifact_path",
+        "verifier_disposition"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "elapsed_deployment_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "candidate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_artifact_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_disposition": {
+          "enum": [
+            "verified_feasible",
+            "verified_infeasible",
+            "unverified",
+            "verification_failed"
+          ]
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_artifact_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reported_cardinality": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional caller-reported cardinality for diagnostics only; the evaluator recomputes cardinality from candidate bytes."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verifier_disposition": {
+                "const": "verified_feasible"
+              }
+            },
+            "required": [
+              "verifier_disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "receipt_sha256",
+              "receipt_artifact_path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verifier_disposition": {
+                "const": "verified_infeasible"
+              }
+            },
+            "required": [
+              "verifier_disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "receipt_sha256",
+              "receipt_artifact_path"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
