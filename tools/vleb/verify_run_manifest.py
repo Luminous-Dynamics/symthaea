@@ -774,6 +774,9 @@ def validate_manifest(
                 receipt_audit["status"] = "unresolved"
                 issues.append({"code": "independent_receipt_audit_unavailable", "message": str(exc)})
 
+    claim_inventory = manifest.get("claim_audit", {}).get("claims", [])
+    if not isinstance(claim_inventory, list):
+        claim_inventory = []
     claim_audit_result: dict[str, Any] = {
         "required": manifest["run_kind"] == "confirmatory",
         "status": "not_required",
@@ -781,11 +784,12 @@ def validate_manifest(
         "supported": 0,
         "contradicted": 0,
         "unresolved": 0,
+        "failed": 0,
         "claims": [],
         "issues": [],
     }
     if manifest["run_kind"] == "confirmatory":
-        if not issues and attestation_result["verified"]:
+        if attestation_result["verified"] and should_extract:
             claim_audit_result = audit_claim_evidence_bundle(
                 manifest,
                 evidence_root,
@@ -796,7 +800,18 @@ def validate_manifest(
             if claim_audit_result["status"] != "passed":
                 issues.extend(claim_audit_result["issues"])
         else:
-            claim_audit_result["status"] = "not_run_due_to_prior_failure"
+            claim_audit_result["status"] = "unresolved"
+            claim_audit_result["claim_count"] = len(claim_inventory)
+            claim_audit_result["unresolved"] = len(claim_inventory)
+            claim_audit_result["claims"] = [
+                {"claim_id": item.get("claim_id"), "status": "unresolved"}
+                for item in claim_inventory
+                if isinstance(item, dict)
+            ]
+            claim_audit_result["issues"] = [{
+                "code": "claim_audit_not_run",
+                "message": "claim evidence could not be audited because trusted attestation/extraction prerequisites did not pass",
+            }]
 
     manifest_valid = not issues and (
         manifest["run_kind"] != "confirmatory" or (
