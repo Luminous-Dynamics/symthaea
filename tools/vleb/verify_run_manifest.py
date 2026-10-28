@@ -403,10 +403,12 @@ def audit_witness_execution_receipt(
     if not {"stdout", "stderr"}.issubset(output_roles):
         issues.append({"code": "witness_receipt_streams_missing", "message": "receipt must bind both stdout and stderr artifacts"})
     output_digest_by_path: dict[str, str] = {}
+    output_role_by_path: dict[str, str] = {}
     for row in outputs:
         path_value = row["path"]
         output_paths.append(path_value)
         output_digest_by_path[path_value] = row["sha256"]
+        output_role_by_path[path_value] = row["role"]
         try:
             path = safe_file(evidence_root, path_value)
             if digest(path.read_bytes()) != row["sha256"]:
@@ -417,11 +419,16 @@ def audit_witness_execution_receipt(
         issues.append({"code": "witness_receipt_duplicate_output", "message": "receipt output paths must be unique"})
     if set(input_paths) & set(output_paths):
         issues.append({"code": "witness_receipt_input_output_alias", "message": "receipt input and output paths must not alias"})
+    if receipt_path_value in set(input_paths) | set(output_paths):
+        issues.append({"code": "witness_receipt_self_reference", "message": "execution receipt may not be an input or output of its own invocation"})
     observed_witness_path = witness.get("artifact_path")
-    if output_digest_by_path.get(observed_witness_path) != witness.get("artifact_sha256"):
+    if (
+        output_digest_by_path.get(observed_witness_path) != witness.get("artifact_sha256")
+        or output_role_by_path.get(observed_witness_path) != "artifact"
+    ):
         issues.append({
             "code": "witness_receipt_artifact_binding_mismatch",
-            "message": "claim witness artifact is not bound to the matching output digest in its execution receipt",
+            "message": "claim witness artifact must be bound to a matching role=artifact output digest in its execution receipt",
         })
     process = receipt["process"]
     if process.get("timed_out") and receipt["observed_result"] != "inconclusive":
