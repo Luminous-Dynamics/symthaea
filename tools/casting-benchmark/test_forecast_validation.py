@@ -101,8 +101,10 @@ class ForecastValidationTests(unittest.TestCase):
             score_forecasts(forecasts, outcomes_for(forecasts, [0, 1]))
 
     def test_rejects_bad_probabilities_and_outcome_ranges(self):
+        malformed_forecast = forecast("bad-probs", [0.2, 0.2])
+        malformed_outcomes = outcomes_for([malformed_forecast], [0])
         with self.assertRaisesRegex(ValueError, "sum to one"):
-            score_forecasts([forecast("f1", [0.2, 0.2])], [], bin_count=10)
+            score_forecasts([malformed_forecast], malformed_outcomes, bin_count=10)
         forecasts = [forecast("f1", [0.5, 0.5])]
         outcomes = outcomes_for(forecasts, [0])
         outcomes[0]["outcome_index"] = 2
