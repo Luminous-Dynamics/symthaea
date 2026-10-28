@@ -206,7 +206,7 @@ fn noise(
 fn task_id(seed: &[u8], generation_id: &str, family_id: &str, index: u64) -> String {
     let mut hasher = Sha256::new();
     hasher.update(TASK_GENERATOR_DOMAIN);
-    hasher.update(b"opaque-task-id.v1\\0");
+    hasher.update(b"opaque-task-id.v1\0");
     let index_bytes = index.to_be_bytes();
     let parts: [&[u8]; 4] = [
         seed,
