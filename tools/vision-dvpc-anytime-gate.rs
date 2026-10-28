@@ -395,7 +395,7 @@ fn cluster_risk_mixture_crossing_probability(
                 let rates = std::iter::repeat_n(low_rate, n - high_count)
                     .chain(std::iter::repeat_n(high_rate, high_count))
                     .collect::<Vec<_>>();
-                cluster_risk_e_value(&rates)? < threshold + EPSILON
+                cluster_risk_e_value(&rates)? + EPSILON < threshold
             };
             if low_path {
                 next[high_count] += mass * low_weight;
@@ -404,7 +404,7 @@ fn cluster_risk_mixture_crossing_probability(
                 let rates = std::iter::repeat_n(low_rate, n - (high_count + 1))
                     .chain(std::iter::repeat_n(high_rate, high_count + 1))
                     .collect::<Vec<_>>();
-                cluster_risk_e_value(&rates)? < threshold + EPSILON
+                cluster_risk_e_value(&rates)? + EPSILON < threshold
             };
             if high_path {
                 next[high_count + 1] += mass * (1.0 - low_weight);
