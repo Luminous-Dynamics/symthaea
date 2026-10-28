@@ -271,6 +271,20 @@ DIWA_WEIGHTS = {
     "constraint_boundary_information": 0.20,
     "frontier_objective_information": 0.10,
 }
+DIWA_FIXED_PARAMETERS = {
+    "neighborhood_size": 4,
+    "inverse_distance_offset": 0.02,
+    "uncertainty_boundary_scale": 0.08,
+    "objective_uncertainty_scale": 0.20,
+    "frontier_distance_scale": 0.10,
+    "robust_sigma_mad_multiplier": 1.4826,
+    "uncertainty_extrapolation_multiplier": 0.35,
+    "minimum_sigma": 0.000001,
+    "medium_probe_rule": "two closest absolute constraint margins, best observed value for each objective, then diverse scalarization picks to fill eight unique candidates",
+    "anchor_rule": "first medium candidate closest to the feasibility boundary; second maximizes input-space RMS distance from the first",
+    "confirmation_rule": "recompute all remaining low-sample candidate predictions after each high call and choose the maximum independently replayable score; ties break on lowest candidate ID",
+    "audit": "For each of the two confirmation decisions, store all eligible candidate scores and prediction components. The scorer independently recomputes predictions, score components, score ordering and selected candidate from the raw trace.",
+}
 DIWA_POLICY = "decision_value_of_information"
 
 
@@ -626,6 +640,15 @@ def score_document(
             "seeds", "policies", "design_count", "cost_budget", "fidelity_costs"
         )
     }
+    diwa_contract = manifest.get("decision_value_policy", {})
+    if diwa_contract.get("id") != DIWA_POLICY:
+        errors.append("decision-impact policy identifier differs from scorer contract")
+    if diwa_contract.get("fixed_calls") != {"low": 60, "medium": 8, "high": 4}:
+        errors.append("decision-impact policy call template differs from scorer contract")
+    if diwa_contract.get("frozen_score_weights") != DIWA_WEIGHTS:
+        errors.append("decision-impact policy weights differ from scorer contract")
+    if diwa_contract.get("fixed_parameters") != DIWA_FIXED_PARAMETERS:
+        errors.append("decision-impact policy fixed parameters differ from scorer contract")
     is_preregistered_default = declared_defaults == manifest_defaults
     if not is_preregistered_default and not allow_diagnostic_subset:
         errors.append(
