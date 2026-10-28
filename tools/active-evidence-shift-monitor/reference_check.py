@@ -21,6 +21,7 @@ SCENARIOS = (
     "stationary_null",
     "step_down_010", "step_down_020", "step_down_030", "step_down_040", "step_down_045",
     "step_up_055", "step_up_060", "step_up_070", "step_up_080", "step_up_090",
+    "selection_bias_no_environment_shift",
 )
 SHIFT_PROBABILITIES = {
     "stationary_null": None,
@@ -34,9 +35,12 @@ SHIFT_PROBABILITIES = {
     "step_up_070": 0.70,
     "step_up_080": 0.80,
     "step_up_090": 0.90,
+    "selection_bias_no_environment_shift": None,
 }
+PRE_SHIFT_PROBABILITIES = {scenario: P0 for scenario in SCENARIOS}
+PRE_SHIFT_PROBABILITIES["selection_bias_no_environment_shift"] = 0.74
 FIELDS = (
-    "boundary", "scenario", "horizon", "change_after", "p0", "p1",
+    "boundary", "scenario", "horizon", "change_after", "p0", "stream_pre_p", "p1",
     "false_alarm_probability", "detection_probability", "mean_detection_delay",
     "per_cell_alpha", "survival_probability",
 )
@@ -90,7 +94,11 @@ def simulate(boundary, scenario, horizon):
     first_alarm = [0.0] * (horizon + 1)
 
     for n in range(1, horizon + 1):
-        probability = P0 if post_shift_p is None or n <= change_after else post_shift_p
+        probability = (
+            PRE_SHIFT_PROBABILITIES[scenario]
+            if post_shift_p is None or n <= change_after
+            else post_shift_p
+        )
         next_active = [0.0] * (horizon + 1)
         for successes, mass in enumerate(active[:n]):
             if mass == 0.0:
@@ -139,6 +147,7 @@ def reference_rows():
                     "horizon": str(horizon),
                     "change_after": str(CHANGE_AFTER) if SHIFT_PROBABILITIES[scenario] is not None else "NA",
                     "p0": f"{P0:.12f}",
+                    "stream_pre_p": f"{PRE_SHIFT_PROBABILITIES[scenario]:.12f}",
                     "p1": f"{SHIFT_PROBABILITIES[scenario]:.12f}" if SHIFT_PROBABILITIES[scenario] is not None else "NA",
                     "false_alarm_probability": f"{false_alarm:.12f}",
                     "detection_probability": as_text(detection),
@@ -168,7 +177,7 @@ def check_csv(path):
     key_fields = ("boundary", "scenario", "horizon")
     text_fields = ("boundary", "scenario", "horizon", "change_after", "p1",
                    "detection_probability", "mean_detection_delay")
-    numeric_fields = ("p0", "false_alarm_probability", "per_cell_alpha", "survival_probability")
+    numeric_fields = ("p0", "stream_pre_p", "false_alarm_probability", "per_cell_alpha", "survival_probability")
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
             raise ValueError(f"row key mismatch on line {line}")
@@ -200,6 +209,19 @@ def self_test():
     if fixed_reused <= PER_CELL_ALPHA:
         raise ValueError(f"negative control failed to expose repeated-look inflation: {fixed_reused}")
 
+    random_sentinel = simulate(
+        "beta_mixture_e_process", "stationary_null", 1000
+    )[0]
+    selection_biased = simulate(
+        "beta_mixture_e_process", "selection_bias_no_environment_shift", 1000
+    )[0]
+    if random_sentinel > PER_CELL_ALPHA + EPS:
+        raise ValueError(f"randomized sentinel exceeded null alpha: {random_sentinel}")
+    if selection_biased < 0.50:
+        raise ValueError(
+            f"selection-bias negative control did not expose spurious alarms: {selection_biased}"
+        )
+
     shifted = simulate("time_uniform_alpha_spending", "step_up_080", 500)
     beta_shifted = simulate("beta_mixture_e_process", "step_up_080", 500)
     if shifted[1] < 0.95 or shifted[2] is None:
@@ -220,7 +242,7 @@ def self_test():
                 total = false_alarm + (detection or 0.0) + survival
                 if abs(total - 1.0) > 1e-9:
                     raise ValueError(f"probability mass does not sum to one: {boundary}, {scenario}, {horizon}")
-    print("PASS: fixed-time negative control, time-uniform and Beta-mixture null control, shift detection, formula witness, and mass conservation")
+    print("PASS: optional-stopping negative control, null controls, shift detection, selection-bias counterexample, formula witness, and mass conservation")
 
 
 def main(argv):
