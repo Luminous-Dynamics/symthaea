@@ -19387,6 +19387,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-hiv-audit"
+version = "0.1.0"
+dependencies = [
+ "csv",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "symthaea-mycelix-bridge"
 version = "0.1.0"
 dependencies = [
