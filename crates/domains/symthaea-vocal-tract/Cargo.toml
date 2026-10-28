@@ -10,6 +10,7 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
 keywords = ["vocal-tract", "articulatory-synthesis", "hdc", "ltc", "formant"]
 categories = ["science", "algorithms", "multimedia::audio"]
+autoexamples = false
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
