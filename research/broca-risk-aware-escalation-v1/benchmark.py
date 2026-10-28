@@ -111,19 +111,41 @@ def sigmoid(v: float) -> float:
     return 1.0/(1.0+math.exp(-v))
 
 def solve_linear(a: list[list[float]], b: list[float]) -> list[float]:
-    n=len(b); m=[row[:] + [b[i]] for i,row in enumerate(a)]
+    """Solve a square system using rank-aware Gauss-Jordan elimination.
+
+    Singular columns become explicit free variables (set to zero). The solver
+    never destroys a row or fabricates a pivot. Inconsistent zero rows raise.
+    Ridge fitting adds positive diagonal regularization, so its normal systems
+    should have full rank; the free-variable path is principally defensive.
+    """
+    n=len(b)
+    if len(a)!=n or any(len(row)!=n for row in a):
+        raise ValueError("solve_linear requires a square matrix and matching RHS")
+    m=[list(map(float,row)) + [float(b[i])] for i,row in enumerate(a)]
+    pivot_row=0
+    pivot_cols=[]
+    eps=1e-12
     for col in range(n):
-        pivot=max(range(col,n),key=lambda r:abs(m[r][col]))
-        if abs(m[pivot][col]) < 1e-12: m[pivot]=[0.0]*(n+1); m[pivot][col]=1e-12
-        m[col],m[pivot]=m[pivot],m[col]
-        div=m[col][col]
-        if abs(div)<1e-12: div=1e-12
-        for j in range(col,n+1): m[col][j]/=div
+        if pivot_row>=n: break
+        pivot=max(range(pivot_row,n),key=lambda r:abs(m[r][col]))
+        if abs(m[pivot][col]) < eps:
+            continue
+        m[pivot_row],m[pivot]=m[pivot],m[pivot_row]
+        div=m[pivot_row][col]
+        for j in range(col,n+1): m[pivot_row][j]/=div
         for r in range(n):
-            if r==col: continue
+            if r==pivot_row: continue
             factor=m[r][col]
-            for j in range(col,n+1): m[r][j]-=factor*m[col][j]
-    return [m[i][n] for i in range(n)]
+            if factor:
+                for j in range(col,n+1): m[r][j]-=factor*m[pivot_row][j]
+        pivot_cols.append(col)
+        pivot_row+=1
+    for r in range(pivot_row,n):
+        if all(abs(m[r][j])<eps for j in range(n)) and abs(m[r][n])>=eps:
+            raise ValueError("linear system is inconsistent")
+    solution=[0.0]*n
+    for row,col in enumerate(pivot_cols): solution[col]=m[row][n]
+    return solution
 
 def fit_ridge(rows: list[list[float]], ys: list[float], lam: float=4.0) -> list[float]:
     n=len(rows[0]); xtx=[[0.0]*n for _ in range(n)]; xty=[0.0]*n
