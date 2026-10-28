@@ -116,3 +116,24 @@ This is a reference-model smoke test only. It does not compile or run Symthaea, 
 3. Add focused Rust unit and integration tests for DTA-01 through DTA-10, including the positive control.
 4. Add an independent raw-trace auditor and deterministic generated-case test in Rust; keep its scoring separate from model utility.
 5. Validate at the exact commit with formatting, compile, focused tests, relevant full suite, and workflow evidence. Queued, skipped, or stale-head runs are not passes.
+
+## 9. External benchmark frontier: correctness is not utility
+
+Current research suggests keeping the evidence-integrity question separate from the learning-algorithm question:
+
+- **Concept-drift detection:** Cerqueira et al., *A Framework for Evaluating and Benchmarking Concept Drift Detection Methods* (KDD 2026) evaluates 14 detector families across seven real-world datasets, four drift types, and abrupt/gradual transitions. It highlights timing-aware metrics and leave-one-dataset-out tuning. Use its stream/dataset protocol for detector claims instead of inventing a separate drift score: [paper](https://doi.org/10.1145/3770855.3819070), [arXiv version](https://arxiv.org/abs/2606.07789).
+- **Reliability-aware reinforcement-learning replay:** ReaPER reports improved performance over uniform replay and prioritized experience replay in its evaluated classic-control and Atari-10 settings. It is a comparator only for a matched RL/replay experiment, not for proving provenance correctness: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60e3d7caf8cfdaf6598467f9b0ebf36a-Abstract-Conference.html).
+- **Continual-learning reliability:** IDER uses idempotence-oriented training and distillation and reports improvements in prediction reliability, accuracy, and forgetting on its evaluated continual-learning benchmarks. Compare it only in a compatible continual-learning setting and reproduce the relevant baseline configuration: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/e34f98c14b861d6f24879e861fcbce1a-Abstract-Conference.html).
+- **Memory-rich regimes:** *Forget Forgetting: Continual Learning in a World of Abundant Memory* argues that when storage is abundant but GPU time is scarce, strong simple replay can outperform more elaborate methods at lower compute cost. This motivates reporting compute and wall-clock efficiency, not only average accuracy: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/17fc58b1ba92abbb72c5f457e140d851-Abstract-Conference.html).
+
+These results are from different task families and are **not directly rankable on a single leaderboard**. The proposed evaluation therefore has three separate scorecards:
+
+1. **Integrity:** exact counterfactual invariance, zero invalid/stale/future/duplicate PE influence, mutation sensitivity, positive controls, and decision-time trace closure.
+2. **Detection:** timing-aware drift F1, false alarms per 1,000 valid observations, missed-drift rate and normalized detection delay under matched information access.
+3. **Learning utility and cost:** held-out task score, calibration, adaptation/regret, retention/forgetting, recovery time, optimizer/update cost, p95 latency, memory and energy.
+
+The first scorecard is a hard admission gate for claiming evidence correctness. It must not be added to the utility score to compensate for task failure, and passing it does not make a SOTA claim. The second and third scorecards require real comparator implementations, pinned datasets/configurations, paired seeds and uncertainty intervals; the currently available synthetic reference results do not fill those cells.
+
+### Proposed falsifiable superiority criterion
+
+After correctness gates pass, pre-register a practical superiority target: improve the **dataset-macro primary utility metric by at least 5% relative to the strongest matched baseline**, with a paired 95% confidence interval excluding zero, while meeting the same access track and compute/memory budget. Report all datasets, worst-task results and negative controls. If this threshold is not met, publish the result as non-superior or inconclusive; do not change the threshold after seeing held-out results. The 5% target is a proposed engineering criterion, not a literature-derived universal standard.
