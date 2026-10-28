@@ -19,7 +19,7 @@ from scipy.optimize import linprog
 
 from prior_set_coverage_double_oracle_benchmark import (
     OBJECTIVES, build_risk_tensor, candidate_priors, prior_risk_matrix,
-    solve_zero_sum, N_GRAPH, N_KERNEL, N_HYP, TOL,
+    solve_zero_sum, point_mass, N_GRAPH, N_KERNEL, N_HYP, TOL,
 )
 
 SCHEMA = "symthaea-constrained-prior-polytope-benchmark-v1"
@@ -42,13 +42,15 @@ def ambiguity_polytope(floor: float = 0.005, marginal_low: float = 0.10, margina
     for k in range(N_KERNEL):
         add_bound(f"kernel_marginal_{k}", [g * N_KERNEL + k for g in range(N_GRAPH)], marginal_low, marginal_high)
     add_bound("graph_kernel_diagonal_mass", [g * N_KERNEL + g for g in range(N_GRAPH)], 0.10, 0.60)
-    add_bound("graph_kernel_antidiagonal_mass", [g * N_KERNEL + (N_KERNEL - 1 - g) for g in range(N_GRAPH)], 0.10, 0.60)
+    add_bound("graph_kernel_antidiagonal_mass", [g * N_KERNEL + (N_KERNEL - 1 - g) for g in range(N_KERNEL)], 0.10, 0.60)
+    # A q <= b representation of both upper and lower bounds.
     A_ub, b_ub = [], []
     for row, low, high in zip(rows, lows, highs):
         A_ub.append(row); b_ub.append(high)
         A_ub.append(-row); b_ub.append(-low)
     A_ub = np.asarray(A_ub, dtype=float)
     b_ub = np.asarray(b_ub, dtype=float)
+    # Confirm feasibility before optimizing a risk objective.
     feasibility = linprog(np.zeros(N_HYP), A_ub=A_ub, b_ub=b_ub,
                           A_eq=np.ones((1, N_HYP)), b_eq=[1.0],
                           bounds=[(floor, 1.0)] * N_HYP, method="highs")
@@ -70,6 +72,7 @@ def maximize_linear_over_polytope(coefficients, polytope):
         raise RuntimeError(f"world LP failed: {result.message}")
     q = np.asarray(result.x, dtype=float)
     value = float(c @ q)
+    # Independent feasibility and objective re-score.
     if abs(float(q.sum()) - 1.0) > 1e-8:
         raise AssertionError("world oracle returned a non-normalized prior")
     if np.any(polytope["A_ub"] @ q - polytope["b_ub"] > 1e-8):
@@ -83,16 +86,17 @@ def maximize_linear_over_polytope(coefficients, polytope):
 
 
 def solve_constrained_minimax(A, polytope, tolerance=TOL):
-    """Solve max_{q in Q} min_policy R(policy,q), recover dual minimax policy.
+    """Solve max_{q in Q} min_policy R(policy,q), then recover minimax policy by dual.
 
-    Minimax equality applies to this finite policy simplex and compact convex prior
+    Minimax equality holds for this finite policy simplex and compact convex prior
     polytope. The prior LP maximizes t subject to A q >= t for every deterministic
-    policy and q in Q. Dual multipliers on those policy constraints yield a policy
-    mix. An independent worst-case-prior LP for that mix produces the upper endpoint.
+    policy and q in Q. Dual multipliers on the policy constraints yield a policy mix.
+    An independent worst-case-prior LP for that mix gives the upper endpoint.
     """
     A = np.asarray(A, dtype=float)
     if A.shape != (8, N_HYP) or np.any(~np.isfinite(A)):
         raise ValueError("risk matrix must be finite with shape (8, 16)")
+    # maximize t -> minimize -t; -Aq + t <= 0 enforces every policy risk >= t.
     n_policy = A.shape[0]
     risk_ub = np.column_stack([-A, np.ones(n_policy)])
     poly_ub = np.column_stack([polytope["A_ub"], np.zeros(len(polytope["b_ub"]))])
@@ -111,7 +115,9 @@ def solve_constrained_minimax(A, polytope, tolerance=TOL):
     if policy_duals.sum() <= 0:
         raise AssertionError("dual policy mixture has no positive mass")
     mu = policy_duals / policy_duals.sum()
+    # Lower endpoint: adversarial prior q*, followed by best policy response.
     lower_raw = float(np.min(A @ q_star))
+    # Upper endpoint: independently maximize risk of recovered policy mix over Q.
     upper_oracle = maximize_linear_over_polytope(A.T @ mu, polytope)
     upper_raw = upper_oracle["value_bits"]
     if lower_raw > upper_raw + 2e-7:
@@ -223,7 +229,6 @@ def main():
     args.output.write_bytes(raw)
     print(json.dumps({"output": str(args.output), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                       "rows": len(result["rows"]), "all_certified": all(r["constrained_polytope"]["status"] == "CERTIFIED_CONSTRAINED_POLYTOPE_GAME" for r in result["rows"])}, indent=2))
-
 
 if __name__ == "__main__":
     main()
