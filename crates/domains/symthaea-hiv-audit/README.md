@@ -2,9 +2,17 @@
 
 This Rust CLI adds a reproducible, fail-closed first step for the HIV Reservoir Discovery benchmark. It does **not** fetch data, fit models, interpret biology, or validate a treatment.
 
+## Acquire the public Dryad deposit
+
+From the Symthaea repository root, download and extract the current public deposit with a strict file allowlist (requires curl, unzip, sha256sum and standard shell utilities):
+
+    bash scripts/research/acquire_hiv_reservoir_dryad.sh /path/to/dryad-files
+
+The downloader records the source URL, retrieval time and downloaded archive SHA-256 beside the extracted files. It refuses to overwrite an existing archive/provenance file and extracts only the exact registered archive members. Official API documentation: https://github.com/datadryad/dryad-app/blob/main/documentation/apis/README.md
+
 ## Build and run
 
-From the Symthaea repository root, after extracting the registered Dryad files into a clean directory, run:
+From the Symthaea repository root, after acquiring the registered Dryad files into a clean directory, run:
 
     cargo test -p symthaea-hiv-audit
     cargo run -p symthaea-hiv-audit -- capture \
