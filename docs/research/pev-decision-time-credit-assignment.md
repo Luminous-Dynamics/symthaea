@@ -156,7 +156,7 @@ The checked reference run accepted 100,000 clean generated trace cases (69,740 v
 
 The newly available paper *Trial by Trace: Benchmarking AI Agent Harnesses for Reliability and Failure Attribution* (arXiv:2610.32285, posted 23 October 2026) proposes separating task success from harness reliability, using trajectory traces and mechanism-based failure attribution. It reports that some runs can succeed at the task while still failing a harness criterion. This supports a two-axis evaluation design for Symthaea: one score for task/learning utility, another for evidence and harness integrity. Its reported scores are not directly comparable to this PE-specific synthetic audit: [paper](https://arxiv.org/abs/2610.32285).
 
-The auditor contract must evolve alongside implementation. In particular, current reference traces do not yet cover a persisted event digest, reset epochs, tamper-evident hash chaining, or cross-process resume from a real Rust checkpoint. These remain explicit extensions rather than implied guarantees.
+That statement describes v1's original scope. Section 11 adds a v2 reference envelope for stable event identity, reset epochs, and hash-chain checking. Neither reference version proves that the production Rust path emits complete traces or validates cross-process checkpoint/restore.
 
 
 ## 11. Reset-aware canonical trace envelope (v2 reference implementation)
