@@ -549,14 +549,14 @@ mod tests {
     }
     #[test] fn selected_evaluation_can_reveal_harmful_decision_value(){
         let a=sample_actions().replace(
-            "ACTION\\tshift-replication\\td4\\tSHIFT_SIGN_REVERSAL\\t5\\t0.10",
-            "ACTION\\tshift-replication\\td4\\tSHIFT_SIGN_REVERSAL\\t5\\t0.40"
+            "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.10",
+            "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.40"
         );
         let o=sample_oracle(&a);
         let out=analyze(a.as_bytes(),&sha256_hex(a.as_bytes()),o.as_bytes(),&sha256_hex(o.as_bytes()),"decision-value-lcb").unwrap();
-        assert!(out.contains("shift-replication\\td4\\ttrue\\tSELECTED"));
-        assert!(out.contains("shift-replication\\td4\\ttrue\\tSELECTED\\t5.00000000\\t0.40000000\\t20\\t30\\tSUCCESS\\t-0.150000000000"));
-        assert!(out.contains("credited_regret_reduction_sum\\t0.300000000000"));
+        assert!(out.contains("shift-replication\td4\ttrue\tSELECTED"));
+        assert!(out.contains("shift-replication\td4\ttrue\tSELECTED\t5.00000000\t0.40000000\t20\t30\tSUCCESS\t-0.150000000000"));
+        assert!(out.contains("credited_regret_reduction_sum\t0.300000000000"));
     }
     #[test] fn sha256_known_vector(){
         assert_eq!(sha256_hex(b"abc"),"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
