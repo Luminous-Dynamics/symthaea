@@ -30,6 +30,21 @@ All calibrated test cases closed the benchmark's numeric two-sided LP certificat
 
 The calibrated set reduces mean joint-objective regret substantially versus the fixed marginal set and full-simplex policy on this synthetic meta-population, but it does **not** beat the six-prior policy on mean joint regret (0.01379 vs 0.02107 bits, so in fact it does beat six-prior by about 0.00728 bits); be careful: the calibrated mean is lower than six-prior mean. The benefit comes with nonzero regret in its p95 tail and missed coverage on 14/120 test draws.
 
+## Additional experiment: matched coverage-target sweep
+
+The same seed and random draw process were reused for nominal targets 80%, 90%, 95% and 99%, holding the calibration/test counts (400/120) and observation budget (120) fixed. This makes target-level comparisons paired on the synthetic draw stream.
+
+| Nominal target | Calibrated radius | Empirical coverage | Wilson 95% interval | Mean joint regret (bits) | p95 joint regret (bits) |
+|---|---:|---:|---:|---:|---:|
+| 80% | 0.080249 | 75.83% | 67.45–82.61% | 0.011182 | 0.048801 |
+| 90% | 0.093886 | 88.33% | 81.37–92.92% | 0.013793 | 0.058482 |
+| 95% | 0.105244 | 94.17% | 88.45–97.15% | 0.017062 | 0.065331 |
+| 99% | 0.129789 | 99.17% | 95.43–99.85% | 0.024614 | 0.071097 |
+
+Every row's numerical policy certificate closed to the declared tolerance. The robust set grows as the nominal coverage target rises; in this fixture, mean joint regret increases by about 2.20× from 80% target to 99% target, while empirical coverage rises from 75.83% to 99.17%. The confidence intervals are wide at only 120 test draws, and the 80%/90% point estimates fall below their targets without contradicting the finite-sample marginal guarantee—the guarantee is probabilistic and the empirical test sample is finite.
+
+The 4-row machine-readable output is committed as `validation/CALIBRATED_PRIOR_AMBIGUITY_TARGET_SWEEP_2026-10-28.json` (2,529 bytes, SHA-256 `5dcfe5ed14daa4efbc2a40b873cecd95870c2068cc4ceb05baf288c58a7e047a`). Total local runtime was about 5.22 seconds for four calibration/test runs. The target sweep shares the source-version mismatch boundary described above and is not evidence of real-world coverage.
+
 ## Important failure mode: marginal coverage is not conditional coverage
 
 Coverage by sampled regime was:
