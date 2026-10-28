@@ -200,20 +200,20 @@ fn write_csv(filter: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 fn main() -> ExitCode {
-    let mut filter = None;
+    let mut filter: Option<String> = None;
     for arg in env::args().skip(1) {
         if arg == "--help" || arg == "-h" {
             eprintln!("Usage: active-evidence-exact-tree [--scenario=NAME]");
             eprintln!("Scenarios: iid, q0_conditional_shift, q1_asymmetric_error, compound_shift, out_of_set_flip");
             return ExitCode::SUCCESS;
         } else if let Some(name) = arg.strip_prefix("--scenario=") {
-            filter = Some(name);
+            filter = Some(name.to_owned());
         } else {
             eprintln!("unknown argument: {arg}");
             return ExitCode::from(2);
         }
     }
-    match write_csv(filter) {
+    match write_csv(filter.as_deref()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => { eprintln!("{e}"); ExitCode::from(2) }
     }
