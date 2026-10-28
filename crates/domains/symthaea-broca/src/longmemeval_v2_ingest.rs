@@ -417,7 +417,7 @@ mod tests {
     fn source_digest_and_ids_ignore_json_whitespace_and_object_key_order() {
         let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":"https://example.test/","states":[{"state_index":0,"step":1,"url":"https://example.test","action":{"type":"click","target":"x"},"thought":"t","accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}]}"#;
         let second = r#"{
-            "states":[{"screenshot":"screenshots/traj-001/2.png","accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0,"accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}],
+            "states":[{"screenshot":"screenshots/traj-order/0.png","accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0}],
             "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":"https://example.test/","id":"traj-order"
         }"#;
         let resolver = |_: &str, _: &str| Some("scope".to_string());
@@ -523,6 +523,36 @@ mod tests {
             |_, _| Some("scope".to_string()),
         );
         assert!(result.unwrap_err().contains("duplicate trajectory-state identity"));
+    }
+
+    #[test]
+    fn required_screenshot_url_and_safe_path_are_enforced() {
+        let base: Value = serde_json::from_str(&sample_line()).unwrap();
+
+        let mut missing_screenshot = base.clone();
+        missing_screenshot["states"][0].as_object_mut().unwrap().remove("screenshot");
+        assert!(ingest_longmemeval_v2_jsonl(
+            [missing_screenshot.to_string().into_bytes()],
+            |_, _| Some("scope".into())
+        ).is_err());
+
+        let mut missing_url = base.clone();
+        missing_url["states"][0].as_object_mut().unwrap().remove("url");
+        assert!(ingest_longmemeval_v2_jsonl(
+            [missing_url.to_string().into_bytes()],
+            |_, _| Some("scope".into())
+        ).is_err());
+
+        let mut traversal = base;
+        traversal["states"][0]["screenshot"] = Value::String("screenshots/../outside.png".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [traversal.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .unwrap_err()
+            .contains("parent-directory traversal")
+        );
     }
 
     #[test]
