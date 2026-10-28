@@ -147,3 +147,10 @@ Using the same four ambiguity scenarios and selecting each greedy arm's best ava
 | 3.0 | Entropy | 1.735898 | 1.609023 | 2.632 |
 
 This is a **matched worst-case expected-cost comparison only against the small set of implemented arms** (random, entropy, plug-in EVSI, and one-step robust EVSI), over the same four hand-defined ambiguity scenarios. The best greedy arm is chosen among the four based on these same scenarios, so this is exploratory rather than a sealed held-out comparison. It does not include Uncertainty Herding or R-IDeA, does not satisfy a per-trajectory hard cost cap, and does not establish SOTA superiority. The key testable hypothesis is narrower: explicit multi-step planning can improve the worst-case decision-regret/cost frontier versus one-step greedy selection in this toy model.
+
+
+The cross-policy matched-budget report can be regenerated after both CSVs are produced:
+
+    python3 tools/active-evidence-exact-tree/compare_cost_frontiers.py /tmp/active-evidence.csv /tmp/robust-tree.csv
+
+The comparator checks completeness of both input inventories, excludes the known-channel reference from deployable-baseline selection, computes the best feasible implemented greedy arm at each shared worst-case expected-cost budget, checks the tree's stated risk/cost aggregates against its scenario rows, and enforces frozen witness values. It does not treat the hindsight/known-channel arm as a deployable method or claim external validity.
