@@ -60,17 +60,12 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
     let root = root.canonicalize().with_context(|| {
         format!("effect primitive scan root does not exist: {}", root.display())
     })?;
-    let scan_roots = [
-        "src", "crates", "stubs", "xtask", "tests", "benches", "examples",
+    let scan_roots = vec![
+        "repository_root (recursive Rust source discovery)".to_string(),
+        "excluded generated/cache directories: .git, target, node_modules, .direnv, .cache, .venv, .devenv".to_string(),
     ];
     let mut files = Vec::new();
-    for relative in scan_roots {
-        collect_rust_files(&root.join(relative), &mut files)?;
-    }
-    let root_build = root.join("build.rs");
-    if root_build.is_file() {
-        files.push(root_build);
-    }
+    collect_rust_files(&root, &mut files)?;
     files.sort();
     files.dedup();
 
@@ -138,7 +133,7 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
     let report = ScanReport {
         schema: SCAN_SCHEMA,
         repository_head: git_head(&root).unwrap_or_else(|| "UNKNOWN".to_string()),
-        scan_roots: scan_roots.iter().map(|path| (*path).to_string()).collect(),
+        scan_roots,
         source_files_seen,
         source_files_parsed,
         parse_failures,
@@ -279,7 +274,16 @@ fn collect_rust_files(directory: &Path, output: &mut Vec<PathBuf>) -> Result<()>
             continue;
         }
         if file_type.is_dir() {
-            collect_rust_files(&path, output)?;
+            const EXCLUDED_DIRS: &[&str] = &[
+                ".git", "target", "node_modules", ".direnv", ".cache", ".venv", ".devenv",
+            ];
+            if !path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| EXCLUDED_DIRS.contains(&name))
+            {
+                collect_rust_files(&path, output)?;
+            }
         } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
             output.push(path);
         }
