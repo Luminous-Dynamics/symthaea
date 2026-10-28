@@ -1,0 +1,190 @@
+{
+  "schema": "symthaea-groupwise-calibrated-prior-ambiguity-summary-v1",
+  "date": "2026-10-28",
+  "status": "SYNTHETIC_REGIMEWISE_CALIBRATION_DIAGNOSTIC_NOT_REAL_WORLD_COVERAGE",
+  "protocol": {
+    "n_calibration": 400,
+    "n_test": 120,
+    "seed": 20261029,
+    "target_coverage": 0.9,
+    "n_observations_per_prior": 120,
+    "regimes": [
+      "diffuse",
+      "sparse",
+      "graph-skewed",
+      "kernel-skewed",
+      "diagonal-correlated",
+      "anti-correlated"
+    ],
+    "group_calibration_sample_sizes": [
+      69,
+      71,
+      68,
+      65,
+      70,
+      57
+    ],
+    "group_radii": [
+      0.09615484507109212,
+      0.09537415728504972,
+      0.10004133746344795,
+      0.0851368132589323,
+      0.08448999622208214,
+      0.09583115560199684
+    ],
+    "global_radius": 0.09181165487112597,
+    "worst_group_radius": 0.10004133746344795
+  },
+  "methods": {
+    "global": {
+      "coverage": {
+        "successes": 111,
+        "n": 120,
+        "rate": 0.925,
+        "wilson95": [
+          0.8635908239400624,
+          0.9600428846040397
+        ]
+      },
+      "regime_coverage": {
+        "diffuse": [
+          16,
+          17
+        ],
+        "sparse": [
+          15,
+          18
+        ],
+        "graph-skewed": [
+          21,
+          23
+        ],
+        "kernel-skewed": [
+          15,
+          16
+        ],
+        "diagonal-correlated": [
+          19,
+          20
+        ],
+        "anti-correlated": [
+          25,
+          26
+        ]
+      },
+      "mean_joint_regret_bits": 0.012046178501541823,
+      "p95_joint_regret_bits": 0.045536076152150134,
+      "mean_radius": 0.091811654871126
+    },
+    "groupwise_oracle": {
+      "coverage": {
+        "successes": 110,
+        "n": 120,
+        "rate": 0.9166666666666666,
+        "wilson95": [
+          0.8533776783593434,
+          0.9541063496250703
+        ]
+      },
+      "regime_coverage": {
+        "diffuse": [
+          16,
+          17
+        ],
+        "sparse": [
+          16,
+          18
+        ],
+        "graph-skewed": [
+          23,
+          23
+        ],
+        "kernel-skewed": [
+          14,
+          16
+        ],
+        "diagonal-correlated": [
+          16,
+          20
+        ],
+        "anti-correlated": [
+          25,
+          26
+        ]
+      },
+      "mean_joint_regret_bits": 0.013839960829369431,
+      "p95_joint_regret_bits": 0.048057167331401786,
+      "mean_radius": 0.093299307843627
+    },
+    "worst_group": {
+      "coverage": {
+        "successes": 117,
+        "n": 120,
+        "rate": 0.975,
+        "wilson95": [
+          0.9290699666721339,
+          0.9914618252300978
+        ]
+      },
+      "regime_coverage": {
+        "diffuse": [
+          17,
+          17
+        ],
+        "sparse": [
+          17,
+          18
+        ],
+        "graph-skewed": [
+          23,
+          23
+        ],
+        "kernel-skewed": [
+          15,
+          16
+        ],
+        "diagonal-correlated": [
+          19,
+          20
+        ],
+        "anti-correlated": [
+          26,
+          26
+        ]
+      },
+      "mean_joint_regret_bits": 0.014411278391065426,
+      "p95_joint_regret_bits": 0.05105348341058038,
+      "mean_radius": 0.10004133746344791
+    }
+  },
+  "verification": {
+    "local_combined_tests": "24/24_PASS",
+    "environment": {
+      "python": "3.13.5",
+      "numpy": "2.3.5",
+      "scipy": "1.17.0"
+    },
+    "local_source_sha256": "f509f056270b670d6ab0f00e03a1c7102f2c624169912079258bc344a183219c",
+    "local_test_sha256": "39bb8e67f7aff18a2b7b13e09334fb4a6a3576bad988a41fd743f80f9fae2f4c",
+    "local_result_json": {
+      "filename": "GROUPWISE_CALIBRATED_PRIOR_AMBIGUITY_RESULTS_2026-10-28.json",
+      "bytes": 73433,
+      "sha256": "3cfb6350f12db29e6cb871409f2c3e79cfe390fce00e73ea456062de22033085"
+    },
+    "local_result_gzip": {
+      "filename": "GROUPWISE_CALIBRATED_PRIOR_AMBIGUITY_RESULTS_2026-10-28.json.gz",
+      "bytes": 6100,
+      "sha256": "be8953084b09c72e49d1296cc141adfe15920deb5acbedea7462f201f27fb9da"
+    },
+    "repository_scm_integration": false,
+    "external_benchmark_run": false,
+    "speedup_claim": false
+  },
+  "limitations": [
+    "Synthetic six-regime prior meta-population",
+    "Groupwise oracle requires known regime at test time",
+    "Max radius is conservative",
+    "Small test subgroups imply wide uncertainty",
+    "No real SCM or external benchmark evaluation"
+  ]
+}
