@@ -288,6 +288,64 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "supported"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "witnesses": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "observed_result": {
+                  "const": "supports"
+                }
+              },
+              "required": [
+                "observed_result"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "contradicted"
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "then": {
+        "properties": {
+          "witnesses": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "observed_result": {
+                  "const": "contradicts"
+                }
+              },
+              "required": [
+                "observed_result"
+              ]
+            }
+          }
+        }
+      }
     }
   ]
 }
