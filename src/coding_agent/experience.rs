@@ -296,10 +296,16 @@ impl CodingAgent {
         &self,
         cycle_result: &CycleResult,
     ) -> ConsciousnessSignals {
-        let prediction_error = 1.0 - self.cognitive_loop.prediction_confidence();
-        let confidence_velocity = if self.prediction_error_history.len() >= 2 {
-            let prev = self.prediction_error_history[self.prediction_error_history.len() - 1];
-            self.cognitive_loop.prediction_confidence() - (1.0 - prev)
+        // Keep the measured PE from the cycle result distinct from confidence.
+        // A numeric compatibility sentinel is not evidence when validity is false.
+        let prediction_error = cycle_result.prediction_error;
+        let prediction_error_valid =
+            cycle_result.prediction_error_valid && prediction_error.is_finite();
+        let confidence = self.cognitive_loop.prediction_confidence();
+        let confidence_gap = 1.0 - confidence;
+        let confidence_velocity = if self.confidence_gap_history.len() >= 2 {
+            let prev_gap = self.confidence_gap_history[self.confidence_gap_history.len() - 1];
+            confidence - (1.0 - prev_gap)
         } else {
             0.0
         };
@@ -314,6 +320,8 @@ impl CodingAgent {
 
         ConsciousnessSignals {
             prediction_error,
+            prediction_error_valid,
+            confidence_gap,
             confidence_velocity,
             phi,
             phi_slope,

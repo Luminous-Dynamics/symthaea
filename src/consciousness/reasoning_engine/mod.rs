@@ -102,12 +102,27 @@ impl ConsciousReasoningEngine {
         self.simulation_state = Some(state);
     }
 
-    /// Record a posthoc outcome (fed back from the previous cycle's action).
+    /// Record a posthoc outcome with a measured prediction error.
+    ///
+    /// Compatibility wrapper for callers that already have a finite measured PE.
     pub fn record_posthoc(&mut self, gate_passed: bool, outcome_good: bool, prediction_error: f64) {
+        self.record_posthoc_with_optional_pe(gate_passed, outcome_good, Some(prediction_error));
+    }
+
+    /// Record a posthoc outcome without fabricating PE when no valid comparison exists.
+    ///
+    /// Gate/outcome calibration is independent of PE availability, so it still
+    /// updates when prediction_error is None. The event preserves that missingness.
+    pub fn record_posthoc_with_optional_pe(
+        &mut self,
+        gate_passed: bool,
+        outcome_good: bool,
+        prediction_error: Option<f64>,
+    ) {
         self.pending_posthoc = Some(PosthocOutcome {
             gate_passed,
             outcome_good,
-            prediction_error,
+            prediction_error: prediction_error.filter(|value| value.is_finite()),
         });
         self.calibrator.record_outcome(gate_passed, outcome_good);
     }
@@ -704,6 +719,26 @@ mod tests {
     // these test the invariants that don't depend on which action gets picked;
     // the full per-action gating behavior is exercised end-to-end by the live
     // CodingAgent smoke verification instead. ──
+
+    #[test]
+    fn posthoc_without_valid_pe_preserves_gate_outcome_and_missingness() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+        ctx.cycle_id = 1;
+        engine.reason(&ctx);
+
+        engine.record_posthoc_with_optional_pe(true, false, None);
+        ctx.cycle_id = 2;
+        engine.reason(&ctx);
+
+        let outcome = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("posthoc gate outcome should still be recorded");
+        assert!(outcome.gate_passed);
+        assert!(!outcome.outcome_good);
+        assert_eq!(outcome.prediction_error, None);
+    }
 
     #[test]
     fn test_gate_none_when_tier1_never_plans() {

@@ -15,6 +15,51 @@ fn test_coding_agent_creation() {
 }
 
 #[test]
+fn coding_agent_does_not_relabel_confidence_gap_as_measured_pe() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 2,
+        working_dir: dir.path().to_path_buf(),
+        target_file: Some(PathBuf::from("pe-provenance.rs")),
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).unwrap();
+
+    // The cold-start cycle has no prior prediction; its numeric PE compatibility
+    // payload must not be accepted as measured evidence.
+    let cycle = agent.cognitive_loop.cycle("cold-start provenance probe");
+    assert!(!cycle.prediction_error_valid);
+
+    // A subsequent comparable sample should retain the measured PE from CycleResult
+    // instead of replacing it with the confidence gap.
+    let second = agent.cognitive_loop.cycle("second provenance probe after model warmup");
+    // Inject a known-valid measured sample into a cloned result to test the
+    // consumer contract independent of whether this local model yields a useful
+    // non-degenerate prediction for the chosen text.
+    let mut measured_cycle = second.clone();
+    measured_cycle.prediction_error = 0.23;
+    measured_cycle.prediction_error_valid = true;
+
+    agent.confidence_gap_history.extend([0.7, 0.6]);
+    let signals = agent.extract_consciousness_signals(&cycle);
+    assert_eq!(signals.prediction_error, cycle.prediction_error);
+    assert!(!signals.prediction_error_valid);
+    assert!(
+        (signals.confidence_gap - (1.0 - agent.cognitive_loop.prediction_confidence()) as f32).abs()
+            < f32::EPSILON
+    );
+    // Invalid PE does not become an entry in measured-error history, while the
+    // independent confidence-gap track remains available for confidence velocity.
+    assert!(agent.prediction_error_history.is_empty());
+    assert_eq!(agent.confidence_gap_history.len(), 2);
+    assert!(signals.confidence_velocity.is_finite());
+
+    let measured = agent.extract_consciousness_signals(&measured_cycle);
+    assert!(measured.prediction_error_valid);
+    assert_eq!(measured.prediction_error, 0.23);
+}
+
+#[test]
 fn test_coding_agent_runs_and_generates() {
     let dir = tempfile::tempdir().unwrap();
     let config = CodingAgentConfig {

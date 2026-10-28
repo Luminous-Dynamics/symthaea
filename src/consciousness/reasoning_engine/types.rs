@@ -516,8 +516,9 @@ pub struct PosthocOutcome {
     pub gate_passed: bool,
     /// Whether the outcome was good.
     pub outcome_good: bool,
-    /// Prediction error after action.
-    pub prediction_error: f64,
+    /// Measured prediction error after action, unavailable when no valid comparison exists.
+    #[serde(default)]
+    pub prediction_error: Option<f64>,
 }
 
 impl ReasoningEvent {

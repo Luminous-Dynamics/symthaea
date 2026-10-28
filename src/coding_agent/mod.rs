@@ -231,7 +231,9 @@ pub enum AgentEvent {
     },
     ConsciousnessSnapshot {
         phi: f32,
+        /// Numeric PE payload; only meaningful when prediction_error_valid is true.
         prediction_error: f32,
+        prediction_error_valid: bool,
         confidence_velocity: f32,
     },
     RetryStrategyChanged(RetryStrategy),
@@ -268,7 +270,12 @@ impl Default for RetryState {
 /// Extracted consciousness signals for agent decision-making.
 #[derive(Debug, Clone, Default)]
 struct ConsciousnessSignals {
+    /// Numeric cycle PE, not a confidence-derived proxy.
     prediction_error: f32,
+    /// Whether this cycle produced genuine, finite PE evidence.
+    prediction_error_valid: bool,
+    /// Confidence gap (1 - confidence), kept distinct from measured PE.
+    confidence_gap: f32,
     confidence_velocity: f32,
     phi: f32,
     phi_slope: f32,
@@ -387,8 +394,10 @@ pub struct CodingAgent {
     /// Set when native_code_template() returns None — forces LLM tier on next generation.
     /// Cleared after a successful LLM generation so native can be tried again on new tasks.
     native_exhausted: bool,
-    /// Prediction error history for trend detection.
+    /// Measured prediction errors; invalid cycle payloads are never appended.
     prediction_error_history: Vec<f32>,
+    /// Confidence-gap history used only to compute confidence velocity.
+    confidence_gap_history: Vec<f32>,
     /// Confidence velocity history for trend detection.
     confidence_velocity_history: Vec<f32>,
     /// Optional event channel for streaming agent progress.
@@ -543,6 +552,7 @@ impl CodingAgent {
             coding_attempts: Vec::new(),
             native_exhausted: false,
             prediction_error_history: Vec::new(),
+            confidence_gap_history: Vec::new(),
             confidence_velocity_history: Vec::new(),
             event_sink: None,
             retry_state: RetryState::default(),
@@ -633,6 +643,7 @@ impl CodingAgent {
         self.failure_patterns.clear();
         self.native_exhausted = false;
         self.prediction_error_history.clear();
+        self.confidence_gap_history.clear();
         self.confidence_velocity_history.clear();
         self.retry_state = RetryState::default();
         self.current_plan = None;
@@ -832,7 +843,9 @@ impl CodingAgent {
             self.pending_reasoning_outcome =
                 Some(consciousness_bridge::PendingReasoningOutcome::capture(
                     &reasoning,
-                    signals.prediction_error as f64,
+                    signals
+                        .prediction_error_valid
+                        .then_some(signals.prediction_error as f64),
                 ));
         }
 
@@ -867,12 +880,19 @@ impl CodingAgent {
         // Extract consciousness signals for decision-making
         let phi = signals.phi;
         self.phi_trace.push(phi);
-        self.prediction_error_history.push(signals.prediction_error);
+        if signals.prediction_error_valid {
+            self.prediction_error_history.push(signals.prediction_error);
+        }
+        self.confidence_gap_history.push(signals.confidence_gap);
         self.confidence_velocity_history
             .push(signals.confidence_velocity);
-        // Keep histories bounded
+        // Keep histories bounded independently: missing PE must not suppress
+        // confidence tracking, and confidence gaps must not masquerade as errors.
         if self.prediction_error_history.len() > 10 {
             self.prediction_error_history.remove(0);
+        }
+        if self.confidence_gap_history.len() > 10 {
+            self.confidence_gap_history.remove(0);
         }
         if self.confidence_velocity_history.len() > 10 {
             self.confidence_velocity_history.remove(0);
@@ -880,6 +900,7 @@ impl CodingAgent {
         self.emit_event(AgentEvent::ConsciousnessSnapshot {
             phi,
             prediction_error: signals.prediction_error,
+            prediction_error_valid: signals.prediction_error_valid,
             confidence_velocity: signals.confidence_velocity,
         });
 
