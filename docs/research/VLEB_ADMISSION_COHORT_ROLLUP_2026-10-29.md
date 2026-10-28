@@ -76,7 +76,7 @@ This still depends on the protected evaluator being the authority for the cohort
 
 ## Meta-evaluation: mutate the evaluator's own guardrails
 
-The workflow now also runs `tools/vleb/run_auditor_mutation_campaign.py`. It first executes the unmodified cohort rollup test suite and requires it to pass. It then produces ten reviewed, syntactically valid guard-bypass mutations: bypass cohort/report digests, weaken locked task inventory, accept an unexpected task, drop run/attempt or revision/image/network binding, restore permissive JSON parsing, ignore eligible-report/admission consistency, and leak score eligibility.
+The workflow now also runs `tools/vleb/run_auditor_mutation_campaign.py`. It first executes the unmodified cohort rollup test suite and requires it to pass. It then produces eleven reviewed, syntactically valid guard-bypass mutations: bypass cohort/report digests, weaken locked task inventory, accept an unexpected task, drop run/attempt or revision/image/network binding, restore permissive JSON parsing, ignore eligible-report/admission consistency, and leak score eligibility.
 
 A mutation is counted as killed only when the test suite actually starts and fails on the mutated implementation. Syntax errors, import/startup failures, and timeouts count as invalid, not killed. The campaign fails if any sentinel survives or is invalid. Target is 100% kill of this frozen sentinel catalog; the metric is not a candidate success score and the tool emits `score_eligible=false`.
 
