@@ -238,7 +238,11 @@
       "required": [
         "source_path",
         "source_sha256",
-        "verifier_binary_sha256"
+        "verifier_binary_sha256",
+        "task_schema_path",
+        "task_schema_sha256",
+        "receipt_schema_path",
+        "receipt_schema_sha256"
       ],
       "properties": {
         "source_path": {
@@ -248,6 +252,18 @@
           "$ref": "#/$defs/sha256"
         },
         "verifier_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "task_schema_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "task_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_schema_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "receipt_schema_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
