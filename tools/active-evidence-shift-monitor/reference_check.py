@@ -857,6 +857,37 @@ def calibrate_cusum_threshold(horizon, alpha):
     return low
 
 
+def simulate_cusum_null_schedule(direction, threshold, horizon, conditional_p_at):
+    """Exact CUSUM DP for predictable rates depending on time and the pre-observation score."""
+    active = [0.0] * threshold
+    active[0] = 1.0
+    alarm_probability = 0.0
+    for n in range(1, horizon + 1):
+        next_active = [0.0] * threshold
+        reachable_states = min(threshold, (n - 1) * CUSUM_UPPER_INCREMENT + 1)
+        for state, mass in enumerate(active[:reachable_states]):
+            if mass == 0.0:
+                continue
+            conditional_p = conditional_p_at(n, state)
+            if not COMPOSITE_NULL_LOWER <= conditional_p <= COMPOSITE_NULL_UPPER:
+                raise ValueError(f"predictable CUSUM schedule escaped accepted band: {conditional_p}")
+            event_p = conditional_p if direction == "upper_cusum" else 1.0 - conditional_p
+            for event, branch_mass in (
+                (True, mass * event_p),
+                (False, mass * (1.0 - event_p)),
+            ):
+                next_state = cusum_next_state(state, event)
+                if next_state >= threshold:
+                    alarm_probability += branch_mass
+                else:
+                    next_active[next_state] += branch_mass
+        active = next_active
+    survival = sum(active)
+    if abs(alarm_probability + survival - 1.0) > 1e-9:
+        raise ValueError("CUSUM predictable schedule did not conserve probability mass")
+    return alarm_probability, survival
+
+
 def simulate_cusum_scenario(direction, scenario, threshold):
     """Run one directional CUSUM exactly and snapshot the preregistered horizons."""
     horizon_max = HORIZONS[-1]
@@ -1114,7 +1145,31 @@ def cusum_self_test():
         raise ValueError(
             f"matched-edge CUSUM moderate-shift power gate failed: CUSUM={cusum_060}, composite={composite_060}"
         )
-    print("PASS: exact matched-edge threshold, both directions, within-band control, mass conservation, selection-bias negative control, and matched-false-alarm power gates")
+    for direction in ("upper_cusum", "lower_cusum"):
+        alternating_alarm, alternating_survival = simulate_cusum_null_schedule(
+            direction, threshold, horizon,
+            lambda n, _state: 0.52 if n % 2 == 0 else 0.48,
+        )
+        if alternating_alarm > matched_reference_alarm + EPS:
+            raise ValueError(f"{direction} exceeded matched edge FPR on alternating null schedule")
+        if abs(alternating_alarm + alternating_survival - 1.0) > 1e-9:
+            raise ValueError(f"{direction} alternating schedule failed mass conservation")
+
+        def feedback_rate(_n, state):
+            evidence_is_favored = state < threshold // 2
+            if direction == "upper_cusum":
+                return 0.52 if evidence_is_favored else 0.48
+            return 0.48 if evidence_is_favored else 0.52
+
+        feedback_alarm, feedback_survival = simulate_cusum_null_schedule(
+            direction, threshold, horizon, feedback_rate
+        )
+        if feedback_alarm > matched_reference_alarm + EPS:
+            raise ValueError(f"{direction} exceeded matched edge FPR on predictable feedback schedule")
+        if abs(feedback_alarm + feedback_survival - 1.0) > 1e-9:
+            raise ValueError(f"{direction} feedback schedule failed mass conservation")
+
+    print("PASS: matched-edge threshold, both directions, alternating and feedback nulls, mass conservation, selection-bias negative control, and matched-FPR power gates")
 
 
 def main(argv):
