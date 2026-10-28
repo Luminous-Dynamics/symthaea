@@ -16,6 +16,8 @@ Inputs are fail-closed. `--protocol` is hashed as raw bytes and must match the d
 
 ## Frozen run config
 
+Validate the run config with [`run-config-v1.schema.json`](run-config-v1.schema.json) before either power or analyze mode. The synthetic shape fixture is `fixtures/run-config-v1.synthetic.json`; its CI validator also joins both exposure lists against the actual frozen `splits.json` because JSON Schema alone cannot prove a family’s assigned partition.
+
 The run config uses `schema_version = "pitb.run-config.v1"` and contains:
 
 - `protocol_id`: `proof-insight-transfer-v0`.
