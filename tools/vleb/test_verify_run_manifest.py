@@ -427,6 +427,22 @@ class RunManifestVerifierTests(unittest.TestCase):
         issues = self.audit_one_execution_receipt()
         self.assertIn("witness_receipt_invocation_mismatch", {row["code"] for row in issues})
 
+    def test_execution_receipt_cannot_alias_witness_artifact_to_stdout(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_path = self.bundle.root / witness["execution_receipt_path"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        for output in receipt["outputs"]:
+            if output["path"] == witness["artifact_path"]:
+                output["role"] = "stdout"
+        raw = jbytes(receipt)
+        receipt_path.write_bytes(raw)
+        witness["execution_receipt_sha256"] = sha(raw)
+        claim_path.write_bytes(jbytes(claim))
+        issues = self.audit_one_execution_receipt()
+        self.assertIn("witness_receipt_artifact_binding_mismatch", {row["code"] for row in issues})
+
     def test_execution_receipt_rejects_wrong_external_verifier_pin(self) -> None:
         claim = json.loads((self.bundle.root / self.bundle.paths["claim"]).read_text(encoding="utf-8"))
         witness = claim["witnesses"][0]
