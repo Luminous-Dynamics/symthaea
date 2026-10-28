@@ -139,7 +139,7 @@ fn target_value(s: &Scenario) -> f64 {
 }
 
 fn clipped_interval(center: f64, radius: f64) -> (f64, f64) {
-    ((center - radius).max(0.0), (center + radius).min(1.0))
+    ((center - radius).clamp(0.0, 1.0), (center + radius).clamp(0.0, 1.0))
 }
 
 fn covers(lower: f64, upper: f64, truth: f64) -> bool {
