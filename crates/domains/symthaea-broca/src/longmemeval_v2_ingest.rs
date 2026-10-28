@@ -57,7 +57,7 @@ pub struct LongMemEvalTrajectory {
     pub environment: String,
     pub goal: String,
     pub outcome: String,
-    pub start_url: Option<String>,
+    pub start_url: String,
     pub states: Vec<LongMemEvalState>,
 }
 
@@ -70,8 +70,8 @@ pub struct LongMemEvalState {
     pub url: Option<String>,
     pub action: Option<Value>,
     pub thought: Option<String>,
-    pub accessibility_tree: Option<String>,
-    pub screenshot: Option<String>,
+    pub accessibility_tree: String,
+    pub screenshot: String,
 }
 
 /// Parse, validate and ingest JSONL trajectory records into deterministic text
@@ -180,6 +180,9 @@ fn validate_trajectory(trajectory: &LongMemEvalTrajectory) -> Result<(), String>
     if trajectory.goal.trim().is_empty() {
         return Err("trajectory goal must be non-empty".into());
     }
+    if trajectory.start_url.trim().is_empty() {
+        return Err("trajectory start_url must be non-empty".into());
+    }
     if !matches!(trajectory.outcome.as_str(), "success" | "failure") {
         return Err(format!("unsupported trajectory outcome {:?}", trajectory.outcome));
     }
@@ -191,6 +194,15 @@ fn validate_trajectory(trajectory: &LongMemEvalTrajectory) -> Result<(), String>
     for state in &trajectory.states {
         if previous_index.is_some_and(|previous| state.state_index <= previous) {
             return Err("state_index values must be strictly increasing and unique".into());
+        }
+        if state.url.trim().is_empty() {
+            return Err("state url must be non-empty".into());
+        }
+        if state.screenshot.trim().is_empty() {
+            return Err("state screenshot path must be non-empty".into());
+        }
+        if state.screenshot.contains("..") {
+            return Err("state screenshot path must not contain parent-directory traversal".into());
         }
         previous_index = Some(state.state_index);
     }
@@ -405,10 +417,10 @@ mod tests {
 
     #[test]
     fn source_digest_and_ids_ignore_json_whitespace_and_object_key_order() {
-        let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":null,"states":[{"state_index":0,"step":1,"url":"https://example.test","action":{"type":"click","target":"x"},"thought":"t","accessibility_tree":"tree","screenshot":null}]}"#;
+        let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":"https://example.test/","states":[{"state_index":0,"step":1,"url":"https://example.test","action":{"type":"click","target":"x"},"thought":"t","accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}]}"#;
         let second = r#"{
-            "states":[{"screenshot":null,"accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0}],
-            "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":null,"id":"traj-order"
+            "states":[{"screenshot":null,"accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0,"accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}],
+            "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":"https://example.test/","id":"traj-order"
         }"#;
         let resolver = |_: &str, _: &str| Some("scope".to_string());
 
