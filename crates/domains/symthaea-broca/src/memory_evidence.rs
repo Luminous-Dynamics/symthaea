@@ -391,7 +391,7 @@ impl EvidenceCommitManifest {
 /// the returned snapshot bytes as required by their threat model.
 /// Versioned immutable inverted index derived from one evidence snapshot.
 ///
-///// The manifest binds the exact serialized bytes; generation and structural
+/// The manifest binds the exact serialized bytes; generation and structural
 /// validation prevent accidentally using an index from another commit.
 pub const LEXICAL_INDEX_SCHEMA_VERSION: &str = "BROCA-LEXICAL-INDEX-V1";
 
@@ -526,7 +526,8 @@ impl LexicalIndex {
             return Err("lexical index total token count does not match document lengths".into());
         }
         for (term, list) in &self.postings {
-            if lexical_tokens(term) != [term.clone()] {
+            let canonical_term = lexical_tokens(term);
+            if canonical_term.len() != 1 || canonical_term[0] != *term {
                 return Err("lexical index contains a non-canonical term".into());
             }
             if list.is_empty() {
