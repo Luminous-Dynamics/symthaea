@@ -30,9 +30,18 @@ pub const V2_MTU: usize = 222;
 pub const V2_PAYLOAD_SIZE: usize = V2_MTU - V2_HEADER_SIZE;
 pub const V2_FLAG_FEC: u8 = 0x01;
 pub const V2_FLAG_LENGTH_BOUND: u8 = 0x02;
-const V2_ALLOWED_FLAGS: u8 = V2_FLAG_FEC | V2_FLAG_LENGTH_BOUND;
+/// Selects the reduced payload budget needed when each whole frame is wrapped
+/// in the current 12-byte-nonce + 16-byte-tag fragment AEAD envelope. This bit
+/// is itself inside the frame and must be authenticated by the outer AEAD.
+pub const V2_FLAG_AEAD_BUDGET: u8 = 0x04;
+const V2_ALLOWED_FLAGS: u8 = V2_FLAG_FEC | V2_FLAG_LENGTH_BOUND | V2_FLAG_AEAD_BUDGET;
+pub const V2_FRAGMENT_AEAD_OVERHEAD: usize = 12 + 16;
+pub const V2_AEAD_PAYLOAD_SIZE: usize =
+    V2_MTU - V2_HEADER_SIZE - V2_FRAGMENT_AEAD_OVERHEAD;
 pub const V2_MAX_DATA_FRAGMENTS: usize = 254;
 pub const V2_MAX_ENCODED_LEN: usize = V2_MAX_DATA_FRAGMENTS * V2_PAYLOAD_SIZE;
+pub const V2_MAX_AEAD_ENCODED_LEN: usize =
+    V2_MAX_DATA_FRAGMENTS * V2_AEAD_PAYLOAD_SIZE;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum V2FragmentError {
@@ -79,24 +88,43 @@ impl LoRaFragmentV2 {
         self.flags & V2_FLAG_FEC != 0
     }
 
-    fn data_count_for_len(encoded_len: usize) -> Option<usize> {
-        if encoded_len == 0 || encoded_len > V2_MAX_ENCODED_LEN {
-            return None;
-        }
-        Some((encoded_len + V2_PAYLOAD_SIZE - 1) / V2_PAYLOAD_SIZE)
+    pub fn aead_budget_profile(&self) -> bool {
+        self.flags & V2_FLAG_AEAD_BUDGET != 0
     }
 
-    fn expected_payload_len(encoded_len: usize, data_count: usize, index: usize, is_fec: bool) -> Option<usize> {
+    fn data_count_for_len(encoded_len: usize, payload_capacity: usize) -> Option<usize> {
+        let max_encoded_len = V2_MAX_DATA_FRAGMENTS.checked_mul(payload_capacity)?;
+        if encoded_len == 0 || encoded_len > max_encoded_len || encoded_len > usize::from(u16::MAX) {
+            return None;
+        }
+        Some((encoded_len + payload_capacity - 1) / payload_capacity)
+    }
+
+    fn expected_payload_len(
+        encoded_len: usize,
+        data_count: usize,
+        index: usize,
+        is_fec: bool,
+        payload_capacity: usize,
+    ) -> Option<usize> {
         if is_fec {
-            return (index == data_count).then_some(V2_PAYLOAD_SIZE);
+            return (index == data_count).then_some(payload_capacity);
         }
         if index >= data_count {
             return None;
         }
         if index + 1 < data_count {
-            Some(V2_PAYLOAD_SIZE)
+            Some(payload_capacity)
         } else {
-            encoded_len.checked_sub((data_count - 1).checked_mul(V2_PAYLOAD_SIZE)?)
+            encoded_len.checked_sub((data_count - 1).checked_mul(payload_capacity)?)
+        }
+    }
+
+    fn payload_capacity_from_flags(flags: u8) -> usize {
+        if flags & V2_FLAG_AEAD_BUDGET != 0 {
+            V2_AEAD_PAYLOAD_SIZE
+        } else {
+            V2_PAYLOAD_SIZE
         }
     }
 
@@ -122,7 +150,8 @@ impl LoRaFragmentV2 {
             return false;
         }
         let encoded_len = self.encoded_len();
-        let Some(data_count) = Self::data_count_for_len(encoded_len) else {
+        let payload_capacity = Self::payload_capacity_from_flags(self.flags);
+        let Some(data_count) = Self::data_count_for_len(encoded_len, payload_capacity) else {
             return false;
         };
         if usize::from(self.total_fragments) != data_count + 1 {
@@ -136,10 +165,16 @@ impl LoRaFragmentV2 {
         if is_fec != (index == data_count) {
             return false;
         }
-        let Some(expected_len) = Self::expected_payload_len(encoded_len, data_count, index, is_fec) else {
+        let Some(expected_len) = Self::expected_payload_len(
+            encoded_len,
+            data_count,
+            index,
+            is_fec,
+            payload_capacity,
+        ) else {
             return false;
         };
-        if usize::from(self.payload_len) != expected_len || expected_len > V2_PAYLOAD_SIZE {
+        if usize::from(self.payload_len) != expected_len || expected_len > payload_capacity {
             return false;
         }
         self.checksum
@@ -211,29 +246,50 @@ impl LoRaFragmentV2 {
 /// Fragment an encoded message using V2 length-bound framing and one XOR parity
 /// frame. Empty and over-bound messages are rejected instead of panicking.
 pub fn fragment_v2(thought_id: u16, encoded: &[u8]) -> Result<Vec<LoRaFragmentV2>, V2FragmentError> {
+    fragment_v2_with_capacity(thought_id, encoded, V2_PAYLOAD_SIZE, false)
+}
+
+/// Fragment for an outer 12-byte nonce + 16-byte tag wrapper while preserving
+/// the 222-byte transport MTU. This only selects the correct byte budget; it
+/// does NOT encrypt, authenticate, or make the existing nonce construction safe.
+pub fn fragment_v2_with_aead_overhead(
+    thought_id: u16,
+    encoded: &[u8],
+) -> Result<Vec<LoRaFragmentV2>, V2FragmentError> {
+    fragment_v2_with_capacity(thought_id, encoded, V2_AEAD_PAYLOAD_SIZE, true)
+}
+
+fn fragment_v2_with_capacity(
+    thought_id: u16,
+    encoded: &[u8],
+    payload_capacity: usize,
+    aead_budget: bool,
+) -> Result<Vec<LoRaFragmentV2>, V2FragmentError> {
     if encoded.is_empty() {
         return Err(V2FragmentError::EmptyPayload);
     }
-    if encoded.len() > V2_MAX_ENCODED_LEN || encoded.len() > usize::from(u16::MAX) {
+    let max_encoded_len = V2_MAX_DATA_FRAGMENTS * payload_capacity;
+    if encoded.len() > max_encoded_len || encoded.len() > usize::from(u16::MAX) {
         return Err(V2FragmentError::PayloadTooLarge);
     }
-    let data_count = (encoded.len() + V2_PAYLOAD_SIZE - 1) / V2_PAYLOAD_SIZE;
+    let data_count = (encoded.len() + payload_capacity - 1) / payload_capacity;
     let total_fragments = u8::try_from(data_count + 1).map_err(|_| V2FragmentError::PayloadTooLarge)?;
     let encoded_len = u16::try_from(encoded.len()).map_err(|_| V2FragmentError::PayloadTooLarge)?;
     let mut frames = Vec::with_capacity(data_count + 1);
     let mut parity = [0u8; V2_PAYLOAD_SIZE];
+    let profile_flag = if aead_budget { V2_FLAG_AEAD_BUDGET } else { 0 };
 
     for index in 0..data_count {
-        let start = index * V2_PAYLOAD_SIZE;
-        let end = (start + V2_PAYLOAD_SIZE).min(encoded.len());
+        let start = index * payload_capacity;
+        let end = (start + payload_capacity).min(encoded.len());
         let chunk = &encoded[start..end];
         let mut payload = [0u8; V2_PAYLOAD_SIZE];
         payload[..chunk.len()].copy_from_slice(chunk);
-        for (parity_byte, chunk_byte) in parity.iter_mut().zip(payload.iter()) {
-            *parity_byte ^= *chunk_byte;
+        for byte_index in 0..payload_capacity {
+            parity[byte_index] ^= payload[byte_index];
         }
         let payload_len = u8::try_from(chunk.len()).map_err(|_| V2FragmentError::PayloadTooLarge)?;
-        let flags = V2_FLAG_LENGTH_BOUND;
+        let flags = V2_FLAG_LENGTH_BOUND | profile_flag;
         let checksum = LoRaFragmentV2::checksum_for(
             thought_id,
             index as u8,
@@ -256,8 +312,8 @@ pub fn fragment_v2(thought_id: u16, encoded: &[u8]) -> Result<Vec<LoRaFragmentV2
     }
 
     let index = data_count as u8;
-    let payload_len = V2_PAYLOAD_SIZE as u8;
-    let flags = V2_FLAG_LENGTH_BOUND | V2_FLAG_FEC;
+    let payload_len = payload_capacity as u8;
+    let flags = V2_FLAG_LENGTH_BOUND | V2_FLAG_FEC | profile_flag;
     let checksum = LoRaFragmentV2::checksum_for(
         thought_id,
         index,
@@ -265,7 +321,7 @@ pub fn fragment_v2(thought_id: u16, encoded: &[u8]) -> Result<Vec<LoRaFragmentV2
         payload_len,
         flags,
         encoded_len,
-        &parity,
+        &parity[..payload_capacity],
     );
     frames.push(LoRaFragmentV2 {
         thought_id,
@@ -287,6 +343,7 @@ pub struct FragmentAssemblerV2 {
     total_fragments: u8,
     encoded_len: usize,
     data_count: usize,
+    payload_capacity: usize,
     received: Vec<bool>,
     fragments: Vec<Option<[u8; V2_PAYLOAD_SIZE]>>,
     payload_lens: Vec<u8>,
@@ -302,12 +359,14 @@ impl FragmentAssemblerV2 {
             return None;
         }
         let encoded_len = first.encoded_len();
-        let data_count = LoRaFragmentV2::data_count_for_len(encoded_len)?;
+        let payload_capacity = LoRaFragmentV2::payload_capacity_from_flags(first.flags);
+        let data_count = LoRaFragmentV2::data_count_for_len(encoded_len, payload_capacity)?;
         Some(Self {
             thought_id: first.thought_id,
             total_fragments: first.total_fragments,
             encoded_len,
             data_count,
+            payload_capacity,
             received: vec![false; data_count + 1],
             fragments: vec![None; data_count],
             payload_lens: vec![0; data_count],
@@ -371,11 +430,11 @@ impl FragmentAssemblerV2 {
             if Some(index) == missing {
                 let chunk = recovered.as_ref()?;
                 let len = if index + 1 == self.data_count {
-                    self.encoded_len.checked_sub((self.data_count - 1).checked_mul(V2_PAYLOAD_SIZE)?)?
+                    self.encoded_len.checked_sub((self.data_count - 1).checked_mul(self.payload_capacity)?)?
                 } else {
-                    V2_PAYLOAD_SIZE
+                    self.payload_capacity
                 };
-                if len == 0 || len > V2_PAYLOAD_SIZE {
+                if len == 0 || len > self.payload_capacity {
                     return None;
                 }
                 output.extend_from_slice(&chunk[..len]);
