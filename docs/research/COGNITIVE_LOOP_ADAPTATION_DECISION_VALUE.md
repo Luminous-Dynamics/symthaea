@@ -208,3 +208,19 @@ The fair comparison must hold input streams, label availability, decision budget
 7. Update claims only after independent review of the exact commit and artifacts.
 
 **Non-claim:** this document introduces a research protocol only. It does not implement the replay engine, validate the current Rust branch, establish a statistical guarantee for the PRM prototype, or report performance gains.
+
+## Independent receipt-to-panel audit
+
+The panel aggregator previously checked receipt-link metadata without independently reopening every raw receipt. The new audit command reopens and hashes the preregistered protocol, panel input, every scorer input, and every replay receipt; invokes the receipt-bound scorer again for all 2,800 cells; requires exact score equality; checks that paths remain inside the bundle root; rejects duplicate identities, reused input or receipt bytes, reused run IDs, and non-replay receipts; then recomputes the full panel comparison.
+
+Run it with:
+
+```bash
+cargo run --locked -p xtask -- audit-cognitive-adaptation-panel \
+  --input path/to/audit-bundle.json \
+  --out reports/cognitive-adaptation-audit.json
+```
+
+The JSON bundle manifest is version 1 and includes `panel_path`, `panel_sha256`, `protocol_path`, `protocol_sha256`, and a `cells` array. Every cell declares `dataset_id`, `seed`, `scenario_id`, `run_id`, `utility_input_path`, `utility_input_sha256`, `replay_receipt_path`, and `replay_receipt_sha256`. Each SHA-256 value must be 64 lowercase hexadecimal characters and match raw bytes. Paths are relative to the manifest directory; absolute paths, `.` or `..` components, and symlinks that resolve outside that directory are rejected.
+
+**Preregistration discipline:** publish the audit-bundle digest and exact protocol and input commitments before examining held-out outcomes. If the bundle is assembled after results are visible, it still enables reproducibility but does not by itself prevent post-hoc selection. A successful audit is not cryptographic proof that a runner executed honestly, that the oracle channel was technically inaccessible, or that the dataset represents deployment. Those remain separate controls and limitations.
