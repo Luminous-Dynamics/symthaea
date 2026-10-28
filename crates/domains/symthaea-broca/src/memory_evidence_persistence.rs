@@ -651,6 +651,14 @@ impl EvidenceDiskStore {
                 index.validate_for_evidence(&evidence_index, pointer.generation)?;
                 Some(index)
             }
+            None if manifest.hdc_store_identity().is_some() => {
+                // Legacy V2 typed generations predate the manifest-bound lexical
+                // artifact. Their verified evidence snapshot remains authoritative,
+                // so rebuild a deterministic in-memory index for reads. The next
+                // typed commit publishes a V3 generation with the index persisted
+                // and digest-bound; never write this fallback into the old generation.
+                Some(LexicalIndex::build(&evidence_index, pointer.generation)?)
+            }
             None => None,
         };
         if let Some(identity) = manifest.hdc_store_identity() {
