@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HIV Reservoir Discovery Hypothesis Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hypothesis_id",
+    "created_at",
+    "claim_type",
+    "claim",
+    "status",
+    "supporting_evidence",
+    "contradictory_evidence",
+    "alternatives",
+    "falsifiable_prediction",
+    "discriminating_test",
+    "predeclared_success_criteria",
+    "limitations",
+    "provenance"
+  ],
+  "properties": {
+    "hypothesis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "claim_type": {
+      "enum": [
+        "reproduction",
+        "association",
+        "prediction",
+        "mechanism",
+        "experiment_selection"
+      ]
+    },
+    "claim": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "pre_registered",
+        "tested_internal",
+        "independently_replicated",
+        "mechanistically_supported",
+        "experimentally_validated",
+        "rejected",
+        "inconclusive"
+      ]
+    },
+    "supporting_evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      },
+      "minItems": 1
+    },
+    "contradictory_evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "falsifiable_prediction": {
+      "type": "string",
+      "minLength": 1
+    },
+    "discriminating_test": {
+      "type": "string",
+      "minLength": 1
+    },
+    "predeclared_success_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_ids",
+        "source_commit",
+        "configuration_digest"
+      ],
+      "properties": {
+        "dataset_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "source_commit": {
+          "type": "string",
+          "minLength": 7
+        },
+        "configuration_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code_digest": {
+          "type": "string"
+        },
+        "receipt_uri": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "review": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reviewer_role",
+          "decision",
+          "rationale"
+        ],
+        "properties": {
+          "reviewer_role": {
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "accept",
+              "revise",
+              "reject",
+              "abstain"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "reviewed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "source_url",
+        "evidence_kind",
+        "supports",
+        "limitations"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "evidence_kind": {
+          "enum": [
+            "primary_data",
+            "peer_reviewed_result",
+            "preprint",
+            "independent_replication",
+            "negative_result",
+            "expert_review"
+          ]
+        },
+        "supports": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "digest": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
