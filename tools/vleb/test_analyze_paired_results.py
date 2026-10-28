@@ -182,6 +182,27 @@ class PairedResultsTests(unittest.TestCase):
         self.assertEqual(interval[1], 1.0)
         self.assertIsNone(_wilson(0, 0, 0.95))
 
+    def test_even_sample_median_uses_standard_midpoint(self) -> None:
+        data = valid_input()
+        for task, duration in zip(data["tasks"], [100, 101, 102, 103]):
+            task["candidate_A"]["duration_ms"] = duration
+        result = analyze(data)
+        self.assertEqual(result["candidate_A"]["duration_ms"]["median"], 101.5)
+
+    def test_excluded_only_lane_keeps_assigned_cost_and_reports_zero_scored(self) -> None:
+        data = valid_input()
+        data["tasks"].append({
+            "task_id": "T-EXCLUDED", "lane": "excluded-only",
+            "candidate_A": outcome("fail", 2.0), "candidate_B": outcome("fail", 3.0),
+            "exclusion": {"reason": "preregistered invalid image", "adjudicated_before_unblinding": True, "adjudication_sha256": sha("f")},
+        })
+        result = analyze(data)
+        lane = result["by_lane"]["excluded-only"]
+        self.assertEqual(lane["assigned_tasks"], 1)
+        self.assertEqual(lane["scored_tasks"], 0)
+        self.assertIsNone(lane["candidate_A"]["aassr"])
+        self.assertEqual(lane["candidate_A"]["total_cost_usd"], 2.0)
+
     def test_per_lane_results_are_reported(self) -> None:
         result = analyze(valid_input())
         self.assertEqual(set(result["by_lane"]), {"repair", "migration"})

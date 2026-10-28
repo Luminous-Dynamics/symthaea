@@ -14,7 +14,7 @@ For each candidate and each task lane, the tool reports:
 - raw resolution rate, including raw passes whose evidence is not yet sufficient;
 - counts/rates for pass, raw-but-unassured pass, fail, unresolved, and abstained;
 - unresolved and abstention rates;
-- total cost, median and p90 duration, and cost per independently verified pass;
+- total cost, conventional median and p90 duration, and cost per independently verified pass; excluded-only lanes remain visible with zero scored tasks and their incurred costs;
 - an exact two-sided McNemar p-value and task-paired AASSR risk difference for the preregistered A/B comparison.
 
 The primary denominator is the locked cohort after only documented task exclusions adjudicated before outcome unblinding. Every included task must have results for both candidates. Costs and elapsed time already incurred on excluded-but-executed assignments remain in the economics totals; exclusion must not make a system appear cheaper. Missing results are invalid input, not an implicit drop. Exclusions require a reason and a digest-pinned adjudication record; the script can verify presence and shape of that record but cannot prove that blinding was genuine.

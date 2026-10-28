@@ -30,6 +30,13 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Registered mutation catalog](mutation-catalog.json)
 - [Mutation campaign runner](run_mutation_campaign.py)
 - [Mutation-generator unit tests](test_mutation_campaign.py)
+- [Evaluator witness receipt schema](witness-receipt.schema.json)
+- [Evaluator witness receipt auditor](audit_witness_receipt.py)
+- [Witness receipt adversarial tests](test_audit_witness_receipt.py)
+- [Paired results schema](paired-results.schema.json)
+- [Locked paired-result analysis](analyze_paired_results.py)
+- [Paired-analysis statistical controls](test_analyze_paired_results.py)
+- [Paired-result analysis protocol](../../docs/research/VLEB_PAIRED_RESULT_ANALYSIS_2026-10-28.md)
 - [Evidence-qualified scorecard](scorecard.json)
 - [Scorecard invariant tests](test_scorecard.py)
 

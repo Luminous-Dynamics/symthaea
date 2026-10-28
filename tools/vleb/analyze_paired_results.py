@@ -15,7 +15,7 @@ import math
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
-from statistics import NormalDist
+from statistics import NormalDist, median
 from typing import Any
 
 OUTCOMES = ("assured_pass", "raw_pass_unverified", "fail", "unresolved", "abstained")
@@ -176,7 +176,7 @@ def _metrics(records: list[dict[str, Any]], candidate_key: str, confidence: floa
         "total_cost_usd": round(cost, 8),
         "cost_per_independently_verified_pass_usd": round(cost / assured, 8) if assured else None,
         "duration_ms": {
-            "median": _nearest_rank(durations, 0.5),
+            "median": median(durations) if durations else None,
             "p90": _nearest_rank(durations, 0.9),
             "total": sum(durations),
         },
@@ -208,15 +208,16 @@ def analyze(data: Any) -> dict[str, Any]:
         else:
             neither += 1
 
-    by_lane: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for task in scored:
-        by_lane[task["lane"]].append(task)
     lane_results: dict[str, Any] = {}
-    for lane, lane_tasks in sorted(by_lane.items()):
+    for lane in sorted({task["lane"] for task in tasks}):
+        lane_assigned = [task for task in tasks if task["lane"] == lane]
+        lane_scored = [task for task in scored if task["lane"] == lane]
         lane_results[lane] = {
-            "candidate_A": _metrics(lane_tasks, "candidate_A", confidence, [task for task in tasks if task["lane"] == lane]),
-            "candidate_B": _metrics(lane_tasks, "candidate_B", confidence, [task for task in tasks if task["lane"] == lane]),
-            "assigned_tasks": len(lane_tasks),
+            "candidate_A": _metrics(lane_scored, "candidate_A", confidence, lane_assigned),
+            "candidate_B": _metrics(lane_scored, "candidate_B", confidence, lane_assigned),
+            "assigned_tasks": len(lane_assigned),
+            "scored_tasks": len(lane_scored),
+            "pre_unblinding_exclusions": len(lane_assigned) - len(lane_scored),
         }
 
     return {
@@ -231,6 +232,7 @@ def analyze(data: Any) -> dict[str, Any]:
             "assigned_tasks": len(tasks),
             "scored_tasks": len(scored),
             "pre_unblinding_exclusions": len(excluded),
+            "excluded_task_ids": [task["task_id"] for task in excluded],
             "task_ids": [task["task_id"] for task in tasks],
         },
         "candidate_A": scored_a,
