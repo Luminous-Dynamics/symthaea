@@ -23,6 +23,8 @@ exclude = [
     # The energy candidate benchmark found a glob-matched legacy path with no
     # Cargo.toml in this pinned tree. Keep it out of workspace membership.
     "crates/core/symthaea",
+    # This directory exists in the tree but has no Cargo.toml; exclude it from the glob.
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
