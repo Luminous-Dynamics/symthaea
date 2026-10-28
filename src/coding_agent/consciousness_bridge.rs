@@ -55,16 +55,17 @@ pub struct PendingReasoningOutcome {
     pub gate_evaluated: bool,
     pub gate_passed: bool,
     pub reasoning_confidence: f32,
-    pub prediction_error_at_decision: f64,
+    /// Measured PE at decision time, absent when the cycle comparison was invalid.
+    pub prediction_error_at_decision: Option<f64>,
 }
 
 impl PendingReasoningOutcome {
-    pub fn capture(reasoning: &ReasoningFeedback, prediction_error: f64) -> Self {
+    pub fn capture(reasoning: &ReasoningFeedback, prediction_error: Option<f64>) -> Self {
         Self {
             gate_evaluated: reasoning.gate_evaluated,
             gate_passed: !reasoning.gate_blocked,
             reasoning_confidence: reasoning.reasoning_confidence,
-            prediction_error_at_decision: prediction_error,
+            prediction_error_at_decision: prediction_error.filter(|value| value.is_finite()),
         }
     }
 }
@@ -249,6 +250,26 @@ mod tests {
         let s = CodeSignals::from_agent_state(&[], 5, 0, None, 25.0, 100.0, false);
         assert!((s.task_complexity - 0.75).abs() < 0.01);
     }
+    #[test]
+    fn pending_outcome_preserves_unavailable_prediction_error() {
+        let reasoning = ReasoningFeedback {
+            gate_evaluated: true,
+            gate_blocked: false,
+            reasoning_confidence: 0.8,
+            ..Default::default()
+        };
+        let pending = PendingReasoningOutcome::capture(&reasoning, None);
+        assert!(pending.gate_evaluated);
+        assert!(pending.gate_passed);
+        assert_eq!(pending.prediction_error_at_decision, None);
+
+        let measured = PendingReasoningOutcome::capture(&reasoning, Some(0.25));
+        assert_eq!(measured.prediction_error_at_decision, Some(0.25));
+
+        let nonfinite = PendingReasoningOutcome::capture(&reasoning, Some(f64::NAN));
+        assert_eq!(nonfinite.prediction_error_at_decision, None);
+    }
+
     #[test]
     fn reasoning_defer_gate() {
         let f = ReasoningFeedback {
