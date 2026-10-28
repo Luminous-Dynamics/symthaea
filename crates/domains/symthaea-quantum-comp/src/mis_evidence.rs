@@ -402,6 +402,16 @@ mod tests {
             sha256_hex(&long_message),
             "27dd1f61b867b6a0f6e9d8a41c43231de52107e53ae424de8f847b821db4b711"
         );
+        let padding_boundaries = [
+            (55, "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318"),
+            (56, "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a"),
+            (63, "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34"),
+            (64, "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"),
+            (65, "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0"),
+        ];
+        for (length, expected) in padding_boundaries {
+            assert_eq!(sha256_hex(&vec![b'a'; length]), expected, "length {length}");
+        }
     }
 
     #[test]
@@ -453,6 +463,37 @@ mod tests {
         assert!(matches!(
             verify_mis_candidate_with_receipt(GRAPH, &bytes, 2, VERIFIER, &changed_receipt),
             Err(MisEvidenceError::ReceiptBytesMismatch)
+        ));
+    }
+
+    #[test]
+    fn rejects_noncanonical_or_ambiguous_edge_serializations() {
+        assert!(matches!(
+            verify_mis_candidate(
+                b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n2 3\\n0 1\\n",
+                &candidate(&[0, 2]),
+                2,
+                VERIFIER
+            ),
+            Err(MisEvidenceError::EdgesNotStrictlySorted)
+        ));
+        assert!(matches!(
+            verify_mis_candidate(
+                b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n0 1\\n0 1\\n",
+                &candidate(&[0, 2]),
+                2,
+                VERIFIER
+            ),
+            Err(MisEvidenceError::EdgesNotStrictlySorted)
+        ));
+        assert!(matches!(
+            verify_mis_candidate(
+                b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 1\\n1 1\\n",
+                &candidate(&[0, 2]),
+                2,
+                VERIFIER
+            ),
+            Err(MisEvidenceError::InvalidEdgeEndpoint)
         ));
     }
 
