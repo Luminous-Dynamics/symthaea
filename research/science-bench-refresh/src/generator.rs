@@ -683,6 +683,12 @@ pub fn generate_task_set_bytes(
     if manifest.purpose != "qualified_run" || manifest.lane != "sealed_refresh" {
         return Err("task regeneration requires a qualified sealed_refresh manifest".to_owned());
     }
+    if !cfg!(test) && crate::BUILT_GENERATOR_WORKTREE_CLEAN != "true" {
+        return Err(
+            "compiled generator came from a dirty worktree; qualified task generation is disabled"
+                .to_owned(),
+        );
+    }
     if manifest.generator.revision != BUILT_GENERATOR_SOURCE_REVISION {
         return Err(format!(
             "manifest generator revision {} does not match the compiled generator source {}",
