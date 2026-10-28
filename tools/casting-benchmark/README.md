@@ -305,7 +305,7 @@ python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_
 
 `CASTING-MF-COMPOSITION-001` crosses the six existing mismatch families independently: one family supplies the low/medium objective values, while another supplies the low/medium constraint margin. At high fidelity, both components resolve to the same analytic truth. Diagonal cells are required to match the existing single-family scenario exactly; off-diagonal cells test combinations in which objective ranking errors and feasibility errors arise from different mechanisms.
 
-This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The original five-policy compositional matrix covered 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs. With the decision-impact challenger below, the current six-policy matrix contains 5,832 runs.
+This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The original five-policy compositional matrix covered 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs. With the decision-impact challenger, the six-policy matrix has 5,832 runs before controls. The formal matrix now also includes severity 0 as an exact negative control, making 6 × 6 × 3 × 4 severities × 3 paired seeds × 6 policies = **7,776 runs**.
 
 Run a fast crossed subset:
 
@@ -359,3 +359,18 @@ For the default cost map of low=1, medium=5, high=25, the policy's fixed allocat
 Research basis: BoTorch's MF-HVKG selects evaluations for expected value of information about the Pareto set, while MOMF includes fidelity as an additional objective. Recent constrained Bayesian-optimization work also highlights difficulty at active feasibility boundaries. DIWA is therefore not claimed as a new general acquisition principle; its contribution is a transparent, auditable challenger targeted at compositional model-error and decision-risk stress. Sources:
 - https://github.com/meta-pytorch/botorch/blob/v0.18.1/tutorials/Multi_objective_multi_fidelity_BO/Multi_objective_multi_fidelity_BO.ipynb
 - https://link.springer.com/article/10.1007/s10589-026-00826-9
+
+
+### Zero-severity negative control
+
+Severity \`0\` is included in the formal default sweep, not merely in unit tests. At zero mismatch, every objective component and constraint margin at low, medium and high fidelity must equal the analytical truth exactly. Any non-zero discrepancy indicates a scenario or composition bug and should fail the benchmark's correctness gate before optimizer comparisons are interpreted.
+
+The authored test checks all 36 objective/constraint-family combinations at dimensions 2/5/10 over a deterministic sample of candidate IDs and all three fidelities. This is a null-control property test only; it does not itself establish optimizer quality.
+
+### Consequential-improvement research comparison
+
+A relevant 2026 paper, Aydogdu et al., *Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization* (published 27 March 2026), explicitly accounts for the deferred high-fidelity validation cost associated with low-fidelity sampling and jointly selects a sample location and fidelity. The paper lists extension to multi-objective optimization as future work, and states that its code/data are available on reasonable request. Therefore it is **not** a direct drop-in baseline for the current multi-objective track.
+
+The protocol now requires an auxiliary fixed-scalarization comparison after the authors' implementation is obtained or an independently rederived implementation has been distinguished and documented, and its environment is locked. Do not call an independent approximation the authors' code. Pin the full dependency graph, charge deferred validation cost, freeze constraint handling, and report each scalarization separately.
+
+Reference: https://doi.org/10.1007/s11081-026-10078-5

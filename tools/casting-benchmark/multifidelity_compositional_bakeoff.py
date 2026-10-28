@@ -39,6 +39,7 @@ from multifidelity_scenario_suite import (
 )
 
 BENCHMARK_ID = "CASTING-MF-COMPOSITION-001"
+DEFAULT_COMPOSITION_SEVERITIES = (0.0, *DEFAULT_SEVERITIES)
 POLICIES = {
     **EXISTING_POLICIES,
     DECISION_VALUE_POLICY_ID: decision_value_of_information_policy,
@@ -242,7 +243,7 @@ def run_sweep(
     objective_families: Iterable[str] = SUPPORTED_SCENARIOS,
     constraint_families: Iterable[str] = SUPPORTED_SCENARIOS,
     dimensions: Iterable[int] = DEFAULT_DIMENSIONS,
-    severities: Iterable[float] = DEFAULT_SEVERITIES,
+    severities: Iterable[float] = DEFAULT_COMPOSITION_SEVERITIES,
     seeds: Iterable[int] = DEFAULT_SEEDS,
     policies: Iterable[str] | None = None,
     cost_budget: int = 200,
@@ -319,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--objective-families", default=",".join(SUPPORTED_SCENARIOS))
     parser.add_argument("--constraint-families", default=",".join(SUPPORTED_SCENARIOS))
     parser.add_argument("--dimensions", default=",".join(map(str, DEFAULT_DIMENSIONS)))
-    parser.add_argument("--severities", default=",".join(map(str, DEFAULT_SEVERITIES)))
+    parser.add_argument("--severities", default=",".join(map(str, DEFAULT_COMPOSITION_SEVERITIES)))
     parser.add_argument("--seeds", default=",".join(map(str, DEFAULT_SEEDS)))
     parser.add_argument("--policies", default=",".join(POLICIES))
     parser.add_argument("--cost-budget", type=int, default=200)

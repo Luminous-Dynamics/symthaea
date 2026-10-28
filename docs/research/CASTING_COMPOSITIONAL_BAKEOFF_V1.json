@@ -114,6 +114,7 @@
       10
     ],
     "severities": [
+      0,
       0.5,
       1,
       2
@@ -124,7 +125,7 @@
       29
     ],
     "policies": 6,
-    "run_count": 5832,
+    "run_count": 7776,
     "raw_runs_preserved": true
   },
   "outputs": [
@@ -145,7 +146,8 @@
     "statistics": "Three-seed defaults are diagnostic only. Minimum 20 paired seeds; target 30 for inferential comparisons; preregister multiple-comparison correction and report per-cell effects.",
     "external": "No SOTA claim until pinned BoTorch MF-HVKG/MOMF and suitable single-fidelity baselines are executed under matched budgets; retain COCO-native scoring on COCO tasks.",
     "physical": "No casting-validity claim without validated multiphysics models, documented solver uncertainty, and held-out physical measurements.",
-    "decision_value_policy": "The sixth policy uses the frozen 60/8/4 fidelity-call template and preregistered score weights; all acquisition inputs must be derived only from observations available before each high-fidelity call."
+    "decision_value_policy": "The sixth policy uses the frozen 60/8/4 fidelity-call template and preregistered score weights; all acquisition inputs must be derived only from observations available before each high-fidelity call.",
+    "zero_mismatch_control": "Severity 0 is included in the formal default matrix and must satisfy exact equality to analytic truth for every family/fidelity, every objective/constraint composition, and a deterministic candidate sample; any discrepancy is a correctness failure."
   },
   "evidence_label": "COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
   "provenance": {
@@ -165,7 +167,8 @@
     "https://doi.org/10.1007/s11831-025-10392-8",
     "https://link.springer.com/article/10.1007/s43939-026-00685-5",
     "https://botorch.org/docs/tutorials/Multi_objective_multi_fidelity_BO",
-    "https://coco-platform.org/data-archive/index.html"
+    "https://coco-platform.org/data-archive/index.html",
+    "https://doi.org/10.1007/s11081-026-10078-5"
   ],
   "decision_value_policy": {
     "id": "decision_value_of_information",
@@ -209,6 +212,29 @@
       "anchor_rule": "first medium candidate closest to the feasibility boundary; second maximizes input-space RMS distance from the first",
       "confirmation_rule": "recompute all remaining low-sample candidate predictions after each high call and choose the maximum independently replayable score; ties break on lowest candidate ID",
       "audit": "For each of the two confirmation decisions, store all eligible candidate scores and prediction components. The scorer independently recomputes predictions, score components, score ordering and selected candidate from the raw trace."
+    }
+  },
+  "negative_controls": {
+    "zero_mismatch": {
+      "severity": 0,
+      "purpose": "Negative control: all low/medium/high responses must equal the analytical high-fidelity truth for every scenario family and every objective/constraint composition.",
+      "required_properties": [
+        "For every candidate and fidelity, objective vectors equal the high-fidelity truth exactly.",
+        "For every candidate and fidelity, constraint margin equals the high-fidelity truth exactly.",
+        "Every diagonal family must agree with the uncomposed single-family evaluator.",
+        "The scorer must reject any non-zero mismatch value recorded in a zero-severity run."
+      ],
+      "claim_boundary": "This verifies the benchmark implementation's null control; it does not establish optimizer quality or physical validity."
+    }
+  },
+  "related_methodology": {
+    "consequential_improvement": {
+      "citation": "Aydogdu et al., Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization, Optimization and Engineering 27 (2026), published 27 March 2026.",
+      "doi": "10.1007/s11081-026-10078-5",
+      "relevance": "The method jointly selects design and fidelity for single-objective MFBO and explicitly accounts for deferred high-fidelity validation cost when evaluating low fidelity.",
+      "scope_caveat": "The paper lists multi-objective extension as future work, so it is not a drop-in multi-objective baseline for this benchmark.",
+      "code_availability": "Article states code/data are available on reasonable request; implementation and immutable dependency lock have not yet been acquired.",
+      "required_followup": "Add an auxiliary fixed-scalarization comparison only after the acquisition and constraint-handling code, dependency environment, and evaluation protocol are pinned. Do not label an approximation as the authors' implementation."
     }
   }
 }

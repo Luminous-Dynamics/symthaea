@@ -31,6 +31,39 @@ class CompositionalBakeoffTests(unittest.TestCase):
                     self.assertEqual(actual.constraint_margin, expected.constraint_margin, (family, candidate_id, fidelity))
                     self.assertEqual(actual.cost_units, expected.cost_units)
 
+    def test_zero_severity_is_exact_truth_negative_control(self) -> None:
+        costs = {"low": 1, "medium": 5, "high": 25}
+        for objective_family in SUPPORTED_SCENARIOS:
+            for constraint_family in SUPPORTED_SCENARIOS:
+                for dimension in (2, 5, 10):
+                    world = CompositionalScenarioWorld(
+                        objective_family, constraint_family, dimension, 0.0, 29,
+                        costs, 128,
+                    )
+                    for candidate_id in (0, 1, 17, 31, 74, 127):
+                        truth = world.truth_for_audit_only(candidate_id)
+                        for fidelity in ("low", "medium", "high"):
+                            observed = world._response(candidate_id, fidelity)
+                            self.assertEqual(
+                                observed.objectives, truth.objectives,
+                                (objective_family, constraint_family, dimension, candidate_id, fidelity),
+                            )
+                            self.assertEqual(
+                                observed.constraint_margin, truth.constraint_margin,
+                                (objective_family, constraint_family, dimension, candidate_id, fidelity),
+                            )
+
+    def test_manifest_freezes_zero_severity_null_control(self) -> None:
+        manifest = json.loads(
+            (ROOT / "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["default_sweep"]["severities"], [0, 0.5, 1, 2])
+        self.assertEqual(
+            manifest["default_sweep"]["run_count"],
+            6 * 6 * 3 * 4 * 3 * 6,
+        )
+        self.assertIn("zero_mismatch", manifest["negative_controls"])
+
     def test_independent_equation_replay_matches_every_family(self) -> None:
         for family in SUPPORTED_SCENARIOS:
             for dimension in (2, 5):
@@ -154,6 +187,22 @@ class CompositionalBakeoffTests(unittest.TestCase):
         self.assertEqual(len(trace[0]["candidate_scores"]), 58)
         self.assertEqual(len(trace[1]["candidate_scores"]), 57)
         trace[0]["candidate_scores"][0]["score"] += 0.01
+        with self.assertRaisesRegex(ValueError, "replay rejected"):
+            score_document(document, ROOT, allow_diagnostic_subset=True)
+
+    def test_zero_severity_trace_replay_rejects_any_mismatch(self) -> None:
+        document = run_sweep(
+            objective_families=("warped_coordinates",),
+            constraint_families=("heteroscedastic_noise",),
+            dimensions=(2,),
+            severities=(0.0,),
+            seeds=(17,),
+            policies=("low_screen",),
+            design_count=75,
+        )
+        self.assertEqual(document["run_count"], 1)
+        evaluation = document["paired_runs"][0]["evaluations"][0]
+        evaluation["objectives"][1] += 1e-5
         with self.assertRaisesRegex(ValueError, "replay rejected"):
             score_document(document, ROOT, allow_diagnostic_subset=True)
 
