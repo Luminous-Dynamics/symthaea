@@ -83,3 +83,10 @@ A mutation is counted as killed only when the test suite actually starts and fai
 This is a first-step meta-evaluation rather than a comprehensive proof that the auditor is correct. The sentinel catalog is deliberately reviewable; expanding it with independently designed mutants and mutation families is part of the next research phase.
 
 The report distinguishes five families: cohort-manifest integrity, audit-report integrity, execution identity, admission consistency, and score-safety policy. A total rate cannot hide a family that was never run or whose sentinel survives.
+
+
+## Connection to component-based benchmark audits
+
+AgentSuite's COBA framework, published in ICML/PMLR 2026, structures benchmark validity checks across four interacting components: User, Environment, Ground Truth, and Evaluation. That offers a useful complement to VLEB's source requirement trace, runtime/provenance pins, reviewed baseline expectations, and evaluation-policy sentinels ([AgentSuite / COBA, PMLR 306](https://proceedings.mlr.press/v306/suh26a.html)).
+
+The mutation campaign introduced here currently covers cohort/report integrity, execution identity, admission consistency, and score-safety policy. It does not yet mutate the entire task/oracle-generation pipeline or independently assess human-review quality. Those should be distinct future families rather than silently treated as covered by the current 11-sentinel pilot.
