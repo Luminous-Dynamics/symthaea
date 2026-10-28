@@ -19,16 +19,19 @@ DISPOSITIONS = frozenset({"evaluate", "escalate", "replicate", "stop", "abstain"
 def _finite_number(value: object, label: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{label} must be a finite number")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{label} must be finite") from exc
     if not math.isfinite(number):
         raise ValueError(f"{label} must be finite")
     return number
 
 
 def _nonblank(value: object, label: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{label} must be a non-empty string")
-    return value.strip()
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        raise ValueError(f"{label} must be a non-empty string without edge whitespace")
+    return value
 
 
 @dataclass(frozen=True)
