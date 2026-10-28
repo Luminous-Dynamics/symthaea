@@ -118,7 +118,7 @@ pub use matched_evaluation::{
     VerifierReceiptEvidence, VerifiedAnytimeQualityError, VerifiedAnytimeQualityEvent,
     VerifiedAnytimeQualitySummary, VerifiedAnytimeQualityTrace, VerifiedMisCandidate,
     compare_matched_arms, compare_restricted_mean_tts, compare_verified_anytime_quality,
-    canonical_mis_graph_vertex_count, canonicalize_dimacs_graph, encode_canonical_mis_candidate,
+    compare_verified_anytime_quality_from_bundle, canonical_mis_graph_vertex_count, canonicalize_dimacs_graph, encode_canonical_mis_candidate,
     sha256_hex, verify_mis_candidate, verify_mis_candidate_for_trial,
     verify_mis_candidate_for_trial_with_receipt, verify_mis_candidate_with_receipt,
 };
