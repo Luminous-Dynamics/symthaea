@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod effect_surface_registry;
+mod effect_authorization_conformance;
 mod effect_primitive_scan;
 mod manifest;
 mod rhn_sweep;
@@ -85,6 +86,11 @@ enum Commands {
         /// Optional path for a deterministic JSON report; otherwise prints JSON to stdout.
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Validate the frozen effect-authorization conformance contract; does not execute cases.
+    EffectAuthorizationConformance {
+        #[arg(long, default_value = "docs/security/effect-authorization-conformance.v1.json")]
+        corpus: PathBuf,
     },
 }
 
@@ -187,6 +193,18 @@ fn main() -> anyhow::Result<()> {
                 std::env::current_dir()?.join(root)
             };
             effect_primitive_scan::scan(&root, out.as_deref())?;
+        }
+        Commands::EffectAuthorizationConformance { corpus } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let corpus_path = if corpus.is_absolute() {
+                corpus
+            } else {
+                root.join(corpus)
+            };
+            effect_authorization_conformance::check(&corpus_path)?;
         }
     }
     Ok(())
