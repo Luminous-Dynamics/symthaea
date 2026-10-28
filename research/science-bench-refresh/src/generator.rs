@@ -203,8 +203,22 @@ fn noise(
     ((raw as f64 / 1_000_000.0) - 1.0) * amplitude
 }
 
-fn task_id(generation_id: &str, family_id: &str, index: u64) -> String {
-    format!("{generation_id}::{family_id}::{index:06}")
+fn task_id(seed: &[u8], generation_id: &str, family_id: &str, index: u64) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(TASK_GENERATOR_DOMAIN);
+    hasher.update(b"opaque-task-id.v1\\0");
+    let index_bytes = index.to_be_bytes();
+    let parts: [&[u8]; 4] = [
+        seed,
+        generation_id.as_bytes(),
+        family_id.as_bytes(),
+        &index_bytes,
+    ];
+    for part in parts {
+        hasher.update(u64::try_from(part.len()).unwrap_or(u64::MAX).to_be_bytes());
+        hasher.update(part);
+    }
+    format!("task-{}", sha256_hex(&hasher.finalize()))
 }
 
 fn generate_one_task(
@@ -219,7 +233,7 @@ fn generate_one_task(
     let instruction = recipe.instruction.clone();
     let count = usize::try_from(recipe.samples_per_task)
         .map_err(|_| "samples_per_task does not fit memory index".to_owned())?;
-    let id = task_id(generation_id, &recipe.family_id, index);
+    let id = task_id(seed, generation_id, &recipe.family_id, index);
 
     let (policy_input, evaluator_only) = match recipe.kind.as_str() {
         "semantic_invariance" => {
@@ -658,6 +672,24 @@ mod tests {
         assert!(!report.task_set_commitment_matches);
         assert!(report.task_set_contract_valid);
         assert!(!report.byte_exact_match);
+    }
+
+    #[test]
+    fn generated_task_ids_do_not_disclose_family_names() {
+        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let value: Value = serde_json::from_slice(&generated).unwrap();
+        let tasks = value["tasks"].as_array().unwrap();
+        for task in tasks {
+            let id = task["task_id"].as_str().unwrap();
+            let family = task["family_id"].as_str().unwrap();
+            assert!(!id.contains(family), "task ID must not reveal family label");
+            let input = task["policy_input"].as_object().unwrap();
+            for forbidden in ["family_id", "task_family", "recipe_kind", "constructor_kind"] {
+                assert!(!input.contains_key(forbidden));
+            }
+        }
+        assert_eq!(tasks.len(), 8);
+        assert!(!manifest.is_empty() && !seed.is_empty() && !config.is_empty());
     }
 
     #[test]
