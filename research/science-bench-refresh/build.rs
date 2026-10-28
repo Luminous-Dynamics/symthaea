@@ -36,9 +36,10 @@ fn main() {
     }
 
     let dirty = run_git(&["status", "--porcelain", "--untracked-files=all"]);
-    if !dirty.is_empty() {
-        panic!(
-            "refusing to compile a qualified generator from a dirty worktree:\n{dirty}"
+    let worktree_clean = dirty.is_empty();
+    if !worktree_clean {
+        println!(
+            "cargo:warning=dirty worktree; unit tests may run, but qualified task generation will be disabled"
         );
     }
 
@@ -51,4 +52,8 @@ fn main() {
     }
 
     println!("cargo:rustc-env=SBR_GENERATOR_SOURCE_REVISION={checked_out_revision}");
+    println!(
+        "cargo:rustc-env=SBR_GENERATOR_WORKTREE_CLEAN={}",
+        if worktree_clean { "true" } else { "false" }
+    );
 }
