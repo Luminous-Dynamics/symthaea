@@ -201,11 +201,14 @@ def validate_claim(
     for index, witness in enumerate(witnesses):
         label = f"witnesses[{index}]"
         kind = witness.get("kind")
-        expected_verifier_sha = trusted_verifier_pins.get(kind)
-        if expected_verifier_sha is None:
-            issues.append({"code": "trusted_verifier_missing", "message": f"{label} kind {kind!r} has no out-of-band verifier pin"})
-        elif witness.get("verifier_sha256") != expected_verifier_sha:
-            issues.append({"code": "witness_verifier_pin_mismatch", "message": f"{label} verifier digest differs from evaluator allowlist"})
+        if not isinstance(kind, str) or kind not in WITNESS_KINDS:
+            issues.append({"code": "witness_kind_invalid", "message": f"{label} has an invalid witness kind"})
+        else:
+            expected_verifier_sha = trusted_verifier_pins.get(kind)
+            if expected_verifier_sha is None:
+                issues.append({"code": "trusted_verifier_missing", "message": f"{label} kind {kind!r} has no out-of-band verifier pin"})
+            elif witness.get("verifier_sha256") != expected_verifier_sha:
+                issues.append({"code": "witness_verifier_pin_mismatch", "message": f"{label} verifier digest differs from evaluator allowlist"})
         try:
             artifact = safe_file(evidence_root, witness.get("artifact_path"))
             observed = digest(artifact.read_bytes())
@@ -213,6 +216,13 @@ def validate_claim(
                 issues.append({"code": "witness_artifact_digest_mismatch", "message": f"{label} artifact bytes differ from claim evidence"})
         except (OSError, ValueError) as exc:
             issues.append({"code": "witness_artifact_invalid", "message": f"{label}: {exc}"})
+        try:
+            execution_receipt = safe_file(evidence_root, witness.get("execution_receipt_path"))
+            receipt_observed = digest(execution_receipt.read_bytes())
+            if receipt_observed != witness.get("execution_receipt_sha256"):
+                issues.append({"code": "execution_receipt_digest_mismatch", "message": f"{label} execution receipt bytes differ from claim evidence"})
+        except (OSError, ValueError) as exc:
+            issues.append({"code": "execution_receipt_invalid", "message": f"{label}: {exc}"})
         result = witness.get("observed_result")
         witness_results.append(result)
         if kind == "independent_execution":

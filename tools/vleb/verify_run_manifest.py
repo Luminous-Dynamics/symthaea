@@ -32,6 +32,20 @@ def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def canonical_invocation_digest(argv: list[str], working_directory: str, timeout_ms: int) -> str:
+    canonical = json.dumps(
+        {
+            "argv": argv,
+            "working_directory": working_directory,
+            "timeout_ms": timeout_ms,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return digest(canonical)
+
+
 def safe_file(root: Path, relative: Any) -> Path:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         raise ValueError("artifact path must be a non-empty POSIX relative path")
@@ -241,12 +255,198 @@ CLAIM_WITNESS_KINDS = {
 }
 
 
+def audit_witness_execution_receipt(
+    receipt_path_value: str,
+    receipt_sha256: str,
+    evidence_root: Path,
+    *,
+    manifest: dict[str, Any],
+    claim: dict[str, Any],
+    witness: dict[str, Any],
+    receipt_schema: dict[str, Any],
+    expected_producer_sha256: str,
+    trusted_claim_verifier_pins: dict[str, str],
+) -> list[dict[str, str]]:
+    """Verify one recorded invocation against the trusted run and source bindings."""
+    issues: list[dict[str, str]] = []
+    try:
+        receipt_path = safe_file(evidence_root, receipt_path_value)
+        raw = receipt_path.read_bytes()
+    except (OSError, ValueError) as exc:
+        return [{"code": "witness_receipt_path_invalid", "message": str(exc)}]
+    if digest(raw) != receipt_sha256:
+        return [{
+            "code": "witness_receipt_digest_mismatch",
+            "message": "receipt bytes differ from the digest in the claim witness",
+        }]
+    try:
+        receipt = json.loads(raw.decode("utf-8", errors="strict"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        return [{"code": "witness_receipt_json_invalid", "message": str(exc)}]
+    if not isinstance(receipt, dict):
+        return [{"code": "witness_receipt_root_invalid", "message": "receipt root must be a JSON object"}]
+    try:
+        Draft202012Validator.check_schema(receipt_schema)
+        schema_errors = list(Draft202012Validator(
+            receipt_schema, format_checker=FormatChecker()
+        ).iter_errors(receipt))
+    except Exception as exc:
+        return [{"code": "witness_receipt_schema_invalid", "message": str(exc)}]
+    for error in schema_errors:
+        location = ".".join(map(str, error.absolute_path)) or "$"
+        issues.append({
+            "code": "witness_receipt_schema_invalid",
+            "message": f"{location}: {error.message}",
+        })
+    if issues:
+        return issues
+
+    repository = manifest["repository"]
+    candidate = manifest["candidate"]
+    runtime = manifest["runtime"]
+    run_binding = {
+        "repository_full_name": repository["full_name"],
+        "repository_id": repository["repository_id"],
+        "run_id": repository["run_id"],
+        "run_attempt": repository["run_attempt"],
+        "source_repository_digest": repository["source_repository_digest"],
+        "source_repository_ref": repository["source_repository_ref"],
+        "candidate_checkout_revision": candidate["checkout_revision"],
+        "workflow_sha": repository["workflow_sha"],
+        "workflow_ref": repository["workflow_ref"],
+    }
+    observed_binding = receipt["run_binding"]
+    for key, expected in run_binding.items():
+        if observed_binding.get(key) != expected:
+            issues.append({
+                "code": "witness_receipt_run_binding_mismatch",
+                "message": f"run_binding.{key} differs from evaluator-pinned manifest",
+            })
+    expected_runtime = {
+        "immutable_image_id": runtime["immutable_image_id"],
+        "network_mode": runtime["network_mode"],
+        "network_mode_observed": runtime["network_mode_observed"],
+    }
+    for key, expected in expected_runtime.items():
+        if receipt["runtime"].get(key) != expected:
+            issues.append({
+                "code": "witness_receipt_runtime_mismatch",
+                "message": f"runtime.{key} differs from evaluator-pinned manifest",
+            })
+    if receipt["task_id"] != manifest["task"]["task_id"]:
+        issues.append({"code": "witness_receipt_task_mismatch", "message": "receipt task ID differs from manifest task"})
+    if receipt["claim_id"] != claim.get("claim_id"):
+        issues.append({"code": "witness_receipt_claim_mismatch", "message": "receipt claim ID differs from claim record"})
+    if receipt["source_sha256"] != claim.get("source", {}).get("sha256"):
+        issues.append({"code": "witness_receipt_source_mismatch", "message": "receipt source digest differs from claim source"})
+    if receipt["observed_result"] != witness.get("observed_result"):
+        issues.append({"code": "witness_receipt_result_mismatch", "message": "receipt observation differs from claim witness result"})
+
+    producer = receipt["producer"]
+    if producer.get("id") != "vleb-record-witness-execution":
+        issues.append({"code": "witness_receipt_producer_id_mismatch", "message": "receipt producer ID is not the trusted VLEB recorder"})
+    if producer.get("source_sha256") != expected_producer_sha256:
+        issues.append({"code": "witness_receipt_producer_mismatch", "message": "receipt producer source digest differs from evaluator pin"})
+    verifier = receipt["verifier"]
+    kind = witness.get("kind")
+    expected_verifier = trusted_claim_verifier_pins.get(kind) if isinstance(kind, str) else None
+    if (
+        verifier.get("kind") != kind
+        or verifier.get("id") != witness.get("verifier_id")
+        or verifier.get("sha256") != witness.get("verifier_sha256")
+        or expected_verifier is None
+        or verifier.get("sha256") != expected_verifier
+    ):
+        issues.append({"code": "witness_receipt_verifier_mismatch", "message": "receipt verifier identity differs from witness and out-of-band pin"})
+
+    invocation = receipt["invocation"]
+    try:
+        recomputed_invocation_sha256 = canonical_invocation_digest(
+            invocation["argv"], invocation["working_directory"], invocation["timeout_ms"]
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        recomputed_invocation_sha256 = None
+        issues.append({
+            "code": "witness_receipt_invocation_invalid",
+            "message": f"invocation cannot be canonically hashed: {exc}",
+        })
+    if (
+        recomputed_invocation_sha256 is None
+        or invocation.get("argv_sha256") != recomputed_invocation_sha256
+        or witness.get("invocation_sha256") != recomputed_invocation_sha256
+    ):
+        issues.append({
+            "code": "witness_receipt_invocation_mismatch",
+            "message": "recorded argv/cwd/timeout do not match the evaluator-pinned witness invocation digest",
+        })
+
+    inputs = receipt["inputs"]
+    source_path = claim["source"]["path"]
+    if not any(row.get("path") == source_path and row.get("sha256") == claim["source"]["sha256"] for row in inputs):
+        issues.append({"code": "witness_receipt_source_input_missing", "message": "receipt inputs do not bind the exact claimed source bytes"})
+    input_paths: list[str] = []
+    for row in inputs:
+        path_value = row["path"]
+        input_paths.append(path_value)
+        try:
+            path = safe_file(evidence_root, path_value)
+            if digest(path.read_bytes()) != row["sha256"]:
+                issues.append({"code": "witness_receipt_input_digest_mismatch", "message": f"input bytes changed: {path_value}"})
+        except (OSError, ValueError) as exc:
+            issues.append({"code": "witness_receipt_input_invalid", "message": f"{path_value}: {exc}"})
+    if len(input_paths) != len(set(input_paths)):
+        issues.append({"code": "witness_receipt_duplicate_input", "message": "receipt input paths must be unique"})
+
+    outputs = receipt["outputs"]
+    output_paths: list[str] = []
+    output_roles = {row.get("role") for row in outputs}
+    if not {"stdout", "stderr"}.issubset(output_roles):
+        issues.append({"code": "witness_receipt_streams_missing", "message": "receipt must bind both stdout and stderr artifacts"})
+    output_digest_by_path: dict[str, str] = {}
+    output_role_by_path: dict[str, str] = {}
+    for row in outputs:
+        path_value = row["path"]
+        output_paths.append(path_value)
+        output_digest_by_path[path_value] = row["sha256"]
+        output_role_by_path[path_value] = row["role"]
+        try:
+            path = safe_file(evidence_root, path_value)
+            if digest(path.read_bytes()) != row["sha256"]:
+                issues.append({"code": "witness_receipt_output_digest_mismatch", "message": f"output bytes changed: {path_value}"})
+        except (OSError, ValueError) as exc:
+            issues.append({"code": "witness_receipt_output_invalid", "message": f"{path_value}: {exc}"})
+    if len(output_paths) != len(set(output_paths)):
+        issues.append({"code": "witness_receipt_duplicate_output", "message": "receipt output paths must be unique"})
+    if set(input_paths) & set(output_paths):
+        issues.append({"code": "witness_receipt_input_output_alias", "message": "receipt input and output paths must not alias"})
+    if receipt_path_value in set(input_paths) | set(output_paths):
+        issues.append({"code": "witness_receipt_self_reference", "message": "execution receipt may not be an input or output of its own invocation"})
+    observed_witness_path = witness.get("artifact_path")
+    if (
+        output_digest_by_path.get(observed_witness_path) != witness.get("artifact_sha256")
+        or output_role_by_path.get(observed_witness_path) != "artifact"
+    ):
+        issues.append({
+            "code": "witness_receipt_artifact_binding_mismatch",
+            "message": "claim witness artifact must be bound to a matching role=artifact output digest in its execution receipt",
+        })
+    process = receipt["process"]
+    if process.get("timed_out") and receipt["observed_result"] != "inconclusive":
+        issues.append({"code": "witness_receipt_timeout_misclassified", "message": "timed-out executions must be inconclusive"})
+    if process.get("timed_out") is not True and process.get("exit_code") is None:
+        issues.append({"code": "witness_receipt_process_status_missing", "message": "non-timeout execution must record an exit code"})
+
+    return issues
+
+
 def audit_claim_evidence_bundle(
     manifest: dict[str, Any],
     evidence_root: Path,
     *,
     expected_claim_auditor_sha256: str | None,
     expected_claim_schema_sha256: str | None,
+    expected_witness_receipt_schema_sha256: str | None,
+    expected_witness_receipt_producer_sha256: str | None,
     trusted_claim_verifier_pins: dict[str, str],
 ) -> dict[str, Any]:
     """Audit every evaluator-pinned claim after attested bundle extraction.
@@ -262,6 +462,7 @@ def audit_claim_evidence_bundle(
         "supported": 0,
         "contradicted": 0,
         "unresolved": 0,
+        "failed": 0,
         "claims": [],
         "issues": [],
     }
@@ -291,11 +492,15 @@ def audit_claim_evidence_bundle(
         or expected_claim_schema_sha256 is None
         or not HEX.fullmatch(expected_claim_auditor_sha256)
         or not HEX.fullmatch(expected_claim_schema_sha256)
+        or expected_witness_receipt_schema_sha256 is None
+        or not HEX.fullmatch(expected_witness_receipt_schema_sha256)
+        or expected_witness_receipt_producer_sha256 is None
+        or not HEX.fullmatch(expected_witness_receipt_producer_sha256)
     ):
         result["status"] = "unresolved"
         result["issues"].append({
             "code": "claim_audit_trust_pins_missing",
-            "message": "claim auditor and schema require evaluator-supplied out-of-band SHA-256 pins",
+            "message": "claim auditor/schema and witness receipt schema/producer require evaluator-supplied out-of-band SHA-256 pins",
         })
         mark_unresolved_claims()
         return result
@@ -308,6 +513,16 @@ def audit_claim_evidence_bundle(
         result["issues"].append({
             "code": "claim_schema_pin_mismatch",
             "message": "manifest claim-schema digest differs from evaluator-supplied pin",
+        })
+    if claim_gate["witness_receipt_schema_sha256"] != expected_witness_receipt_schema_sha256:
+        result["issues"].append({
+            "code": "witness_receipt_schema_pin_mismatch",
+            "message": "manifest witness receipt schema digest differs from evaluator-supplied pin",
+        })
+    if claim_gate["witness_receipt_producer_sha256"] != expected_witness_receipt_producer_sha256:
+        result["issues"].append({
+            "code": "witness_receipt_producer_pin_mismatch",
+            "message": "manifest witness receipt producer digest differs from evaluator-supplied pin",
         })
     if not trusted_claim_verifier_pins:
         result["status"] = "unresolved"
@@ -328,6 +543,18 @@ def audit_claim_evidence_bundle(
     try:
         auditor = safe_file(evidence_root, claim_gate["auditor_path"])
         schema = safe_file(evidence_root, claim_gate["schema_path"])
+        witness_schema_path = safe_file(evidence_root, claim_gate["witness_receipt_schema_path"])
+        witness_producer_path = safe_file(evidence_root, claim_gate["witness_receipt_producer_path"])
+        if digest(witness_schema_path.read_bytes()) != expected_witness_receipt_schema_sha256:
+            result["issues"].append({
+                "code": "witness_receipt_schema_bundle_digest_mismatch",
+                "message": "witness receipt schema bytes in the attested bundle differ from external pin",
+            })
+        if digest(witness_producer_path.read_bytes()) != expected_witness_receipt_producer_sha256:
+            result["issues"].append({
+                "code": "witness_receipt_producer_bundle_digest_mismatch",
+                "message": "witness receipt producer bytes in the attested bundle differ from external pin",
+            })
         if digest(auditor.read_bytes()) != expected_claim_auditor_sha256:
             result["issues"].append({
                 "code": "claim_auditor_bundle_digest_mismatch",
@@ -338,11 +565,13 @@ def audit_claim_evidence_bundle(
                 "code": "claim_schema_bundle_digest_mismatch",
                 "message": "claim schema bytes inside the attested bundle differ from the external pin",
             })
+        witness_receipt_schema = json.loads(witness_schema_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         result["issues"].append({
             "code": "claim_audit_tool_path_invalid",
             "message": str(exc),
         })
+        mark_unresolved_claims()
         return result
     if result["issues"]:
         mark_unresolved_claims()
@@ -357,6 +586,7 @@ def audit_claim_evidence_bundle(
             "code": "claim_inventory_duplicate",
             "message": "claim IDs and claim paths must be unique in the evaluator-pinned manifest",
         })
+        mark_unresolved_claims()
         return result
 
     all_valid = True
@@ -408,6 +638,7 @@ def audit_claim_evidence_bundle(
                 "code": "claim_input_invalid",
                 "message": f"{item['claim_id']}: {exc}",
             })
+            result["failed"] += 1
             result["claims"].append(row)
             all_valid = False
             continue
@@ -445,6 +676,33 @@ def audit_claim_evidence_bundle(
                 and parsed.get("claim_id") == item["claim_id"]
                 and parsed.get("task_id") == task_id
             )
+            receipt_audits: list[dict[str, Any]] = []
+            if valid:
+                for witness in claim_data.get("witnesses", []):
+                    receipt_issues = audit_witness_execution_receipt(
+                        witness["execution_receipt_path"],
+                        witness["execution_receipt_sha256"],
+                        evidence_root,
+                        manifest=manifest,
+                        claim=claim_data,
+                        witness=witness,
+                        receipt_schema=witness_receipt_schema,
+                        expected_producer_sha256=expected_witness_receipt_producer_sha256,
+                        trusted_claim_verifier_pins=trusted_claim_verifier_pins,
+                    )
+                    receipt_audits.append({
+                        "witness_id": witness.get("witness_id"),
+                        "path": witness.get("execution_receipt_path"),
+                        "status": "passed" if not receipt_issues else "failed",
+                        "issues": receipt_issues,
+                    })
+                    if receipt_issues:
+                        valid = False
+                        result["issues"].extend({
+                            "code": entry["code"],
+                            "message": f"{item['claim_id']} / {witness.get('witness_id')}: {entry['message']}",
+                        } for entry in receipt_issues)
+            row["witness_receipts"] = receipt_audits
             if valid:
                 verdict = parsed["claim_verdict"]
                 if verdict not in ("supported", "contradicted", "unresolved"):
@@ -457,8 +715,9 @@ def audit_claim_evidence_bundle(
                 row["status"] = "failed"
                 result["issues"].append({
                     "code": "claim_evidence_audit_failed",
-                    "message": f"{item['claim_id']}: claim auditor did not validate the pinned evidence chain",
+                    "message": f"{item['claim_id']}: claim auditor or execution receipt did not validate",
                 })
+                result["failed"] += 1
                 all_valid = False
         except (OSError, subprocess.TimeoutExpired) as exc:
             row["status"] = "unresolved"
@@ -467,6 +726,7 @@ def audit_claim_evidence_bundle(
                 "code": "claim_evidence_audit_unavailable",
                 "message": f"{item['claim_id']}: {exc}",
             })
+            result["unresolved"] += 1
             all_valid = False
         result["claims"].append(row)
 
@@ -487,6 +747,8 @@ def validate_manifest(
     gh_executable: str = "gh",
     expected_claim_auditor_sha256: str | None = None,
     expected_claim_schema_sha256: str | None = None,
+    expected_witness_receipt_schema_sha256: str | None = None,
+    expected_witness_receipt_producer_sha256: str | None = None,
     trusted_claim_verifier_pins: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
@@ -782,6 +1044,8 @@ def validate_manifest(
                 evidence_root,
                 expected_claim_auditor_sha256=expected_claim_auditor_sha256,
                 expected_claim_schema_sha256=expected_claim_schema_sha256,
+                expected_witness_receipt_schema_sha256=expected_witness_receipt_schema_sha256,
+                expected_witness_receipt_producer_sha256=expected_witness_receipt_producer_sha256,
                 trusted_claim_verifier_pins=trusted_claim_verifier_pins or {},
             )
             if claim_audit_result["status"] != "passed":
@@ -846,6 +1110,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-verifier-binary-sha256", required=True)
     parser.add_argument("--expected-claim-auditor-sha256")
     parser.add_argument("--expected-claim-schema-sha256")
+    parser.add_argument("--expected-witness-receipt-schema-sha256")
+    parser.add_argument("--expected-witness-receipt-producer-sha256")
     parser.add_argument("--trusted-claim-verifier", action="append", default=[], metavar="KIND=SHA256")
     parser.add_argument("--gh-executable", default="gh")
     parser.add_argument("--output", type=Path)
@@ -876,6 +1142,8 @@ def main(argv: list[str] | None = None) -> int:
         gh_executable=args.gh_executable,
         expected_claim_auditor_sha256=args.expected_claim_auditor_sha256,
         expected_claim_schema_sha256=args.expected_claim_schema_sha256,
+        expected_witness_receipt_schema_sha256=args.expected_witness_receipt_schema_sha256,
+        expected_witness_receipt_producer_sha256=args.expected_witness_receipt_producer_sha256,
         trusted_claim_verifier_pins=parse_claim_verifier_pins(args.trusted_claim_verifier),
     )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"

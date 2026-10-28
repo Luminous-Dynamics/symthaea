@@ -6,14 +6,15 @@
     "Industry benchmark results are comparators, not Symthaea measurements.",
     "Targets are proposals until a protocol-matched experiment measures them.",
     "A synthetic-fixture result is not a broad benchmark score.",
-    "No score is eligible unless task admission and independent evidence requirements pass."
+    "No score is eligible unless task admission and independent evidence requirements pass.",
+    "Legacy-Bench publications/views may report different aggregation metrics. Factory's official methodology page reports overall pass rate; the Fireworks index reports avg@3. Keep them separate and do not compare the percentages as if they share a protocol."
   ],
   "industry_comparators": {
     "legacy_bench": {
       "source_updated": "2026-10-22",
       "metric": "avg@3",
       "source_url": "https://fireworks.ai/specialized-intelligence-index/benchmarks/code-generation/legacy-bench",
-      "comparability_note": "Legacy-Bench uses its own task distribution and harness. Compare only using authorized full-benchmark access and a matched protocol; avg@3 is not pass@1.",
+      "comparability_note": "Legacy-Bench uses its own task distribution and harness. Compare only using authorized full-benchmark access and a matched protocol; avg@3 is not pass@1. This Fireworks-index avg@3 view is separate from Factory's official Legacy-Bench page, which currently displays an overall pass-rate leaderboard updated April 2026; do not conflate the 62% avg@3 listing with the 42.5% official-page score.",
       "entries": [
         {
           "model": "Claude Opus 5.5",
@@ -124,6 +125,36 @@
       },
       "report_status": "paper-reported-observational-audit",
       "comparability_note": "An observational audit of existing submissions; does not establish equivalence or causal scaffold effects. Motivates paired tests, uncertainty reporting and model-scaffold provenance."
+    },
+    "legacy_bench_official_factory": {
+      "source_updated": "2026-04",
+      "metric": "overall pass rate",
+      "source_url": "https://docs.factory.com/benchmarks/legacy-bench",
+      "top_listed_model": "Factory Droid (GPT-5.3 Codex)",
+      "top_listed_score_pct": 42.5,
+      "other_listed_entries": [
+        {
+          "model": "Factory Droid (GPT-5.4)",
+          "score_pct": 40.7
+        },
+        {
+          "model": "Codex CLI (GPT-5.4)",
+          "score_pct": 40.1
+        }
+      ],
+      "methodology": {
+        "task_families": [
+          "COBOL",
+          "Java 7",
+          "BASIC",
+          "C89",
+          "Fortran",
+          "Assembly"
+        ],
+        "task_description": "Hundreds of tasks with containerized source environments, reference solutions and hidden verification tests",
+        "public_samples": 10
+      },
+      "comparability_note": "Different published view and aggregation from the Fireworks index's avg@3 listing. Page states last updated April 2026. Do not compare 42.5% overall pass rate directly against 62% avg@3 or use either as a VLEB result."
     }
   },
   "proposed_targets": {
