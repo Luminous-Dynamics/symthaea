@@ -442,6 +442,7 @@ pub fn assess_promotion(
         || !policy.non_inferiority_margin_pp.is_finite() || policy.non_inferiority_margin_pp < 0.0
         || !policy.max_cost_ratio_for_efficiency_win.is_finite()
         || !(0.0..=1.0).contains(&policy.max_cost_ratio_for_efficiency_win)
+        || policy.min_independent_groups == 0
     {
         errors.push("promotion policy contains invalid thresholds".to_string());
     }
@@ -664,6 +665,19 @@ mod tests {
         let mut trace = matched_trace();
         trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().paired_group_count = 12;
         assert!(assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).is_err());
+    }
+
+
+    #[test]
+    fn invalid_promotion_policy_is_rejected() {
+        let trace = matched_trace();
+        let policy = PromotionPolicy {
+            min_independent_groups: 0,
+            ..PromotionPolicy::default()
+        };
+        assert!(assess_promotion(
+            &trace, "trial", "baseline", "trial-heldout", "baseline-heldout", policy
+        ).is_err());
     }
 
     #[test]
