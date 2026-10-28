@@ -206,10 +206,28 @@ impl EvidenceRecord {
     }
 }
 
-/// Process-local map from HDC candidate IDs to evidence payloads.
+/// Versioned snapshot envelope for restoring the payload resolver after restart.
 ///
-/// Production persistence must commit lifecycle/tombstone state atomically with
-/// the durable vector index. This in-memory resolver does not solve that yet.
+/// The unkeyed digest detects accidental/truncated/corrupted record bytes; it is
+/// not an authenticity signature. A hostile-storage deployment must additionally
+/// pin or authenticate the snapshot digest outside this file.
+const EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-INDEX-SNAPSHOT-V1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EvidenceIndexSnapshot {
+    schema_version: String,
+    /// HDC-ID-sorted records include revoked, superseded and deleted tombstones.
+    records: Vec<EvidenceRecord>,
+    records_sha256: String,
+}
+
+/// Map from HDC candidate IDs to evidence payloads.
+///
+/// Snapshot/restore preserves lifecycle tombstones across process restarts, but
+/// this is not a disk transaction and cannot atomically commit with the HDC
+/// vector index. Callers must coordinate both stores and durably pin/authenticate
+/// the returned snapshot bytes as required by their threat model.
 #[derive(Debug, Default)]
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
@@ -219,6 +237,107 @@ pub struct EvidenceIndex {
 impl EvidenceIndex {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Encode a deterministic versioned snapshot.
+    ///
+    /// Records are serialized in ascending HDC ID order. The embedded digest
+    /// covers the canonical serialized record vector and detects partial or
+    /// accidental changes; it does not authenticate the writer.
+    pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
+        let records: Vec<EvidenceRecord> = self.records.values().cloned().collect();
+        let mut evidence_ids = BTreeSet::new();
+
+        for record in &records {
+            record.validate()?;
+            if !evidence_ids.insert(record.evidence_id.clone()) {
+                return Err("snapshot contains duplicate evidence_id".into());
+            }
+            if let EvidencePayload::Text { value } = &record.payload {
+                if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                    return Err("snapshot contains text content_sha256 mismatch".into());
+                }
+            }
+        }
+
+        // Every supersession edge must remain resolvable within this snapshot.
+        for record in &records {
+            if record.lifecycle == EvidenceLifecycle::Superseded {
+                let replacement = record.superseded_by.as_deref()
+                    .ok_or_else(|| "superseded evidence requires superseded_by".to_string())?;
+                let replacement_record = records.iter()
+                    .find(|candidate| candidate.evidence_id == replacement)
+                    .ok_or_else(|| "snapshot is missing superseding evidence".to_string())?;
+                if replacement_record.scope_id != record.scope_id {
+                    return Err("snapshot supersession crosses scopes".into());
+                }
+            }
+        }
+
+        let records_json = serde_json::to_vec(&records)
+            .map_err(|error| format!("failed to serialize evidence records: {error}"))?;
+        let snapshot = EvidenceIndexSnapshot {
+            schema_version: EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION.to_string(),
+            records,
+            records_sha256: sha256_hex(&records_json),
+        };
+        serde_json::to_vec(&snapshot)
+            .map_err(|error| format!("failed to serialize evidence snapshot: {error}"))
+    }
+
+    /// Restore a snapshot while rebuilding all derived ID maps from records.
+    ///
+    /// This validates the format, record structure, text payload digests,
+    /// duplicate identities and supersession references. Source provenance
+    /// digests are retained but cannot be rechecked without the original source
+    /// bytes; image payload bytes are rechecked under payload_root at resolve.
+    pub fn restore_snapshot(bytes: &[u8]) -> Result<Self, String> {
+        let snapshot: EvidenceIndexSnapshot = serde_json::from_slice(bytes)
+            .map_err(|error| format!("invalid evidence snapshot: {error}"))?;
+        if snapshot.schema_version != EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION {
+            return Err("unsupported evidence snapshot schema version".into());
+        }
+        if !is_sha256(&snapshot.records_sha256) {
+            return Err("snapshot records_sha256 must be lowercase SHA-256".into());
+        }
+        let records_json = serde_json::to_vec(&snapshot.records)
+            .map_err(|error| format!("failed to serialize restored records: {error}"))?;
+        if sha256_hex(&records_json) != snapshot.records_sha256 {
+            return Err("evidence snapshot record digest mismatch".into());
+        }
+
+        let mut index = Self::new();
+        for record in snapshot.records {
+            record.validate()?;
+            if let EvidencePayload::Text { value } = &record.payload {
+                if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                    return Err("restored text content_sha256 mismatch".into());
+                }
+            }
+            if index.records.contains_key(&record.hdc_id) {
+                return Err("snapshot contains duplicate hdc_id".into());
+            }
+            if index.evidence_ids.contains_key(&record.evidence_id) {
+                return Err("snapshot contains duplicate evidence_id".into());
+            }
+            index.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
+            index.records.insert(record.hdc_id, record);
+        }
+
+        for record in index.records.values() {
+            if record.lifecycle == EvidenceLifecycle::Superseded {
+                let replacement = record.superseded_by.as_deref()
+                    .ok_or_else(|| "superseded evidence requires superseded_by".to_string())?;
+                let replacement_hdc_id = index.evidence_ids.get(replacement)
+                    .ok_or_else(|| "snapshot is missing superseding evidence".to_string())?;
+                let replacement_record = index.records.get(replacement_hdc_id)
+                    .ok_or_else(|| "snapshot supersession index is inconsistent".to_string())?;
+                if replacement_record.scope_id != record.scope_id {
+                    return Err("snapshot supersession crosses scopes".into());
+                }
+            }
+        }
+        Ok(index)
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
@@ -379,6 +498,52 @@ mod tests {
             valid_until_unix_ms: None,
             superseded_by: None,
         }
+    }
+
+    #[test]
+    fn snapshot_round_trip_preserves_tombstones_and_blocks_resurrection() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-deleted", "web", "old route"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(8, "evidence-active", "web", "current route"), b"canonical trajectory bytes").unwrap();
+        index.mark_deleted(7).unwrap();
+
+        let snapshot = index.snapshot_bytes().unwrap();
+        let restored = EvidenceIndex::restore_snapshot(&snapshot).unwrap();
+        let items = restored.resolve(&[7, 8, 7], "web", 150, Path::new("."), 10).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].value, "current route");
+        assert!(restored.insert(
+            text_record(7, "evidence-resurrection", "web", "resurrected route"),
+            b"canonical trajectory bytes",
+        ).is_err());
+        assert_eq!(restored.snapshot_bytes().unwrap(), snapshot);
+    }
+
+    #[test]
+    fn snapshot_rejects_record_tampering_and_noncanonical_envelopes() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-a", "web", "trusted route"), b"canonical trajectory bytes").unwrap();
+        let snapshot = index.snapshot_bytes().unwrap();
+
+        let mut value: serde_json::Value = serde_json::from_slice(&snapshot).unwrap();
+        value["records"][0]["payload"]["value"] = serde_json::Value::String("tampered route".into());
+        let tampered = serde_json::to_vec(&value).unwrap();
+        assert!(EvidenceIndex::restore_snapshot(&tampered).is_err());
+
+        value["schema_version"] = serde_json::Value::String("BROCA-EVIDENCE-INDEX-SNAPSHOT-V999".into());
+        assert!(EvidenceIndex::restore_snapshot(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn snapshot_rebuild_rejects_duplicate_ids_even_with_recomputed_digest() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-a", "web", "route one"), b"canonical trajectory bytes").unwrap();
+        let snapshot = index.snapshot_bytes().unwrap();
+        let mut envelope: EvidenceIndexSnapshot = serde_json::from_slice(&snapshot).unwrap();
+        envelope.records.push(envelope.records[0].clone());
+        envelope.records_sha256 = hash(&serde_json::to_vec(&envelope.records).unwrap());
+        let crafted = serde_json::to_vec(&envelope).unwrap();
+        assert!(EvidenceIndex::restore_snapshot(&crafted).is_err());
     }
 
     #[test]
