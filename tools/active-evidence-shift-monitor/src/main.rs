@@ -1651,7 +1651,7 @@ mod tests {
                 COMPOSITE_NULL_UPPER,
             );
             assert!(
-                previous > matched_reference_alarm_probability - EPS,
+                previous > matched_reference_alarm_probability + EPS,
                 "calibration did not find the minimum threshold: previous={previous}, target={matched_reference_alarm_probability}"
             );
         }
