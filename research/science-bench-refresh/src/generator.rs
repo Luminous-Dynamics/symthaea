@@ -927,6 +927,75 @@ mod tests {
     }
 
     #[test]
+    fn fixed_seed_sweep_has_unique_tasks_and_non_degenerate_recipe_coverage() {
+        let config = demo_config();
+        let mut task_ids = BTreeSet::new();
+        let mut task_set_digests = BTreeSet::new();
+        let mut scales = BTreeSet::new();
+        let mut slope_bins = BTreeSet::new();
+        let mut noise_residuals = BTreeSet::new();
+
+        for index in 0_u64..64 {
+            let seed_material = format!("science-bench-seed-sweep-v1/{index}");
+            let seed = Sha256::digest(seed_material.as_bytes()).to_vec();
+            let manifest = manifest_for_test(&config, &seed);
+            let generated = generate_task_set_bytes(&manifest, &seed, &config)
+                .expect("each frozen sweep seed must generate a valid task set");
+            assert!(task_set_digests.insert(sha256_hex(&generated)));
+
+            let task_set: Value =
+                serde_json::from_slice(&generated).expect("generated task set is valid JSON");
+            let tasks = task_set["tasks"].as_array().expect("task array");
+            assert_eq!(tasks.len(), 8);
+            for task in tasks {
+                let id = task["task_id"].as_str().expect("task ID");
+                assert!(
+                    task_ids.insert(id.to_owned()),
+                    "task ID collided across the seed sweep: {id}"
+                );
+            }
+
+            let semantic = tasks
+                .iter()
+                .find(|task| task["family_id"] == "semantic_invariance")
+                .expect("semantic-invariance case");
+            let scale = semantic["evaluator_only"]["inverse_coordinate_transform"]["scale"]
+                .as_f64()
+                .expect("scale");
+            scales.insert(scale.to_bits());
+            let slope = semantic["evaluator_only"]["latent_law"]["slope"]
+                .as_f64()
+                .expect("slope");
+            slope_bins.insert(slope.floor() as u32);
+
+            let noisy = tasks
+                .iter()
+                .find(|task| task["family_id"] == "sampling_noise_shift")
+                .expect("noisy case");
+            let law = &noisy["evaluator_only"]["law"];
+            let slope = law["slope"].as_f64().expect("noisy-law slope");
+            let intercept = law["intercept"].as_f64().expect("noisy-law intercept");
+            for row in noisy["policy_input"]["observations"]
+                .as_array()
+                .expect("observations")
+            {
+                let x = row["x"].as_f64().expect("x");
+                let y = row["y"].as_f64().expect("y");
+                noise_residuals.insert((y - (slope * x + intercept)).to_bits());
+            }
+        }
+
+        assert_eq!(task_set_digests.len(), 64);
+        assert_eq!(task_ids.len(), 64 * 8);
+        assert_eq!(scales.len(), 4, "all declared coordinate scales should appear");
+        assert_eq!(slope_bins, BTreeSet::from([1, 2, 3, 4]));
+        assert!(
+            noise_residuals.len() > 100,
+            "noise outcomes should not collapse to a small set"
+        );
+    }
+
+    #[test]
     fn changed_task_bytes_fail_exact_regeneration_even_when_json_parses() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let final_manifest = manifest_with_task_commitment(&manifest, &generated);
