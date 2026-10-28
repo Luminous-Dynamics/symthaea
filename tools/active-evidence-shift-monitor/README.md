@@ -85,16 +85,16 @@ The independent prototype gives a reference edge alarm probability of 0.00089158
 
 For an abrupt change after observation 100 and a 1,000-observation horizon, the independent exact-DP prototype yields:
 
-| Post-change event rate | Composite-band e-process detection | CUSUM upper-arm detection | CUSUM conditional mean delay |
-|---:|---:|---:|---:|
-| 0.55 | 1.769% | 7.226% | 773.9 observations |
-| 0.60 | 73.527% | 93.336% | 622.7 observations |
-| 0.70 | about 99.987% | effectively 100% | 290.0 observations |
-| 0.80 | about 99.987% | effectively 100% | 186.7 observations |
+| Post-change event rate | Composite-band e-process detection | CUSUM detection | Mean delay | Median delay | P90 delay |
+|---:|---:|---:|---:|---:|---:|
+| 0.55 | 1.769% | 7.226% | 773.9 | 796 | 883 |
+| 0.60 | 73.527% | 93.336% | 622.7 | 618 | 799 |
+| 0.70 | about 99.987% | effectively 100% | 290.0 | 287 | 350 |
+| 0.80 | about 99.987% | effectively 100% | 186.7 | 186 | 215 |
 
-These are finite synthetic Bernoulli results from independent local DP calculations, not the result of the current Rust branch’s workflow. They suggest that this CUSUM score allocation has more horizon-1,000 power for the weak/moderate step alternatives at this specific matched edge operating point, at the cost of long conditional detection delays. They do not establish universal superiority or a worst-case matched-family FPR advantage. The CUSUM reports both directions separately; it does not manufacture a joint two-sided power statistic.
+These are finite synthetic Bernoulli results from independent local DP calculations, not the result of the current Rust branch’s workflow. Conditional delay quantiles are computed only among runs that alarm after the change. At p1=0.55, detection is rare and the observed conditional delays are therefore a fast-detection subset; detection probability must be read alongside all latency quantiles. The results suggest that this CUSUM score allocation has more horizon-1,000 power for the weak/moderate step alternatives at this specific matched edge operating point, at the cost of long conditional detection delays. They do not establish universal superiority or a worst-case matched-family FPR advantage. The CUSUM reports both directions separately; it does not manufacture a joint two-sided power statistic.
 
-The output receipts include both the exact reference alarm probability and the calibrated CUSUM boundary rate, plus the conservative family union bound and per-cell alpha. The independent Python reference checks the minimum threshold, matched operating point, scenario semantics, probability-mass conservation, accepted-band schedules and mutation rejection. Use this as a comparison hypothesis pending exact-head Rust qualification. The broader industry lane should still compare version-pinned CUSUM/EWMA/Page–Hinkley/ADWIN and suitable distribution-sensitive detectors, as tracked in [issue #8818](https://github.com/Luminous-Dynamics/symthaea/issues/8818).
+The output receipts include both the exact reference alarm probability and the calibrated CUSUM boundary rate, plus the conservative family union bound and per-cell alpha. Mean, median and 90th-percentile post-change delays are emitted separately; when no detection mass exists, conditional delay metrics are `NA`. The independent Python reference checks the minimum threshold, matched operating point, scenario semantics, probability-mass conservation, accepted-band schedules and mutation rejection. Use this as a comparison hypothesis pending exact-head Rust qualification. The broader industry lane should still compare version-pinned CUSUM/EWMA/Page–Hinkley/ADWIN and suitable distribution-sensitive detectors, as tracked in [issue #8818](https://github.com/Luminous-Dynamics/symthaea/issues/8818).
 
 The independent Python reference reproduces the exact CUSUM dynamic program and edge-rate calibration. Rust compilation, formatting and exact-head CI status remain separate qualification gates.
 
