@@ -669,6 +669,46 @@ mod tests {
         assert!(twenty_percent_large_shift.detection_probability > 0.99);
         assert!(ten_percent_large_shift.mean_detection_delay.is_some());
         assert!(twenty_percent_large_shift.mean_detection_delay.is_some());
+
+        // Check every configured audit share and shift direction against the per-cell
+        // anytime false-alarm budget, not only the handpicked power witnesses above.
+        for fraction in SENTINEL_FRACTIONS.into_iter().filter(|fraction| *fraction > 0.0) {
+            let sentinel_labels =
+                (fraction * TOTAL_LABEL_BUDGET as f64).round() as usize;
+            let change_after_sentinel =
+                (fraction * SHIFT_AFTER_TOTAL_LABELS as f64).round() as usize;
+            let stable = evaluate(
+                Boundary::BetaMixtureEProcess,
+                NOMINAL_P,
+                NOMINAL_P,
+                None,
+                0,
+                sentinel_labels,
+            );
+            assert!(
+                stable.false_alarm_probability <= PER_CELL_ALPHA + EPS,
+                "stable sentinel alarm {} exceeded alpha at fraction {}",
+                stable.false_alarm_probability,
+                fraction
+            );
+            for post_shift_p in BUDGET_SHIFT_PROBABILITIES {
+                let shifted = evaluate(
+                    Boundary::BetaMixtureEProcess,
+                    NOMINAL_P,
+                    NOMINAL_P,
+                    Some(post_shift_p),
+                    change_after_sentinel,
+                    sentinel_labels,
+                );
+                assert!(
+                    shifted.false_alarm_probability <= PER_CELL_ALPHA + EPS,
+                    "pre-change false alarm {} exceeded alpha at fraction {} and p1 {}",
+                    shifted.false_alarm_probability,
+                    fraction,
+                    post_shift_p
+                );
+            }
+        }
     }
 
     #[test]
