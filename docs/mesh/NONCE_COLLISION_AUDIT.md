@@ -34,6 +34,10 @@ The test named `legacy_packet_fragment_nonce_overlap_negative_control` reproduce
 
 ## Independent repeat paths
 
+### Default epoch is zero on direct DualLayerMesh construction
+
+`DualLayerMesh::new` initializes `encryption_epoch` to zero. A caller that configures an encryption key but does not explicitly set an epoch uses the same fixed packet-epoch component across restarts; if source, payload type, sequence and key recur, the packet nonce repeats deterministically. Some `Mind` construction paths separately initialize an epoch with a random byte, but that does not change the direct-construction default and is not a strict uniqueness guarantee.
+
 ### Random 8-bit packet epoch
 
 The packet nonce uses a random one-byte epoch. Conditional on the same source, type, key and sequence recurring across restart, the epoch matches for one restart pair with probability 1/256 = 0.390625%. If the same key/sequence conditions recur across multiple starts, the probability of any collision among independent uniform epochs follows the birthday bound:
