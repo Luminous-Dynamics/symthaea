@@ -76,6 +76,8 @@ The source paper itself warns that further work is needed, including functional 
 - [Benchmark protocol](BENCHMARK_PROTOCOL.md) — outcomes, baselines, splits, success criteria and leakage controls.
 - [Dataset register](datasets.json) — initial machine-readable source inventory; all entries remain unacquired until their local files are verified.
 - [Hypothesis ledger schema](HYPOTHESIS_LEDGER.schema.json) — minimum structure for traceable, falsifiable claims.
+- [Industry and SOTA comparison](INDUSTRY_AND_SOTA.md) — task-matched comparators and prospective superiority gates.
+- [Initial candidate research questions](CANDIDATE_HYPOTHESES.md) — published priors separated from proposed tests.
 
 ## Primary scientific sources
 
