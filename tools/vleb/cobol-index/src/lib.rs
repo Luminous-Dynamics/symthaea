@@ -7,18 +7,10 @@
 
 use std::fmt::Write as _;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct IndexOptions {
     /// Include lines marked with the fixed-format debug indicator 'D'.
     pub include_debug_lines: bool,
-}
-
-impl Default for IndexOptions {
-    fn default() -> Self {
-        Self {
-            include_debug_lines: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -406,9 +398,10 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
     for i in 0..tokens.len() {
         let token = &tokens[i];
 
-        if is_word(token, "IDENTIFICATION")
-            && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION"))
-            || is_word(token, "ID") && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION"))
+        if (is_word(token, "IDENTIFICATION")
+            && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION")))
+            || (is_word(token, "ID")
+                && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION")))
         {
             let name = "IDENTIFICATION".to_owned();
             active_division = Some(name.clone());
