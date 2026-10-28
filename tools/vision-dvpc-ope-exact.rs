@@ -15,6 +15,7 @@ struct Scenario {
     n: usize,
     target_a: f64,
     logging_a: f64,
+    estimated_logging_a: f64,
     reward_a: f64,
     reward_b: f64,
     qhat_a: f64,
@@ -81,7 +82,7 @@ fn invalid(message: impl Into<String>) -> String {
 
 fn parse_grid(input: &str) -> Result<Vec<Scenario>, String> {
     let mut lines = input.lines();
-    let expected_header = "scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap";
+    let expected_header = "scenario_id\tn\ttarget_probability_a\ttrue_logging_probability_a\testimated_logging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap";
     if lines.next() != Some(expected_header) {
         return Err(invalid("unexpected scenario header"));
     }
@@ -92,7 +93,7 @@ fn parse_grid(input: &str) -> Result<Vec<Scenario>, String> {
             continue;
         }
         let fields: Vec<&str> = line.split('\t').collect();
-        if fields.len() != 9 {
+        if fields.len() != 10 {
             return Err(invalid(format!("line {}: expected nine fields", index + 2)));
         }
         if fields[0].is_empty() || !ids.insert(fields[0].to_owned()) {
@@ -115,16 +116,18 @@ fn parse_grid(input: &str) -> Result<Vec<Scenario>, String> {
             id: fields[0].to_owned(),
             n,
             target_a: parse(2, "target_probability_a")?,
-            logging_a: parse(3, "logging_probability_a")?,
-            reward_a: parse(4, "reward_mean_a")?,
-            reward_b: parse(5, "reward_mean_b")?,
-            qhat_a: parse(6, "qhat_a")?,
-            qhat_b: parse(7, "qhat_b")?,
-            clip_cap: parse(8, "clip_cap")?,
+            logging_a: parse(3, "true_logging_probability_a")?,
+            estimated_logging_a: parse(4, "estimated_logging_probability_a")?,
+            reward_a: parse(5, "reward_mean_a")?,
+            reward_b: parse(6, "reward_mean_b")?,
+            qhat_a: parse(7, "qhat_a")?,
+            qhat_b: parse(8, "qhat_b")?,
+            clip_cap: parse(9, "clip_cap")?,
         };
         for (name, value) in [
             ("target_probability_a", s.target_a),
-            ("logging_probability_a", s.logging_a),
+            ("true_logging_probability_a", s.logging_a),
+            ("estimated_logging_probability_a", s.estimated_logging_a),
             ("reward_mean_a", s.reward_a),
             ("reward_mean_b", s.reward_b),
             ("qhat_a", s.qhat_a),
@@ -179,6 +182,7 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
 
     let target_b = 1.0 - s.target_a;
     let logging_b = 1.0 - s.logging_a;
+    let estimated_logging_b = 1.0 - s.estimated_logging_a;
     let q_target = s.target_a * s.qhat_a + target_b * s.qhat_b;
     let event_probabilities = [
         s.logging_a * (1.0 - s.reward_a),
@@ -202,13 +206,13 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
             probability *= event_probabilities[event];
             let action_a = event < 2;
             let reward = if event % 2 == 0 { 0.0 } else { 1.0 };
-            let logging_p = if action_a { s.logging_a } else { logging_b };
+            let estimator_logging_p = if action_a { s.estimated_logging_a } else { estimated_logging_b };
             let target_p = if action_a { s.target_a } else { target_b };
             let qhat = if action_a { s.qhat_a } else { s.qhat_b };
-            if logging_p <= 0.0 {
-                return Err(invalid("internal enumerator reached a zero-probability selected action"));
+            if estimator_logging_p <= 0.0 {
+                return Err(invalid("estimated logging propensity is zero for an observed action"));
             }
-            weights[row] = target_p / logging_p;
+            weights[row] = target_p / estimator_logging_p;
             rewards[row] = reward;
             q_selected[row] = qhat;
         }
@@ -379,12 +383,13 @@ mod tests {
     #[test]
     fn fixture_is_frozen_and_includes_healthy_weak_and_zero_support_cases() {
         let scenarios = parse_grid(GRID).unwrap();
-        assert_eq!(scenarios.len(), 6);
+        assert_eq!(scenarios.len(), 8);
         assert_eq!(scenarios[0].id, "healthy_correct");
         assert!(scenarios.iter().any(|s| s.logging_a == 0.9));
         assert!(scenarios.iter().any(|s| s.logging_a == 0.95));
         assert!(scenarios.iter().any(|s| s.logging_a == 0.99));
         assert!(scenarios.iter().any(|s| unsupported_target_mass(s) > EPS));
+        assert!(scenarios.iter().any(|s| (s.logging_a - s.estimated_logging_a).abs() > EPS));
     }
 
     #[test]
@@ -411,6 +416,20 @@ mod tests {
             assert!(metric(&report, Estimator::DoublyRobust).bias.abs() < 1e-9, "{} bias={}", id, metric(&report, Estimator::DoublyRobust).bias);
             assert!(metric(&report, Estimator::Direct).bias.abs() > 0.01, "{} should expose model bias", id);
         }
+    }
+
+    #[test]
+    fn correct_reward_model_preserves_dr_expectation_under_misspecified_propensity() {
+        let report = enumerate(&scenario("propensity_misspecified_correct_q")).unwrap();
+        assert!(metric(&report, Estimator::DoublyRobust).bias.abs() < 1e-9);
+        assert!(metric(&report, Estimator::Ips).bias.abs() > 0.1);
+    }
+
+    #[test]
+    fn simultaneous_propensity_and_reward_misspecification_breaks_dr_expectation() {
+        let report = enumerate(&scenario("both_misspecified")).unwrap();
+        assert!(metric(&report, Estimator::DoublyRobust).bias.abs() > 0.05);
+        assert!((metric(&report, Estimator::DoublyRobust).expected - 0.420833333333).abs() < 1e-8);
     }
 
     #[test]
@@ -460,7 +479,7 @@ mod tests {
         let first = run_sweep(GRID).unwrap();
         let second = run_sweep(GRID).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.lines().filter(|line| line.starts_with("METRIC\t")).count(), 150);
+        assert_eq!(first.lines().filter(|line| line.starts_with("METRIC\t")).count(), 210);
         assert!(first.contains("SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED"));
         assert!(first.contains("METRIC\thealthy_correct\tIPS\tSUPPORT_OK_SYNTHETIC_ONLY\texpected\t0.500000000000"));
         assert!(first.contains("confidence_intervals\tNOT_COMPUTED"));
