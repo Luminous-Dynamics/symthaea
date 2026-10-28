@@ -581,7 +581,14 @@ impl EvidenceIndex {
             return Err("only active evidence can be superseded".into());
         }
         if old.scope_id != new_scope {
-         /// Resolve ranked HDC IDs to safe context items with source provenance.
+            return Err("evidence cannot be superseded across scopes".into());
+        }
+        old.lifecycle = EvidenceLifecycle::Superseded;
+        old.superseded_by = Some(new_evidence_id);
+        old.validate()
+    }
+
+    /// Resolve ranked HDC IDs to safe context items with source provenance.
     ///
     /// Missing IDs, duplicates, inactive records, invalid times and cross-scope
     /// records are skipped. A present but corrupt payload is an error, not
