@@ -28,6 +28,7 @@
 //! ```
 
 pub mod aviation_data_contract;
+pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
 pub mod aviation_robustness;
 pub mod aviation_network_externalities;
