@@ -48,13 +48,14 @@ File: `crates/domains/symthaea-operations-research/src/aviation_distributional_r
 
 The companion module `aviation_probability_calibration.rs` adds a transparent conservative baseline for selecting a TV radius from the Calibration partition, rather than choosing an arbitrary radius by inspecting final results.
 
-Given a frozen nominal distribution (p), empirical calibration frequencies (\hat p), (K) finite-support categories, (n) independent calibration episodes and failure probability (δ), use a union-Hoeffding bound:
-[
-epsilon = sqrt{\frac{\log(2K/\delta)}{2n}},
-\qquad
-\rho = \min\left(1, \operatorname{TV}(p,\hat p)+\frac K2\epsilon\right).
-]
-The code reports empirical TV distance, the sampling allowance, failure probability, episode count and resulting radius separately. It uses integer ppm for probability inputs and rounds the empirical distance and final radius upward. When evidence is sparse or the support is large, the bound may saturate at (ρ=1); that is a visible conservatism cost, not a reason to silently lower the confidence level.
+Given a frozen nominal distribution `p`, empirical calibration frequencies `p_hat`, `K` finite-support categories, `n` independent calibration episodes and failure probability `delta`, use a union-Hoeffding bound:
+
+```text
+epsilon = sqrt(ln(2*K/delta) / (2*n))
+rho = min(1, TV(p, p_hat) + (K/2)*epsilon)
+```
+
+The code reports empirical TV distance, the sampling allowance, failure probability, episode count and resulting radius separately. It uses integer ppm for probability inputs and rounds the empirical distance and final radius upward. When evidence is sparse or the support is large, the bound may saturate at `rho = 1`; that is a visible conservatism cost, not a reason to silently lower the confidence level.
 
 **Assumption boundary:** this bound requires independent draws from one fixed finite-support distribution. Airline disruptions may be temporally dependent, season-dependent and nonstationary. Count complete event episodes rather than rows; calibrate separately across relevant regimes/time blocks and take a predeclared envelope where appropriate. This baseline does not guarantee coverage under arbitrary drift or for omitted categories. The split-integrity module can validate declared cluster separation and chronology, but cannot prove independence or data lineage.
 
