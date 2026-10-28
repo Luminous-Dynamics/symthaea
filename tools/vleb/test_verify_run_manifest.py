@@ -281,6 +281,70 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.assertFalse(result["eligible"], result)
         self.assertIn(code, {row["code"] for row in result["issues"]}, result)
 
+    def test_claim_audit_passes_only_with_pinned_source_and_witness(self) -> None:
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(result["claim_count"], 1)
+        self.assertEqual(result["supported"], 1)
+        self.assertEqual(result["contradicted"], 0)
+        self.assertEqual(result["unresolved"], 0)
+
+    def test_claim_audit_missing_out_of_band_verifier_pin_fails_closed(self) -> None:
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={},
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_rejects_witness_artifact_tampering(self) -> None:
+        witness = self.bundle.root / self.bundle.paths["claim_witness"]
+        witness.write_bytes(b'{"copy_references":[]}\\n')
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_rejects_source_revision_mismatch(self) -> None:
+        source = self.bundle.root / self.bundle.paths["claim_source"]
+        source.write_bytes(b"       COPY OTHER-REC.\\n")
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_rejects_auditor_or_schema_pin_mismatch(self) -> None:
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256="0" * 64,
+            expected_claim_schema_sha256="0" * 64,
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed")
+        codes = {row["code"] for row in result["issues"]}
+        self.assertIn("claim_auditor_pin_mismatch", codes)
+        self.assertIn("claim_schema_pin_mismatch", codes)
+
     def test_development_manifest_hashes_and_schema_pass(self) -> None:
         result = self.bundle.audit()
         self.assertTrue(result["eligible"], result["issues"])
