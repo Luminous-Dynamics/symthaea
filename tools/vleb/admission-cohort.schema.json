@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vleb-admission-cohort.schema.json",
+  "title": "VLEB admission cohort manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cohort_id",
+    "run_kind",
+    "protocol_sha256",
+    "task_ids",
+    "task_results"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vleb-admission-cohort-v1"
+    },
+    "cohort_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "run_kind": {
+      "const": "confirmatory"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "task_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 128
+      }
+    },
+    "task_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "audit_report_path",
+          "audit_report_sha256",
+          "receipt_sha256",
+          "task_contract_sha256",
+          "protocol_sha256",
+          "candidate_patch_sha256",
+          "auditor_sha256"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128
+          },
+          "audit_report_path": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "audit_report_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "task_contract_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "protocol_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "candidate_patch_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "auditor_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    }
+  }
+}

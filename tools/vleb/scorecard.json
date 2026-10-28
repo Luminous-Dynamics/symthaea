@@ -244,6 +244,16 @@
         "the reference implementation passes every required mapped test",
         "missing or ambiguous logs remain unresolved and cannot be dropped from the denominator"
       ]
+    },
+    "requirement_source_item_coverage_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Pooled traced requirement source items divided by all declared source items from the locked scored-task cohort."
+    },
+    "required_test_trace_coverage_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Pooled trace-mapped logical test IDs divided by all required logical test IDs from the locked scored-task cohort."
     }
   },
   "current_measurements": {
@@ -320,6 +330,18 @@
       "eligible": false,
       "status": "not_measured",
       "reason": "Per-test baseline expectations are implemented in draft PR #8801, but the exact-head suite has not passed and no locked confirmatory cohort has been evaluated."
+    },
+    "requirement_source_item_coverage_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The pinned cohort rollup is draft code; no locked cohort has been admitted and reported at an exact validated head."
+    },
+    "required_test_trace_coverage_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The pinned cohort rollup is draft code; no locked cohort has been admitted and reported at an exact validated head."
     }
   },
   "metric_definitions": {
@@ -386,7 +408,7 @@
       ]
     },
     "requirement_to_test_traceability": {
-      "formula": "traceable declared contract source items and trace-mapped required test IDs / total declared source items and required test IDs",
+      "formula": "Share of assigned scored tasks whose traceability check is complete in the independent audit; item-level source and test coverage are reported as separate pooled metrics.",
       "pass_requirements": [
         "coverage of task statement, every invariant, allowed behavior change, and observable effect is exactly complete",
         "each source item is mapped once and only once",
@@ -413,6 +435,26 @@
         "unknown, missing, ambiguous, or mismatched test results remain unresolved or failed and cannot be dropped",
         "report overall two-sided baseline/reference gate separately from per-test alignment",
         "composite_weighted_score is false"
+      ],
+      "composite_weighted_score": false
+    },
+    "requirement_source_item_coverage": {
+      "formula": "sum(traced_source_item_count) / sum(declared_source_item_count) across verified cohort audit reports",
+      "denominator_rules": [
+        "cohort task inventory is frozen before candidate execution",
+        "missing/invalid audit reports invalidate the cohort rather than removing assigned tasks",
+        "report both pooled numerator and denominator",
+        "never average per-task percentages"
+      ],
+      "composite_weighted_score": false
+    },
+    "required_test_trace_coverage": {
+      "formula": "sum(traced_required_test_count) / sum(required_test_count) across verified cohort audit reports",
+      "denominator_rules": [
+        "cohort task inventory and required test IDs are frozen before candidate execution",
+        "missing/invalid audit reports invalidate the cohort rather than removing assigned tasks",
+        "report both pooled numerator and denominator",
+        "never average per-task percentages"
       ],
       "composite_weighted_score": false
     }
