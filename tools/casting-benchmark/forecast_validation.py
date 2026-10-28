@@ -8,9 +8,12 @@ shift, or safety.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
+from pathlib import Path
+import sys
 from typing import Any, Sequence
 
 
@@ -276,3 +279,75 @@ def score_forecasts(
             "does not prove independence, calibration under unobserved shift, or physical safety."
         ),
     }
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant is forbidden: {value}")
+
+
+def _load_json_bytes(raw: bytes, label: str) -> Any:
+    try:
+        return json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{label} is not valid strict UTF-8 JSON") from exc
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("forecasts", type=Path, help="frozen pre-outcome forecast manifest JSON")
+    parser.add_argument("outcomes", type=Path, help="later outcome manifest JSON")
+    parser.add_argument("--output", type=Path, required=True, help="receipt JSON output path")
+    parser.add_argument("--bins", type=int, default=10, help="fixed top-label reliability bin count (2..100)")
+    args = parser.parse_args(argv)
+
+    try:
+        forecast_path = args.forecasts.resolve()
+        outcome_path = args.outcomes.resolve()
+        output_path = args.output.resolve()
+        if output_path in {forecast_path, outcome_path}:
+            raise ValueError("receipt output must not overwrite either input manifest")
+        forecast_raw = forecast_path.read_bytes()
+        outcome_raw = outcome_path.read_bytes()
+        forecast_doc = _load_json_bytes(forecast_raw, "forecast manifest")
+        outcome_doc = _load_json_bytes(outcome_raw, "outcome manifest")
+        if not isinstance(forecast_doc, list) or not isinstance(outcome_doc, list):
+            raise ValueError("forecast and outcome manifest roots must be JSON arrays")
+
+        receipt = score_forecasts(forecast_doc, outcome_doc, bin_count=args.bins)
+        receipt["receipt_label"] = "PREQUENTIAL_PREDICTIVE_SCORING_NOT_CALIBRATION_CERTIFICATION"
+        receipt["source_artifacts"] = {
+            "forecast_manifest_sha256": hashlib.sha256(forecast_raw).hexdigest(),
+            "outcome_manifest_sha256": hashlib.sha256(outcome_raw).hexdigest(),
+        }
+        receipt["evaluator_sha256"] = hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(receipt, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+    except (OSError, ValueError, TypeError, OverflowError) as exc:
+        print(f"forecast validation failed: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"forecast validation receipt written: {output_path}")
+    print(f"forecast_manifest_sha256={receipt['source_artifacts']['forecast_manifest_sha256']}")
+    print(f"outcome_manifest_sha256={receipt['source_artifacts']['outcome_manifest_sha256']}")
+    print(f"forecast_count={receipt['forecast_count']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
