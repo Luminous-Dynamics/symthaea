@@ -646,20 +646,20 @@ pub struct MatchedComparisonSummary {
 pub struct RestrictedTtsPairResult {
     /// Pair ID present in both arms.
     pub pair_id: String,
-    /// The baseline attained the verified target with complete all-in cost at or before the horizon.
+    /// The baseline attained the verified target with a measured deployment interval at or before the horizon.
     pub baseline_hit_within_horizon: bool,
-    /// The candidate attained the verified target with complete all-in cost at or before the horizon.
+    /// The candidate attained the verified target with a measured deployment interval at or before the horizon.
     pub candidate_hit_within_horizon: bool,
-    /// Baseline contribution: measured all-in time on a within-horizon hit, otherwise the horizon.
+    /// Baseline contribution: directly measured deployment elapsed on a within-horizon hit, otherwise the horizon.
     pub baseline_restricted_time_ms: f64,
-    /// Candidate contribution: measured all-in time on a within-horizon hit, otherwise the horizon.
+    /// Candidate contribution: directly measured deployment elapsed on a within-horizon hit, otherwise the horizon.
     pub candidate_restricted_time_ms: f64,
 }
 
 /// Failure-inclusive restricted-mean time-to-target comparison for one graph instance.
 ///
 /// Every attempted pair contributes one value per arm. A target miss, unverified output,
-/// timeout/crash/abort, missing all-in timing, or hit after the horizon contributes exactly
+/// timeout/crash/abort, missing direct deployment timing, or hit after the horizon contributes exactly
 /// the frozen horizon. This is a fixed-horizon operational score, not a Kaplan-Meier
 /// estimate; aggregate it across graph instances/families with the preregistered method.
 #[derive(Debug, Clone, PartialEq)]
@@ -672,21 +672,21 @@ pub struct RestrictedMeanTtsSummary {
     pub horizon_ms: f64,
     /// Total matched trials, including every miss and failure.
     pub pair_count: usize,
-    /// Baseline verified target hits with complete all-in timing <= horizon.
+    /// Baseline verified target hits with direct deployment timing <= horizon.
     pub baseline_hits_within_horizon: usize,
-    /// Candidate verified target hits with complete all-in timing <= horizon.
+    /// Candidate verified target hits with direct deployment timing <= horizon.
     pub candidate_hits_within_horizon: usize,
     /// Baseline within-horizon hit rate over every paired attempt.
     pub baseline_hit_rate_within_horizon: f64,
     /// Candidate within-horizon hit rate over every paired attempt.
     pub candidate_hit_rate_within_horizon: f64,
-    /// Verified baseline target claims with incomplete all-in timing.
+    /// Verified baseline target hits with unknown direct deployment timing.
     pub baseline_untimed_target_hits: usize,
-    /// Verified candidate target claims with incomplete all-in timing.
+    /// Verified candidate target hits with unknown direct deployment timing.
     pub candidate_untimed_target_hits: usize,
-    /// Verified baseline target hits with measured all-in time after the horizon.
+    /// Verified baseline target hits with direct deployment elapsed after the horizon.
     pub baseline_hits_after_horizon: usize,
-    /// Verified candidate target hits with measured all-in time after the horizon.
+    /// Verified candidate target hits with direct deployment elapsed after the horizon.
     pub candidate_hits_after_horizon: usize,
     /// Mean baseline restricted time, with misses capped at the horizon.
     pub baseline_restricted_mean_ms: f64,
