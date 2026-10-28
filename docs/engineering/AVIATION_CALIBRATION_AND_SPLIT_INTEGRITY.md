@@ -39,6 +39,8 @@ Every row should have a stable source-row ID, event-cluster ID, event time, part
 
 ## Current research comparator
 
+Additional relevant comparator: Yang and Jin (ICML 2026), [Multi-Distribution Robust Conformal Prediction](https://proceedings.mlr.press/v306/yang26ad.html), which studies finite-sample coverage across heterogeneous source distributions. It motivates regime-specific calibration rather than pooling all airport/weather conditions under a single unexamined distribution.
+
 Momtaz (2026), *Rolling-Calibrated Conformal Decision Support for Seasonal Airport Taxi-Time Planning under Distribution Shift*, evaluates rolling one-sided conformal calibration on 17 IATA seasons and 722 airports in the EUROCONTROL CODA dataset. The paper distinguishes exchangeability-based conformal guarantees from empirical adaptation under distribution shift and notes the operational trade-off between under-planning and padding. DOI: https://doi.org/10.19139/soic-2310-5070-3782.
 
 That work is a calibration-method comparator, not proof that this split auditor improves prediction intervals. The next fair comparison should reproduce its calibration regime where data licensing permits, then separately test whether a calibrated uncertainty set improves the *downstream recovery decision*.
@@ -76,9 +78,17 @@ Report:
 - Demonstrated reduction in held-out tail cost compared with the best matched baseline, while satisfying a predeclared average-cost and utilization non-inferiority bound.
 - For predictive uncertainty, report empirical coverage and width by time block and regime; do not claim formal coverage under arbitrary distribution shift.
 
+## Finite-sample radius calibration
+
+The adjacent `aviation_probability_calibration.rs` module derives a conservative TV radius from a frozen nominal scenario distribution and observed calibration frequencies. It separates the empirical TV discrepancy from a union-Hoeffding sampling allowance and reports the declared failure probability, episode count, whether the result saturates at 100%, and the required radius. The synthetic example feeds this radius into the DRO evaluator.
+
+This bound assumes independent complete disruption episodes drawn from one fixed finite-support distribution. Airline data can violate that assumption through temporal dependence, seasonality and regime shifts. Use event episodes rather than rows, report subgroup/time-block calibration, and use a predeclared envelope across regimes rather than pooling incompatible distributions. A wide or saturated bound is a meaningful indication that the calibration sample is inadequate.
+
+Tracking: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787).
+
 ## Runnable contract-composition example
 
-The example `crates/domains/symthaea-operations-research/examples/aviation_calibration_protocol_benchmark.rs` combines split integrity, declared tuning provenance, and the TV-radius robustness curve in one small synthetic program. It exits nonzero if the declared split/tuning contract fails and emits a JSON-formatted manifest of partition stats and curve points. It is only a smoke-test fixture; real data wiring, manifest digests, data lineage, model fitting and final evaluation remain outside this example.
+The example `crates/domains/symthaea-operations-research/examples/aviation_calibration_protocol_benchmark.rs` combines split integrity, declared tuning provenance, finite-sample TV-radius calibration, evaluation at the resulting radius, and the TV-radius robustness curve in one small synthetic program. It exits nonzero if the declared split/tuning contract fails and emits a JSON-formatted manifest of partition stats and curve points. It is only a smoke-test fixture; real data wiring, manifest digests, data lineage, model fitting and final evaluation remain outside this example.
 
 ## Test status and claim ceiling
 
