@@ -58,7 +58,7 @@ Freeze (H), target, cost boundary, baseline, and graph/family weights before con
 
 1. Event timestamps are finite, non-negative, in nondecreasing serialized order, and share the exact root clock origin and deployment boundary. No stage-duration sum substitutes for a direct clock.
 2. Event IDs are unique within a trace. The trial ID is globally unique across compared arms; pair ID is the pairing key.
-3. Candidate and receipt artifact paths are relative to the declared evidence bundle. Reject absolute paths, traversal, symlinks escaping the bundle, missing files, duplicate event IDs, and digest mismatches.
+3. Candidate and receipt artifact paths are relative to the declared evidence bundle. Reject absolute paths, traversal, symlinks escaping the bundle, missing files, duplicate event IDs, digest mismatches, and any single path that is assigned different bytes/digests within the same trace.
 4. The independently checked candidate cardinality lies between zero and (n), and every selected vertex is unique/in-range with no selected edge conflict.
 5. A verified feasible event must have a validated receipt and a validated candidate; the receipt verdict and cardinality must match recomputation. Caller-provided verified fields alone never raise (C(t)).
 6. A non-verified event cannot carry a verified cardinality. Its reported cardinality is descriptive only.
