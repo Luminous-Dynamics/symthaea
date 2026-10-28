@@ -129,6 +129,14 @@ pub fn score(input: MissingnessInput, source_bytes: &[u8]) -> anyhow::Result<Mis
         input.sensitivity_grid.reference_deltas.iter().any(|delta| *delta == 0.0),
         "reference sensitivity grid must include delta=0"
     );
+    ensure!(
+        input.sensitivity_grid.candidate_deltas.iter().all(|delta| delta.is_finite()),
+        "candidate sensitivity grid values must be finite"
+    );
+    ensure!(
+        input.sensitivity_grid.reference_deltas.iter().all(|delta| delta.is_finite()),
+        "reference sensitivity grid values must be finite"
+    );
 
     let candidate = summarize_arm(&input.candidate)?;
     let reference = summarize_arm(&input.reference)?;
@@ -334,6 +342,13 @@ mod tests {
         let reference = arm("reference", 10, vec![0.3; 10], 0, 0, 0, 0);
         let scored = score(input(candidate, reference), b"ranking-reversal").unwrap();
         assert!(scored.candidate.observed_mean_loss.unwrap() < scored.reference.observed_mean_loss.unwrap());
+        // Evaluator-only truth assumes the eight unobserved candidate losses are 0.9.
+        // This hidden truth is not a policy input; it demonstrates that the observed-case
+        // ranking can reverse while the identification interval remains honest.
+        let candidate_full_truth = (0.1 + 0.1 + 8.0 * 0.9) / 10.0;
+        assert!(candidate_full_truth > scored.reference.observed_mean_loss.unwrap());
+        assert!(scored.candidate.full_mean_loss_lower_bound <= candidate_full_truth);
+        assert!(candidate_full_truth <= scored.candidate.full_mean_loss_upper_bound);
         assert!(scored.candidate_minus_reference_loss_lower_bound < 0.0);
         assert!(scored.candidate_minus_reference_loss_upper_bound > 0.0);
         assert!(!scored.identification_interval_excludes_zero_in_candidate_favor);
@@ -350,6 +365,25 @@ mod tests {
         assert_eq!(scored.candidate.full_mean_loss_upper_bound, 1.0);
         assert!(scored.sensitivity_surface.is_empty());
         assert!(scored.sensitivity_status.contains("no-observed-outcomes"));
+    }
+
+    #[test]
+    fn worst_case_bounds_contain_all_binary_hidden_outcome_completions() {
+        let partially_observed = arm("candidate", 6, vec![0.2, 0.8], 0, 0, 4, 0);
+        let summary = summarize_arm(&partially_observed).unwrap();
+        // Four missing outcomes have 2^4 binary completions. Since each hidden loss
+        // lies in [0,1], every completion must lie inside the registered mean bounds.
+        for mask in 0_u32..(1_u32 << 4) {
+            let hidden_sum: f64 = (0..4)
+                .map(|bit| if mask & (1 << bit) == 0 { 0.0 } else { 1.0 })
+                .sum();
+            let full_mean = (1.0 + hidden_sum) / 6.0;
+            assert!(
+                summary.full_mean_loss_lower_bound <= full_mean + 1e-12
+                    && full_mean <= summary.full_mean_loss_upper_bound + 1e-12,
+                "bounds do not contain hidden-outcome completion {mask}: {full_mean}"
+            );
+        }
     }
 
     #[test]
