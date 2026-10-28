@@ -364,6 +364,11 @@ fn exact_sweep() -> Result<String, String> {
     validate_contract()?;
     let scenarios = parse_grid(GRID)?;
     let mut output = String::from("kind\thorizon\ttruth_ppm\talpha_ppm\tprob_ever_cross\tinterpretation\n");
+    let _ = writeln!(
+        output,
+        "CONTRACT\talpha_risk={:.6}\talpha_value={:.6}\talpha_joint={:.6}\trisk_cap={:.6}\tvalue_floor={:.6}\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tpeeking_looks=72,120",
+        RISK_ALPHA, VALUE_ALPHA, JOINT_ALPHA, RISK_CAP, VALUE_FLOOR
+    );
     let mut risk_count = 0usize;
     let mut value_count = 0usize;
     for scenario in &scenarios {
@@ -549,6 +554,7 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.lines().filter(|line| line.starts_with("RISK\t")).count(), 20);
         assert_eq!(first.lines().filter(|line| line.starts_with("VALUE\t")).count(), 20);
+        assert!(first.contains("CONTRACT\talpha_risk=0.025000\talpha_value=0.025000\talpha_joint=0.050000\trisk_cap=0.050000\tvalue_floor=0.500000\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tpeeking_looks=72,120"));
         assert!(first.contains("PEEKING_CONTROL\t120\t50000\t72,120\t0.032937159528\t0.008924249150\t0.025000"));
         assert!(first.contains("GATE_CONTROL\tall_clear\tAUTHORIZED"));
         assert!(first.contains("GATE_CONTROL\tmissing_evidence\tDENIED"));
