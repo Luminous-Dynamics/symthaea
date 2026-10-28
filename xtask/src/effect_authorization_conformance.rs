@@ -193,12 +193,40 @@ fn validate(manifest: &Manifest, corpus_sha256: String) -> Result<Summary> {
     require_nonempty("case_schema.expected_effect_adapter_invocations_for_case", &manifest.case_schema.expected_effect_adapter_invocations_for_case)?;
     require_nonempty("case_schema.effect_witness", &manifest.case_schema.effect_witness)?;
     require_nonempty("case_schema.terminal_class", &manifest.case_schema.terminal_class)?;
+    if !manifest.case_schema.expected_effect_adapter_invocations_for_case.contains("point-of-effect adapter") {
+        bail!("case schema must count invocations at the instrumented point-of-effect adapter");
+    }
 
     ensure_nonempty_list("event_denominators", &manifest.event_denominators)?;
     ensure_nonempty_list("performance_policy.report_separately", &manifest.performance_policy.report_separately)?;
     ensure_nonempty_list("performance_policy.percentiles", &manifest.performance_policy.percentiles)?;
     ensure_nonempty_list("performance_policy.occupancy_points", &manifest.performance_policy.occupancy_points)?;
     ensure_nonempty_list("performance_policy.requirements", &manifest.performance_policy.requirements)?;
+    const REQUIRED_EVENTS: &[&str] = &[
+        "effect_adapter_invocations", "observed_side_effects", "postconditions_confirmed",
+        "postconditions_failed", "outcome_unknown", "receipt_verification_failed",
+        "timeouts", "missing_or_incomplete_rows",
+    ];
+    for event in REQUIRED_EVENTS {
+        if !manifest.event_denominators.iter().any(|item| item == event) {
+            bail!("event denominators are missing required outcome stage {event}");
+        }
+    }
+    const REQUIRED_STAGES: &[&str] = &[
+        "credential_verification", "local_recognition", "policy_decision",
+        "durable_reservation", "dispatch_admission", "effect_adapter",
+        "postcondition_verification", "end_to_end",
+    ];
+    for stage in REQUIRED_STAGES {
+        if !manifest.performance_policy.report_separately.iter().any(|item| item == stage) {
+            bail!("performance report is missing comparable stage {stage}");
+        }
+    }
+    if !manifest.gates.positive_controls.to_ascii_lowercase().contains("exactly once")
+        || !manifest.gates.positive_controls.to_ascii_lowercase().contains("deny-all")
+    {
+        bail!("positive-control gate must require exactly-once legitimate execution and explicitly fail deny-all systems");
+    }
 
     let profile = &manifest.test_profile;
     if !profile.currentness_required_at_effect_entry
@@ -282,9 +310,21 @@ fn validate(manifest: &Manifest, corpus_sha256: String) -> Result<Summary> {
             bail!("case {} has an unsupported ID class", case.id);
         }
     }
-    if positive == 0 || negative == 0 || indeterminate == 0 || lifecycle == 0 || concurrent != 1 {
+    let expected_ids = (1..=4)
+        .map(|number| format!("POS-{number:03}"))
+        .chain((1..=32).map(|number| format!("NEG-{number:03}")))
+        .chain(std::iter::once("IND-001".to_string()))
+        .chain((1..=4).map(|number| format!("LIFE-{number:03}")))
+        .collect::<BTreeSet<_>>();
+    let actual_ids = manifest.cases.iter().map(|case| case.id.clone()).collect::<BTreeSet<_>>();
+    if actual_ids != expected_ids {
+        let missing = expected_ids.difference(&actual_ids).cloned().collect::<Vec<_>>();
+        let unexpected = actual_ids.difference(&expected_ids).cloned().collect::<Vec<_>>();
+        bail!("frozen v1 case inventory changed; missing={missing:?}, unexpected={unexpected:?}; create a reviewed corpus version instead of silently changing denominators");
+    }
+    if positive != 4 || negative != 32 || indeterminate != 1 || lifecycle != 4 || concurrent != 1 {
         bail!(
-            "benchmark must contain positive, negative, indeterminate, lifecycle and exactly one concurrent one-shot control (got +{positive}, -{negative}, indeterminate {indeterminate}, lifecycle {lifecycle}, concurrent {concurrent})"
+            "frozen v1 class counts changed (got +{positive}, -{negative}, indeterminate {indeterminate}, lifecycle {lifecycle}, concurrent {concurrent})"
         );
     }
 
