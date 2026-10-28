@@ -62,6 +62,12 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     security = data.get("industry_comparators", {}).get("agent_security_league", {})
     if security.get("top_listed_functional_pct") != 87.2 or security.get("top_listed_security_correctness_pct") != 37.4:
         errors.append("security_comparator_reference_drift")
+    dual_gauge = data.get("industry_comparators", {}).get("dual_gauge", {})
+    if dual_gauge.get("task_count") != 307 or dual_gauge.get("reported_best_joint_functional_security_success_pct_upper_bound") != 15.0:
+        errors.append("dual_gauge_reference_drift")
+    last_secure = data.get("industry_comparators", {}).get("last_secure_code_benchmark", {})
+    if last_secure.get("task_count") != 450 or last_secure.get("reported_best_joint_functional_security_success_pct") != 25.1:
+        errors.append("last_secure_benchmark_reference_drift")
     return errors
 
 
@@ -109,6 +115,16 @@ class ScorecardTests(unittest.TestCase):
         security = self.scorecard["current_measurements"]["security_correctness_pct"]
         self.assertIsNone(security["value"])
         self.assertFalse(security["eligible"])
+
+    def test_joint_security_functional_success_remains_unmeasured(self) -> None:
+        joint = self.scorecard["current_measurements"]["security_joint_functional_success_pct"]
+        self.assertIsNone(joint["value"])
+        self.assertFalse(joint["eligible"])
+
+    def test_security_comparators_are_not_vleb_results(self) -> None:
+        self.assertIsNone(self.scorecard["current_measurements"]["security_correctness_pct"]["value"])
+        self.assertEqual(self.scorecard["industry_comparators"]["dual_gauge"]["task_count"], 307)
+        self.assertEqual(self.scorecard["industry_comparators"]["last_secure_code_benchmark"]["task_count"], 450)
 
 
 if __name__ == "__main__":
