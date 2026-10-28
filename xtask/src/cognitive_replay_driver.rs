@@ -534,6 +534,15 @@ mod tests {
     }
 
     #[test]
+    fn receipt_audit_rejects_decision_trace_mutation_without_receipt_digest_update() {
+        let mut policy = ConsumeDeliveredPolicy;
+        let mut receipt = scenario(vec![0.0; 6]).run(&mut policy).expect("driver run");
+        receipt.decisions[1].prediction += 0.5;
+        let error = audit_receipt(&receipt).expect_err("decision trace mutation must invalidate receipt digest");
+        assert!(error.to_string().contains("receipt_sha256 does not match canonical replay receipt"));
+    }
+
+    #[test]
     fn receipt_audit_rejects_feature_stream_mutation_without_commitment_update() {
         let mut policy = ConsumeDeliveredPolicy;
         let mut receipt = scenario(vec![0.0; 6]).run(&mut policy).expect("driver run");
