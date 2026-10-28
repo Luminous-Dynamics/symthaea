@@ -187,6 +187,82 @@ Until qualification is complete, user-facing descriptions and internal comments 
 
 In particular, attention should not assign higher weight because a value is asserted to indicate greater consciousness. It may use a qualified integration feature as one learned input, but should be evaluated against task utility, preserve a baseline without that input, and avoid locking the controller into a metric that fails negative controls.
 
+## 9. Competitive strategy: beat the cost–evidence frontier
+
+Do not compete with a formal reference implementation by relabeling a proxy as faster IIT. Use the reference as the authority for the explicitly matched formal quantity, then compete on the quality/cost trade-off and on independently measured engineering utility.
+
+### 9.1 Use the strongest reference as an offline qualification oracle
+
+The current PyPhi 2.0 documentation describes a broad toolchain including formalism-specific IIT 3.0 / IIT 4.0 variants, cost estimation, state/subsystem sweeps, macro-grain search, parameter landscapes, distributed computation and cause–effect relation queries. The changelog also describes substrate estimation with uncertainty and certified upper bounds for IIT quantities. Pin the exact release candidate or release artifact and all model/profile options; never rely on a floating install.
+
+Suggested architecture:
+
+```text
+explicit causal model + frozen state + pinned formalism profile
+                     |
+          offline PyPhi reference job
+                     |
+    immutable outputs + model/source/config digests
+                     |
+       Rust fixture consumer / qualification runner
+                     |
+  Symthaea proxy vs reference vs simple baseline report
+```
+
+Keep the oracle tooling outside the production runtime. Rust tests should consume frozen oracle outputs so the normal Symthaea build does not require a Python runtime. An oracle refresh is a separately reviewed data change and must not overwrite old evidence silently.
+
+### 9.2 Move from a universal score to an accuracy–cost–decision frontier
+
+For every estimator, report a frontier across fixed budgets (wall time, peak memory, and exact-reference calls). At each budget report:
+- numeric error when the quantity and scale are comparable;
+- uncertainty/coverage when the method claims bounds or intervals;
+- pairwise ranking reversals and partition/MIP agreement;
+- the rate at which estimator errors actually change a downstream decision;
+- cost per independently checked successful task outcome.
+
+The competitive goal is **more useful, calibrated decisions for the same cost**, or the same quality for lower cost. Do not optimize raw correlation in isolation. Choose the acceptance thresholds before unblinding the held-out cases.
+
+### 9.3 Active counterexample mining
+
+After the baseline comparison exists, use a separate training pool to search for small causal systems where the proxy ensemble disagrees most with the formal reference. Candidate search axes include topology, transition noise, common drivers, state, temporal grain, and subsystem boundary.
+
+1. Search for the strongest disagreement using only the training pool.
+2. Minimize the system to a comprehensible counterexample.
+3. Add the counterexample and its source/model/config digests to the regression corpus.
+4. Freeze a generator-family holdout that is never used to tune the proxy.
+5. Re-evaluate the full frontier, preserving all earlier failures.
+
+The aim is to actively discover the edge of validity, not to find a topology set on which one preferred score looks good.
+
+### 9.4 Treat grain and causal substrate as first-class variables
+
+A 16,384-dimensional hypervector is an encoding, not automatically 16,384 independent causal units. Before calculating formal quantities, define the candidate units and the interventions that would change them. For larger systems, compare defensible micro/meso/macro descriptions only when each induced causal model is explicit and its construction is reproducible.
+
+PyPhi's current documentation includes macro-unit/grain analysis. Symthaea can compare representation-level and module-level proxies with those reference-defined systems, but cannot treat a vector coordinate permutation, a neural unit permutation, and a change of causal grain as the same transformation.
+
+### 9.5 Keep utility optimization separate from theory fitting
+
+Use three pre-registered objective families:
+- **Formal correspondence:** match one pinned reference quantity and structure under the stated model.
+- **Proxy quality:** predict the named reference property at lower compute cost.
+- **Cognitive utility:** improve held-out task results, robustness, calibration or recovery under matched resources.
+
+A metric can fail formal correspondence but still be a useful engineering feature; it can also correlate with the reference while harming a task. Preserve those outcomes instead of folding them into a universal composite score. Only the third track can justify operational influence, and only for the specific task and deployment conditions it tests.
+
+### 9.6 Competitive gates (targets, not results)
+
+| Objective | Qualification target |
+|---|---|
+| Formal oracle fixtures | 100% agreement with independently checked frozen known answers within specified tolerances |
+| Invalid/underspecified models | 0 false accepts in the required negative-control suite |
+| Proxy false confidence | No reported bound/interval without coverage evidence; no silent exactness claim |
+| Held-out robustness | Report worst-case and generator-family error; never only pooled correlation |
+| Cost frontier | Publish quality-vs-wall-time/memory curve for all feasible baselines |
+| Cognitive utility | Positive preregistered effect against a compute-matched baseline, with uncertainty and failure costs |
+| Reproducibility | Exact source/model/config digests and a fresh qualification receipt for each tested head |
+
+These are release targets, not observed results. The next best experiment is the smallest one that can falsify a current claim, not the largest system that can produce an impressive number.
+
 ## References
 
 - Albantakis et al. (2023), “Integrated Information Theory (IIT) 4.0: Formulating the Properties of Phenomenal Existence in Physical Terms”: https://doi.org/10.1371/journal.pcbi.1011465
