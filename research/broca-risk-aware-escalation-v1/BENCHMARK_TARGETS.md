@@ -35,6 +35,63 @@ Sieve and Sage: https://aclanthology.org/2026.findings-emnlp.2356/
 
 These adjacent directions test when an agent should abstain or recognize evidence absence versus being distracted by contradictory evidence. The proposed Broca contribution is not “invent abstention”; it is to evaluate **sequential answer/escalate/abstain selection** with risk/coverage/cost frontiers plus memory provenance and update governance.
 
+## Priority 1: Evolving the memory pipeline (MemPro)
+
+Paper: https://aclanthology.org/2026.emnlp-main.XXXX/  
+Code: https://github.com/wanghai673/MemPro
+
+MemPro's core direction is to treat the **whole memory pipeline as a versioned, evolvable program** instead of assuming that one fixed retrieve/summarize/consolidate recipe is optimal. Each candidate pipeline should be treated as an independently versioned system and evaluated under a fixed development budget; it must not be tuned on the final held-out set.
+
+Broca experiment:
+- Compare fixed raw-slice RAG, fixed BM25, fixed dense retrieval, current Broca policy, and an evolved-pipeline controller under the same reader, context budget, compute budget and seed/data split.
+- Store every pipeline version as an immutable manifest: modules, parameters, source/model digests, prompt and data digests, resource budget, parent version, rationale and evaluation receipt.
+- Optimize a declared objective such as held-out task success subject to cost and governance constraints. Keep the entire candidate tree; do not report only the winning run.
+- Report gain per iteration / per unit of optimization compute, outer-loop overfitting, cost-quality Pareto frontier, stability across seeds, and post-shift regression.
+- Include negative controls: random edits, shuffled feedback, held-out labels injected into optimizer metadata, and repeated tuning on validation until it overfits.
+
+This is a **system-level optimization** lane, not a new retrieval metric. LongMemEval, LoCoMo, HotpotQA and NarrativeQA are not interchangeable; evaluate each with its own official protocol where compatible. Paper claims remain paper-reported until matched runs are completed.
+
+## Priority 1: Compile evidence into guarded reusable skills (MSCE)
+
+Paper: https://aclanthology.org/2026.findings-emnlp.XXXX/
+
+The recent Memory-to-Skill Co-Evolution line argues that repeatedly useful experience can become a callable skill, but a memory-derived skill must preserve its evidence, applicability boundary, verification requirements and reliability. This is distinct from storing a text summary.
+
+Broca experiment:
+- Actions: retain raw episode, summarize, propose skill, activate skill, revise skill, quarantine, or retire.
+- Every promoted skill must carry source evidence IDs/digests, supported task families, explicit preconditions, prohibited contexts, a verification check and rollback lineage.
+- Test both skill reuse within its source environment and transfer to a new environment; separately report false skill activation, unsupported generalization, tool/argument correctness, execution success, and safe fallback.
+- Compare always-retrieve, summary-only, fixed skill templates, evidence-grounded skill promotion, and an oracle that is strictly diagnostic.
+- A skill may be promoted only on development data. Evaluate transfer on a held-out environment and prevent a generated skill from laundering an unverified or revoked claim into executable policy.
+
+The contribution worth testing is not “skills are novel”; it is **auditable promotion with constrained transfer and rollback**.
+
+## Priority 1: Implicit personalized safety (PerMemSafe)
+
+Paper: https://aclanthology.org/2026.findings-acl.XXXX/
+
+Personalization can improve helpfulness while also making a system more likely to act on unsafe inferred preferences or to overgeneralize from past user behavior. A memory policy should therefore be evaluated for helpfulness and safety independently.
+
+Broca experiment:
+- Separate explicit, user-confirmed preferences from implicit patterns inferred from behavior.
+- Test conflict cases: old preference vs current request, harmful inferred preference, sensitive attribute inference, context/scope shift, user correction, revocation, and uncertainty about identity or authorization.
+- Include no-personalization, explicit-only memory, unrestricted personalization, evidence-gated personalization and a conservative safety memory baseline.
+- Report safety success, helpfulness, unnecessary refusal, unsafe compliance, inferred-preference calibration, consent/revocation latency and cross-context leakage separately.
+- Any claimed safety advantage must use the benchmark's own evaluation protocol and matched model/prompt settings. A paper-reported gain for SentinelMem or another method is not a Broca result and must not be merged into LongMemEval accuracy.
+
+## The unifying research hypothesis
+
+These directions suggest a stronger thesis than "better retrieval": **memory should be a governed, versioned decision system that can evolve without losing evidence, safety or reproducibility**.
+
+Model it as four coupled but separately testable decisions:
+
+1. **Acquire:** what source evidence is worth retaining?
+2. **Retrieve / act:** what evidence should influence this decision, and at what cost?
+3. **Compile / evolve:** when is evidence strong enough to become a reusable summary, procedure or skill?
+4. **Govern / revise:** what must be scoped, corrected, revoked, quarantined or forgotten?
+
+Do not optimize these all at once in an opaque reward. First qualify each subsystem with a simple baseline and contract tests; then evaluate the joint system against frozen baselines. The joint policy should be allowed to lose to simpler retrieval. Complexity is justified only by measured held-out task, cost or safety gains.
+
 ## Priority 2: LongMemEval-V1 and LoCoMo
 
 Original LongMemEval: https://github.com/xiaowu0162/LongMemEval
@@ -52,8 +109,8 @@ Use for long conversational memory and temporal reasoning, but keep V1 and V2 as
 
 ## Next experiments
 
-1. Implement the risk selector and telemetry in the actual Rust-backed MemoryBridge; keep Python only as a thin official-harness adapter.
-2. Run LongMemEval-V2 small tier across both domains with the three matched arms and official evaluator.
-3. Replace synthetic features/outcomes with observed retrieval evidence and outcome traces under the same answer backbone.
-4. Add Mem2ActBench for action grounding and TimlMemBench/FAMA for governance.
-5. Publish the full Pareto frontier. If conventional raw-slice RAG wins at equal cost/quality, simplify Broca accordingly.
+1. Finish and qualify the source-bound text adapter: run Rust/Python tests, verify the pinned harness installer on a clean checkout, and preserve all failures and receipts.
+2. Run the LongMemEval-V2 small tier on both web and enterprise with matched `no_retrieval`, `rag_query_to_slice`, BM25, and separately named AgentRunbook-C V2 arms. Use the official evaluator and unchanged reference frontier.
+3. Add an evolutionary outer-loop experiment only after the fixed baselines are stable. Freeze candidate-generation budget, manifest format, development feedback and held-out suite before optimization.
+4. Add Mem2ActBench for action grounding; TimlMemBench/FAMA and PerMemSafe for lifecycle and personalized safety; a separate evidence-grounded skill-transfer lane for MSCE-style promotion. Keep all metric families separate.
+5. Publish quality–latency–lifecycle-cost Pareto curves and a version tree of tried pipelines. If conventional raw-slice RAG wins at equal cost/quality, simplify Broca. If a complex winner is fragile across seeds or shifts, do not promote it.
