@@ -52,7 +52,7 @@ The receipt auditor now requires stdout and stderr paths, requires each path to 
 
 ## Evaluator pin completeness hardening (follow-up)
 
-The auditor now requires out-of-band canonical SHA-256 pins for the full source-span list, exact invocation object, and input-artifact inventory. This prevents a receipt from selecting a different but still hash-valid source span, changing arguments/working directory/environment fingerprints, or substituting another scenario input while reusing the same task and source digest. It also compares the producer's repository full name, workflow ref, and triggering event against evaluator-supplied expectations in addition to numeric repository ID, workflow path/SHA, run ID, and attempt.
+The auditor now requires out-of-band an exact source-path pin plus canonical SHA-256 pins for the full source-span list, exact invocation object, and input-artifact inventory. This prevents a receipt from selecting a different but still hash-valid source span, changing arguments/working directory/environment fingerprints, or substituting another scenario input while reusing the same task and source digest. It also compares the producer's repository full name, workflow ref, and triggering event against evaluator-supplied expectations in addition to numeric repository ID, workflow path/SHA, run ID, and attempt.
 
 Canonical pins use UTF-8 JSON serialized with sorted keys, no insignificant whitespace, non-ASCII preserved, and non-finite numbers forbidden. The protected task/claim registry must calculate these pins before the run; they must not be copied from the receipt being audited. New negative controls cover changed spans, invocation, input inventory, workflow ref/event, and repository name.
 
@@ -60,3 +60,5 @@ Canonical pins use UTF-8 JSON serialized with sorted keys, no insignificant whit
 ## Strict JSON parsing hardening (follow-up)
 
 The receipt auditor now rejects duplicate JSON object keys and non-standard numeric constants such as NaN and Infinity before schema validation. Some parsers silently accept duplicate keys by retaining only the last value; rejecting them prevents different tools from assigning different meanings to the same attested bytes. An end-to-end negative control verifies duplicate-key receipts fail closed.
+
+The source path itself is also compared to an evaluator-supplied pin; matching bytes and spans at an alternate path are not silently treated as the same claim anchor.

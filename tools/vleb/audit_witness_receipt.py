@@ -96,6 +96,7 @@ def validate_receipt(
     expected_run_attempt: int,
     expected_task_id: str,
     expected_claim_id: str,
+    expected_source_path: str,
     expected_source_sha256: str,
     expected_source_spans_sha256: str,
     expected_invocation_sha256: str,
@@ -161,6 +162,7 @@ def validate_receipt(
             (("producer", "run_attempt"), expected_run_attempt, "run_attempt_mismatch"),
             (("task_id",), expected_task_id, "task_id_mismatch"),
             (("claim_id",), expected_claim_id, "claim_id_mismatch"),
+            (("source", "path"), expected_source_path, "source_path_mismatch"),
             (("source", "sha256"), expected_source_sha256, "source_digest_mismatch"),
             (("verifier", "kind"), expected_verifier_kind, "verifier_kind_mismatch"),
             (("verifier", "id"), expected_verifier_id, "verifier_id_mismatch"),
@@ -286,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-run-attempt", type=int, required=True)
     parser.add_argument("--expected-task-id", required=True)
     parser.add_argument("--expected-claim-id", required=True)
+    parser.add_argument("--expected-source-path", required=True)
     parser.add_argument("--expected-source-sha256", required=True)
     parser.add_argument("--expected-source-spans-sha256", required=True)
     parser.add_argument("--expected-invocation-sha256", required=True)
@@ -311,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
         expected_run_attempt=args.expected_run_attempt,
         expected_task_id=args.expected_task_id,
         expected_claim_id=args.expected_claim_id,
+        expected_source_path=args.expected_source_path,
         expected_source_sha256=args.expected_source_sha256,
         expected_source_spans_sha256=args.expected_source_spans_sha256,
         expected_invocation_sha256=args.expected_invocation_sha256,
