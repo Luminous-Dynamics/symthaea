@@ -285,56 +285,64 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
 fn run_sweep(input: &str) -> Result<String, String> {
     let scenarios = parse_grid(input)?;
     let mut out = String::from(
-        "HEADER\trecord_type\tscenario_id\tverdict\tfield\tvalue\n",
+        "HEADER\trecord_type\tscenario_id\testimator\tverdict\tmetric\tvalue\n",
     );
     for scenario in scenarios {
         let result = enumerate(&scenario)?;
         let _ = writeln!(
             out,
-            "SCENARIO\t{}\t{}\ttrue_value\t{:.12}",
+            "SCENARIO\t{}\t-\t{}\toracle_truth_evaluator_only\t{:.12}",
             result.scenario.id, result.verdict, result.target_value
         );
         let _ = writeln!(
             out,
-            "SCENARIO\t{}\t{}\tunsupported_target_mass\t{:.12}",
+            "SCENARIO\t{}\t-\t{}\tunsupported_target_mass\t{:.12}",
             result.scenario.id, result.verdict, result.unsupported_target_mass
         );
         if result.verdict == "NOT_IDENTIFIED" {
             let _ = writeln!(
                 out,
-                "SCENARIO\t{}\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED",
+                "SCENARIO\t{}\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED",
                 result.scenario.id
             );
             continue;
         }
         let _ = writeln!(
             out,
-            "SCENARIO\t{}\t{}\tenumerated_states\t{}",
+            "SCENARIO\t{}\t-\t{}\tenumerated_states\t{}",
             result.scenario.id, result.verdict, result.enumerated_states
         );
         let _ = writeln!(
             out,
-            "SCENARIO\t{}\t{}\tprobability_mass\t{:.12}",
+            "SCENARIO\t{}\t-\t{}\tprobability_mass\t{:.12}",
             result.scenario.id, result.verdict, result.probability_mass
         );
         for metric in result.metrics {
-            let _ = writeln!(
-                out,
-                "METRIC\t{}\t{}\texpected={:.12};bias={:.12};variance={:.12};rmse={:.12};max_abs_error={:.12}",
-                result.scenario.id,
-                metric.estimator.name(),
-                metric.expected,
-                metric.bias,
-                metric.variance,
-                metric.rmse,
-                metric.max_abs_error
-            );
+            for (field, value) in [
+                ("expected", metric.expected),
+                ("bias", metric.bias),
+                ("variance", metric.variance),
+                ("rmse", metric.rmse),
+                ("max_abs_error", metric.max_abs_error),
+            ] {
+                let _ = writeln!(
+                    out,
+                    "METRIC\t{}\t{}\t{}\t{}\t{:.12}",
+                    result.scenario.id,
+                    metric.estimator.name(),
+                    result.verdict,
+                    field,
+                    value
+                );
+            }
         }
     }
+    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tconfidence_intervals\tNOT_COMPUTED\n");
+    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tproduction_authorization\tNOT_CLAIMED\n");
     Ok(out)
 }
 
-use std::fmt::Write as FmtWrite;
+use std::fmt::Write as _;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -442,9 +450,9 @@ mod tests {
         let first = run_sweep(GRID).unwrap();
         let second = run_sweep(GRID).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.lines().filter(|line| line.starts_with("METRIC\t")).count(), 30);
-        assert!(first.contains("SCENARIO\tzero_support\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED"));
-        assert!(first.contains("no confidence interval") == false);
+        assert_eq!(first.lines().filter(|line| line.starts_with("METRIC\t")).count(), 150);
+        assert!(first.contains("SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED"));
+        assert!(first.contains("METRIC\thealthy_correct\tIPS\tSUPPORT_OK_SYNTHETIC_ONLY\texpected\t0.500000000000"));\n        assert!(first.contains("confidence_intervals\tNOT_COMPUTED"));
     }
 
     #[test]
