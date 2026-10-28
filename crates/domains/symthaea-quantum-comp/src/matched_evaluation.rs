@@ -392,6 +392,12 @@ pub struct MatchedComparisonSummary {
     pub baseline_target_hits: usize,
     /// Number of pairs where the candidate reached its verified target.
     pub candidate_target_hits: usize,
+    /// Baseline target-hit rate over all matched trials, including failures.
+    pub baseline_target_hit_rate: f64,
+    /// Candidate target-hit rate over all matched trials, including failures.
+    pub candidate_target_hit_rate: f64,
+    /// Candidate minus baseline target-hit rate. Positive favors the candidate.
+    pub target_hit_rate_delta_candidate_minus_baseline: f64,
     /// Number of pairs where both methods reached the target.
     pub both_target_hits: usize,
     /// Pairs where only the candidate reached the target.
@@ -413,11 +419,13 @@ pub struct MatchedComparisonSummary {
     /// Both-hit pairs where measured energy boundaries differ.
     pub mismatched_energy_scope_pairs: usize,
     /// Median paired baseline/candidate time ratio, restricted to both-hit costed
-    /// pairs. Values greater than 1 favor the candidate on runtime.
-    pub median_time_speedup: Option<f64>,
+    /// pairs. This is a conditional diagnostic, not the primary result; values > 1
+    /// favor the candidate on runtime. Target-hit rates and misses must be reported too.
+    pub median_time_speedup_given_both_hit: Option<f64>,
     /// Median paired baseline/candidate energy ratio, restricted to both-hit pairs
-    /// with matching measured boundaries. Values greater than 1 favor the candidate.
-    pub median_energy_speedup: Option<f64>,
+    /// with matching measured boundaries. This is conditional, not a system-wide
+    /// energy claim; values > 1 favor the candidate.
+    pub median_energy_speedup_given_both_hit: Option<f64>,
     /// Complete per-pair details so the summary is auditable.
     pub pairs: Vec<MatchedPairResult>,
 }
@@ -717,6 +725,10 @@ pub fn compare_matched_arms(
         pair_count: pairs.len(),
         baseline_target_hits,
         candidate_target_hits,
+        baseline_target_hit_rate: baseline_target_hits as f64 / pairs.len() as f64,
+        candidate_target_hit_rate: candidate_target_hits as f64 / pairs.len() as f64,
+        target_hit_rate_delta_candidate_minus_baseline:
+            (candidate_target_hits as f64 - baseline_target_hits as f64) / pairs.len() as f64,
         both_target_hits,
         candidate_only_target_hits,
         baseline_only_target_hits,
@@ -726,8 +738,8 @@ pub fn compare_matched_arms(
         candidate_uncosted_target_hits,
         comparable_energy_pairs,
         mismatched_energy_scope_pairs,
-        median_time_speedup: median(&mut time_speedups),
-        median_energy_speedup: median(&mut energy_speedups),
+        median_time_speedup_given_both_hit: median(&mut time_speedups),
+        median_energy_speedup_given_both_hit: median(&mut energy_speedups),
         pairs,
     })
 }
@@ -867,8 +879,8 @@ mod tests {
         assert_eq!(result.baseline_only_target_hits, 0);
         assert_eq!(result.neither_target_hit, 0);
         assert_eq!(result.both_hit_costed_pairs, 1);
-        assert_eq!(result.median_time_speedup, Some(2.0));
-        assert_eq!(result.median_energy_speedup, Some(2.0));
+        assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
+        assert_eq!(result.median_energy_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.pairs[1].time_speedup_baseline_over_candidate, None);
     }
 
