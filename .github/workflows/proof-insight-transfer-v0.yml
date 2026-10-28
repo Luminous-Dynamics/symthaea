@@ -287,6 +287,89 @@ jobs:
               raise SystemExit("schema must reject the incomplete v1 power report")
           print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v2 schema, validation/test exposure quarantine, 48-cell effect/ICC/association grid, 36-cell weak-null grid, 48-cell null multiplicity check, simultaneous worst-association power bound, denominator reconciliation and negative controls; fixture is synthetic and not a power result")
           PY
+      - name: Validate run-config v1 schema and split-aware exposure quarantine
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/run-config-v1.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/run-config-v1.synthetic.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" <<'PY'
+          import copy
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          schema_path, fixture_path, split_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          fixture = json.loads(fixture_path.read_text())
+          split_manifest = json.loads(split_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(fixture)
+
+          assignments = {}
+          for family in split_manifest["families"]:
+              family_id = family["family_id"]
+              if family_id in assignments:
+                  raise SystemExit(f"duplicate frozen family ID: {family_id}")
+              assignments[family_id] = family["split"]
+
+          expected_partition = split_manifest["split_plan"]["partition_digest_sha256"]
+          if fixture["partition_digest_sha256"] != expected_partition:
+              raise SystemExit("synthetic run-config fixture must bind the checked-in frozen partition digest")
+          if assignments.get("012") != "validation" or assignments.get("089") != "test":
+              raise SystemExit("required exposed families must remain assigned to validation/test respectively")
+          if set(fixture["known_exposed_validation_family_ids"]) & set(fixture["known_exposed_test_family_ids"]):
+              raise SystemExit("validation/test exposure lists must be disjoint")
+
+          def check_split_aware_config(config):
+              validator.validate(config)
+              validation_ids = config["known_exposed_validation_family_ids"]
+              test_ids = config["known_exposed_test_family_ids"]
+              if set(validation_ids) & set(test_ids):
+                  raise ValueError("exposure lists overlap")
+              wrong_validation = [x for x in validation_ids if assignments.get(x) != "validation"]
+              wrong_test = [x for x in test_ids if assignments.get(x) != "test"]
+              if wrong_validation or wrong_test:
+                  raise ValueError(f"exposure IDs do not match frozen partition: validation={wrong_validation}, test={wrong_test}")
+
+          bad = copy.deepcopy(fixture)
+          del bad["known_exposed_validation_family_ids"]
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: missing validation exposure list was accepted")
+
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_validation_family_ids"].append("089")
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: test family 089 was accepted in validation quarantine")
+
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_test_family_ids"].append("012")
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: validation family 012 was accepted in test quarantine")
+
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_validation_family_ids"] = []
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: empty validation quarantine was accepted")
+
+          print("PITB_RUN_CONFIG_V1_PASS: strict schema, frozen partition digest, split-aware exposure IDs, disjoint quarantines and four malformed-config controls; fixture is synthetic and not a benchmark run")
+          PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
         run: |
