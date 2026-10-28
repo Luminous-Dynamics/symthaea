@@ -948,11 +948,13 @@ mod tests {
 
     #[test]
     fn nonfinite_token_normalization_never_rewrites_string_contents() {
-        let input = r#"{"text":"NaN Infinity -Infinity","value":NaN}"#;
+        let input = r#"{"text":"NaN Infinity -Infinity","a":NaN,"b":Infinity,"c":-Infinity}"#;
         let (normalized, count) = normalize_python_nonfinite_json(input);
-        assert_eq!(count, 1);
+        assert_eq!(count, 3);
         assert!(normalized.contains(r#""text":"NaN Infinity -Infinity""#));
-        assert!(normalized.contains(r#""value":null"#));
+        assert!(normalized.contains(r#""a":null"#));
+        assert!(normalized.contains(r#""b":null"#));
+        assert!(normalized.contains(r#""c":null"#));
         assert!(serde_json::from_str::<Value>(&normalized).is_ok());
     }
 
