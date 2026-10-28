@@ -168,6 +168,12 @@ impl LoRaFragment {
         let flags = buf[5];
         let checksum = u16::from_le_bytes([buf[6], buf[7]]);
 
+        // Reject reserved flag bits. In particular, a length-bound V2 frame
+        // must not be ambiguously interpreted as a legacy 8-byte-header frame.
+        if flags & !FLAG_FEC != 0 {
+            return None;
+        }
+
         // Sanity checks
         if total_fragments == 0 || fragment_index >= total_fragments {
             return None;
