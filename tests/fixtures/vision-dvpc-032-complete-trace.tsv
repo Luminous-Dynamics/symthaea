@@ -1,0 +1,5 @@
+context_id	action_id	target_probability	logging_probability	selected	reward	cluster_id
+c1	a	0.5	0.5	yes	1.0	g1
+c1	b	0.5	0.5	no	NA	g1
+c2	a	0.5	0.5	no	NA	g2
+c2	b	0.5	0.5	yes	0.0	g2

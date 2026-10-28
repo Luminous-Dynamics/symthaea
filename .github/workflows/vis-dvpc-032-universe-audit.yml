@@ -1,0 +1,63 @@
+name: VIS-DVPC-032 candidate-action universe audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-universe-audit.rs"
+      - "tests/fixtures/vision-dvpc-032-*.tsv"
+      - "docs/research/VIS_DVPC_032_UNIVERSE_AUDIT_V1.md"
+      - ".github/workflows/vis-dvpc-032-universe-audit.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-universe-audit.rs"
+      - "tests/fixtures/vision-dvpc-032-*.tsv"
+      - "docs/research/VIS_DVPC_032_UNIVERSE_AUDIT_V1.md"
+      - ".github/workflows/vis-dvpc-032-universe-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and frozen fixtures
+        uses: actions/checkout@v4
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Verify frozen fixture digests
+        run: sha256sum -c tests/fixtures/vision-dvpc-032.SHA256SUMS
+      - name: Format universe verifier
+        run: rustfmt --edition 2024 tools/vision-dvpc-universe-audit.rs
+      - name: Run exact universe tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-universe-audit.rs -o /tmp/vis-dvpc-032-tests
+          /tmp/vis-dvpc-032-tests
+      - name: Verify frozen complete fixture
+        run: |
+          manifest_sha="$(sha256sum tests/fixtures/vision-dvpc-032-manifest.tsv | cut -d ' ' -f1)"
+          trace_sha="$(sha256sum tests/fixtures/vision-dvpc-032-complete-trace.tsv | cut -d ' ' -f1)"
+          rustc --edition=2024 -O tools/vision-dvpc-universe-audit.rs -o /tmp/vis-dvpc-032
+          /tmp/vis-dvpc-032 --verify tests/fixtures/vision-dvpc-032-manifest.tsv tests/fixtures/vision-dvpc-032-complete-trace.tsv "$manifest_sha" "$trace_sha" | tee /tmp/vis-dvpc-032-result.tsv
+          grep -Fq $'SUMMARY\t-\tverdict\tCOMPLETE_ACTION_UNIVERSE' /tmp/vis-dvpc-032-result.tsv
+      - name: Create exact-source receipt
+        run: |
+          {
+            printf 'VIS_DVPC_032_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-universe-audit.rs tests/fixtures/vision-dvpc-032.SHA256SUMS tests/fixtures/vision-dvpc-032-manifest.tsv tests/fixtures/vision-dvpc-032-complete-trace.tsv /tmp/vis-dvpc-032-result.tsv
+          } > /tmp/vis-dvpc-032-receipt.tsv
+          cat /tmp/vis-dvpc-032-receipt.tsv
+      - name: Publish result and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-032-universe-audit-${{ github.sha }}
+          path: |
+            /tmp/vis-dvpc-032-result.tsv
+            /tmp/vis-dvpc-032-receipt.tsv
+          retention-days: 90
