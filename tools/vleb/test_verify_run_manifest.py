@@ -294,6 +294,11 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.assertEqual(result["supported"], 1)
         self.assertEqual(result["contradicted"], 0)
         self.assertEqual(result["unresolved"], 0)
+        self.assertEqual(result["failed"], 0)
+        self.assertEqual(
+            result["supported"] + result["contradicted"] + result["unresolved"] + result["failed"],
+            result["claim_count"],
+        )
 
     def test_claim_audit_missing_out_of_band_verifier_pin_fails_closed(self) -> None:
         result = verifier.audit_claim_evidence_bundle(
@@ -320,6 +325,11 @@ class RunManifestVerifierTests(unittest.TestCase):
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failed"], 1)
+        self.assertEqual(
+            result["supported"] + result["contradicted"] + result["unresolved"] + result["failed"],
+            result["claim_count"],
+        )
         self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
 
     def test_claim_audit_rejects_source_revision_mismatch(self) -> None:
