@@ -20,7 +20,7 @@ The strict invocation is expected to fail today because none of the entries has 
 
 ## What the checker establishes
 
-The Rust xtask command validates the v1 schema, uniqueness of surface IDs, repository-relative source paths, required claim-boundary fields, qualification-evidence shape, and whether every recorded source anchor occurs in its recorded file. It emits the inspected Git HEAD when available.
+The Rust xtask command validates the v1 schema, uniqueness of surface IDs, repository-relative source paths, required claim-boundary fields, qualification-evidence shape, and whether every recorded source anchor occurs in its recorded file. It emits the inspected Git HEAD when available. Its registry identity digest is SHA-256 over compact serialized parsed JSON after removing the `qualification_evidence` field from every entry; this prevents a qualification record from having to contain a digest of a document that includes that very digest. The digest still binds all other registry fields, including the source baseline and entry descriptions.
 
 It does **not** establish that:
 
