@@ -194,6 +194,12 @@ def analyze_paired_runs(
             "candidate_cost": sum(row["candidate_lifecycle_cost"] for row in group_rows),
         })
 
+    if any(group["base_cost"] <= 0 for group in group_stats):
+        raise ValueError(
+            "every bootstrap group must have positive baseline lifecycle cost "
+            "so every resampled cost-reduction ratio is defined"
+        )
+
     rng = random.Random(seed)
     accuracy_delta_samples: list[float] = []
     cost_reduction_samples: list[float] = []
