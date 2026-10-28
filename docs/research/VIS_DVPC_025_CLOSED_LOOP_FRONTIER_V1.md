@@ -45,7 +45,7 @@ For each campaign-policy pair, output includes selected actions, gate status/rea
 
 Net value is realized activation value minus (all actual measurement and activation costs multiplied by 100 milli-value units). An abstaining policy that spends money but never activates can therefore have negative net value; a policy that never spends gets zero rather than being credited as a discovery success. Actual costs, not only planning estimates, control budget-overrun reporting.
 
-The output is a metric vector, not a single weighted leaderboard score. Keep risk, realized value, cost, activation coverage, uncertified activations, false-safe authorizations, harmful activations and budget overruns separately visible. An uncertified activation is a policy action without a successful gate; a false-safe authorization is a gate pass when the evaluator-only target truth is at or beyond the risk boundary or at/below the value floor. They are different failure types.
+The output is a metric vector, not a single weighted leaderboard score. Keep risk, realized value, cost, activation coverage, uncertified activations, false-safe authorizations, harmful activations and budget overruns separately visible. An uncertified activation is a policy action without a successful gate; a false-safe authorization is a gate pass when the evaluator-only target truth is above the risk cap or below the value floor. They are different failure types.
 
 ## Known-answer acceptance gates
 
