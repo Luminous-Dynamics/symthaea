@@ -67,6 +67,9 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "candidate_pool_sha256": candidate_pool_sha,
         "manifest_generator_sha256": "9" * 64,
         "nominal_prediction_source": "test_low_fidelity_reference",
+        "nominal_prediction_evaluations": design_count,
+        "nominal_prediction_fidelity": "low",
+        "nominal_prediction_cost_units": design_count,
         "reference_point": [1.2, 1.2],
         "selected_candidate_ids": [0],
         "selection_frozen_before_holdout": True,
@@ -91,6 +94,8 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "holdout_role": "synthetic_post_selection_diagnostic",
         "evidence_class": "synthetic",
         "shift_suite_id": "test-synthetic-shift-suite",
+        "shift_evaluation_count": design_count * 2,
+        "shift_cost_accounting": "synthetic_analytic_not_priced",
         "shifts": [
             {
                 "shift_id": "boundary-shift",
@@ -134,6 +139,8 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         self.assertEqual(len(parsed["candidates"]), 75)
         self.assertEqual(parsed["selected_ids"], {"0"})
         self.assertEqual(len(parsed["shifts"]), 2)
+        self.assertEqual(document["source_run"]["audit_accounting"]["nominal_prediction_cost_units"], 75)
+        self.assertEqual(document["source_run"]["audit_accounting"]["shift_evaluation_count"], 150)
 
     def test_adapter_binds_exact_sweep_and_manifest_bytes(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
