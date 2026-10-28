@@ -68,6 +68,7 @@
 
 mod dual_layer;
 mod lora_fragment;
+mod lora_fragment_v2;
 mod mesh_receiver;
 pub mod sensor;
 
@@ -85,6 +86,10 @@ pub use dual_layer::{
 pub use lora_fragment::{
     FLAG_FEC, FragmentAssembler, HEADER_SIZE, LORA_MTU, LoRaFragment, PAYLOAD_SIZE, crc16_ccitt,
     fragment,
+};
+pub use lora_fragment_v2::{
+    FragmentAssemblerV2, LoRaFragmentV2, V2FragmentError, fragment_v2, V2_HEADER_SIZE,
+    V2_MTU, V2_PAYLOAD_SIZE, V2_MAX_DATA_FRAGMENTS, V2_MAX_ENCODED_LEN,
 };
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
 pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
