@@ -302,6 +302,7 @@ struct WeakNullScenario {
     status: String,
     true_target_weighted_mean_effect_percentage_points: f64,
     assumed_family_icc: f64,
+    pair_association_fraction: f64,
     requested_family_effect_heterogeneity_sd_percentage_points: f64,
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
@@ -346,6 +347,7 @@ struct PowerReport {
     null_effect_false_claim_probability_max: Option<f64>,
     null_effect_false_claim_probability_upper_simultaneous_95_max: Option<f64>,
     weak_null_family_effect_heterogeneity_sd_grid_percentage_points: Vec<f64>,
+    weak_null_pair_association_fraction_grid: Vec<f64>,
     weak_null_scenarios: Vec<WeakNullScenario>,
     weak_null_false_claim_probability_max: Option<f64>,
     weak_null_false_claim_probability_upper_simultaneous_95_max: Option<f64>,
@@ -649,23 +651,33 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         }
     }
     let weak_null_sd_grid_pp = [5.0_f64, 10.0, 20.0];
-    let mut weak_null_scenarios = Vec::with_capacity(weak_null_sd_grid_pp.len() * icc_grid.len());
+    let weak_null_pair_association_grid = [0.0_f64, 0.5, 0.9];
+    let mut weak_null_scenarios = Vec::with_capacity(
+        weak_null_sd_grid_pp.len() * icc_grid.len() * weak_null_pair_association_grid.len(),
+    );
     for (sd_index, sd_pp) in weak_null_sd_grid_pp.iter().copied().enumerate() {
         for (icc_index, icc) in icc_grid.iter().copied().enumerate() {
-            let scenario_index = sd_index * icc_grid.len() + icc_index;
-            let scenario_seed = config
-                .bootstrap_seed
-                .wrapping_add(0xD1B5_4A32_D192_ED03)
-                .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
-            weak_null_scenarios.push(simulate_weak_null_scenario(
-                &family_target_counts,
-                baseline_rate,
-                sd_pp / 100.0,
-                icc,
-                simulations,
-                bootstrap_replicates,
-                scenario_seed,
-            )?);
+            for (association_index, association) in
+                weak_null_pair_association_grid.iter().copied().enumerate()
+            {
+                let scenario_index = sd_index * icc_grid.len() * weak_null_pair_association_grid.len()
+                    + icc_index * weak_null_pair_association_grid.len()
+                    + association_index;
+                let scenario_seed = config
+                    .bootstrap_seed
+                    .wrapping_add(0xD1B5_4A32_D192_ED03)
+                    .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
+                weak_null_scenarios.push(simulate_weak_null_scenario(
+                    &family_target_counts,
+                    baseline_rate,
+                    sd_pp / 100.0,
+                    icc,
+                    association,
+                    simulations,
+                    bootstrap_replicates,
+                    scenario_seed,
+                )?);
+            }
         }
     }
     let weak_null_false_claim_probability_max = weak_null_scenarios
@@ -740,6 +752,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         null_effect_false_claim_probability_max,
         null_effect_false_claim_probability_upper_simultaneous_95_max,
         weak_null_family_effect_heterogeneity_sd_grid_percentage_points: weak_null_sd_grid_pp.to_vec(),
+        weak_null_pair_association_fraction_grid: weak_null_pair_association_grid.to_vec(),
         weak_null_scenarios,
         weak_null_false_claim_probability_max,
         weak_null_false_claim_probability_upper_simultaneous_95_max,
@@ -751,8 +764,9 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             "Family sizes are taken from eligible validation outcomes and reused as the projected evaluation-family-size distribution; test eligibility may differ.".to_string(),
             "A beta-binomial family random effect induces the specified baseline Bernoulli ICC; treatment success shares the same latent family difficulty with its marginal success rate shifted by the scenario effect.".to_string(),
             "Arm outcomes are sampled independently conditional on family difficulty, so additional within-target pairing correlation is not assumed; this is an explicit approximation, not an empirically estimated ICC.".to_string(),
-            "A separate weak-null grid assigns normally generated family-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points across the preregistered ICC grid; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
-            "The weak-null grid tests false-claim probability when positive and negative family effects cancel on average. It is a finite family-size stress model, not proof of nominal coverage under every outcome dependence, missingness, or family-selection process.".to_string(),
+            "A separate weak-null grid assigns normally generated family-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points, ICC grid is 0, 0.05, 0.10, 0.20, and pair-association fractions are 0, 0.5, 0.9; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
+            "Weak-null paired outcomes use a bivariate Bernoulli coupling with the prescribed marginal success rates; the association fraction interpolates joint-success probability from independence to the Frechet upper bound and is not a Pearson correlation. The 36-cell weak-null grid tests false-claim probability when positive and negative family effects cancel on average, under those explicit pair-association and ICC values.".to_string(),
+            "This finite family-size stress model does not cover selective missingness, alternative family-size mechanisms, or every dependence structure and is not proof of nominal coverage universally.".to_string(),
             "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
             "Power estimates and their Monte Carlo standard errors are design simulations only. The report retains per-cell 95% Wilson bounds for diagnostics and uses a conservative one-sided Wilson upper bound with z=2.74 across the 16 registered strict/weak null cells for the simultaneous false-claim gate. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
@@ -819,7 +833,10 @@ fn wilson_interval_with_z(successes: usize, trials: usize, z: f64) -> (f64, f64)
 // twelve family-heterogeneous weak-null cells. z=2.74 is slightly more
 // conservative than the one-sided Bonferroni critical value for alpha=.05/16.
 fn simultaneous_null_upper_bound(successes: usize, trials: usize) -> f64 {
-    wilson_interval_with_z(successes, trials, 2.74).1
+    // Four strict-null ICC cells plus 3 SD × 4 ICC × 3 pair-association
+    // weak-null cells: 40 registered null cells. z=3.03 exceeds the one-sided
+    // Bonferroni critical value for alpha=.05/40.
+    wilson_interval_with_z(successes, trials, 3.03).1
 }
 
 fn simulate_power_scenario(
@@ -939,6 +956,7 @@ fn simulate_weak_null_scenario(
     baseline_rate: f64,
     requested_effect_sd: f64,
     icc: f64,
+    pair_association_fraction: f64,
     simulations: usize,
     bootstrap_replicates: usize,
     seed: u64,
@@ -958,6 +976,11 @@ fn simulate_weak_null_scenario(
     }
     if !icc.is_finite() || !(0.0..1.0).contains(&icc) {
         bail!("weak-null family ICC must lie in [0,1)");
+    }
+    if !pair_association_fraction.is_finite()
+        || !(0.0..=1.0).contains(&pair_association_fraction)
+    {
+        bail!("weak-null pair-association fraction must lie in [0,1]");
     }
     if simulations == 0 || bootstrap_replicates == 0 {
         bail!("weak-null simulation and bootstrap counts must be positive");
@@ -982,6 +1005,7 @@ fn simulate_weak_null_scenario(
             baseline_rate,
             requested_effect_sd,
             icc,
+            pair_association_fraction,
             &mut rng,
         )?;
         let total_delta: i64 = simulated_families
@@ -1017,6 +1041,7 @@ fn simulate_weak_null_scenario(
         status: "estimated".to_string(),
         true_target_weighted_mean_effect_percentage_points: 0.0,
         assumed_family_icc: icc,
+        pair_association_fraction,
         requested_family_effect_heterogeneity_sd_percentage_points: requested_effect_sd * 100.0,
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
@@ -1045,6 +1070,7 @@ fn simulate_weak_null_matched_study(
     baseline_rate: f64,
     requested_effect_sd: f64,
     icc: f64,
+    pair_association_fraction: f64,
     rng: &mut SplitMix64,
 ) -> Result<(Vec<SimulatedFamily>, f64)> {
     let baseline_rates: Vec<f64> = family_target_counts
@@ -1066,10 +1092,19 @@ fn simulate_weak_null_matched_study(
         .zip(treatment_effects)
     {
         let treatment_family_rate = (baseline_family_rate + effect).clamp(0.0, 1.0);
+        let joint_success_probability = joint_success_probability_at_association(
+            baseline_family_rate,
+            treatment_family_rate,
+            pair_association_fraction,
+        )?;
         let mut paired_delta_sum = 0_i64;
         for _ in 0..family.eligible_target_count {
-            let baseline_success = rng.uniform01() < baseline_family_rate;
-            let treatment_success = rng.uniform01() < treatment_family_rate;
+            let (baseline_success, treatment_success) = sample_paired_bernoulli(
+                baseline_family_rate,
+                treatment_family_rate,
+                joint_success_probability,
+                rng,
+            );
             paired_delta_sum += (if treatment_success { 1_i64 } else { 0_i64 })
                 - (if baseline_success { 1_i64 } else { 0_i64 });
         }
