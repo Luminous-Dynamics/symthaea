@@ -202,7 +202,7 @@ fn artifact_commitment_for(
     hasher.update(context);
     hasher.update(payload_len.to_be_bytes());
     hasher.update(artifact_bytes);
-    Ok(hex_digest(hasher.finalize().as_slice()))
+    Ok(hex_digest(&hasher.finalize()))
 }
 
 /// Compute the commitment to all frozen non-artifact manifest fields.
@@ -913,7 +913,7 @@ mod tests {
         assert!(report.seed_commitment_matches);
         assert!(report.task_set_commitment_matches);
         assert_eq!(report.seed_bytes, 32);
-        assert_eq!(report.task_set_bytes, test_task_set().len() as u64);
+        assert_eq!(report.task_set_bytes, u64::try_from(test_task_set().len()).unwrap());
     }
 
     #[test]
