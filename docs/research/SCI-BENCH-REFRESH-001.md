@@ -172,7 +172,35 @@ Do not use a universal fixed percentage gain as the only success criterion. Firs
 
 These benchmarks are complementary, not directly commensurate. Do not compare scores across them without matching task definitions, scoring semantics, budgets and evaluation units.
 
-## 11. Initial delivery sequence
+## 11. Competitive baseline plan and stretch targets
+
+Do not publish one cross-benchmark leaderboard number. These benchmarks measure different tasks and score semantics; use a portfolio and state which inference each result supports.
+
+| Evidence lane | Baseline portfolio | What it can establish | What it cannot establish by itself |
+|---|---|---|---|
+| Interactive law discovery | Pinned NewtonBench native baseline; paired no-tool/tool policy; same task/seed and total resource caps | Whether a policy improves interactive discovery and native equation scores | Physical discovery or transfer to unrelated task families |
+| Autonomous experiment design | Science-Gym and/or GravityBench policy baselines, including random/fixed observation selection and strongest available native baseline | Whether the policy chooses informative observations under a controlled budget | Superiority to offline symbolic-regression solvers on non-comparable tasks |
+| Offline symbolic regression | A frozen snapshot of eligible top methods from SRBench/SRBench++, with method revisions, tuning budget and resource envelope captured | Accuracy/complexity/resource trade-offs on compatible equation-recovery tasks | That an agent can independently design experiments or manage scientific workflow |
+| Real scientific workflows | ScienceAgentBench tasks or another independently sourced, rights-cleared task set with expert/domain validation | A bounded check of transfer into real data-driven scientific tasks | Exact law-discovery performance on synthetic physics; its metric must not be pooled with the others |
+
+Selection of the strongest comparator must be reproducible from a dated source snapshot. Do not select only the baseline that loses: keep complementary methods when their strengths differ, and document hyperparameter/tuning effort. SRBench's own motivation is that no single symbolic-regression method dominates across all datasets, and it explicitly considers accuracy, complexity and energy/cost trade-offs.
+
+### Prospective stretch targets — not current results
+
+Use the baseline-only pilot to estimate variance and define the practical minimum effect before powering the confirmatory study. The following are proposed research ambitions, not universal benchmark standards:
+
+1. **Discovery efficiency:** at matched total budget, target at least 20% lower median total cost to the first independently validated law, without worse validated-hit rate or higher confidently-wrong rate. Count failed experiments, reference/oracle calls, tokens, runtime and rejected candidates; if costs cannot be converted to a defensible common unit, publish separate budget curves rather than a synthetic total.
+2. **Held-out symbolic recovery:** target at least a 10 percentage-point absolute increase in exact, independently checkable recovery over the strongest eligible baseline at matched budget, with a preregistered paired uncertainty interval excluding no improvement. If exact recovery is not formally checkable, do not replace it with a judge score without relabelling the claim.
+3. **False discovery:** target a one-sided 95% upper confidence bound no greater than 5% for confidently wrong law claims on independently generated null/confounded worlds. The number of worlds must be selected prospectively; for intuition, zero failures in 60 independent Bernoulli null worlds gives an upper bound of about 5% by the rule-of-three approximation, but task-family dependence invalidates treating correlated cases as 60 independent trials.
+4. **Invariant behavior:** require 100% pass on frozen evaluator/generator positive and negative controls, no leaked oracle-only inputs accepted by the policy interface, and 100% expected-task denominator accounting.
+5. **Generalization:** demonstrate gains on held-out task families and refresh generations while preserving anchor scores; report per-family deltas and the public-to-refresh gap instead of hiding regressions in a pooled mean.
+6. **Uncertainty:** whenever confidence/probability outputs are used to justify a scientific claim, report grouped calibration and coverage against the matching target population. Do not tune a threshold on the sealed generation and reuse it as confirmatory evidence.
+
+To claim a win over the state of the art, the candidate must beat the strongest eligible comparator on a predeclared decision-relevant metric at matched budgets, report uncertainty and per-family failures, and retain acceptable false-discovery/calibration behavior. Pareto improvements are preferable to a single composite: validated discovery rate, total cost, predictive extrapolation, complexity and epistemic reliability should remain separately visible.
+
+These ambitions should be narrowed or revised only using baseline-only pilot evidence before unblinding—not after seeing the candidate's confirmatory result.
+
+## 12. Initial delivery sequence
 
 1. **Protocol (this document):** freeze lanes, threat model, generation and scoring rules.
 2. **Manifest/schema + synthetic fixture:** canonical example with pre-run commitments, hidden-field boundaries and expected denominator.
@@ -181,6 +209,6 @@ These benchmarks are complementary, not directly commensurate. Do not compare sc
 5. **Baseline-only pilot:** use pinned NewtonBench or a separately declared small synthetic profile; no candidate-policy superiority claim.
 6. **Confirmatory study:** paired frozen policies, predeclared effect and sample size, complete cost accounting, held-out generation(s), and independent review.
 
-## 12. Claim ceiling
+## 13. Claim ceiling
 
 This document is a protocol proposal. It does not show that a benchmark has been generated, that an evaluator-held secret can be safely maintained by the current runner, that task constructors are qualified, or that Symthaea exceeds any state-of-the-art baseline. The first valid result is successful generator/evaluator qualification; a model win is a later and separate claim.
