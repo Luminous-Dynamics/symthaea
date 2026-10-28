@@ -519,6 +519,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn stable_source_encoding_ignores_object_key_order() {
+        let first: Value = serde_json::from_str(
+            r#"{"z":{"b":2,"a":1},"a":[true,"text"]}"#
+        ).unwrap();
+        let second: Value = serde_json::from_str(
+            r#"{"a":[true,"text"],"z":{"a":1,"b":2}}"#
+        ).unwrap();
+
+        assert_eq!(stable_json_bytes(&first).unwrap(), stable_json_bytes(&second).unwrap());
+    }
+
     #[test]
     fn init_is_required_and_scope_is_pinned() {
         let mut worker = Worker::new();
