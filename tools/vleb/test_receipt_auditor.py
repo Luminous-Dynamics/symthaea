@@ -194,7 +194,7 @@ class AuditBundle:
             "mutation_results": mutation_rows, "differential_checks": checks,
             "verifier": {
                 "verifier_id": "synthetic-auditor-test", "verifier_version": "test",
-                "verifier_binary_sha256": sha(MODULE_PATH.read_bytes()), "receipt_recomputed": True,
+                "verifier_binary_sha256": sha(b"synthetic-verifier-binary"), "receipt_recomputed": True,
                 "required_test_coverage": 1, "environment_match": "match", "verdict": "pass", "reason_codes": [],
                 "auditor_output_sha256": sha(b"synthetic-auditor-output"),
             },
@@ -237,6 +237,7 @@ class AuditBundle:
             expected_image_id=self.IMAGE_ID, expected_task_sha256=sha(self.task_path.read_bytes()),
             expected_protocol_sha256=sha(self.protocol_path.read_bytes()), expected_candidate_patch_sha256=sha(self.patch_path.read_bytes()),
             expected_auditor_sha256=audit_module.sha256_path(MODULE_PATH),
+            expected_verifier_binary_sha256=sha(b"synthetic-verifier-binary"),
         )
 
     def write_receipt(self) -> None:
@@ -287,6 +288,10 @@ class ReceiptAuditorTests(unittest.TestCase):
     def test_auditor_binary_must_match_approved_digest(self) -> None:
         self.bundle.inputs = replace(self.bundle.inputs, expected_auditor_sha256="0" * 64)
         self.assert_issue(self.bundle.run_audit(), "auditor_identity_mismatch")
+
+    def test_verifier_binary_identity_must_match_out_of_band_pin(self) -> None:
+        self.bundle.inputs = replace(self.bundle.inputs, expected_verifier_binary_sha256="0" * 64)
+        self.assert_issue(self.bundle.run_audit(), "receipt_verifier_identity_mismatch")
 
     def test_receipt_task_hash_tampering_is_rejected(self) -> None:
         self.bundle.receipt["task_contract_sha256"] = "1" * 64
