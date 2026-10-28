@@ -326,7 +326,7 @@ The scorer independently reimplements the Halton pool, all six scenario response
 Tests include diagonal parity across all families/fidelities, component separation for an off-diagonal cell, full trace replay, and adversarial objective/cost mutation checks:
 
 ```sh
-python3 -m unittest tools/casting-benchmark/test_compositional_bakeoff.py -v
+(cd tools/casting-benchmark && python3 -m unittest test_compositional_bakeoff.py -v)
 ```
 
 The three-seed default is diagnostic only. Use at least 20 paired seeds (target 30), multiplicity-aware preregistered analysis, pinned external baselines and a separate physical-validation gate before making claims of general superiority or foundry relevance.
