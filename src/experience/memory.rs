@@ -556,6 +556,16 @@ mod tests {
     }
 
     #[test]
+    fn experience_record_preserves_missing_pe_as_invalid() {
+        let signals = PrincipledSignals::new();
+        let record = ExperienceRecord::from_signals("missing-pe", "query", &signals);
+        assert_eq!(record.prediction_error, 0.5);
+        assert!(!record.prediction_error_valid);
+        assert_eq!(record.learning_value(), record.outcome.as_ref().map(|_| 0.4).unwrap_or(0.0)
+            + 1.0 / (1.0 + record.age_seconds() as f32 / 86400.0));
+    }
+
+    #[test]
     fn test_user_mirror_update() {
         let mut mirror = UserEpistemicMirror::new("user123");
         assert_eq!(mirror.interaction_count, 0);
