@@ -7,7 +7,7 @@ bounded JSONL IPC, official context shape validation, and persistence/replay.
 """
 from __future__ import annotations
 
-import atexit
+import weakref
 import hashlib
 import json
 import os
@@ -26,6 +26,30 @@ PROTOCOL_ID = "BROCA-LME-V2-BM25-WORKER-V1"
 MAX_WORKER_LINE_BYTES = 32 * 1024 * 1024
 WORKER_MANIFEST_NAME = "broca_worker_manifest.json"
 TRAJECTORY_JOURNAL_NAME = "broca_trajectory_journal.jsonl"
+
+def _finalize_worker_resources(process: subprocess.Popen, journal: Any) -> None:
+    """Release a worker without retaining its adapter instance until interpreter exit."""
+    try:
+        if process.stdin is not None:
+            process.stdin.close()
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+    if process.poll() is None:
+        try:
+            process.terminate()
+            process.wait(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=1.0)
+        except OSError:
+            pass
+    try:
+        if not journal.closed:
+            journal.close()
+    except (OSError, ValueError):
+        pass
+
+
 
 
 @register_memory
@@ -119,6 +143,14 @@ class BrocaRustMemory(Memory):
             daemon=True,
         )
         self._reader_thread.start()
+        # Avoid atexit.register(self.close): a bound-method atexit callback
+        # retains every per-question memory instance until process shutdown.
+        self._finalizer = weakref.finalize(
+            self,
+            _finalize_worker_resources,
+            self._process,
+            self._journal,
+        )
 
         try:
             self._rpc({
@@ -130,7 +162,6 @@ class BrocaRustMemory(Memory):
         except BaseException:
             self._abort_worker()
             raise
-        atexit.register(self.close)
 
     @property
     def memory_config(self) -> dict[str, object]:
@@ -355,18 +386,11 @@ class BrocaRustMemory(Memory):
             if self._closed:
                 return
             self._closed = True
-            try:
-                if self._process.stdin is not None:
-                    self._process.stdin.close()
-                if self._process.poll() is None:
-                    self._process.terminate()
-                    try:
-                        self._process.wait(timeout=1.0)
-                    except subprocess.TimeoutExpired:
-                        self._process.kill()
-                        self._process.wait(timeout=1.0)
-            finally:
-                self._journal.close()
+            finalizer = getattr(self, "_finalizer", None)
+            if finalizer is not None and finalizer.alive:
+                finalizer()
+            else:
+                _finalize_worker_resources(self._process, self._journal)
 
     def _save_backend(self, output_dir: Path) -> None:
         journal_path = output_dir / TRAJECTORY_JOURNAL_NAME
