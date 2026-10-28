@@ -1,23 +1,39 @@
 # Broca evidence persistence and crash-consistency conformance
 
-**Status:** protocol/specification added alongside the snapshot codec. The disk-backed coordinator, atomic publication and crash-injection suite are **not implemented**. This document is a release gate, not a persistence qualification result.
+**Status:** prototype disk-generation coordinator and in-process failpoint tests added in `memory_evidence_persistence.rs`. The code is not compiled in this environment; the 1,000-schedule qualification gate and real power-loss/platform tests remain open. This document is a release gate, not a persistence qualification result.
 
 ## Invariant
 
 An HDC candidate ID is not evidence. A query may receive a payload only when the candidate index and evidence snapshot belong to the same committed generation and the resolved record passes scope, lifecycle, validity-window and content-digest checks.
 
-The snapshot codec preserves tombstones and rebuilds ID maps. `EvidenceCommitManifest` binds exact serialized HDC-index bytes and exact evidence-snapshot bytes to a nonzero generation. Its SHA-256 values are unkeyed consistency checks, not writer authentication. A hostile-storage deployment must verify a signature or externally pinned digest before trusting the manifest.
+The snapshot codec preserves tombstones, binds schema + generation + records into its digest, and rebuilds ID maps. `EvidenceCommitManifest` binds exact serialized HDC-index bytes and exact evidence-snapshot bytes to a nonzero generation. The new disk store stages immutable artifacts, syncs each file, renames the generation directory, reads back and verifies the artifacts, then atomically replaces `CURRENT` last. Recovery checks `CURRENT`, manifest and artifact digests and never falls back to an older generation. Its SHA-256 values are unkeyed consistency checks, not writer authentication. A hostile-storage deployment must verify a signature or externally pinned digest before trusting the manifest.
+
+## Implemented prototype surface
+
+`EvidenceDiskStore` exposes `open(root)`, `commit(hdc_index_bytes, &EvidenceIndex)` and `recover()`. The generation is assigned under a filesystem lock from the last fully verified commit. Staging lives under `generations/`; generation directory names bind the generation number and manifest digest. The `CURRENT` pointer is the publication point and names exactly one commit.
+
+The implementation is intentionally conservative:
+
+- A corrupt, missing-artifact, unknown-version, or symlinked `CURRENT` is an error, not an empty store or a fallback trigger.
+- A generation containing missing, symlinked or digest-mismatched artifacts cannot be recovered.
+- The commit manifest and snapshot generation must agree; records are revalidated during snapshot restoration.
+- Multiple threads using one store instance serialize through a mutex, and cross-process writers serialize through an exclusive `.writer.lock` file.
+- A crashed process can leave `.writer.lock`. The store refuses new commits until an operator confirms the writer is dead and reconciles/removes the stale lock. It does not guess that a lock is stale.
+- The filesystem contract is currently Unix directory-fsync + same-filesystem rename. Other platforms fail closed; no cross-platform durability claim is made.
+- The HDC index serializer remains the caller's responsibility: the coordinator hashes the supplied bytes but cannot infer that they semantically correspond to the supplied `EvidenceIndex`. Only call `commit` with a matched pair from the same in-memory generation.
+
+The in-process fault hooks cover interruption after the HDC-index write, evidence snapshot write, manifest write, generation publication, before `CURRENT` publication, and after `CURRENT` rename. They are deterministic failure-injection tests, **not** process-kill or power-loss tests.
 
 ## Required publish protocol
 
 The persistence coordinator must treat these bytes as one logical commit:
 
-1. Allocate monotonically increasing generation `g`; stage an HDC index and evidence snapshot in a private generation-specific location.
-2. Flush the exact index and snapshot bytes to stable storage using same-filesystem temporary files, file sync, and atomic rename where supported.
-3. Create the commit manifest for `g` from those exact bytes; read all three artifacts back and verify their digests and schema before publication.
-4. Publish the manifest last as the commit point; sync the containing directory where the platform supports it. A mutating API must not report success before the commit point is durable under the declared platform contract.
-5. On query, load only artifacts named by the committed generation; verify index digest, snapshot digest, snapshot decoding, and generation equality before calling `resolve`.
-6. If a committed artifact is missing, corrupt, has an unknown schema, or does not match the manifest, return no context and surface an integrity failure. Do not silently fall back to an older generation: it may predate a deletion, revocation or supersession.
+1. Allocate monotonically increasing generation `g`; stage an HDC index and evidence snapshot in a private generation-specific location. **Implemented** by `EvidenceDiskStore` after verifying the current commit.
+2. Flush the exact index and snapshot bytes to stable storage using same-filesystem temporary files, file sync, and atomic rename where supported. **Implemented for the declared Unix prototype assumptions**; not yet power-loss-qualified.
+3. Create the commit manifest for `g` from those exact bytes; read all three artifacts back and verify their digests and schema before publication. **Implemented** before the pointer is changed.
+4. Publish `CURRENT` last as the commit point, pointing at the immutable manifest and generation; sync the containing directory. **Implemented**. An error after pointer rename is an ambiguous durability outcome and requires `recover()` inspection.
+5. On query, load only artifacts named by the committed generation; verify index digest, snapshot digest, snapshot decoding, and generation equality before calling `resolve`. **Implemented** by `recover()`; adapter/query wiring remains open.
+6. If a committed artifact is missing, corrupt, has an unknown schema, or does not match the manifest, return an integrity error. The caller must surface zero context. **Implemented at the store API**; any consuming adapter must preserve this failure rather than converting it to an empty successful result.
 7. Retain prior generations only according to a declared recovery and retention policy. If an operator explicitly authorizes recovery to an older generation, mark it as a recovery event and re-apply an authoritative deletion/revocation log before serving queries.
 
 The in-memory module does not implement these filesystem steps. Atomic rename alone is not a universal power-loss guarantee; the implementation must state and test its actual filesystem/platform assumptions.
