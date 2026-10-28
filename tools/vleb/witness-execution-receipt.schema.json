@@ -83,7 +83,9 @@
       "required": [
         "kind",
         "id",
-        "sha256"
+        "sha256",
+        "path",
+        "argv_index"
       ],
       "properties": {
         "kind": {
@@ -101,6 +103,13 @@
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "argv_index": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -413,7 +422,8 @@
           "enum": [
             "stdout",
             "stderr",
-            "artifact"
+            "artifact",
+            "verdict"
           ]
         }
       }
