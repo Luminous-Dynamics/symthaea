@@ -271,175 +271,148 @@ class PyPhiValidator:
             adj[j, i] = 1  # Undirected
         return adj
 
-    def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
-        """
-        Compute exact Φ using PyPhi.
-
-        Args:
-            topology: Topology specification
-
-        Returns:
-            (phi_value, computation_time_seconds)
-        """
-        if not PYPHI_AVAILABLE:
-            raise RuntimeError("PyPhi not installed")
-
-        import time
-
-        # Create adjacency matrix
-        adj = self.edges_to_adjacency(topology.n_nodes, topology.edges)
-
-        # PyPhi requires a TPM (transition probability matrix)
-        # For a simple deterministic network, we use identity-like TPM
-        # This is a simplification - real validation would use actual network dynamics
-
-        # Create simple network: each node XORs its inputs
-        # TPM shape: (2^n_nodes, n_nodes) - probability of each node being ON
-        # given each possible past state
-
-        n = topology.n_nodes
-        n_states = 2 ** n
-
-        # Simple TPM: each node takes OR of neighbors
-        tpm = np.zeros((n_states, n))
-        for state in range(n_states):
-            state_bits = [(state >> i) & 1 for i in range(n)]
-            for node in range(n):
-                # Node is ON if any neighbor was ON
-                neighbors = [j for j in range(n) if adj[node, j] == 1]
-                if neighbors:
-                    neighbor_or = any(state_bits[j] for j in neighbors)
-                    tpm[state, node] = 1.0 if neighbor_or else 0.0
-                else:
-                    tpm[state, node] = state_bits[node]  # Isolated nodes stay same
-
-        # Add small noise to avoid deterministic issues
-        tpm = np.clip(tpm * 0.98 + 0.01, 0.01, 0.99)
-
-        start = time.time()
-
-        try:
-            # Create PyPhi network
-            network = pyphi.Network(tpm, connectivity_matrix=adj)
-
-            # Get subsystem for all nodes in all-on state
-            state = tuple([1] * n)
-            subsystem = pyphi.Subsystem(network, state)
-
-            # Compute Φ (this is the expensive operation)
-            sia = pyphi.compute.sia(subsystem)
-            phi = sia.phi
-
-            elapsed = time.time() - start
-            return phi, elapsed
-
-        except Exception as e:
-            logger.error(f"PyPhi computation failed for {topology.name}: {e}")
-            raise
-
-    def compute_hdc_phi(self, topology: TopologySpec, n_samples: int = 10) -> Tuple[float, float, float]:
-        """
-        Compute HDC-based Φ using Symthaea.
-
-        Args:
-            topology: Topology specification
-            n_samples: Number of samples for averaging
-
-        Returns:
-            (mean_phi, std_phi, computation_time_seconds)
-        """
-        import time
-
-        # Build Rust code to compute Φ for this topology
-        # This calls the actual Symthaea implementation
-
-        rust_code = f'''
-use symthaea::hdc::{{
-    consciousness_topology_generators::ConsciousnessTopology,
-    phi_real::RealPhiCalculator,
-    HDC_DIMENSION,
-}};
-
-fn main() {{
-    let calc = RealPhiCalculator::new();
-    let mut phis = Vec::new();
-
-    for seed in 0..{n_samples}u64 {{
-        // Create topology from edge list
-        let n_nodes = {topology.n_nodes};
-        let edges: Vec<(usize, usize)> = vec!{topology.edges!r};
-
-        // Use ring as base and modify
-        let mut topo = ConsciousnessTopology::from_edges(n_nodes, edges, HDC_DIMENSION, seed);
-        let phi = calc.compute(&topo.node_representations);
-        phis.push(phi);
-    }}
-
-    let mean: f64 = phis.iter().sum::<f64>() / phis.len() as f64;
-    let variance: f64 = phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phis.len() as f64;
-    let std = variance.sqrt();
-
-    println!("{{{{\\"mean\\": {{}}, \\"std\\": {{}}}}}}", mean, std);
-}}
-'''
-
-        # For now, use a simpler approach - run the actual binary
-        start = time.time()
-
-        try:
-            # Run Symthaea's phi calculation via cargo
-            result = subprocess.run(
-                [
-                    self.symthaea_binary, "run", "--example",
-                    "phi_for_topology", "--release", "--",
-                    json.dumps({
-                        "n_nodes": topology.n_nodes,
-                        "edges": topology.edges,
-                        "n_samples": n_samples
-                    })
-                ],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                cwd=Path(__file__).parent.parent
+    def build_model(self, topology: TopologySpec) -> Tuple[np.ndarray, np.ndarray, dict]:
+        """Build one explicit state-by-node TPM shared by both implementations."""
+        if topology.n_nodes < 2 or topology.n_nodes > MAX_EXACT_NODES:
+            raise ValueError(
+                f"Exact comparison supports 2..={MAX_EXACT_NODES} nodes; got {topology.n_nodes}"
             )
 
-            if result.returncode == 0:
-                output = json.loads(result.stdout.strip())
-                elapsed = time.time() - start
-                return output["mean"], output["std"], elapsed
-            else:
-                # Fallback: use estimated values based on topology type
-                logger.warning(f"Symthaea computation failed, using estimates for {topology.name}")
-                elapsed = time.time() - start
-                return self._estimate_hdc_phi(topology), 0.001, elapsed
+        adjacency = self.edges_to_adjacency(topology.n_nodes, topology.edges)
+        n_states = 1 << topology.n_nodes
+        tpm = np.zeros((n_states, topology.n_nodes), dtype=np.float64)
 
-        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError) as e:
-            logger.warning(f"Symthaea call failed: {e}, using estimates")
-            elapsed = time.time() - start
-            return self._estimate_hdc_phi(topology), 0.001, elapsed
+        # Fixed, explicit dynamics: each node is ON when any neighbor is ON,
+        # with independent per-node flip noise. Little-endian state indexing
+        # matches the Rust TransitionProbabilityMatrix contract and PyPhi's TPM.
+        for state_index in range(n_states):
+            bits = [(state_index >> i) & 1 for i in range(topology.n_nodes)]
+            for node in range(topology.n_nodes):
+                neighbors = [j for j in range(topology.n_nodes) if adjacency[node, j] == 1]
+                base = float(any(bits[j] for j in neighbors)) if neighbors else float(bits[node])
+                tpm[state_index, node] = (
+                    base * (1.0 - NOISE_LEVEL) + (1.0 - base) * NOISE_LEVEL
+                )
 
-    def _estimate_hdc_phi(self, topology: TopologySpec) -> float:
-        """Estimate HDC-Φ based on topology characteristics."""
-        # Based on validated results from research
-        estimates = {
-            "ring": 0.4954,
-            "star": 0.4553,
-            "line": 0.4768,
-            "cube": 0.4960,
-            "torus": 0.4953,
-            "binary_tree": 0.4712,
+        state = np.ones(topology.n_nodes, dtype=np.uint8)
+        model = {
+            "formalism_profile": FORMALISM_PROFILE,
+            "n_nodes": topology.n_nodes,
+            "noise_level": NOISE_LEVEL,
+            "state": state.astype(int).tolist(),
+            "topology_name": topology.name,
+            "tpm": tpm.tolist(),
         }
+        canonical_model = json.dumps(
+            model, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8")
+        model_sha256 = hashlib.sha256(canonical_model).hexdigest()
+        payload = {
+            "schema_version": MODEL_SCHEMA_VERSION,
+            "model_sha256": model_sha256,
+            **model,
+        }
+        return tpm, state, payload
 
-        for key, value in estimates.items():
-            if key in topology.name.lower():
-                # Adjust for node count
-                base_nodes = 8
-                adjustment = 0.01 * (topology.n_nodes - base_nodes) / base_nodes
-                return value + adjustment
+    def compute_pyphi_phi(
+        self, topology: TopologySpec, tpm: np.ndarray, state: np.ndarray
+    ) -> Tuple[float, float]:
+        """Compute PyPhi system integrated information under explicit IIT_3_0."""
+        if not PYPHI_AVAILABLE or pyphi is None:
+            raise RuntimeError("PyPhi is not installed; reference result is unavailable")
+        if PYPHI_VERSION != EXPECTED_PYPHI_VERSION:
+            raise RuntimeError(
+                f"PyPhi version mismatch: expected {EXPECTED_PYPHI_VERSION}, got {PYPHI_VERSION!r}"
+            )
 
-        # Default: between star and ring
-        return 0.475
+        start = __import__("time").monotonic()
+        adjacency = self.edges_to_adjacency(topology.n_nodes, topology.edges)
+        substrate = pyphi.Substrate(
+            tpm,
+            cm=adjacency,
+            node_labels=tuple(f"n{i}" for i in range(topology.n_nodes)),
+        )
+        analysis = pyphi.analyze(
+            substrate,
+            tuple(int(bit) for bit in state.tolist()),
+            formalism=FORMALISM_PROFILE,
+        )
+        value = float(analysis.phi)  # PyPhi's system integrated information φ_s.
+        elapsed = __import__("time").monotonic() - start
+        if not math.isfinite(value) or value < 0.0:
+            raise RuntimeError(f"PyPhi returned an invalid φ_s value: {value!r}")
+        return value, elapsed
+
+    def compute_candidate_phi(
+        self, payload: dict
+    ) -> Tuple[float, float, str]:
+        """Call the maintained Rust TPM adapter; failures never create scores."""
+        start = __import__("time").monotonic()
+        command = [
+            self.symthaea_binary,
+            "run",
+            "--quiet",
+            "--release",
+            "--example",
+            "iit3_tpm_phi_adapter",
+            "--",
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                input=json.dumps(payload, separators=(",", ":"), allow_nan=False),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                cwd=Path(__file__).resolve().parent.parent,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Rust TPM adapter timed out; no score produced") from exc
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"Rust adapter executable not found: {self.symthaea_binary}") from exc
+        elapsed = __import__("time").monotonic() - start
+
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()[-1500:]
+            raise RuntimeError(
+                f"Rust TPM adapter exited {result.returncode}; no score produced. stderr={stderr!r}"
+            )
+
+        try:
+            output = json.loads(result.stdout)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise RuntimeError("Rust TPM adapter returned malformed JSON; no score produced") from exc
+        if not isinstance(output, dict):
+            raise RuntimeError("Rust TPM adapter output must be a JSON object")
+        required = {
+            "schema_version",
+            "metric_id",
+            "formalism_profile",
+            "model_sha256",
+            "n_nodes",
+            "state",
+            "value",
+        }
+        missing = sorted(required - output.keys())
+        if missing:
+            raise RuntimeError(f"Rust TPM adapter output missing fields {missing}; no score produced")
+        if output["schema_version"] != "symthaea-iit3-tpm-output-v1":
+            raise RuntimeError(f"Unsupported Rust output schema: {output['schema_version']!r}")
+        if output["metric_id"] != RUST_CANDIDATE_METRIC_ID:
+            raise RuntimeError(f"Unexpected Rust metric identity: {output['metric_id']!r}")
+        for key in ("formalism_profile", "model_sha256", "n_nodes", "state"):
+            if output[key] != payload[key]:
+                raise RuntimeError(
+                    f"Rust output {key} does not match the submitted model; no score produced"
+                )
+        value = output["value"]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RuntimeError("Rust candidate score must be numeric")
+        value = float(value)
+        if not math.isfinite(value) or value < 0.0:
+            raise RuntimeError(f"Rust adapter returned invalid candidate score {value!r}")
+        return value, elapsed, output["metric_id"]
 
     def validate_topology(self, topology: TopologySpec) -> ValidationResult:
         """
