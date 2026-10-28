@@ -63,3 +63,30 @@ The alpha-spending method is extremely conservative here; that is a measurable e
 
 
 Metric interpretation: in the step-shift rows, false-alarm probability counts alarms at or before the change point; detection probability counts first alarms strictly after the change point. The reported mean delay is conditional on detecting after the change. In stationary-null rows, false-alarm probability is the probability of any alarm by the horizon, while detection probability and detection delay are NA. The three probabilities (pre-change false alarm, post-change detection, and survival) sum to one.
+
+
+## Follow-up: Beta-mixture likelihood-ratio e-process
+
+A fourth arm, beta_mixture_e_process, is now implemented. For Bernoulli observations with S successes in n trials and a fixed null rate p0, it computes the marginal likelihood ratio of a Beta(1/2, 1/2) alternative mixture against the null:
+
+    log E_n = log B(S+1/2, n-S+1/2) - log B(1/2,1/2)
+              - S log(p0) - (n-S) log(1-p0)
+
+Under the iid Bernoulli(p0) null, E_n is a nonnegative likelihood-ratio martingale with expectation one. Ville's inequality bounds the probability that it ever crosses 1/(alpha/M) by alpha/M. The implementation therefore checks whether log E_n exceeds log(M/alpha); it does not estimate a fixed-time confidence interval and then reuse it. The alternative prior is fixed before seeing the stream. This is a different valid sequential test from the alpha-spending confidence sequence and can be more efficient for abrupt alternatives well represented by the mixture, though it does not guarantee the same power or delay for every alternative.
+
+Independent standard-library Python exact-DP result for this fixture:
+
+| Monitor | Null false-alarm probability by horizon 1,000 | Step-shift detection by horizon 500 | Mean detection delay after change |
+|---|---:|---:|---:|
+| Fixed-time final look | 0.000442 | 1.000000 | 400.00 |
+| Fixed-time interval reused each look (invalid) | 0.009366 | 0.996183 | 78.82 |
+| Time-uniform Hoeffding alpha spending | 0.000000451 | 0.999999604 | 157.50 |
+| Beta-mixture e-process | 0.003059 | 0.997539 | 94.76 |
+
+The Beta-mixture e-process remains below the per-cell false-alarm allocation alpha/M = 0.004167 in the exact null DP and detects the selected p=0.5 to p=0.8 step earlier than the alpha-spending Hoeffding baseline. The repeated fixed-time method is faster in this scenario, but its null false-alarm probability at horizon 1,000 exceeds alpha/M and it is deliberately not a valid optional-stopping method.
+
+The calculation is exact for the finite Bernoulli state model, not for real-world shift detection. The Beta mixture's prior and log-gamma implementation have a deterministic small-case check (n=2, S=1, p0=0.5 gives e-value 0.5); the independent Python checker recomputes every output row and requires the Beta-mixture null / shift controls to pass. Rust tests and Rust/Python parity still require the workflow to complete at the exact current source head.
+
+Methodological references:
+- Waudby-Smith & Ramdas, *Estimating means of bounded random variables by betting*, JRSS B 2024: https://doi.org/10.1093/jrsssb/qkad009
+- Howard et al., *Time-uniform, nonparametric, nonasymptotic confidence sequences*, Annals of Statistics 2021: https://doi.org/10.1214/20-AOS1991
