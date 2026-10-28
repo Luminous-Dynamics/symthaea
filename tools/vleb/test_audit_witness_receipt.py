@@ -12,6 +12,10 @@ from audit_witness_receipt import validate_receipt
 def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+def canonical_sha(value) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return sha(encoded)
+
 
 class WitnessReceiptAuditTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -90,13 +94,19 @@ class WitnessReceiptAuditTests(unittest.TestCase):
             "expected_receipt_sha256": sha(self.receipt_path.read_bytes()),
             "expected_schema_sha256": sha(self.schema_path.read_bytes()),
             "expected_repository_id": "1136141775",
+            "expected_repository_full_name": "Luminous-Dynamics/symthaea",
             "expected_workflow_path": ".github/workflows/vleb-ledger-reference.yml",
             "expected_workflow_sha": "a" * 40,
+            "expected_workflow_ref": "refs/heads/locked-evaluator",
+            "expected_event": "workflow_dispatch",
             "expected_run_id": "40690000123",
             "expected_run_attempt": 2,
             "expected_task_id": "COBOL.SETTLEMENT.001",
             "expected_claim_id": "BALANCE.PIC",
             "expected_source_sha256": self.receipt["source"]["sha256"],
+            "expected_source_spans_sha256": canonical_sha(self.receipt["source"]["spans"]),
+            "expected_invocation_sha256": canonical_sha(self.receipt["invocation"]),
+            "expected_inputs_sha256": canonical_sha(self.receipt["inputs"]),
             "expected_verifier_kind": "independent_execution",
             "expected_verifier_id": "ledger-reference-v1",
             "expected_verifier_sha256": "b" * 64,
@@ -134,6 +144,28 @@ class WitnessReceiptAuditTests(unittest.TestCase):
     def test_source_revision_must_match_external_pin(self) -> None:
         result = self.audit(expected_source_sha256="f" * 64)
         self.assertIn("source_digest_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_source_spans_must_match_evaluator_claim_inventory_pin(self) -> None:
+        result = self.audit(expected_source_spans_sha256="e" * 64)
+        self.assertIn("source_spans_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_exact_invocation_must_match_evaluator_pin(self) -> None:
+        result = self.audit(expected_invocation_sha256="e" * 64)
+        self.assertIn("invocation_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_input_inventory_must_match_evaluator_task_pin(self) -> None:
+        result = self.audit(expected_inputs_sha256="e" * 64)
+        self.assertIn("input_inventory_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_workflow_reference_and_event_are_pinned(self) -> None:
+        result = self.audit(expected_workflow_ref="refs/heads/untrusted")
+        self.assertIn("workflow_ref_mismatch", {issue["code"] for issue in result["issues"]})
+        result = self.audit(expected_event="pull_request")
+        self.assertIn("event_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_repository_name_is_bound_with_numeric_identity(self) -> None:
+        result = self.audit(expected_repository_full_name="attacker/fork")
+        self.assertIn("repository_full_name_mismatch", {issue["code"] for issue in result["issues"]})
 
     def test_verifier_identity_and_digest_are_pinned(self) -> None:
         result = self.audit(expected_verifier_id="untrusted-verifier")

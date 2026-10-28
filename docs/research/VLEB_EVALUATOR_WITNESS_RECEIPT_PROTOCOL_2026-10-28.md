@@ -49,3 +49,9 @@ VLEB should report ordinary task pass rate alongside assurance-adjusted semantic
 ## Log-digest binding hardening (follow-up)
 
 The receipt auditor now requires stdout and stderr paths, requires each path to appear in the declared output inventory, and requires the inventory digest to equal the execution log digest. The normal artifact audit then re-hashes the actual files. This closes a gap where a receipt could carry a self-reported stdout/stderr hash unrelated to any checked bytes. Two negative controls cover digest mismatch and missing log inventory.
+
+## Evaluator pin completeness hardening (follow-up)
+
+The auditor now requires out-of-band canonical SHA-256 pins for the full source-span list, exact invocation object, and input-artifact inventory. This prevents a receipt from selecting a different but still hash-valid source span, changing arguments/working directory/environment fingerprints, or substituting another scenario input while reusing the same task and source digest. It also compares the producer's repository full name, workflow ref, and triggering event against evaluator-supplied expectations in addition to numeric repository ID, workflow path/SHA, run ID, and attempt.
+
+Canonical pins use UTF-8 JSON serialized with sorted keys, no insignificant whitespace, non-ASCII preserved, and non-finite numbers forbidden. The protected task/claim registry must calculate these pins before the run; they must not be copied from the receipt being audited. New negative controls cover changed spans, invocation, input inventory, workflow ref/event, and repository name.
