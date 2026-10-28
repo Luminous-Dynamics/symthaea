@@ -324,13 +324,21 @@ fn main() {
         .map(|blocker| format!("\"{:?}\"", blocker))
         .collect::<Vec<_>>()
         .join(", ");
+    let calibration_age_json = readiness_report.calibration_age_seconds
+        .map_or("null".to_string(), |age| age.to_string());
+    let monitor_observation_age_json = readiness_report.monitor_observation_age_seconds
+        .map_or("null".to_string(), |age| age.to_string());
 
     let mut json = String::new();
     writeln!(
         &mut json,
-        "{{\n  \"benchmark\": \"aviation-calibration-robustness-contract\",\n  \"contract_status\": \"ACCEPTED\",\n  \"decision_status\": \"{:?}\",\n  \"decision_gate_blockers\": [{}],\n  \"claim_ceiling\": \"synthetic fixtures only; policy performance is not certified\",\n  \"split_audit\": {{\n    \"status\": \"{:?}\",\n    \"partitions\": [",
+        "{{\n  \"benchmark\": \"aviation-calibration-robustness-contract\",\n  \"contract_status\": \"ACCEPTED\",\n  \"decision_status\": \"{:?}\",\n  \"decision_gate_blockers\": [{}],\n  \"calibration_age_seconds\": {},\n  \"max_calibration_age_seconds\": {},\n  \"monitor_observation_age_seconds\": {},\n  \"max_monitor_observation_age_seconds\": {},\n  \"claim_ceiling\": \"synthetic fixtures only; policy performance is not certified\",\n  \"split_audit\": {{\n    \"status\": \"{:?}\",\n    \"partitions\": [",
         readiness_report.status,
         readiness_blockers_json,
+        calibration_age_json,
+        readiness_report.max_calibration_age_seconds,
+        monitor_observation_age_json,
+        readiness_report.max_monitor_observation_age_seconds,
         split.status
     ).expect("write to String");
     for (index, stats) in split.partitions.iter().enumerate() {
