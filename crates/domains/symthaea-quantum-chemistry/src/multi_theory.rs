@@ -465,7 +465,6 @@ fn compute_phi_ig(joint: &[f64], n_a: usize, n_b: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::molecule::Atom;
 
     #[test]
     fn test_theory_scores_bounded() {

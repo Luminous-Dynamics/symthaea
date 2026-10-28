@@ -28,8 +28,7 @@
 
 use crate::basis::BasisSet;
 use crate::constants::{
-    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD,
-    SCF_ENERGY_THRESHOLD,
+    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD, SCF_ENERGY_THRESHOLD,
 };
 use crate::integrals::eri::{compute_eri_tensor, compute_schwarz_bounds};
 use crate::integrals::kinetic::kinetic_matrix;
@@ -116,12 +115,11 @@ fn try_alpha_beta_split(
     n_electrons: usize,
     multiplicity: u32,
 ) -> Result<(usize, usize), ScfSolveError> {
-    let electron_count = i64::try_from(n_electrons).map_err(|_| {
-        ScfSolveError::InconsistentElectronicState {
+    let electron_count =
+        i64::try_from(n_electrons).map_err(|_| ScfSolveError::InconsistentElectronicState {
             electron_count: n_electrons,
             multiplicity,
-        }
-    })?;
+        })?;
     if multiplicity == 0 {
         return Err(ScfSolveError::InvalidMultiplicity { multiplicity });
     }
@@ -273,8 +271,9 @@ fn try_unrestricted_hartree_fock_with_eigensolver_budget(
         CANONICAL_ORTH_THRESHOLD,
         overlap_iterations,
     )?;
-    let mut solver_diagnostics =
-        ScfSolverDiagnostics::from_overlap_residual(checked_orthogonalization.orthogonality_residual);
+    let mut solver_diagnostics = ScfSolverDiagnostics::from_overlap_residual(
+        checked_orthogonalization.orthogonality_residual,
+    );
     let x_mat = checked_orthogonalization.transformation;
     let n_ind = checked_orthogonalization.n_independent;
     let eigensolver_iterations = eigensolver_iteration_budget
@@ -301,14 +300,8 @@ fn try_unrestricted_hartree_fock_with_eigensolver_budget(
     };
 
     // Step 4: Initial guess — one checked H_core generalized solve for both spins.
-    let initial = solve_generalized_eigen_checked(
-        &h_core,
-        &s_mat,
-        &x_mat,
-        n,
-        n_ind,
-        eigensolver_iterations,
-    )?;
+    let initial =
+        solve_generalized_eigen_checked(&h_core, &s_mat, &x_mat, n, n_ind, eigensolver_iterations)?;
     solver_diagnostics.record_generalized_solve(&initial);
     let mut c_alpha = initial.generalized.coefficients.clone();
     let mut c_beta = initial.generalized.coefficients;
@@ -489,7 +482,12 @@ mod tests {
         assert!(!legacy.converged);
         assert!(legacy.total_energy.is_nan());
         assert!(legacy.electronic_energy.is_nan());
-        assert!(legacy.solver_error.as_deref().is_some_and(|message| message.contains("non-finite")));
+        assert!(
+            legacy
+                .solver_error
+                .as_deref()
+                .is_some_and(|message| message.contains("non-finite"))
+        );
         assert!(legacy.solver_diagnostics.is_none());
     }
 
@@ -524,11 +522,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "invalid molecule: charge")]
     fn test_legacy_uhf_keeps_invalid_charge_panic_contract() {
-        let molecule = Molecule::with_charge(
-            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
-            2,
-            1,
-        );
+        let molecule =
+            Molecule::with_charge(vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)], 2, 1);
         let basis = Sto3g::build(&molecule);
         let _ = unrestricted_hartree_fock(&molecule, &basis, &UhfConfig::default());
     }

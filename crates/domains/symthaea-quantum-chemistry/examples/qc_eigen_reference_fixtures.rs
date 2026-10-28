@@ -81,7 +81,9 @@ fn record_case(
     dimension: usize,
     matrix_row_major: Vec<f64>,
 ) -> MatrixCaseRecord {
-    let max_iterations = 100_usize.saturating_mul(dimension).saturating_mul(dimension);
+    let max_iterations = 100_usize
+        .saturating_mul(dimension)
+        .saturating_mul(dimension);
     let result = symmetric_eigen_checked(&matrix_row_major, dimension, max_iterations);
     MatrixCaseRecord {
         case_id,
@@ -112,15 +114,9 @@ fn native_result(result: CheckedSymmetricEigenResult) -> NativeEigenResult {
         "non_converged"
     };
     let stopping_reason = match result.stopping_reason {
-        EigenStoppingReason::Converged => {
-            "converged"
-        }
-        EigenStoppingReason::IterationLimit => {
-            "iteration_limit"
-        }
-        EigenStoppingReason::ResidualContractFailed => {
-            "residual_contract_failed"
-        }
+        EigenStoppingReason::Converged => "converged",
+        EigenStoppingReason::IterationLimit => "iteration_limit",
+        EigenStoppingReason::ResidualContractFailed => "residual_contract_failed",
     };
     NativeEigenResult {
         status,
@@ -149,11 +145,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             3,
             vec![2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0],
         ),
-        record_case("dense_symmetric_3x3", 3, vec![4.0, 1.0, 2.0, 1.0, 3.0, 0.5, 2.0, 0.5, 5.0]),
+        record_case(
+            "dense_symmetric_3x3",
+            3,
+            vec![4.0, 1.0, 2.0, 1.0, 3.0, 0.5, 2.0, 0.5, 5.0],
+        ),
         record_case("negative_off_diagonal", 2, vec![1.0, -0.75, -0.75, 1.0]),
-        record_case("near_linear_dependence", 2, vec![1.0, 0.9999999, 0.9999999, 1.0]),
-        record_case("small_scale_symmetric", 2, vec![1e-16, 0.5e-16, 0.5e-16, 1e-16]),
-        record_case("subnormal_scale_symmetric", 2, vec![1e-310, 0.5e-310, 0.5e-310, 1e-310]),
+        record_case(
+            "near_linear_dependence",
+            2,
+            vec![1.0, 0.9999999, 0.9999999, 1.0],
+        ),
+        record_case(
+            "small_scale_symmetric",
+            2,
+            vec![1e-16, 0.5e-16, 0.5e-16, 1e-16],
+        ),
+        record_case(
+            "subnormal_scale_symmetric",
+            2,
+            vec![1e-310, 0.5e-310, 0.5e-310, 1e-310],
+        ),
     ];
 
     let (ending_revision, ending_tree_sha) = source_provenance()?;

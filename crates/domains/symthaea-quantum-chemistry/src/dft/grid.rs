@@ -738,7 +738,7 @@ mod tests {
         // the quality presets instead of validating only one specially chosen
         // Gaussian. Tolerances are relative and deliberately tighter for
         // the denser presets; they do not tune SCF or chemical-energy criteria.
-        let atom = Atom::new(1, 0.0, 0.0, 0.0);
+        let atoms = [Atom::new(1, 0.0, 0.0, 0.0)];
         let cases = [
             (GridQuality::Coarse, 5e-4),
             (GridQuality::Medium, 5e-6),
@@ -748,7 +748,7 @@ mod tests {
         let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
 
         for (quality, relative_tolerance) in cases {
-            let grid = DftGrid::build(&[atom], quality);
+            let grid = DftGrid::build(&atoms, quality);
             for alpha in alphas {
                 let numerical: f64 = grid
                     .points

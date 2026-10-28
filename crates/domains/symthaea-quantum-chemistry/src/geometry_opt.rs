@@ -7,8 +7,6 @@
 //! The potential energy surface (PES) is the total energy E(R) where R is
 //! the set of all nuclear coordinates.
 
-use crate::Atom;
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -179,6 +177,7 @@ pub fn optimize_geometry(molecule: &Molecule, config: &GeomOptConfig) -> GeomOpt
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Atom;
     use crate::constants::BOHR_TO_ANGSTROM;
 
     #[test]
