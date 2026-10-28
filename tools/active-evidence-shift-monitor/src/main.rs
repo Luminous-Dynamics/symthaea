@@ -1726,7 +1726,8 @@ mod tests {
                         assert!(metrics.mean_post_shift_detection_delay.is_none());
                     }
                     let is_accepted_null_control =
-                        scenario.class == ScenarioClass::WithinBandTransitionControl
+                        scenario.class == ScenarioClass::StationaryNull
+                            || scenario.class == ScenarioClass::WithinBandTransitionControl
                             || (scenario.class == ScenarioClass::BaselineMisspecification
                                 && (COMPOSITE_NULL_LOWER..=COMPOSITE_NULL_UPPER)
                                     .contains(&scenario.pre_shift_p));
