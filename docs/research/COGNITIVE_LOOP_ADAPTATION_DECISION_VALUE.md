@@ -302,3 +302,9 @@ For action-coupled domains, use a separate closed-loop protocol:
 - Add paired common-random-number evaluation in validated simulators, then a bounded canary/randomized evaluation when safe and justified. Report failures and safety violations, not only average reward.
 
 This distinction is essential before extending the benchmark to robotics, energy control, or other systems where an intervention can change the future stream. Detector/predictor accuracy on a fixed stream is a legitimate but narrower result than closed-loop policy improvement.
+
+### Canonical bindings in the driver prototype
+
+The driver receipt now includes `feature_stream_sha256` over the canonical serialized feature events and `receipt_sha256` over the canonical receipt with that digest field empty. The independent auditor recomputes both. A raw feature edit without updating the commitment is rejected; adversarial semantic tests may reseal altered fixtures so they exercise the intended causal/integrity gate rather than failing only on a stale outer hash.
+
+These checks detect accidental mutation and establish self-consistency. A digest stored beside the bytes is not an external trust anchor: an editor who can rewrite both the payload and its digest can create another internally consistent receipt. For confirmatory use, publish/pin the expected stream and receipt digests in an independently controlled bundle or preregistration record before interpreting outcomes, and retain the explicit claim boundary against malicious or non-isolated runners.
