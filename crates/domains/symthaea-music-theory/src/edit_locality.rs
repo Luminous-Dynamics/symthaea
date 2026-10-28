@@ -130,18 +130,18 @@ pub fn verify_edit_locality_with_config(
     config: &EditLocalityConfig,
 ) -> Result<EditLocalityEvidence, EditLocalityError> {
     validate_config(config)?;
-    validate_events(source, "source")?;
-    validate_events(target, "target")?;
-    if source.is_empty() || target.is_empty() {
-        return Err(EditLocalityError::InvalidInput(
-            "source and target must both contain events",
-        ));
-    }
     if source.len() > MAX_EDIT_LOCALITY_EVENTS || target.len() > MAX_EDIT_LOCALITY_EVENTS {
         return Err(EditLocalityError::UnsupportedEdit(
             "event count exceeds the edit-locality computation budget",
         ));
     }
+    if source.is_empty() || target.is_empty() {
+        return Err(EditLocalityError::InvalidInput(
+            "source and target must both contain events",
+        ));
+    }
+    validate_events(source, "source")?;
+    validate_events(target, "target")?;
     if source.len() != target.len() {
         return Err(EditLocalityError::UnsupportedEdit(
             "event insertion/deletion is not supported by edit-locality-v1.0",
@@ -541,6 +541,22 @@ mod tests {
         assert!(!evidence.requested_property_passed);
         assert!(evidence.protected_properties_passed);
         assert!(!evidence.passed);
+    }
+
+    #[test]
+    fn event_budget_is_checked_before_event_traversal() {
+        let source: Vec<_> = (0..=MAX_EDIT_LOCALITY_EVENTS)
+            .map(|i| LocalityEvent {
+                pitch_midi: 60,
+                onset_beats: i as f64,
+                duration_beats: 0.5,
+            })
+            .collect();
+        let request = EditRequest { operation: EditOperation::Transpose { semitones: 5 } };
+        assert!(matches!(
+            verify_edit_locality(&source, &source, &request),
+            Err(EditLocalityError::UnsupportedEdit(_))
+        ));
     }
 
     #[test]
