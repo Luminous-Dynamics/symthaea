@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 BENCHMARK_ID = "CASTING-DECISION-ROBUSTNESS-001"
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 TOL = 1e-12
 
 
@@ -94,13 +94,45 @@ def _objectives(value: Any, label: str, reference: tuple[float, float]) -> tuple
 def validate_document(document: Any) -> dict[str, Any]:
     required = {
         "schema_version", "benchmark_id", "task_id", "run_id", "split",
-        "reference_point", "candidate_set", "holdout_shifts",
+        "reference_point", "candidate_set", "holdout_shifts", "source_run",
     }
     doc = _require_exact_keys(document, required, "document")
     if doc["schema_version"] != SCHEMA_VERSION:
         raise ValueError(f"schema_version must be {SCHEMA_VERSION}")
     if doc["benchmark_id"] != BENCHMARK_ID:
         raise ValueError(f"benchmark_id must be {BENCHMARK_ID}")
+    source_run = _require_exact_keys(
+        doc["source_run"],
+        {
+            "sweep_sha256", "candidate_pool_sha256", "objective_family",
+            "constraint_family", "dimension", "severity", "seed", "policy",
+            "fidelity_costs", "cost_budget", "cost_spent",
+        },
+        "source_run",
+    )
+    _sha256(source_run["sweep_sha256"], "source_run.sweep_sha256")
+    _sha256(source_run["candidate_pool_sha256"], "source_run.candidate_pool_sha256")
+    for field in ("objective_family", "constraint_family", "policy"):
+        if not isinstance(source_run[field], str) or not source_run[field].strip():
+            raise ValueError(f"source_run.{field} must be a non-empty string")
+    for field in ("dimension", "seed"):
+        if isinstance(source_run[field], bool) or not isinstance(source_run[field], int) or source_run[field] < 0:
+            raise ValueError(f"source_run.{field} must be a non-negative integer")
+    if source_run["dimension"] < 2:
+        raise ValueError("source_run.dimension must be at least 2")
+    _finite_number(source_run["severity"], "source_run.severity")
+    if source_run["severity"] < 0:
+        raise ValueError("source_run.severity must be non-negative")
+    fidelity_costs = _require_exact_keys(
+        source_run["fidelity_costs"], {"low", "medium", "high"}, "source_run.fidelity_costs"
+    )
+    for level, value in fidelity_costs.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"source_run.fidelity_costs.{level} must be a positive integer")
+    cost_budget = _finite_number(source_run["cost_budget"], "source_run.cost_budget")
+    cost_spent = _finite_number(source_run["cost_spent"], "source_run.cost_spent")
+    if cost_budget <= 0 or cost_spent < 0 or cost_spent > cost_budget + TOL:
+        raise ValueError("source_run cost accounting is invalid")
     for field in ("task_id", "run_id"):
         if not isinstance(doc[field], str) or not doc[field].strip():
             raise ValueError(f"{field} must be a non-empty string")
@@ -189,7 +221,12 @@ def validate_document(document: Any) -> dict[str, Any]:
             raise ValueError(f"shift {shift_id} must evaluate every candidate exactly once; missing={missing}, extra={extra}")
         shifts.append({"shift_id": shift_id, "shift_family": shift_family, "evaluations": evaluations})
 
-    return {"reference_point": reference, "candidates": candidates, "selected_ids": selected_ids, "shifts": shifts, "task_id": doc["task_id"], "run_id": doc["run_id"], "split": split}
+    return {
+        "reference_point": reference, "candidates": candidates,
+        "selected_ids": selected_ids, "shifts": shifts,
+        "task_id": doc["task_id"], "run_id": doc["run_id"], "split": split,
+        "source_run": source_run,
+    }
 
 
 def score_document(document: Any, raw_bytes: bytes) -> dict[str, Any]:
@@ -290,6 +327,7 @@ def score_document(document: Any, raw_bytes: bytes) -> dict[str, Any]:
         "evaluator_source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
         "task_id": parsed["task_id"],
         "run_id": parsed["run_id"],
+        "source_run": parsed["source_run"],
         "split_declarations": {
             "holdout_role": parsed["split"]["holdout_role"],
             "selection_frozen_before_holdout": parsed["split"]["selection_frozen_before_holdout"],
