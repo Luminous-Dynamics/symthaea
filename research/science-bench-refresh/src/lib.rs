@@ -665,7 +665,9 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     }
     if !task_count_overflow && planned_task_count != manifest.expected_task_count {
         issues.push(format!(
-            "task denominator mismatch: expected_task_count={}, planned_task_count={planned_task_count}",
+            "task denominator mismatch: expected_task_count={}, "
+                .to_owned()
+                + &format!("planned_task_count={planned_task_count}"),
             manifest.expected_task_count
         ));
     }
