@@ -34,7 +34,7 @@
       "verifier_disposition": "verified_feasible",
       "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "receipt_artifact_path": "receipts/verified-cardinality-2.json",
-      "verified_cardinality": 2
+      "reported_cardinality": 2
     },
     {
       "event_id": "candidate-event-verified-4",
@@ -44,7 +44,7 @@
       "verifier_disposition": "verified_feasible",
       "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
       "receipt_artifact_path": "receipts/verified-cardinality-4.json",
-      "verified_cardinality": 4
+      "reported_cardinality": 4
     }
   ]
 }
