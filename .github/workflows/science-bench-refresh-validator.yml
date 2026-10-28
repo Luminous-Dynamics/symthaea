@@ -44,8 +44,8 @@ jobs:
           set -euo pipefail
           cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json > /tmp/science-bench-refresh-report.json
           grep -q '"valid": true' /tmp/science-bench-refresh-report.json
-          grep -q '"admissible_for_scoring": false' /tmp/science-bench-refresh-report.json
-          grep -q '"eligible_for_sealed_generalization_claim": false' /tmp/science-bench-refresh-report.json
+          grep -q '"manifest_declares_scoring_eligible": false' /tmp/science-bench-refresh-report.json
+          grep -q '"manifest_declares_sealed_generalization_profile": false' /tmp/science-bench-refresh-report.json
           set +e
           cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json --require-scoring > /tmp/science-bench-refresh-required.json
           scoring_exit=$?
