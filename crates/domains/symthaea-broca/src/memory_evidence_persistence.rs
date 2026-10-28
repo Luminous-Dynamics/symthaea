@@ -1086,6 +1086,66 @@ mod tests {
 
 
     #[test]
+    fn typed_generation_rejects_missing_or_tampered_lexical_index() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "cart checkout evidence"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        let dir = generation_path(&root.path().join("evidence-generations"), 1);
+        let lexical_path = dir.join(LEXICAL_FILE);
+        let original = fs::read(&lexical_path).unwrap();
+        fs::write(&lexical_path, b"tampered lexical index").unwrap();
+        assert!(disk.recover().is_err(), "tampered lexical index must fail manifest verification");
+
+        fs::write(&lexical_path, &original).unwrap();
+        fs::remove_file(&lexical_path).unwrap();
+        assert!(disk.recover().is_err(), "missing manifest-bound lexical index must fail closed");
+    }
+
+    #[test]
+    fn interruption_after_lexical_index_write_keeps_previous_generation_current() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "first generation"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        hdc.append(8, &BinaryHV::random(8)).unwrap();
+        evidence.insert(active_evidence(8, "second generation"), b"canonical trajectory bytes").unwrap();
+        hdc.sync_all().unwrap();
+        let identity = {
+            let view = hdc.read_view();
+            let checksum = view.content_checksum();
+            HdcStoreIdentity {
+                store_generation: view.generation(),
+                live_count: checksum.live_count,
+                checksum_version: checksum.version,
+                checksum_hex: checksum.hex(),
+            }
+        };
+        let canonical_bytes = fs::read(hdc.path()).unwrap();
+        assert!(disk.commit_with_identity_and_fault(
+            &canonical_bytes,
+            &evidence,
+            Some(identity),
+            Some(CommitFaultPoint::AfterLexicalIndexWrite),
+        ).is_err());
+
+        let recovered = disk.recover().unwrap().unwrap();
+        assert_eq!(recovered.generation, 1, "unpublished lexical artifact must not advance CURRENT");
+        assert_eq!(recovered.evidence_index.active_hdc_ids(), [7_u64].into_iter().collect());
+        assert!(recovered.lexical_index.is_some());
+    }
+
+    #[test]
     fn committed_text_query_returns_grounded_lexical_context_with_provenance() {
         let root = tempdir().unwrap();
         let hdc_path = root.path().join("canonical.hdc");
