@@ -31,8 +31,10 @@ jobs:
           components: rustfmt
       - name: Verify frozen public actions and separate oracle bytes
         run: sha256sum -c tests/fixtures/vision-dvpc-025.SHA256SUMS
-      - name: Format standalone scorer
-        run: rustfmt --edition 2024 tools/vision-dvpc-closed-loop-frontier.rs
+      - name: Record committed source and format standalone scorer
+        run: |
+          git show "$GITHUB_SHA:tools/vision-dvpc-closed-loop-frontier.rs" | sha256sum | cut -d ' ' -f1 > /tmp/vis-dvpc-025-committed-source.sha256
+          rustfmt --edition 2024 tools/vision-dvpc-closed-loop-frontier.rs
       - name: Compile and run unit tests
         run: |
           rustc --edition=2024 --test tools/vision-dvpc-closed-loop-frontier.rs -o /tmp/vis-dvpc-025-tests
@@ -54,8 +56,9 @@ jobs:
             printf 'VIS_DVPC_025_RECEIPT\tformat\tv1\n'
             printf 'commit_sha\t%s\n' "$GITHUB_SHA"
             printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-closed-loop-frontier.rs \
-              tests/fixtures/vision-dvpc-025-visible-actions.tsv \
+            printf 'committed_source_sha256\t%s\n' "$(cat /tmp/vis-dvpc-025-committed-source.sha256)"
+            printf 'formatted_build_source_sha256\t%s\n' "$(sha256sum tools/vision-dvpc-closed-loop-frontier.rs | cut -d ' ' -f1)"
+            sha256sum tests/fixtures/vision-dvpc-025-visible-actions.tsv \
               tests/fixtures/vision-dvpc-025-oracle.tsv \
               /tmp/vis-dvpc-025-frontier.tsv
           } > /tmp/vis-dvpc-025-receipt.tsv
