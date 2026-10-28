@@ -835,7 +835,9 @@ impl CobolIndex {
         }
         output.push_str("],\n  \"copy_references\": [");
         for (i, item) in self.copy_references.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"name\":{},\"location\":{},\"has_replacing_clause\":{}}}",
@@ -846,12 +848,21 @@ impl CobolIndex {
         }
         output.push_str("],\n  \"file_descriptions\": [");
         for (i, item) in self.file_descriptions.iter().enumerate() {
-            if i > 0 { output.push(','); }
-            let _ = write!(output, "{{\"name\":{},\"location\":{}}}", q(&item.name), loc_json(&item.location));
+            if i > 0 {
+                output.push(',');
+            }
+            let _ = write!(
+                output,
+                "{{\"name\":{},\"location\":{}}}",
+                q(&item.name),
+                loc_json(&item.location)
+            );
         }
         output.push_str("],\n  \"data_items\": [");
         for (i, item) in self.data_items.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"level\":{},\"name\":{},\"picture\":{},\"usage\":{},\"redefines\":{},\"location\":{}}}",
@@ -865,7 +876,9 @@ impl CobolIndex {
         }
         output.push_str("],\n  \"embedded_blocks\": [");
         for (i, item) in self.embedded_blocks.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"kind\":{},\"location\":{},\"has_end_exec\":{}}}",
@@ -876,7 +889,9 @@ impl CobolIndex {
         }
         output.push_str("],\n  \"diagnostics\": [");
         for (i, item) in self.diagnostics.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"code\":{},\"message\":{},\"location\":{}}}",
