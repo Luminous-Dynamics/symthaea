@@ -601,7 +601,14 @@ mod tests {
 
     #[test]
     fn alignment_accepts_one_bounded_insert_but_reports_it() {
-        let source = simple_source();
+        let mut source = simple_source();
+        for i in 5..10 {
+            source.push(SymbolicEvent {
+                pitch_midi: 60 + (i % 5) * 2,
+                onset_beats: i as f64,
+                duration_beats: 0.5,
+            });
+        }
         let claim = descriptor(
             PitchOrientation::Preserve,
             0,
