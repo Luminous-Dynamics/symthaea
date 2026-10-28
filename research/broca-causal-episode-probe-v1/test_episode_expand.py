@@ -103,7 +103,7 @@ class EpisodeExpandTests(unittest.TestCase):
     def _write_candidate_bundle(self, directory: Path, candidate_k: int = 10) -> tuple[Path, Path]:
         trajectory_path = FIXTURE_DIR / "trajectories.jsonl"
         prediction_path = directory / "candidate-predictions.jsonl"
-        prediction_bytes = b'{"question_id":"Q1","audit":[]}\\n'
+        prediction_bytes = b'{"question_id":"Q1","audit":[]}\n'
         prediction_path.write_bytes(prediction_bytes)
         manifest = {
             "schema": "broca-causal-episode-probe-v1",
@@ -127,7 +127,7 @@ class EpisodeExpandTests(unittest.TestCase):
     def test_candidate_prediction_tampering_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             prediction_path, trajectory_path = self._write_candidate_bundle(Path(temp), 10)
-            prediction_path.write_text('{"question_id":"tampered","audit":[]}\\n', encoding="utf-8")
+            prediction_path.write_text('{"question_id":"tampered","audit":[]}\n', encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "prediction digest"):
                 load_candidate_manifest(prediction_path, trajectory_path, 5)
 
