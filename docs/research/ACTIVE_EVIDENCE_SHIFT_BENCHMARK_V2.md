@@ -265,3 +265,18 @@ Acceptance implications:
 - Preserve the selection-bias controls; a representative reference rate and an adaptively selected observed rate remain different estimands.
 
 The current implementation makes the limitation observable; it does **not** yet claim to solve composite-null monitoring. Results are exact for the stated synthetic Bernoulli model only. Implementation and independent checker: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744).
+
+
+## 23. Composite-null sequential monitoring under reference-rate uncertainty
+
+Point-null e-processes assume a precisely specified baseline rate. The benchmark now adds a composite-null directional betting process for a preregistered Bernoulli interval p_t ∈ [0.48, 0.52]. Each fixed upper-direction factor is 1 + λ(X_t − 0.52); each fixed lower-direction factor is 1 − λ(X_t − 0.48). Under any predictable conditional rate p_t in the interval, each direction's conditional expectation is at most one. The process mixes λ ∈ {0.05, 0.10, 0.20, 0.40, 0.80} with fixed equal weights in each direction and then mixes the two directions equally. Nonnegative supermartingale mixtures preserve anytime-valid threshold control, provided the interval and stakes are fixed before inspecting the monitored stream.
+
+This expands the baseline comparison to six families: the four fixed Beta alternatives, their equal portfolio, and the composite-band process. At horizon 1,000 with a per-cell threshold of 1/(0.05/12), independent exact-DP calculations report:
+- At stationary p=0.48, the point-null priors alarm with probabilities 0.90%–1.73%, exceeding the allocated 0.4167%; the composite-band process alarms with probability 0.089%, because p=0.48 is within its declared null.
+- At stationary p=0.52, the composite-band false-alarm probability is also 0.089%.
+- At stationary p=0.45 or p=0.55, the band-null process alarms with probability 4.53%; those values are outside its declared interval, so this does not contradict its guarantee.
+- Following a change from p=0.50 after 100 observations, the band-null process detects p1=0.55 with probability 1.77%, p1=0.60 with 73.53%, and p1=0.70 / 0.80 with approximately 99.99% by horizon 1,000. The original Jeffreys point-null e-process has higher power at p1=0.55 (11.84%) but does not control a stable p=0.48 stream under its point null.
+
+This is an explicit robustness-versus-sensitivity trade-off; it is not a universal winner. The composite process is appropriate only when [0.48, 0.52] is justified from independent calibration knowledge. Its interval must not be selected from the held-out stream. The local exact-DP fixture uses stationary rates within and outside the band; formal validity extends to conditional rates that stay inside the band by the supermartingale argument, but this benchmark has not yet evaluated all such adaptive/serially dependent streams.
+
+Acceptance requirements: preserve exact-null, selection-bias and point-null misspecification controls; test both band edges and outside-band alternatives; report false alarms and detection separately; validate any interval chosen from a baseline sample using disjoint baseline/tuning/evaluation streams; and include a serial/adversarial conditional-probability stress test. A composite-null alarm does not by itself identify which assumption failed. Implementation and checker: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744). The underlying betting confidence-sequence literature includes Waudby-Smith and Ramdas, “Estimating means of bounded random variables by betting,” https://arxiv.org/abs/2010.09686; this implementation is inspired by the general e-process idea but is not a claimed reproduction of that paper's method.
