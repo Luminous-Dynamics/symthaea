@@ -177,19 +177,20 @@ jobs:
 
           if fixture["schema_version"] != "pitb.power-report.v1":
               raise SystemExit("primary power fixture must use schema v1")
-          if len(fixture["scenarios"]) != 16 or len(fixture["weak_null_scenarios"]) != 12:
-              raise SystemExit("primary power fixture must contain 16 strict/power rows and 12 weak-null rows")
+          if len(fixture["scenarios"]) != 16 or len(fixture["weak_null_scenarios"]) != 36:
+              raise SystemExit("primary power fixture must contain 16 strict/power rows and 36 weak-null rows")
           if sum(row["eligible_target_count"] for row in fixture["family_target_counts"]) != fixture["eligible_validation_target_count"]:
               raise SystemExit("fixture target denominator must equal the sum of its family sizes")
 
           iccs = {0.0, 0.05, 0.1, 0.2}
           effects = {0.0, 10.0, 15.0, 20.0}
+          associations = {0.0, 0.5, 0.9}
           strict_keys = {(row["true_treatment_effect_percentage_points"], row["assumed_family_icc"]) for row in fixture["scenarios"]}
-          weak_keys = {(row["requested_family_effect_heterogeneity_sd_percentage_points"], row["assumed_family_icc"]) for row in fixture["weak_null_scenarios"]}
+          weak_keys = {(row["requested_family_effect_heterogeneity_sd_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["weak_null_scenarios"]}
           if strict_keys != {(effect, icc) for effect in effects for icc in iccs}:
               raise SystemExit("fixture strict grid has missing or duplicate effect/ICC cells")
-          if weak_keys != {(sd, icc) for sd in (5.0, 10.0, 20.0) for icc in iccs}:
-              raise SystemExit("fixture weak-null grid has missing or duplicate heterogeneity/ICC cells")
+          if weak_keys != {(sd, icc, association) for sd in (5.0, 10.0, 20.0) for icc in iccs for association in associations}:
+              raise SystemExit("fixture weak-null grid has missing or duplicate heterogeneity/ICC/association cells")
           for row in fixture["scenarios"]:
               if row["true_treatment_effect_percentage_points"] == 0.0:
                   if row["null_effect_false_claim_probability_upper_simultaneous_95"] < row["estimated_power_upper_95"]:
@@ -238,7 +239,7 @@ jobs:
               pass
           else:
               raise SystemExit("schema must reject the pre-v1 report version")
-          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v1 schema, 16-cell strict grid, 12-cell weak-null grid, denominator reconciliation, simultaneous-bound consistency and two negative controls; fixture is synthetic and not a power result")
+          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v1 schema, 16-cell strict/power grid, 36-cell weak-null heterogeneity/ICC/association grid, denominator reconciliation, 40-cell null multiplicity check and negative controls; fixture is synthetic and not a power result")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
