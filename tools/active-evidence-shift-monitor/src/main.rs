@@ -1133,11 +1133,20 @@ mod tests {
                     FAMILY_HORIZON,
                     |n, successes| table[n][successes],
                 );
-                assert!(
+                let transition_alarm_probability =
                     within_band_transition.false_alarm_probability
-                        + within_band_transition.detection_probability
-                        <= PER_CELL_ALPHA + EPS,
+                        + within_band_transition.detection_probability;
+                assert!(
+                    transition_alarm_probability <= PER_CELL_ALPHA + EPS,
                     "composite-null family exceeded alpha for a transition within the accepted band"
+                );
+                assert!(
+                    (transition_alarm_probability
+                        + within_band_transition.survival_probability
+                        - 1.0)
+                        .abs()
+                        <= 1.0e-9,
+                    "composite-null transition probability mass did not conserve"
                 );
             }
 
