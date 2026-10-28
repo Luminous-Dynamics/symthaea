@@ -241,16 +241,17 @@ impl IntegratedInformation {
         }
     }
 
-    /// Compute detailed Φ components based on IIT theory
+    /// Compute the legacy `PhiComponents` feature bundle.
     ///
-    /// Returns PhiComponents with 7 measurements:
-    /// 1. **Integration** - Core Φ value (minimum info partition loss)
-    /// 2. **Binding** - How strongly components bind (MIP info loss)
-    /// 3. **Workspace** - Global workspace information (total system info)
-    /// 4. **Attention** - Selective integration (component distinctiveness)
-    /// 5. **Recursion** - Self-referential processing (temporal continuity)
-    /// 6. **Efficacy** - Processing efficiency (normalized Φ)
-    /// 7. **Knowledge** - Accumulated information (historical Φ average)
+    /// These are estimator-derived engineering features, not seven formally
+    /// validated IIT/GWT/HOT quantities:
+    /// 1. partition-proxy score;
+    /// 2. partition information-loss proxy;
+    /// 3. size-normalized information proxy (not GWT workspace access);
+    /// 4. component-distinctiveness proxy;
+    /// 5. recent score stability (not recurrence or self-reference);
+    /// 6. size-normalized score (not general processing efficacy);
+    /// 7. historical score average (not accumulated knowledge).
     fn compute_phi_components(
         &self,
         phi: f64,
@@ -258,19 +259,16 @@ impl IntegratedInformation {
         system_info: f64,
         mip_info: f64,
     ) -> PhiComponents {
-        // 1. Integration: Core Φ value (information lost by minimum partition)
+        // 1. Legacy partition-proxy output.
         let integration = phi;
 
-        // 2. Binding: Strength of component binding (how much info lost by best partition)
-        // Higher values = components are more tightly bound together
+        // 2. Partition information-loss proxy. This is not a causal binding measurement.
         let binding = (system_info - mip_info).max(0.0);
 
-        // 3. Workspace: Global workspace information content
-        // Total distinctiveness of integrated state
+        // 3. Size-normalized information proxy; not a Global Workspace Theory measure.
         let workspace = system_info / (components.len() as f64).sqrt();
 
-        // 4. Attention: Selective integration (component distinctiveness)
-        // Measure how distinct each component is from the bundled state
+        // 4. Component-distinctiveness proxy relative to the bundled representation.
         let system_state = self.bundle_components(components);
         let mut distinctiveness_sum = 0.0;
         for component in components {
@@ -279,8 +277,7 @@ impl IntegratedInformation {
         }
         let attention = distinctiveness_sum / components.len() as f64;
 
-        // 5. Recursion: Self-referential processing (temporal continuity)
-        // Compare current Φ to recent history to measure stable processing
+        // 5. Recent score stability. Variance of a scalar is not recurrence or self-reference.
         let recursion = if self.phi_history.len() >= 2 {
             let recent_phi: Vec<f64> = self
                 .phi_history
@@ -290,26 +287,24 @@ impl IntegratedInformation {
                 .map(|m| m.phi)
                 .collect();
 
-            // Temporal continuity = 1 - variance (stable = high recursion)
+            // Low variance maps to a larger stability feature; this is not a recursion estimate.
             let mean = recent_phi.iter().sum::<f64>() / recent_phi.len() as f64;
             let variance: f64 = recent_phi.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
                 / recent_phi.len() as f64;
 
             (1.0 - variance.sqrt()).max(0.0)
         } else {
-            0.5 // Default moderate recursion for first measurements
+            0.5 // Historical default for insufficient score history, not a recursion estimate
         };
 
-        // 6. Efficacy: How effectively the system processes information
-        // Ratio of integration to component count (efficiency)
+        // 6. Size-normalized score; this is not a validated processing-efficiency measure.
         let efficacy = if components.len() > 1 {
             phi / (components.len() as f64).ln()
         } else {
             0.0
         };
 
-        // 7. Knowledge: Accumulated information over time
-        // Average Φ across history (learning/memory trace)
+        // 7. Historical score average; this does not measure learned knowledge.
         let knowledge = if !self.phi_history.is_empty() {
             self.phi_history.iter().map(|m| m.phi).sum::<f64>() / self.phi_history.len() as f64
         } else {
@@ -327,21 +322,18 @@ impl IntegratedInformation {
         }
     }
 
-    /// Compute Φ (integrated information) for a system state
+    /// Compute the legacy HDC integration proxy for a set of binary hypervectors.
     ///
-    /// This is the core IIT calculation. We compute:
-    /// 1. Total information in the system
-    /// 2. Information in all possible partitions
-    /// 3. Φ = minimum information loss across partitions
+    /// This estimator derives a scalar from its information and partition routines;
+    /// it does not compute formal IIT Φ, and its output thresholds have no validated
+    /// correspondence to consciousness, sleep, anesthesia, or awareness.
     ///
     /// # Arguments
-    /// * `components` - System components as hypervectors
+    /// * `components` - HDC component representations, not an explicit causal TPM
     ///
     /// # Returns
-    /// Φ value (0.0 to 1.0+)
-    /// - Φ = 0: No integration (unconscious)
-    /// - Φ > 0.3: Moderate integration
-    /// - Φ > 0.5: High integration (consciousness-like)
+    /// Estimator-specific nonnegative score. Interpret only under the exact estimator
+    /// profile and task for which prospective utility has been demonstrated.
     ///
     /// # Example
     /// ```ignore
@@ -970,14 +962,12 @@ impl IntegratedInformation {
         (mip, min_info)
     }
 
-    /// Classify consciousness state based on Φ value
+    /// Map a legacy proxy score into historical score bands.
     ///
-    /// Based on empirical correlations from neuroscience:
-    /// - Φ < 0.1: Unconscious (deep sleep, anesthesia)
-    /// - 0.1-0.3: Low consciousness (drowsy)
-    /// - 0.3-0.5: Moderate (normal waking)
-    /// - 0.5-0.7: High (focused attention)
-    /// - Φ ≥ 0.7: Very high (peak states, meditation)
+    /// This method and its enum name are retained for API compatibility only. The
+    /// thresholds are not validated against neuroscience and must not be interpreted
+    /// as labels for unconsciousness, sleep, anesthesia, waking awareness, or meditation.
+    /// New code should consume the underlying proxy score with explicit estimator identity.
     pub fn classify_state(&self, phi: f64) -> ConsciousnessState {
         if phi < 0.1 {
             ConsciousnessState::Minimal
@@ -1111,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consciousness_classification() {
+    fn test_legacy_score_band_classification() {
         let phi_calc = IntegratedInformation::new();
 
         assert_eq!(phi_calc.classify_state(0.05), ConsciousnessState::Minimal);
