@@ -51,7 +51,7 @@ The catalog contains 17 probes; only these four semantic source mutants are exec
 
 ## Independent evidence auditor
 
-`tools/vleb/audit_receipt.py` recomputes artifact hashes and checks the task's logical-test inventory against concrete execution names, baseline/reference controls, environment identity, mutation target tests, differential evidence, timing and costs. The CLI requires caller-supplied pins for the task contract, protocol, candidate patch, auditor source, checkout revision and immutable runtime image; these must come from the trusted evaluator/run manifest, not from receipt fields.
+`tools/vleb/audit_receipt.py` recomputes artifact hashes and checks the task's logical-test inventory against concrete execution names, baseline/reference controls, environment identity, mutation target tests, differential evidence, timing and costs. The CLI requires caller-supplied pins for the task contract, protocol, candidate patch, auditor source, verifier binary, checkout revision and immutable runtime image; these must come from the trusted evaluator/run manifest, not from receipt fields. Auditor source and verifier binary have separate identities; matching the source digest does not prove which executable produced the receipt.
 
 Run its synthetic adversarial unit tests with:
 
@@ -63,4 +63,4 @@ The auditor deliberately rejects public-development fixtures and does not curren
 
 ## Validation status
 
-The reference crate currently contains 17 unit tests and 4 CLI integration tests, including a seeded differential reducer over 64 generated ledgers, permutation invariance, arbitrary duplicate multiplicity, maximum-value arithmetic, strict integer-token syntax and malformed CSV cases. These tests were authored but have not been compiled or executed in this environment because rustc and cargo are unavailable. CI results must be checked at the exact PR head. The fixture is not score-eligible until those tests execute, an independent reviewer approves the oracle, and adversarial task admission is complete.
+The reference crate currently contains 20 unit tests and 4 CLI integration tests, including a seeded differential reducer over 64 generated ledgers, permutation invariance, arbitrary duplicate multiplicity, maximum-value arithmetic, strict integer-token syntax and malformed CSV cases. The latest checked completed CI attempt compiled the crate, passed all 20 unit tests, all 4 CLI tests and strict Clippy. The format gate failed, and the mutation campaign found 2 semantic kills with 2 unresolved mutant constructions; follow-up commits address the remaining formatting and format-sensitive mutation anchors. The exact current PR-head workflow must pass before treating those fixes as validated. The fixture is not score-eligible until task admission, independent oracle review and all required controls are complete.
