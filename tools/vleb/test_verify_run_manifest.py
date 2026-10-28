@@ -486,6 +486,9 @@ class RunManifestVerifierTests(unittest.TestCase):
             result = self.bundle.audit(verify_attestation=True, repin_for_test=True)
 
         self.assertTrue(result["eligible"], result["issues"])
+        self.assertTrue(result["score_eligible"], result)
+        self.assertEqual(result["independent_claim_audit"]["status"], "passed")
+        self.assertEqual(result["independent_claim_audit"]["supported"], 1)
         attestation_argv = mocked_run.call_args_list[0].args[0]
         for flag in (
             "--cert-identity",
@@ -502,6 +505,35 @@ class RunManifestVerifierTests(unittest.TestCase):
             attestation_argv,
         )
 
+
+    def test_confirmatory_score_is_ineligible_without_claim_verifier_pin(self) -> None:
+        self.bundle.manifest["run_kind"] = "confirmatory"
+        self.bundle.manifest["task"]["exposure"] = "private_confirmatory"
+        self.bundle.manifest["task"]["independent_reviewer_count"] = 1
+        self.bundle.manifest["task"]["baseline_empty_patch_failed"] = True
+        self.bundle.manifest["task"]["reference_solution_passed"] = True
+        self.bundle.manifest["provenance"]["attestation_required"] = True
+        self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
+        attestation = synthetic_attestation(self.bundle.manifest)
+        audit_result = jbytes({"eligible": True, "verdict": "pass", "issues": []})
+
+        def fake_run(argv: list[str], **kwargs: Any) -> Mock:
+            if argv[0] == "gh":
+                return Mock(returncode=0, stdout=attestation)
+            if any(str(arg).endswith("audit_receipt.py") for arg in argv):
+                return Mock(returncode=0, stdout=audit_result)
+            raise AssertionError(f"claim auditor should not run without trusted pins: {argv!r}")
+
+        with patch.object(verifier.subprocess, "run", side_effect=fake_run):
+            result = self.bundle.audit(
+                verify_attestation=True,
+                repin_for_test=True,
+                trusted_claim_verifier_pins={},
+            )
+
+        self.assertFalse(result["score_eligible"], result)
+        self.assertEqual(result["independent_claim_audit"]["status"], "unresolved")
+        self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
 
     def test_attestation_certificate_and_subject_positive_control(self) -> None:
         raw = synthetic_attestation(self.bundle.manifest)
