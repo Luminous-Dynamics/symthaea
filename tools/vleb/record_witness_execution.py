@@ -38,6 +38,20 @@ def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def invocation_digest(argv: list[str], working_directory: str, timeout_ms: int) -> str:
+    canonical = json.dumps(
+        {
+            "argv": argv,
+            "working_directory": working_directory,
+            "timeout_ms": timeout_ms,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return digest(canonical)
+
+
 def safe_path(root: Path, value: str, *, must_exist: bool) -> Path:
     if not value or "\\" in value or "\x00" in value:
         raise ValueError("path must be a non-empty canonical POSIX relative path")
@@ -101,6 +115,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--network-mode-observed", choices=("true", "false"), required=True)
     parser.add_argument("--working-directory", default=".")
     parser.add_argument("--timeout-ms", type=int, default=120000)
+    parser.add_argument("--expected-invocation-sha256", required=True)
     parser.add_argument("--receipt-path", required=True)
     parser.add_argument("--stdout-path", required=True)
     parser.add_argument("--stderr-path", required=True)
@@ -124,6 +139,15 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("verifier SHA-256 must be 64 lowercase hexadecimal characters")
         if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{1,127}", args.claim_id):
             raise ValueError("claim ID is invalid")
+        if len(args.expected_invocation_sha256) != 64 or any(
+            char not in "0123456789abcdef" for char in args.expected_invocation_sha256
+        ):
+            raise ValueError("expected invocation SHA-256 must be 64 lowercase hexadecimal characters")
+        observed_invocation_sha256 = invocation_digest(
+            args.command, args.working_directory, args.timeout_ms
+        )
+        if observed_invocation_sha256 != args.expected_invocation_sha256:
+            raise ValueError("command argv, working directory or timeout differs from evaluator-pinned invocation")
 
         root = args.artifact_root.resolve(strict=True)
         source = safe_path(root, args.source_path, must_exist=True)
@@ -235,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
             },
             "invocation": {
                 "argv": args.command,
+                "argv_sha256": observed_invocation_sha256,
                 "working_directory": args.working_directory,
                 "timeout_ms": args.timeout_ms,
                 "environment_sha256": env_sha,
