@@ -166,6 +166,21 @@ def adapt_documents(
         raise ValueError("sweep.design_count must be an integer >= 75")
     if not isinstance(sweep["paired_runs"], list) or not sweep["paired_runs"]:
         raise ValueError("sweep.paired_runs must be a non-empty array")
+    if sweep["run_count"] != len(sweep["paired_runs"]):
+        raise ValueError("sweep.run_count does not match paired_runs length")
+    if not isinstance(sweep["source_sha256"], dict) or not sweep["source_sha256"]:
+        raise ValueError("sweep.source_sha256 must be a non-empty path-to-digest object")
+    for path, digest in sweep["source_sha256"].items():
+        if not isinstance(path, str) or not path or path.startswith("/") or ".." in Path(path).parts:
+            raise ValueError(f"invalid source-lock path: {path!r}")
+        _digest(digest, f"sweep.source_sha256[{path!r}]")
+    sweep_costs = _exact(sweep["fidelity_costs"], {"low", "medium", "high"}, "sweep.fidelity_costs")
+    for level, value in sweep_costs.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"sweep.fidelity_costs.{level} must be a positive integer")
+    sweep_budget = _number(sweep["cost_budget"], "sweep.cost_budget")
+    if sweep_budget <= 0:
+        raise ValueError("sweep.cost_budget must be positive")
     design_count = sweep["design_count"]
 
     selection = _exact(
@@ -191,6 +206,11 @@ def adapt_documents(
         raise ValueError("selected run design_count disagrees with sweep")
     if _number(run.get("severity"), "selected run severity") != selector["severity"]:
         raise ValueError("selected run severity disagrees with selector")
+    if _number(run.get("cost_budget"), "selected run cost_budget") != sweep_budget:
+        raise ValueError("selected run budget disagrees with sweep")
+    run_costs = _exact(run.get("fidelity_costs"), {"low", "medium", "high"}, "selected run fidelity_costs")
+    if run_costs != sweep_costs:
+        raise ValueError("selected run fidelity costs disagree with sweep")
     candidate_pool_sha = _digest(run.get("candidate_pool_sha256"), "selected run candidate_pool_sha256")
     if _digest(selection["candidate_pool_sha256"], "selection_manifest.candidate_pool_sha256") != candidate_pool_sha:
         raise ValueError("selection candidate pool digest does not match selected run")
@@ -258,6 +278,7 @@ def adapt_documents(
     if not isinstance(evaluations, list) or not evaluations:
         raise ValueError("selected sweep run has no evaluation ledger")
     seen_eval_keys = set()
+    summed_cost = 0
     for i, observation in enumerate(evaluations):
         if not isinstance(observation, dict):
             raise ValueError(f"selected run evaluations[{i}] must be an object")
@@ -272,7 +293,16 @@ def adapt_documents(
         seen_eval_keys.add(key)
         _objective_pair(observation.get("objectives"), f"selected run evaluation {i}.objectives", reference)
         _number(observation.get("constraint_margin"), f"selected run evaluation {i}.constraint_margin")
-    fidelity_costs = _exact(run.get("fidelity_costs"), {"low", "medium", "high"}, "selected run fidelity_costs")
+        cost_units = observation.get("cost_units")
+        if isinstance(cost_units, bool) or not isinstance(cost_units, int) or cost_units != run_costs[fidelity]:
+            raise ValueError(f"selected run evaluation {i}.cost_units disagrees with its fidelity cost")
+        summed_cost += cost_units
+    declared_spent = _number(run.get("cost_spent"), "selected run cost_spent")
+    if abs(summed_cost - declared_spent) > REFERENCE_TOL:
+        raise ValueError("selected run cost_spent disagrees with its evaluation ledger")
+    if declared_spent > sweep_budget + REFERENCE_TOL:
+        raise ValueError("selected run cost_spent exceeds the declared budget")
+    fidelity_costs = run_costs
     return {
         "schema_version": "1.1.0",
         "benchmark_id": AUDIT_BENCHMARK_ID,
