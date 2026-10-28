@@ -4,6 +4,8 @@ This directory defines a proposed benchmark format. **It currently contains no d
 
 ## Files
 
+- `weak-null-calibration-audit-2026-10-28.md` — exploratory independent simulation of inference calibration under a zero average treatment effect with heterogeneous component effects. Not production inference, not Rust/CI output, and not a transfer result.
+
 - `insight-record.schema.json` — JSON Schema Draft 2020-12 for one provenance-linked insight record, including semantic-validation evidence and a constructive-solving track for unknown witnesses, proof obligations, and answer equivalence (RPE or formal/expert checking).
 - `proof-progress-trace.schema.json` — strict trace contract for content-addressed proof-state snapshots, per-instance obligation lineage, resource counters, classified failures, lemma invalidation, subtree retraction, global replanning and cost-aware routing with decision receipts. CI validates obligation and budget invariants; splits are not verified closures. The schema is not yet a live prover trace collector or a measured result.
 - `counterfactual-precondition-suite.schema.json` plus `fixtures/counterfactual-precondition-suite.synthetic.json` — paired base/counterfactual targets with typed mutation class, source-artifact digest, separate base/variant artifact and statement digests, dual-review adjudications and outcome-row IDs. The nine-pair synthetic fixture distinguishes syntax-only no-ops from changed-surface equivalent reformulations, local semantic mutations and one pending adjudication. CI validates these relations and rejects malformed/leakage/adjudication controls. The fixture is contract-only, not mathematics or measured model behavior.
