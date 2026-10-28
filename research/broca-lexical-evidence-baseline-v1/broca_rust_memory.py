@@ -23,7 +23,7 @@ from typing import Any
 from .memory import Memory, MemoryContextItem, register_memory, require
 
 
-PROTOCOL_ID = "BROCA-LME-V2-BM25-WORKER-V1"
+PROTOCOL_ID = "BROCA-LME-V2-BM25-WORKER-V2"
 MAX_WORKER_LINE_BYTES = 32 * 1024 * 1024
 WORKER_MANIFEST_NAME = "broca_worker_manifest.json"
 TRAJECTORY_JOURNAL_NAME = "broca_trajectory_journal.jsonl"
@@ -143,6 +143,7 @@ class BrocaRustMemory(Memory):
         self._closed = False
         self._trajectory_ids: set[str] = set()
         self._trajectory_count = 0
+        self._event_count = 0
         self._audit_by_invocation: dict[str, dict[str, Any]] = {}
         self._journal = tempfile.TemporaryFile(mode="w+t", encoding="utf-8", newline="\n")
 
@@ -235,14 +236,59 @@ class BrocaRustMemory(Memory):
             # Only journal a trajectory after the worker atomically accepted it.
             # If persistence fails after in-memory insertion, kill this worker so
             # the unjournaled trajectory cannot be queried as if it were durable.
-            try:
-                self._journal.write(serialized + "\n")
-                self._journal.flush()
-            except BaseException as error:
-                self._abort_worker()
-                raise RuntimeError(f"failed to persist trajectory journal: {error}") from error
+            self._append_journal_event({"event": "insert_trajectory", "trajectory": trajectory})
             self._trajectory_ids.add(trajectory_id)
             self._trajectory_count += 1
+
+    def _append_journal_event(self, event: dict[str, object]) -> None:
+        serialized = json.dumps(
+            event,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        encoded = (serialized + "\n").encode("utf-8")
+        require(len(encoded) <= self.max_jsonl_line_bytes,
+                "journal event exceeds configured JSONL line bound")
+        try:
+            self._journal.write(serialized + "\n")
+            self._journal.flush()
+            self._event_count += 1
+        except BaseException as error:
+            self._abort_worker()
+            raise RuntimeError(f"failed to persist lifecycle journal event: {error}") from error
+
+    def revoke_evidence(self, evidence_id: str) -> None:
+        require(isinstance(evidence_id, str) and evidence_id.strip(),
+                "evidence_id must be a non-empty string")
+        with self._lock:
+            self._rpc({"op": "revoke", "evidence_id": evidence_id})
+            self._append_journal_event({"event": "revoke_evidence", "evidence_id": evidence_id})
+
+    def delete_evidence(self, evidence_id: str) -> None:
+        require(isinstance(evidence_id, str) and evidence_id.strip(),
+                "evidence_id must be a non-empty string")
+        with self._lock:
+            self._rpc({"op": "delete", "evidence_id": evidence_id})
+            self._append_journal_event({"event": "delete_evidence", "evidence_id": evidence_id})
+
+    def supersede_evidence(self, old_evidence_id: str, new_evidence_id: str) -> None:
+        require(isinstance(old_evidence_id, str) and old_evidence_id.strip(),
+                "old_evidence_id must be a non-empty string")
+        require(isinstance(new_evidence_id, str) and new_evidence_id.strip(),
+                "new_evidence_id must be a non-empty string")
+        with self._lock:
+            self._rpc({
+                "op": "supersede",
+                "old_evidence_id": old_evidence_id,
+                "new_evidence_id": new_evidence_id,
+            })
+            self._append_journal_event({
+                "event": "supersede_evidence",
+                "old_evidence_id": old_evidence_id,
+                "new_evidence_id": new_evidence_id,
+            })
 
     def query(
         self,
@@ -470,6 +516,7 @@ class BrocaRustMemory(Memory):
             "scope_id": self.scope_id,
             "worker_sha256": self.worker_sha256,
             "trajectory_count": self._trajectory_count,
+            "event_count": self._event_count,
             "journal_file": TRAJECTORY_JOURNAL_NAME,
             "journal_sha256": journal_sha,
             "bm25_params": dict(self.bm25_params),
@@ -495,19 +542,53 @@ class BrocaRustMemory(Memory):
         require(self._sha256_file(journal_path) == manifest.get("journal_sha256"),
                 "trajectory journal digest mismatch")
 
-        loaded_count = 0
-        with journal_path.open("r", encoding="utf-8") as file:
-            for line_number, line in enumerate(file, start=1):
-                require(len(line.encode("utf-8")) <= self.max_jsonl_line_bytes,
-                        f"journal line {line_number} exceeds configured size bound")
-                if not line.strip():
-                    raise RuntimeError(f"blank trajectory journal line {line_number}")
-                trajectory = json.loads(line)
-                require(isinstance(trajectory, dict), f"journal line {line_number} must be an object")
-                self.insert(trajectory)
-                loaded_count += 1
-        require(loaded_count == manifest.get("trajectory_count"),
-                "trajectory journal count differs from manifest")
+        loaded_trajectories = 0
+        loaded_events = 0
+        try:
+            with journal_path.open("r", encoding="utf-8") as file:
+                for line_number, line in enumerate(file, start=1):
+                    require(len(line.encode("utf-8")) <= self.max_jsonl_line_bytes,
+                            f"journal line {line_number} exceeds configured size bound")
+                    if not line.strip():
+                        raise RuntimeError(f"blank trajectory journal line {line_number}")
+                    event_row = json.loads(line)
+                    require(isinstance(event_row, dict),
+                            f"journal line {line_number} must be an object")
+                    event = event_row.get("event")
+                    if event == "insert_trajectory":
+                        trajectory = event_row.get("trajectory")
+                        require(isinstance(trajectory, dict),
+                                f"journal insert event {line_number} must contain trajectory object")
+                        self.insert(trajectory)
+                        loaded_trajectories += 1
+                    elif event == "revoke_evidence":
+                        evidence_id = event_row.get("evidence_id")
+                        require(isinstance(evidence_id, str),
+                                f"journal revoke event {line_number} requires evidence_id")
+                        self.revoke_evidence(evidence_id)
+                    elif event == "delete_evidence":
+                        evidence_id = event_row.get("evidence_id")
+                        require(isinstance(evidence_id, str),
+                                f"journal delete event {line_number} requires evidence_id")
+                        self.delete_evidence(evidence_id)
+                    elif event == "supersede_evidence":
+                        old_id = event_row.get("old_evidence_id")
+                        new_id = event_row.get("new_evidence_id")
+                        require(isinstance(old_id, str) and isinstance(new_id, str),
+                                f"journal supersession event {line_number} requires both evidence IDs")
+                        self.supersede_evidence(old_id, new_id)
+                    else:
+                        raise RuntimeError(f"unsupported journal event at line {line_number}: {event!r}")
+                    loaded_events += 1
+            require(loaded_trajectories == manifest.get("trajectory_count"),
+                    "trajectory journal insert count differs from manifest")
+            require(loaded_events == manifest.get("event_count"),
+                    "trajectory journal event count differs from manifest")
+            require(self._event_count == loaded_events,
+                    "replayed event count differs from journal event count")
+        except BaseException:
+            self._abort_worker()
+            raise
 
     @staticmethod
     def _sha256_file(path: Path) -> str:
