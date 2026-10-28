@@ -481,6 +481,27 @@ mod tests {
     }
 
     #[test]
+    fn minimum_projection_yield_blocks_stopping_even_when_ranking_is_stable() {
+        let mut c = config();
+        c.min_projection_yield = 0.8;
+        let mut gate = TrajectoryAcquisitionGate::new(c).unwrap();
+        let order = vec![0, 1, 2, 3];
+        gate.observe(batch("b1", 2, 2, Some(order.clone()))).unwrap();
+        gate.observe(batch("b2", 2, 1, Some(order.clone()))).unwrap();
+        let decision = gate.observe(batch("b3", 2, 1, Some(order)).unwrap();
+        match decision {
+            AcquisitionDecision::Continue(snapshot) => {
+                assert_eq!(snapshot.attempted_total, 6);
+                assert_eq!(snapshot.valid_projection_total, 4);
+                assert!((snapshot.projection_yield - (2.0 / 3.0)).abs() < 1e-12);
+                assert!(snapshot.ranking_stability_met);
+                assert!(!snapshot.minimum_projection_yield_met);
+            }
+            other => panic!("low projection yield must not stop acquisition: {other:?}"),
+        }
+    }
+
+    #[test]
     fn budget_exhaustion_is_not_reported_as_stable_stop() {
         let mut c = config();
         c.max_attempts = 6;
