@@ -90,6 +90,21 @@ For Mem2ActBench, report exact task success alongside:
 
 Use task-level controls where the same task is run with memory enabled, memory disabled, and a deliberately stale or wrong memory record. A system should improve task success with valid memory and should never become more confidently wrong when memory is stale.
 
+### Context efficiency and trajectory diversity
+
+The trajectory ingester currently produces state-level text records and repeats trajectory-wide metadata in each state's rendered text. This makes a concrete retrieval-quality hypothesis testable: a query matching a goal can allow sibling states from one trajectory to monopolize top-k, even when the question needs multiple independent examples or a transition-specific state. The official AgentRunbook-R baseline explicitly separates raw-state slices, state-transition events, and procedure/hint notes; these are useful comparison arms, not mechanisms to assume are superior.
+
+Evaluate with identical evidence, query set and length-bounded context budget:
+
+- Current BM25 state records with repeated trajectory metadata.
+- Normalized state text plus a separately indexed trajectory-level note.
+- Source-aware selection with a bounded per-trajectory quota, allowing adjacent-state expansion only for transition/workflow queries.
+- Oracle span selection, clearly labeled as a diagnostic upper bound and never included as a competitive method score.
+
+Report top-k trajectory concentration (max share and entropy), distinct trajectories/states, relevant-state recall, contiguous-span precision, duplicate-token ratio, context tokens, query latency/cost, and answer accuracy by each of the five LME-V2 abilities. Static-state queries should penalize unnecessary neighbors; dynamic-state/workflow queries should test whether isolating single states loses transition evidence. Tune on development questions, freeze policy, then evaluate held-out test questions and official LAFS Gain.
+
+This ablation separates a retrieval-policy win from a representation/index win. Keep it separate from HDC kernel throughput and exact-search parity.
+
 ## Required baseline arms
 
 Freeze and compare these as separate arms. Do not conflate them into one advertised “memory” result.
