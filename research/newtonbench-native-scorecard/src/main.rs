@@ -42,7 +42,7 @@ fn collect_trial_artifacts(root: &Path) -> io::Result<Vec<ArtifactInput>> {
         ));
     }
     let mut paths = Vec::new();
-    collect_recursively(root, root, &mut paths)?;
+    collect_recursively(root, &mut paths)?;
     paths.sort();
     let mut artifacts = Vec::with_capacity(paths.len());
     for path in paths {
@@ -59,13 +59,13 @@ fn collect_trial_artifacts(root: &Path) -> io::Result<Vec<ArtifactInput>> {
     Ok(artifacts)
 }
 
-fn collect_recursively(root: &Path, current: &Path, found: &mut Vec<PathBuf>) -> io::Result<()> {
+fn collect_recursively(current: &Path, found: &mut Vec<PathBuf>) -> io::Result<()> {
     let mut entries = fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
         let path = entry.path();
         if path.is_dir() {
-            collect_recursively(root, &path, found)?;
+            collect_recursively(&path, found)?;
         } else if path.is_file() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
@@ -74,6 +74,5 @@ fn collect_recursively(root: &Path, current: &Path, found: &mut Vec<PathBuf>) ->
             }
         }
     }
-    let _ = root;
     Ok(())
 }
