@@ -11,6 +11,7 @@ This is a research agenda, not evidence that the current Symthaea optimizer beat
 - **MF-HVKG** uses a one-step look-ahead acquisition to choose design/fidelity for Pareto-set knowledge and hypervolume under posterior mean.
 - **MOMF** adds a fidelity/trust objective to multi-objective optimization.
 - **MF-JESMOC** targets constrained multi-objective multi-fidelity optimization and selects both design and fidelity using cost-normalized joint-entropy reduction; the paper reports experiments on synthetic and real-world problems, and links public code.
+- **MF-SCBO** (preprint posted 24 September 2026) extends scalable constrained Bayesian optimization to multiple fidelities, including non-nested sampling. It is a relevant new comparator for constrained and higher-dimensional settings, but its task assumptions still need to be matched explicitly.
 - **Consequential improvement (CI)** is a recent acquisition method for multi-fidelity Bayesian optimization that accounts for deferred high-fidelity validation cost. Its cited paper positions its multi-objective extension as future work, so do not call the Symthaea heuristic an implementation of CI.
 - **COCO BBOB-biobj** offers 55 bi-objective functions with official performance assessment. It is a complementary test of optimizer quality, not a casting simulator.
 
@@ -18,6 +19,10 @@ References:
 - BoTorch MF-HVKG / MOMF tutorial: https://botorch.org/docs/v0.13.0/tutorials/Multi_objective_multi_fidelity_BO
 - MF-JESMOC paper: https://doi.org/10.1016/j.neucom.2025.131674
 - MF-JESMOC public code: https://github.com/fernandezdaniel/MOBOCMF
+- MF-SCBO paper: https://arxiv.org/abs/2609.29941
+- MF-SCBO public code: https://github.com/Nemo-Virtual-Lab/MF-SCBO
+- NIST (2026), risk-based VVUQ methods for computational modelling and simulation: https://doi.org/10.6028/NIST.AMS.100-85
+- Conformal Policy Control (ICML 2026): https://proceedings.mlr.press/v306/prinster26a.html
 - Consequential improvement paper: https://doi.org/10.1007/s11081-026-10078-5
 - COCO archive: https://coco-platform.org/data-archive/index.html
 - Multi-fidelity BO experimental best-practices review: https://www.nature.com/articles/s43588-025-00822-9
@@ -98,8 +103,16 @@ These are proposed engineering gates for a serious superiority claim, and must b
 
 These targets are not universal industry standards and do not, by themselves, prove industrial usefulness. They are proposed gates; obtain foundry stakeholder agreement on the actual quality, risk and economic outcomes before the physical track.
 
+## New safety paradigm: promotion risk must be statistically controlled
+
+A candidate that a cheap model labels feasible but high fidelity rejects is a **false-feasible promotion**. Treat this as a decision-risk event, not just another optimization metric. The new `promotion_risk_gate.py` computes the one-sided exact Clopper–Pearson upper confidence bound for this event rate and returns `allow` only when a 5% risk target is met by a predeclared **independent held-out validation sample**.
+
+The key negative control: at 95% one-sided confidence, 0 failures in 8 independent Bernoulli trials still permits a failure probability of about 31.2%; 0/58 still does not establish a 5% upper bound; 0/59 reaches about 4.95%. Optimizer-selected promotion outcomes cannot certify their own risk because selection is adaptive. The scorer therefore reports a descriptive bound for its optimization trace but never treats that trace as independent validation. The guarantee also depends on representative/exchangeable validation data; under distribution shift it is not a deployment guarantee. Required action under unsupported shift: abstain, collect representative high-fidelity evidence, and re-calibrate before relying on the gate.
+
+This is aligned with the risk-based credibility direction in NIST's October 2026 VVUQ report, and with 2026 work on conformal policy control. The present module is a small exact-binomial gate, **not** a complete conformal or distribution-free shift-robust guarantee.
+
 ## What is implemented now vs still open
 
-Implemented in this branch: an adaptive heuristic for joint candidate/fidelity choice; local residual correction; a deferred validation-cost proxy; per-action audit trace; independent action replay; and tests authored for budget response and tamper rejection.
+Implemented in the current stacked branches: an adaptive heuristic for joint candidate/fidelity choice; local residual correction; a deferred validation-cost proxy; per-action audit trace; independent action replay; an exact binomial promotion-risk gate that requires independent held-out validation for certification; and tests authored for budget response, tamper rejection, known bounds and fail-closed behavior.
 
 Not yet demonstrated: local test execution, any full sweep, advantage over DIWA / MF-HVKG / MOMF / MF-JESMOC, calibration of its uncertainty, validated casting-simulator performance, or physical foundry benefit. The method should be revised or discarded if matched-cost trials do not support the hypothesis.
