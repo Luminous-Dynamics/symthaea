@@ -96,6 +96,25 @@ jobs:
             exit 1
           fi
 
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --sentinel-budget-csv > "$temp_dir/sentinel-original.csv"
+          python3 - "$temp_dir/sentinel-original.csv" "$temp_dir/sentinel-mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[1]["true_shift_detection_probability"] = "0.1"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget "$temp_dir/sentinel-mutated.csv"; then
+            echo "sentinel-budget checker accepted a mutated detection probability" >&2
+            exit 1
+          fi
+
       - name: Upload exact-source result and provenance
         if: always()
         uses: actions/upload-artifact@v4
