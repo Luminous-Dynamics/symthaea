@@ -470,7 +470,12 @@ mod tests {
         let mut sorted = order.clone();
         sorted.sort_unstable();
         assert_eq!(sorted, vec![0, 1, 2]);
+        assert_eq!(order, vec![0, 1, 2]);
         assert_eq!(order, summary.ordered_vertices(&degrees, PriorOrdering::BiasFirst).unwrap());
+        assert_eq!(
+            summary.ordered_vertices(&degrees, PriorOrdering::UncertaintyFirst).unwrap(),
+            vec![1, 2, 0]
+        );
         assert_eq!(
             summary.ordered_vertices(&degrees, PriorOrdering::DegreeOnly).unwrap(),
             vec![1, 2, 0]
