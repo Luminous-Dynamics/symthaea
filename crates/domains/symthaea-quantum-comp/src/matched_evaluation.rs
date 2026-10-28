@@ -1768,6 +1768,8 @@ mod tests {
                     verifier_receipt: None,
                     verification: CandidateVerification::Unverified,
                     conflict_count: None,
+                    deployment_elapsed_ms: Some(1.0),
+                    standardized_algorithm_elapsed_ms: Some(0.85),
                     costs: costs(1.0),
                     energy: EnergyRecord::not_measured(),
                 },
