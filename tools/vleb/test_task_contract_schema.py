@@ -138,12 +138,11 @@ class TaskContractSchemaTests(unittest.TestCase):
         errors = self.errors(task)
         self.assertTrue(any("requirement_traceability" in error for error in errors), errors)
 
-    def test_private_requirement_traceability_schema_rejects_duplicate_ids_and_empty_test_map(self) -> None:
+    def test_requirement_traceability_entry_requires_concrete_test_ids(self) -> None:
         task = self.valid_private_task()
-        task["behavior_contract"]["requirement_traceability"][1]["requirement_id"] = task["behavior_contract"]["requirement_traceability"][0]["requirement_id"]
+        del task["behavior_contract"]["requirement_traceability"][0]["required_test_ids"]
         errors = self.errors(task)
-        # Per-entry schema validates the shape; cross-entry uniqueness is enforced by the independent auditor.
-        self.assertEqual(errors, [])
+        self.assertTrue(any("required_test_ids" in error for error in errors), errors)
 
     def test_private_task_requires_each_reference_hash_and_artifact_path(self) -> None:
         task = self.valid_private_task()
