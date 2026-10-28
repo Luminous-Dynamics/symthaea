@@ -841,6 +841,11 @@ mod tests {
             .expect("required fields array")
             .iter()
             .any(|field| field.as_str() == Some("expected_task_count")));
+        assert!(schema["required"]
+            .as_array()
+            .expect("required fields array")
+            .iter()
+            .any(|field| field.as_str() == Some("protocol_commitment_sha256")));
     }
 
 
@@ -896,6 +901,87 @@ mod tests {
             sha256_hex(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
+    }
+
+
+    #[test]
+    fn revealed_seed_and_task_set_verify_against_exact_commitments() {
+        let manifest = valid_qualified_manifest("sealed_refresh");
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &test_task_set()).unwrap();
+        assert!(report.verified, "{:?}", report.issues);
+        assert!(report.seed_commitment_matches);
+        assert!(report.task_set_commitment_matches);
+        assert_eq!(report.seed_bytes, 32);
+        assert_eq!(report.task_set_bytes, test_task_set().len() as u64);
+    }
+
+    #[test]
+    fn changed_seed_is_reported_as_commitment_mismatch() {
+        let manifest = valid_qualified_manifest("sealed_refresh");
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let mut seed = test_seed();
+        seed[0] ^= 0xff;
+        let report = verify_reveal(&manifest_bytes, &seed, &test_task_set()).unwrap();
+        assert!(!report.verified);
+        assert!(!report.seed_commitment_matches);
+        assert!(report.task_set_commitment_matches);
+        assert!(report.issues.iter().any(|issue| issue.contains("seed does not match")));
+    }
+
+    #[test]
+    fn changed_task_set_is_reported_as_commitment_mismatch() {
+        let manifest = valid_qualified_manifest("sealed_refresh");
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let mut task_set = test_task_set();
+        task_set.push(b' ');
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &task_set).unwrap();
+        assert!(!report.verified);
+        assert!(report.seed_commitment_matches);
+        assert!(!report.task_set_commitment_matches);
+        assert!(report.issues.iter().any(|issue| issue.contains("task-set bytes do not match")));
+    }
+
+    #[test]
+    fn protocol_context_change_invalidates_frozen_commitment() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        manifest["budget"]["max_total_tokens"] = json!(50001);
+        let report = validate_value(&manifest).unwrap();
+        assert!(!report.valid);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("does not match the frozen manifest context")));
+    }
+
+    #[test]
+    fn artifact_commitments_are_domain_separated() {
+        let manifest = valid_qualified_manifest("sealed_refresh");
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let same_bytes = vec![0x44; 32];
+        let seed_hash =
+            compute_artifact_commitment(&manifest_bytes, "seed", &same_bytes).unwrap();
+        let task_hash =
+            compute_artifact_commitment(&manifest_bytes, "task-set", &same_bytes).unwrap();
+        assert_ne!(seed_hash, task_hash);
+    }
+
+    #[test]
+    fn short_seed_is_rejected_before_commitment() {
+        let manifest = valid_qualified_manifest("sealed_refresh");
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let error = compute_artifact_commitment(&manifest_bytes, "seed", b"short")
+            .expect_err("short seed must be rejected");
+        assert!(error.contains("at least 32 bytes"));
+    }
+
+    #[test]
+    fn reveal_verification_refuses_open_or_unqualified_manifests() {
+        let manifest = valid_qualified_manifest("reproducible_open");
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let error = verify_reveal(&manifest_bytes, &test_seed(), &test_task_set())
+            .expect_err("open benchmark lane must not claim sealed reveal verification");
+        assert!(error.contains("lane=sealed_refresh"));
     }
 
     #[test]
