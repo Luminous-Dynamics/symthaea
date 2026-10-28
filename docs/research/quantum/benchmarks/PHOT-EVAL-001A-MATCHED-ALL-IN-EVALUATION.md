@@ -42,9 +42,9 @@ The stacked follow-up implementation in `mis_evidence.rs` now defines a narrow c
 
 - Recomputes SHA-256 from the exact original graph and candidate byte slices.
 - Rejects non-canonical line endings, ambiguous decimal encodings, duplicate/unsorted edges, self-loops, out-of-range vertices, duplicate/unsorted candidate vertices, and declared-count mismatches.
-- Counts selected-edge conflicts directly from the canonical graph. A candidate with a conflict gets a conflict receipt, never a target hit; a feasible candidate below the frozen target also is not a hit.
-- Constructs a deterministic receipt from the recomputed graph/candidate digests, verifier digest, target, size, conflict count, and verdict.
-- `verify_mis_candidate_with_receipt` re-runs verification and requires the actual persisted receipt bytes to exactly match the reconstructed receipt bytes; it also recomputes the receipt SHA-256.
+- Counts selected-edge conflicts in O(V + E) using a candidate-membership bitmap and one edge scan. A candidate with a conflict gets a conflict receipt, never a target hit; a feasible candidate below the frozen target also is not a hit.
+- Constructs a deterministic `SYMTHEA-MIS-RECEIPT-V2` receipt from the recomputed graph/candidate digests, verifier digest, target, size, conflict count, verdict, and an explicit context-present field.
+- `verify_mis_candidate_with_receipt` re-runs verification and requires the actual persisted receipt bytes to exactly match the reconstructed receipt bytes; it also recomputes the receipt SHA-256. The trial-bound follow-up adds protocol/trial/pair/seed binding to that context.
 - Returns an opaque `VerifiedMisCandidate` whose fields cannot be constructed or modified through the crate's safe public API. The matched evaluator requires this evidence token and rebinds its metadata to the trial and report.
 
 The SHA-256 implementation is dependency-free and has known-answer vectors for empty input, `abc`, the standard quick-brown-fox vector, multi-block input, and lengths around SHA-256 padding boundaries. These tests are authored but have not yet been executed in Rust at the time of this draft; exact-head CI remains required.
