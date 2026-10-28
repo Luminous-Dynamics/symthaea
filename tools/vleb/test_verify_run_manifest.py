@@ -9,6 +9,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import Mock, patch
 from pathlib import Path
 from typing import Any
 
@@ -263,6 +264,34 @@ class RunManifestVerifierTests(unittest.TestCase):
     def test_mutation_accounting_inconsistency_is_rejected(self) -> None:
         self.bundle.manifest["mutation_campaign"]["killed"] = 3
         self.assert_issue(self.bundle.audit(repin_for_test=True), "mutation_accounting_inconsistent")
+
+    def test_confirmatory_bundle_is_not_extracted_before_attestation_verifies(self) -> None:
+        self.bundle.manifest["run_kind"] = "confirmatory"
+        self.bundle.manifest["task"]["exposure"] = "private_confirmatory"
+        self.bundle.manifest["task"]["independent_reviewer_count"] = 1
+        self.bundle.manifest["task"]["baseline_empty_patch_failed"] = True
+        self.bundle.manifest["task"]["reference_solution_passed"] = True
+        self.bundle.manifest["provenance"]["attestation_required"] = True
+        self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
+        bundle_path = self.bundle.root / self.bundle.paths["bundle"]
+        bundle_path.write_bytes(b"untrusted non-ZIP bytes")
+        self.bundle.manifest["evidence_bundle"]["sha256"] = sha(bundle_path.read_bytes())
+
+        with patch.object(
+            verifier.subprocess,
+            "run",
+            return_value=Mock(returncode=1, stdout=b"signature verification failed"),
+        ), patch.object(
+            verifier,
+            "extract_evidence_bundle",
+            side_effect=AssertionError("must not extract before attestation verification"),
+        ) as extract:
+            result = self.bundle.audit(verify_attestation=True, repin_for_test=True)
+
+        self.assertFalse(result["eligible"], result)
+        self.assertIn("attestation_verification_failed", {row["code"] for row in result["issues"]})
+        self.assertNotIn("evidence_bundle_invalid", {row["code"] for row in result["issues"]})
+        extract.assert_not_called()
 
     def test_confirmatory_run_cannot_skip_attestation(self) -> None:
         self.bundle.manifest["run_kind"] = "confirmatory"
