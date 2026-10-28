@@ -601,6 +601,61 @@ mod tests {
             .any(|field| field.as_str() == Some("expected_task_count")));
     }
 
+
+    #[test]
+    fn schema_required_and_property_sets_match_for_strict_objects() {
+        use std::collections::BTreeSet;
+
+        fn property_names(value: &Value) -> BTreeSet<String> {
+            value
+                .as_object()
+                .expect("schema properties object")
+                .keys()
+                .cloned()
+                .collect()
+        }
+
+        fn required_names(value: &Value) -> BTreeSet<String> {
+            value["required"]
+                .as_array()
+                .expect("schema required array")
+                .iter()
+                .map(|field| field.as_str().expect("field name").to_owned())
+                .collect()
+        }
+
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/generation-manifest.schema.json"
+        ))
+        .expect("valid JSON Schema document");
+        assert_eq!(
+            property_names(&schema["properties"]),
+            required_names(&schema)
+        );
+
+        for path in [
+            &schema["properties"]["generator"],
+            &schema["properties"]["evaluator"],
+            &schema["properties"]["policy_freeze"],
+            &schema["properties"]["budget"],
+            &schema["properties"]["task_family_mixture"]["items"],
+        ] {
+            assert_eq!(
+                property_names(&path["properties"]),
+                required_names(path),
+                "nested object property/required mismatch"
+            );
+        }
+    }
+
+    #[test]
+    fn sha256_implementation_matches_known_answer() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
     #[test]
     fn malformed_json_is_rejected() {
         let error = validate_manifest_bytes(b"{not-json")
