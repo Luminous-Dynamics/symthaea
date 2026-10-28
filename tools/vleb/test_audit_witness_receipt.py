@@ -104,6 +104,7 @@ class WitnessReceiptAuditTests(unittest.TestCase):
             "expected_run_attempt": 2,
             "expected_task_id": "COBOL.SETTLEMENT.001",
             "expected_claim_id": "BALANCE.PIC",
+            "expected_source_path": "source.cbl",
             "expected_source_sha256": self.receipt["source"]["sha256"],
             "expected_source_spans_sha256": canonical_sha(self.receipt["source"]["spans"]),
             "expected_invocation_sha256": canonical_sha(self.receipt["invocation"]),
@@ -145,6 +146,10 @@ class WitnessReceiptAuditTests(unittest.TestCase):
     def test_source_revision_must_match_external_pin(self) -> None:
         result = self.audit(expected_source_sha256="f" * 64)
         self.assertIn("source_digest_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_source_path_must_match_evaluator_claim_inventory_pin(self) -> None:
+        result = self.audit(expected_source_path="copybook/renamed-source.cbl")
+        self.assertIn("source_path_mismatch", {issue["code"] for issue in result["issues"]})
 
     def test_source_spans_must_match_evaluator_claim_inventory_pin(self) -> None:
         result = self.audit(expected_source_spans_sha256="e" * 64)
