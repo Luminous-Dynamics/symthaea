@@ -283,7 +283,9 @@ class BrocaRustMemoryAdapterTests(unittest.TestCase):
         adapter = self.make_adapter()
         with self.assertRaises(RuntimeError):
             adapter.query("billing", query_image={"not": "a path"})
-\n    def test_context_digest_mismatch_is_rejected(self):
+
+
+    def test_context_digest_mismatch_is_rejected(self):
         with patch.dict(os.environ, {"BROCA_FAKE_WORKER_MODE": "digest_mismatch"}):
             adapter = self.make_adapter()
             adapter.insert(self.trajectory())
