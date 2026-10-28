@@ -3280,8 +3280,9 @@ mod tests {
             ("012".to_string(), "validation".to_string()),
             ("017".to_string(), "validation".to_string()),
             ("089".to_string(), "test".to_string()),
+            ("099".to_string(), "test".to_string()),
         ]);
-        let validation_has_test_id = vec!["012".to_string(), "089".to_string()];
+        let validation_has_test_id = vec!["012".to_string(), "099".to_string()];
         let test = vec!["089".to_string()];
         assert!(validate_exposure_quarantine(&validation_has_test_id, &test, &frozen)
             .expect_err("test family 089 must not enter validation exposure list")
