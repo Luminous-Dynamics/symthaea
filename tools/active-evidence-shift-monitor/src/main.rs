@@ -967,6 +967,18 @@ mod tests {
                 "family {} exceeds the anytime null alarm allocation",
                 family.name()
             );
+            let misspecified_baseline = evaluate_with_alarm(
+                0.48,
+                None,
+                0,
+                FAMILY_HORIZON,
+                |n, successes| table[n][successes],
+            );
+            assert!(
+                misspecified_baseline.false_alarm_probability > PER_CELL_ALPHA,
+                "family {} hid the declared-p0 misspecification control",
+                family.name()
+            );
 
             let weak_shift = evaluate_with_alarm(
                 NOMINAL_P,
