@@ -113,8 +113,10 @@ pub use interop::{AdapterAuthority, IntegrationDeclaration, IntegrationTarget};
 pub use matched_evaluation::{
     CandidateVerification, EnergyRecord, EnergyScope, MatchedArmReport,
     MatchedComparisonSummary, MatchedEvaluationError, MatchedPairResult,
-    MatchedTrialRecord, MisEvidenceError, MisEvidenceVerdict, StageCostsMs, TimeWinner,
+    MatchedTrialRecord, MisEvidenceError, MisEvidenceVerdict, RestrictedMeanTtsSummary,
+    RestrictedTtsPairResult, StageCostsMs, TimeWinner,
     TrialTermination, VerifierReceiptEvidence, VerifiedMisCandidate, compare_matched_arms,
+    compare_restricted_mean_tts,
     canonicalize_dimacs_graph, sha256_hex, verify_mis_candidate,
     verify_mis_candidate_with_receipt,
 };
