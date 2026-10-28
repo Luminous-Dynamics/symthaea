@@ -75,7 +75,7 @@ After the initial two-set comparison, I evaluated five nested graph/kernel margi
 
 The robust value rises monotonically as the admissible marginal range widens. In this fixture, the six-prior policy remains optimal for the graph and kernel objectives across all five widths, but becomes suboptimal for joint prediction at the two widest sets. This is a useful *sensitivity curve* for robustness versus conservatism; it is not a calibration curve because these bounds were chosen illustratively rather than estimated from data.
 
-The exact 15-row local output is losslessly committed as `validation/CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json.gz` (compressed SHA-256 `98e4bfa4d824ec7c73bc0743f5a90302045b32b003fc91863c630a44f1e7b318`; Git blob `02b16e9103a59d5544cc68d12d79f8909dbe296e`). Its raw local JSON is 15 rows, 5,xxx bytes, SHA-256 `58e85876088d62fb9393551df359b995c58af7ec1d51f7551ba82b4b10ebd2d4`.
+The exact 15-row local output is losslessly committed as `validation/CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json.gz` (compressed SHA-256 `98e4bfa4d824ec7c73bc0743f5a90302045b32b003fc91863c630a44f1e7b318`; Git blob `02b16e9103a59d5544cc68d12d79f8909dbe296e`). Its raw local JSON is 15 rows, 5,931 bytes, SHA-256 `58e85876088d62fb9393551df359b995c58af7ec1d51f7551ba82b4b10ebd2d4`.
 
 ## Related work and benchmark implications
 
