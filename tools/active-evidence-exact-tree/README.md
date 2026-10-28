@@ -157,3 +157,41 @@ The comparator checks completeness of both input inventories, excludes the known
 
 
 When the dedicated GitHub Actions qualification workflow completes, it uploads an exact-head artifact containing both deterministic result CSVs, the matched-cost frontier CSV, and a provenance receipt with the source commit/tree, toolchain versions, runner identity, and SHA-256 digests. This is designed to make the generated benchmark report inspectable without assuming the result of any queued workflow.
+
+
+## Follow-up: ambiguity set derived from calibration uncertainty
+
+A third Rust binary, src/bin/calibrated_box.rs, replaces the hand-coded ambiguity set with simultaneous confidence intervals for the 12 binary channel parameters (4 queries × 3 true hypotheses). For each calibration size n, the fixture sets the synthetic success count to round(n × nominal_probability) and uses a two-sided Hoeffding interval with familywise alpha 0.05 allocated over 12 cells:
+
+    radius = sqrt(log(2 * 12 / 0.05) / (2 * n))
+
+**Important distinction:** these are deterministic synthetic calibration counts centered around the nominal probabilities. They are a sample-size / interval-width sensitivity experiment, not observed sensor calibration and not an empirical coverage estimate. Under independent fixed-sample Bernoulli calibration for each cell and stationarity, Hoeffding plus the union bound gives at least 95% simultaneous coverage; deployment shift can still put the true channel outside the box.
+
+### Exact optimization over the calibration box
+
+For a fixed query tree, conditional trajectory risk for a given true hypothesis h is multi-affine in the four channel probabilities associated with that h, provided a query is never repeated on a path. Its maximum over the row's four-dimensional interval box therefore occurs at one of 16 endpoint combinations. Since the uncertainty box factorizes by hypothesis, worst-case expected loss and expected cost can be computed by maximizing each of the three class-conditional rows separately: 48 row-vertex evaluations per tree, rather than a full 2^12 = 4,096 matrix-vertex sweep. A Rust regression test and an independent Python self-test compare the factorized maximum with exhaustive 4,096-vertex enumeration for a shallow tree. This shortcut is specific to a product box and no-query-repeat trees; correlated confidence regions require a different treatment.
+
+### Exploratory reference values
+
+The standard-library Python prototype selected these trees over the fixed calibration-size sweep:
+
+| Synthetic calibration observations per query/hypothesis cell | Confidence radius | Worst-case expected loss over box | Worst-case expected query cost | Policy outcome |
+|---:|---:|---:|---:|---|
+| 20 | 0.39287 | 2.30000 | 0.000 | Abstain / no query |
+| 50 | 0.24847 | 2.26012 | 1.000 | One query |
+| 100 | 0.17570 | 1.93863 | 1.000 | One query |
+| 200 | 0.12424 | 1.70706 | 1.000 | One query |
+| 500 | 0.07857 | 1.50158 | 1.000 | One query |
+| 1,000 | 0.05556 | 1.38936 | 3.188 | Deeper tree |
+
+For n = 20 the interval is so broad that even the selected full tree is no better in worst-case risk than stopping. At n = 50–500, the robust optimum is a one-query tree. At n = 1,000 it can justify a deeper tree. This is the behavior the calibration-sized experiment is meant to expose; it does not imply these are minimum sample sizes in any real application.
+
+The calibrated-box policy also remains vulnerable outside its confidence set. In the deliberately out-of-box channel-flip control, expected regret is 3.77 for n = 50–500, and 2.553 at n = 1,000, versus 2.300 with no query. Do not interpret the interval guarantee as deployment-shift protection.
+
+### Run and qualification
+
+    cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box > /tmp/calibrated-box.csv
+    python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py --self-test
+    python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py /tmp/calibrated-box.csv
+
+The dedicated workflow now includes this binary, deterministic output comparison, independent row-by-row reference verification, a mutated-row negative control, and the generated CSV in the exact-head artifact/receipt. The Rust binary and checker have not been compiled/executed together in this environment; these reference values are from a separate local Python prototype pending exact-head CI.
