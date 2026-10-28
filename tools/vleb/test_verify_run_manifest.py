@@ -361,6 +361,8 @@ class RunManifestVerifierTests(unittest.TestCase):
             self.bundle.root,
             expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "passed", result)
@@ -375,6 +377,8 @@ class RunManifestVerifierTests(unittest.TestCase):
             self.bundle.root,
             expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             trusted_claim_verifier_pins={},
         )
         self.assertEqual(result["status"], "unresolved")
@@ -391,6 +395,8 @@ class RunManifestVerifierTests(unittest.TestCase):
             self.bundle.root,
             expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "failed")
@@ -404,6 +410,8 @@ class RunManifestVerifierTests(unittest.TestCase):
             self.bundle.root,
             expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "failed")
@@ -422,6 +430,8 @@ class RunManifestVerifierTests(unittest.TestCase):
             self.bundle.root,
             expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "failed", result)
@@ -433,6 +443,8 @@ class RunManifestVerifierTests(unittest.TestCase):
             self.bundle.root,
             expected_claim_auditor_sha256="0" * 64,
             expected_claim_schema_sha256="0" * 64,
+            expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "failed")
