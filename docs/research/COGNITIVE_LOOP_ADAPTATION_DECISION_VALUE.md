@@ -246,3 +246,42 @@ cargo run --locked -p xtask -- audit-cognitive-adaptation-panel \
 The JSON bundle manifest is version 1 and includes `panel_path`, `panel_sha256`, `protocol_path`, `protocol_sha256`, and a `cells` array. Every cell declares `dataset_id`, `seed`, `scenario_id`, `run_id`, `utility_input_path`, `utility_input_sha256`, `replay_receipt_path`, and `replay_receipt_sha256`. Each SHA-256 value must be 64 lowercase hexadecimal characters and match raw bytes. Paths are relative to the manifest directory; absolute paths, `.` or `..` components, and symlinks that resolve outside that directory are rejected.
 
 **Preregistration discipline:** publish the audit-bundle digest and exact protocol and input commitments before examining held-out outcomes. If the bundle is assembled after results are visible, it still enables reproducibility but does not by itself prevent post-hoc selection. A successful audit is not cryptographic proof that a runner executed honestly, that the oracle channel was technically inaccessible, or that the dataset represents deployment. Those remain separate controls and limitations.
+
+## Driver-owned replay boundary and dual-latency evaluation (October 2026)
+
+A Rust contract prototype now exists in `xtask/src/cognitive_replay_driver.rs`. It gives adapters only newly delivered features and newly revealed outcomes, keeps hidden targets in driver-owned state, records each decision's eligible and consumed evidence IDs, and independently audits delivery sets and reveal timing. It is not yet connected to the production cognitive loop or the confirmatory 2,800-cell panel. The typed API limits accidental information leakage; it is not a security sandbox against adapter code that has independent access to the source dataset.
+
+The current prototype uses a fixed positive label delay. That is only Phase A. A research-grade replay driver should treat at least two clocks independently:
+
+- **Label-reveal latency:** when the outcome associated with an earlier prediction or decision becomes observable.
+- **Intervention-effect latency:** how long after staging/committing an intervention before its task-level benefit or harm can be estimated.
+
+These clocks should be independently preregistered and varied. The driver should ultimately support per-outcome reveal schedules, out-of-order arrivals, explicitly missing labels, and right-censored outcomes. A label that has not arrived is not a zero loss, evidence of no benefit, or permission to substitute a later sample.
+
+### Required latency and censoring experiment matrix
+
+Cross the following factors without mixing information-access tracks:
+
+1. Label delay: immediate-after-decision, short, long, variable/per-outcome, and out-of-order reveal.
+2. Outcome completeness: complete labels, missing-at-random labels, missingness correlated with observed features, and explicitly censored outcomes. State the assumptions; do not label missing-not-at-random data as ignorable.
+3. Intervention-effect horizon: immediate effect, delayed benefit, delayed harm, transient benefit, and effect not identifiable within the registered horizon.
+4. Drift: abrupt, gradual, recurring, and nuisance/no-impact changes.
+5. Policy: no adaptation, detector-triggered, benefit-gated, staged verify/rollback, periodic adaptation, and oracle-only diagnostic.
+
+Preregister the target estimand for each cell. For outcomes censored before the evaluation horizon, use a declared censoring-aware estimand or classify the cell as not identified; do not silently drop it or count it as a policy failure. When policy actions influence which labels are observed, explicitly address observation-selection bias and the conditions needed for a causal comparison.
+
+### Acceptance gates before confirmatory runs
+
+- Prefix invariance: changing hidden future outcomes must not change earlier actions.
+- Reveal-time correctness: no outcome may affect a decision before its registered availability tick, even under out-of-order arrivals or checkpoint/restore.
+- Censoring discipline: missing, censored, delayed, and observed outcomes have distinct states and are never silently coerced to numeric sentinels.
+- Intervention timing: verification begins only after the registered effect-evaluation window is observable; early evidence cannot stand in for a mature task outcome.
+- Equal-information comparisons: candidate and baseline policies receive matched feature and label access, with any oracle channel separately typed and excluded from deployable rankings.
+- Independent audit: rebuild eligible and consumed evidence sets from the driver-authored trace and recompute scores from raw per-cycle records.
+- Positive and negative controls: a policy that ignores every valid outcome must fail a positive control, while nuisance shifts and future-data mutation must not create a false gain.
+
+### Updated field comparison
+
+Current monitoring platforms such as WhyLabs document performance tracking with delayed or partial ground truth, and Arize documents drift, performance, and data-quality monitoring. Symthaea should not claim superiority merely for timestamping labels or emitting provenance reports. The differentiating test is whether a policy improves held-out task outcomes **at the same information budget**, while accounting for intervention-effect latency, missing/censored feedback, recovery risk, compute and operational cost. Any numerical industry comparison requires matched workloads, comparable access to actual outcomes, and a reproducible measurement method.
+
+Research motivation: the KDD 2026 drift benchmark advocates controlled perturbations of real streams and leave-one-dataset-out tuning ([paper](https://doi.org/10.1145/3770855.3819070)); the October 2026 TPAMI work couples drift with verification latency ([paper record](https://pubmed.ncbi.nlm.nih.gov/42862614/)); a recent experimental survey addresses delayed and partially labelled data streams ([paper](https://doi.org/10.1016/j.dsp.2026.106325)); and AAAI 2026 work on uplift modeling with delayed feedback discusses how delayed treatment effects distort outcome assessment ([paper](https://doi.org/10.1609/aaai.v40i19.38686)). These sources motivate experimental dimensions and safeguards; they do not establish that Symthaea outperforms those methods.
