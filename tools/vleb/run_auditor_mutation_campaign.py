@@ -22,66 +22,77 @@ RAN_TESTS = re.compile(r"Ran \d+ tests?\b")
 MUTATIONS: tuple[dict[str, str], ...] = (
     {
         "id": "cohort_manifest_digest",
+        "family": "cohort_manifest_integrity",
         "description": "bypass evaluator-supplied cohort-manifest digest verification",
         "anchor": "if observed_cohort_sha != expected_cohort_sha256:",
         "replacement": "if False:",
     },
     {
         "id": "audit_report_digest",
+        "family": "report_integrity",
         "description": "bypass per-report byte digest verification",
         "anchor": 'if digest(report_raw) != row["audit_report_sha256"]:',
         "replacement": "if False:",
     },
     {
         "id": "locked_task_inventory",
+        "family": "cohort_manifest_integrity",
         "description": "bypass exact ordered task inventory verification",
         "anchor": 'if task_row_ids != manifest["task_ids"]:',
         "replacement": "if False:",
     },
     {
         "id": "unexpected_task_rejection",
+        "family": "cohort_manifest_integrity",
         "description": "accept reports for task IDs outside the locked inventory",
         "anchor": "if task_id not in expected_task_ids:",
         "replacement": "if False:",
     },
     {
         "id": "run_attempt_binding",
+        "family": "execution_identity",
         "description": "bypass run-ID and attempt-number binding",
         "anchor": 'if report["run_id"] != row["run_id"] or type(report["attempt_number"]) is not int or report["attempt_number"] != row["attempt_number"]:',
         "replacement": "if False:",
     },
     {
         "id": "checkout_revision_binding",
+        "family": "execution_identity",
         "description": "bypass expected and observed checkout revision binding",
         "anchor": 'if report["expected_revision"] != row["expected_revision"] or report["observed_revision"] != row["expected_revision"]:',
         "replacement": "if False:",
     },
     {
         "id": "runtime_image_binding",
+        "family": "execution_identity",
         "description": "bypass immutable runtime image binding",
         "anchor": 'if report["expected_image_id"] != row["expected_image_id"] or report["runtime_image_id"] != row["expected_image_id"]:',
         "replacement": "if False:",
     },
     {
         "id": "network_mode_binding",
+        "family": "execution_identity",
         "description": "bypass observed network-mode binding",
         "anchor": 'if report["network_mode"] != row["expected_network_mode"]:',
         "replacement": "if False:",
     },
     {
         "id": "strict_duplicate_key_parser",
+        "family": "report_integrity",
         "description": "replace strict cohort JSON parsing with default permissive parsing",
         "anchor": "manifest = strict_json_loads(cohort_raw)",
         "replacement": "manifest = json.loads(cohort_raw)",
     },
     {
         "id": "eligibility_consistency",
+        "family": "admission_consistency",
         "description": "allow eligible reports with incomplete admission summaries",
         "anchor": 'if report.get("eligible") is True and isinstance(trace_value,dict) and isinstance(baseline_value,dict):',
         "replacement": "if False:",
     },
     {
         "id": "score_eligibility_leak",
+        "family": "score_safety",
         "description": "make the rollup claim score eligibility",
         "anchor": '"analysis_only":True,\n        "score_eligible":False,',
         "replacement": '"analysis_only":True,\n        "score_eligible":True,',
@@ -145,6 +156,30 @@ def prepare_tree(
     return destination
 
 
+def summarize_families(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Report each guardrail family's coverage; a family cannot hide in the overall rate."""
+    output: dict[str, Any] = {}
+    for family in sorted({mutation["family"] for mutation in MUTATIONS}):
+        expected = [mutation for mutation in MUTATIONS if mutation["family"] == family]
+        observed = [row for row in results if row.get("family") == family]
+        killed = sum(row.get("status") == "killed" for row in observed)
+        survived = sum(row.get("status") == "survived" for row in observed)
+        invalid = sum(row.get("status") == "invalid" for row in observed)
+        not_run = len(expected) - len(observed)
+        denominator = len(expected)
+        output[family] = {
+            "expected_count": denominator,
+            "executed_count": len(observed),
+            "killed_count": killed,
+            "survived_count": survived,
+            "invalid_count": invalid,
+            "not_run_count": max(0, not_run),
+            "kill_rate_pct": (100.0*killed/denominator) if denominator and not not_run else None,
+            "complete": denominator > 0 and len(observed) == denominator and killed == denominator and survived == 0 and invalid == 0,
+        }
+    return output
+
+
 def run_campaign(
     source_path: Path,
     suite_path: Path,
@@ -182,6 +217,7 @@ def run_campaign(
             "survived_count": 0,
             "invalid_count": 0,
             "mutation_kill_rate_pct": None,
+            "family_summary": summarize_families([]),
             "analysis_only": True,
             "score_eligible": False,
             "mutations": [],
@@ -194,6 +230,7 @@ def run_campaign(
             count = source_text.count(mutation["anchor"])
             result: dict[str, Any] = {
                 "id": mutation["id"],
+                "family": mutation["family"],
                 "description": mutation["description"],
                 "anchor_count": count,
                 "status": "invalid",
@@ -244,6 +281,9 @@ def run_campaign(
         issues.append({"code":"auditor_mutations_invalid","message":f"{invalid} sentinel mutation(s) were invalid or failed to execute cleanly"})
     if killed != count:
         issues.append({"code":"auditor_mutation_campaign_incomplete","message":"every reviewed sentinel guard mutation must be killed by the adversarial test suite"})
+    family_summary = summarize_families(results)
+    if any(not row["complete"] for row in family_summary.values()):
+        issues.append({"code":"auditor_mutation_family_incomplete","message":"every guardrail family must kill all of its reviewed sentinel mutations"})
     return {
         "schema_version": "vleb-auditor-mutation-campaign-v1",
         "baseline_passed": True,
@@ -256,6 +296,7 @@ def run_campaign(
         "survived_count": survived,
         "invalid_count": invalid,
         "mutation_kill_rate_pct": (100.0*killed/count) if count else None,
+        "family_summary": summarize_families(results),
         "analysis_only": True,
         "score_eligible": False,
         "mutations": results,
