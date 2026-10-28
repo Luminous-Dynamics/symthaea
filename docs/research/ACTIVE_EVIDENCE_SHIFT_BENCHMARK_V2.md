@@ -142,3 +142,16 @@ Implementation consequence: any real-task extension must split by task/source/do
 The ICLR 2025 Uncertainty Herding work specifically targets the low-/high-label-budget tension, so every acquisition comparison must include low through high budgets and cannot tune the "low-budget" boundary after looking at test results: https://proceedings.iclr.cc/paper_files/paper/2025/hash/0302fb83c62991efbccf0a003e4f5a92-Abstract-Conference.html.
 
 Finally, apply the generalization distinction emphasized by NIST AI 800-3: benchmark performance on a fixed scenario set and expected performance over a broader task population are different estimands. State which one is reported, and only generalize with an analysis design whose independent units match the population claim: https://doi.org/10.6028/NIST.AI.800-3.
+
+
+## 15. Sequential calibration must be anytime-valid
+
+The calibration-derived ambiguity set can be queried and inspected repeatedly while the acquisition policy decides whether to stop. A fixed-sample confidence interval should not be reused as though it had its nominal coverage at every data-dependent stopping time. The implementation pilot now includes both:
+- fixed-sample Hoeffding intervals, for a preregistered single-look calibration baseline;
+- a transparent time-uniform Hoeffding/alpha-spending sequence with per-cell/time failure mass alpha/[M n(n+1)], where M is the number of likelihood cells.
+
+Since the time weights sum to one, the latter retains familywise coverage over all scheduled looks under independent stationary Bernoulli observations per cell. It is a conservative correctness baseline. It does not solve model misspecification, nonstationarity, selection bias in the calibration sample, or arbitrary distribution shift.
+
+For an efficiency frontier, compare the same acquisition objective under fixed-sample Hoeffding, alpha-spending Hoeffding, and a variance-adaptive empirical-Bernstein confidence sequence. Use matched label and compute budgets; report interval width and acquisition regret, not coverage alone. Relevant foundations: Howard et al., *Time-uniform, nonparametric, nonasymptotic confidence sequences* (Annals of Statistics, 2021, https://doi.org/10.1214/20-AOS1991), and Waudby-Smith & Ramdas, *Estimating means of bounded random variables by betting* (JRSS B, 2024, https://doi.org/10.1093/jrsssb/qkad009).
+
+Exploratory implementation and independent Python checks live in [PR #8723](https://github.com/Luminous-Dynamics/symthaea/pull/8723). They are not yet Rust-qualified until exact-head workflow checks finish.
