@@ -635,6 +635,18 @@ mod tests {
 
         value["schema_version"] = serde_json::Value::String("BROCA-EVIDENCE-INDEX-SNAPSHOT-V999".into());
         assert!(EvidenceIndex::restore_snapshot(&serde_json::to_vec(&value).unwrap()).is_err());
+
+        // Recomputing the outer snapshot digest must not hide a bad payload digest.
+        let mut crafted: EvidenceIndexSnapshot = serde_json::from_slice(&snapshot).unwrap();
+        if let EvidencePayload::Text { value } = &mut crafted.records[0].payload {
+            *value = "tampered route".into();
+        }
+        crafted.snapshot_sha256 = hash(&serde_json::to_vec(&(
+            &crafted.schema_version,
+            crafted.generation,
+            &crafted.records,
+        )).unwrap());
+        assert!(EvidenceIndex::restore_snapshot(&serde_json::to_vec(&crafted).unwrap()).is_err());
     }
 
     #[test]
@@ -679,8 +691,10 @@ mod tests {
     #[test]
     fn commit_manifest_rejects_zero_generation_and_invalid_snapshot() {
         assert!(EvidenceCommitManifest::new(0, b"index", b"not a snapshot").is_err());
+        assert!(EvidenceCommitManifest::new(1, b"index", b"not a snapshot").is_err());
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "current route"), b"canonical trajectory bytes").unwrap();
+        assert!(index.snapshot_bytes(0).is_err());
         let evidence_bytes = index.snapshot_bytes(3).unwrap();
         assert!(EvidenceCommitManifest::new(0, b"index", &evidence_bytes).is_err());
         assert!(EvidenceCommitManifest::new(4, b"index", &evidence_bytes).is_err());
