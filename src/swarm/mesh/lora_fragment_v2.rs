@@ -201,11 +201,22 @@ impl LoRaFragmentV2 {
             )
     }
 
-    /// Serialize a validated fragment to its exact wire bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
+    /// Serialize into caller-owned storage without allocating.
+    ///
+    /// Returns the exact number of bytes written, or None if the destination
+    /// is too small. A too-small destination is rejected before any bytes are
+    /// changed. Callers can pass a fixed [u8; V2_MTU] buffer on embedded targets.
+    pub fn write_to(&self, out: &mut [u8]) -> Option<usize> {
         debug_assert!(self.is_well_formed());
         let payload_len = usize::from(self.payload_len);
-        let mut out = vec![0u8; V2_HEADER_SIZE + payload_len];
+        if payload_len > V2_PAYLOAD_SIZE {
+            return None;
+        }
+        let total = V2_HEADER_SIZE.checked_add(payload_len)?;
+        if out.len() < total {
+            return None;
+        }
+
         out[0..2].copy_from_slice(&self.thought_id.to_le_bytes());
         out[2] = self.fragment_index;
         out[3] = self.total_fragments;
@@ -213,7 +224,20 @@ impl LoRaFragmentV2 {
         out[5] = self.flags;
         out[6..8].copy_from_slice(&self.checksum.to_le_bytes());
         out[8..10].copy_from_slice(&self.encoded_len.to_le_bytes());
-        out[V2_HEADER_SIZE..].copy_from_slice(&self.payload[..payload_len]);
+        out[V2_HEADER_SIZE..total].copy_from_slice(&self.payload[..payload_len]);
+        Some(total)
+    }
+
+    /// Allocate a Vec and serialize this fragment to its exact wire bytes.
+    /// Prefer write_to when the caller owns a reusable MTU-sized buffer.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        debug_assert!(self.is_well_formed());
+        let total = V2_HEADER_SIZE + usize::from(self.payload_len);
+        let mut out = vec![0u8; total];
+        let written = self
+            .write_to(&mut out)
+            .expect("validated fragment fits its exact-sized output buffer");
+        debug_assert_eq!(written, total);
         out
     }
 
@@ -478,6 +502,23 @@ mod tests {
             *byte = (state >> 24) as u8;
         }
         bytes
+    }
+
+    #[test]
+    fn caller_buffer_serialization_matches_vec_and_rejects_short_output_atomically() {
+        let frames = fragment_v2(0x5eed, &sample(2105, 42)).unwrap();
+        for frame in frames {
+            let expected = frame.to_bytes();
+            let mut wire = [0xa5u8; V2_MTU];
+            let written = frame.write_to(&mut wire).expect("MTU buffer fits");
+            assert_eq!(written, expected.len());
+            assert_eq!(&wire[..written], expected.as_slice());
+
+            let mut short = vec![0x5au8; expected.len() - 1];
+            let before = short.clone();
+            assert_eq!(frame.write_to(&mut short), None);
+            assert_eq!(short, before, "short-buffer rejection must not partially write");
+        }
     }
 
     #[test]
