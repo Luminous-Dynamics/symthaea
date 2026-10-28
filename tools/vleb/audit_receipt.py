@@ -42,6 +42,7 @@ class AuditInputs:
     expected_protocol_sha256: str
     expected_candidate_patch_sha256: str
     expected_auditor_sha256: str
+    expected_verifier_binary_sha256: str
 
 
 def digest(raw: bytes) -> str:
@@ -186,8 +187,10 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
         actual_auditor = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         if not HEX.fullmatch(inputs.expected_auditor_sha256) or actual_auditor != inputs.expected_auditor_sha256:
             issues.append({"code": "auditor_identity_mismatch", "message": "auditor source differs from independently pinned implementation"})
-        if receipt.get("verifier", {}).get("verifier_binary_sha256") != inputs.expected_auditor_sha256:
-            issues.append({"code": "receipt_verifier_identity_mismatch", "message": "receipt verifier digest does not match pinned auditor source"})
+        if not HEX.fullmatch(inputs.expected_verifier_binary_sha256):
+            issues.append({"code": "invalid_verifier_binary_pin", "message": "independent verifier binary SHA-256 pin missing or malformed"})
+        elif receipt.get("verifier", {}).get("verifier_binary_sha256") != inputs.expected_verifier_binary_sha256:
+            issues.append({"code": "receipt_verifier_identity_mismatch", "message": "receipt verifier binary digest does not match independent evaluator pin"})
     except OSError as exc:
         issues.append({"code": "auditor_identity_unavailable", "message": str(exc)})
 
@@ -437,6 +440,7 @@ def args_for_cli(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--expected-protocol-sha256", required=True)
     parser.add_argument("--expected-patch-sha256", required=True)
     parser.add_argument("--expected-auditor-sha256", required=True)
+    parser.add_argument("--expected-verifier-binary-sha256", required=True)
     parser.add_argument("--output", type=Path)
     return parser.parse_args(argv)
 
@@ -450,6 +454,7 @@ def main(argv: list[str] | None = None) -> int:
         expected_revision=args.expected_revision, expected_image_id=args.expected_image,
         expected_task_sha256=args.expected_task_sha256, expected_protocol_sha256=args.expected_protocol_sha256,
         expected_candidate_patch_sha256=args.expected_patch_sha256, expected_auditor_sha256=args.expected_auditor_sha256,
+        expected_verifier_binary_sha256=args.expected_verifier_binary_sha256,
     ))
     output = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
