@@ -30,6 +30,7 @@ def load_module(name: str, path: Path):
 runner = load_module("vleb_run_execution_witness", ROOT / "tools/vleb/run_execution_witness.py")
 auditor = load_module("vleb_audit_execution_witness", ROOT / "tools/vleb/audit_execution_witness.py")
 SCHEMA_PATH = ROOT / "tools/vleb/execution-witness-receipt.schema.json"
+PLAN_SCHEMA_PATH = ROOT / "tools/vleb/execution-witness-plan.schema.json"
 
 
 def sha(raw: bytes) -> str:
@@ -131,12 +132,16 @@ class ExecutionWitnessTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.fx.close()
 
-    def test_plan_schema_and_recorded_execution_are_valid(self) -> None:
+    def test_plan_and_receipt_schemas_and_recorded_execution_are_valid(self) -> None:
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        plan_schema = json.loads(PLAN_SCHEMA_PATH.read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(schema)
+        Draft202012Validator.check_schema(plan_schema)
+        plan_errors = list(Draft202012Validator(plan_schema, format_checker=FormatChecker()).iter_errors(self.fx.plan))
         receipt = self.fx.result["receipt"]
-        errors = list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(receipt))
-        self.assertEqual(errors, [])
+        receipt_errors = list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(receipt))
+        self.assertEqual(plan_errors, [])
+        self.assertEqual(receipt_errors, [])
         self.assertTrue(self.fx.result["execution_contract_passed"])
         self.assertEqual(receipt["invocation"]["exit_code"], 0)
 
