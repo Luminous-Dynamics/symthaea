@@ -34,14 +34,24 @@ class ConstrainedPriorPolytopeTests(unittest.TestCase):
             self.assertAlmostEqual(sum(r["policy_weights"]), 1.0, places=8)
             self.assertGreaterEqual(min(r["policy_weights"]), -1e-12)
 
-    def test_result_grid_covers_all_objectives(self):
-        r = run_benchmark()
-        self.assertEqual([x["objective"] for x in r["rows"]], list(OBJECTIVES))
-        self.assertTrue(all(x["constrained_polytope"]["status"] == "CERTIFIED_CONSTRAINED_POLYTOPE_GAME" for x in r["rows"]))
+    def test_result_grid_covers_both_ambiguity_sets_and_all_objectives(self):
+        result = run_benchmark()
+        self.assertEqual(len(result["rows"]), 2 * len(OBJECTIVES))
+        self.assertEqual({row["ambiguity_set"] for row in result["rows"]},
+                         {"bounded_marginals", "contains_all_legacy_priors"})
+        self.assertEqual({row["objective"] for row in result["rows"]}, set(OBJECTIVES))
+        self.assertTrue(all(row["constrained_polytope"]["status"] == "CERTIFIED_CONSTRAINED_POLYTOPE_GAME"
+                            for row in result["rows"]))
+        broad = [row for row in result["rows"] if row["ambiguity_set"] == "contains_all_legacy_priors"]
+        self.assertTrue(all(row["all_six_legacy_priors_inside_Q"] for row in broad))
 
     def test_rejects_invalid_prior_floor(self):
         with self.assertRaises(ValueError):
             ambiguity_polytope(floor=0.1)
+
+    def test_rejects_invalid_marginal_bounds(self):
+        with self.assertRaises(ValueError):
+            ambiguity_polytope(marginal_low=0.6, marginal_high=0.4)
 
 
 if __name__ == "__main__":
