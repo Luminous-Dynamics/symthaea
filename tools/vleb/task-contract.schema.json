@@ -508,5 +508,74 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "properties": {
+              "exposure": {
+                "enum": [
+                  "private_holdout",
+                  "private_confirmatory"
+                ]
+              }
+            },
+            "required": [
+              "exposure"
+            ]
+          }
+        },
+        "required": [
+          "classification"
+        ]
+      },
+      "then": {
+        "properties": {
+          "classification": {
+            "required": [
+              "reviewer_count"
+            ],
+            "properties": {
+              "reviewer_count": {
+                "minimum": 1
+              }
+            }
+          },
+          "oracle_contract": {
+            "required": [
+              "oracle_review",
+              "reference_evidence_sha256",
+              "reference_evidence_artifacts"
+            ],
+            "properties": {
+              "oracle_review": {
+                "required": [
+                  "independent_reviewer_count",
+                  "mutation_equivalence_reviewed"
+                ],
+                "properties": {
+                  "independent_reviewer_count": {
+                    "minimum": 1
+                  },
+                  "mutation_equivalence_reviewed": {
+                    "const": true
+                  }
+                }
+              },
+              "reference_evidence_sha256": {
+                "required": [
+                  "baseline_log",
+                  "reference_log",
+                  "reference_patch",
+                  "test_bundle"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
