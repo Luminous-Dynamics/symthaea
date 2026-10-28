@@ -55,7 +55,7 @@ epsilon = sqrt(ln(2*K/delta) / (2*n))
 rho = min(1, TV(p, p_hat) + (K/2)*epsilon)
 ```
 
-The code reports empirical TV distance, the sampling allowance, failure probability, episode count and resulting radius separately. It uses integer ppm for probability inputs and rounds the empirical distance and final radius upward. When evidence is sparse or the support is large, the bound may saturate at `rho = 1`; that is a visible conservatism cost, not a reason to silently lower the confidence level.
+The code reports empirical TV distance, the sampling allowance, failure probability, episode count and resulting radius separately. The new `calibrate_tv_radius_envelope` extends this to multiple declared airport/weather/season regimes: it allocates a family-wise failure budget by Bonferroni, calibrates each regime separately, and returns the maximum regime radius for a common robust policy. It uses integer ppm for probability inputs and rounds the empirical distance and final radius upward. When evidence is sparse or the support is large, the bound may saturate at `rho = 1`; that is a visible conservatism cost, not a reason to silently lower the confidence level.
 
 **Assumption boundary:** this bound requires independent draws from one fixed finite-support distribution. Airline disruptions may be temporally dependent, season-dependent and nonstationary. Count complete event episodes rather than rows; calibrate separately across relevant regimes/time blocks and take a predeclared envelope where appropriate. This baseline does not guarantee coverage under arbitrary drift or for omitted categories. The split-integrity module can validate declared cluster separation and chronology, but cannot prove independence or data lineage.
 
@@ -108,7 +108,7 @@ Do not optimize or select the radius against final test outcomes. The curve is a
 
 ## Test status and claim ceiling
 
-Fourteen Rust unit tests are defined, covering exact hand calculations, TV radius zero/full, identical costs, probability-mass validation, stable row ordering, radius-mismatch rejection, a scenario where nominal improvement turns into a positive worst-case expected cost delta, robustness-premium accounting and monotone sensitivity curves. Three integration-oracle tests independently enumerate tiny probability grids and compare the resulting maximum expected cost against the production greedy transfer method, including zero-probability stress atoms. These are defined but not run: the current environment has no `cargo` or `rustc`.
+Nineteen Rust unit tests are defined, covering exact hand calculations, TV radius zero/full, identical costs, probability-mass validation, stable row ordering, radius-mismatch rejection, a scenario where nominal improvement turns into a positive worst-case expected cost delta, robustness-premium accounting and monotone sensitivity curves. Three integration-oracle tests independently enumerate tiny probability grids and compare the resulting maximum expected cost against the production greedy transfer method, including zero-probability stress atoms. These are defined but not run: the current environment has no `cargo` or `rustc`.
 
 Any passing result is bounded to the finite support and the declared TV ambiguity set. It does not prove distribution-free robustness, airline savings, causal intervention effects, operational authority, airworthiness or regulatory certification.
 
@@ -121,3 +121,6 @@ Implementation and reproduction follow-up: [AVIATION-ENTERPRISE-008 #8752](https
 ## Executable calibration integration (28 October 2026)
 
 The synthetic example `examples/aviation_calibration_protocol_benchmark.rs` now uses `calibrate_tv_radius` on explicitly labeled calibration frequencies, evaluates the resulting radius using `evaluate_tv_robust_cost_delta`, and separately reports a predeclared sensitivity curve. This demonstrates composition across the split auditor, tuning provenance gate, finite-sample radius calibration and DRO evaluator. It is not an operational dataset pipeline; in a real run, the frequencies must be derived from frozen Calibration event clusters, and the Test partition must not be used to choose the confidence level or other settings.
+
+
+The finite-sample module also includes regime-envelope tests: deterministic regime ordering, per-regime Bonferroni allocation, maximum-radius selection, invalid/duplicate regime rejection and failure when the family-wise delta cannot be allocated as positive integer ppm. The calibration unit-test count is now nineteen, plus five public-API integration fixtures. Tests remain uncompiled in this environment.
