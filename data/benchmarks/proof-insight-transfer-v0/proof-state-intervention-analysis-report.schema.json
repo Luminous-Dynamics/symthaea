@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/proof-state-intervention-analysis-report.schema.json",
   "title": "PITB Proof-State Intervention Analysis Report v0",
-  "description": "Strict output contract for the deterministic state-intervention analyzer. The report is descriptive and the confirmatory decision cannot be pass.",
+  "description": "Strict output contract for the deterministic state-intervention analyzer. Percentile endpoints use linear interpolation; zero-width bootstrap intervals are suppressed. The report is descriptive and the confirmatory decision cannot be pass.",
   "type": "object",
   "additionalProperties": false,
   "required": [
