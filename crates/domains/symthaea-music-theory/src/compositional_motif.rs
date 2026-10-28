@@ -757,6 +757,41 @@ mod tests {
     }
 
     #[test]
+    fn fragment_receipt_uses_original_source_indices() {
+        let source = simple_source();
+        let claim = descriptor(
+            PitchOrientation::Preserve,
+            7,
+            1.0,
+            1.0,
+            SelectionMode::ContiguousFragment,
+            1,
+            3,
+        );
+        let target = transform_sequence(&source, claim, 6.25);
+        let evidence = verify_compositional_transform(&source, &target, 6.25, &claim).unwrap();
+        assert!(evidence.passed, "{evidence:?}");
+        assert_eq!(
+            evidence
+                .aligned_pairs
+                .iter()
+                .map(|pair| pair.source_index)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            evidence
+                .aligned_pairs
+                .iter()
+                .map(|pair| pair.target_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert!(evidence.deleted_source_indices.is_empty());
+        assert!(evidence.inserted_target_indices.is_empty());
+    }
+
+    #[test]
     fn rejects_unidentifiable_inversion_of_constant_pitch_motif() {
         let source = vec![
             SymbolicEvent { pitch_midi: 60, onset_beats: 0.0, duration_beats: 0.5 },
