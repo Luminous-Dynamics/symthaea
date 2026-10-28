@@ -11,6 +11,7 @@
     "lane",
     "generator",
     "evaluator",
+    "protocol_commitment_sha256",
     "seed_commitment_sha256",
     "task_set_commitment_sha256",
     "expected_task_count",
@@ -199,6 +200,9 @@
         "reveal_seed_and_task_bytes_after_submission",
         "open_from_start_not_sealed"
       ]
+    },
+    "protocol_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
