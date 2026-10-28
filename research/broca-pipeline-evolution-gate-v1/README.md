@@ -28,10 +28,10 @@ Those papers report their own methods and results. They are not comparable to ea
 - **Non-compensatory risk gate:** a candidate with any critical governance event cannot be promoted, no matter its task accuracy.
 - **Two promotion routes:**
   1. **Quality win:** paired held-out task-success lift is at least +3 percentage points and the lower bound of its preregistered 95% grouped paired interval exceeds zero.
-  2. **Efficiency win:** accuracy is no more than 1 percentage point below baseline and measured total lifecycle cost is at most 75% of baseline.
+  2. **Efficiency win:** the lower endpoint of the paired 95% confidence interval is at least -1 percentage point and measured total lifecycle cost is at most 75% of baseline. Point-estimate non-inferiority alone is insufficient.
 - **Reject otherwise:** a candidate that does not meet either route is not promoted. The policy thresholds are proposed internal defaults, not industry standards.
 
-The module validates receipt structure and consistency. It does not compute the confidence interval, verify that the runner is honest, or cryptographically attest to the model/evaluator. The external runner must produce the metric and artifact receipts; the top-level run verifier must independently hash/validate those artifacts.
+The module validates receipt structure and consistency and applies the reported paired confidence bound. It does not compute that confidence interval, verify that the runner is honest, or cryptographically attest to the model/evaluator. The external runner must produce the metric and artifact receipts; the top-level run verifier must independently hash/validate those artifacts.
 
 ## Run focused Rust tests
 
