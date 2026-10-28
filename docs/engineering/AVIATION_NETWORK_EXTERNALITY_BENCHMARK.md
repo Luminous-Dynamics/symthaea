@@ -65,3 +65,10 @@ A passing test demonstrates only the frozen model and fixture. It does not estab
 ## Evidence status
 
 The local Python fixture and synthetic stress checks for the preceding AVNX artifact passed 10 tests. This repository commit adds a Rust ledger and selector with 9 unit tests defined. The current environment still has no local `cargo` or `rustc`, so the Rust tests have not run. Workflow records for the earlier draft PR were skipped, not passed.
+
+
+## Pareto-frontier extension (28 October 2026)
+
+The Rust module now includes `network_pareto_frontier`, which keeps system cost, worst-actor regression, non-cancelled delay, cancellations, and kg CO2e as separate objectives. It returns non-dominated candidate indices and assessments for every candidate; invalid ledgers remain visible with explicit exclusion errors. This avoids inventing a weighted sum to choose among legitimate trade-offs. The frontier is descriptive, not a fairness decision by itself: a downstream policy should apply predeclared hard constraints or a stakeholder-approved choice rule.
+
+Two additional unit tests cover retaining a genuine cost-versus-harm trade-off while removing a dominated candidate, and excluding malformed candidates without hiding the reason. The Rust module now defines 11 tests; no Rust compile/test claim is made because a Rust toolchain is still unavailable in the current execution environment.
