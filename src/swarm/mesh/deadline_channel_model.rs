@@ -201,7 +201,7 @@ fn loss_threshold_ppm(
     } else {
         // Convert averaged per-mille probability to parts per million, without
         // quantizing the weighted good/bad exposure to a whole per-mille.
-        ((weighted_loss * 1000) / covered_us).min(u128::from(HASH_BUCKETS - 1)) as u64
+        ((weighted_loss * 1000) / covered_us).min(u128::from(HASH_BUCKETS)) as u64
     }
 }
 
@@ -307,7 +307,7 @@ fn complete_time(
     parity_end_us: Option<u64>,
     parity_received: bool,
 ) -> Option<u64> {
-    if data_received_us.iter().all(Option::is_some) {
+    if data_received_us.iter().all(|item| item.is_some()) {
         return data_received_us.iter().flatten().copied().max();
     }
     let missing = data_received_us.iter().filter(|item| item.is_none()).count();
@@ -449,4 +449,30 @@ fn ack_loss_is_deterministic_and_charged_as_airtime_and_retransmissions() {
 
     assert!(selective_airtime_ack250 > selective_airtime_ack0);
     assert!(selective_retry_ack250 > selective_retry_ack0);
+}
+
+#[test]
+fn burst_trace_is_reproducible_and_exercises_both_channel_states() {
+    let model = ChannelModel::GilbertElliott {
+        good_loss_per_mille: 20,
+        bad_loss_per_mille: 750,
+        good_to_bad_per_mille: 100,
+        bad_to_good_per_mille: 500,
+    };
+    let first = make_state_trace(model, 0xBADC_0FFE);
+    let second = make_state_trace(model, 0xBADC_0FFE);
+    assert_eq!(first, second);
+    assert!(first.iter().any(|bad| *bad), "trace should enter the bad state");
+    assert!(first.iter().any(|bad| !*bad), "trace should include the good state");
+
+    let seed = 0x1234_5678;
+    let outcome_a = simulate(Strategy::Hybrid, model, &first, seed, 7, Some(100));
+    let outcome_b = simulate(Strategy::Hybrid, model, &second, seed, 7, Some(100));
+    assert_eq!(outcome_a, outcome_b);
+}
+
+#[test]
+fn impossible_loss_probability_rejects_every_frame() {
+    assert!(!event_delivered(123, 0, false, HASH_BUCKETS));
+    assert!(!event_delivered(123, 500_000, true, HASH_BUCKETS));
 }
