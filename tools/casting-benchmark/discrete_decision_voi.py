@@ -147,7 +147,7 @@ def evaluate_action(
             for world in range(world_count)
         )
         observation_probabilities.append(outcome_probability)
-        if outcome_probability <= TOL:
+        if outcome_probability == 0.0:
             posterior_decisions.append(None)
             continue
 
