@@ -23,7 +23,7 @@ Those papers report their own methods and results. They are not comparable to ea
 
 - **Candidate lineage:** each candidate has a stable ID, parent candidate, increasing edit iteration, candidate-manifest digest, source/config/prompt digests and lifecycle state. Duplicate IDs, missing parents, self-parenting, cycles and malformed digests fail validation.
 - **Optimizer visibility:** candidate generation can reference only completed development/calibration receipts. Held-out receipts may exist for audit but cannot appear in the optimizer-visible allowlist or in a candidate's build inputs.
-- **Receipt binding:** an evaluation receipt names the exact candidate manifest, benchmark, dataset, case set, answer model, reader prompt, evaluator, harness and shared protocol.
+- **Receipt binding:** an evaluation receipt names the exact candidate manifest, benchmark, dataset, case set, answer model, reader prompt, evaluator, harness and shared protocol. A receipt SHA-256 is recomputed over the entire receipt with its own digest field blanked; changing accuracy, confidence bounds, group count, cost or a run identity without updating the digest is rejected.
 - **Matched promotion:** candidate and baseline must use the same held-out case set, reader/model/prompt/evaluator/harness and protocol; candidate must be frozen before evaluation and both receipts must be completed.
 - **Non-compensatory risk gate:** a candidate with any critical governance event cannot be promoted, no matter its task accuracy.
 - **Two promotion routes:**
@@ -37,7 +37,7 @@ The module validates receipt structure and consistency and applies the reported 
 
 `pipeline_evolution.schema.json` describes the trace structure: candidate nodes, immutable artifact digests, evaluation receipts, development/calibration/held-out splits, and the explicit optimizer-visible receipt allowlist. It rejects malformed field types and digest formats at the JSON-schema layer.
 
-Cross-reference rules, parent cycles, candidate-manifest digest recomputation, held-out leakage, protocol/case matching, confidence-bound and promotion policy are semantic checks enforced by the Rust module. JSON Schema alone is not sufficient.
+Cross-reference rules, parent cycles, candidate-manifest and receipt digest recomputation, held-out leakage, protocol/case matching, confidence-bound and promotion policy are semantic checks enforced by the Rust module. JSON Schema alone is not sufficient.
 
 ## Run focused Rust tests
 
@@ -47,7 +47,7 @@ From the repository root when a Rust toolchain is available:
 cargo test -p symthaea-broca --lib memory_pipeline_evolution
 ```
 
-Twelve unit tests are authored for: valid candidate tree; held-out leakage to optimizer; candidate built from held-out feedback; missing parent/cycle; quality promotion; cost/non-inferiority promotion; rejecting a cost win when the confidence bound misses non-inferiority; mismatched protocol/cases; governance incident blocking promotion; insufficient independent groups; invalid policy parameters; and iteration/manifest-digest pinning.
+Thirteen unit tests are authored for: valid candidate tree; held-out leakage to optimizer; candidate built from held-out feedback; missing parent/cycle; quality promotion; cost/non-inferiority promotion; rejecting a cost win when the confidence bound misses non-inferiority; mismatched protocol/cases; governance incident blocking promotion; insufficient independent groups; invalid policy parameters; iteration/manifest-digest pinning; and metric tampering without matching receipt digest.
 
 No Rust compiler is available in the code-authoring environment, so these tests are authored, not passed. CI results are not counted unless an executed, current-head run is inspected.
 
