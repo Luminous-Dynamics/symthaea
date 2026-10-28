@@ -318,6 +318,17 @@ fn scan_policy_input_for_oracle_fields(
                         "policy_input contains a non-ASCII field name at {path}.{key}"
                     ));
                 }
+                if key.is_empty()
+                    || !key.chars().all(|character| {
+                        character.is_ascii_alphanumeric()
+                            || character == '_'
+                            || character == '-'
+                    })
+                {
+                    issues.push(format!(
+                        "policy_input field name must match ASCII letters, digits, underscore, or hyphen at {path}.{key}"
+                    ));
+                }
                 let normalized: String = key
                     .chars()
                     .filter(|character| character.is_ascii_alphanumeric())
@@ -1391,6 +1402,24 @@ mod tests {
             .issues
             .iter()
             .any(|issue| issue.contains("non-ASCII field name")));
+    }
+
+    #[test]
+    fn malformed_policy_input_field_names_are_rejected() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
+        task_set["tasks"][0]["policy_input"]["not a field"] = json!("value");
+        let task_bytes = serde_json::to_vec(&task_set).unwrap();
+        let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        manifest["task_set_commitment_sha256"] = json!(
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes)
+                .unwrap()
+        );
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+        assert!(report.task_set_commitment_matches);
+        assert!(!report.task_set_contract_valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("field name must match")));
     }
 
     #[test]
