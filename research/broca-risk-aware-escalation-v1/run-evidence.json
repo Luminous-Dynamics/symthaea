@@ -5,8 +5,8 @@
   "evidence_classification": "synthetic_only_not_Broca_runtime_or_external_benchmark",
   "source": {
     "path": "research/broca-risk-aware-escalation-v1/benchmark.py",
-    "sha256": "6ca3caf5c1fc61a406a9989483921a381bcd7a45640aadd5d04a1bac6e81806f",
-    "git_blob_sha1": "dd192d891d9899b80ccc41481c5ba72b7bea34ee",
+    "sha256": "a070a9fe6f459b9364dd3ed5448d19580b432e0a98a3439a6e9a92f92ecc17c9",
+    "git_blob_sha1": "56f2ddacfb5aaaed283e7e75bc33d70ec15f322e",
     "byte_match_to_published_branch_source": true
   },
   "verifier": {
@@ -43,7 +43,7 @@
     "receipt_sha256": "473f99aabe5a7c568cad72fbceb0d2853876c4149c7a22eab697e4fd5635c3d1"
   },
   "validation": {
-    "tests_passed": 15,
+    "tests_passed": 16,
     "tests_failed": 0,
     "raw_outcome_digest_verified": true,
     "summary_recomputed_from_raw_outcomes": true,
@@ -83,6 +83,7 @@
     "All cases, features, correctness rates, and costs are generated or assumed by the synthetic benchmark.",
     "No Symthaea/Broca runtime, LLM endpoint, or official LongMemEval-V2 evaluator was executed.",
     "Wilson-bound calibration is empirical and not a distribution-free guarantee under shift.",
-    "No SOTA or real-world generalization claim is made."
+    "No SOTA or real-world generalization claim is made.",
+    "A review found and fixed a singular-system fallback in the linear solver; the corrected source was rerun, producing the same outcome digest and passing singular/inconsistent-system regression tests."
   ]
 }
