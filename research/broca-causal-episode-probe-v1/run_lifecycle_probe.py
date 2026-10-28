@@ -82,6 +82,32 @@ def invoke_worker(worker: Path, requests: list[dict[str, Any]], timeout_seconds:
     return responses, request_bytes, completed.stdout
 
 
+def _validate_context_audit(result: dict[str, Any], label: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    audit = result.get("audit")
+    context = result.get("context")
+    if not isinstance(audit, list) or not isinstance(context, list):
+        raise ValueError(f"{label}: query result must contain audit and context arrays")
+    if len(context) != len(audit):
+        raise ValueError(f"{label}: reader context and audit cardinalities disagree")
+    typed_audit: list[dict[str, Any]] = []
+    for index, (raw_item, raw_context) in enumerate(zip(audit, context), 1):
+        if not isinstance(raw_item, dict) or not isinstance(raw_context, dict):
+            raise ValueError(f"{label}: item {index} must be an audit/context object")
+        evidence_id = raw_item.get("evidence_id")
+        content_digest = raw_item.get("content_sha256")
+        value = raw_context.get("value")
+        if not isinstance(evidence_id, str) or not evidence_id:
+            raise ValueError(f"{label}: item {index} lacks a stable evidence ID")
+        if raw_context.get("type") != "text" or not isinstance(value, str):
+            raise ValueError(f"{label}: item {index} is not a text context item")
+        if not isinstance(content_digest, str) or len(content_digest) != 64:
+            raise ValueError(f"{label}: item {index} lacks a content digest")
+        if sha256_bytes(value.encode("utf-8")) != content_digest:
+            raise ValueError(f"{label}: item {index} context value does not match its audit digest")
+        typed_audit.append(raw_item)
+    return typed_audit, context
+
+
 def assert_transition_result(
     old_evidence_id: str,
     new_evidence_id: str,
@@ -89,26 +115,20 @@ def assert_transition_result(
     old_query_result: dict[str, Any],
     new_query_result: dict[str, Any],
 ) -> None:
+    if old_evidence_id == new_evidence_id:
+        raise ValueError("old and replacement evidence IDs must differ")
     if supersede_result.get("lifecycle") != "superseded":
         raise ValueError("worker did not confirm superseded lifecycle")
     if supersede_result.get("old_evidence_id") != old_evidence_id:
         raise ValueError("worker superseded the wrong old evidence ID")
     if supersede_result.get("new_evidence_id") != new_evidence_id:
         raise ValueError("worker superseded to the wrong replacement ID")
-    old_audit = old_query_result.get("audit")
-    new_audit = new_query_result.get("audit")
-    if not isinstance(old_audit, list) or not isinstance(new_audit, list):
-        raise ValueError("post-transition query results must contain audit arrays")
-    if any(item.get("evidence_id") == old_evidence_id for item in old_audit if isinstance(item, dict)):
+    old_audit, _old_context = _validate_context_audit(old_query_result, "old-value query")
+    new_audit, _new_context = _validate_context_audit(new_query_result, "replacement query")
+    if any(item["evidence_id"] == old_evidence_id for item in old_audit):
         raise ValueError("retired evidence remained retrievable after supersession")
-    if not any(item.get("evidence_id") == new_evidence_id for item in new_audit if isinstance(item, dict)):
+    if not any(item["evidence_id"] == new_evidence_id for item in new_audit):
         raise ValueError("replacement evidence is not retrievable after supersession")
-    old_context = old_query_result.get("context")
-    new_context = new_query_result.get("context")
-    if not isinstance(old_context, list) or not isinstance(new_context, list):
-        raise ValueError("post-transition context must be an array")
-    if len(old_context) != len(old_audit) or len(new_context) != len(new_audit):
-        raise ValueError("reader context and audit cardinalities disagree")
 
 
 def main() -> int:
@@ -142,8 +162,10 @@ def main() -> int:
     if discovery_insert.get("trajectory_id") != trajectory["id"]:
         raise ValueError("discovery insert returned the wrong trajectory ID")
     source_sha256 = discovery_insert.get("source_sha256")
-    if not isinstance(source_sha256, str) or len(source_sha256) != 64:
-        raise ValueError("worker insert did not return a source SHA-256")
+    if not isinstance(source_sha256, str) or len(source_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in source_sha256
+    ):
+        raise ValueError("worker insert did not return a lowercase source SHA-256")
     discovery_audit = discovery[2].get("audit")
     if not isinstance(discovery_audit, list):
         raise ValueError("discovery query has no audit array")
