@@ -133,3 +133,28 @@ Performance campaigns are specified separately for credential verification, reco
 Run `cargo run -p xtask -- effect-authorization-conformance` to validate the frozen v1 corpus contract before a behavioral harness consumes it. The checker uses strict typed parsing (unknown fields fail), validates unique case IDs and mutation paths, enforces class-specific decisions/effect counts/terminal dispositions, and guards the baseline security invariants and benchmark-stage requirements. It prints a SHA-256 of the exact corpus bytes.
 
 Its `contract_integrity=PASS` means only that the specification is structurally consistent. The command deliberately emits `execution_status=NOT_EXECUTED_BY_THIS_COMMAND` and `security_qualification=NOT_EVALUATED_BY_THIS_COMMAND`. Unit-test source covers positive-control utility, missing negative mutations, duplicate/invalid mutation paths, forbidden effect counts, and lifecycle terminal-class regressions. These Rust tests and the command have not been compiled or executed in this environment because the Rust toolchain is unavailable.
+
+
+## Competitive benchmark roadmap: targets, not claims
+
+The current v1 corpus contains 41 frozen contract vectors: 4 positive controls, 32 negative controls, 1 indeterminate control, and 4 lifecycle/evidence controls. This is a useful conformance seed, **not yet a representative industry-scale adversarial dataset and not an executed security benchmark**.
+
+The path to a credible comparison is staged:
+
+1. **Contract integrity (this PR):** fail closed on unknown JSON fields, case removal/addition, duplicate IDs or mutation paths, weakened one-shot/restart gates, missing outcome denominators, and invalid expected dispositions. The committed Rust checker and unit-test source establish this stage, pending actual compilation/execution.
+2. **Instrumented effect harness:** turn each case into typed test input and count calls at the true effect adapter. Add positive and negative filesystem/process sentinels plus an outcome-unknown fixture. An ignored mutation or uninstrumented effect must fail the harness; merely obtaining a policy decision is insufficient.
+3. **Broaden the fixed corpus:** target at least 500 independently reviewed adversarial cases and 1,000 legitimate/benign operations, with explicit coverage across credential/issuer, audience/purpose, delegation/revocation, identity joins, path/argv binding, concurrency/restart, and outcome evidence. Report category-level confidence intervals, false blocks, missing trials and all raw rows.
+4. **Model-mediated track:** where prompt-to-tool selection is under test, replay a fixed attack/benign prompt set across multiple models and replay configurations, while holding the enforcement layer and policy constant. A stretch scale target is comparable to APort Vault's published 4,371 human-authored attacks and 14 models; do not imply equivalence before the corpus, task distribution, and replay protocol match. The deterministic conformance track must remain separable from the model's ability to request a tool.
+5. **Independent reproduction:** publish a versioned dataset snapshot, exact code/source SHA, toolchain, host capture, policy profile, runner instrumentation, per-trial event rows, receipt digests, and an independent replay script. Changes to case inventory or policy profiles require a new version, not retroactive scoring changes.
+
+### Proposed performance gates
+
+These are engineering targets, not measured results:
+
+- Local identity/recognition/policy-decision path: target p99 below 1 ms on a pinned reference host.
+- Complete durable authorization-admission round trip: first reproduce an equivalent APS L4-style baseline (APS publishes 822 µs p50 / 6.0 ms p99 on its canonical EPYC host), then target p99 below that baseline with the same durability, revocation, receipt, and retry semantics. Never benchmark a hot in-memory cache against a durable round trip.
+- Positive utility: zero false blocks on frozen mandatory positive controls; as benign coverage grows, target a false-block rate below 1% on at least 1,000 reviewed legitimate operations, with confidence intervals disclosed.
+- Safety correctness is a hard gate, not a weighted score: zero unauthorized effects, zero effects after deny/strict-indeterminate, exactly one successful use under a shared-capability concurrency race, and zero successful replay after the declared restart model.
+- Every report separately counts requests, decisions, adapter calls, side effects, independently confirmed postconditions, unknown outcomes, receipt failures, timeouts and missing/incomplete rows. A crash after possible effect is not reclassified as “no effect,” and an exit code alone is not a postcondition.
+
+External context: APort Vault reports 0 unpermitted transfers across 69,297 authorization-layer evaluations at policy Levels 2–4, with 25,370 payments still executed; its dataset had 225,964 completed out of 244,776 planned evaluations, so its own missing rows remain part of the comparison. Mergen's published 551-case suite is a decision-only gate measurement, not an end-to-end side-effect guarantee. APS reports separate verifier, SDK, queued-durable and gateway layers. These are useful methodological baselines; unlike-for-like replication is required before claiming to outperform any of them.
