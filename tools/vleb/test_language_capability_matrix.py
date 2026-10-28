@@ -47,12 +47,8 @@ def validate_matrix(data: dict[str, Any]) -> list[str]:
             errors.append(f"unsubstantiated_benchmark_claim:{name}")
         if row.get("dispatch_recognition") == "supported" and not row.get("evidence"):
             errors.append(f"supported_dispatch_without_evidence:{name}")
-        if row.get("generation") == "supported" and row.get("held_out_benchmark") != "measured":
-            # Generator support is a source-level capability claim, not benchmark success;
-            # nevertheless it must not imply benchmark results. Keep all current generation
-            # statuses conservative until independently audited.
-            if row.get("generation") != "not_audited":
-                errors.append(f"generation_claim_requires_explicit_review:{name}")
+        if row.get("generation") == "supported" and not row.get("evidence"):
+            errors.append(f"supported_generation_without_evidence:{name}")
 
     lookup = {row["language"]: row for row in rows}
     for name in ("COBOL", "Assembly / HLASM"):
@@ -98,6 +94,13 @@ class LanguageCapabilityMatrixTests(unittest.TestCase):
             self.assertEqual(rows[name]["dispatch_recognition"], "unsupported")
             self.assertEqual(rows[name]["generation"], "not_audited")
             self.assertEqual(rows[name]["held_out_benchmark"], "not_run")
+
+    def test_generation_capability_is_distinct_from_benchmark_performance(self) -> None:
+        data = json.loads(json.dumps(self.matrix))
+        row = next(r for r in data["languages"] if r["language"] == "Rust")
+        row["generation"] = "supported"
+        self.assertNotIn("generation_claim_requires_explicit_review:Rust", validate_matrix(data))
+        self.assertIn("supported_generation_without_evidence:Rust", validate_matrix(data))
 
     def test_dispatch_support_does_not_imply_parser_or_generation(self) -> None:
         rows = {r["language"]: r for r in self.matrix["languages"]}
