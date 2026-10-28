@@ -362,6 +362,7 @@ def validate_manifest(
     # and hash/audit only members actually contained inside that sealed bundle.
     resolved: dict[str, Path] = {}
     bundle_path: Path | None = None
+    bundle_digest_valid = False
     try:
         bundle_path = safe_file(artifact_root, bundle["path"])
         observed_bundle_sha = digest(bundle_path.read_bytes())
@@ -371,42 +372,10 @@ def validate_manifest(
                 "code": "artifact_digest_mismatch",
                 "message": f"evidence bundle: expected {bundle['sha256']}, observed {observed_bundle_sha}",
             })
+        else:
+            bundle_digest_valid = True
     except (OSError, ValueError) as exc:
         issues.append({"code": "artifact_path_invalid", "message": f"evidence bundle: {exc}"})
-
-    temporary_evidence = tempfile.TemporaryDirectory(prefix="vleb-sealed-evidence-")
-    evidence_root = Path(temporary_evidence.name)
-    if bundle_path is not None:
-        try:
-            observed_artifact_count = extract_evidence_bundle(bundle_path, evidence_root)
-            if observed_artifact_count != bundle["artifact_count"]:
-                issues.append({
-                    "code": "evidence_bundle_inventory_mismatch",
-                    "message": f"manifest declares {bundle['artifact_count']} bundle files, observed {observed_artifact_count}",
-                })
-        except (OSError, ValueError, zipfile.BadZipFile) as exc:
-            issues.append({"code": "evidence_bundle_invalid", "message": str(exc)})
-
-    hashed_fields = [
-        ("task contract", task["contract_path"], task["contract_sha256"]),
-        ("protocol", manifest["protocol"]["path"], manifest["protocol"]["sha256"]),
-        ("candidate patch", manifest["candidate"]["patch_path"], manifest["candidate"]["patch_sha256"]),
-        ("auditor source", manifest["auditor"]["source_path"], manifest["auditor"]["source_sha256"]),
-        ("task schema", manifest["auditor"]["task_schema_path"], manifest["auditor"]["task_schema_sha256"]),
-        ("receipt schema", manifest["auditor"]["receipt_schema_path"], manifest["auditor"]["receipt_schema_sha256"]),
-        ("mutation catalog", campaign["catalog_path"], campaign["catalog_sha256"]),
-        ("mutation results", campaign["results_path"], campaign["results_sha256"]),
-        ("evidence receipt", bundle["receipt_path"], bundle["receipt_sha256"]),
-    ]
-    for label, relative, expected in hashed_fields:
-        try:
-            path = safe_file(evidence_root, relative)
-            observed = digest(path.read_bytes())
-            resolved[label] = path
-            if observed != expected:
-                issues.append({"code": "artifact_digest_mismatch", "message": f"{label}: expected {expected}, observed {observed}"})
-        except (OSError, ValueError) as exc:
-            issues.append({"code": "artifact_path_invalid", "message": f"{label}: {exc}"})
 
     attestation_result: dict[str, Any] = {"required": provenance["attestation_required"], "verified": False, "status": "not_required"}
     if manifest["run_kind"] == "confirmatory" or provenance["attestation_required"]:
@@ -446,6 +415,52 @@ def validate_manifest(
                     issues.append({"code": "attestation_verification_failed", "message": completed.stdout.decode("utf-8", errors="replace")[-4000:]})
             except (OSError, subprocess.TimeoutExpired) as exc:
                 issues.append({"code": "attestation_verification_unavailable", "message": str(exc)})
+
+    temporary_evidence = tempfile.TemporaryDirectory(prefix="vleb-sealed-evidence-")
+    evidence_root = Path(temporary_evidence.name)
+    require_attestation = manifest["run_kind"] == "confirmatory" or provenance["attestation_required"]
+    should_extract = (
+        bundle_path is not None
+        and bundle_digest_valid
+        and (not require_attestation or attestation_result["verified"])
+    )
+    if should_extract:
+        try:
+            observed_artifact_count = extract_evidence_bundle(bundle_path, evidence_root)
+            if observed_artifact_count != bundle["artifact_count"]:
+                issues.append({
+                    "code": "evidence_bundle_inventory_mismatch",
+                    "message": f"manifest declares {bundle['artifact_count']} bundle files, observed {observed_artifact_count}",
+                })
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            issues.append({"code": "evidence_bundle_invalid", "message": str(exc)})
+    elif bundle_path is not None:
+        issues.append({
+            "code": "evidence_bundle_not_trusted",
+            "message": "bundle was not extracted because its digest or required attestation did not verify",
+        })
+
+    hashed_fields = [
+        ("task contract", task["contract_path"], task["contract_sha256"]),
+        ("protocol", manifest["protocol"]["path"], manifest["protocol"]["sha256"]),
+        ("candidate patch", manifest["candidate"]["patch_path"], manifest["candidate"]["patch_sha256"]),
+        ("auditor source", manifest["auditor"]["source_path"], manifest["auditor"]["source_sha256"]),
+        ("task schema", manifest["auditor"]["task_schema_path"], manifest["auditor"]["task_schema_sha256"]),
+        ("receipt schema", manifest["auditor"]["receipt_schema_path"], manifest["auditor"]["receipt_schema_sha256"]),
+        ("mutation catalog", campaign["catalog_path"], campaign["catalog_sha256"]),
+        ("mutation results", campaign["results_path"], campaign["results_sha256"]),
+        ("evidence receipt", bundle["receipt_path"], bundle["receipt_sha256"]),
+    ]
+    if should_extract:
+        for label, relative, expected in hashed_fields:
+            try:
+                path = safe_file(evidence_root, relative)
+                observed = digest(path.read_bytes())
+                resolved[label] = path
+                if observed != expected:
+                    issues.append({"code": "artifact_digest_mismatch", "message": f"{label}: expected {expected}, observed {observed}"})
+            except (OSError, ValueError) as exc:
+                issues.append({"code": "artifact_path_invalid", "message": f"{label}: {exc}"})
 
     receipt_audit: dict[str, Any] = {"required": manifest["run_kind"] == "confirmatory", "status": "not_required"}
     if manifest["run_kind"] == "confirmatory" and not issues and attestation_result["verified"]:
