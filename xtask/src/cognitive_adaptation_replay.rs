@@ -330,7 +330,7 @@ fn simulate_policy(
                         );
                         let evidence = serde_json::json!({
                             "method": "out-of-sample-shadow-loss",
-                            "observations": transaction.shadow_evaluations,
+                            "observations": &transaction.shadow_evaluations,
                             "active_mean_loss": active_mean,
                             "candidate_mean_loss": candidate_mean,
                             "minimum_improvement": 0.005,
@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn no_impact_feature_shift_does_not_trigger_deployable_pe_policies() {
+    fn no_impact_feature_shift_does_not_trigger_deployable_outcome_policies() {
         let generated = build_synthetic_run("no-impact", 64, 17).expect("fixture generation");
         for arm_id in ["detector-triggered", "detector-benefit-gated", "staged-verify-rollback"] {
             let arm = generated.receipt.arms.iter().find(|arm| arm.arm_id == arm_id).unwrap();
