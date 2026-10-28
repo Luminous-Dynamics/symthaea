@@ -99,8 +99,11 @@ class LanguageCapabilityMatrixTests(unittest.TestCase):
         data = json.loads(json.dumps(self.matrix))
         row = next(r for r in data["languages"] if r["language"] == "Rust")
         row["generation"] = "supported"
-        self.assertNotIn("generation_claim_requires_explicit_review:Rust", validate_matrix(data))
-        self.assertIn("supported_generation_without_evidence:Rust", validate_matrix(data))
+        row["evidence"] = []
+        errors = validate_matrix(data)
+        self.assertNotIn("generation_claim_requires_explicit_review:Rust", errors)
+        self.assertIn("supported_generation_without_evidence:Rust", errors)
+        self.assertIn("supported_dispatch_without_evidence:Rust", errors)
 
     def test_dispatch_support_does_not_imply_parser_or_generation(self) -> None:
         rows = {r["language"]: r for r in self.matrix["languages"]}
