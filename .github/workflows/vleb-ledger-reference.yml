@@ -47,6 +47,8 @@ jobs:
         run: python tools/vleb/test_language_capability_matrix.py
       - name: Validate atomic legacy claim evidence contracts
         run: python tools/vleb/test_legacy_claim_evidence.py
+      - name: Audit legacy claim source spans and witness pins
+        run: python tools/vleb/test_audit_legacy_claim.py
       - name: Validate fail-closed evidence receipt schema
         run: python tools/vleb/test_receipt_schema.py
       - name: Test independent receipt auditor and adversarial controls
