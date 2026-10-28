@@ -419,7 +419,7 @@ mod tests {
             let mut injected = base.clone();
             injected.as_object_mut().unwrap().insert(key.into(), value);
             assert!(
-                ingest_longmemeval_v2_jsonl([injected.to_string()], |_, _| Some("scope".into()))
+                ingest_longmemeval_v2_jsonl([injected.to_string().into_bytes()], |_, _| Some("scope".into()))
                     .is_err(),
                 "must reject top-level {key}"
             );
@@ -429,7 +429,7 @@ mod tests {
         nested["states"][0].as_object_mut().unwrap()
             .insert("questionType".into(), Value::String("static".into()));
         assert!(
-            ingest_longmemeval_v2_jsonl([nested.to_string()], |_, _| Some("scope".into())).is_err()
+            ingest_longmemeval_v2_jsonl([nested.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
         );
     }
 
@@ -438,13 +438,13 @@ mod tests {
         let mut unknown: Value = serde_json::from_str(&sample_line()).unwrap();
         unknown.as_object_mut().unwrap().insert("new_field".into(), Value::Bool(true));
         assert!(
-            ingest_longmemeval_v2_jsonl([unknown.to_string()], |_, _| Some("scope".into())).is_err()
+            ingest_longmemeval_v2_jsonl([unknown.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
         );
 
         let mut unordered: Value = serde_json::from_str(&sample_line()).unwrap();
         unordered["states"][1]["state_index"] = Value::from(0);
         assert!(
-            ingest_longmemeval_v2_jsonl([unordered.to_string()], |_, _| Some("scope".into())).is_err()
+            ingest_longmemeval_v2_jsonl([unordered.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
         );
     }
 
@@ -473,7 +473,7 @@ mod tests {
         let mut invalid: Value = serde_json::from_str(&sample_line()).unwrap();
         invalid["domain"] = Value::String("mobile".into());
         assert!(
-            ingest_longmemeval_v2_jsonl([invalid.to_string()], |_, _| Some("scope".into())).is_err()
+            ingest_longmemeval_v2_jsonl([invalid.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
         );
     }
 }
