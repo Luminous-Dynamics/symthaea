@@ -928,7 +928,8 @@ mod tests {
             .insert(record, &source_bytes_for_text("trusted text"))
             .is_err());
         assert!(index.records.is_empty());
-        assert!(index.lexical_documents.is_empty());
+        assert!(index.lexical_postings.is_empty());
+        assert!(index.lexical_document_lengths.is_empty());
     }
 
     #[test]
