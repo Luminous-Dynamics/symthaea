@@ -87,7 +87,7 @@ pub struct ArmV1 {
     pub interpreter: bool,
     pub automatic_diagnostics: bool,
     pub fresh_synthesis: bool,
-    pub draft_retention: Option<String>,
+    pub draft_retention: String,
     pub batch_limit_enforced: bool,
     pub role: String,
 }
@@ -272,13 +272,11 @@ fn expected_arm_grid(manifest: &RunManifestV1, issues: &mut Vec<String>) {
                 arm.arm_id
             ));
         }
-        if let Some(draft_retention) = &arm.draft_retention {
-            if !matches!(
-                draft_retention.as_str(),
-                "native" | "retain_unless_disconfirmed" | "replace_if_valid" | "not_applicable"
-            ) {
-                issues.push(format!("arm {} has an unsupported draft_retention", arm.arm_id));
-            }
+        if !matches!(
+            arm.draft_retention.as_str(),
+            "native" | "retain_unless_disconfirmed" | "replace_if_valid" | "not_applicable"
+        ) {
+            issues.push(format!("arm {} has an unsupported draft_retention", arm.arm_id));
         }
     }
     let expected: BTreeSet<(bool, &str)> = [
@@ -674,7 +672,8 @@ mod tests {
         value["evaluator"]["judge_prompt_sha256"] = json!("d".repeat(64));
         for model in value["models"].as_array_mut().unwrap() {
             model["snapshot_status"] = json!("pinned");
-            model["revision_or_alias"] = json!(format!("fixture-pinned-{}", model["model_id"].as_str().unwrap()));
+            let model_id = model["model_id"].as_str().unwrap().to_owned();
+            model["revision_or_alias"] = json!(format!("fixture-pinned-{model_id}"));
         }
         for slice in value["task_slices"].as_array_mut().unwrap() {
             slice["paired_rollout_seeds_sha256"] = json!("e".repeat(64));
