@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 BENCHMARK_ID = "CASTING-DECISION-ROBUSTNESS-001"
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 TOL = 1e-12
 
 
@@ -104,15 +104,21 @@ def validate_document(document: Any) -> dict[str, Any]:
     source_run = _require_exact_keys(
         doc["source_run"],
         {
-            "sweep_sha256", "adapter_sha256", "candidate_pool_sha256", "objective_family",
-            "constraint_family", "dimension", "severity", "seed", "policy",
+            "sweep_sha256", "adapter_sha256", "manifest_generator_sha256", "candidate_pool_sha256",
+            "objective_family", "constraint_family", "dimension", "severity", "seed", "policy",
+            "nominal_prediction_source", "evidence_class",
             "fidelity_costs", "cost_budget", "cost_spent",
         },
         "source_run",
     )
     _sha256(source_run["sweep_sha256"], "source_run.sweep_sha256")
     _sha256(source_run["adapter_sha256"], "source_run.adapter_sha256")
+    _sha256(source_run["manifest_generator_sha256"], "source_run.manifest_generator_sha256")
     _sha256(source_run["candidate_pool_sha256"], "source_run.candidate_pool_sha256")
+    if not isinstance(source_run["nominal_prediction_source"], str) or not source_run["nominal_prediction_source"].strip():
+        raise ValueError("source_run.nominal_prediction_source must be non-empty")
+    if source_run["evidence_class"] not in {"synthetic", "simulator", "physical"}:
+        raise ValueError("source_run.evidence_class must be synthetic, simulator, or physical")
     for field in ("objective_family", "constraint_family", "policy"):
         if not isinstance(source_run[field], str) or not source_run[field].strip():
             raise ValueError(f"source_run.{field} must be a non-empty string")
@@ -145,8 +151,10 @@ def validate_document(document: Any) -> dict[str, Any]:
     )
     if split["selection_frozen_before_holdout"] is not True:
         raise ValueError("selection_frozen_before_holdout must be true")
-    if split["holdout_role"] != "independent_post_selection":
-        raise ValueError("holdout_role must be independent_post_selection")
+    if split["holdout_role"] not in {"independent_post_selection", "synthetic_post_selection_diagnostic"}:
+        raise ValueError("holdout_role must be independent_post_selection or synthetic_post_selection_diagnostic")
+    if split["holdout_role"] == "synthetic_post_selection_diagnostic" and doc["source_run"]["evidence_class"] != "synthetic":
+        raise ValueError("synthetic holdout role requires synthetic evidence_class")
     _sha256(split["selection_freeze_sha256"], "split.selection_freeze_sha256")
     _sha256(split["holdout_manifest_sha256"], "split.holdout_manifest_sha256")
 
