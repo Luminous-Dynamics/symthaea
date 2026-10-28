@@ -129,3 +129,26 @@ This is an offline validator, not a timing authority. A valid digest proves byte
 The score report is descriptive. For repeated observations, define the independent unit and uncertainty method; do not treat correlated rows as independent. A low score on one synthetic regime does not imply physical calibration, and a high aggregate score must not hide boundary/shift degradation.
 
 Implementation and unit tests are committed to the research branch and wired to the focused CI job. They have not yet been claimed passing pending an exact-head run.
+
+## 9. Multi-objective comparator card: MF-JESMOC / MOBOCMF
+
+- Paper: Fernández-Sánchez and Hernández-Lobato, *Joint entropy search for multi-objective Bayesian optimization with constraints and multiple fidelities*, Neurocomputing 657 (7 Dec 2025), article 131674, DOI https://doi.org/10.1016/j.neucom.2025.131674.
+- Public repository: https://github.com/fernandezdaniel/MOBOCMF
+- Pinned revision: [95293f6b59375ef9d4c71f61d4e42d788d116da8](https://github.com/fernandezdaniel/MOBOCMF/commit/95293f6b59375ef9d4c71f61d4e42d788d116da8), latest commit returned by GitHub's repository search, dated 25 April 2024.
+- Main acquisition implementation: https://github.com/fernandezdaniel/MOBOCMF/blob/95293f6b59375ef9d4c71f61d4e42d788d116da8/mobocmf/acquisition_functions/JESMOC_MFDGP.py
+- Public toy example: https://github.com/fernandezdaniel/MOBOCMF/blob/95293f6b59375ef9d4c71f61d4e42d788d116da8/examples/toy_synthetic_2D_JESMOCMF/toy_synthetic_2D_JESMOCMF.py
+- The example configures two objectives, two constraints, two fidelities, per-evaluation cost units 1 and 10, and 60 Bayesian-optimization iterations. It is a genuinely relevant multi-objective constrained multifidelity baseline candidate, unlike single-objective MF-SCBO.
+
+### Reproduction hazards
+
+1. **Dependencies are not locked.** README lists only `botorch >= 0.9.0`; no root `requirements.txt` was found. Resolve and archive exact Python, PyTorch, BoTorch, GPyTorch, SciPy, NumPy and other runtime versions plus platform/device/determinism settings.
+2. **License needs resolution.** `setup.py` declares `Apache License 2.0`, but a root `LICENSE` file could not be fetched at this revision. Do not redistribute copied implementation or assert license compliance until the exact license text/terms are verified. Source inspection and benchmarking discussions should keep this unresolved status explicit.
+3. **Coupled versus decoupled evaluation.** The `coupled_acq` path sums objective and constraint acquisition terms, and the `_get_nextpoint_coupled` selection then divides by aggregate evaluation cost at each fidelity. In `decoupled_acq`, per-black-box cost division is commented out; a decoupled experiment would therefore require a separately reviewed and labelled correction. For faithful reproduction, start with coupled evaluation only.
+4. **Keep diagnostic truth out of the policy.** The API exposes `eval_highest_fidelity`; the public example should be audited for this setting, and the primary baseline should use the normal fidelity-selection mode. Any high-fidelity call performed only to score a final result must be evaluator-only and charged to the common audit/total-cost ledger, never exposed to acquisition or stopping.
+5. **Reproduce the same mathematical track.** Verify objective directions, constraint signs, feasible-set definition, objective normalizations and reference point against the paper before comparing hypervolume. Keep the exact method configuration and random seed fixed; count initial low/high-fidelity observations and all fitting/restarts.
+
+### Fair benchmark placement
+
+MF-JESMOC is the strongest currently identified open-source candidate for a native multi-objective constrained multi-fidelity comparator. It should be paired with an up-to-date maintained baseline such as BoTorch's published MF-HVKG/MOMF implementation, not used as the only comparator. The official BoTorch tutorial describes MF-HVKG as one-step lookahead on value of information about the Pareto set and MOMF as an alternative multi-objective multi-fidelity approach: https://botorch.org/docs/v0.13.0/tutorials/Multi_objective_multi_fidelity_BO.
+
+Status: **candidate identified, source revision pinned, not reproduced**. No performance result or SOTA comparison is claimed. Do not close the reproduction gate until license, runtime environment, numerical conventions, fidelity costs, and policy/evaluator truth separation are archived.
