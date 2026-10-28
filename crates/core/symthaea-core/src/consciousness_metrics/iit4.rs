@@ -30,9 +30,9 @@ pub struct IIT4Result {
     pub big_phi: f64,
     /// Entropy-derived intrinsic-information proxy, not a formal IIT ii value unless qualified.
     pub intrinsic_information: f64,
-    /// Number of concepts (mechanisms with φ > 0)
+    /// Count of components whose proxy score exceeds `phi_threshold`; not a formal concept count.
     pub concept_count: usize,
-    /// Concept structure: irreducible cause-effect mechanisms.
+    /// Optional component-level proxy summaries; not formal cause/effect mechanisms.
     /// Only populated when `iit4` feature is enabled.
     #[cfg(feature = "iit4")]
     pub concepts: Vec<ConceptStructure>,
@@ -49,14 +49,13 @@ pub struct IIT4Result {
 pub struct ConceptStructure {
     /// Index of the mechanism component
     pub mechanism_index: usize,
-    /// Small phi (irreducibility) of this concept
+    /// HDC component proxy score; not formally calculated IIT small φ.
     pub phi: f64,
-    /// Cause information: how much this mechanism constrains its past
+    /// Mutual-information proxy between this HDC component and bundled context; not a causal repertoire.
     pub cause_info: f64,
-    /// Effect information: how much this mechanism constrains its future
+    /// Entropy-derived proxy used as an effect-like feature; not a future causal repertoire.
     pub effect_info: f64,
-    /// Combined cause-effect power: min(cause_info, effect_info)
-    /// IIT 4.0 uses the minimum to ensure both directions are specified.
+    /// Minimum of two proxy features, retained for compatibility; not formal IIT cause-effect power.
     pub cause_effect_power: f64,
 }
 
@@ -160,10 +159,10 @@ impl IIT4Calculator {
         id / 2.0 // Normalize to [0, 1] range for identical distributions
     }
 
-    /// Compute small phi (φ) - irreducibility of a mechanism
+    /// Compute the legacy HDC partition proxy for one component against context.
     ///
-    /// φ measures how much a mechanism's cause-effect is reduced
-    /// when the system is partitioned.
+    /// This computes a difference between mutual-information-like estimates over
+    /// hypervector bundles. It does not evaluate formal IIT cause/effect repertoires.
     pub fn small_phi(&self, mechanism: &ContinuousHV, context: &[ContinuousHV]) -> f64 {
         if context.is_empty() {
             return 0.0;
@@ -209,10 +208,10 @@ impl IIT4Calculator {
         (whole_mi - min_mi).max(0.0)
     }
 
-    /// Compute intrinsic information
+    /// Compute an entropy-derived proxy feature.
     ///
-    /// How much the current state specifies about itself
-    /// (self-information under the mechanism)
+    /// This function does not calculate formal IIT intrinsic information from an
+    /// explicit causal model; it maps the HDC vector's estimated entropy to a score.
     pub fn intrinsic_information(&self, state: &ContinuousHV) -> f64 {
         // Use entropy as a proxy for self-information
         // Lower entropy = more specific state = higher intrinsic info
@@ -221,7 +220,7 @@ impl IIT4Calculator {
         (max_h - h).max(0.0)
     }
 
-    /// Compute full IIT 4.0 analysis
+    /// Compute this module's aggregate HDC proxy summary (not full IIT 4.0 analysis).
     pub fn analyze(&self, components: &[ContinuousHV]) -> IIT4Result {
         let n = components.len();
         if n < 2 {
@@ -274,7 +273,8 @@ impl IIT4Calculator {
             #[cfg(feature = "iit4")]
             {
                 // Compute cause and effect info for this mechanism
-                // Cause info: MI between mechanism and context (past → present)
+                // Cause-like feature: MI between the HDC vector and bundled context;
+                // no past/future transition model is supplied in this calculation.
                 let refs: Vec<&ContinuousHV> = context.iter().collect();
                 let bundle = ContinuousHV::bundle(&refs);
                 let cause_info = self
@@ -284,7 +284,7 @@ impl IIT4Calculator {
                 // Effect info: use intrinsic information as proxy for future constraint
                 let effect_info = self.intrinsic_information(&components[i]);
 
-                // IIT 4.0: cause-effect power = min(cause, effect)
+                // Legacy combination of two proxy features; not formal IIT cause-effect power.
                 let cause_effect_power = cause_info.min(effect_info);
 
                 if phi_i > self.phi_threshold {
