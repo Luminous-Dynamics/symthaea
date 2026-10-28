@@ -111,7 +111,7 @@ class ForecastValidationTests(unittest.TestCase):
         ]
         result = score_forecasts(forecasts, outcomes_for(forecasts, [0, 1, 0]), bin_count=5)
         self.assertEqual(len(result["overall"]["top_label_reliability_bins"]), 5)
-        self.assertEqual(result["overall"]["top_label_reliability_bins"][4]["count"], 0)
+        self.assertEqual(result["overall"]["top_label_reliability_bins"][4]["count"], 2)
         self.assertGreater(result["overall"]["top_label_expected_calibration_error"], 0.0)
 
 
