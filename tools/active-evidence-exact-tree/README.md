@@ -213,3 +213,28 @@ A local independent Python calculation gave the following minimum per-cell cover
 | 1,000 | 0.999558 | 0.994692 |
 
 This strengthens finite-grid qualification, but the uniform guarantee still comes from the Hoeffding/Bonferroni argument under independent fixed-sample Bernoulli observations—not from this probability grid. The synthetic calibration counts used to choose the policy are rounded around nominal probabilities and are not the random samples used in the coverage calculation.
+
+
+## Follow-up: fixed-sample versus anytime-valid calibration
+
+The calibration-box experiment now runs two interval regimes over the same sample-size sweep:
+- **Fixed-sample Hoeffding:** radius sqrt(log(2 M / alpha) / (2 n)).
+- **Time-uniform Hoeffding with alpha spending:** radius sqrt(log(2 M n (n+1) / alpha) / (2 n)), assigning failure mass alpha / (M n(n+1)) to each cell/time. Since the series over n sums to one, a union bound controls all 12 likelihood cells across all sample sizes at once, assuming independent stationary Bernoulli observations within each cell. This gives optional-stopping validity for the confidence bounds, unlike reusing a fixed-time interval after repeatedly checking it.
+
+This is a deliberately conservative anytime-valid reference, not the state of the art in confidence sequences. Howard, Ramdas, McAuliffe and Sekhon develop time-uniform nonparametric confidence sequences with non-asymptotic guarantees ([Annals of Statistics, 2021](https://doi.org/10.1214/20-AOS1991)); Waudby-Smith and Ramdas develop variance-adaptive empirical-Bernstein confidence sequences ([JRSS B, 2024](https://doi.org/10.1093/jrsssb/qkad009)). The next efficiency comparison should replace the simple alpha-spending boundary with at least one of those established tighter approaches, while keeping this transparent baseline.
+
+Independent standard-library Python formula checks (not Rust qualification) give:
+
+| n per cell | Fixed-sample radius | Time-uniform radius | Fixed grid minimum cell coverage | Time-uniform grid minimum cell coverage |
+|---:|---:|---:|---:|---:|
+| 20 | 0.392867 | 0.552586 | 0.999598 | 1.000000 |
+| 50 | 0.248471 | 0.374401 | 0.999694 | 1.000000 |
+| 200 | 0.124236 | 0.204789 | 0.999501 | 1.000000 |
+| 1,000 | 0.055560 | 0.099976 | 0.999558 | 1.000000 |
+| 10,000 | 0.017570 | 0.035067 | 0.999552 | 1.000000 |
+
+Finite-grid coverage was calculated by enumerating the full Binomial(n,p) probability mass at 11 probabilities, not by Monte Carlo. It is a diagnostic grid, not a proof for all p; the guarantee follows from the concentration bound and alpha-spending construction. High grid coverage in this table primarily reflects conservative width and clipping at [0,1], not superior acquisition performance.
+
+The independent Python check also re-enumerated the shallow one-query policy's full 2^12 product-box vertices and matched the factorized class-row maximum exactly for both fixed-sample and time-uniform intervals. The Rust test suite contains the same regression check. This verifies the finite model's vertex-reduction calculation, not whether the model or stationary Bernoulli assumptions match deployment.
+
+The workflow now emits both interval regimes in the policy-result CSV and the coverage-grid CSV, checks them independently, and includes both files in the source/toolchain/hash provenance artifact. Exact-head Rust formatting, tests, Clippy, and Rust-versus-Python row parity remain the qualification gate.
