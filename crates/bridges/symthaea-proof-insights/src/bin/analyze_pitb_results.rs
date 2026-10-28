@@ -796,12 +796,15 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 }
 
 fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
+    wilson_interval_with_z(successes, trials, 1.959_963_984_540_054_f64)
+}
+
+fn wilson_interval_with_z(successes: usize, trials: usize, z: f64) -> (f64, f64) {
     if trials == 0 {
         return (0.0, 1.0);
     }
     let n = trials as f64;
     let p = successes as f64 / n;
-    let z = 1.959_963_984_540_054_f64;
     let z_squared = z * z;
     let denominator = 1.0 + z_squared / n;
     let center = (p + z_squared / (2.0 * n)) / denominator;
@@ -810,6 +813,13 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
         (center - half_width).max(0.0),
         (center + half_width).min(1.0),
     )
+}
+
+// The registered null grid has 16 cells: four strict-null ICC cells plus
+// twelve family-heterogeneous weak-null cells. z=2.74 is slightly more
+// conservative than the one-sided Bonferroni critical value for alpha=.05/16.
+fn simultaneous_null_upper_bound(successes: usize, trials: usize) -> f64 {
+    wilson_interval_with_z(successes, trials, 2.74).1
 }
 
 fn simulate_power_scenario(
@@ -1797,6 +1807,16 @@ fn validate_power_report(
                 let standard_error = scenario
                     .monte_carlo_standard_error
                     .context("estimated power scenario has no Monte Carlo standard error")?;
+                let expected_simultaneous_null_upper = if
+                    scenario.true_treatment_effect_percentage_points.abs() <= 1e-12
+                {
+                    Some(simultaneous_null_upper_bound(
+                        scenario.utility_gate_passes,
+                        report.study_simulations,
+                    ))
+                } else {
+                    None
+                };
                 if [power, lower, upper, standard_error]
                     .iter()
                     .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
@@ -1806,6 +1826,10 @@ fn validate_power_report(
                     || scenario.degenerate_interval_trials > report.study_simulations
                     || scenario.utility_gate_passes
                         > report.study_simulations - scenario.degenerate_interval_trials
+                    || !same_optional_probability(
+                        scenario.null_effect_false_claim_probability_upper_simultaneous_95,
+                        expected_simultaneous_null_upper,
+                    )
                 {
                     bail!("power scenario has inconsistent probability or confidence bounds");
                 }
@@ -1907,6 +1931,9 @@ fn validate_power_report(
         let upper = scenario
             .false_claim_probability_upper_95
             .context("weak-null scenario lacks an upper Wilson bound")?;
+        let simultaneous_upper = scenario
+            .false_claim_probability_upper_simultaneous_95
+            .context("weak-null scenario lacks a simultaneous upper Wilson bound")?;
         let standard_error = scenario
             .monte_carlo_standard_error
             .context("weak-null scenario lacks its Monte Carlo standard error")?;
@@ -1937,11 +1964,16 @@ fn validate_power_report(
             || scenario.degenerate_interval_trials > report.study_simulations
             || scenario.false_claims
                 > report.study_simulations - scenario.degenerate_interval_trials
-            || [probability, lower, upper, standard_error]
+            || [probability, lower, upper, simultaneous_upper, standard_error]
                 .iter()
                 .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
             || lower > probability + 1e-12
             || probability > upper + 1e-12
+            || upper > simultaneous_upper + 1e-12
+            || (simultaneous_upper
+                - simultaneous_null_upper_bound(scenario.false_claims, report.study_simulations))
+                .abs()
+                > 1e-12
             || !mean_effect.is_finite()
             || !realized_sd.is_finite()
             || realized_sd < 0.0
@@ -2000,6 +2032,10 @@ fn validate_power_report(
                     expected.false_claim_probability_upper_95,
                 )
                 || !same_optional_probability(
+                    observed.false_claim_probability_upper_simultaneous_95,
+                    expected.false_claim_probability_upper_simultaneous_95,
+                )
+                || !same_optional_probability(
                     observed.mean_observed_effect_percentage_points,
                     expected.mean_observed_effect_percentage_points,
                 )
@@ -2020,17 +2056,17 @@ fn validate_power_report(
         .iter()
         .filter_map(|scenario| scenario.estimated_false_claim_probability)
         .reduce(f64::max);
-    let max_weak_null_false_claim_upper_95 = report
+    let max_weak_null_false_claim_upper_simultaneous_95 = report
         .weak_null_scenarios
         .iter()
-        .filter_map(|scenario| scenario.false_claim_probability_upper_95)
+        .filter_map(|scenario| scenario.false_claim_probability_upper_simultaneous_95)
         .reduce(f64::max);
     if !same_optional_probability(
         report.weak_null_false_claim_probability_max,
         max_weak_null_false_claim_probability,
     ) || !same_optional_probability(
-        report.weak_null_false_claim_probability_upper_95_max,
-        max_weak_null_false_claim_upper_95,
+        report.weak_null_false_claim_probability_upper_simultaneous_95_max,
+        max_weak_null_false_claim_upper_simultaneous_95,
     ) {
         bail!("weak-null false-claim maxima do not match scenario rows");
     }
@@ -3052,6 +3088,10 @@ mod tests {
             right.false_claim_probability_upper_95
         );
         assert_eq!(
+            left.false_claim_probability_upper_simultaneous_95,
+            right.false_claim_probability_upper_simultaneous_95
+        );
+        assert_eq!(
             left.mean_observed_effect_percentage_points,
             right.mean_observed_effect_percentage_points
         );
@@ -3068,6 +3108,9 @@ mod tests {
             .zip(left.estimated_false_claim_probability)
             .zip(left.false_claim_probability_upper_95)
             .is_some_and(|((lower, rate), upper)| lower <= rate && rate <= upper));
+        assert!(left.false_claim_probability_upper_simultaneous_95
+            .zip(left.false_claim_probability_upper_95)
+            .is_some_and(|(adjusted, per_cell)| adjusted >= per_cell));
     }
 
     #[test]
