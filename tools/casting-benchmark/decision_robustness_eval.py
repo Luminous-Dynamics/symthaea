@@ -287,6 +287,7 @@ def score_document(document: Any, raw_bytes: bytes) -> dict[str, Any]:
         "benchmark_id": BENCHMARK_ID,
         "receipt_label": "POST_SELECTION_SHIFT_AUDIT_NOT_PHYSICAL_CERTIFICATION",
         "input_sha256": hashlib.sha256(raw_bytes).hexdigest(),
+        "evaluator_source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
         "task_id": parsed["task_id"],
         "run_id": parsed["run_id"],
         "split_declarations": {
