@@ -25,11 +25,20 @@ This analysis uses **Bonferroni-adjusted two-sided Wilson intervals**. Bonferron
 
 The number of cases is unchanged at 90% and 95% in this sample. At a 99% target, case-wise correction leaves 41/192 cases, while the benchmark-wide family leaves 26/192. No case qualifies for a 99.9% lower-bound target under either family.
 
-These counts are **not radio capability limits**. They reflect the current synthetic model, candidate strategies, scenario matrix and 2,000-trial sample. The 99.9% result means this experiment does not statistically qualify any scenario to that target; it does not prove the protocol could never achieve 99.9%.
+## Sample-size floor for near-perfect reliability
+
+Even if every trial succeeds, the lower Wilson bound is limited by sample count. For (n) successes out of (n) trials, the two-sided Wilson lower bound simplifies to (n/(n+z^2)). Therefore the 99.9% infeasibility result at (n=2{,}000) is sample-size-limited regardless of which strategy succeeds in every trial; it must not be interpreted as proof that the protocol cannot achieve 99.9%.
+
+| Confidence family | Maximum lower bound with 2,000/2,000 successes | Minimum n for 99% | Minimum n for 99.9% | Minimum n for 99.99% |
+|---|---:|---:|---:|---:|
+| Per-case, 4 strategies | 99.689% | 618 | 6,233 | 62,380 |
+| Benchmark-wide, 768 candidates | 99.209% | 1,579 | 15,933 | 159,465 |
+
+These sample counts assume zero failures and cover only binomial sampling error under the synthetic model. Any failures require more trials; model and hardware uncertainty are additional. For deployment-grade claims, use a predeclared held-out corpus and enough repetitions for the target—not only the development run.
 
 ## How to use the two families
 
-Case-wise bounds suit selection for one predeclared, already-frozen deployment scenario. Benchmark-wide bounds are safer when publishing a single claim about results over the entire sweep. If the deployment scenario itself is picked after seeing the sweep, that selection also needs to be addressed; the stronger evaluation is to tune on development seeds and then confirm on independent held-out seeds and, later, held-out radio conditions.
+Case-wise bounds suit selection for one predeclared, already-frozen deployment scenario. Benchmark-wide bounds are safer when publishing one claim about the entire sweep. If the deployment scenario itself is chosen after seeing the outcomes, that selection also needs to be addressed; the stronger evaluation is to tune on development seeds and confirm on independent held-out seeds and later held-out radio conditions.
 
 ## Recommended evaluation protocol
 
