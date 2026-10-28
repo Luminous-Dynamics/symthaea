@@ -2,7 +2,7 @@
 
 - Dataset version: `MEL-MR-COMPOSITION-SMOKE-1.1`
 
-- Dataset: MEL-MR-COMPOSITION-SMOKE-1.0
+- Fixture file: `mel-mr-eval-003-compositional-smoke-cases-v1.jsonl`
 - Cases: 120 (60 accept, 60 reject)
 - Motif families: 12; family-held-out splits: development 6 families / 60 cases, calibration 2 / 20, test 4 / 40
 - Structural checks: case IDs unique; all targets match selection lengths; no family crosses a split; expected verdict agrees with actual-vs-claimed descriptors and declared perturbation.
