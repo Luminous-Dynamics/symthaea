@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Versioned contract for compositional motif transformation verification.
-pub const COMPOSITIONAL_MOTIF_CONTRACT_VERSION: &str = "compositional-motif-v1";
+pub const COMPOSITIONAL_MOTIF_CONTRACT_VERSION: &str = "compositional-motif-v1.1";
 
 /// Hard cap on dynamic-programming cells to bound untrusted-input work and memory.
 pub const MAX_ALIGNMENT_CELLS: usize = 1_000_000;
@@ -77,6 +77,8 @@ pub struct CompositionalVerificationConfig {
     /// Permit additional target events only when the caller explicitly declares
     /// that this transformation may contain insertions/ornaments. Source events
     /// in the claimed selection are never silently deletable.
+    /// Missing in pre-v1.1 receipts defaults to false (fail closed).
+    #[serde(default)]
     pub allow_target_insertions: bool,
 }
 
@@ -983,6 +985,23 @@ mod tests {
         assert_eq!(a.pitch.max_error, b.pitch.max_error);
         assert_eq!(a.onset.max_error, b.onset.max_error);
         assert_eq!(a.duration.max_error, b.duration.max_error);
+    }
+
+    #[test]
+    fn legacy_verification_config_defaults_insertions_to_disabled() {
+        let legacy = serde_json::json!({
+            "pitch_tolerance_semitones": 0.25,
+            "onset_tolerance_beats": 0.05,
+            "duration_log_ratio_tolerance": 0.05,
+            "minimum_coverage": 0.90,
+            "maximum_gap_fraction": 0.10
+        });
+        let config: CompositionalVerificationConfig =
+            serde_json::from_value(legacy).expect("legacy config remains readable");
+        assert!(
+            !config.allow_target_insertions,
+            "missing legacy field must default to fail-closed insertion policy"
+        );
     }
 
     #[test]
