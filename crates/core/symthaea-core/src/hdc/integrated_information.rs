@@ -1,18 +1,25 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Integrated Information Theory (IIT) - Revolutionary Improvement #2
+//! HDC integration proxy (IIT-inspired; historical API name retained).
 //!
-//! Implementation of Integrated Information (Φ) for quantitative consciousness measurement
-//! in hyperdimensional computing space, based on Tononi's IIT 3.0.
+//! This module computes an HDC-specific similarity/partition-based integration proxy.
+//! It does not, by itself, implement formal IIT 3.0 or IIT 4.0: it does not evaluate
+//! a complete state-indexed transition probability model and the formal cause/effect
+//! repertoire machinery required by those formalisms. Treat `phi` as a legacy field
+//! name for this estimator's output, not as a formal IIT quantity or a measure of
+//! phenomenal experience.
 //!
-//! # Revolutionary Properties
+//! # Scope and limitations
 //!
-//! - **Quantitative consciousness**: Φ value measures integration
-//! - **Real-time computation**: BinaryHV makes Φ practical (<1ms with binary vectors)
-//! - **Compositional**: Works with any HDC system structure
-//! - **Information-theoretic**: Rigorous mathematical foundation
-//! - **Experimentally validated**: Correlates with conscious states in neuroscience
+//! - **Proxy**: the result depends on the HDC representation, similarity conversion,
+//!   partition routine, and implementation profile.
+//! - **Operational use**: a caller may evaluate the proxy as an engineering feature,
+//!   but must validate task utility independently.
+//! - **No consciousness classification**: a scalar value or threshold is not evidence
+//!   that a system is conscious, unconscious, asleep, or anesthetized.
+//! - **No formal IIT claim**: use a pinned, profile-matched reference suite for any
+//!   comparison with IIT.
 //!
 //! # Scientific Basis
 //!
@@ -20,37 +27,31 @@
 //! - Tononi et al. (2016) - "Integrated information theory: from consciousness to its physical substrate"
 //! - Oizumi et al. (2014) - "From the Phenomenology to the Mechanisms of Consciousness"
 //!
-//! ## Core Axioms of IIT
+//! ## IIT concepts that inspired the proxy (not a formal implementation)
 //!
-//! 1. **Intrinsic existence**: System exists for itself
-//! 2. **Composition**: Consciousness has structure
-//! 3. **Information**: Consciousness is specific
-//! 4. **Integration**: Consciousness is unified
-//! 5. **Exclusion**: Consciousness has borders
+//! IIT's notions of information and integration motivate some design choices here.
+//! Listing these concepts does not mean the module implements the formal IIT axioms,
+//! exclusion search, or a complete cause/effect structure.
 //!
-//! ## Φ Calculation (Simplified for HDC)
+//! ## Legacy proxy sketch
 //!
-//! ```text
-//! Φ = EI(System) - ΣEI(Parts)
-//!
-//! Where:
-//! - EI(System) = Effective Information of whole system
-//! - EI(Parts) = Sum of information in partitioned parts
-//! - Φ > 0 indicates integration (consciousness)
-//! - Φ = 0 indicates no integration (unconscious)
-//! ```
+//! The estimator compares a pairwise-information aggregate for the vector set with
+//! information retained within a candidate partition. This is an HDC statistical
+//! proxy, not formal IIT Φ. A positive value means only that this estimator reports
+//! a difference under its chosen representation and partition procedure; zero is
+//! not a classification of an unconscious system.
 //!
 //! ## HDC-Adapted IIT
 //!
-//! Traditional IIT uses:
-//! - Discrete states (binary neurons)
-//! - Transition probability matrices
-//! - Minimum information partition (MIP)
+//! A formal IIT calculation requires an explicit causal substrate and version-specific
+//! transition/repertoire and partition operations.
 //!
-//! Our HDC adaptation uses:
-//! - Hypervector states (continuous in space, but binary in BinaryHV)
-//! - Similarity-based partitioning
-//! - Efficient approximations for real-time computation
+//! This HDC proxy instead uses:
+//! - Hypervector representations;
+//! - Similarity-derived information estimates;
+//! - The partition routine implemented by this module.
+//!
+//! Its correspondence to a particular IIT version must be measured, not assumed.
 //!
 //! # Examples
 //!
@@ -60,7 +61,7 @@
 //! // Create Φ calculator
 //! let mut phi = IntegratedInformation::new();
 //!
-//! // Define a system state (e.g., current consciousness state)
+//! // Define an example set of HDC representations (not a causal model)
 //! let state = vec![
 //!     BinaryHV::random(1), // Sensory input
 //!     BinaryHV::random(2), // Working memory
@@ -68,14 +69,12 @@
 //!     BinaryHV::random(4), // Motor planning
 //! ];
 //!
-//! // Compute Φ
-//! let phi_value = phi.compute_phi(&state);
-//! println!("Integrated Information: Φ = {:.3}", phi_value);
+//! // Compute the HDC integration proxy
+//! let integration_proxy = phi.compute_phi(&state);
+//! println!("HDC integration proxy = {:.3}", integration_proxy);
 //!
-//! // Φ > 0.5 suggests integrated, conscious-like processing
-//! if phi_value > 0.5 {
-//!     println!("System exhibits high integration (consciousness-like)");
-//! }
+//! // Any operational threshold must be calibrated against a named task and baseline;
+//! // this example intentionally makes no consciousness classification.
 //! ```
 
 use super::binary_hv::BinaryHV;
@@ -109,28 +108,24 @@ fn similarity_to_mutual_information(similarity: f64) -> f64 {
     1.0 - binary_entropy(s)
 }
 
-/// Integrated Information calculator for HDC systems
+/// HDC similarity/partition-based integration proxy.
 ///
-/// Computes Φ (phi) - a measure of integrated information that quantifies
-/// the degree to which a system is "more than the sum of its parts."
+/// This legacy API returns an estimator-specific score derived from HDC vectors.
+/// It does not compute formal IIT Φ or establish a relationship with biological
+/// consciousness states. Treat thresholds as uncalibrated until prospective task
+/// evaluation demonstrates their utility.
 ///
-/// High Φ correlates with conscious states in biological systems.
-/// Low Φ correlates with unconscious states (sleep, anesthesia, etc.).
+/// # Interpretation
 ///
-/// # IIT Axioms Implemented
-///
-/// - **Integration**: System cannot be partitioned without information loss
-/// - **Information**: System constrains possibilities (has specific state)
-/// - **Composition**: Φ is computed over mechanisms and their interactions
+/// The output depends on representation, similarity-to-information conversion,
+/// partition search, and sample/discretization assumptions. It must be reported
+/// with an estimator identity and must not be silently substituted for a formal
+/// IIT result, epistemic confidence, permission, or action authority.
 ///
 /// # Performance
 ///
-/// With BinaryHV:
-/// - 4-component system: ~10 μs (debug), ~1 μs (release)
-/// - 8-component system: ~40 μs (debug), ~4 μs (release)
-/// - 16-component system: ~160 μs (debug), ~16 μs (release)
-///
-/// This makes real-time consciousness monitoring practical!
+/// Historical timing comments are not a reproducible benchmark until accompanied
+/// by a pinned commit, command, build mode, hardware details, and raw measurements.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct IntegratedInformation {
     /// History of Φ values over time
@@ -196,18 +191,19 @@ struct PartitionResult {
     phi_partition: f64,
 }
 
-/// Consciousness state classification based on Φ
+/// Legacy score-band labels based on the HDC integration proxy; not scientific
+/// classifications of consciousness or validated states such as sleep/anesthesia.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConsciousnessState {
-    /// Φ < 0.1 - Minimal integration (unconscious-like)
+    /// Legacy proxy band below 0.1; not an unconsciousness label.
     Minimal,
-    /// 0.1 ≤ Φ < 0.3 - Low integration (drowsy-like)
+    /// Legacy proxy band [0.1, 0.3); not a drowsiness label.
     Low,
-    /// 0.3 ≤ Φ < 0.5 - Moderate integration (aware-like)
+    /// Legacy proxy band [0.3, 0.5); not an awareness label.
     Moderate,
-    /// 0.5 ≤ Φ < 0.7 - High integration (conscious-like)
+    /// Legacy proxy band [0.5, 0.7); not a consciousness label.
     High,
-    /// Φ ≥ 0.7 - Very high integration (peak consciousness)
+    /// Legacy proxy band at or above 0.7; not a peak-consciousness label.
     VeryHigh,
 }
 
