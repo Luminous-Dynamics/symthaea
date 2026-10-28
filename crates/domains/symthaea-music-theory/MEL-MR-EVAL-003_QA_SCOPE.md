@@ -8,3 +8,7 @@
 - Explicitly NOT established: Rust verifier correctness, integration, compile/test status, mutation adequacy, human recognition, commercial competitiveness, or generalization.
 
 The corpus is smoke-scale. Do not use it as the sole evidence for a release or publication claim.
+
+## Follow-on Rust prototype status
+
+The PR includes a Rust unit test that replays the committed corpus and asserts all 108 expected verdicts, plus adversarial and metamorphic unit tests. These tests are **authored but not executed**: local cargo/rustc/rustfmt are unavailable and the current exact-head GitHub workflow records are skipped. A separate local Python simulation of the intended alignment and verdict logic reported 0/108 expected-verdict mismatches. That result is not interchangeable with execution of the Rust implementation.
