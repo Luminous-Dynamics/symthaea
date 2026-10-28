@@ -526,7 +526,7 @@
             },
             "then": {
               "properties": {
-                "estimated_utility_gate_passes": {
+                "utility_gate_passes": {
                   "type": "integer",
                   "const": 0
                 },
