@@ -1,0 +1,22 @@
+{
+  "trial_id": 1,
+  "module_name": "m0_gravity",
+  "noise_level": 0,
+  "model_name": "fixture-model",
+  "equation_difficulty": "easy",
+  "model_system": "vanilla_equation",
+  "law_version": "v0",
+  "agent_backend": "code_assisted_agent",
+  "LLM judge": "fixture-judge",
+  "status": "completed",
+  "rounds": 4,
+  "total_tokens": 1200,
+  "num_experiments": 2,
+  "evaluation": {
+    "rmsle": 0.2,
+    "exact_accuracy": 1,
+    "symbolic_equivalent": true,
+    "symbolic_msg": null,
+    "error": null
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "trial_id": 2,
+  "module_name": "m0_gravity",
+  "noise_level": 0.1,
+  "model_name": "fixture-model",
+  "equation_difficulty": "hard",
+  "model_system": "simple_system",
+  "law_version": "v1",
+  "agent_backend": "vanilla_agent",
+  "LLM judge": "fixture-judge",
+  "status": "failed",
+  "rounds": 0,
+  "total_tokens": 0,
+  "num_experiments": 0,
+  "evaluation": {"rmsle": NaN, "exact_accuracy": 0.0, "symbolic_equivalent": false, "error": "fixture failure"}
+}

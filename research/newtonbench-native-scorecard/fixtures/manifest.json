@@ -1,0 +1,28 @@
+{
+  "schema": "symthaea.newtonbench_native_pair_manifest.v1",
+  "upstream_repository": "HKUST-KnowComp/NewtonBench",
+  "upstream_revision": "fixture-only",
+  "model_name": "fixture-model",
+  "judge_model_name": "fixture-judge",
+  "runner_configuration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "vanilla_backend": "vanilla_agent",
+  "tool_backend": "code_assisted_agent",
+  "expected_pairs": [
+    {
+      "trial_id": 1,
+      "module_name": "m0_gravity",
+      "noise_level": 0,
+      "equation_difficulty": "easy",
+      "model_system": "vanilla_equation",
+      "law_version": "v0"
+    },
+    {
+      "trial_id": 2,
+      "module_name": "m0_gravity",
+      "noise_level": 0.1,
+      "equation_difficulty": "hard",
+      "model_system": "simple_system",
+      "law_version": "v1"
+    }
+  ]
+}
