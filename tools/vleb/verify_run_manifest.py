@@ -32,6 +32,20 @@ def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def canonical_invocation_digest(argv: list[str], working_directory: str, timeout_ms: int) -> str:
+    canonical = json.dumps(
+        {
+            "argv": argv,
+            "working_directory": working_directory,
+            "timeout_ms": timeout_ms,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return digest(canonical)
+
+
 def safe_file(root: Path, relative: Any) -> Path:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         raise ValueError("artifact path must be a non-empty POSIX relative path")
@@ -344,6 +358,27 @@ def audit_witness_execution_receipt(
         or verifier.get("sha256") != expected_verifier
     ):
         issues.append({"code": "witness_receipt_verifier_mismatch", "message": "receipt verifier identity differs from witness and out-of-band pin"})
+
+    invocation = receipt["invocation"]
+    try:
+        recomputed_invocation_sha256 = canonical_invocation_digest(
+            invocation["argv"], invocation["working_directory"], invocation["timeout_ms"]
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        recomputed_invocation_sha256 = None
+        issues.append({
+            "code": "witness_receipt_invocation_invalid",
+            "message": f"invocation cannot be canonically hashed: {exc}",
+        })
+    if (
+        recomputed_invocation_sha256 is None
+        or invocation.get("argv_sha256") != recomputed_invocation_sha256
+        or witness.get("invocation_sha256") != recomputed_invocation_sha256
+    ):
+        issues.append({
+            "code": "witness_receipt_invocation_mismatch",
+            "message": "recorded argv/cwd/timeout do not match the evaluator-pinned witness invocation digest",
+        })
 
     inputs = receipt["inputs"]
     source_path = claim["source"]["path"]
