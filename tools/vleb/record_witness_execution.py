@@ -222,6 +222,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         if verifier_input_row["sha256"] != actual_verifier_sha256:
             raise ValueError("verifier bytes changed while preparing the pinned invocation")
+        source_sha256_before = next(
+            row["sha256"] for row in input_rows if row["path"] == args.source_path
+        )
 
         output_values = [
             ("stdout", args.stdout_path),
@@ -276,6 +279,16 @@ def main(argv: list[str] | None = None) -> int:
         stdout_path.write_bytes(stdout)
         stderr_path.write_bytes(stderr)
 
+        input_drift_paths: list[str] = []
+        for input_row in input_rows:
+            try:
+                current_input = safe_path(root, input_row["path"], must_exist=True)
+                if digest(current_input.read_bytes()) != input_row["sha256"]:
+                    input_drift_paths.append(input_row["path"])
+            except (OSError, ValueError):
+                input_drift_paths.append(input_row["path"])
+        input_drift_paths = sorted(set(input_drift_paths))
+
         output_rows: list[dict[str, str]] = []
         for role, value in output_values:
             path = safe_path(root, value, must_exist=True)
@@ -283,9 +296,14 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"output is not a regular file: {value}")
             output_rows.append({"path": value, "sha256": digest(path.read_bytes()), "role": role})
 
-        source_sha256 = digest(source.read_bytes())
+        source_sha256 = source_sha256_before
         observed_result = "inconclusive"
         verdict_errors: list[str] = []
+        if input_drift_paths:
+            verdict_errors.append(
+                "declared input bytes changed during verifier execution: "
+                + ", ".join(input_drift_paths)
+            )
         try:
             verdict_raw = verdict_path.read_bytes()
             verdict = json.loads(
@@ -309,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
                     verdict_errors.append("verdict result is not a supported classification")
                 if (
                     not verdict_errors
+                    and not input_drift_paths
                     and not timed_out
                     and signal_name is None
                     and exit_code == 0
@@ -347,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
                 "environment_sha256": env_sha,
             },
             "inputs": input_rows,
+            "input_drift_paths": input_drift_paths,
             "outputs": output_rows,
             "process": {
                 "exit_code": exit_code,
