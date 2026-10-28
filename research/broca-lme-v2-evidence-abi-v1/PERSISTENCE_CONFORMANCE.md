@@ -21,6 +21,7 @@ The implementation is intentionally conservative:
 - A crashed process can leave `.writer.lock`. The store refuses new commits until an operator confirms the writer is dead and reconciles/removes the stale lock. It does not guess that a lock is stale.
 - The filesystem contract is currently Unix directory-fsync + same-filesystem rename. Other platforms fail closed; no cross-platform durability claim is made.
 - The HDC index serializer remains the caller's responsibility: the coordinator hashes the supplied bytes but cannot infer that they semantically correspond to the supplied `EvidenceIndex`. Only call `commit` with a matched pair from the same in-memory generation.
+- The production binding step is tracked in [issue #8699](https://github.com/Luminous-Dynamics/symthaea/issues/8699): accept the actual `HdcStore`, pin its generation and logical checksum, require exact live-ID parity with `Active` evidence records, and revalidate that identity through `HdcStoreReader` on recovery.
 
 The in-process fault hooks cover interruption after the HDC-index write, evidence snapshot write, manifest write, generation publication, before `CURRENT` publication, and after `CURRENT` rename. They are deterministic failure-injection tests, **not** process-kill or power-loss tests.
 
