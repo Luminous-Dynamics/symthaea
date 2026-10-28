@@ -1,0 +1,10 @@
+[package]
+name = "vleb-cobol-index"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Read-only, evidence-preserving fixed-format COBOL source indexer for VLEB experiments"
+
+[[bin]]
+name = "vleb-cobol-index"
+path = "src/main.rs"
