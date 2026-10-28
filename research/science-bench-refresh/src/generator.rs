@@ -687,8 +687,14 @@ pub fn generate_task_set_bytes(
     let declared_task_commitment = required_text(
         &admission_view["task_set_commitment_sha256"],
         "manifest.task_set_commitment_sha256",
-    )?;
-    if declared_task_commitment == "0".repeat(64) {
+    )?
+    .to_owned();
+    if declared_task_commitment.len() == 64
+        && declared_task_commitment
+            .as_bytes()
+            .iter()
+            .all(|byte| *byte == b'0')
+    {
         admission_view["task_set_commitment_sha256"] =
             json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     }
