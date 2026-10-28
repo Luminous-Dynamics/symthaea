@@ -70,11 +70,11 @@ struct QualificationEvidence {
 struct Summary {
     entries: usize,
     source_anchors_checked: usize,
-    qualified_entries: usize,
-    unqualified_entries: usize,
+    entries_marked_qualified: usize,
+    entries_not_marked_qualified: usize,
 }
 
-pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Result<()> {
+pub fn check(root: &Path, registry_path: &Path, require_evidence_records: bool) -> Result<()> {
     let raw = fs::read_to_string(registry_path)
         .with_context(|| format!("read effect-surface registry: {}", registry_path.display()))?;
     let registry: Registry =
@@ -84,7 +84,7 @@ pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Resu
 
     println!("registry_id={}", registry.registry_id);
     println!("registry_version={}", registry.version);
-    println!("registry_sha256={registry_digest}");
+    println!("registry_identity_sha256={registry_digest}");
     println!(
         "registry_baseline={}@{}",
         registry.source_baseline.baseline_ref, registry.source_baseline.baseline_commit
@@ -96,19 +96,20 @@ pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Resu
         summary.source_anchors_checked, summary.entries
     );
     println!("entry_count={}", summary.entries);
-    println!("qualified_entries={}", summary.qualified_entries);
-    println!("unqualified_entries={}", summary.unqualified_entries);
+    println!("records_marked_qualified={}", summary.entries_marked_qualified);
+    println!("records_not_marked_qualified={}", summary.entries_not_marked_qualified);
     println!(
         "inventory_completeness={}",
         registry.source_baseline.completeness
     );
+    println!("registry_record_status=NOT_INDEPENDENTLY_VERIFIED");
     println!("security_qualification=NOT_EVALUATED_BY_THIS_COMMAND");
     println!("repository_wide_no_bypass=NOT_CLAIMED");
 
-    if require_qualified && summary.unqualified_entries > 0 {
+    if require_evidence_records && summary.entries_not_marked_qualified > 0 {
         bail!(
-            "--require-qualified failed: {} of {} registry entries lack recorded qualification evidence",
-            summary.unqualified_entries,
+            "--require-evidence-records failed: {} of {} records are not marked qualified with a complete evidence record; this command does not independently verify receipts",
+            summary.entries_not_marked_qualified,
             summary.entries
         );
     }
@@ -303,8 +304,8 @@ fn validate(root: &Path, registry: &Registry, registry_digest: &str) -> Result<S
     Ok(Summary {
         entries: registry.entries.len(),
         source_anchors_checked,
-        qualified_entries,
-        unqualified_entries: registry.entries.len() - qualified_entries,
+        entries_marked_qualified: qualified_entries,
+        entries_not_marked_qualified: registry.entries.len() - qualified_entries,
     })
 }
 
