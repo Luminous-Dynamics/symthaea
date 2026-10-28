@@ -2367,6 +2367,34 @@ mod tests {
     }
 
     #[test]
+    fn identical_positive_family_effects_cannot_pass_after_real_bootstrap() {
+        let families: Vec<FamilyAggregate> = (0..MIN_CONFIRMATORY_FAMILY_CLUSTERS)
+            .map(|index| FamilyAggregate {
+                family_id: format!("family-{index:02}"),
+                target_count: 1,
+                treatment_semantic_gate_successes: 1,
+                baseline_semantic_gate_successes: 0,
+                paired_delta_sum: 1,
+                paired_effect_percentage_points: 100.0,
+            })
+            .collect();
+
+        let (effect, lower, upper, target_pairs, clusters) =
+            paired_cluster_bootstrap(&families, EXPECTED_BOOTSTRAP_REPLICATES, 20261028)
+                .expect("the full bootstrap should accept valid family aggregates");
+        assert_eq!((effect, lower, upper), (1.0, 1.0, 1.0));
+        assert_eq!(target_pairs, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+        assert_eq!(clusters, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+
+        let (informative, excludes_zero, passed, decision) =
+            confirmatory_utility_gate(effect, lower, upper, clusters);
+        assert!(!informative);
+        assert!(excludes_zero);
+        assert!(!passed);
+        assert_eq!(decision, "no_claim_degenerate_bootstrap_interval");
+    }
+
+    #[test]
     fn informative_positive_interval_can_pass_only_with_effect_and_cluster_gates() {
         let (informative, excludes_zero, passed, decision) =
             confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
