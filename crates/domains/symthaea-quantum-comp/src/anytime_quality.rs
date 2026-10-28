@@ -59,6 +59,10 @@ pub struct VerifiedAnytimeQualityEvent {
 /// All frozen identities and ordered events for one solver trial.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedAnytimeQualityTrace {
+    /// Trace schema version, currently exactly 1.0.
+    pub schema_version: String,
+    /// Direct deployment-time clock boundary required by PHOT-EVAL-005A.
+    pub clock_boundary: String,
     /// Protocol identifier.
     pub protocol_id: String,
     /// Lowercase SHA-256 of the frozen experiment protocol.
@@ -123,6 +127,10 @@ pub struct VerifiedAnytimeQualitySummary {
 /// Validation error for a verified anytime-quality trace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifiedAnytimeQualityError {
+    /// Trace schema version is unsupported.
+    InvalidSchemaVersion,
+    /// Trace clock boundary differs from the frozen protocol definition.
+    InvalidClockBoundary,
     /// Empty or noncanonical identifier.
     InvalidIdentifier(&'static str),
     /// Not 64 lowercase hexadecimal characters.
@@ -168,6 +176,8 @@ pub enum VerifiedAnytimeQualityError {
 impl fmt::Display for VerifiedAnytimeQualityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidSchemaVersion => write!(f, "unsupported anytime trace schema version"),
+            Self::InvalidClockBoundary => write!(f, "trace clock boundary does not match protocol"),
             Self::InvalidIdentifier(field) => write!(f, "invalid identifier: {field}"),
             Self::InvalidDigest(field) => write!(f, "invalid SHA-256 digest: {field}"),
             Self::InvalidSeedIdentity => write!(f, "seed identity is not canonical base-10 u64"),
@@ -248,6 +258,12 @@ pub fn compare_verified_anytime_quality(
     graph_bytes: &[u8],
     trace: &VerifiedAnytimeQualityTrace,
 ) -> Result<VerifiedAnytimeQualitySummary, VerifiedAnytimeQualityError> {
+    if trace.schema_version != "1.0" {
+        return Err(VerifiedAnytimeQualityError::InvalidSchemaVersion);
+    }
+    if trace.clock_boundary != "request-entry-to-persisted-candidate-and-verification-evidence" {
+        return Err(VerifiedAnytimeQualityError::InvalidClockBoundary);
+    }
     validate_identifier(&trace.protocol_id, "protocol_id")?;
     validate_identifier(&trace.trial_id, "trial_id")?;
     validate_identifier(&trace.pair_id, "pair_id")?;
@@ -522,6 +538,8 @@ mod tests {
         terminal_outcome: AnytimeTerminalOutcome, events: Vec<VerifiedAnytimeQualityEvent>,
     ) -> VerifiedAnytimeQualityTrace {
         VerifiedAnytimeQualityTrace {
+            schema_version: "1.0".to_owned(),
+            clock_boundary: "request-entry-to-persisted-candidate-and-verification-evidence".to_owned(),
             protocol_id: "PHOT-EVAL-005A".to_owned(),
             protocol_sha256: PROTOCOL.to_owned(),
             trial_id: "trial-1".to_owned(),
@@ -664,6 +682,24 @@ mod tests {
                 AnytimeTerminalOutcome::NoFeasibleCandidate, vec![too_large],
             )),
             Err(VerifiedAnytimeQualityError::CardinalityOutOfRange(_))
+        ));
+    }
+
+
+    #[test]
+    fn rejects_unsupported_schema_and_clock_boundary() {
+        let valid = trace(AnytimeTerminalOutcome::MissingOutput, vec![]);
+        let mut wrong_version = valid.clone();
+        wrong_version.schema_version = "2.0".to_owned();
+        assert!(matches!(
+            compare_verified_anytime_quality(GRAPH, &wrong_version),
+            Err(VerifiedAnytimeQualityError::InvalidSchemaVersion)
+        ));
+        let mut wrong_clock = valid;
+        wrong_clock.clock_boundary = "solver-discovery-time".to_owned();
+        assert!(matches!(
+            compare_verified_anytime_quality(GRAPH, &wrong_clock),
+            Err(VerifiedAnytimeQualityError::InvalidClockBoundary)
         ));
     }
 
