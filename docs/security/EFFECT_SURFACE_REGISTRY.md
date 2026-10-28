@@ -84,6 +84,23 @@ Nixward's proposed benchmark should emulate that denominator discipline while te
 
 A stretch research result for Nixward would be an open, reproducible cross-surface conformance suite that combines a versioned effect registry, frozen adversarial and benign controls, actual instrumented effects, exact source/toolchain identity, and independently verified outcome receipts. This could be more useful than chasing a single leaderboard score because it exposes both bypasses and overblocking while making the evidence auditable.
 
+
+## Federated identity composition is a separate follow-up
+
+The cross-repository integration is tracked in [NIXWARD-FEDERATED-IDENTITY-001 / Symthaea #8717](https://github.com/Luminous-Dynamics/symthaea/issues/8717), with coordination comments on [Mycelix LEX-NET-025 / #1149](https://github.com/Luminous-Dynamics/mycelix/issues/1149), [Mycelix LEX-NET-028 / #1215](https://github.com/Luminous-Dynamics/mycelix/issues/1215), and [Symthaea NIXWARD-AUTH-ISSUER-001 / #8624](https://github.com/Luminous-Dynamics/symthaea/issues/8624).
+
+That follow-up should reuse Symthaea's existing executor-identity composition lineage (#4519, #4585, #4618), Nixward's semantic adapter and generic Action Runtime convergence (#5197, #6385), and Mycelix's local recognition/lease, typed receipt and revocation/delegation contracts. It must not create a parallel identity provider or execution-authority kernel.
+
+The key boundary is:
+
+- Mycelix can contribute authenticated, provenance-bound claims and a purpose-scoped local recognition result.
+- Symthaea's trusted composer determines whether the required workload/software/device/profile evidence identifies the same live executor subject.
+- A local authority owner—not the foreign issuer, reputation system or identity composer—issues any local bounded grant.
+- Nixward binds that grant to the exact target, operation, pre-state and postcondition.
+- The existing qualified Action Runtime remains responsible for current authority and the final one-shot dispatch boundary.
+
+W3C Verifiable Credentials Data Model v2.0 is a W3C Recommendation for portable cryptographically secured, privacy-respecting, machine-verifiable claims, while SPIFFE SVIDs provide workload identity under a trust domain and are not local authorization. These standards can inform adapters; neither implies the cross-repository composition has been implemented or qualified. See [W3C VC Data Model 2.0](https://www.w3.org/TR/vc-data-model/) and [SPIFFE SVID concepts](https://spiffe.io/docs/latest/spiffe/concepts/).
+
 ## Current scope
 
 This is an initial known-surface baseline audited against main commit c6355cc6ffe01843b841f6b9a8a09eabd2556deb on 2026-10-28, informed by #8656 and the linked per-surface issues. The entries are source-review records with explicit limitations. The inventory is intentionally incomplete and all listed surfaces remain unqualified or only partially guarded.
