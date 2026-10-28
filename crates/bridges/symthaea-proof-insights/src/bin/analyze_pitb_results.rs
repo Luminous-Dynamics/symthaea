@@ -283,6 +283,7 @@ struct PowerScenario {
     status: String,
     true_treatment_effect_percentage_points: f64,
     assumed_family_icc: f64,
+    pair_association_fraction: f64,
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
     utility_gate_passes: usize,
@@ -336,6 +337,7 @@ struct PowerReport {
     validation_baseline_semantic_success_rate: f64,
     family_target_counts: Vec<FamilyTargetCount>,
     assumed_family_icc_grid: Vec<f64>,
+    pair_association_fraction_grid: Vec<f64>,
     true_effect_grid_percentage_points: Vec<f64>,
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
@@ -633,25 +635,34 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 
     let effect_grid = [0.0_f64, 0.10, 0.15, 0.20];
     let icc_grid = [0.0_f64, 0.05, 0.10, 0.20];
-    let mut scenarios = Vec::with_capacity(effect_grid.len() * icc_grid.len());
+    let pair_association_grid = [0.0_f64, 0.5, 0.9];
+    let mut scenarios = Vec::with_capacity(
+        effect_grid.len() * icc_grid.len() * pair_association_grid.len(),
+    );
     for (effect_index, effect) in effect_grid.iter().copied().enumerate() {
         for (icc_index, icc) in icc_grid.iter().copied().enumerate() {
-            let scenario_seed = config.bootstrap_seed.wrapping_add(
-                (effect_index * icc_grid.len() + icc_index) as u64 * 0x9E37_79B9_7F4A_7C15,
-            );
-            scenarios.push(simulate_power_scenario(
-                &family_target_counts,
-                baseline_rate,
-                effect,
-                icc,
-                simulations,
-                bootstrap_replicates,
-                scenario_seed,
-            )?);
+            for (association_index, association) in pair_association_grid.iter().copied().enumerate() {
+                let scenario_index = effect_index * icc_grid.len() * pair_association_grid.len()
+                    + icc_index * pair_association_grid.len()
+                    + association_index;
+                let scenario_seed = config.bootstrap_seed.wrapping_add(
+                    scenario_index as u64 * 0x9E37_79B9_7F4A_7C15,
+                );
+                scenarios.push(simulate_power_scenario(
+                    &family_target_counts,
+                    baseline_rate,
+                    effect,
+                    icc,
+                    association,
+                    simulations,
+                    bootstrap_replicates,
+                    scenario_seed,
+                )?);
+            }
         }
     }
     let weak_null_sd_grid_pp = [5.0_f64, 10.0, 20.0];
-    let weak_null_pair_association_grid = [0.0_f64, 0.5, 0.9];
+    let weak_null_pair_association_grid = pair_association_grid;
     let mut weak_null_scenarios = Vec::with_capacity(
         weak_null_sd_grid_pp.len() * icc_grid.len() * weak_null_pair_association_grid.len(),
     );
@@ -698,15 +709,37 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
         .filter_map(|scenario| scenario.null_effect_false_claim_probability_upper_simultaneous_95)
         .reduce(f64::max);
-    let twenty_point_scenario = scenarios.iter().find(|scenario| {
-        (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
-            && (scenario.assumed_family_icc - 0.20).abs() < f64::EPSILON
-            && scenario.status == "estimated"
-    });
-    let estimated_power_at_20pp_and_icc_020 =
-        twenty_point_scenario.and_then(|scenario| scenario.estimated_utility_gate_power);
-    let estimated_power_at_20pp_and_icc_020_lower_95 =
-        twenty_point_scenario.and_then(|scenario| scenario.estimated_power_lower_95);
+    let twenty_point_scenarios: Vec<&PowerScenario> = scenarios
+        .iter()
+        .filter(|scenario| {
+            (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
+                && (scenario.assumed_family_icc - 0.20).abs() < f64::EPSILON
+        })
+        .collect();
+    let all_worst_case_associations_estimated =
+        twenty_point_scenarios.len() == pair_association_grid.len()
+            && twenty_point_scenarios.iter().all(|scenario| {
+                scenario.estimated_utility_gate_power.is_some()
+                    && scenario.estimated_power_lower_95.is_some()
+            });
+    // Require the power floor at the worst registered pairing dependence, not
+    // just whichever scenario happens to appear first in the report.
+    let estimated_power_at_20pp_and_icc_020 = if all_worst_case_associations_estimated {
+        twenty_point_scenarios
+            .iter()
+            .filter_map(|scenario| scenario.estimated_utility_gate_power)
+            .reduce(f64::min)
+    } else {
+        None
+    };
+    let estimated_power_at_20pp_and_icc_020_lower_95 = if all_worst_case_associations_estimated {
+        twenty_point_scenarios
+            .iter()
+            .filter_map(|scenario| scenario.estimated_power_lower_95)
+            .reduce(f64::min)
+    } else {
+        None
+    };
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
         && estimated_power_at_20pp_and_icc_020_lower_95.is_some_and(|power| power >= 0.80)
         && null_effect_false_claim_probability_upper_simultaneous_95_max
@@ -725,7 +758,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 
     let design_digest = run_design_sha256(&config)?;
     let report = PowerReport {
-        schema_version: "pitb.power-report.v1".to_string(),
+        schema_version: "pitb.power-report.v2".to_string(),
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_design_sha256: design_digest,
@@ -741,6 +774,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         validation_baseline_semantic_success_rate: baseline_rate,
         family_target_counts,
         assumed_family_icc_grid: icc_grid.to_vec(),
+        pair_association_fraction_grid: pair_association_grid.to_vec(),
         true_effect_grid_percentage_points: effect_grid.map(|value| value * 100.0).to_vec(),
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
@@ -763,12 +797,12 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         model_assumptions: vec![
             "Family sizes are taken from eligible validation outcomes and reused as the projected evaluation-family-size distribution; test eligibility may differ.".to_string(),
             "A beta-binomial family random effect induces the specified baseline Bernoulli ICC; treatment success shares the same latent family difficulty with its marginal success rate shifted by the scenario effect.".to_string(),
-            "Arm outcomes are sampled independently conditional on family difficulty, so additional within-target pairing correlation is not assumed; this is an explicit approximation, not an empirically estimated ICC.".to_string(),
+            "The strict-null and positive-effect power grid samples paired outcomes using the same bivariate Bernoulli coupling as the weak-null grid. Its association-fraction levels are 0, 0.5, and 0.9; zero gives conditional independence and higher values approach the Frechet upper bound. This is a scenario grid, not an empirically estimated correlation.".to_string(),
             "A separate weak-null grid assigns normally generated family-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points, ICC grid is 0, 0.05, 0.10, 0.20, and pair-association fractions are 0, 0.5, 0.9; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
             "Weak-null paired outcomes use a bivariate Bernoulli coupling with the prescribed marginal success rates; the association fraction interpolates joint-success probability from independence to the Frechet upper bound and is not a Pearson correlation. The 36-cell weak-null grid tests false-claim probability when positive and negative family effects cancel on average, under those explicit pair-association and ICC values.".to_string(),
             "This finite family-size stress model does not cover selective missingness, alternative family-size mechanisms, or every dependence structure and is not proof of nominal coverage universally.".to_string(),
             "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
-            "Power estimates and their Monte Carlo standard errors are design simulations only. The report retains per-cell 95% Wilson bounds for diagnostics and uses a conservative one-sided Wilson upper bound with z=3.03 across the 40 registered strict/weak null cells for the simultaneous false-claim gate. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
+            "Power estimates and their Monte Carlo standard errors are design simulations only. The strict null has 4 ICCs × 3 association fractions = 12 cells; the heterogeneous weak null has 3 effect SDs × 4 ICCs × 3 association fractions = 36 cells. The one-sided Wilson upper bound uses z=3.08 across all 48 registered null cells, conservatively exceeding the Bonferroni critical value for alpha=0.05/48. These are model-conditional design diagnostics, not measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
         interpretation,
     };
@@ -777,7 +811,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     serialized.push(b'\n');
     fs::write(out_path, serialized).with_context(|| format!("write power report to {out_path}"))?;
     println!(
-        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} lower95={} strict_null_false_claim_upper_simultaneous95={} weak_null_false_claim_upper_simultaneous95={} gate={}",
+        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} worst_assoc_power20pp_icc020={} worst_assoc_lower95={} strict_null_false_claim_upper_simultaneous95={} weak_null_false_claim_upper_simultaneous95={} gate={}",
         report.selected_baseline_arm,
         report.eligible_validation_target_count,
         report.eligible_validation_family_count,
@@ -829,12 +863,12 @@ fn wilson_interval_with_z(successes: usize, trials: usize, z: f64) -> (f64, f64)
     )
 }
 
-// The registered null grid has 40 cells: four strict-null ICC cells plus
-// 3 family-effect SDs × 4 ICCs × 3 paired-outcome association fractions.
-// z=3.03 conservatively exceeds the one-sided Bonferroni critical value
-// for alpha=.05/40.
+// The registered null grid has 48 cells: 4 strict-null ICCs × 3
+// paired-outcome association fractions plus 3 family-effect SDs × 4 ICCs × 3
+// association fractions for the heterogeneous weak null. z=3.08 conservatively
+// exceeds the one-sided Bonferroni critical value for alpha=.05/48.
 fn simultaneous_null_upper_bound(successes: usize, trials: usize) -> f64 {
-    wilson_interval_with_z(successes, trials, 3.03).1
+    wilson_interval_with_z(successes, trials, 3.08).1
 }
 
 fn simulate_power_scenario(
@@ -842,6 +876,7 @@ fn simulate_power_scenario(
     baseline_rate: f64,
     true_effect: f64,
     icc: f64,
+    pair_association_fraction: f64,
     simulations: usize,
     bootstrap_replicates: usize,
     seed: u64,
@@ -851,6 +886,11 @@ fn simulate_power_scenario(
     }
     if !(0.0..1.0).contains(&icc) {
         bail!("family ICC must lie in [0,1)");
+    }
+    if !pair_association_fraction.is_finite()
+        || !(0.0..=1.0).contains(&pair_association_fraction)
+    {
+        bail!("pair-association fraction must lie in [0,1]");
     }
     if !baseline_rate.is_finite()
         || !(0.0..=1.0).contains(&baseline_rate)
@@ -868,6 +908,7 @@ fn simulate_power_scenario(
             status: "infeasible_effect_above_ceiling".to_string(),
             true_treatment_effect_percentage_points: true_effect * 100.0,
             assumed_family_icc: icc,
+            pair_association_fraction,
             study_simulations: simulations,
             bootstrap_replicates_per_simulated_study: bootstrap_replicates,
             utility_gate_passes: 0,
@@ -899,8 +940,9 @@ fn simulate_power_scenario(
             baseline_rate,
             treatment_rate,
             icc,
+            pair_association_fraction,
             &mut rng,
-        );
+        )?;
         let total_delta: i64 = simulated_families
             .iter()
             .map(|family| family.paired_delta_sum)
@@ -926,6 +968,7 @@ fn simulate_power_scenario(
         status: "estimated".to_string(),
         true_treatment_effect_percentage_points: true_effect * 100.0,
         assumed_family_icc: icc,
+        pair_association_fraction,
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
         utility_gate_passes: passes,
@@ -1274,8 +1317,9 @@ fn simulate_matched_study(
     baseline_rate: f64,
     treatment_rate: f64,
     icc: f64,
+    pair_association_fraction: f64,
     rng: &mut SplitMix64,
-) -> Vec<SimulatedFamily> {
+) -> Result<Vec<SimulatedFamily>> {
     family_target_counts
         .iter()
         .map(|family| {
@@ -1285,17 +1329,27 @@ fn simulate_matched_study(
                 baseline_rate,
                 treatment_rate,
             );
+            let joint_success_probability = joint_success_probability_at_association(
+                baseline_family_rate,
+                treatment_family_rate,
+                pair_association_fraction,
+            )?;
             let mut delta_sum = 0_i64;
             for _ in 0..family.eligible_target_count {
-                let baseline_success = rng.uniform01() < baseline_family_rate;
-                let treatment_success = rng.uniform01() < treatment_family_rate;
+                let (baseline_success, treatment_success) =
+                    sample_paired_bernoulli_from_joint_probability(
+                        baseline_family_rate,
+                        treatment_family_rate,
+                        joint_success_probability,
+                        rng,
+                    );
                 delta_sum += (if treatment_success { 1_i64 } else { 0_i64 })
                     - (if baseline_success { 1_i64 } else { 0_i64 });
             }
-            SimulatedFamily {
+            Ok(SimulatedFamily {
                 target_count: family.eligible_target_count,
                 paired_delta_sum: delta_sum,
-            }
+            })
         })
         .collect()
 }
@@ -1758,7 +1812,7 @@ fn validate_power_report(
     eligible_validation: &[&TargetOutcome],
     validation_scores: &BTreeMap<String, f64>,
 ) -> Result<()> {
-    if report.schema_version != "pitb.power-report.v1" {
+    if report.schema_version != "pitb.power-report.v2" {
         bail!("unsupported power report schema {}", report.schema_version);
     }
     if report.protocol_id != EXPECTED_PROTOCOL_ID
@@ -1844,6 +1898,7 @@ fn validate_power_report(
 
     let expected_effects = [0.0_f64, 10.0, 15.0, 20.0];
     let expected_iccs = [0.0_f64, 0.05, 0.10, 0.20];
+    let expected_pair_associations = [0.0_f64, 0.5, 0.9];
     if report.true_effect_grid_percentage_points.len() != expected_effects.len()
         || report
             .true_effect_grid_percentage_points
@@ -1856,9 +1911,16 @@ fn validate_power_report(
             .iter()
             .zip(expected_iccs)
             .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
-        || report.scenarios.len() != expected_effects.len() * expected_iccs.len()
+        || report.pair_association_fraction_grid.len() != expected_pair_associations.len()
+        || report
+            .pair_association_fraction_grid
+            .iter()
+            .zip(expected_pair_associations)
+            .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
+        || report.scenarios.len()
+            != expected_effects.len() * expected_iccs.len() * expected_pair_associations.len()
     {
-        bail!("power report effect/ICC grid differs from the preregistered 4x4 grid");
+        bail!("power report effect/ICC/pair-association grid differs from the preregistered 4x4x3 grid");
     }
 
     let mut observed_scenarios = BTreeSet::new();
@@ -1872,9 +1934,13 @@ fn validate_power_report(
             || !expected_iccs
                 .iter()
                 .any(|icc| (scenario.assumed_family_icc - icc).abs() <= 1e-12)
+            || !expected_pair_associations
+                .iter()
+                .any(|association| (scenario.pair_association_fraction - association).abs() <= 1e-12)
             || !observed_scenarios.insert((
                 (scenario.true_treatment_effect_percentage_points * 1000.0).round() as i32,
                 (scenario.assumed_family_icc * 1000.0).round() as i32,
+                (scenario.pair_association_fraction * 1000.0).round() as i32,
             ))
         {
             bail!("power report contains duplicate or unregistered scenarios");
@@ -1938,61 +2004,68 @@ fn validate_power_report(
     // actually computed from the pinned family sizes, seed, and decision rule.
     for (effect_index, effect_pp) in expected_effects.iter().copied().enumerate() {
         for (icc_index, icc) in expected_iccs.iter().copied().enumerate() {
-            let observed = report
-                .scenarios
-                .iter()
-                .find(|scenario| {
-                    (scenario.true_treatment_effect_percentage_points - effect_pp).abs() <= 1e-12
-                        && (scenario.assumed_family_icc - icc).abs() <= 1e-12
-                })
-                .context("power report lacks a required effect/ICC scenario")?;
-            let scenario_seed = config.bootstrap_seed.wrapping_add(
-                (effect_index * expected_iccs.len() + icc_index) as u64 * 0x9E37_79B9_7F4A_7C15,
-            );
-            let expected = simulate_power_scenario(
-                &expected_family_rows,
-                *selected_rate,
-                effect_pp / 100.0,
-                icc,
-                report.study_simulations,
-                report.bootstrap_replicates_per_simulated_study,
-                scenario_seed,
-            )?;
-            if observed.status != expected.status
-                || observed.utility_gate_passes != expected.utility_gate_passes
-                || observed.degenerate_interval_trials != expected.degenerate_interval_trials
-                || !same_optional_probability(
-                    observed.estimated_utility_gate_power,
-                    expected.estimated_utility_gate_power,
-                )
-                || !same_optional_probability(
-                    observed.monte_carlo_standard_error,
-                    expected.monte_carlo_standard_error,
-                )
-                || !same_optional_probability(
-                    observed.estimated_power_lower_95,
-                    expected.estimated_power_lower_95,
-                )
-                || !same_optional_probability(
-                    observed.estimated_power_upper_95,
-                    expected.estimated_power_upper_95,
-                )
-                || !same_optional_probability(
-                    observed.null_effect_false_claim_probability_upper_simultaneous_95,
-                    expected.null_effect_false_claim_probability_upper_simultaneous_95,
-                )
-                || !same_optional_probability(
-                    observed.mean_observed_effect_percentage_points,
-                    expected.mean_observed_effect_percentage_points,
-                )
-                || !same_optional_probability(
-                    observed.mean_lower_95ci_percentage_points,
-                    expected.mean_lower_95ci_percentage_points,
-                )
-            {
-                bail!(
-                    "power report scenario +{effect_pp}pp/ICC {icc} cannot be reproduced from the pinned validation rows and seed"
+            for (association_index, association) in expected_pair_associations.iter().copied().enumerate() {
+                let observed = report
+                    .scenarios
+                    .iter()
+                    .find(|scenario| {
+                        (scenario.true_treatment_effect_percentage_points - effect_pp).abs() <= 1e-12
+                            && (scenario.assumed_family_icc - icc).abs() <= 1e-12
+                            && (scenario.pair_association_fraction - association).abs() <= 1e-12
+                    })
+                    .context("power report lacks a required effect/ICC/pair-association scenario")?;
+                let scenario_index = effect_index * expected_iccs.len() * expected_pair_associations.len()
+                    + icc_index * expected_pair_associations.len()
+                    + association_index;
+                let scenario_seed = config.bootstrap_seed.wrapping_add(
+                    scenario_index as u64 * 0x9E37_79B9_7F4A_7C15,
                 );
+                let expected = simulate_power_scenario(
+                    &expected_family_rows,
+                    *selected_rate,
+                    effect_pp / 100.0,
+                    icc,
+                    association,
+                    report.study_simulations,
+                    report.bootstrap_replicates_per_simulated_study,
+                    scenario_seed,
+                )?;
+                if observed.status != expected.status
+                    || observed.utility_gate_passes != expected.utility_gate_passes
+                    || observed.degenerate_interval_trials != expected.degenerate_interval_trials
+                    || !same_optional_probability(
+                        observed.estimated_utility_gate_power,
+                        expected.estimated_utility_gate_power,
+                    )
+                    || !same_optional_probability(
+                        observed.monte_carlo_standard_error,
+                        expected.monte_carlo_standard_error,
+                    )
+                    || !same_optional_probability(
+                        observed.estimated_power_lower_95,
+                        expected.estimated_power_lower_95,
+                    )
+                    || !same_optional_probability(
+                        observed.estimated_power_upper_95,
+                        expected.estimated_power_upper_95,
+                    )
+                    || !same_optional_probability(
+                        observed.null_effect_false_claim_probability_upper_simultaneous_95,
+                        expected.null_effect_false_claim_probability_upper_simultaneous_95,
+                    )
+                    || !same_optional_probability(
+                        observed.mean_observed_effect_percentage_points,
+                        expected.mean_observed_effect_percentage_points,
+                    )
+                    || !same_optional_probability(
+                        observed.mean_lower_95ci_percentage_points,
+                        expected.mean_lower_95ci_percentage_points,
+                    )
+                {
+                    bail!(
+                        "power report scenario +{effect_pp}pp/ICC {icc}/pair-association {association} cannot be reproduced from the pinned validation rows and seed"
+                    );
+                }
             }
         }
     }
@@ -2205,22 +2278,44 @@ fn validate_power_report(
         bail!("power report null-effect false-claim maxima do not match its scenario rows");
     }
 
-    let worst_case = report
+    let worst_case_scenarios: Vec<&PowerScenario> = report
         .scenarios
         .iter()
-        .find(|scenario| {
+        .filter(|scenario| {
             (scenario.true_treatment_effect_percentage_points - 20.0).abs() <= 1e-12
                 && (scenario.assumed_family_icc - 0.20).abs() <= 1e-12
         })
-        .context("power report lacks the +20pp/ICC 0.20 design scenario")?;
+        .collect();
+    let all_worst_case_associations_estimated =
+        worst_case_scenarios.len() == expected_pair_associations.len()
+            && worst_case_scenarios.iter().all(|scenario| {
+                scenario.estimated_utility_gate_power.is_some()
+                    && scenario.estimated_power_lower_95.is_some()
+            });
+    let recomputed_worst_power = if all_worst_case_associations_estimated {
+        worst_case_scenarios
+            .iter()
+            .filter_map(|scenario| scenario.estimated_utility_gate_power)
+            .reduce(f64::min)
+    } else {
+        None
+    };
+    let recomputed_worst_lower = if all_worst_case_associations_estimated {
+        worst_case_scenarios
+            .iter()
+            .filter_map(|scenario| scenario.estimated_power_lower_95)
+            .reduce(f64::min)
+    } else {
+        None
+    };
     if !same_optional_probability(
         report.estimated_power_at_20pp_and_icc_020,
-        worst_case.estimated_utility_gate_power,
+        recomputed_worst_power,
     ) || !same_optional_probability(
         report.estimated_power_at_20pp_and_icc_020_lower_95,
-        worst_case.estimated_power_lower_95,
+        recomputed_worst_lower,
     ) {
-        bail!("power report headline power estimate does not match the +20pp/ICC 0.20 scenario");
+        bail!("power report headline power must equal the worst registered pairing-association case at +20pp/ICC 0.20");
     }
 
     let recomputed_gate = report.eligible_validation_family_count
@@ -3280,7 +3375,7 @@ mod tests {
             })
             .collect();
         let scenario = simulate_power_scenario(
-            &families, 0.35, 0.0, 0.20, 64, 128, 20261028,
+            &families, 0.35, 0.0, 0.20, 0.0, 64, 128, 20261028,
         )
         .expect("strict-null scenario should be estimated");
         assert_eq!(scenario.status, "estimated");
@@ -3301,7 +3396,7 @@ mod tests {
                 eligible_target_count: if index % 3 == 0 { 2 } else { 1 },
             })
             .collect();
-        let left = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 64, 100, 20261020)
+        let left = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 0.0, 64, 100, 20261020)
             .expect("synthetic power scenario should run");
         let right = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 64, 100, 20261020)
             .expect("repeating a frozen seed must be deterministic");
