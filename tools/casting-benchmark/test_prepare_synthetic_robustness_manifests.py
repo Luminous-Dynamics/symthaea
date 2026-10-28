@@ -94,7 +94,7 @@ def make_artifacts():
         },
         source.read_bytes(),
     )
-    selection_raw = canonical(selection)
+    selection_raw = (json.dumps(selection, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
     holdout_raw = canonical(holdout)
     return sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw
 
