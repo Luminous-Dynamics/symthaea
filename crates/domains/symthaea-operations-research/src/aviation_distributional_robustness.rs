@@ -43,6 +43,8 @@ pub enum DistributionalRobustError {
     InvalidTvRadius { radius_ppm: u32 },
     ArithmeticOverflow { context: &'static str },
     TvRadiusMismatch { report_radius_ppm: u32, requested_radius_ppm: u32 },
+    EmptyRadiusSequence,
+    NonIncreasingTvRadii { previous_ppm: u32, next_ppm: u32 },
 }
 
 /// Nominal and worst-case probabilities for one scenario.
@@ -151,6 +153,26 @@ pub enum DistributionalExclusion {
 pub struct DistributionalRobustAssessment {
     pub eligible: bool,
     pub exclusions: Vec<DistributionalExclusion>,
+}
+
+/// One exact point in a predeclared TV-radius sensitivity curve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DistributionalRobustnessCurvePoint {
+    pub tv_radius_ppm: u32,
+    pub nominal_expected_delta_numerator_ppm: i128,
+    pub worst_case_expected_delta_numerator_ppm: i128,
+    /// Worst-case expected delta minus nominal expected delta, exact ppm numerator.
+    pub robustness_premium_numerator_ppm: i128,
+}
+
+/// Sensitivity curve over strictly increasing, caller-predeclared TV radii.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DistributionalRobustnessCurve {
+    pub points: Vec<DistributionalRobustnessCurvePoint>,
+    /// First evaluated radius whose worst-case expected delta exceeds the
+    /// predeclared maximum. At threshold zero, this is the first radius at which
+    /// the candidate no longer has non-positive robust expected cost delta.
+    pub first_ineligible_radius_ppm: Option<u32>,
 }
 
 fn add_checked(a: i128, b: i128, context: &'static str) -> Result<i128, DistributionalRobustError> {
@@ -372,6 +394,65 @@ pub fn assess_tv_robust_candidate(
     })
 }
 
+
+/// Evaluate robustness at an explicit, strictly increasing radius grid.
+///
+/// The grid and maximum expected-cost threshold must be fixed before inspecting
+/// final test outcomes. The routine reports the robustness premium and first
+/// radius at which the candidate crosses the threshold; it does not calibrate
+/// probabilities or select a radius from held-out/test performance.
+pub fn evaluate_tv_robustness_curve(
+    scenarios: &[ScenarioCostDelta],
+    radii_ppm: &[u32],
+    max_worst_case_expected_delta_units: i64,
+) -> Result<DistributionalRobustnessCurve, DistributionalRobustError> {
+    if radii_ppm.is_empty() {
+        return Err(DistributionalRobustError::EmptyRadiusSequence);
+    }
+    for pair in radii_ppm.windows(2) {
+        if pair[1] <= pair[0] {
+            return Err(DistributionalRobustError::NonIncreasingTvRadii {
+                previous_ppm: pair[0],
+                next_ppm: pair[1],
+            });
+        }
+    }
+
+    let threshold_numerator = i128::from(max_worst_case_expected_delta_units)
+        .checked_mul(i128::from(PROBABILITY_SCALE_PPM))
+        .ok_or(DistributionalRobustError::ArithmeticOverflow {
+            context: "robustness curve threshold scaling",
+        })?;
+
+    let mut points = Vec::with_capacity(radii_ppm.len());
+    let mut first_ineligible_radius_ppm = None;
+    for radius_ppm in radii_ppm {
+        let report = evaluate_tv_robust_cost_delta(scenarios, *radius_ppm)?;
+        let nominal = report.nominal_expected_delta_numerator_ppm;
+        let worst_case = report.worst_case_expected_delta_numerator_ppm;
+        let premium = worst_case.checked_sub(nominal).ok_or(
+            DistributionalRobustError::ArithmeticOverflow {
+                context: "robustness premium",
+            },
+        )?;
+
+        if first_ineligible_radius_ppm.is_none() && worst_case > threshold_numerator {
+            first_ineligible_radius_ppm = Some(*radius_ppm);
+        }
+        points.push(DistributionalRobustnessCurvePoint {
+            tv_radius_ppm: *radius_ppm,
+            nominal_expected_delta_numerator_ppm: nominal,
+            worst_case_expected_delta_numerator_ppm: worst_case,
+            robustness_premium_numerator_ppm: premium,
+        });
+    }
+
+    Ok(DistributionalRobustnessCurve {
+        points,
+        first_ineligible_radius_ppm,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -552,6 +633,40 @@ mod tests {
         let report = evaluate_tv_robust_cost_delta(&items, 100_000).unwrap();
         assert_eq!(report.worst_single_scenario_id, "adverse");
         assert_eq!(report.worst_single_scenario_delta_units, 20);
+    }
+
+
+    #[test]
+    fn robustness_curve_reports_premium_and_first_sign_flip_radius() {
+        let curve = evaluate_tv_robustness_curve(
+            &scenarios(),
+            &[0, 200_000, 400_000, 500_000, 1_000_000],
+            0,
+        ).unwrap();
+        assert_eq!(curve.points.len(), 5);
+        assert_eq!(curve.points[1].robustness_premium_numerator_ppm, 24_000_000);
+        assert_eq!(curve.first_ineligible_radius_ppm, Some(500_000));
+    }
+
+    #[test]
+    fn robustness_curve_is_monotone_and_rejects_bad_radius_grids() {
+        let curve = evaluate_tv_robustness_curve(
+            &scenarios(),
+            &[0, 100_000, 200_000, 500_000, 1_000_000],
+            0,
+        ).unwrap();
+        assert!(curve.points.windows(2).all(|w|
+            w[0].worst_case_expected_delta_numerator_ppm
+                <= w[1].worst_case_expected_delta_numerator_ppm
+        ));
+        assert_eq!(
+            evaluate_tv_robustness_curve(&scenarios(), &[], 0),
+            Err(DistributionalRobustError::EmptyRadiusSequence)
+        );
+        assert!(matches!(
+            evaluate_tv_robustness_curve(&scenarios(), &[0, 200_000, 100_000], 0),
+            Err(DistributionalRobustError::NonIncreasingTvRadii { .. })
+        ));
     }
 
 }
