@@ -238,6 +238,9 @@ def audit_execution_receipt(
     if receipt.get("verifier", {}).get("id") != plan["verifier"]["id"]:
         issues.append({"code": "verifier_id_mismatch", "message": "receipt verifier ID differs from pinned plan"})
     try:
+        expected_executable_path = str(Path(plan["verifier"]["executable_path"]).resolve(strict=True))
+        if receipt.get("verifier", {}).get("executable_path") != expected_executable_path:
+            issues.append({"code": "verifier_path_mismatch", "message": "receipt verifier path differs from the pinned executable path"})
         observed_executable = digest(Path(plan["verifier"]["executable_path"]).resolve(strict=True).read_bytes())
         if observed_executable != expected_verifier_sha256:
             issues.append({"code": "verifier_executable_digest_mismatch", "message": "available verifier executable bytes differ from evaluator pin"})
