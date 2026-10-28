@@ -8,7 +8,7 @@ on:
       - ".github/workflows/vleb-ledger-reference.yml"
   push:
     branches:
-      - "research/vleb-claim-eligibility-gate-2026-10-28"
+      - research/vleb-claim-eligibility-gate-2026-10-28
     paths:
       - "tools/vleb/**"
       - ".github/workflows/vleb-ledger-reference.yml"
@@ -55,12 +55,13 @@ jobs:
         run: python tools/vleb/test_legacy_claim_evidence.py
       - name: Audit legacy claim source spans and witness pins
         run: python tools/vleb/test_audit_legacy_claim.py
+      - name: Validate evaluator witness receipt and anti-replay controls
+        run: python tools/vleb/test_audit_witness_receipt.py
       - name: Validate fail-closed evidence receipt schema
         run: python tools/vleb/test_receipt_schema.py
       - name: Test independent receipt auditor and adversarial controls
         run: python tools/vleb/test_receipt_auditor.py
-      - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy
       - name: Test reference implementation and CLI contract
