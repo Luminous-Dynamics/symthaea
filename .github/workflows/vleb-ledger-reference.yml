@@ -6,6 +6,12 @@ on:
     paths:
       - "tools/vleb/**"
       - ".github/workflows/vleb-ledger-reference.yml"
+  push:
+    branches:
+      - "research/vleb-witness-receipts-2026-10-28"
+    paths:
+      - "tools/vleb/**"
+      - ".github/workflows/vleb-ledger-reference.yml"
   workflow_dispatch:
 
 permissions:
