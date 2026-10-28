@@ -235,3 +235,17 @@ Independent exact-DP Python-reference results show why no universal audit percen
 The EESAS paper is a timely comparator for label-shift risk during iterative active sampling. Include it where the task supports its assumptions instead of treating sentinel monitoring as the only possible response. Do not claim reproduction or superiority unless its stated method and evaluation semantics are actually implemented. Source: https://doi.org/10.1016/j.eswa.2026.132567.
 
 Tracking implementation: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744). Full matched baselines and OOD axes: [issue #8749](https://github.com/Luminous-Dynamics/symthaea/issues/8749).
+
+
+## 21. Compare predeclared anytime-valid prior portfolios
+
+The shift-monitor benchmark now compares a fixed Beta(1/2,1/2) e-process, Beta(1,1), Beta(5,5), Beta(20,20), and an equal-weight portfolio of those four alternatives. All share the same Ville threshold 1/δ, δ=0.05/12, and the same fixed horizon in the reported finite fixture. A convex mixture of e-processes remains an e-process under the same null; portfolio weights must be frozen before observing the stream and must not be selected on the held-out shift.
+
+Independent exact-DP Python calculations at horizon 1,000 under a change after 100 observations give:
+- Jeffreys Beta(1/2,1/2): stable-null alarm 0.003059; post-shift detection 11.84% at p1=0.55 and 94.28% at p1=0.60.
+- Equal-weight four-prior portfolio: stable-null alarm 0.002778; post-shift detection 17.93% at p1=0.55 and 96.75% at p1=0.60.
+- Beta(20,20): stable-null alarm 0.001884; post-shift detection 22.83% at p1=0.55 and 97.92% at p1=0.60.
+
+All stable-null alarm probabilities are below the allocated α/12=0.004167. These are probabilities for the stated synthetic Bernoulli process, not deployment evidence. Because the same Ville boundary is used but realised null alarm probability varies, this is an anytime-validity / power tradeoff comparison, **not** a matched-realised-false-alarm leaderboard. Report actual null alarm rates and pre-shift false alarms separately. A finite-horizon threshold tuned to use the alpha budget can be explored as a separate comparator, but it must be labelled finite-horizon calibrated and cannot inherit the unrestricted Ville guarantee merely because the score is an e-process.
+
+Implementation: the third report `--eprocess-family-csv` in [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744) includes an exact-DP Rust evaluator, a separate standard-library Python reference, deterministic output comparison, label/metric assertions and a mutation negative control. Its current head still needs exact-source CI qualification. The next validation must test weaker and stronger alternatives, p0 misspecification, gradual ramps, bursts, serial dependence and a sealed set of shift families.
