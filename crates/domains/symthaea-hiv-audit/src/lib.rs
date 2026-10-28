@@ -176,7 +176,7 @@ pub fn scan_dataset(
             .is_some_and(|s| s.eq_ignore_ascii_case("csv"));
         if is_csv {
             let name = path.file_name().and_then(|s| s.to_str()).unwrap_or_default();
-            if !expected.contains(name) {
+            if !expected.contains(name.as_str()) {
                 return Err(format!("unregistered CSV file in data directory: {}", path.display()));
             }
         }
