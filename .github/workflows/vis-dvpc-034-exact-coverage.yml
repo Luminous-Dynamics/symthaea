@@ -1,0 +1,73 @@
+name: VIS-DVPC-034 exact OPE interval coverage
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-coverage-exact.rs"
+      - "tests/fixtures/vision-dvpc-034-coverage.tsv"
+      - "tests/fixtures/vision-dvpc-034.SHA256SUMS"
+      - "docs/research/VIS_DVPC_034_EXACT_COVERAGE_V1.md"
+      - ".github/workflows/vis-dvpc-034-exact-coverage.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-coverage-exact.rs"
+      - "tests/fixtures/vision-dvpc-034-coverage.tsv"
+      - "tests/fixtures/vision-dvpc-034.SHA256SUMS"
+      - "docs/research/VIS_DVPC_034_EXACT_COVERAGE_V1.md"
+      - ".github/workflows/vis-dvpc-034-exact-coverage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and frozen scenario fixture
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Verify frozen fixture digest
+        run: sha256sum -c tests/fixtures/vision-dvpc-034.SHA256SUMS
+      - name: Run exact interval-coverage unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-coverage-exact.rs -o /tmp/vis-dvpc-034-tests
+          /tmp/vis-dvpc-034-tests
+      - name: Run the exact finite-sample coverage sweep
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-coverage-exact.rs -o /tmp/vis-dvpc-034
+          /tmp/vis-dvpc-034 --sweep | tee /tmp/vis-dvpc-034-results.tsv
+
+          test "$(grep -c '^METRIC[[:space:]]' /tmp/vis-dvpc-034-results.tsv)" = "126"
+          grep -Eq 'SCENARIO[[:space:]]+zero_support[[:space:]]+-[[:space:]]+NOT_IDENTIFIED[[:space:]]+confidence_intervals[[:space:]]+SUPPRESSED' /tmp/vis-dvpc-034-results.tsv
+          grep -Eq 'METRIC[[:space:]]+healthy_correct[[:space:]]+WALD_95[[:space:]]+ASSUMPTIONS_MATCH_SYNTHETIC_DGP[[:space:]]+exact_coverage[[:space:]]+0[.]781250000000' /tmp/vis-dvpc-034-results.tsv
+          grep -Eq 'METRIC[[:space:]]+weak_overlap_001[[:space:]]+WALD_95[[:space:]]+ASSUMPTIONS_MATCH_SYNTHETIC_DGP[[:space:]]+exact_coverage' /tmp/vis-dvpc-034-results.tsv
+          grep -Eq 'AGGREGATE[[:space:]]+ALL_CORRECT_PROPENSITY[[:space:]]+HOEFFDING_95[[:space:]]+COVERAGE_FLOOR_MET[[:space:]]+minimum_exact_coverage' /tmp/vis-dvpc-034-results.tsv
+          grep -Eq 'AGGREGATE[[:space:]]+ALL_CORRECT_PROPENSITY[[:space:]]+EMP_BERNSTEIN_95[[:space:]]+COVERAGE_FLOOR_MET[[:space:]]+minimum_exact_coverage' /tmp/vis-dvpc-034-results.tsv
+          grep -Fq 'ASSUMPTION_VIOLATION_DESCRIPTIVE_ONLY' /tmp/vis-dvpc-034-results.tsv
+          grep -Fq 'confidence_sequence' /tmp/vis-dvpc-034-results.tsv
+          grep -Fq 'NOT_IMPLEMENTED' /tmp/vis-dvpc-034-results.tsv
+      - name: Create exact-source reproducibility receipt
+        run: |
+          {
+            printf 'VIS_DVPC_034_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum \
+              tools/vision-dvpc-coverage-exact.rs \
+              tests/fixtures/vision-dvpc-034.SHA256SUMS \
+              tests/fixtures/vision-dvpc-034-coverage.tsv \
+              /tmp/vis-dvpc-034-results.tsv
+          } > /tmp/vis-dvpc-034-receipt.tsv
+          cat /tmp/vis-dvpc-034-receipt.tsv
+      - name: Publish exact coverage output and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-034-coverage
+          path: |
+            /tmp/vis-dvpc-034-results.tsv
+            /tmp/vis-dvpc-034-receipt.tsv
+          retention-days: 90
