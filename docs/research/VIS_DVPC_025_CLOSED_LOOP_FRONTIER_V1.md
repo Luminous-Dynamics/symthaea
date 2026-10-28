@@ -53,7 +53,7 @@ The output is a metric vector, not a single weighted leaderboard score. Keep ris
 2. The scorer emits exactly 117 campaign-policy rows and nine policy summaries.
 3. The intentionally unsafe forced_adapt baseline is recorded with 13 uncertified activations in the no-evidence fixture.
 4. The fixed decision-value policy authorizes a safe, positive-value campaign and records positive net value. The anytime decision-value policy consumes a second batch, crosses the time-uniform risk/value evidence thresholds, then authorizes without false-safe authorization.
-5. On the frozen null-boundary witness, the unsafe naive-peeking baseline authorizes despite hidden target risk being exactly 5%; the compliant anytime and ordinary unit-aware gates refuse to count that `FIXED_PEEKED` stream.
+5. On the frozen above-cap witness, the unsafe naive-peeking baseline authorizes despite hidden target risk being 6%, above the 5% cap; the compliant anytime and ordinary unit-aware gates refuse to count that FIXED_PEEKED stream.
 6. A byte-mutated raw risk stream is rejected because its observation count no longer matches the aggregate.
 7. The row-dependent control does not authorize the high-uncertainty baseline and actual cost overruns cannot disappear from the ledger.
 8. Tests and scoring run against the exact commit in the dedicated workflow; the workflow publishes raw rows and committed-source/formatted-source/fixture/output receipts.
