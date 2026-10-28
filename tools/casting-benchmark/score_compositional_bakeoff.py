@@ -29,7 +29,7 @@ SUPPORTED_FAMILIES = (
 SUPPORTED_DIMENSIONS = (2, 5, 10)
 POLICY_ORDER = (
     "high_only", "low_screen", "fixed_top_k", "discrepancy_aware",
-    "adaptive_budget", "decision_value_of_information",
+    "adaptive_budget", "decision_value_of_information", "joint_action_cost_aware",
 )
 ALLOWED_PROMOTION_METHODS = {
     "high_only": set(),
@@ -38,6 +38,7 @@ ALLOWED_PROMOTION_METHODS = {
     "discrepancy_aware": {"discrepancy_anchor", "discrepancy_corrected"},
     "adaptive_budget": {"adaptive_discrepancy_anchor", "adaptive_cost_aware_corrected"},
     "decision_value_of_information": {"decision_impact_anchor", "decision_impact_confirmation"},
+    "joint_action_cost_aware": {"joint_action_cost_aware"},
 }
 REFERENCE_POINT = (1.2, 1.2)
 TOL = 1e-9
@@ -45,6 +46,7 @@ PRIMES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53)
 SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_decision_value_policy.py",
+    "tools/casting-benchmark/multifidelity_joint_action_policy.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
@@ -64,7 +66,7 @@ RUN_KEYS = {
     "true_finite_pool_hypervolume", "observed_high_fidelity_hypervolume",
     "normalized_hypervolume_fraction", "promotion_records", "decision_value_trace",
     "predicted_feasible_promotion_count", "false_promotion_count", "false_promotion_rate",
-    "evaluations",
+    "evaluations", "joint_action_trace",
 }
 EVAL_KEYS = {"candidate_id", "fidelity", "objectives", "constraint_margin", "cost_units"}
 PROMOTION_KEYS = {"candidate_id", "predicted_margin", "method", "observed_high_margin"}
