@@ -309,6 +309,17 @@ Open an issue on GitHub for research discussions.
 
 ---
 
+## Applied Biomedical Research
+
+### HIV Reservoir Discovery
+
+A proposed, evidence-grounded research program focused on public HIV reservoir and latency datasets. The current work establishes a benchmark protocol and machine-readable dataset register; it does not claim a validated HIV discovery capability.
+
+- [Program overview](hiv-reservoir-discovery/README.md)
+- [Benchmark protocol](hiv-reservoir-discovery/BENCHMARK_PROTOCOL.md)
+- [Candidate dataset register](hiv-reservoir-discovery/datasets.json)
+- [Falsifiable hypothesis ledger schema](hiv-reservoir-discovery/HYPOTHESIS_LEDGER.schema.json)
+
 ## Further Reading
 
 ### Textbooks
