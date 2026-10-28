@@ -123,96 +123,99 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
     let charge_energy = charge_energy_available_kwh(case, &sources);
     let charge_duration = charge_duration_h(case, &sources, &demand);
 
-    let mut findings = Vec::with_capacity(10);
-    findings.push(compare_le(
-        "route_length_envelope",
-        resolve(&case.vessel.length_overall_m, "m", &sources),
-        resolve(&case.route.maximum_vessel_length_m, "m", &sources),
-        "m",
-        "vessel length overall <= route maximum vessel length",
-    ));
-    findings.push(compare_le(
-        "route_beam_envelope",
-        resolve(&case.vessel.beam_m, "m", &sources),
-        resolve(&case.route.maximum_vessel_beam_m, "m", &sources),
-        "m",
-        "vessel beam <= route maximum vessel beam",
-    ));
-    findings.push(compare_le(
-        "route_draft_envelope",
-        resolve(&case.vessel.design_draft_m, "m", &sources),
-        resolve(&case.route.maximum_vessel_draft_m, "m", &sources),
-        "m",
-        "design draft <= declared route draft limit",
-    ));
-    findings.push(compare_le(
-        "under_keel_clearance",
-        sum_values(
-            &[
-                (&case.vessel.design_draft_m, "m"),
-                (&case.route.minimum_under_keel_clearance_m, "m"),
-            ],
-            &sources,
+    let findings = vec![
+        compare_le(
+            "route_length_envelope",
+            resolve(&case.vessel.length_overall_m, "m", &sources),
+            resolve(&case.route.maximum_vessel_length_m, "m", &sources),
+            "m",
+            "vessel length overall <= route maximum vessel length",
         ),
-        resolve(&case.route.available_water_depth_m, "m", &sources),
-        "m",
-        "design draft + required under-keel clearance <= declared water depth",
-    ));
-    findings.push(compare_le(
-        "berth_length_envelope",
-        resolve(&case.vessel.length_overall_m, "m", &sources),
-        resolve(&case.terminal.berth_length_m, "m", &sources),
-        "m",
-        "vessel length overall <= declared berth length",
-    ));
-    findings.push(compare_le(
-        "berth_beam_envelope",
-        resolve(&case.vessel.beam_m, "m", &sources),
-        resolve(&case.terminal.berth_beam_limit_m, "m", &sources),
-        "m",
-        "vessel beam <= declared berth beam limit",
-    ));
-    findings.push(compare_le(
-        "payload_capacity",
-        resolve(&case.duty_cycle.required_payload_tonnes, "t", &sources),
-        resolve(&case.vessel.cargo_capacity_tonnes, "t", &sources),
-        "t",
-        "required payload <= declared cargo capacity",
-    ));
-    findings.push(compare_le(
-        "battery_energy_per_duty_cycle",
-        demand.clone(),
-        usable_capacity,
-        "kWh",
-        concat!(
-            "sum of four declared leg loads <= nominal battery energy × temperature factor × ",
-            "end-of-life factor × (1 − reserve fraction)",
+        compare_le(
+            "route_beam_envelope",
+            resolve(&case.vessel.beam_m, "m", &sources),
+            resolve(&case.route.maximum_vessel_beam_m, "m", &sources),
+            "m",
+            "vessel beam <= route maximum vessel beam",
         ),
-    ));
-    findings.push(compare_le(
-        "shore_recharge_before_departure",
-        demand.clone(),
-        charge_energy,
-        "kWh",
-        concat!(
-            "duty-cycle energy <= min(charger power, shore connection power) × charge window × ",
-            "charging efficiency",
+        compare_le(
+            "route_draft_envelope",
+            resolve(&case.vessel.design_draft_m, "m", &sources),
+            resolve(&case.route.maximum_vessel_draft_m, "m", &sources),
+            "m",
+            "design draft <= declared route draft limit",
         ),
-    ));
-    findings.push(compare_le(
-        "service_turnaround_window",
-        match (
-            resolve(&case.duty_cycle.round_trip_duration_h, "h", &sources),
-            charge_duration,
-        ) {
-            (Ok(mission_h), Ok(charge_h)) => mission_h.add(charge_h, "mission plus recharge time"),
-            (Err(reason), _) => Err(reason),
-            (_, Err(reason)) => Err(reason),
-        },
-        resolve(&case.terminal.available_service_window_h, "h", &sources),
-        "h",
-        "declared round-trip duration + idealized recharge duration <= declared service window",
-    ));
+        compare_le(
+            "under_keel_clearance",
+            sum_values(
+                &[
+                    (&case.vessel.design_draft_m, "m"),
+                    (&case.route.minimum_under_keel_clearance_m, "m"),
+                ],
+                &sources,
+            ),
+            resolve(&case.route.available_water_depth_m, "m", &sources),
+            "m",
+            "design draft + required under-keel clearance <= declared water depth",
+        ),
+        compare_le(
+            "berth_length_envelope",
+            resolve(&case.vessel.length_overall_m, "m", &sources),
+            resolve(&case.terminal.berth_length_m, "m", &sources),
+            "m",
+            "vessel length overall <= declared berth length",
+        ),
+        compare_le(
+            "berth_beam_envelope",
+            resolve(&case.vessel.beam_m, "m", &sources),
+            resolve(&case.terminal.berth_beam_limit_m, "m", &sources),
+            "m",
+            "vessel beam <= declared berth beam limit",
+        ),
+        compare_le(
+            "payload_capacity",
+            resolve(&case.duty_cycle.required_payload_tonnes, "t", &sources),
+            resolve(&case.vessel.cargo_capacity_tonnes, "t", &sources),
+            "t",
+            "required payload <= declared cargo capacity",
+        ),
+        compare_le(
+            "battery_energy_per_duty_cycle",
+            demand.clone(),
+            usable_capacity,
+            "kWh",
+            concat!(
+                "sum of four declared leg loads <= nominal battery energy × temperature factor × ",
+                "end-of-life factor × (1 − reserve fraction)",
+            ),
+        ),
+        compare_le(
+            "shore_recharge_before_departure",
+            demand.clone(),
+            charge_energy,
+            "kWh",
+            concat!(
+                "duty-cycle energy <= min(charger power, shore connection power) × charge window × ",
+                "charging efficiency",
+            ),
+        ),
+        compare_le(
+            "service_turnaround_window",
+            match (
+                resolve(&case.duty_cycle.round_trip_duration_h, "h", &sources),
+                charge_duration,
+            ) {
+                (Ok(mission_h), Ok(charge_h)) => {
+                    mission_h.add(charge_h, "mission plus recharge time")
+                }
+                (Err(reason), _) => Err(reason),
+                (_, Err(reason)) => Err(reason),
+            },
+            resolve(&case.terminal.available_service_window_h, "h", &sources),
+            "h",
+            "declared round-trip duration + idealized recharge duration <= declared service window",
+        ),
+    ];
 
     Ok(AssessmentReport {
         schema_version: "2.0.0".to_owned(),
@@ -251,9 +254,9 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
     })
 }
 
-fn validate_provenance<'a>(
-    records: &'a [ProvenanceRecord],
-) -> Result<BTreeMap<&'a str, &'a ProvenanceRecord>, AssessmentError> {
+fn validate_provenance(
+    records: &[ProvenanceRecord],
+) -> Result<BTreeMap<&str, &ProvenanceRecord>, AssessmentError> {
     let mut sources = BTreeMap::new();
     for record in records {
         if record.id.trim().is_empty() {
