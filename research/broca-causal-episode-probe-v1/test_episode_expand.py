@@ -1,9 +1,19 @@
 """Offline tests for fixed-budget episode-neighborhood expansion."""
 from __future__ import annotations
 
+import hashlib
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
-from episode_expand import extract_indexed_refs, expand_predictions, read_jsonl, FIXTURE_DIR
+from episode_expand import (
+    extract_indexed_refs,
+    expand_predictions,
+    load_candidate_manifest,
+    read_jsonl,
+    FIXTURE_DIR,
+)
 
 
 TRAJECTORIES = read_jsonl(FIXTURE_DIR / "trajectories.jsonl")
@@ -89,6 +99,43 @@ class EpisodeExpandTests(unittest.TestCase):
         row = prediction("Q1", [hit("episode-release-rollback", "/states/0/text", 0)])
         with self.assertRaisesRegex(ValueError, "duplicate prediction question_id"):
             expand_predictions(TRAJECTORIES, [row, row], k=5)
+
+    def _write_candidate_bundle(self, directory: Path, candidate_k: int = 10) -> tuple[Path, Path]:
+        trajectory_path = FIXTURE_DIR / "trajectories.jsonl"
+        prediction_path = directory / "candidate-predictions.jsonl"
+        prediction_bytes = b'{"question_id":"Q1","audit":[]}\\n'
+        prediction_path.write_bytes(prediction_bytes)
+        manifest = {
+            "schema": "broca-causal-episode-probe-v1",
+            "prediction_sha256": hashlib.sha256(prediction_bytes).hexdigest(),
+            "trajectory_fixture_sha256": hashlib.sha256(trajectory_path.read_bytes()).hexdigest(),
+            "scope_id": "web",
+            "worker_sha256": "a" * 64,
+            "bm25": {"k1": 1.2, "b": 0.75, "max_items": candidate_k},
+        }
+        manifest_path = prediction_path.with_suffix(prediction_path.suffix + ".manifest.json")
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return prediction_path, trajectory_path
+
+    def test_candidate_manifest_binds_worker_pool_and_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            prediction_path, trajectory_path = self._write_candidate_bundle(Path(temp), 10)
+            manifest, _path = load_candidate_manifest(prediction_path, trajectory_path, 5)
+            self.assertEqual(manifest["worker_sha256"], "a" * 64)
+            self.assertEqual(manifest["bm25"]["max_items"], 10)
+
+    def test_candidate_prediction_tampering_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            prediction_path, trajectory_path = self._write_candidate_bundle(Path(temp), 10)
+            prediction_path.write_text('{"question_id":"tampered","audit":[]}\\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "prediction digest"):
+                load_candidate_manifest(prediction_path, trajectory_path, 5)
+
+    def test_candidate_pool_smaller_than_eval_budget_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            prediction_path, trajectory_path = self._write_candidate_bundle(Path(temp), 4)
+            with self.assertRaisesRegex(ValueError, "candidate pool"):
+                load_candidate_manifest(prediction_path, trajectory_path, 5)
 
 
 if __name__ == "__main__":
