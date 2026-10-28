@@ -35,6 +35,8 @@ Each trial's `manifest_sha256` must equal the SHA-256 of the exact manifest byte
 
 Missing rows are reported from the manifest's expected denominator; they are not silently dropped. Paired deltas use only complete runs of both arms and report how many expected pairs were incomplete.
 
+The manifest also fixes one shared per-trial resource cap across every arm: `max_tool_calls`, `max_experiment_queries`, `max_tokens`, and `max_elapsed_ms`. Every consumed resource must stay within these caps for a trial to be counted as completed. An over-cap trial must be marked `budget_violation` and may not carry scored outcomes; the report retains its resource counts and includes it in the all-assigned denominator. The auditor rejects both an unlabelled overrun and a budget-violation label without an evidenced cap breach.
+
 The manifest JSON fields are:
 `schema`, `protocol_id`, `model_id`, `model_revision`, `prompt_sha256`, `task_manifest_sha256`, `tool_registry_sha256`, `treatments`, and `task_seeds`. Each task-seed record contains `task_id`, `domain`, `law_complexity`, `system_complexity`, `noise_level`, `seed`, and `tool_available`.
 
