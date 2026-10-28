@@ -178,8 +178,8 @@ def synthetic_attestation(manifest: dict[str, Any]) -> bytes:
                     "subjectAlternativeName": {"type": "URI", "value": signer_uri},
                     "issuer": "https://token.actions.githubusercontent.com",
                     "sourceRepositoryIdentifier": str(repo["repository_id"]),
-                    "sourceRepositoryDigest": repo["workflow_sha"],
-                    "sourceRepositoryRef": repo["workflow_ref"],
+                    "sourceRepositoryDigest": repo["source_repository_digest"],
+                    "sourceRepositoryRef": repo["source_repository_ref"],
                     "githubWorkflowRepository": repo["full_name"],
                     "githubWorkflowRef": repo["workflow_ref"],
                     "githubWorkflowSHA": repo["workflow_sha"],
@@ -319,6 +319,12 @@ class RunManifestVerifierTests(unittest.TestCase):
     def test_attestation_certificate_and_subject_positive_control(self) -> None:
         raw = synthetic_attestation(self.bundle.manifest)
         self.assertEqual(verifier.attestation_output_issues(raw, self.bundle.manifest), [])
+
+    def test_workflow_source_and_candidate_revision_are_distinct_bindings(self) -> None:
+        manifest = self.bundle.manifest
+        self.assertNotEqual(manifest["repository"]["workflow_sha"], manifest["repository"]["source_repository_digest"])
+        self.assertNotEqual(manifest["repository"]["source_repository_digest"], manifest["candidate"]["checkout_revision"])
+        self.assertEqual(verifier.attestation_output_issues(synthetic_attestation(manifest), manifest), [])
 
     def test_attestation_repository_id_mismatch_is_rejected(self) -> None:
         output = json.loads(synthetic_attestation(self.bundle.manifest))
