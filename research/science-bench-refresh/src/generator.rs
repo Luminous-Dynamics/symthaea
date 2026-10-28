@@ -99,13 +99,21 @@ fn decode_config(bytes: &[u8]) -> Result<GeneratorConfigV1, String> {
                 recipe.family_id
             ));
         }
-        if !recipe.x_start.is_finite() || !recipe.x_step.is_finite() || recipe.x_step <= 0.0 {
+        if !recipe.x_start.is_finite()
+            || recipe.x_start.abs() > 1.0e9
+            || !recipe.x_step.is_finite()
+            || recipe.x_step <= 0.0
+            || recipe.x_step > 1.0e9
+        {
             return Err(format!(
                 "recipe {} requires finite x_start and positive finite x_step",
                 recipe.family_id
             ));
         }
-        if !recipe.noise_amplitude.is_finite() || recipe.noise_amplitude < 0.0 {
+        if !recipe.noise_amplitude.is_finite()
+            || recipe.noise_amplitude < 0.0
+            || recipe.noise_amplitude > 1.0e9
+        {
             return Err(format!(
                 "recipe {} noise_amplitude must be finite and non-negative",
                 recipe.family_id
@@ -399,6 +407,13 @@ pub fn generate_task_set_bytes(
     let mut bytes = serde_json::to_vec_pretty(&task_set)
         .map_err(|error| format!("cannot serialize generated task set: {error}"))?;
     bytes.push(b'\n');
+    let task_set_issues = crate::validate_task_set_contract(&manifest, &bytes);
+    if !task_set_issues.is_empty() {
+        return Err(format!(
+            "generator produced a task set that violates its contract: {}",
+            task_set_issues.join("; ")
+        ));
+    }
     Ok(bytes)
 }
 
@@ -524,6 +539,45 @@ mod tests {
         let provisional = serde_json::from_slice::<Value>(&manifest).unwrap();
         let _ = provisional;
         (manifest, seed, config, generated)
+    }
+
+    #[test]
+    fn verify_regeneration_accepts_exact_replay_and_task_commitment() {
+        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let final_manifest =
+            manifest_with_task_commitment(&manifest, &seed, &config, &generated);
+        let report = verify_regeneration(&final_manifest, &seed, &config, &generated).unwrap();
+        assert!(report.verified, "{:?}", report.issues);
+        assert!(report.seed_commitment_matches);
+        assert!(report.task_set_commitment_matches);
+        assert!(report.task_set_contract_valid);
+        assert!(report.byte_exact_match);
+        assert_eq!(report.regenerated_task_set_sha256, report.committed_task_set_sha256);
+    }
+
+    #[test]
+    fn different_seed_cannot_reproduce_committed_task_set() {
+        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let final_manifest =
+            manifest_with_task_commitment(&manifest, &seed, &config, &generated);
+        let mut different_seed = seed.clone();
+        different_seed[0] ^= 1;
+        let error = verify_regeneration(&final_manifest, &different_seed, &config, &generated)
+            .expect_err("wrong seed must fail before task comparison");
+        assert!(error.contains("seed bytes do not match"));
+    }
+
+    #[test]
+    fn generator_schema_fixture_is_valid_json_and_matches_version() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/generator-config.schema.json"
+        ))
+        .expect("generator schema JSON");
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(GENERATOR_CONFIG_SCHEMA)
+        );
+        assert_eq!(sha256_hex(&demo_config()).len(), 64);
     }
 
     #[test]
