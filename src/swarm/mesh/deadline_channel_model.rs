@@ -476,3 +476,77 @@ fn impossible_loss_probability_rejects_every_frame() {
     assert!(!event_delivered(123, 0, false, HASH_BUCKETS));
     assert!(!event_delivered(123, 500_000, true, HASH_BUCKETS));
 }
+
+#[test]
+fn fixed_seed_cohort_reports_delivery_by_deadline_for_all_strategies() {
+    let model = ChannelModel::Iid {
+        loss_per_mille: 100,
+    };
+    let strategies = [
+        Strategy::NoRecovery,
+        Strategy::XorFec,
+        Strategy::SelectiveRetry,
+        Strategy::Hybrid,
+    ];
+    let deadlines_us = [5_000_000, 15_000_000, 30_000_000, 90_000_000];
+    let mut successes = [[0u32; 4]; 4];
+    let mut airtime_totals = [0u64; 4];
+    const TRIALS: u64 = 512;
+
+    for trial in 0..TRIALS {
+        let seed = 0x4D45_5348_2026_1028u64
+            ^ trial.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let trace = make_state_trace(model, seed ^ 0xBADC_0FFE);
+        let outcomes = [
+            simulate(Strategy::NoRecovery, model, &trace, seed, 7, Some(100)),
+            simulate(Strategy::XorFec, model, &trace, seed, 7, Some(100)),
+            simulate(Strategy::SelectiveRetry, model, &trace, seed, 7, Some(100)),
+            simulate(Strategy::Hybrid, model, &trace, seed, 7, Some(100)),
+        ];
+
+        for (strategy_index, outcome) in outcomes.iter().copied().enumerate() {
+            airtime_totals[strategy_index] =
+                airtime_totals[strategy_index].saturating_add(outcome.airtime_us);
+            for (deadline_index, deadline_us) in deadlines_us.iter().copied().enumerate() {
+                if by_deadline(outcome, deadline_us) {
+                    successes[strategy_index][deadline_index] += 1;
+                }
+            }
+        }
+    }
+
+    for strategy_index in 0..strategies.len() {
+        for deadline_index in 1..deadlines_us.len() {
+            assert!(
+                successes[strategy_index][deadline_index - 1]
+                    <= successes[strategy_index][deadline_index],
+                "delivery count cannot decrease when the deadline increases"
+            );
+        }
+    }
+    for deadline_index in 0..deadlines_us.len() {
+        assert!(
+            successes[2][deadline_index] >= successes[0][deadline_index],
+            "selective retry preserves every no-recovery delivery by deadline"
+        );
+        assert!(
+            successes[3][deadline_index] >= successes[1][deadline_index],
+            "hybrid preserves every XOR-FEC delivery by deadline"
+        );
+    }
+    assert!(airtime_totals[2] >= airtime_totals[0] * TRIALS);
+    assert!(airtime_totals[3] >= airtime_totals[1] * TRIALS);
+
+    eprintln!(
+        "mesh-deadline-feedback channel=iid100 ack_loss=100‰ sf=7 trials={} delivery_by_deadline_5/15/30/90s_no_fec={}/{}/{}/{} xor={}/{}/{}/{} selective={}/{}/{}/{} hybrid={}/{}/{}/{} mean_phy_airtime_us_no_fec/xor/selective/hybrid={}/{}/{}/{}",
+        TRIALS,
+        successes[0][0], successes[0][1], successes[0][2], successes[0][3],
+        successes[1][0], successes[1][1], successes[1][2], successes[1][3],
+        successes[2][0], successes[2][1], successes[2][2], successes[2][3],
+        successes[3][0], successes[3][1], successes[3][2], successes[3][3],
+        airtime_totals[0] / TRIALS,
+        airtime_totals[1] / TRIALS,
+        airtime_totals[2] / TRIALS,
+        airtime_totals[3] / TRIALS,
+    );
+}
