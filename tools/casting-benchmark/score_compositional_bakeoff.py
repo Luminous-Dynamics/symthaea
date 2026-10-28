@@ -1019,6 +1019,16 @@ def score_document(
         errors.append("decision-impact policy weights differ from scorer contract")
     if diwa_contract.get("fixed_parameters") != DIWA_FIXED_PARAMETERS:
         errors.append("decision-impact policy fixed parameters differ from scorer contract")
+    joint_contract = manifest.get("joint_action_policy", {})
+    joint_rule = joint_contract.get("adaptive_rule", {})
+    if joint_contract.get("id") != JOINT_POLICY:
+        errors.append("joint-action policy identifier differs from scorer contract")
+    if joint_rule.get("bootstrap_low_calls") != 6:
+        errors.append("joint-action bootstrap count differs from scorer contract")
+    if joint_rule.get("information_fraction") != JOINT_INFORMATION_FRACTION:
+        errors.append("joint-action information fractions differ from scorer contract")
+    if joint_rule.get("score_weights") != JOINT_SCORE_WEIGHTS:
+        errors.append("joint-action score weights differ from scorer contract")
     is_preregistered_default = declared_defaults == manifest_defaults
     if not is_preregistered_default and not allow_diagnostic_subset:
         errors.append(
@@ -1154,12 +1164,13 @@ def score_document(
         _near(run["unused_cost"], document["cost_budget"] - actual_spend, f"{label}.unused_cost", errors)
         if actual_spend > document["cost_budget"]:
             errors.append(f"{label} exceeds budget")
-        try:
-            expected_counts = expected_call_counts(policy, costs, document["cost_budget"], document["design_count"])
-            if count_map != expected_counts:
-                errors.append(f"{label} call template mismatch: expected {expected_counts}, got {count_map}")
-        except ValueError as exc:
-            errors.append(f"{label} invalid call template: {exc}")
+        if policy != JOINT_POLICY:
+            try:
+                expected_counts = expected_call_counts(policy, costs, document["cost_budget"], document["design_count"])
+                if count_map != expected_counts:
+                    errors.append(f"{label} call template mismatch: expected {expected_counts}, got {count_map}")
+            except ValueError as exc:
+                errors.append(f"{label} invalid call template: {exc}")
 
         if len(ledger) != run["evaluation_count"]:
             errors.append(f"{label} ledger length disagrees with evaluation_count")
@@ -1220,6 +1231,7 @@ def score_document(
             _near(run["false_promotion_rate"], rate, f"{label}.false_promotion_rate", errors)
 
         _replay_diwa_run(run, errors)
+        _replay_joint_action_run(run, costs, document["cost_budget"], errors)
 
     expected_keys = {
         (obj, con, dim, float(sev), seed, policy)
