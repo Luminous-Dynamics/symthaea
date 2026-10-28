@@ -1,0 +1,96 @@
+{
+  "audit_panel_accepted": true,
+  "bootstrap_replicates_per_arm": 3000,
+  "invalid_pe_placebo_effect": {
+    "bootstrap_ci_high": 0.005847422421875001,
+    "bootstrap_ci_level": 0.95,
+    "bootstrap_ci_low": -0.0008286091796874981,
+    "bootstrap_replicates": 3000,
+    "ci_excludes_zero": false,
+    "mean_effect": 0.00249059505859375,
+    "n_pairs": 512,
+    "paired_sd": 0.03846960792573614,
+    "paired_se": 0.0017001325396172361
+  },
+  "mutation_results": {
+    "boolean_transition_count": {
+      "detected": true,
+      "expected_error": "VALID_PE_ADMISSION_NOT_EXACTLY_ONCE"
+    },
+    "duplicate_pair_id": {
+      "detected": true,
+      "expected_error": "PAIR_ID_DUPLICATE"
+    },
+    "duplicate_run_id_across_pairs": {
+      "detected": true,
+      "expected_error": "RUN_ID_DUPLICATE"
+    },
+    "invalid_pe_admitted": {
+      "detected": true,
+      "expected_error": "INVALID_PE_ADMISSION"
+    },
+    "malformed_intervention_type": {
+      "detected": true,
+      "expected_error": "EXPECTED_INTERVENTION_INVALID"
+    },
+    "outcome_calibration_mismatch": {
+      "detected": true,
+      "expected_error": "PAIRED_OUTCOME_CALIBRATION_DIGEST_MISMATCH"
+    },
+    "outcome_out_of_range": {
+      "detected": true,
+      "expected_error": "TREATMENT_OUTCOME_INVALID"
+    },
+    "paired_input_mismatch": {
+      "detected": true,
+      "expected_error": "PAIRED_SCENARIO_DIGEST_MISMATCH"
+    },
+    "pre_intervention_state_mismatch": {
+      "detected": true,
+      "expected_error": "PAIRED_PRE_INTERVENTION_STATE_DIGEST_MISMATCH"
+    },
+    "randomness_tape_mismatch": {
+      "detected": true,
+      "expected_error": "PAIRED_RANDOMNESS_TAPE_DIGEST_MISMATCH"
+    },
+    "treatment_role_swapped": {
+      "detected": true,
+      "expected_error": "TREATMENT_INTERVENTION_MISMATCH"
+    },
+    "unverified_prefix_replay": {
+      "detected": true,
+      "expected_error": "TREATMENT_PREFIX_REPLAY_NOT_VERIFIED"
+    },
+    "valid_pe_missing_evidence": {
+      "detected": true,
+      "expected_error": "VALID_PE_EVIDENCE_ID_MISSING"
+    }
+  },
+  "mutations_detected": 13,
+  "mutations_injected": 13,
+  "pairs_per_arm": 512,
+  "placebo_ci_inside_equivalence_margin": true,
+  "placebo_equivalence_margin": 0.02,
+  "positive_control_ci_excludes_zero": true,
+  "positive_control_lower_bound_exceeds_0_05": true,
+  "production_symthaea_imported": false,
+  "rust_compiled_or_executed": false,
+  "scope_note": "Synthetic stochastic outcomes with planted effects; estimates validate this reference estimator only, not Symthaea causal influence or task utility.",
+  "seed": 20261028,
+  "self_test_passed": true,
+  "status": "PASS_CAUSAL_REPLAY_REFERENCE_ONLY",
+  "synthetic_ground_truth_invalid_pe_effect": 0.0,
+  "synthetic_ground_truth_valid_pe_effect": 0.08,
+  "total_paired_runs": 2048,
+  "valid_pe_effect": {
+    "bootstrap_ci_high": 0.0831100012890625,
+    "bootstrap_ci_level": 0.95,
+    "bootstrap_ci_low": 0.07632085958984375,
+    "bootstrap_replicates": 3000,
+    "ci_excludes_zero": true,
+    "mean_effect": 0.079807341171875,
+    "n_pairs": 512,
+    "paired_sd": 0.03932334723832454,
+    "paired_se": 0.001737862843198286
+  }
+}
