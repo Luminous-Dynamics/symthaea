@@ -335,13 +335,43 @@ fn validate_case(case: &Case) -> Result<()> {
             }
         }
         Some("NEG") => {
-            if !matches!(case.expected.authorization_decision.as_str(), "deny" | "indeterminate")
-                || case.expected.effect_adapter_invocations_for_case != 0
-                || case.expected.effect_witness != "none"
-                || case.setup.successful_effects_before_case != 0
-                || case.mutations.is_empty()
-            {
+            if case.mutations.is_empty() || case.expected.effect_adapter_invocations_for_case != 0 {
                 bail!("negative control {} must mutate the baseline and expect zero effect-adapter calls", case.id);
+            }
+            match case.id.as_str() {
+                "NEG-024" | "NEG-026" => {
+                    let expected_terminal = if case.id == "NEG-024" {
+                        "consumed_capability_rejected"
+                    } else {
+                        "restart_replay_rejected"
+                    };
+                    if case.expected.authorization_decision != "deny"
+                        || case.expected.effect_witness != "unchanged_from_setup"
+                        || case.expected.terminal_class != expected_terminal
+                        || case.setup.successful_effects_before_case != 1
+                        || case.setup.consumed_capability_persisted != Some(true)
+                    {
+                        bail!("replay case {} must preserve prior-effect state and reject the persisted consumed capability", case.id);
+                    }
+                }
+                "NEG-027" => {
+                    if case.expected.authorization_decision != "deny"
+                        || case.expected.effect_witness != "none"
+                        || case.expected.terminal_class != "bypass_blocked_and_witnessed"
+                        || case.setup.successful_effects_before_case != 0
+                    {
+                        bail!("effect-surface bypass case must be blocked without executing the requested effect");
+                    }
+                }
+                _ => {
+                    if !matches!(case.expected.authorization_decision.as_str(), "deny" | "indeterminate")
+                        || case.expected.effect_witness != "none"
+                        || case.setup.successful_effects_before_case != 0
+                        || !case.expected.terminal_class.ends_with("_before_effect")
+                    {
+                        bail!("negative control {} must fail before effect entry without changing the baseline world", case.id);
+                    }
+                }
             }
         }
         Some("IND") => {
@@ -355,21 +385,26 @@ fn validate_case(case: &Case) -> Result<()> {
             }
         }
         Some("LIFE") => {
+            let expected_terminal = match case.id.as_str() {
+                "LIFE-001" => "outcome_unknown_no_automatic_replay",
+                "LIFE-002" => "postcondition_mismatch_quarantined",
+                "LIFE-003" => "evidence_incomplete_not_success",
+                "LIFE-004" => "receipt_tamper_detected_no_success_claim",
+                _ => bail!("unknown lifecycle vector {}; add an explicit expected terminal disposition", case.id),
+            };
             if case.category != "lifecycle"
                 || case.expected.authorization_decision != "allow"
                 || case.expected.effect_adapter_invocations_for_case != 1
                 || case.setup.successful_effects_before_case != 0
+                || case.expected.terminal_class != expected_terminal
+                || case.mutations.is_empty()
             {
-                bail!("lifecycle case {} must distinguish a valid authorization from a later effect/outcome/evidence failure", case.id);
+                bail!("lifecycle case {} must distinguish valid authorization from its exact later effect/outcome/evidence failure", case.id);
             }
         }
         _ => bail!("case {} must use a POS-, NEG-, IND-, or LIFE- prefix", case.id),
     }
 
-    if case.id.starts_with("POS-") && !case.mutations.is_empty() {
-        // Positive variations are permitted, but their named mutations must remain explicit.
-        // No blanket allow result may be inferred from the case ID.
-    }
     if case.id.starts_with("LIFE-") && case.mutations.is_empty() {
         bail!("lifecycle case {} must explicitly model its failure condition", case.id);
     }
@@ -473,6 +508,6 @@ mod tests {
         case.mutations.push(Mutation { path: "effect.result".to_string(), value: json!("timeout_after_possible_commit") });
         assert!(validate_case(&case).is_ok());
         case.expected.terminal_class = "postcondition_confirmed".to_string();
-        assert!(validate_case(&case).is_ok()); // The structural checker cannot prove outcome truth.
+        assert!(validate_case(&case).is_err());
     }
 }
