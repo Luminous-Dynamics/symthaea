@@ -200,7 +200,7 @@ fn exact_coverage_sweep() -> Result<String, String> {
     let ps_ppm = unique_ps(&points);
     let ps: Vec<f64> = ps_ppm.iter().map(|p| *p as f64 / PPM).collect();
     let mut output = String::from(
-        "COVERAGE\tsample_n\trisk_p_ppm\tvalue_p_ppm\trisk_coverage\tvalue_coverage\tjoint_union_lower_bound\tjoint_target\n",
+        "HEADER\tsample_n\trisk_p_ppm\tvalue_p_ppm\trisk_coverage\tvalue_coverage\tjoint_union_lower_bound\tjoint_target\n",
     );
     let mut min_risk = 1.0_f64;
     let mut min_value = 1.0_f64;
