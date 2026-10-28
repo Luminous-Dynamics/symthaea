@@ -92,6 +92,16 @@
     {
       "id": "adaptive_budget",
       "role": "cost-responsive heuristic"
+    },
+    {
+      "id": "decision_value_of_information",
+      "role": "decision-impact-weighted acquisition using predicted feasible hypervolume gain, boundary information and frontier objective uncertainty",
+      "fixed_calls": {
+        "low": 60,
+        "medium": 8,
+        "high": 4
+      },
+      "method_class": "interpretable heuristic; not exact posterior expected value of information"
     }
   ],
   "default_sweep": {
@@ -113,8 +123,8 @@
       23,
       29
     ],
-    "policies": 5,
-    "run_count": 4860,
+    "policies": 6,
+    "run_count": 5832,
     "raw_runs_preserved": true
   },
   "outputs": [
@@ -124,7 +134,8 @@
     "Finite-pool normalized feasible hypervolume",
     "False-feasible promotion count/rate",
     "Paired-seed contrasts versus high_only on each cell",
-    "Independent response replay and source-byte digests"
+    "Independent response replay and source-byte digests",
+    "Decision-impact acquisition score and uncertainty components for the new candidate policy"
   ],
   "acceptance_gates": {
     "execution": "Authored tests must pass locally before any empirical statement; runner artifacts must be retained.",
@@ -132,12 +143,14 @@
     "composition": "Diagonal cells must numerically match the corresponding existing scenario runner under matched inputs; test this as a property gate.",
     "statistics": "Three-seed defaults are diagnostic only. Minimum 20 paired seeds; target 30 for inferential comparisons; preregister multiple-comparison correction and report per-cell effects.",
     "external": "No SOTA claim until pinned BoTorch MF-HVKG/MOMF and suitable single-fidelity baselines are executed under matched budgets; retain COCO-native scoring on COCO tasks.",
-    "physical": "No casting-validity claim without validated multiphysics models, documented solver uncertainty, and held-out physical measurements."
+    "physical": "No casting-validity claim without validated multiphysics models, documented solver uncertainty, and held-out physical measurements.",
+    "decision_value_policy": "The sixth policy uses the frozen 60/8/4 fidelity-call template and preregistered score weights; all acquisition inputs must be derived only from observations available before each high-fidelity call."
   },
   "evidence_label": "COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
   "provenance": {
     "source_digest_paths": [
       "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+      "tools/casting-benchmark/multifidelity_decision_value_policy.py",
       "tools/casting-benchmark/score_compositional_bakeoff.py",
       "tools/casting-benchmark/multifidelity_scenario_suite.py",
       "tools/casting-benchmark/multifidelity_stress.py",
@@ -152,5 +165,35 @@
     "https://link.springer.com/article/10.1007/s43939-026-00685-5",
     "https://botorch.org/docs/tutorials/Multi_objective_multi_fidelity_BO",
     "https://coco-platform.org/data-archive/index.html"
-  ]
+  ],
+  "decision_value_policy": {
+    "id": "decision_value_of_information",
+    "label": "Decision-Impact-Weighted Acquisition (DIWA)",
+    "scope": "transparent heuristic baseline, not an exact Bayesian value-of-information estimator",
+    "fidelity_call_template": {
+      "low": 60,
+      "medium": 8,
+      "high": 4
+    },
+    "cost_units": {
+      "low": 1,
+      "medium": 5,
+      "high": 25
+    },
+    "frozen_score_weights": {
+      "expected_hypervolume_gain": 0.7,
+      "constraint_boundary_information": 0.2,
+      "frontier_objective_information": 0.1
+    },
+    "score_definition": {
+      "expected_hypervolume_gain": "predicted probability of feasibility multiplied by positive marginal 2D hypervolume gain normalized by the fixed reference rectangle",
+      "constraint_boundary_information": "uncertainty scale times exp(-abs(predicted_margin)/margin_uncertainty)",
+      "frontier_objective_information": "objective uncertainty scale multiplied by exp(-distance_to_predicted_feasible_frontier/0.10)"
+    },
+    "limitations": [
+      "Uncertainty is estimated from small paired low/medium/high residual samples, not a calibrated posterior.",
+      "Weights are heuristic and must be frozen before the measured comparison; run a separate preregistered weight-sensitivity track.",
+      "Two high-fidelity anchors limit calibration quality; this is a hypothesis to benchmark, not an established improvement."
+    ]
+  }
 }
