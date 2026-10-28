@@ -263,14 +263,25 @@ fn scan_policy_input_for_oracle_fields(
     issues: &mut Vec<String>,
 ) {
     const FORBIDDEN_KEYS: &[&str] = &[
+        "answer",
         "answer_key",
+        "canonical_equation",
+        "correct_answer",
         "evaluator_only",
+        "expected_equation",
+        "expected_law",
+        "gold",
         "ground_truth",
+        "ground_truth_law",
         "hidden_law",
         "hidden_target",
         "oracle_answer",
-        "true_equation",
+        "reference_answer",
+        "solution",
+        "target",
         "target_equation",
+        "target_law",
+        "true_equation",
     ];
     match value {
         serde_json::Value::Object(fields) => {
@@ -1228,6 +1239,23 @@ mod tests {
         assert!(!report.task_set_contract_valid);
         assert!(!report.verified);
         assert!(report.issues.iter().any(|issue| issue.contains("record count")));
+    }
+
+    #[test]
+    fn direct_answer_key_in_policy_input_is_rejected() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
+        task_set["tasks"][0]["policy_input"]["answer"] = json!("oracle leak");
+        let task_bytes = serde_json::to_vec(&task_set).unwrap();
+        let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        manifest["task_set_commitment_sha256"] = json!(
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes).unwrap()
+        );
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+        assert!(report.task_set_commitment_matches);
+        assert!(!report.task_set_contract_valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("forbidden oracle field")));
     }
 
     #[test]
