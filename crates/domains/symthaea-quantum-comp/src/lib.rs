@@ -113,8 +113,9 @@ pub use interop::{AdapterAuthority, IntegrationDeclaration, IntegrationTarget};
 pub use matched_evaluation::{
     CandidateVerification, EnergyRecord, EnergyScope, MatchedArmReport,
     MatchedComparisonSummary, MatchedEvaluationError, MatchedPairResult,
-    MatchedTrialRecord, StageCostsMs, TimeWinner, TrialTermination, VerifierReceiptEvidence,
-    compare_matched_arms,
+    MatchedTrialRecord, MisEvidenceError, MisEvidenceVerdict, StageCostsMs, TimeWinner,
+    TrialTermination, VerifierReceiptEvidence, VerifiedMisCandidate, compare_matched_arms,
+    sha256_hex, verify_mis_candidate, verify_mis_candidate_with_receipt,
 };
 pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
