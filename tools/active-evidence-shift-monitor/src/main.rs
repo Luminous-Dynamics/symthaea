@@ -39,7 +39,7 @@ enum EProcessFamily {
 }
 
 impl EProcessFamily {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::Jeffreys,
         Self::Uniform,
         Self::BetaFiveFive,
