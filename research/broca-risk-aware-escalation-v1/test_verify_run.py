@@ -8,6 +8,8 @@ class ArtifactVerifierTests(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp=tempfile.TemporaryDirectory()
         cls.run_dir=Path(cls.tmp.name)/"valid"
+        benchmark.main_orig=benchmark.main
+        # Small but complete run through the real CLI entrypoint.
         import subprocess,sys
         subprocess.run([sys.executable,str(Path(benchmark.__file__)),"--out",str(cls.run_dir),"--dev-cases","500","--test-cases-per-regime","100"],check=True,capture_output=True,text=True)
     @classmethod
@@ -36,6 +38,7 @@ class ArtifactVerifierTests(unittest.TestCase):
         digest=hashlib.sha256(f.read_bytes()).hexdigest(); rec["outcome_sha256"]=digest; summ["artifact_sha256"]=digest
         (p/"receipt.json").write_text(json.dumps(rec,indent=2,sort_keys=True)+"\n")
         (p/"summary.json").write_text(json.dumps(summ,indent=2,sort_keys=True)+"\n")
+        # Update the receipt's summary pin so only the independently recomputed metric catches it.
         rec=json.loads((p/"receipt.json").read_text()); rec["summary_sha256"]=hashlib.sha256((p/"summary.json").read_bytes()).hexdigest()
         (p/"receipt.json").write_text(json.dumps(rec,indent=2,sort_keys=True)+"\n")
         ok,errors=verify_run.verify(p)
@@ -54,6 +57,7 @@ class ArtifactVerifierTests(unittest.TestCase):
         (p/"receipt.json").write_text(json.dumps(rec,indent=2,sort_keys=True)+"\n")
         ok,errors=verify_run.verify(p)
         self.assertFalse(ok); self.assertTrue(any("row count mismatch" in e or "policy matrix incomplete" in e for e in errors))
+
     def test_config_tamper_rejected(self):
         p=self.clone("config_bad")
         with (p/"config.json").open("a") as f: f.write("\n# altered config\n")
