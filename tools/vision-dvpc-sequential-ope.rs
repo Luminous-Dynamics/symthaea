@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use std::fs;
 
 const FIXTURE: &str = include_str!("../tests/fixtures/vision-dvpc-035-sequential.tsv");
-const HEADER: &str = "scenario_id\thorizon\ttarget_probability_a\ttrue_logging_probability_a\testimated_logging_probability_a\treward_mean_a\treward_mean_b";
+const HEADER: &str = "scenario_id\thorizon\ttarget_probability_a\ttrue_logging_schedule_a\testimated_logging_schedule_a\treward_mean_a\treward_mean_b";
 const MAX_HORIZON: usize = 8;
 const ALPHA: f64 = 0.05;
 const Z_975: f64 = 1.959_963_984_540_054;
@@ -20,8 +20,8 @@ struct Scenario {
     id: String,
     horizon: usize,
     target_a: f64,
-    true_logging_a: f64,
-    estimated_logging_a: f64,
+    true_logging_schedule: Vec<f64>,
+    estimated_logging_schedule: Vec<f64>,
     reward_a: f64,
     reward_b: f64,
 }
@@ -53,6 +53,20 @@ struct ScenarioResult {
 
 fn invalid(message: impl Into<String>) -> String {
     message.into()
+}
+
+fn parse_schedule(value: &str, horizon: usize, name: &str, line_number: usize) -> Result<Vec<f64>, String> {
+    let values: Vec<f64> = value.split(',')
+        .map(|field| field.parse::<f64>()
+            .map_err(|_| invalid(format!("line {line_number}: invalid {name} entry"))))
+        .collect::<Result<_, _>>()?;
+    if values.len() != horizon {
+        return Err(invalid(format!("line {line_number}: {name} must contain exactly {horizon} entries")));
+    }
+    if values.iter().any(|p| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+        return Err(invalid(format!("line {line_number}: {name} entries must be finite and in [0,1]")));
+    }
+    Ok(values)
 }
 
 fn parse_fixture(input: &str) -> Result<Vec<Scenario>, String> {
@@ -90,8 +104,8 @@ fn parse_fixture(input: &str) -> Result<Vec<Scenario>, String> {
             id: fields[0].to_owned(),
             horizon,
             target_a: parse(2, "target_probability_a")?,
-            true_logging_a: parse(3, "true_logging_probability_a")?,
-            estimated_logging_a: parse(4, "estimated_logging_probability_a")?,
+            true_logging_schedule: parse_schedule(fields[3], horizon, "true_logging_schedule_a", line_index + 2)?,
+            estimated_logging_schedule: parse_schedule(fields[4], horizon, "estimated_logging_schedule_a", line_index + 2)?,
             reward_a: parse(5, "reward_mean_a")?,
             reward_b: parse(6, "reward_mean_b")?,
         });
@@ -108,17 +122,19 @@ fn target_value(s: &Scenario) -> f64 {
 
 fn unsupported_target_mass(s: &Scenario) -> f64 {
     let target_b = 1.0 - s.target_a;
-    let logging_b = 1.0 - s.true_logging_a;
-    (if s.target_a > 0.0 && s.true_logging_a <= 0.0 { s.target_a } else { 0.0 })
-        + (if target_b > 0.0 && logging_b <= 0.0 { target_b } else { 0.0 })
+    let action_a_ever_logged = s.true_logging_schedule.iter().any(|p| *p > 0.0);
+    let action_b_ever_logged = s.true_logging_schedule.iter().any(|p| *p < 1.0);
+    (if s.target_a > 0.0 && !action_a_ever_logged { s.target_a } else { 0.0 })
+        + (if target_b > 0.0 && !action_b_ever_logged { target_b } else { 0.0 })
 }
 
-fn event_probabilities(s: &Scenario) -> [f64; 4] {
+fn event_probabilities(s: &Scenario, look: usize) -> [f64; 4] {
+    let logging_a = s.true_logging_schedule[look];
     [
-        s.true_logging_a * (1.0 - s.reward_a),
-        s.true_logging_a * s.reward_a,
-        (1.0 - s.true_logging_a) * (1.0 - s.reward_b),
-        (1.0 - s.true_logging_a) * s.reward_b,
+        logging_a * (1.0 - s.reward_a),
+        logging_a * s.reward_a,
+        (1.0 - logging_a) * (1.0 - s.reward_b),
+        (1.0 - logging_a) * s.reward_b,
     ]
 }
 
@@ -139,7 +155,9 @@ fn alpha_spending_hoeffding_radius(max_importance_weight: f64, look: usize) -> f
 
 fn evaluate(s: &Scenario) -> Result<ScenarioResult, String> {
     let truth = target_value(s);
-    let propensities_match = (s.true_logging_a - s.estimated_logging_a).abs() <= EPS;
+    let propensities_match = s.true_logging_schedule.iter()
+        .zip(&s.estimated_logging_schedule)
+        .all(|(truth, estimate)| (truth - estimate).abs() <= EPS);
     if unsupported_target_mass(s) > EPS {
         return Ok(ScenarioResult {
             scenario: s.clone(),
@@ -157,20 +175,21 @@ fn evaluate(s: &Scenario) -> Result<ScenarioResult, String> {
     }
 
     let target_b = 1.0 - s.target_a;
-    let estimated_logging_b = 1.0 - s.estimated_logging_a;
-    if (s.target_a > 0.0 && s.estimated_logging_a <= 0.0)
-        || (target_b > 0.0 && estimated_logging_b <= 0.0)
-    {
+    if s.estimated_logging_schedule.iter().any(|p| {
+        (s.target_a > 0.0 && *p <= 0.0) || (target_b > 0.0 && *p >= 1.0)
+    }) {
         return Err(invalid(format!("{}: estimated logging propensity is zero for a target-supported action", s.id)));
     }
-    let weight_a = if s.target_a > 0.0 { s.target_a / s.estimated_logging_a } else { 0.0 };
-    let weight_b = if target_b > 0.0 { target_b / estimated_logging_b } else { 0.0 };
-    let max_weight = weight_a.max(weight_b);
+    let max_weight = s.estimated_logging_schedule.iter()
+        .map(|p| {
+            (if s.target_a > 0.0 { s.target_a / p } else { 0.0 })
+                .max(if target_b > 0.0 { target_b / (1.0 - p) } else { 0.0 })
+        })
+        .fold(0.0_f64, f64::max);
     if !max_weight.is_finite() || max_weight <= 0.0 {
         return Err(invalid(format!("{}: invalid maximum importance weight", s.id)));
     }
 
-    let probabilities = event_probabilities(s);
     let state_count = 4usize.pow(s.horizon as u32);
     let mut mass = 0.0;
     let mut wald_coverage = vec![0.0_f64; s.horizon + 1];
@@ -188,13 +207,23 @@ fn evaluate(s: &Scenario) -> Result<ScenarioResult, String> {
         let mut code = state;
         let mut probability = 1.0;
         let mut samples = Vec::with_capacity(s.horizon);
-        for _ in 0..s.horizon {
+        for look in 0..s.horizon {
             let event = code % 4;
             code /= 4;
+            let probabilities = event_probabilities(s, look);
             probability *= probabilities[event];
             let action_a = event < 2;
             let reward = if event % 2 == 0 { 0.0 } else { 1.0 };
-            samples.push((if action_a { weight_a } else { weight_b }) * reward);
+            let estimated_logging_a = s.estimated_logging_schedule[look];
+            let estimated_logging_b = 1.0 - estimated_logging_a;
+            let weight = if action_a {
+                if s.target_a > 0.0 { s.target_a / estimated_logging_a } else { 0.0 }
+            } else if target_b > 0.0 {
+                target_b / estimated_logging_b
+            } else {
+                0.0
+            };
+            samples.push(weight * reward);
         }
         if probability <= 0.0 {
             continue;
@@ -404,10 +433,15 @@ mod tests {
     #[test]
     fn fixture_pins_healthy_weak_misspecified_and_zero_support() {
         let scenarios = parse_fixture(FIXTURE).unwrap();
-        assert_eq!(scenarios.len(), 5);
-        assert!(scenarios.iter().any(|s| s.true_logging_a == 0.99 && s.estimated_logging_a == 0.99));
-        assert!(scenarios.iter().any(|s| (s.true_logging_a - s.estimated_logging_a).abs() > EPS));
+        assert_eq!(scenarios.len(), 6);
+        assert!(scenarios.iter().any(|s| s.true_logging_schedule.iter().any(|p| *p == 0.99)
+            && s.true_logging_schedule.iter().zip(&s.estimated_logging_schedule).all(|(a, b)| (a - b).abs() <= EPS)));
+        assert!(scenarios.iter().any(|s| s.true_logging_schedule.iter().zip(&s.estimated_logging_schedule)
+            .any(|(a, b)| (a - b).abs() > EPS)));
         assert!(scenarios.iter().any(|s| unsupported_target_mass(s) > EPS));
+        assert!(scenarios.iter().any(|s| s.id == "rotating_logger"
+            && s.true_logging_schedule.iter().any(|p| *p < 0.6)
+            && s.true_logging_schedule.iter().any(|p| *p > 0.95)));
     }
 
     #[test]
@@ -430,7 +464,7 @@ mod tests {
 
     #[test]
     fn alpha_spending_sequence_preserves_coverage_under_correct_propensities() {
-        for id in ["healthy_correct", "weak_overlap_010", "weak_overlap_001"] {
+        for id in ["healthy_correct", "weak_overlap_010", "weak_overlap_001", "rotating_logger"] {
             let r = result(id);
             assert!(r.propensities_match);
             assert!(r.sequence_simultaneous_coverage.unwrap() + 1e-9 >= 1.0 - ALPHA,
@@ -468,7 +502,7 @@ mod tests {
     fn malformed_reward_values_and_duplicate_scenario_ids_fail_closed() {
         let invalid_reward = FIXTURE.replace("\t0.2\t0.8\n", "\t1.2\t0.8\n");
         assert!(parse_fixture(&invalid_reward).is_err());
-        let duplicate = format!("{FIXTURE}healthy_correct\t8\t0.5\t0.5\t0.5\t0.2\t0.8\n");
+        let duplicate = format!("{FIXTURE}healthy_correct\t8\t0.5\t0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5\t0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5\t0.2\t0.8\n");
         assert!(parse_fixture(&duplicate).is_err());
     }
 
