@@ -78,6 +78,7 @@ The source paper itself warns that further work is needed, including functional 
 - [Hypothesis ledger schema](HYPOTHESIS_LEDGER.schema.json) — minimum structure for traceable, falsifiable claims.
 - [Industry and SOTA comparison](INDUSTRY_AND_SOTA.md) — task-matched comparators and prospective superiority gates.
 - [Initial candidate research questions](CANDIDATE_HYPOTHESES.md) — published priors separated from proposed tests.
+- [Rust dataset audit CLI](../../../crates/domains/symthaea-hiv-audit/README.md) — local checksums, CSV shape, UUID uniqueness and pairwise joins.
 
 ## Primary scientific sources
 
