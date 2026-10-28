@@ -17,7 +17,7 @@
 use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, MemoryContextItem, ResolvedMemoryContextItem};
 use std::collections::BTreeSet;
 use symthaea_core::hdc::BinaryHV;
-use symthaea_hdc_store::{HdcStore, HdcStoreReader, IndexOpenPolicy};
+use symthaea_hdc_store::{HdcStore, HdcStoreReader};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -621,10 +621,11 @@ impl EvidenceDiskStore {
         let evidence_index = EvidenceIndex::restore_snapshot(&snapshot_bytes)?;
         if let Some(identity) = manifest.hdc_store_identity() {
             identity.validate_for_recovery()?;
-            let reader = HdcStoreReader::open_with_index_policy(
-                &dir.join(INDEX_FILE),
-                IndexOpenPolicy::Rebuild,
-            ).map_err(|error| format!("committed HDC store failed independent reopen: {error}"))?;
+            // Integrity validation needs the canonical data reader, not an ANN
+            // sidecar rebuild. ANN materialization is a separate query policy;
+            // rebuilding it here would add cost to every exact/lexical query.
+            let reader = HdcStoreReader::open(&dir.join(INDEX_FILE))
+                .map_err(|error| format!("committed HDC store failed independent reopen: {error}"))?;
             if reader.generation() != identity.store_generation {
                 return Err("committed HDC internal generation does not match manifest identity".into());
             }
