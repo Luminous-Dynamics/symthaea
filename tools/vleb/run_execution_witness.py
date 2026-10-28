@@ -303,7 +303,7 @@ def record_execution(
     receipt: dict[str, Any] = {
         "schema_version": "vleb-execution-witness-v1",
         **expected_identity(plan),
-        "plan_path": str(safe_relative(plan_path.as_posix())),
+        "plan_path": str(safe_relative(plan_relative)),
         "plan_sha256": expected_plan_sha256,
         "verifier": {
             "id": plan["verifier"]["id"],
