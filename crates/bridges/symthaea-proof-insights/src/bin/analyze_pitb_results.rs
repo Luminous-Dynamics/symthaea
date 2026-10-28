@@ -27,6 +27,7 @@ const EXPECTED_UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a
 const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
 // Conservative minimum, not a substitute for run-specific simulation-based power.
 const MIN_CONFIRMATORY_FAMILY_CLUSTERS: usize = 20;
+const POWER_ASSOCIATION_SIMULTANEOUS_Z: f64 = 2.13;
 const REQUIRED_EXPOSED_FAMILY: &str = "089";
 const EXPECTED_SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
 const EXPECTED_SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
