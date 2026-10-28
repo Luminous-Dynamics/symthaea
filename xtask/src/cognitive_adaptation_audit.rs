@@ -89,10 +89,7 @@ pub fn evaluate_file(
     let manifest_bytes = fs::read(&manifest_path)
         .with_context(|| format!("reading audit bundle {}", manifest_path.display()))?;
     let actual_bundle_sha256 = sha256_hex(&manifest_bytes);
-    ensure!(
-        actual_bundle_sha256 == expected_bundle_sha256,
-        "audit bundle digest does not match the independently supplied preregistration digest"
-    );
+    validate_expected_bundle_digest(&actual_bundle_sha256, expected_bundle_sha256)?;
     let bundle: AuditBundle = serde_json::from_slice(&manifest_bytes)
         .with_context(|| format!("parsing audit bundle {}", manifest_path.display()))?;
     ensure!(bundle.schema_version == 1, "audit bundle schema_version must be 1");
@@ -156,6 +153,21 @@ pub fn evaluate_file(
 
     let panel_input: AdaptationPanelInput = serde_json::from_slice(&panel_bytes)
         .context("parsing adaptation panel input")?;
+    let protocol_scenarios = grid
+        .get("registered_scenario_ids")
+        .and_then(serde_json::Value::as_array)
+        .context("protocol complete_grid must declare registered_scenario_ids")?
+        .iter()
+        .map(|value| {
+            value.as_str()
+                .context("registered_scenario_ids must contain only strings")
+                .map(str::to_owned)
+        })
+        .collect::<anyhow::Result<BTreeSet<_>>>()?;
+    ensure!(
+        protocol_scenarios == panel_input.expected_scenario_ids.iter().cloned().collect(),
+        "panel scenario IDs differ from the preregistered protocol"
+    );
     let preview = cognitive_adaptation_panel::evaluate(panel_input.clone())
         .context("validating panel records before independent replay audit")?;
     ensure!(
@@ -341,6 +353,15 @@ fn validate_relative_path(path: &Path, label: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn validate_expected_bundle_digest(actual: &str, expected: &str) -> anyhow::Result<()> {
+    validate_sha256(expected, "expected_bundle_sha256")?;
+    ensure!(
+        actual == expected,
+        "audit bundle digest does not match the independently supplied preregistration digest"
+    );
+    Ok(())
+}
+
 fn validate_sha256(value: &str, label: &str) -> anyhow::Result<()> {
     ensure!(
         value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()),
@@ -382,7 +403,8 @@ mod tests {
     #[test]
     fn requires_an_independently_pinned_bundle_digest() {
         let expected = "a".repeat(64);
-        assert!(validate_sha256(&expected, "expected_bundle_sha256").is_ok());
-        assert!(validate_sha256("not-pinned", "expected_bundle_sha256").is_err());
+        assert!(validate_expected_bundle_digest(&expected, &expected).is_ok());
+        assert!(validate_expected_bundle_digest(&"b".repeat(64), &expected).is_err());
+        assert!(validate_expected_bundle_digest(&expected, "not-pinned").is_err());
     }
 }
