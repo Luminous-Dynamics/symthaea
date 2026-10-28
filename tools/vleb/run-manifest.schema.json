@@ -421,7 +421,11 @@
         "auditor_sha256",
         "schema_path",
         "schema_sha256",
-        "claims"
+        "claims",
+        "witness_receipt_schema_path",
+        "witness_receipt_schema_sha256",
+        "witness_receipt_producer_path",
+        "witness_receipt_producer_sha256"
       ],
       "properties": {
         "auditor_path": {
@@ -464,6 +468,18 @@
               }
             }
           }
+        },
+        "witness_receipt_schema_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "witness_receipt_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "witness_receipt_producer_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "witness_receipt_producer_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
