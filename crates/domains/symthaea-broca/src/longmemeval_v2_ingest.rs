@@ -553,6 +553,39 @@ mod tests {
             .unwrap_err()
             .contains("parent-directory traversal")
         );
+
+        let mut absolute = base.clone();
+        absolute["states"][0]["screenshot"] =
+            Value::String("/tmp/outside.png".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [absolute.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .unwrap_err()
+            .contains("relative beneath screenshots")
+        );
+
+        let mut invalid_step = base.clone();
+        invalid_step["states"][0]["step"] = Value::String("not-an-integer".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [invalid_step.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .is_err()
+        );
+
+        let mut invalid_action = base;
+        invalid_action["states"][0]["action"] =
+            serde_json::json!({"type": "click", "target": "search"});
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [invalid_action.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .is_err()
+        );
     }
 
     #[test]
