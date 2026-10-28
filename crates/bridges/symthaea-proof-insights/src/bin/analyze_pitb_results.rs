@@ -909,6 +909,251 @@ fn simulate_power_scenario(
     })
 }
 
+fn simulate_weak_null_scenario(
+    family_target_counts: &[FamilyTargetCount],
+    baseline_rate: f64,
+    requested_effect_sd: f64,
+    icc: f64,
+    simulations: usize,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<WeakNullScenario> {
+    if family_target_counts.is_empty()
+        || family_target_counts
+            .iter()
+            .any(|family| family.eligible_target_count == 0)
+    {
+        bail!("weak-null calibration requires nonempty family sizes");
+    }
+    if !baseline_rate.is_finite() || !(0.0..=1.0).contains(&baseline_rate) {
+        bail!("weak-null baseline rate must be a finite probability");
+    }
+    if !requested_effect_sd.is_finite() || requested_effect_sd < 0.0 {
+        bail!("weak-null family-effect SD must be finite and nonnegative");
+    }
+    if !icc.is_finite() || !(0.0..1.0).contains(&icc) {
+        bail!("weak-null family ICC must lie in [0,1)");
+    }
+    if simulations == 0 || bootstrap_replicates == 0 {
+        bail!("weak-null simulation and bootstrap counts must be positive");
+    }
+
+    let total_targets: usize = family_target_counts
+        .iter()
+        .map(|family| family.eligible_target_count)
+        .sum();
+    if total_targets == 0 {
+        bail!("weak-null calibration has zero eligible targets");
+    }
+
+    let mut rng = SplitMix64 { state: seed };
+    let mut false_claims = 0_usize;
+    let mut degenerate_interval_trials = 0_usize;
+    let mut sum_effect = 0.0;
+    let mut sum_realized_effect_sd = 0.0;
+    for _ in 0..simulations {
+        let (simulated_families, realized_effect_sd) = simulate_weak_null_matched_study(
+            family_target_counts,
+            baseline_rate,
+            requested_effect_sd,
+            icc,
+            &mut rng,
+        )?;
+        let total_delta: i64 = simulated_families
+            .iter()
+            .map(|family| family.paired_delta_sum)
+            .sum();
+        let observed_effect = total_delta as f64 / total_targets as f64;
+        let [lower, upper] = simulated_cluster_bootstrap_interval(
+            &simulated_families,
+            bootstrap_replicates,
+            &mut rng,
+        );
+        if upper - lower <= f64::EPSILON {
+            degenerate_interval_trials += 1;
+        }
+        sum_effect += observed_effect;
+        sum_realized_effect_sd += realized_effect_sd;
+        if confirmatory_utility_gate(
+            observed_effect,
+            lower,
+            upper,
+            family_target_counts.len(),
+        )
+        .2
+        {
+            false_claims += 1;
+        }
+    }
+
+    let false_claim_probability = false_claims as f64 / simulations as f64;
+    let (false_claim_lower, false_claim_upper) = wilson_interval(false_claims, simulations);
+    Ok(WeakNullScenario {
+        status: "estimated".to_string(),
+        assumed_family_icc: icc,
+        requested_family_effect_heterogeneity_sd_percentage_points: requested_effect_sd * 100.0,
+        study_simulations: simulations,
+        bootstrap_replicates_per_simulated_study: bootstrap_replicates,
+        false_claims,
+        degenerate_interval_trials,
+        estimated_false_claim_probability: Some(false_claim_probability),
+        monte_carlo_standard_error: Some(
+            (false_claim_probability * (1.0 - false_claim_probability) / simulations as f64)
+                .sqrt(),
+        ),
+        false_claim_probability_lower_95: Some(false_claim_lower),
+        false_claim_probability_upper_95: Some(false_claim_upper),
+        mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
+        mean_realized_family_effect_heterogeneity_sd_percentage_points: Some(
+            sum_realized_effect_sd / simulations as f64 * 100.0,
+        ),
+        interpretation: "Weak-null calibration: treatment effects vary by family but are recentered to exactly zero target-weighted mean within each simulated study. The gate false-claim rate is estimated under the declared ICC and family-size design; it does not cover every possible outcome-dependence or missingness mechanism.".to_string(),
+    })
+}
+
+fn simulate_weak_null_matched_study(
+    family_target_counts: &[FamilyTargetCount],
+    baseline_rate: f64,
+    requested_effect_sd: f64,
+    icc: f64,
+    rng: &mut SplitMix64,
+) -> Result<(Vec<SimulatedFamily>, f64)> {
+    let baseline_rates: Vec<f64> = family_target_counts
+        .iter()
+        .map(|_| sample_family_rate(baseline_rate, icc, rng))
+        .collect();
+    let treatment_effects = sample_centered_weak_null_family_effects(
+        family_target_counts,
+        &baseline_rates,
+        requested_effect_sd,
+        rng,
+    )?;
+    let realized_effect_sd = weighted_family_effect_sd(&treatment_effects, family_target_counts);
+    let mut families = Vec::with_capacity(family_target_counts.len());
+
+    for ((family, baseline_family_rate), effect) in family_target_counts
+        .iter()
+        .zip(baseline_rates)
+        .zip(treatment_effects)
+    {
+        let treatment_family_rate = (baseline_family_rate + effect).clamp(0.0, 1.0);
+        let mut paired_delta_sum = 0_i64;
+        for _ in 0..family.eligible_target_count {
+            let baseline_success = rng.uniform01() < baseline_family_rate;
+            let treatment_success = rng.uniform01() < treatment_family_rate;
+            paired_delta_sum += (if treatment_success { 1_i64 } else { 0_i64 })
+                - (if baseline_success { 1_i64 } else { 0_i64 });
+        }
+        families.push(SimulatedFamily {
+            target_count: family.eligible_target_count,
+            paired_delta_sum,
+        });
+    }
+    Ok((families, realized_effect_sd))
+}
+
+fn sample_centered_weak_null_family_effects(
+    family_target_counts: &[FamilyTargetCount],
+    baseline_family_rates: &[f64],
+    requested_effect_sd: f64,
+    rng: &mut SplitMix64,
+) -> Result<Vec<f64>> {
+    if family_target_counts.is_empty()
+        || family_target_counts.len() != baseline_family_rates.len()
+        || family_target_counts
+            .iter()
+            .any(|family| family.eligible_target_count == 0)
+    {
+        bail!("weak-null family counts and baseline rates must be nonempty and aligned");
+    }
+    if !requested_effect_sd.is_finite() || requested_effect_sd < 0.0 {
+        bail!("requested weak-null effect SD must be finite and nonnegative");
+    }
+    if baseline_family_rates
+        .iter()
+        .any(|rate| !rate.is_finite() || !(0.0..=1.0).contains(rate))
+    {
+        bail!("weak-null baseline family rates must be finite probabilities");
+    }
+    if requested_effect_sd == 0.0 {
+        return Ok(vec![0.0; family_target_counts.len()]);
+    }
+
+    let total_targets: f64 = family_target_counts
+        .iter()
+        .map(|family| family.eligible_target_count as f64)
+        .sum();
+    let raw: Vec<f64> = (0..family_target_counts.len())
+        .map(|_| rng.normal())
+        .collect();
+    let weighted_mean = raw
+        .iter()
+        .zip(family_target_counts)
+        .map(|(value, family)| value * family.eligible_target_count as f64)
+        .sum::<f64>()
+        / total_targets;
+    let centered: Vec<f64> = raw.iter().map(|value| value - weighted_mean).collect();
+    let centered_sd = weighted_family_effect_sd(&centered, family_target_counts);
+    if centered_sd <= f64::EPSILON {
+        return Ok(vec![0.0; family_target_counts.len()]);
+    }
+
+    let standardized: Vec<f64> = centered
+        .iter()
+        .map(|value| value / centered_sd)
+        .collect();
+    // A single common scale factor preserves the exact target-weighted zero
+    // mean while keeping every treatment probability inside [0,1]. The
+    // realized effect SD is reported because boundary constraints can shrink
+    // the requested heterogeneity.
+    let mut feasible_scale = 1.0_f64;
+    for (standard_effect, baseline_rate) in standardized.iter().zip(baseline_family_rates) {
+        let proposed_effect = standard_effect * requested_effect_sd;
+        if proposed_effect > 0.0 {
+            feasible_scale = feasible_scale.min((1.0 - baseline_rate) / proposed_effect);
+        } else if proposed_effect < 0.0 {
+            feasible_scale = feasible_scale.min(baseline_rate / -proposed_effect);
+        }
+    }
+    feasible_scale = feasible_scale.clamp(0.0, 1.0);
+    Ok(standardized
+        .iter()
+        .map(|effect| effect * requested_effect_sd * feasible_scale)
+        .collect())
+}
+
+fn weighted_family_effect_sd(
+    effects: &[f64],
+    family_target_counts: &[FamilyTargetCount],
+) -> f64 {
+    if effects.is_empty() || effects.len() != family_target_counts.len() {
+        return 0.0;
+    }
+    let total_targets: f64 = family_target_counts
+        .iter()
+        .map(|family| family.eligible_target_count as f64)
+        .sum();
+    if total_targets <= 0.0 {
+        return 0.0;
+    }
+    let mean = effects
+        .iter()
+        .zip(family_target_counts)
+        .map(|(effect, family)| effect * family.eligible_target_count as f64)
+        .sum::<f64>()
+        / total_targets;
+    let variance = effects
+        .iter()
+        .zip(family_target_counts)
+        .map(|(effect, family)| {
+            let difference = effect - mean;
+            difference * difference * family.eligible_target_count as f64
+        })
+        .sum::<f64>()
+        / total_targets;
+    variance.max(0.0).sqrt()
+}
+
 fn simulate_matched_study(
     family_target_counts: &[FamilyTargetCount],
     baseline_rate: f64,
