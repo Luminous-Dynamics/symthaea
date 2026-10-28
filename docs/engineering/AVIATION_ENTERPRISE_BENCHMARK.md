@@ -328,6 +328,6 @@ Follow-up: [AVIATION-ENTERPRISE-011 #8795](https://github.com/Luminous-Dynamics/
 
 The new [ADRG-001 readiness gate](./AVIATION_DECISION_READINESS_GATE.md) composes feature-audit status, split-integrity status, independent plan-verifier status, drift-monitor status, distributionally robust eligibility, network harm eligibility and a matching active calibration receipt. It returns every blocker in deterministic order and the positive state is only `EligibleForHumanReview`. The synthetic contract example now exercises this composition using a verified tiny plan, a synthetic network comparison and a sequence that triggers the online drift alarm; expected readiness is Blocked, demonstrating that a passing optimization/cost result does not override a stale-regime alarm.
 
-Fourteen unit tests and four additional public-API integration tests are defined for the composition gate, but remain uncompiled. This API trusts the reports it receives; actual integration requires trusted verifier outputs and cryptographically bound run receipts.
+Fifteen unit tests and four additional public-API integration tests are defined for the composition gate, but remain uncompiled. This API trusts the reports it receives; actual integration requires trusted verifier outputs and cryptographically bound run receipts.
 
 Follow-up: [AVIATION-ENTERPRISE-012 #8798](https://github.com/Luminous-Dynamics/symthaea/issues/8798).
