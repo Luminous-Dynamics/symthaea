@@ -1,0 +1,67 @@
+name: QOBLIB MIS Byte Manifest
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-quantum-comp/src/mis_evidence.rs"
+      - "crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs"
+      - "docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv"
+      - ".github/workflows/qoblib-mis-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-source-manifest:
+    name: Verify pinned QOBLIB MIS inputs and emit SHA-256 manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Symthaea commit under test
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned QOBLIB dataset revision
+        uses: actions/checkout@v4
+        with:
+          repository: ZIB-AOPT/QOBLIB
+          ref: 1e0e7c523cd9707dd541cc9e5a3086125d4da3c7
+          path: qoblib
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Record toolchain
+        run: rustc --version --verbose
+
+      - name: Compile dependency-free verifier and manifest CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --crate-name symthaea_quantum_comp --crate-type lib \
+            crates/domains/symthaea-quantum-comp/src/mis_evidence.rs \
+            --out-dir "$RUNNER_TEMP"
+          rustc --edition=2024 \
+            --extern "symthaea_quantum_comp=$RUNNER_TEMP/libsymthaea_quantum_comp.rlib" \
+            crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs \
+            -o "$RUNNER_TEMP/qoblib-mis-manifest"
+
+      - name: Verify all pinned source files and compute both SHA-256 identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/qoblib-mis-manifest" \
+            "$GITHUB_WORKSPACE/qoblib" \
+            "$GITHUB_WORKSPACE/docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv" \
+            "$RUNNER_TEMP/qoblib-mis-sha256-manifest.tsv"
+          count="$(grep -vc '^#' "$RUNNER_TEMP/qoblib-mis-sha256-manifest.tsv")"
+          test "$count" -eq 50
+          sha256sum "$RUNNER_TEMP/qoblib-mis-sha256-manifest.tsv"
+
+      - name: Upload reproducible SHA-256 manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: qoblib-mis-sha256-manifest
+          path: "${{ runner.temp }}/qoblib-mis-sha256-manifest.tsv"
+          if-no-files-found: error
+          retention-days: 90

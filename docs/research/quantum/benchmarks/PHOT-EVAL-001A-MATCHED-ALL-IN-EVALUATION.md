@@ -56,25 +56,25 @@ The stacked follow-up implementation in `mis_evidence.rs` now defines a narrow c
 - Rejects non-canonical line endings, ambiguous decimal encodings, duplicate/unsorted edges, self-loops, out-of-range vertices, duplicate/unsorted candidate vertices, and declared-count mismatches.
 - Counts selected-edge conflicts directly from the canonical graph. A candidate with a conflict gets a conflict receipt, never a target hit; a feasible candidate below the frozen target also is not a hit.
 - Constructs a deterministic receipt from the recomputed graph/candidate digests, verifier digest, target, size, conflict count, and verdict.
-- `verify_mis_candidate_with_receipt` re-runs verification and requires the actual persisted receipt bytes to exactly match the reconstructed receipt bytes; it also recomputes the receipt SHA-256.
-- Returns an opaque `VerifiedMisCandidate` whose fields cannot be constructed or modified through the crate's safe public API. The matched evaluator requires this evidence token and rebinds its metadata to the trial and report.
+- Adds `MisEvidenceContext` and `verify_mis_candidate_for_trial`, binding the protocol digest, unique trial ID, pair ID, and seed identity into the canonical receipt bytes. The matched evaluator rejects an unscoped receipt or a receipt whose context differs from the enclosing trial/report; cross-trial receipt swaps are explicitly tested.
+- `verify_mis_candidate_with_receipt` and the trial-scoped variant re-run verification and require the actual persisted receipt bytes to exactly match the reconstructed receipt bytes; both recompute the receipt SHA-256.
+- Returns an opaque `VerifiedMisCandidate` whose fields cannot be constructed or modified through the crate's safe public API. The matched evaluator requires a trial-scoped token and rebinds its graph/verifier/candidate metadata and experiment context to the trial and report.
 
 The SHA-256 implementation is dependency-free and has known-answer vectors for empty input, `abc`, the standard quick-brown-fox vector, multi-block input, and lengths around SHA-256 padding boundaries. These tests are authored but have not yet been executed in Rust at the time of this draft; exact-head CI remains required.
 
-**Trust limit:** hashes establish byte identity/integrity, not signer identity or trusted execution. The verifier digest is supplied by the caller and must be pinned to the actual reviewed verifier build/source outside this module. This module does not sign receipts or authenticate the machine that executed it. The existing `ResearchArtifactReceipt` still uses a non-cryptographic FNV fingerprint and is not suitable as an authenticated verifier receipt. Do not claim malicious-producer resistance, independent lab reproduction, or cryptographic attestation until a separate trust mechanism is implemented and audited.
+**Trust limit:** hashes establish byte identity/integrity, not signer identity or trusted execution. Trial-context binding detects accidental or incorrect receipt substitution, but the context identifiers are supplied by the caller; this does not prove that the candidate originated from the claimed live solver process. The verifier digest must be pinned to the actual reviewed verifier build/source outside this module. This module does not sign receipts or authenticate the machine that executed it. The existing `ResearchArtifactReceipt` still uses a non-cryptographic FNV fingerprint and is not suitable as an authenticated verifier receipt. Do not claim malicious-producer resistance, independent lab reproduction, or cryptographic attestation until a separate trust mechanism is implemented and audited.
 
 ## Pinned QOBLIB input manifest
 
 The following files were added with the verifier follow-up:
 
-- `QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv` pins the 50 graph file paths, Git blob SHA-1s, byte sizes, immutable QOBLIB commit, and data-license reference.
-- `crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs` is a Rust CLI that validates the checkout's exact commit, checks the complete `.gph` inventory, validates each file's size and Git blob ID, and emits the **raw-source SHA-256** and **canonical-graph SHA-256** from the file bytes.
-- Invocation after obtaining a clean QOBLIB clone at the pinned commit:
-  `cargo run -p symthaea-quantum-comp --example qoblib_mis_manifest -- <qoblib-root> docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv <output-manifest.tsv>`
+- `QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv` pins the 50 graph file paths, Git blob SHA-1s, byte sizes, expected vertex/edge counts, immutable QOBLIB commit, and data-license reference.
+- `crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs` validates the checkout's exact commit, complete `.gph` inventory, each file's size and Git blob ID, and each graph's dimensions against the pinned catalog. It emits **raw-source SHA-256** and **canonical-graph SHA-256** from actual file bytes.
+- `.github/workflows/qoblib-mis-manifest.yml` compiles the dependency-free verifier and CLI directly with the pinned Rust toolchain, checks all 50 files at the pinned QOBLIB commit, and uploads `qoblib-mis-sha256-manifest.tsv` as a workflow artifact if successful. It can also be invoked manually.
 
-The raw source hash preserves dataset provenance; the canonical graph hash identifies the exact semantic graph bytes consumed by the independent verifier. Keep both. The generated manifest is not populated into the preregistration template until the tool has run successfully against the pinned graph bytes and the split/target/budget fields are frozen.
+The raw source hash preserves dataset provenance; the canonical graph hash identifies the exact semantic graph bytes consumed by the independent verifier. Keep both. The generated manifest is not populated into the preregistration template until this integration workflow succeeds against the pinned graph bytes and the split/target/budget fields are frozen.
 
-The CLI parser and canonicalizer/verifier have standalone `rustc --test` coverage in `scripts/research/run-photonic-contract-tests.sh`. Those tests exercise the parser and algorithm contracts; they do **not** execute the real Git checkout and 50-file hashing loop. That integration run remains necessary before declaring the data manifest complete.
+The CLI parser and canonicalizer/verifier have standalone `rustc --test` coverage in `scripts/research/run-photonic-contract-tests.sh`. Those tests exercise the parser and algorithm contracts; the separate `qoblib-mis-manifest.yml` workflow covers the actual Git checkout and all 50 source files. Until that workflow passes at an exact commit, raw/canonical SHA-256 values remain pending.
 
 ## Negative controls in unit tests
 

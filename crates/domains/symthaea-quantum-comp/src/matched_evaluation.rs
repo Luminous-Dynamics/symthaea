@@ -19,11 +19,13 @@
 #[path = "mis_evidence.rs"]
 mod mis_evidence;
 pub use self::mis_evidence::{
-    MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, sha256_hex,
-    verify_mis_candidate, verify_mis_candidate_with_receipt,
+    MisEvidenceContext, MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, encode_canonical_mis_candidate, sha256_hex,
+    verify_mis_candidate, verify_mis_candidate_for_trial, verify_mis_candidate_for_trial_with_receipt,
+    verify_mis_candidate_with_receipt,
 };
 
-/// Evidence minted only by re-hashing and independently verifying canonical MIS artifacts.
+/// Opaque evidence minted by the MIS verifier and scoped to one experiment trial.
+/// A generic unscoped verifier result cannot satisfy the matched evaluator.
 pub type VerifierReceiptEvidence = VerifiedMisCandidate;
 
 use std::collections::{HashMap, HashSet};
@@ -234,7 +236,7 @@ pub enum CandidateVerification {
 /// One attempted solver run, including failed and unverified outcomes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchedTrialRecord {
-    /// Unique identifier for this attempted run within an arm.
+    /// Globally unique identifier for this attempted run across all comparison arms.
     pub trial_id: String,
     /// Pair identifier shared by the corresponding baseline/candidate trial.
     pub pair_id: String,
@@ -270,7 +272,7 @@ impl MatchedTrialRecord {
     ///
     /// The report-level validator additionally binds the receipt to the report's
     /// graph and verifier digests before a comparison is accepted.
-    fn verified_target_hit(&self, target_size: usize) -> bool {
+    fn verified_target_hit(&self, target_size: usize, protocol_sha256: &str) -> bool {
         if self.verification != CandidateVerification::VerifiedIndependentSet
             || self.conflict_count != Some(0)
         {
@@ -285,6 +287,9 @@ impl MatchedTrialRecord {
         let Some(receipt) = self.verifier_receipt.as_ref() else {
             return false;
         };
+        let Some(context) = receipt.context() else {
+            return false;
+        };
         size >= target_size
             && validate_sha256("candidate_sha256", candidate_sha256).is_ok()
             && validate_sha256("verifier_receipt_sha256", receipt.receipt_sha256()).is_ok()
@@ -296,6 +301,10 @@ impl MatchedTrialRecord {
             && receipt.candidate_size() == size
             && receipt.conflict_count() == 0
             && receipt.candidate_sha256() == candidate_sha256
+            && context.protocol_sha256() == protocol_sha256
+            && context.trial_id() == self.trial_id
+            && context.pair_id() == self.pair_id
+            && context.seed() == self.seed
     }
 
     fn validate(
@@ -303,6 +312,7 @@ impl MatchedTrialRecord {
         instance_sha256: &str,
         target_size: usize,
         verifier_sha256: &str,
+        protocol_sha256: &str,
     ) -> Result<(), MatchedEvaluationError> {
         if self.trial_id.trim().is_empty() {
             return Err(MatchedEvaluationError::EmptyTrialId);
@@ -406,6 +416,12 @@ impl MatchedTrialRecord {
             let candidate_size = self.candidate_size.ok_or_else(|| {
                 MatchedEvaluationError::InconsistentCandidateRecord(self.trial_id.clone())
             })?;
+            let context = receipt.context().ok_or_else(|| {
+                MatchedEvaluationError::VerifierReceiptMismatch {
+                    trial_id: self.trial_id.clone(),
+                    field: "trial_context",
+                }
+            })?;
             for (field, matches) in [
                 ("instance_sha256", receipt.instance_sha256() == instance_sha256),
                 ("verifier_sha256", receipt.verifier_sha256() == verifier_sha256),
@@ -413,6 +429,10 @@ impl MatchedTrialRecord {
                 ("target_size", receipt.target_size() == target_size),
                 ("candidate_size", receipt.candidate_size() == candidate_size),
                 ("conflict_count", Some(receipt.conflict_count()) == self.conflict_count),
+                ("protocol_sha256", context.protocol_sha256() == protocol_sha256),
+                ("trial_id", context.trial_id() == self.trial_id),
+                ("pair_id", context.pair_id() == self.pair_id),
+                ("seed", context.seed() == self.seed),
                 ("verdict", match self.verification {
                     CandidateVerification::VerifiedIndependentSet =>
                         receipt.verdict() == MisEvidenceVerdict::VerifiedIndependentSet,
@@ -525,7 +545,12 @@ impl MatchedArmReport {
         let mut trial_ids = HashSet::with_capacity(self.trials.len());
         let mut pair_ids = HashSet::with_capacity(self.trials.len());
         for trial in &self.trials {
-            trial.validate(&self.instance_sha256, self.target_size, &self.verifier_sha256)?;
+            trial.validate(
+                &self.instance_sha256,
+                self.target_size,
+                &self.verifier_sha256,
+                &self.protocol_sha256,
+            )?;
             if !trial_ids.insert(trial.trial_id.clone()) {
                 return Err(MatchedEvaluationError::DuplicateTrialId(
                     trial.trial_id.clone(),
@@ -861,6 +886,22 @@ pub fn compare_matched_arms(
 ) -> Result<MatchedComparisonSummary, MatchedEvaluationError> {
     baseline.validate()?;
     candidate.validate()?;
+
+    // Receipt context includes trial ID but not arm ID. Enforce global uniqueness across
+    // both arms so the same run identity cannot be reused for two different methods.
+    let baseline_trial_ids: HashSet<&str> = baseline
+        .trials
+        .iter()
+        .map(|trial| trial.trial_id.as_str())
+        .collect();
+    if let Some(duplicate) = candidate
+        .trials
+        .iter()
+        .find(|trial| baseline_trial_ids.contains(trial.trial_id.as_str()))
+    {
+        return Err(MatchedEvaluationError::DuplicateTrialId(duplicate.trial_id.clone()));
+    }
+
     if !time_tie_tolerance_ms.is_finite() || time_tie_tolerance_ms < 0.0 {
         return Err(MatchedEvaluationError::InvalidTieTolerance);
     }
@@ -928,8 +969,8 @@ pub fn compare_matched_arms(
             ));
         }
 
-        let baseline_hit = baseline_trial.verified_target_hit(baseline.target_size);
-        let candidate_hit = candidate_trial.verified_target_hit(candidate.target_size);
+        let baseline_hit = baseline_trial.verified_target_hit(baseline.target_size, &baseline.protocol_sha256);
+        let candidate_hit = candidate_trial.verified_target_hit(candidate.target_size, &candidate.protocol_sha256);
         if baseline_hit {
             baseline_target_hits += 1;
         }
@@ -1276,6 +1317,7 @@ mod tests {
 
     const TEST_GRAPH: &[u8] = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 6\\nedges 0\\n";
     const TEST_VERIFIER: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const TEST_PROTOCOL: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
     fn candidate_bytes(size: usize) -> Vec<u8> {
         let mut bytes = format!("SYMTHEA-MIS-CANDIDATE-V1\\ncount {size}\\n");
@@ -1297,8 +1339,16 @@ mod tests {
         energy: EnergyRecord,
     ) -> MatchedTrialRecord {
         let candidate = candidate_bytes(size);
-        let evidence = verify_mis_candidate(graph_bytes, &candidate, target, verifier_sha256)
-            .expect("synthetic candidate and graph are canonical");
+        let context = MisEvidenceContext::new(TEST_PROTOCOL, id, pair, seed)
+            .expect("synthetic test IDs must be canonical");
+        let evidence = verify_mis_candidate_for_trial(
+            graph_bytes,
+            &candidate,
+            target,
+            verifier_sha256,
+            context,
+        )
+        .expect("synthetic candidate and graph are canonical");
         let (verification, conflicts) = match evidence.verdict() {
             MisEvidenceVerdict::VerifiedIndependentSet =>
                 (CandidateVerification::VerifiedIndependentSet, Some(0)),
@@ -1370,7 +1420,7 @@ mod tests {
             arm_id: arm_id.to_owned(),
             method_id: method_id.to_owned(),
             instance_sha256: sha256_hex(TEST_GRAPH),
-            protocol_sha256: "b".repeat(64),
+            protocol_sha256: TEST_PROTOCOL.to_owned(),
             target_size: 5,
             per_trial_solver_budget_ms: 1_000.0,
             tuning_budget_ms: 10_000.0,
@@ -1580,10 +1630,47 @@ mod tests {
             }],
         );
         assert!(failed.validate().is_ok());
-        assert!(!failed.trials[0].verified_target_hit(5));
+        assert!(!failed.trials[0].verified_target_hit(5, &failed.protocol_sha256));
         let result = compare_matched_arms(&baseline, &failed, 0.0).unwrap();
         assert_eq!(result.candidate_target_hits, 0);
         assert_eq!(result.baseline_only_target_hits, 1);
+    }
+
+
+    #[test]
+    fn unscoped_generic_verification_cannot_count_as_an_experiment_target_hit() {
+        let mut trial =
+            verified_trial("trial", "pair", 7, 5, costs(50.0), EnergyRecord::not_measured());
+        let candidate_bytes = candidate_bytes(5);
+        let unscoped = verify_mis_candidate(TEST_GRAPH, &candidate_bytes, 5, TEST_VERIFIER).unwrap();
+        assert!(unscoped.context().is_none());
+        trial.verifier_receipt = Some(unscoped);
+        let report = report("baseline", "classical", vec![trial]);
+        assert!(matches!(
+            report.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch {
+                field: "trial_context",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_receipt_swapped_between_trial_ids_even_when_candidate_bytes_match() {
+        let first = verified_trial("trial-a", "pair-a", 7, 5, costs(50.0), EnergyRecord::not_measured());
+        let second = verified_trial("trial-b", "pair-b", 7, 5, costs(50.0), EnergyRecord::not_measured());
+        assert_eq!(first.candidate_sha256, second.candidate_sha256);
+
+        let mut swapped = second.clone();
+        swapped.verifier_receipt = first.verifier_receipt.clone();
+        let report = report("baseline", "classical", vec![first, swapped]);
+        assert!(matches!(
+            report.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch {
+                field: "trial_id",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -1657,8 +1744,7 @@ mod tests {
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::VerifierMismatch)));
 
         candidate.verifier_sha256 = baseline.verifier_sha256.clone();
-        candidate.trials[0] = verified_trial_for("c", "pair-1", 1, 5, 5, TEST_GRAPH, TEST_VERIFIER, costs(50.0), EnergyRecord::not_measured());
-        candidate.trials[0].pair_id = "other-pair".into();
+        candidate.trials[0] = verified_trial_for("c", "other-pair", 1, 5, 5, TEST_GRAPH, TEST_VERIFIER, costs(50.0), EnergyRecord::not_measured());
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::PairSetMismatch)));
     }
 
@@ -1702,7 +1788,7 @@ mod tests {
             "classical",
             vec![verified_trial("b", "pair", 1, 5, costs(100.0), EnergyRecord::not_measured())],
         );
-        assert!(good.trials[0].verified_target_hit(5));
+        assert!(good.trials[0].verified_target_hit(5, &good.protocol_sha256));
 
         let mut missing_receipt = good.clone();
         missing_receipt.trials[0].verifier_receipt = None;
@@ -1737,6 +1823,31 @@ mod tests {
         assert!(matches!(
             wrong_instance.validate(),
             Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "instance_sha256", .. })
+        ));
+
+        let mut wrong_protocol = good.clone();
+        wrong_protocol.protocol_sha256 = "6".repeat(64);
+        assert!(matches!(
+            wrong_protocol.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "protocol_sha256", .. })
+        ));
+    }
+
+    #[test]
+    fn matched_arms_reject_globally_reused_trial_id() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("same-run", "pair", 7, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("same-run", "pair", 7, 5, costs(40.0), EnergyRecord::not_measured())],
+        );
+        assert!(matches!(
+            compare_matched_arms(&baseline, &candidate, 0.0),
+            Err(MatchedEvaluationError::DuplicateTrialId(id)) if id == "same-run"
         ));
     }
 

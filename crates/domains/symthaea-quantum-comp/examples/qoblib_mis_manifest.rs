@@ -30,6 +30,8 @@ struct PinnedFile {
     relative_path: String,
     git_blob_sha1: String,
     size_bytes: u64,
+    expected_vertices: usize,
+    expected_edges: usize,
 }
 
 fn main() {
@@ -109,7 +111,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         let source_sha256 = sha256_hex(&bytes);
         let canonical = canonicalize_dimacs_graph(&bytes)?;
         let canonical_sha256 = sha256_hex(&canonical);
-        let (vertices, edges) = canonical_graph_counts(&canonical)?;
+        let (vertices, edges) = verify_expected_dimensions(
+            &pinned.name,
+            &canonical,
+            pinned.expected_vertices,
+            pinned.expected_edges,
+        )?;
         output.push_str(&format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             pinned.name,
@@ -154,8 +161,8 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
         }
 
         let columns: Vec<&str> = line.split('\t').collect();
-        if columns.len() != 4 {
-            return Err(format!("pinned manifest line {} must have four tab-separated columns", line_number + 1).into());
+        if columns.len() != 6 {
+            return Err(format!("pinned manifest line {} must have six tab-separated columns", line_number + 1).into());
         }
         let name = columns[0].to_owned();
         let relative_path = columns[1].to_owned();
@@ -169,6 +176,8 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
         }
         let git_blob_sha1 = columns[2].to_owned();
         let size_bytes = columns[3].parse::<u64>()?;
+        let expected_vertices = columns[4].parse::<usize>()?;
+        let expected_edges = columns[5].parse::<usize>()?;
         if name.is_empty()
             || git_blob_sha1.len() != 40
             || !git_blob_sha1.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -183,6 +192,8 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
             relative_path,
             git_blob_sha1,
             size_bytes,
+            expected_vertices,
+            expected_edges,
         });
     }
 
@@ -231,6 +242,22 @@ fn verify_instance_directory_inventory(
     Ok(())
 }
 
+fn verify_expected_dimensions(
+    instance_name: &str,
+    canonical_graph: &[u8],
+    expected_vertices: usize,
+    expected_edges: usize,
+) -> Result<(usize, usize), Box<dyn Error>> {
+    let (vertices, edges) = canonical_graph_counts(canonical_graph)?;
+    if vertices != expected_vertices || edges != expected_edges {
+        return Err(format!(
+            "{instance_name} graph dimensions mismatch: expected {expected_vertices} vertices / {expected_edges} edges, got {vertices} vertices / {edges} edges"
+        )
+        .into());
+    }
+    Ok((vertices, edges))
+}
+
 fn canonical_graph_counts(bytes: &[u8]) -> Result<(usize, usize), Box<dyn Error>> {
     let text = std::str::from_utf8(bytes)?;
     let mut lines = text.lines();
@@ -274,8 +301,15 @@ mod tests {
     const COMMIT: &str = "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7";
     const BLOB: &str = "433ad3290665909e1ee5c17abfa8c946391938dc";
 
-    fn line(name: &str, path: &str, blob: &str, size: usize) -> String {
-        format!("{name}\\t{path}\\t{blob}\\t{size}\\n")
+    fn line(
+        name: &str,
+        path: &str,
+        blob: &str,
+        size: usize,
+        vertices: usize,
+        edges: usize,
+    ) -> String {
+        format!("{name}\\t{path}\\t{blob}\\t{size}\\t{vertices}\\t{edges}\\n")
     }
 
     #[test]
@@ -286,7 +320,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
                 BLOB,
-                3652
+                3652,
+                52,
+                454
             )
         );
         let (commit, entries) = parse_pinned_manifest(&manifest).unwrap();
@@ -295,6 +331,8 @@ mod tests {
         assert_eq!(entries[0].name, "aves-sparrow-social");
         assert_eq!(entries[0].git_blob_sha1, BLOB);
         assert_eq!(entries[0].size_bytes, 3652);
+        assert_eq!(entries[0].expected_vertices, 52);
+        assert_eq!(entries[0].expected_edges, 454);
     }
 
     #[test]
@@ -303,10 +341,20 @@ mod tests {
             "aves-sparrow-social",
             "07-independentset/instances/aves-sparrow-social.gph",
             BLOB,
-            3652
+            3652,
+            52,
+            454
         );
         let manifest = format!("# source_commit={COMMIT}\\n{row}{row}");
         assert!(parse_pinned_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn verifies_expected_dimensions_and_rejects_catalog_mismatch() {
+        let canonical = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n0 1\\n2 3\\n";
+        assert_eq!(verify_expected_dimensions("fixture", canonical, 4, 2).unwrap(), (4, 2));
+        assert!(verify_expected_dimensions("fixture", canonical, 5, 2).is_err());
+        assert!(verify_expected_dimensions("fixture", canonical, 4, 1).is_err());
     }
 
     #[test]
@@ -317,7 +365,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/another-name.gph",
                 BLOB,
-                3652
+                3652,
+                52,
+                454
             )
         );
         assert!(parse_pinned_manifest(&wrong_filename).is_err());
@@ -328,7 +378,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
                 "deadbeef",
-                3652
+                3652,
+                52,
+                454
             )
         );
         assert!(parse_pinned_manifest(&malformed_blob).is_err());
