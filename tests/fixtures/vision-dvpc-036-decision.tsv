@@ -1,0 +1,7 @@
+scenario_id	horizon	target_probability_a	logging_probability_a	reward_mean_a	reward_mean_b	threshold
+healthy_null_h8	8	0.5	0.5	0.2	0.8	0.5
+healthy_null_h256	256	0.5	0.5	0.2	0.8	0.5
+healthy_alt_small_h256	256	0.5	0.5	0.3	0.8	0.5
+healthy_alt_clear_h256	256	0.5	0.5	0.4	0.8	0.5
+weak_null_p099_h256	256	0.5	0.99	0.2	0.8	0.5
+weak_alt_small_p099_h256	256	0.5	0.99	0.3	0.8	0.5
