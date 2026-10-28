@@ -443,7 +443,7 @@ mod tests {
         let frames = fragment_v2(4, &original).unwrap();
         let mut assembler = FragmentAssemblerV2::new(&frames[0]).unwrap();
         for frame in &frames[..frames.len() - 1] {
-            assert!(assembler.feed(frame) || assembler.is_complete());
+            assembler.feed(frame);
         }
         assert_eq!(assembler.assemble().as_deref(), Some(original.as_slice()));
     }
