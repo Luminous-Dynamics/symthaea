@@ -1,0 +1,44 @@
+name: VIS-DVPC-022 adaptive activation gate
+
+on:
+  pull_request:
+    paths:
+      - 'tools/vision-dvpc-activation-gate.rs'
+      - 'tests/fixtures/vision-dvpc-022-*'
+      - 'docs/research/VIS_DVPC_022_ADAPTIVE_ACTIVATION_GATE_V1.md'
+      - '.github/workflows/vis-dvpc-022-adaptive-activation-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/vision-dvpc-activation-gate.rs'
+      - 'tests/fixtures/vision-dvpc-022-*'
+      - 'docs/research/VIS_DVPC_022_ADAPTIVE_ACTIVATION_GATE_V1.md'
+      - '.github/workflows/vis-dvpc-022-adaptive-activation-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and fixtures
+        uses: actions/checkout@v4
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Verify frozen fixture bytes
+        run: sha256sum -c tests/fixtures/vision-dvpc-022.SHA256SUMS
+      - name: Format standalone scorer
+        run: rustfmt --edition 2024 tools/vision-dvpc-activation-gate.rs
+      - name: Run scorer tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-activation-gate.rs -o /tmp/vis-dvpc-022-tests
+          /tmp/vis-dvpc-022-tests
+      - name: Score frozen known-answer fixture
+        run: |
+          rustc --edition=2024 tools/vision-dvpc-activation-gate.rs -o /tmp/vis-dvpc-022
+          /tmp/vis-dvpc-022 --score
+          test "$(/tmp/vis-dvpc-022 --zero-failure-required 25000 50000 | cut -f2)" = "72"
