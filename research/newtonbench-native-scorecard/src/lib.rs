@@ -315,8 +315,11 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<BTreeMap<TrialKey, Expecte
         && !valid_git_commit_sha(&manifest.upstream_revision)
     {
         return Err(
-            "upstream_revision must be a 40-character lowercase Git commit SHA; use fixture-only only in synthetic fixtures"
-                .to_owned(),
+            concat!(
+                "upstream_revision must be a 40-character lowercase Git commit SHA; ",
+                "use fixture-only only in synthetic fixtures"
+            )
+            .to_owned(),
         );
     }
     if !valid_digest(&manifest.runner_configuration_sha256) {
