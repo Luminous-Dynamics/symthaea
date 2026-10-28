@@ -785,8 +785,27 @@ mod tests {
     }
 
     fn test_task_set() -> Vec<u8> {
-        br#"{"schema":"symthaea.science_bench_refresh_task_set.v1","generation_id":"test-generation-0001","tasks":[]}"#.to_vec()
+        serde_json::to_vec(&json!({
+            "schema": TASK_SET_SCHEMA,
+            "generation_id": "test-generation-0001",
+            "tasks": [
+                {
+                    "task_id": "task-0001",
+                    "family_id": "family-a",
+                    "policy_input": {"observations": [{"x": 1.0, "y": 2.0}]},
+                    "evaluator_only": {"expected_law": "y = 2*x"}
+                },
+                {
+                    "task_id": "task-0002",
+                    "family_id": "family-b",
+                    "policy_input": {"observations": [{"x": 3.0, "y": 6.0}]},
+                    "evaluator_only": {"expected_law": "y = 2*x"}
+                }
+            ]
+        }))
+        .expect("task-set serializes")
     }
+
 
     fn validate_value(value: &Value) -> Result<ValidationReportV1, String> {
         validate_manifest_bytes(&serde_json::to_vec(value).expect("JSON serializes"))
