@@ -81,6 +81,9 @@ A hash proves byte identity, not secrecy, correct execution, scientific validity
 
 ### 5.1 Executable commit–reveal contract
 
+The synthetic generator emits four distinct families: semantic-preserving coordinate reparameterization, noisy-law recovery, common-cause nulls, and narrow-domain identifiability/abstention. A separate constructor-specific semantic gate checks the transformed-law equations, bounds every noisy sample by its declared noise amplitude, verifies the zero-direct-effect/common-cause null, and requires an explicit alternative polynomial law for each identifiability case. The alternative is constructed as a nonzero multiple of the product of `(x - observed_x_i)`: it is exactly zero at every observed root but differs at an out-of-domain challenge point. This demonstrates why finite observations alone do not identify a unique global function in that synthetic family. The tasks are still not a qualified physical benchmark; the gate validates synthetic construction logic, not real scientific truth.
+
+
 The Rust validator implements a versioned, domain-separated commitment profile:
 
 1. `protocol_commitment_sha256` commits to every frozen non-artifact manifest field: generation/lane/purpose, generator identity and configuration digest, evaluator identity and oracle-separation declaration, family mixture and expected denominator, policy/tool/prompt/configuration identities, resource budget, analysis-plan digest, and reveal policy.
