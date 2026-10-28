@@ -960,6 +960,76 @@ def _replay_joint_action_run(
             errors.append(f"{label}: policy stopped while an affordable joint action remained")
 
 
+
+DEFAULT_PROMOTION_RISK_TARGET = 0.05
+DEFAULT_PROMOTION_RISK_CONFIDENCE = 0.95
+
+
+def _risk_log_binomial_cdf_at_most(k: int, n: int, p: float) -> float:
+    """Independent verifier implementation of log P[Binomial(n,p) <= k]."""
+    if k < 0:
+        return -math.inf
+    if k >= n:
+        return 0.0
+    if p <= 0.0:
+        return 0.0
+    if p >= 1.0:
+        return -math.inf
+    log_p, log_q = math.log(p), math.log1p(-p)
+    terms = [
+        math.lgamma(n + 1) - math.lgamma(j + 1) - math.lgamma(n - j + 1)
+        + j * log_p + (n - j) * log_q
+        for j in range(k + 1)
+    ]
+    peak = max(terms)
+    return peak + math.log(sum(math.exp(term - peak) for term in terms))
+
+
+def _risk_upper_bound(false_feasible: int, validated_predicted_feasible: int) -> float | None:
+    """One-sided exact 95% binomial upper bound, independently re-derived here."""
+    n, k = validated_predicted_feasible, false_feasible
+    if n <= 0:
+        return None
+    if k <= 0:
+        return -math.expm1(math.log(1.0 - DEFAULT_PROMOTION_RISK_CONFIDENCE) / n)
+    if k >= n:
+        return 1.0
+    target = math.log(1.0 - DEFAULT_PROMOTION_RISK_CONFIDENCE)
+    lo, hi = 0.0, 1.0
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        if _risk_log_binomial_cdf_at_most(k, n, mid) > target:
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
+def _promotion_risk_gate(false_feasible: int, validated_predicted_feasible: int) -> dict:
+    bound = _risk_upper_bound(false_feasible, validated_predicted_feasible)
+    observed = (
+        false_feasible / validated_predicted_feasible
+        if validated_predicted_feasible > 0 else None
+    )
+    certified = bound is not None and bound <= DEFAULT_PROMOTION_RISK_TARGET
+    return {
+        "validated_predicted_feasible_count": validated_predicted_feasible,
+        "false_feasible_count": false_feasible,
+        "observed_false_feasible_rate": observed,
+        "one_sided_confidence": DEFAULT_PROMOTION_RISK_CONFIDENCE,
+        "upper_confidence_bound": bound,
+        "risk_target": DEFAULT_PROMOTION_RISK_TARGET,
+        "certified": certified,
+        "decision": "allow" if certified else "abstain",
+        "reason": (
+            "upper_bound_within_target" if certified else
+            "no_validated_predicted_feasible_promotions" if validated_predicted_feasible == 0 else
+            "observed_rate_exceeds_target" if observed > DEFAULT_PROMOTION_RISK_TARGET else
+            "insufficient_evidence_for_target"
+        ),
+    }
+
+
 def score_document(
     document: dict,
     repo_root: Path | None = None,
