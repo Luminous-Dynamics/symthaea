@@ -53,8 +53,11 @@ class BrocaRustMemory(Memory):
         require(os.access(self.worker_path, os.X_OK), f"worker binary is not executable: {self.worker_path}")
 
         raw_scope = memory_params.get("scope_id")
-        require(raw_scope in {"web", "enterprise"}, "scope_id must be exactly 'web' or 'enterprise'")
-        self.scope_id = str(raw_scope)
+        require(
+            isinstance(raw_scope, str) and raw_scope in {"web", "enterprise"},
+            "scope_id must be exactly 'web' or 'enterprise'",
+        )
+        self.scope_id = raw_scope
 
         raw_timeout = memory_params.get("timeout_seconds", 60.0)
         require(
