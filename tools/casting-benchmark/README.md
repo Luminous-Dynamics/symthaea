@@ -374,3 +374,19 @@ A relevant 2026 paper, Aydogdu et al., *Consequential improvement acquisition fu
 The protocol now requires an auxiliary fixed-scalarization comparison after the authors' implementation is obtained or an independently rederived implementation has been distinguished and documented, and its environment is locked. Do not call an independent approximation the authors' code. Pin the full dependency graph, charge deferred validation cost, freeze constraint handling, and report each scalarization separately.
 
 Reference: https://doi.org/10.1007/s11081-026-10078-5
+
+## Adaptive joint candidate–fidelity acquisition (research candidate)
+
+`multifidelity_joint_action_policy.py` adds `joint_action_cost_aware` as a seventh policy. Unlike DIWA's frozen 60/8/4 allocation, it ranks affordable `(candidate, fidelity)` actions online after a six-call low-fidelity space-filling bootstrap. Its score combines estimated feasible hypervolume gain, constraint-boundary information, frontier uncertainty, paired local fidelity discrepancies, and the proxy cost of later high-fidelity validation. Each call records the budget, selected pair, score, effective cost and validation-cost proxy.
+
+The acquisition is intentionally labelled a **heuristic**, not exact Bayesian value of information, not the Aydogdu et al. consequential-improvement method, and not a demonstrated improvement. The independent scorer replays every selected action from only the prior ledger and rejects changed action choices, score fields, cost accounting or premature termination.
+
+The default synthetic matrix now contains 7 policies and 9,072 planned runs (6×6 objective/constraint compositions, 3 dimensions, 4 severities including the exact zero-mismatch control, 3 diagnostic seeds, 7 policies). This count is a plan, **not executed results**.
+
+Next comparison gate: matched cost budgets and paired seeds against pinned BoTorch MF-HVKG/MOMF, plus appropriate single-fidelity baselines; use COCO's native performance methodology on `bbob-biobj`. The 2026 consequential-improvement method remains a separate single-objective track until its authors' implementation is available or an independently derived scalarized baseline is separately locked. No SOTA or foundry-validity claim follows from synthetic replay alone.
+
+References:
+- BoTorch multi-fidelity multi-objective BO: https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO
+- Aydogdu et al. (2026), consequential improvement: https://doi.org/10.1007/s11081-026-10078-5
+- COCO official archive / BBOB-biobj: https://coco-platform.org/data-archive/index.html
+
