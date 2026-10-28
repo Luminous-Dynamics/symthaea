@@ -1,0 +1,55 @@
+# source_repo=ZIB-AOPT/QOBLIB
+# source_commit=1e0e7c523cd9707dd541cc9e5a3086125d4da3c7
+# commit_date=2026-10-19T09:52:56Z
+# data_license=CC-BY-4.0
+# columns=instance_name<TAB>relative_path<TAB>git_blob_sha1<TAB>size_bytes
+aves-sparrow-social	07-independentset/instances/aves-sparrow-social.gph	433ad3290665909e1ee5c17abfa8c946391938dc	3652
+brock200-1	07-independentset/instances/brock200-1.gph	86fb49f62a753e86136d1d219bb3cfb0953025cc	132391
+brock200-2	07-independentset/instances/brock200-2.gph	d1141099281fdd4ba084cee7c7ec7962d9e6cc96	89455
+brock200-3	07-independentset/instances/brock200-3.gph	20d7385374abf7f395f2872e7e2b8b7b1e113f12	107568
+brock200-4	07-independentset/instances/brock200-4.gph	ac3e9cf78855466d04349a1e72a94c447cebe329	116622
+brock400-1	07-independentset/instances/brock400-1.gph	8753f7459a9c70b0a3b1cbfec3cfb8a51dca58b2	189858
+brock800-1	07-independentset/instances/brock800-1.gph	8878281d0c299c0b6e8644d4906897d6fa0957ed	1090630
+C125-9	07-independentset/instances/C125-9.gph	8a4d512bc71a16a458b6aae3f2820cf6bd04127d	6570
+C500-9	07-independentset/instances/C500-9.gph	ab86bdb0bf11698c9d6dbcc7550166c03b1f8086	118902
+C4000-5	07-independentset/instances/C4000-5.gph	ef7bc2199ab168029667b1354beb509b25bd5283	45759337
+c-fat200-1	07-independentset/instances/c-fat200-1.gph	fdc601ac55b67d5eb6f7d21c16b53d5a3d4e8490	13684
+chesapeake	07-independentset/instances/chesapeake.gph	3e3754fe393d4e239359c872c0b4aa9cbcfc1716	1303
+es60fst01	07-independentset/instances/es60fst01.gph	1e2fe810d783f782df9b18f354d80f5f9c543822	1393
+es60fst02	07-independentset/instances/es60fst02.gph	60b6ffb5b015323eb0f7c9503d1247c39804e27f	2558
+es60fst03	07-independentset/instances/es60fst03.gph	cf1d6e4777f00e98851b0807fe5ae352c6771c5b	1220
+es60fst04	07-independentset/instances/es60fst04.gph	631b72a35a7e31ed3dfbefb7c17d208cb923e153	2154
+farm	07-independentset/instances/farm.gph	ae103bba88413c1a8eafdeddd07ba5fe69fddc8d	291
+football	07-independentset/instances/football.gph	8413a17349b56abacbc9035aab65712e856fae62	929
+frb45-21-3	07-independentset/instances/frb45-21-3.gph	d55c460b982d82adb7b26a64dcf00242ae0623e8	567919
+frb50-23-3	07-independentset/instances/frb50-23-3.gph	6f8038d9582d2c781aac6e1238ea8d32d531ed1d	815744
+frb53-24-1	07-independentset/instances/frb53-24-1.gph	c9f27dd043584aeb65747ea0a14cae6458a15fc0	969290
+frb59-26-2	07-independentset/instances/frb59-26-2.gph	cd41c1f2806429644309fdac1194e86f50e42683	1333968
+frb100-40	07-independentset/instances/frb100-40.gph	dd218203d7de1212e90db848ecbaf49a584905c6	6562251
+gen200_p0-9_44	07-independentset/instances/gen200_p0-9_44.gph	2d4d0e3807864af046b5b3fff44c07da1168ff00	17872
+hamming6-2	07-independentset/instances/hamming6-2.gph	638f948ef513f01681965f2c003e0027e0d94301	14094
+hamming6-4	07-independentset/instances/hamming6-4.gph	b16bfe4b459aa5e4643545d0083f410707aeb798	5448
+hamming10-4	07-independentset/instances/hamming10-4.gph	6bf6931f6f8ffd9153f56f8c53e85010f5f03165	881546
+ibm32	07-independentset/instances/ibm32.gph	224c63c2d5ceb258d7bc58c2095c8bac891f0cdd	719
+insecta-ant-colony1-day38	07-independentset/instances/insecta-ant-colony1-day38.gph	b5f3376d0eece5215716ce9ec7a76bda7678571b	8894
+insecta-ant-colony3-day09	07-independentset/instances/insecta-ant-colony3-day09.gph	da7b1c36651ef0ed848e1510d6239ee6e8876f4b	76691
+johnson8-2-4	07-independentset/instances/johnson8-2-4.gph	fc8c0994dec39e07c4ed8509cd1aaf0bf6837a67	1559
+johnson8-4-4	07-independentset/instances/johnson8-4-4.gph	5c6ac520d524519794578501c1331afb9a65925c	14378
+johnson16-2-4	07-independentset/instances/johnson16-2-4.gph	7e22ce82421c9e3c2a595e9acab20d6d63095a3c	44788
+karate	07-independentset/instances/karate.gph	693d44ec559772f8a6227751a385934cb71b4d94	576
+keller4	07-independentset/instances/keller4.gph	c35ca3d2012d58d20aaecd12be574ab384a28880	44920
+keller6	07-independentset/instances/keller6.gph	4e271ffbe6d55d96b6649da58807381e9577f47f	11687749
+mammalia-kangaroo-interactions	07-independentset/instances/mammalia-kangaroo-interactions.gph	0300fc23f1fe9cd2c20b11d5f0a487ffca27e187	805
+MANN-a9	07-independentset/instances/MANN-a9.gph	1e3e6b6f8183beb8eb088705dde6f52cd6cd7616	6998
+p_hat1500-1	07-independentset/instances/p_hat1500-1.gph	2283fbf1b93b2b3ce5a0a9d0895d5728c046efef	8830096
+p_hat1500-3	07-independentset/instances/p_hat1500-3.gph	ccecf415f24126f3535c97760feb4b92ae3b4003	2912292
+R_500_005_1	07-independentset/instances/R_500_005_1.gph	0e0d13b86ab5624729cd8cee102fd5aad0e2aa5a	59942
+R_1000_005_1	07-independentset/instances/R_1000_005_1.gph	5588d1895ca52bdd88fc9cd49189867761dfd066	241580
+sloane_1dc_64	07-independentset/instances/sloane_1dc_64.gph	e4fa8f731cfe0e94f50f7256519ad0cfdb6bd3a3	4240
+sloane_1dc_128	07-independentset/instances/sloane_1dc_128.gph	273d86e55323a9f100142ea02d914edf4f202edc	12242
+sloane_1zc_128	07-independentset/instances/sloane_1zc_128.gph	8cc7d2f84a5a77c9920cac476138883efb63a30b	9388
+sloane_2dc_128	07-independentset/instances/sloane_2dc_128.gph	7ffb6fe72cf5e4ccf72c29986f0ec23f20cd06c5	43073
+socfb-haverford76	07-independentset/instances/socfb-haverford76.gph	e16b622144d215bfaf24e76fb09192f84bf7d89f	623695
+socfb-trinity100	07-independentset/instances/socfb-trinity100.gph	6fc6e7fad6975c97c79c5735eae7f0dd468db061	1248497
+sorrell4	07-independentset/instances/sorrell4.gph	d8c60e415b4d58492c2a566c8903f03306992b27	5523709
+sorrell7	07-independentset/instances/sorrell7.gph	532623aa0dec9a79b026b75d8b2156fc5d96d297	430964
