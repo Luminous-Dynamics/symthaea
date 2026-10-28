@@ -771,8 +771,8 @@ mod tests {
         let mut engine = ConsciousReasoningEngine::new();
         let mut ctx = make_context(0.8, 0.8, 25_000);
 
-        let decision_evidence = PredictionErrorEvidence::valid(0.37, Some(4), 5).unwrap();
-        engine.record_posthoc_with_evidence(true, true, Some(decision_evidence));
+        let decision_evidence = PredictionErrorEvidence::valid(0.37, Some(5), 6).unwrap();
+        engine.record_posthoc_with_evidence(Some(6), true, true, Some(decision_evidence));
         ctx.cycle_id = 6;
         engine.reason(&ctx);
 
@@ -782,18 +782,19 @@ mod tests {
                 .posthoc_outcome
                 .as_ref()
                 .expect("decision-time outcome should be attached");
+            assert_eq!(outcome.decision_cycle, Some(6));
             assert_eq!(outcome.prediction_error, Some(f64::from(0.37_f32)));
             let evidence = outcome
                 .prediction_evidence
                 .as_ref()
                 .expect("typed decision evidence should survive resolution");
-            assert_eq!(evidence.observation_cycle(), 5);
-            assert_eq!(evidence.prediction_cycle(), Some(4));
+            assert_eq!(evidence.observation_cycle(), 6);
+            assert_eq!(evidence.prediction_cycle(), Some(5));
         }
 
         // A later outcome carries its own evidence and cannot rewrite the first event.
-        let later_evidence = PredictionErrorEvidence::valid(0.91, Some(20), 21).unwrap();
-        engine.record_posthoc_with_evidence(false, false, Some(later_evidence));
+        let later_evidence = PredictionErrorEvidence::valid(0.91, Some(6), 7).unwrap();
+        engine.record_posthoc_with_evidence(Some(7), false, false, Some(later_evidence));
         ctx.cycle_id = 7;
         engine.reason(&ctx);
 
@@ -805,7 +806,7 @@ mod tests {
             .expect("original outcome remains in history");
         assert_eq!(
             first.prediction_evidence.as_ref().unwrap().observation_cycle(),
-            5
+            6
         );
         let latest = engine
             .last_event()
@@ -813,7 +814,7 @@ mod tests {
             .expect("later posthoc event should exist");
         assert_eq!(
             latest.prediction_evidence.as_ref().unwrap().observation_cycle(),
-            21
+            7
         );
     }
 
@@ -828,7 +829,7 @@ mod tests {
         )
         .unwrap();
 
-        engine.record_posthoc_with_evidence(true, false, Some(invalid));
+        engine.record_posthoc_with_evidence(Some(10), true, false, Some(invalid));
         ctx.cycle_id = 10;
         engine.reason(&ctx);
 
