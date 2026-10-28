@@ -103,9 +103,10 @@ class ReferenceReplayTests(unittest.TestCase):
         manifest = manifest_for()
         generated = rr.independently_generate(manifest, SEED_A, CONFIG)
         by_family = {task["family_id"]: task for task in generated["tasks"]}
-        self.assertEqual(set(by_family), set(manifest["task_family_mixture"] and [
-            recipe["family_id"] for recipe in CONFIG["recipes"]
-        ]))
+        self.assertEqual(
+            set(by_family),
+            {recipe["family_id"] for recipe in CONFIG["recipes"]},
+        )
         for task in generated["tasks"]:
             self.assertIn("instruction", task["policy_input"])
             self.assertIn("observations", task["policy_input"])
