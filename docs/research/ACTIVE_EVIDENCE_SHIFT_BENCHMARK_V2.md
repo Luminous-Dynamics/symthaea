@@ -198,3 +198,28 @@ At horizon 1,000, the Beta-mixture e-process has exact alarm probability 0.00305
 Implementation: maintain separate evidence channels for (a) adaptively chosen labels and (b) randomized sentinel/audit labels drawn from the target population. If using known inclusion probabilities, evaluate the justified estimator and its overlap/positivity conditions explicitly; do not assume importance weighting repairs zero-support or unobserved strata. Charge sentinel queries and compute against the same total budget. Report environment-shift false alarms on the representative audit stream, selection-policy changes separately, and detection delay/power for genuine target-population shifts.
 
 Tracking implementation and exact toy values: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744). The result is a mechanism-isolation fixture, not evidence that a specific sentinel rate or correction policy is optimal. Next tests should vary stratum prevalence, conditional rates, inclusion-probability misspecification, overlap failure, and budget shares, then carry the preregistered design to source-held-out real tasks.
+
+
+## 19. Sentinel-budget frontier: spend labels to identify population drift
+
+The executable monitor benchmark now emits a second frontier that treats randomized audits as a scarce resource. It fixes a total label budget of 1,000 and a target-population shift from p=0.5 to p=0.8 after 100 total labels. The sentinel channel is sampled on a regularly spaced, randomized audit cadence; non-sentinel labels remain available to the adaptive acquisition policy. Only sentinel labels are used for the target-drift monitor. The zero-sentinel arm instead monitors the adaptive selected stream and is a negative control for selection-induced alarms.
+
+An independent exact-DP Python reference produced the following pilot results. Rust code and the independent CSV checker implement the same sweep, but these values are not Rust-qualified until the exact-head workflow completes.
+
+| Sentinel budget share | Audit labels | Alarm by horizon when target is stable | Detection after genuine shift by horizon | Mean post-shift delay, total-label equivalents |
+|---:|---:|---:|---:|---:|
+| 0% | 0 | ~1.000 (spurious, selected stream only) | Not identifiable from representative audit evidence | — |
+| 5% | 50 | 0.002118 | 57.69% | 614 |
+| 10% | 100 | 0.002461 | 96.96% | 473 |
+| 20% | 200 | 0.002711 | 99.85% | 285 |
+| 25% | 250 | 0.002774 | 99.84% | 241 |
+| 50% | 500 | 0.002938 | 99.79% | 148 |
+| 100% | 1,000 | 0.003059 | 99.75% | 95 |
+
+The table separates the false-alarm probability on the stable audit stream from false alarms before the true shift and post-shift detection. At larger sentinel shares, there are more opportunities for a pre-shift false alarm; post-shift detection probability alone can therefore decline slightly even while the monitor alarms somewhere with probability near one. It is not valid to optimize the post-shift detection column in isolation.
+
+The 10% audit share reaches roughly 97% detection by the total budget for this large abrupt shift, whereas 5% reaches only about 58%. These figures are model-specific trade-offs, not a universal recommended rate. We must preregister the target shift family, primary objective, and total-label/compute budget before testing alternatives.
+
+Acceptance for the next version: sweep audit fraction, shift magnitude and onset; test low-amplitude/gradual shifts, changing stratum prevalence, conditional shift, inclusion-probability errors, rare groups, and support overlap; report false alarms, missed shifts, post-change delay and tail risk jointly. Compare (a) random sentinel audits, (b) design-based estimators with known inclusion probabilities and explicit positivity/overlap checks, and (c) policy-conditioned monitoring. No weighting method may claim to recover unsupported regions where inclusion probability is zero. Always debit audits from the same acquisition budget and keep an oracle non-deployable.
+
+Implementation: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744). Related OOD task and matched baseline matrix: [issue #8749](https://github.com/Luminous-Dynamics/symthaea/issues/8749).
