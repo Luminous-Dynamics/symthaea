@@ -101,16 +101,37 @@ impl WisdomState {
         self.meta_cognition.accuracy()
     }
 
-    /// Update wisdom state based on an experience
+    /// Update wisdom state based on a measured prediction error and other signals.
     pub fn update_from_experience(
         &mut self,
         prediction_error: f32,
         uncertainty: f32,
         coherence: f32,
     ) {
-        // High prediction error → boost Wisdom (what don't I know?)
-        if prediction_error > 0.5 {
-            self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
+        self.update_from_optional_experience(Some(prediction_error), uncertainty, coherence);
+    }
+
+    /// Update wisdom from signals when prediction-error evidence may be absent.
+    ///
+    /// Missing/non-finite PE does not trigger surprise-driven Wisdom, autopoiesis,
+    /// or self-model updates. Uncertainty/coherence-driven updates remain active.
+    pub fn update_from_optional_experience(
+        &mut self,
+        prediction_error: Option<f32>,
+        uncertainty: f32,
+        coherence: f32,
+    ) {
+        let prediction_error = prediction_error.filter(|value| value.is_finite());
+
+        if let Some(prediction_error) = prediction_error {
+            // High prediction error → boost Wisdom (what don't I know?)
+            if prediction_error > 0.5 {
+                self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
+            }
+
+            // PE-dependent monitors must receive measured evidence only.
+            self.autopoiesis.record_cycle(prediction_error, coherence);
+            self.meta_cognition.update_self_model(prediction_error);
         }
 
         // High uncertainty → boost Play (what haven't I tried?)
@@ -122,12 +143,6 @@ impl WisdomState {
         if coherence < 0.4 {
             self.harmonics.boost(ActiveHarmonic::Coherence, 0.15);
         }
-
-        // Update autopoietic monitoring
-        self.autopoiesis.record_cycle(prediction_error, coherence);
-
-        // Update meta-cognitive model
-        self.meta_cognition.update_self_model(prediction_error);
 
         // Decay back toward balance
         self.harmonics.decay_toward_balance(0.02);
