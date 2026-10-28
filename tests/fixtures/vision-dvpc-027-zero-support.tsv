@@ -1,0 +1,13 @@
+context_id	action_id	target_probability	logging_probability	selected	reward	cluster_id
+z01	a	0.7	0.7	yes	0.2	zgroup1
+z01	b	0.0	0.3	no	NA	zgroup1
+z01	c	0.3	0.0	no	NA	zgroup1
+z02	a	0.7	0.7	yes	0.2	zgroup1
+z02	b	0.0	0.3	no	NA	zgroup1
+z02	c	0.3	0.0	no	NA	zgroup1
+z03	a	0.7	0.7	yes	0.2	zgroup2
+z03	b	0.0	0.3	no	NA	zgroup2
+z03	c	0.3	0.0	no	NA	zgroup2
+z04	a	0.7	0.7	yes	0.2	zgroup2
+z04	b	0.0	0.3	no	NA	zgroup2
+z04	c	0.3	0.0	no	NA	zgroup2

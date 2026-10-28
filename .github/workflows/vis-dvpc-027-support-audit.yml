@@ -1,0 +1,67 @@
+name: VIS-DVPC-027 counterfactual support audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-support-audit.rs"
+      - "tests/fixtures/vision-dvpc-027-*.tsv"
+      - "docs/research/VIS_DVPC_027_COUNTERFACTUAL_SUPPORT_AUDIT_V1.md"
+      - ".github/workflows/vis-dvpc-027-support-audit.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-support-audit.rs"
+      - "tests/fixtures/vision-dvpc-027-*.tsv"
+      - "docs/research/VIS_DVPC_027_COUNTERFACTUAL_SUPPORT_AUDIT_V1.md"
+      - ".github/workflows/vis-dvpc-027-support-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and fixtures
+        uses: actions/checkout@v4
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Verify frozen fixture hashes
+        run: sha256sum -c tests/fixtures/vision-dvpc-027.SHA256SUMS
+      - name: Format standalone scorer
+        run: rustfmt --edition 2024 tools/vision-dvpc-support-audit.rs
+      - name: Run support audit unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027-tests
+          /tmp/vis-dvpc-027-tests
+      - name: Build and score frozen controls
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027
+          supported_sha="$(sha256sum tests/fixtures/vision-dvpc-027-supported.tsv | cut -d ' ' -f1)"
+          zero_sha="$(sha256sum tests/fixtures/vision-dvpc-027-zero-support.tsv | cut -d ' ' -f1)"
+          /tmp/vis-dvpc-027 --audit tests/fixtures/vision-dvpc-027-supported.tsv "$supported_sha" | tee /tmp/vis-dvpc-027-supported.tsv
+          grep -q $'SUMMARY\tstatus\tSUPPORTED_DIAGNOSTIC_ONLY' /tmp/vis-dvpc-027-supported.tsv
+          /tmp/vis-dvpc-027 --audit tests/fixtures/vision-dvpc-027-zero-support.tsv "$zero_sha" | tee /tmp/vis-dvpc-027-zero.tsv
+          grep -q $'SUMMARY\tstatus\tNOT_IDENTIFIED' /tmp/vis-dvpc-027-zero.tsv
+          grep -q $'SUMMARY\tips_point_estimate_diagnostic_only\tNA_NOT_IDENTIFIED' /tmp/vis-dvpc-027-zero.tsv
+      - name: Create exact-source receipt
+        run: |
+          {
+            printf 'VIS_DVPC_027_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-support-audit.rs tests/fixtures/vision-dvpc-027.SHA256SUMS tests/fixtures/vision-dvpc-027-supported.tsv tests/fixtures/vision-dvpc-027-zero-support.tsv /tmp/vis-dvpc-027-supported.tsv /tmp/vis-dvpc-027-zero.tsv
+          } > /tmp/vis-dvpc-027-receipt.tsv
+          cat /tmp/vis-dvpc-027-receipt.tsv
+      - name: Publish support reports and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-027-support-audit-${{ github.sha }}
+          path: |
+            /tmp/vis-dvpc-027-supported.tsv
+            /tmp/vis-dvpc-027-zero.tsv
+            /tmp/vis-dvpc-027-receipt.tsv
+          retention-days: 90
