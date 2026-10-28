@@ -53,8 +53,6 @@ class TaskContractSchemaTests(unittest.TestCase):
 
         def add(requirement_id: str, source_kind: str, source_text: str, test_ids: list[str], observable_effects: list[str]) -> None:
             selected = [test_id for test_id in test_ids if test_id in required]
-            if not selected:
-                selected = sorted(required)[:1]
             trace.append({
                 "requirement_id": requirement_id,
                 "source_kind": source_kind,
@@ -67,7 +65,7 @@ class TaskContractSchemaTests(unittest.TestCase):
             ["ledger.normal_exact_output", "ledger.unknown_side_fails_closed", "ledger.final_line_ending_invariant", "ledger.malformed_csv_rejected"],
             effects)
         for index, invariant in enumerate(behavior["invariants"]):
-            test_ids = by_invariant[index] if index < len(by_invariant) else sorted(required)
+            test_ids = by_invariant[index] if index < len(by_invariant) else []
             invariant_effects = (
                 ["numeric_semantics", "exit_code"] if index == 0 else
                 ["idempotency", "control_totals"] if index == 1 else
@@ -78,9 +76,9 @@ class TaskContractSchemaTests(unittest.TestCase):
             )
             add(f"TRACE.INVARIANT.{index + 1:03d}", "invariant", invariant, test_ids, invariant_effects)
         for index, change in enumerate(behavior["allowed_behavior_changes"]):
-            add(f"TRACE.ALLOWED.{index + 1:03d}", "allowed_behavior_change", change, sorted(required), effects)
+            add(f"TRACE.ALLOWED.{index + 1:03d}", "allowed_behavior_change", change, [], effects)
         for effect in effects:
-            add(f"TRACE.EFFECT.{effect.upper()}", "observable_effect", effect, by_effect.get(effect, sorted(required)), [effect])
+            add(f"TRACE.EFFECT.{effect.upper()}", "observable_effect", effect, by_effect.get(effect, []), [effect])
         return trace
 
     def valid_private_task(self) -> dict[str, Any]:
