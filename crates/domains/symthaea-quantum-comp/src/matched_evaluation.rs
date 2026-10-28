@@ -1306,6 +1306,22 @@ mod tests {
         verified_trial_for(id, pair, seed, size, 5, TEST_GRAPH, TEST_VERIFIER, stage_costs, energy)
     }
 
+    fn timeout_trial(id: &str, pair: &str, seed: u64) -> MatchedTrialRecord {
+        MatchedTrialRecord {
+            trial_id: id.to_owned(),
+            pair_id: pair.to_owned(),
+            seed,
+            termination: TrialTermination::TimedOut,
+            candidate_size: None,
+            candidate_sha256: None,
+            verifier_receipt: None,
+            verification: CandidateVerification::NotReturned,
+            conflict_count: None,
+            costs: StageCostsMs::default(),
+            energy: EnergyRecord::not_measured(),
+        }
+    }
+
     fn report(arm_id: &str, method_id: &str, trials: Vec<MatchedTrialRecord>) -> MatchedArmReport {
         MatchedArmReport {
             arm_id: arm_id.to_owned(),
@@ -1675,4 +1691,123 @@ mod tests {
             Err(MatchedEvaluationError::InvalidTieTolerance)
         ));
     }
+    #[test]
+    fn restricted_mean_tts_keeps_misses_and_post_horizon_hits_at_horizon() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![
+                verified_trial("b1", "p1", 1, 5, costs(50.0), EnergyRecord::not_measured()),
+                verified_trial("b2", "p2", 2, 5, costs(100.0), EnergyRecord::not_measured()),
+                verified_trial("b3", "p3", 3, 5, costs(200.0), EnergyRecord::not_measured()),
+                timeout_trial("b4", "p4", 4),
+            ],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![
+                verified_trial("c1", "p1", 1, 5, costs(40.0), EnergyRecord::not_measured()),
+                verified_trial("c2", "p2", 2, 5, costs(60.0), EnergyRecord::not_measured()),
+                MatchedTrialRecord {
+                    trial_id: "c3".into(),
+                    pair_id: "p3".into(),
+                    seed: 3,
+                    termination: TrialTermination::Completed,
+                    candidate_size: Some(99),
+                    candidate_sha256: Some("9".repeat(64)),
+                    verifier_receipt: None,
+                    verification: CandidateVerification::Unverified,
+                    conflict_count: None,
+                    costs: costs(1.0),
+                    energy: EnergyRecord::not_measured(),
+                },
+                timeout_trial("c4", "p4", 4),
+            ],
+        );
+
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.pair_count, 4);
+        assert_eq!(result.baseline_hits_within_horizon, 2);
+        assert_eq!(result.candidate_hits_within_horizon, 2);
+        assert_eq!(result.baseline_hits_after_horizon, 1);
+        assert_eq!(result.candidate_hits_after_horizon, 0);
+        assert_eq!(result.baseline_uncosted_target_hits, 0);
+        assert_eq!(result.candidate_uncosted_target_hits, 0);
+        assert!((result.baseline_restricted_mean_ms - 87.5).abs() < 1e-9);
+        assert!((result.candidate_restricted_mean_ms - 75.0).abs() < 1e-9);
+        assert!((result.paired_mean_difference_candidate_minus_baseline_ms + 12.5).abs() < 1e-9);
+        assert_eq!(result.candidate_faster_pairs, 2);
+        assert_eq!(result.baseline_faster_pairs, 0);
+        assert_eq!(result.tied_pairs, 2);
+        assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - (87.5 / 75.0)).abs() < 1e-9);
+        assert_eq!(result.pairs[2].baseline_restricted_time_ms, 100.0);
+        assert_eq!(result.pairs[2].candidate_restricted_time_ms, 100.0);
+    }
+
+    #[test]
+    fn restricted_mean_tts_does_not_count_uncosted_verified_targets_as_hits() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let mut missing_queue = costs(25.0);
+        missing_queue.queue_wait_ms = None;
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("c", "p", 1, 5, missing_queue, EnergyRecord::not_measured())],
+        );
+
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.baseline_hits_within_horizon, 1);
+        assert_eq!(result.candidate_hits_within_horizon, 0);
+        assert_eq!(result.candidate_uncosted_target_hits, 1);
+        assert_eq!(result.pairs[0].candidate_restricted_time_ms, 100.0);
+        assert_eq!(result.candidate_restricted_mean_ms, 100.0);
+        assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn restricted_mean_tts_all_miss_comparison_has_no_misleading_time_ratio() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![timeout_trial("b", "p", 1)],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![timeout_trial("c", "p", 1)],
+        );
+        let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
+        assert_eq!(result.baseline_restricted_mean_ms, 100.0);
+        assert_eq!(result.candidate_restricted_mean_ms, 100.0);
+        assert_eq!(result.baseline_hit_rate_within_horizon, 0.0);
+        assert_eq!(result.candidate_hit_rate_within_horizon, 0.0);
+        assert_eq!(result.baseline_over_candidate_restricted_mean_ratio, None);
+        assert_eq!(result.tied_pairs, 1);
+    }
+
+    #[test]
+    fn restricted_mean_tts_rejects_nonpositive_or_nonfinite_horizons() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("c", "p", 1, 5, costs(40.0), EnergyRecord::not_measured())],
+        );
+        for horizon in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(matches!(
+                compare_restricted_mean_tts(&baseline, &candidate, horizon),
+                Err(MatchedEvaluationError::InvalidRestrictedTtsHorizon)
+            ));
+        }
+    }
+
 }
