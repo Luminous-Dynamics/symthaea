@@ -30,6 +30,7 @@
 use super::super::subsystem_trait::{
     CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 use serde::{Deserialize, Serialize};
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
@@ -79,6 +80,9 @@ pub const MUSE_EXPORT_SECS: f32 = 8.0;
 
 /// Maximum number of pending exports in the queue before oldest is dropped.
 pub const MUSE_EXPORT_QUEUE_CAPACITY: usize = 4;
+
+/// Length of the MUSE PE checkpoint: header, held input value, and PEVC v2.
+const MUSE_PEV_CHECKPOINT_LEN: usize = 32;
 
 /// Fade-to-silence duration when safety level is Red (ms).
 pub const MUSE_SILENCE_FADE_MS: u32 = 200;
@@ -153,6 +157,11 @@ pub struct MuseManager {
     synth: StreamingSynth,
     /// Most recent MusicalState (for telemetry).
     last_musical_state: MusicalState,
+    /// Last admitted input PE, before any downstream musical effects are applied.
+    /// Keeping this distinct prevents modulation from feeding back into held evidence.
+    last_admitted_prediction_error: f32,
+    /// Exactly-once admission cursor for snapshot PE.
+    prediction_error_cursor: PredictionEvidenceCursor,
     /// Rendered audio buffer from last chunk (for external consumption).
     last_chunk: Vec<[f32; 2]>,
 
@@ -222,6 +231,8 @@ impl MuseManager {
         Self {
             synth,
             last_musical_state: MusicalState::default(),
+            last_admitted_prediction_error: MusicalState::default().prediction_error,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
             last_chunk: Vec::new(),
             injected_dopamine: 0.5,
             injected_serotonin: 0.5,
@@ -396,9 +407,19 @@ impl MuseManager {
             consciousness_level: snapshot.unified_psi as f32,
             // The synthesizer has no validity channel of its own. Hold the
             // last admitted PE rather than sonifying the missing-comparison sentinel.
-            prediction_error: snapshot
-                .prediction_error_sample()
-                .unwrap_or(self.last_musical_state.prediction_error),
+            // Never read the raw compatibility float here. PE admission occurs before mapping.
+            prediction_error: self.last_admitted_prediction_error,
+        }
+    }
+
+    /// Admit the snapshot PE once, updating held input only for valid new evidence.
+    /// Invalid observations still advance the observed high-water mark in the cursor.
+    fn admit_snapshot_prediction_error(&mut self, snapshot: &CycleSnapshot) {
+        if let Some(value) = self
+            .prediction_error_cursor
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number)
+        {
+            self.last_admitted_prediction_error = value;
         }
     }
 
@@ -550,10 +571,66 @@ impl CognitiveSubsystem for MuseManager {
         MUSE_INTERVAL
     }
 
+    /// Persist the PE admission substate. Synthesizer DSP state retains its existing lifecycle.
+    fn checkpoint(&self) -> Vec<u8> {
+        let mut data = Vec::with_capacity(MUSE_PEV_CHECKPOINT_LEN);
+        data.extend_from_slice(b"MPEV");
+        data.push(1); // Muse PE checkpoint version
+        data.extend_from_slice(&self.last_admitted_prediction_error.to_le_bytes());
+        data.extend_from_slice(&self.prediction_error_cursor.encode_checkpoint_extension_v2());
+        data
+    }
+
+    fn restore(&mut self, data: &[u8]) -> Result<(), String> {
+        // Old stateless checkpoints had no PE cursor. Reset this substate, rather than
+        // accidentally retaining admission history from a different stream.
+        if data.is_empty() {
+            self.prediction_error_cursor.reset();
+            self.last_admitted_prediction_error = MusicalState::default().prediction_error;
+            return Ok(());
+        }
+        if data.len() != MUSE_PEV_CHECKPOINT_LEN {
+            return Err(format!(
+                "MuseManager PE checkpoint has unsupported length: {}",
+                data.len()
+            ));
+        }
+        if &data[0..4] != b"MPEV" {
+            return Err("MuseManager: invalid PE checkpoint magic".to_string());
+        }
+        if data[4] != 1 {
+            return Err(format!(
+                "MuseManager: unsupported PE checkpoint version {}",
+                data[4]
+            ));
+        }
+
+        // Parse and validate everything before mutating the manager.
+        let restored_pe = f32::from_le_bytes(
+            data[5..9]
+                .try_into()
+                .map_err(|_| "MuseManager: corrupt held PE bytes".to_string())?,
+        );
+        if !restored_pe.is_finite() {
+            return Err("MuseManager: held PE must be finite".to_string());
+        }
+        let restored_cursor =
+            PredictionEvidenceCursor::decode_checkpoint_extension_v2(&data[9..32])?;
+        if restored_cursor.last_admitted_observation_cycle().is_none()
+            && restored_pe != MusicalState::default().prediction_error
+        {
+            return Err("MuseManager: non-default held PE requires an admitted cycle".to_string());
+        }
+        self.last_admitted_prediction_error = restored_pe;
+        self.prediction_error_cursor = restored_cursor;
+        Ok(())
+    }
+
     fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
         let cycle = snapshot.cycle_number;
 
-        // 1. Map snapshot to musical state
+        // 1. Admit PE independently from downstream musical transformations.
+        self.admit_snapshot_prediction_error(snapshot);
         let mut musical_state = self.map_snapshot_to_musical_state(snapshot);
 
         // 2. Apply allostatic modulations
@@ -826,6 +903,7 @@ mod tests {
         let mut valid = default_snapshot();
         valid.prediction_error = 0.37;
         valid.prediction_error_valid = 1;
+        manager.last_admitted_prediction_error = valid.prediction_error_sample().unwrap();
         manager.last_musical_state = manager.map_snapshot_to_musical_state(&valid);
 
         let mut invalid = default_snapshot();
@@ -834,6 +912,105 @@ mod tests {
         let state = manager.map_snapshot_to_musical_state(&invalid);
 
         assert_eq!(state.prediction_error, 0.37);
+    }
+
+
+    #[test]
+    fn process_admits_snapshot_pe_once_and_allows_same_cycle_recovery() {
+        let mut manager = MuseManager::new();
+        let mut snapshot = default_snapshot();
+        snapshot.cycle_number = 10;
+        snapshot.prediction_error = 0.37;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        assert_eq!(manager.last_admitted_prediction_error, 0.37);
+
+        // A different payload for an already-admitted cycle is a duplicate.
+        snapshot.prediction_error = 0.91;
+        manager.process(&snapshot);
+        assert_eq!(manager.last_admitted_prediction_error, 0.37);
+
+        // Invalid newer evidence advances observed, but not admitted, watermark.
+        snapshot.cycle_number = 11;
+        snapshot.prediction_error = f32::NAN;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        assert_eq!(manager.last_admitted_prediction_error, 0.37);
+
+        // Delayed older evidence is blocked after observation of cycle 11.
+        snapshot.cycle_number = 10;
+        snapshot.prediction_error = 0.72;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        assert_eq!(manager.last_admitted_prediction_error, 0.37);
+
+        // A valid retry for the invalid observation cycle remains possible once.
+        snapshot.cycle_number = 11;
+        snapshot.prediction_error = 0.49;
+        manager.process(&snapshot);
+        assert_eq!(manager.last_admitted_prediction_error, 0.49);
+
+        // A second valid payload for cycle 11 cannot overwrite the admitted value.
+        snapshot.prediction_error = 0.99;
+        manager.process(&snapshot);
+        assert_eq!(manager.last_admitted_prediction_error, 0.49);
+    }
+
+    #[test]
+    fn checkpoint_restore_preserves_muse_pe_admission_and_held_input() {
+        let mut manager = MuseManager::new();
+        let mut snapshot = default_snapshot();
+        snapshot.cycle_number = 40;
+        snapshot.prediction_error = 0.42;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+
+        // Invalid cycle 41 advances the observed watermark without replacing held PE.
+        snapshot.cycle_number = 41;
+        snapshot.prediction_error = f32::NAN;
+        manager.process(&snapshot);
+        let checkpoint = manager.checkpoint();
+
+        let mut restored = MuseManager::new();
+        restored.restore(&checkpoint).expect("valid checkpoint");
+        assert_eq!(restored.last_admitted_prediction_error, 0.42);
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(41)
+        );
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(40)
+        );
+
+        // Restore must preserve duplicate/stale rejection and same-cycle recovery.
+        snapshot.cycle_number = 40;
+        snapshot.prediction_error = 0.8;
+        restored.process(&snapshot);
+        assert_eq!(restored.last_admitted_prediction_error, 0.42);
+
+        snapshot.cycle_number = 41;
+        snapshot.prediction_error = 0.61;
+        restored.process(&snapshot);
+        assert_eq!(restored.last_admitted_prediction_error, 0.61);
+    }
+
+    #[test]
+    fn malformed_muse_pe_checkpoint_fails_without_mutating_cursor() {
+        let mut manager = MuseManager::new();
+        let mut snapshot = default_snapshot();
+        snapshot.cycle_number = 8;
+        snapshot.prediction_error = 0.31;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        let before_pe = manager.last_admitted_prediction_error;
+        let before_cursor = manager.prediction_error_cursor;
+
+        let mut malformed = manager.checkpoint();
+        malformed[14] = 7; // PEVC observed-presence flag is not canonical.
+        assert!(manager.restore(&malformed).is_err());
+        assert_eq!(manager.last_admitted_prediction_error, before_pe);
+        assert_eq!(manager.prediction_error_cursor, before_cursor);
     }
 
     #[test]
