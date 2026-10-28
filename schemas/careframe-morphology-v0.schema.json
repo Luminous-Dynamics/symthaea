@@ -221,8 +221,6 @@
         "joint_type",
         "origin_m",
         "axis_xyz",
-        "lower_limit_rad",
-        "upper_limit_rad",
         "max_effort_nm",
         "max_velocity_rad_s",
         "command_enabled",
@@ -247,7 +245,8 @@
         "joint_type": {
           "enum": [
             "fixed",
-            "revolute"
+            "revolute",
+            "continuous"
           ]
         },
         "origin_m": {
@@ -354,7 +353,11 @@
               "max_velocity_rad_s": {
                 "const": 0
               }
-            }
+            },
+            "required": [
+              "lower_limit_rad",
+              "upper_limit_rad"
+            ]
           }
         },
         {
@@ -369,6 +372,46 @@
             ]
           },
           "then": {
+            "properties": {
+              "max_effort_nm": {
+                "exclusiveMinimum": 0
+              },
+              "max_velocity_rad_s": {
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "lower_limit_rad",
+              "upper_limit_rad"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "joint_type": {
+                "const": "continuous"
+              }
+            },
+            "required": [
+              "joint_type"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "lower_limit_rad"
+                  ]
+                },
+                {
+                  "required": [
+                    "upper_limit_rad"
+                  ]
+                }
+              ]
+            },
             "properties": {
               "max_effort_nm": {
                 "exclusiveMinimum": 0
