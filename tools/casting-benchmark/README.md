@@ -303,30 +303,30 @@ python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_
 
 ## Compositional objective/constraint mismatch bake-off
 
-\`CASTING-MF-COMPOSITION-001\` crosses the six existing mismatch families independently: one family supplies the low/medium objective values, while another supplies the low/medium constraint margin. At high fidelity, both components resolve to the same analytic truth. Diagonal cells are required to match the existing single-family scenario exactly; off-diagonal cells test combinations in which objective ranking errors and feasibility errors arise from different mechanisms.
+`CASTING-MF-COMPOSITION-001` crosses the six existing mismatch families independently: one family supplies the low/medium objective values, while another supplies the low/medium constraint margin. At high fidelity, both components resolve to the same analytic truth. Diagonal cells are required to match the existing single-family scenario exactly; off-diagonal cells test combinations in which objective ranking errors and feasibility errors arise from different mechanisms.
 
 This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The preregistered default covers 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs.
 
 Run a fast crossed subset:
 
-\`\`\`sh
-python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \\
-  --objective-families local_bias_island,warped_coordinates \\
-  --constraint-families constraint_boundary,discontinuous_step \\
-  --dimensions 2 --severities 0.5,1 --seeds 17,23 --design-count 75 \\
+```sh
+python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \
+  --objective-families local_bias_island,warped_coordinates \
+  --constraint-families constraint_boundary,discontinuous_step \
+  --dimensions 2 --severities 0.5,1 --seeds 17,23 --design-count 75 \
   > /tmp/casting-compositional-results.json
 
-python3 tools/casting-benchmark/score_compositional_bakeoff.py \\
-  /tmp/casting-compositional-results.json \\
+python3 tools/casting-benchmark/score_compositional_bakeoff.py \
+  /tmp/casting-compositional-results.json \
   --receipt /tmp/casting-compositional-receipt.json
-\`\`\`
+```
 
-The scorer independently reimplements the Halton pool, all six scenario response equations, objective/constraint composition, ledger accounting, promotion labels and exact 2D hypervolume. It checks the result against pre-run SHA-256 digests of the runner/scorer/scenario/manifests. The receipt is unsigned; hashes establish byte identity, not signer identity or proof of execution. Every successful receipt remains labelled \`COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE\`.
+The scorer independently reimplements the Halton pool, all six scenario response equations, objective/constraint composition, ledger accounting, promotion labels and exact 2D hypervolume. It checks the result against pre-run SHA-256 digests of the runner/scorer/scenario/manifests. The receipt is unsigned; hashes establish byte identity, not signer identity or proof of execution. Every successful receipt remains labelled `COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE`.
 
 Tests include diagonal parity across all families/fidelities, component separation for an off-diagonal cell, full trace replay, and adversarial objective/cost mutation checks:
 
-\`\`\`sh
+```sh
 python3 -m unittest tools/casting-benchmark/test_compositional_bakeoff.py -v
-\`\`\`
+```
 
 The three-seed default is diagnostic only. Use at least 20 paired seeds (target 30), multiplicity-aware preregistered analysis, pinned external baselines and a separate physical-validation gate before making claims of general superiority or foundry relevance.
