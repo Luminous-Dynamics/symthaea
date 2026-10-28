@@ -76,6 +76,22 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     dual_gauge = data.get("industry_comparators", {}).get("dual_gauge", {})
     if dual_gauge.get("task_count") != 307 or dual_gauge.get("reported_best_joint_functional_security_success_pct_upper_bound") != 15.0:
         errors.append("dual_gauge_reference_drift")
+    legacy_code = data.get("industry_comparators", {}).get("legacy_code_bench_2026", {})
+    if legacy_code.get("task_count") != 200 or legacy_code.get("complexity_tiers") != 4:
+        errors.append("legacy_code_bench_reference_drift")
+    if legacy_code.get("report_status") != "benchmark-author-reported":
+        errors.append("legacy_code_bench_result_attribution_missing")
+    ibm = data.get("industry_comparators", {}).get("ibm_enterprise_cobol_to_java_icse_2026", {})
+    if ibm.get("public_programs") != 20 or ibm.get("proprietary_customer_applications") != 10:
+        errors.append("ibm_cobol_translation_scope_drift")
+    rank_audit = data.get("industry_comparators", {}).get("swe_bench_leaderboard_stability_audit", {})
+    findings = rank_audit.get("findings", {})
+    if findings.get("audited_submission_count") is not None:
+        errors.append("rank_audit_field_placement")
+    if rank_audit.get("audited_submission_count") != 254:
+        errors.append("swe_bench_rank_audit_scope_drift")
+    if rank_audit.get("findings", {}).get("adjacent_top_30_verified_pairs_significant_at_alpha_0_05") != 0:
+        errors.append("rank_audit_result_drift")
     last_secure = data.get("industry_comparators", {}).get("last_secure_code_benchmark", {})
     if last_secure.get("task_count") != 450 or last_secure.get("reported_best_joint_functional_security_success_pct") != 25.1:
         errors.append("last_secure_benchmark_reference_drift")
@@ -147,6 +163,19 @@ class ScorecardTests(unittest.TestCase):
         self.assertIsNone(self.scorecard["current_measurements"]["security_correctness_pct"]["value"])
         self.assertEqual(self.scorecard["industry_comparators"]["dual_gauge"]["task_count"], 307)
         self.assertEqual(self.scorecard["industry_comparators"]["last_secure_code_benchmark"]["task_count"], 450)
+
+    def test_legacy_comprehension_comparators_are_context_not_vleb_scores(self) -> None:
+        legacy = self.scorecard["industry_comparators"]["legacy_code_bench_2026"]
+        ibm = self.scorecard["industry_comparators"]["ibm_enterprise_cobol_to_java_icse_2026"]
+        self.assertEqual(legacy["task_count"], 200)
+        self.assertEqual(ibm["public_programs"], 20)
+        self.assertIsNone(self.scorecard["current_measurements"]["assurance_adjusted_semantic_success_rate_pct"]["value"])
+
+    def test_leaderboard_stability_audit_requires_paired_uncertainty(self) -> None:
+        audit = self.scorecard["industry_comparators"]["swe_bench_leaderboard_stability_audit"]
+        self.assertEqual(audit["audited_submission_count"], 254)
+        self.assertEqual(audit["findings"]["adjacent_top_30_verified_pairs_significant_at_alpha_0_05"], 0)
+        self.assertIn("observational", audit["report_status"])
 
 
 if __name__ == "__main__":
