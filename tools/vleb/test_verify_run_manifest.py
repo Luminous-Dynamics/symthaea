@@ -332,6 +332,24 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
 
+    def test_claim_audit_malformed_witness_kind_fails_closed_without_crashing(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        claim["witnesses"][0]["kind"] = ["source_index"]
+        raw = jbytes(claim)
+        claim_path.write_bytes(raw)
+        self.bundle.manifest["claim_audit"]["claims"][0]["claim_sha256"] = sha(raw)
+
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed", result)
+        self.assertIn("claim_verifier_pin_missing", {row["code"] for row in result["issues"]})
+
     def test_claim_audit_rejects_auditor_or_schema_pin_mismatch(self) -> None:
         result = verifier.audit_claim_evidence_bundle(
             self.bundle.manifest,
