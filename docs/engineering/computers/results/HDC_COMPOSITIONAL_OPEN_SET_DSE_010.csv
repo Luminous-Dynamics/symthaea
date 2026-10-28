@@ -1,0 +1,19 @@
+seed,dimension_bits,corpus_size,bundle_arity,score_only_threshold,calibration_known_n,calibration_known_accept_count,calibration_known_accept_rate,calibration_independent_unknown_n,calibration_independent_unknown_accept_count,calibration_independent_unknown_max_score,heldout_independent_unknown_n,heldout_independent_unknown_accept_count,heldout_independent_unknown_accept_rate,evidence_note
+20261028,16384,256,3,0.5146484375,32,32,1.0,32,0,0.51458740234375,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,256,7,0.514892578125,32,32,1.0,32,0,0.51483154296875,32,2,0.0625,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,256,15,0.51397705078125,32,32,1.0,32,0,0.513916015625,32,1,0.03125,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,1024,3,0.517333984375,32,32,1.0,32,0,0.51727294921875,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,1024,7,0.51702880859375,32,32,1.0,32,0,0.5169677734375,32,2,0.0625,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,1024,15,0.51715087890625,32,32,1.0,32,0,0.51708984375,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,4096,3,0.51654052734375,32,32,1.0,32,0,0.5164794921875,32,2,0.0625,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,4096,7,0.51702880859375,32,32,1.0,32,0,0.5169677734375,32,3,0.09375,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261028,16384,4096,15,0.51824951171875,32,32,1.0,32,0,0.5181884765625,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,256,3,0.51373291015625,32,32,1.0,32,0,0.513671875,32,1,0.03125,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,256,7,0.5125732421875,32,32,1.0,32,0,0.51251220703125,32,6,0.1875,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,256,15,0.51654052734375,32,32,1.0,32,0,0.5164794921875,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,1024,3,0.515380859375,32,32,1.0,32,0,0.51531982421875,32,1,0.03125,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,1024,7,0.5172119140625,32,32,1.0,32,0,0.51715087890625,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,1024,15,0.5166015625,32,32,1.0,32,0,0.51654052734375,32,1,0.03125,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,4096,3,0.516845703125,32,32,1.0,32,0,0.51678466796875,32,0,0.0,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,4096,7,0.51715087890625,32,32,1.0,32,0,0.51708984375,32,2,0.0625,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
+20261029,16384,4096,15,0.516357421875,32,32,1.0,32,0,0.51629638671875,32,2,0.0625,small synthetic pilot; threshold frozen; not a deployment FAR guarantee
