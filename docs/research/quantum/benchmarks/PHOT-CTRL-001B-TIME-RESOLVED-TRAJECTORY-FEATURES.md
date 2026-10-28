@@ -49,6 +49,14 @@ H4. Any improvement transfers across at least one held-out graph family, rather 
 
 Each hypothesis can fail independently. Feature importance or predictive accuracy alone is not an optimization advantage; the downstream decision metric is paired all-in verified performance.
 
+## Feature identifiability positive control
+
+The unit-test corpus includes two synthetic trajectory cohorts with identical terminal selection frequency (the only vertex is selected in every completed run) but different dynamics:
+- early-flip cohort: the spin changes at normalized time 0.25 and stays selected;
+- late-flip cohort: the spin changes at normalized time 1.0.
+
+The expected final-spin frequency is 1.0 for both cohorts, so a terminal-frequency-only prior cannot distinguish them. The expected mean late-flip rate and last-flip time differ. This is a *feature identifiability control*: it demonstrates that the extractor can represent temporal distinctions not encoded by final states. It does not demonstrate that these distinctions predict MIS optimum membership, reduce solver time, or transfer to real trajectories.
+
 ## Experiment design
 
 ### Frozen cohorts
