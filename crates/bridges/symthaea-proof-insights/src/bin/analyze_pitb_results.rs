@@ -1136,9 +1136,13 @@ fn joint_success_probability_at_association(
     // reaches the Frechet upper bound P(Y0=1,Y1=1)=min(p0,p1). Intermediate
     // values interpolate joint success probability; this is not a Pearson rho.
     let independent_joint = baseline_probability * treatment_probability;
-    Ok(independent_joint
-        + pair_association_fraction
-            * (baseline_probability.min(treatment_probability) - independent_joint))
+    let lower_frechet = (baseline_probability + treatment_probability - 1.0).max(0.0);
+    let upper_frechet = baseline_probability.min(treatment_probability);
+    let joint = independent_joint
+        + pair_association_fraction * (upper_frechet - independent_joint);
+    // Roundoff near fraction 1 must not violate the Frechet bounds used by the
+    // categorical sampler's debug assertions.
+    Ok(joint.clamp(lower_frechet, upper_frechet))
 }
 
 fn sample_paired_bernoulli_from_joint_probability(
