@@ -48,7 +48,7 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
             "candidate_pool_sha256": candidate_pool_sha,
             "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
             "cost_budget": 200,
-            "cost_spent": 130,
+            "cost_spent": 26,
             "evaluations": [
                 {"candidate_id": 0, "fidelity": "high", "objectives": [0.2, 0.7], "constraint_margin": 0.1, "cost_units": 25},
                 {"candidate_id": 1, "fidelity": "low", "objectives": [0.3, 0.6], "constraint_margin": 0.2, "cost_units": 1},
