@@ -15,6 +15,8 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Source-only directory has no Cargo.toml; see #7048/#8065.
+    "crates/core/symthaea-observation-attestation",
     # Orphaned directory containing only an empty examples/unused.rs; the root
     # package is already a workspace member. Restore only if a real crate is added.
     "crates/core/symthaea",
