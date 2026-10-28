@@ -249,3 +249,19 @@ Independent exact-DP Python calculations at horizon 1,000 under a change after 1
 All stable-null alarm probabilities are below the allocated α/12=0.004167. These are probabilities for the stated synthetic Bernoulli process, not deployment evidence. Because the same Ville boundary is used but realised null alarm probability varies, this is an anytime-validity / power tradeoff comparison, **not** a matched-realised-false-alarm leaderboard. Report actual null alarm rates and pre-shift false alarms separately. A finite-horizon threshold tuned to use the alpha budget can be explored as a separate comparator, but it must be labelled finite-horizon calibrated and cannot inherit the unrestricted Ville guarantee merely because the score is an e-process.
 
 Implementation: the third report `--eprocess-family-csv` in [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744) includes an exact-DP Rust evaluator, a separate standard-library Python reference, deterministic output comparison, label/metric assertions and a mutation negative control. Its current head still needs exact-source CI qualification. The next validation must test weaker and stronger alternatives, p0 misspecification, gradual ramps, bursts, serial dependence and a sealed set of shift families.
+
+
+## 22. Nominal-rate misspecification must be an explicit negative control
+
+The e-process null guarantee requires the nominal Bernoulli rate p0 to be correct. The executable now includes stable observed streams with actual event rate p ∈ {0.45, 0.48, 0.49, 0.51, 0.52, 0.55}, while every monitor continues to use declared p0=0.50. These are **stationary baseline-misspecification controls**: alarm probability is measured while the stream's actual rate is constant, not because the environment changes during observation.
+
+For the Beta-prior e-process families at horizon 1,000 and log threshold log(240), an independent exact-DP Python prototype found that an actual stationary p=0.48 stream alarms with probability 0.90% (Jeffreys), 1.10% (uniform), 1.55% (Beta(5,5)), 1.73% (Beta(20,20)), and 1.36% (equal portfolio). All exceed the nominal per-cell allocation 0.4167%. At p=0.49, outcomes range from 0.40% to 0.48%, with some families already slightly exceeding the allocation. These are not violations of Ville's inequality; the data-generating rate is outside the declared null. The result demonstrates that an estimated or misspecified reference rate is a separate source of epistemic uncertainty.
+
+Acceptance implications:
+- Report performance on the exact null and under each misspecified stationary baseline separately.
+- Do not call alarms under p≠p0 false-alarm-guarantee violations; label them assumption-sensitivity results.
+- Test a separately collected reference stream, a reference-rate confidence sequence, and a valid composite-null betting process over a preregistered p0 interval.
+- Keep baseline-estimation data, policy/tuning data, and held-out evaluation stream disjoint. Calibrating p0 and the threshold on the same stream is not independent validation.
+- Preserve the selection-bias controls; a representative reference rate and an adaptively selected observed rate remain different estimands.
+
+The current implementation makes the limitation observable; it does **not** yet claim to solve composite-null monitoring. Results are exact for the stated synthetic Bernoulli model only. Implementation and independent checker: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744).
