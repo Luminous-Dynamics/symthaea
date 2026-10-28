@@ -141,7 +141,7 @@ fn hoeffding_intervals(n: usize) -> Intervals {
     let mut intervals = [[[0.0; 2]; 3]; 4];
     for query in 0..4 {
         for hypothesis in 0..3 {
-            let successes = (NOMINAL[query][hypothesis] * n as f64).round() as usize;
+            let successes = (NOMINAL[query][hypothesis] * n as f64).round_ties_even() as usize;
             let estimate = successes as f64 / n as f64;
             intervals[query][hypothesis] = [
                 (estimate - radius).max(0.0),
