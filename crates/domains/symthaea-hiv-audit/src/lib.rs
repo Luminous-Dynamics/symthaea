@@ -282,6 +282,10 @@ fn audit_csv(path: &Path) -> Result<(CsvAudit, HashSet<String>), String> {
         }
     }
 
+    if rows == 0 || ids.is_empty() {
+        return Err(format!("{} has no participant data rows", path.display()));
+    }
+
     let header_serialized = headers.iter().collect::<Vec<_>>().join("\u{1f}");
     let mut sorted_ids: Vec<&str> = ids.iter().map(String::as_str).collect();
     sorted_ids.sort_unstable();
@@ -513,10 +517,13 @@ mod tests {
             "symthaea-hiv-audit-source-{}.zip",
             std::process::id()
         ));
-        fs::write(&path, [0x50, 0x4b, 0x03, 0x04]).expect("write ZIP-signature fixture");
+        fs::write(&path, &[0x50_u8, 0x4b, 0x03, 0x04]).expect("write ZIP-signature fixture");
         let audit = audit_source_archive(&path).expect("accept recognized ZIP signature");
         assert_eq!(audit.byte_length, 4);
-        assert_eq!(audit.filename, path.file_name().unwrap().to_string_lossy());
+        assert_eq!(
+            audit.filename,
+            path.file_name().unwrap().to_string_lossy().to_string()
+        );
         let _ = fs::remove_file(&path);
 
         let not_zip = std::env::temp_dir().join(format!(
