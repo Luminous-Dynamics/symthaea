@@ -137,7 +137,9 @@ Use the versioned shift families from the decision-robustness contract, sealed u
 Use adapters to public benchmark suites only after licensing, semantics, fidelity mapping, objective/constraint direction, transformations, and known optima are checked. Candidate suites:
 - the fourteen analytic multi-fidelity problems and experimental protocol described at https://doi.org/10.1007/s11831-025-10392-8;
 - COCO BBOB-constrained (54 functions) from https://coco-platform.org/data-archive/index.html;
-- reproducible benchmark tasks released with a locked MF-SCBO revision.
+- reproducible benchmark tasks released with a locked MF-SCBO revision;
+- MF-JESMOC/MOBOCMF at pinned revision `95293f6b59375ef9d4c71f61d4e42d788d116da8`, after resolving its license/dependency lock and reproducing the coupled-evaluation path; see `CASTING_MF_SCBO_BASELINE_AUDIT_V1.md`;
+- BoTorch MF-HVKG/MOMF as a maintained public implementation and cross-check.
 
 Keep these results separate from the compositional casting fixtures and any physical foundry claims.
 
@@ -207,6 +209,7 @@ Check that a recommendation does not become safer merely by excluding difficult 
 - Palazzolo, Binois & Giraldi, **MF-SCBO** (2026 preprint): https://arxiv.org/abs/2609.29941; implementation https://github.com/Nemo-Virtual-Lab/MF-SCBO.
 - Xie et al., **Cost-aware Stopping for Bayesian Optimization**, ICML 2026: https://proceedings.mlr.press/v306/xie26c.html.
 - Aydogdu et al., **Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization**, published 27 March 2026 / issue September 2026: https://doi.org/10.1007/s11081-026-10078-5. This already jointly selects a sample/fidelity around consequential high-fidelity improvement; include as a comparator if an executable implementation can be obtained and locked. The paper reports code/data available upon reasonable request rather than a clearly linked public implementation. It notes future work on multi-objective extension and more complex cost structures, making multi-objective casting robustness a better differentiator than claiming generic joint sample/fidelity selection as new.
+- Fernández-Sánchez and Hernández-Lobato, **MF-JESMOC**, a multi-fidelity constrained multi-objective entropy-search method (Neurocomputing, 2025): https://doi.org/10.1016/j.neucom.2025.131674; repository revision and reproduction hazards are pinned in `CASTING_MF_SCBO_BASELINE_AUDIT_V1.md`.
 - NIST AMS 100-85 (5 October 2026), risk-based uncertainty quantification and VVUQ: https://doi.org/10.6028/NIST.AMS.100-85.
 - Multifidelity benchmark methodology and fourteen analytical problems (2025): https://doi.org/10.1007/s11831-025-10392-8.
 - COCO constrained suite: https://coco-platform.org/data-archive/index.html.
