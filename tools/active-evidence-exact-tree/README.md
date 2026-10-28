@@ -18,7 +18,7 @@ The latent hypothesis prior and loss matrix remain fixed. The shift axes here al
 From the repository root:
 
     cargo test --manifest-path tools/active-evidence-exact-tree/Cargo.toml
-    cargo run --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml > /tmp/active-evidence.csv
+    cargo run --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > /tmp/active-evidence.csv
     python3 tools/active-evidence-exact-tree/reference_check.py /tmp/active-evidence.csv
 
 No third-party Rust crates or Python packages are required. The exact Rust results have not been qualified until those commands run on the checked-out source. The independent Python checker is included to compare the emitted CSV against a separate reference calculation.
