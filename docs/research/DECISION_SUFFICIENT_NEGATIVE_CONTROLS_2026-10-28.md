@@ -51,13 +51,14 @@ Pooled calibration undercovered the 90% target on this deliberately shifted prio
 
 ## External literature: direct baselines still required
 
-The results are not an SOTA comparison. Direct, same-split baselines should include Multi-Distribution Robust Conformal Prediction (MDCP, max-p), Risk-Optimal Conformal Prediction (ROCP), Utility-Directed Conformal Prediction, loss-aware DRO, and ERT conditional-coverage diagnostics:
+The results are not an SOTA comparison. Direct, same-split baselines should include Multi-Distribution Robust Conformal Prediction (MDCP, max-p), Risk-Optimal Conformal Prediction (ROCP), Utility-Directed Conformal Prediction, loss-aware DRO, ERT conditional-coverage diagnostics, and Conformal Policy Control (CPC):
 
 - MDCP (ICML 2026): https://proceedings.mlr.press/v306/yang26ad.html ; implementation https://github.com/AragornBFRer/MDCP
 - ROCP (ICML 2026): https://proceedings.mlr.press/v306/wang26ar.html ; implementation https://github.com/TaoWangPenn/Risk-Optimal-Conformal-Prediction
 - Utility-Directed Conformal Prediction (ICLR 2025): https://proceedings.iclr.cc/paper_files/paper/2025/hash/0c6b452f1bbfb6905f6bac957d73b321-Abstract-Conference.html
 - Loss-Aware Distributionally Robust Optimization (ICML 2026): https://proceedings.mlr.press/v306/ohnemus26a.html
 - Conditional Coverage Diagnostics / ERT (ICML 2026): https://proceedings.mlr.press/v306/braun26c.html ; implementation https://github.com/EISacho/covmetrics
+- Conformal Policy Control (ICML 2026) uses conformal calibration from a safe reference policy to regulate an optimized but untested policy under declared risk tolerance: https://proceedings.mlr.press/v306/prinster26a.html ; implementation https://github.com/samuelstanton/conformal-policy-control
 
 ## Provenance
 
