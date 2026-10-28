@@ -56,7 +56,9 @@ class ManifestBundle:
             "witness_receipt_schema": "witness-execution-receipt.schema.json",
             "witness_receipt_producer": "record_witness_execution.py",
             "claim_source": "legacy.cbl",
+            "claim_verifier": "vleb-cobol-index",
             "claim_witness": "index.json",
+            "claim_verdict": "verdict.json",
             "claim_stdout": "index.stdout",
             "claim_stderr": "index.stderr",
             "claim_execution_receipt": "claims/COPY.BANK.REC.receipt.json",
@@ -78,7 +80,9 @@ class ManifestBundle:
             "witness_receipt_schema": b"copied from repository below",
             "witness_receipt_producer": b"copied from repository below",
             "claim_source": b"       COPY BANK-REC.\n",
+            "claim_verifier": b"synthetic fixed-format source index verifier\n",
             "claim_witness": b'{"copy_references":["BANK-REC"]}\n',
+            "claim_verdict": b"written from fixture below",
             "claim_stdout": b'indexed COPY BANK-REC\n',
             "claim_stderr": b"",
             "claim_execution_receipt": b"written from fixture below",
@@ -99,7 +103,18 @@ class ManifestBundle:
         stderr_raw = (self.root / self.paths["claim_stderr"]).read_bytes()
         witness_producer_sha = sha((self.root / self.paths["witness_receipt_producer"]).read_bytes())
         witness_receipt_schema_sha = sha((self.root / self.paths["witness_receipt_schema"]).read_bytes())
-        verifier_sha = "d" * 64
+        verifier_sha = sha((self.root / self.paths["claim_verifier"]).read_bytes())
+        verdict = {
+            "schema_version": "vleb-witness-verdict-v1",
+            "task_id": "vleb-private-task-0001",
+            "claim_id": "COPY.BANK.REC",
+            "source_sha256": sha(source_raw),
+            "verifier_sha256": verifier_sha,
+            "result": "supports",
+        }
+        verdict_raw = jbytes(verdict)
+        (self.root / self.paths["claim_verdict"]).write_bytes(verdict_raw)
+        self.verifier_sha = verifier_sha
         invocation_argv = ["vleb-cobol-index", "--format", "fixed", "legacy.cbl"]
         invocation_sha = sha(json.dumps({
             "argv": invocation_argv,
@@ -131,7 +146,13 @@ class ManifestBundle:
                 "id": "vleb-record-witness-execution",
                 "source_sha256": witness_producer_sha,
             },
-            "verifier": {"kind": "source_index", "id": "test-source-indexer", "sha256": verifier_sha},
+            "verifier": {
+                "kind": "source_index",
+                "id": "test-source-indexer",
+                "sha256": verifier_sha,
+                "path": self.paths["claim_verifier"],
+                "argv_index": 0,
+            },
             "invocation": {
                 "argv": invocation_argv,
                 "argv_sha256": invocation_sha,
@@ -139,11 +160,15 @@ class ManifestBundle:
                 "timeout_ms": 120000,
                 "environment_sha256": "e" * 64,
             },
-            "inputs": [{"path": self.paths["claim_source"], "sha256": sha(source_raw)}],
+            "inputs": [
+                {"path": self.paths["claim_source"], "sha256": sha(source_raw)},
+                {"path": self.paths["claim_verifier"], "sha256": verifier_sha},
+            ],
             "outputs": [
                 {"path": self.paths["claim_stdout"], "sha256": sha(stdout_raw), "role": "stdout"},
                 {"path": self.paths["claim_stderr"], "sha256": sha(stderr_raw), "role": "stderr"},
                 {"path": self.paths["claim_witness"], "sha256": sha(witness_raw), "role": "artifact"},
+                {"path": self.paths["claim_verdict"], "sha256": sha(verdict_raw), "role": "verdict"},
             ],
             "process": {"exit_code": 0, "signal": None, "timed_out": False},
             "observed_result": "supports",
@@ -179,6 +204,9 @@ class ManifestBundle:
                 "invocation_sha256": invocation_sha,
                 "verifier_id": "test-source-indexer",
                 "verifier_sha256": verifier_sha,
+                "verifier_path": self.paths["claim_verifier"],
+                "verifier_argv_index": 0,
+                "verdict_path": self.paths["claim_verdict"],
                 "observed_result": "supports",
             }],
             "unresolved_reason": None,
@@ -306,7 +334,7 @@ class ManifestBundle:
                 sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             ),
             trusted_claim_verifier_pins=kwargs.pop(
-                "trusted_claim_verifier_pins", {"source_index": "d" * 64}
+                "trusted_claim_verifier_pins", {"source_index": self.verifier_sha}
             ),
             **kwargs,
         )
@@ -380,7 +408,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_producer_sha256=sha(
                 (ROOT / "tools/vleb/record_witness_execution.py").read_bytes()
             ),
-            trusted_claim_verifier_pins={"source_index": "d" * 64},
+            trusted_claim_verifier_pins={"source_index": self.bundle.verifier_sha},
         )
 
     def test_execution_receipt_matches_exact_task_run_source_and_runtime(self) -> None:
@@ -471,7 +499,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
             expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
             expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
-            trusted_claim_verifier_pins={"source_index": "d" * 64},
+            trusted_claim_verifier_pins={"source_index": self.bundle.verifier_sha},
         )
         self.assertEqual(result["status"], "passed", result)
         self.assertEqual(result["claim_count"], 1)
@@ -505,7 +533,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
             expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
             expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
-            trusted_claim_verifier_pins={"source_index": "d" * 64},
+            trusted_claim_verifier_pins={"source_index": self.bundle.verifier_sha},
         )
         self.assertEqual(result["status"], "failed")
         self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
@@ -520,7 +548,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
             expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
             expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
-            trusted_claim_verifier_pins={"source_index": "d" * 64},
+            trusted_claim_verifier_pins={"source_index": self.bundle.verifier_sha},
         )
         self.assertEqual(result["status"], "failed")
         self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
@@ -540,7 +568,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
             expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
             expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
-            trusted_claim_verifier_pins={"source_index": "d" * 64},
+            trusted_claim_verifier_pins={"source_index": self.bundle.verifier_sha},
         )
         self.assertEqual(result["status"], "failed", result)
         self.assertIn("claim_verifier_pin_missing", {row["code"] for row in result["issues"]})
@@ -553,7 +581,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_claim_schema_sha256="0" * 64,
             expected_witness_receipt_schema_sha256=sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
             expected_witness_receipt_producer_sha256=sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
-            trusted_claim_verifier_pins={"source_index": "d" * 64},
+            trusted_claim_verifier_pins={"source_index": self.bundle.verifier_sha},
         )
         self.assertEqual(result["status"], "failed")
         codes = {row["code"] for row in result["issues"]}
