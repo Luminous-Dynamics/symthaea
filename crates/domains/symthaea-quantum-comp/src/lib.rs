@@ -115,7 +115,8 @@ pub use matched_evaluation::{
     MatchedComparisonSummary, MatchedEvaluationError, MatchedPairResult,
     MatchedTrialRecord, MisEvidenceError, MisEvidenceVerdict, StageCostsMs, TimeWinner,
     TrialTermination, VerifierReceiptEvidence, VerifiedMisCandidate, compare_matched_arms,
-    sha256_hex, verify_mis_candidate, verify_mis_candidate_with_receipt,
+    canonicalize_dimacs_graph, sha256_hex, verify_mis_candidate,
+    verify_mis_candidate_with_receipt,
 };
 pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
