@@ -379,8 +379,20 @@ fn required_u64(value: &Value, field: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("missing or invalid unsigned integer field {field}"))
 }
 
-fn optional_u64(value: &Value, field: &str) -> Option<u64> {
-    value.get(field).and_then(Value::as_u64)
+fn optional_u64(value: &Value, field: &str, issues: &mut Vec<String>) -> Option<u64> {
+    match value.get(field) {
+        Some(item) => match item.as_u64() {
+            Some(number) => Some(number),
+            None => {
+                issues.push(format!("{field} missing, negative, or not an unsigned integer"));
+                None
+            }
+        },
+        None => {
+            issues.push(format!("{field} missing"));
+            None
+        }
+    }
 }
 
 fn optional_metric(value: Option<&Value>, label: &str, issues: &mut Vec<String>) -> Option<f64> {
@@ -501,15 +513,24 @@ fn parse_artifact(
         }
     };
 
+    let (rmsle, exact_accuracy) = if status == TrialStatus::Completed {
+        (rmsle, exact_accuracy)
+    } else {
+        issues.push(
+            "evaluation metrics withheld because the upstream trial did not complete".to_owned(),
+        );
+        (None, None)
+    };
+
     Ok((
         key,
         TrialObservationV1 {
             status,
             rmsle,
             exact_accuracy,
-            rounds: optional_u64(&value, "rounds"),
-            num_experiments: optional_u64(&value, "num_experiments"),
-            total_tokens: optional_u64(&value, "total_tokens"),
+            rounds: optional_u64(&value, "rounds", &mut issues),
+            num_experiments: optional_u64(&value, "num_experiments", &mut issues),
+            total_tokens: optional_u64(&value, "total_tokens", &mut issues),
             source_path: artifact.path.clone(),
             source_sha256: sha256_hex(&artifact.raw_bytes),
             normalized_nonfinite_tokens,
@@ -1098,6 +1119,10 @@ mod tests {
         let trial = report.body.paired_trials.iter().find(|p| p.expected.trial_id == 2).unwrap();
         let observed = trial.vanilla.as_ref().unwrap();
         assert_eq!(observed.rmsle, None);
+        assert_eq!(observed.exact_accuracy, None);
+        assert!(
+            observed.issues.iter().any(|issue| issue.contains("metrics withheld"))
+        );
         assert_eq!(observed.normalized_nonfinite_tokens, 1);
     }
 
