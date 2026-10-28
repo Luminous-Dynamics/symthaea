@@ -19,6 +19,7 @@ const EPS: f64 = 1.0e-12;
 const TOTAL_LABEL_BUDGET: usize = 1000;
 const SHIFT_AFTER_TOTAL_LABELS: usize = 100;
 const SENTINEL_FRACTIONS: [f64; 7] = [0.0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0];
+const BUDGET_SHIFT_PROBABILITIES: [f64; 5] = [0.55, 0.60, 0.70, 0.80, 0.90];
 const BETA_PRIOR_A: f64 = 0.5;
 const BETA_PRIOR_B: f64 = 0.5;
 
@@ -347,7 +348,7 @@ fn print_csv() {
 
 fn print_sentinel_budget_csv() {
     println!(
-        "sentinel_fraction,total_label_budget,sentinel_labels,adaptive_labels,change_after_sentinel_labels,no_target_shift_alarm_probability,pre_change_false_alarm_probability,true_shift_detection_probability,mean_delay_sentinel_labels,mean_delay_total_label_equivalent,per_cell_alpha"
+        "sentinel_fraction,post_shift_p,total_label_budget,sentinel_labels,adaptive_labels,change_after_sentinel_labels,no_target_shift_alarm_probability,pre_change_false_alarm_probability,true_shift_detection_probability,mean_delay_sentinel_labels,mean_delay_total_label_equivalent,per_cell_alpha"
     );
 
     for fraction in SENTINEL_FRACTIONS {
@@ -366,7 +367,7 @@ fn print_sentinel_budget_csv() {
                 TOTAL_LABEL_BUDGET,
             );
             println!(
-                "{:.4},{},{},{},NA,{:.12},NA,NA,NA,NA,{:.12}",
+                "{:.4},NA,{},{},{},NA,{:.12},NA,NA,NA,NA,{:.12}",
                 fraction,
                 TOTAL_LABEL_BUDGET,
                 sentinel_labels,
@@ -389,31 +390,35 @@ fn print_sentinel_budget_csv() {
             0,
             sentinel_labels,
         );
-        let shifted = evaluate(
-            Boundary::BetaMixtureEProcess,
-            NOMINAL_P,
-            NOMINAL_P,
-            Some(SHIFTED_P),
-            change_after_sentinel,
-            sentinel_labels,
-        );
-        let delay_total_equivalent =
-            shifted.mean_detection_delay.map(|delay| delay / fraction);
 
-        println!(
-            "{:.4},{},{},{},{},{:.12},{:.12},{},{},{},{:.12}",
-            fraction,
-            TOTAL_LABEL_BUDGET,
-            sentinel_labels,
-            adaptive_labels,
-            change_after_sentinel,
-            stable.false_alarm_probability,
-            shifted.false_alarm_probability,
-            csv_optional(Some(shifted.detection_probability)),
-            csv_optional(shifted.mean_detection_delay),
-            csv_optional(delay_total_equivalent),
-            PER_CELL_ALPHA
-        );
+        for post_shift_p in BUDGET_SHIFT_PROBABILITIES {
+            let shifted = evaluate(
+                Boundary::BetaMixtureEProcess,
+                NOMINAL_P,
+                NOMINAL_P,
+                Some(post_shift_p),
+                change_after_sentinel,
+                sentinel_labels,
+            );
+            let delay_total_equivalent =
+                shifted.mean_detection_delay.map(|delay| delay / fraction);
+
+            println!(
+                "{:.4},{:.2},{},{},{},{},{:.12},{:.12},{},{},{},{:.12}",
+                fraction,
+                post_shift_p,
+                TOTAL_LABEL_BUDGET,
+                sentinel_labels,
+                adaptive_labels,
+                change_after_sentinel,
+                stable.false_alarm_probability,
+                shifted.false_alarm_probability,
+                csv_optional(Some(shifted.detection_probability)),
+                csv_optional(shifted.mean_detection_delay),
+                csv_optional(delay_total_equivalent),
+                PER_CELL_ALPHA
+            );
+        }
     }
 }
 
@@ -613,7 +618,23 @@ mod tests {
             0,
             50,
         );
-        let ten_percent_shift = evaluate(
+        let ten_percent_mild_shift = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            Some(0.60),
+            10,
+            100,
+        );
+        let ten_percent_moderate_shift = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            Some(0.70),
+            10,
+            100,
+        );
+        let ten_percent_large_shift = evaluate(
             Boundary::BetaMixtureEProcess,
             NOMINAL_P,
             NOMINAL_P,
@@ -621,7 +642,15 @@ mod tests {
             10,
             100,
         );
-        let twenty_percent_shift = evaluate(
+        let twenty_percent_moderate_shift = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            NOMINAL_P,
+            Some(0.70),
+            20,
+            200,
+        );
+        let twenty_percent_large_shift = evaluate(
             Boundary::BetaMixtureEProcess,
             NOMINAL_P,
             NOMINAL_P,
@@ -632,10 +661,14 @@ mod tests {
 
         assert!(selected_only.false_alarm_probability > 0.99);
         assert!(five_percent_stable.false_alarm_probability <= PER_CELL_ALPHA + EPS);
-        assert!(ten_percent_shift.detection_probability > 0.95);
-        assert!(twenty_percent_shift.detection_probability > 0.99);
-        assert!(ten_percent_shift.mean_detection_delay.is_some());
-        assert!(twenty_percent_shift.mean_detection_delay.is_some());
+        assert!(ten_percent_mild_shift.detection_probability < 0.05);
+        assert!(ten_percent_moderate_shift.detection_probability > 0.40);
+        assert!(ten_percent_moderate_shift.detection_probability < 0.50);
+        assert!(ten_percent_large_shift.detection_probability > 0.95);
+        assert!(twenty_percent_moderate_shift.detection_probability > 0.85);
+        assert!(twenty_percent_large_shift.detection_probability > 0.99);
+        assert!(ten_percent_large_shift.mean_detection_delay.is_some());
+        assert!(twenty_percent_large_shift.mean_detection_delay.is_some());
     }
 
     #[test]
