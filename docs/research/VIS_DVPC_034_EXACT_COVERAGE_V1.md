@@ -26,18 +26,20 @@ The bounded intervals' formal-coverage comparison is meaningful only when logged
 
 The zero-support scenario returns `NOT_IDENTIFIED` and `confidence_intervals=SUPPRESSED`; no estimator-model value is allowed to stand in for identification.
 
-## Exact known answers
+## Exact coverage–width frontier
 
-An independent enumerator found the following Wald coverage under the frozen DGP, before any Rust CI qualification:
+The following values are independently enumerated under the frozen Bernoulli DGP (six rows per sample, true target value 0.5). Mean width is the expected length of the confidence set after intersecting it with [0,1].
 
-| Scenario | Target value | Exact Wald coverage | Interpretation |
-|---|---:|---:|---|
-| `healthy_correct` | 0.5 | 0.781250 | Severe finite-sample undercoverage at n=6 |
-| `weak_overlap_010` | 0.5 | 0.449037 | Coverage falls as maximum importance weight grows |
-| `weak_overlap_005` | 0.5 | 0.228808 | More severe undercoverage |
-| `weak_overlap_001` | 0.5 | 0.063024 | Normal approximation is unusable here as a nominal 95% interval |
+| Scenario | Wald coverage | Wald mean width | Hoeffding coverage | Hoeffding mean width | Empirical-Bernstein coverage | Empirical-Bernstein mean width |
+|---|---:|---:|---:|---:|---:|---:|
+| `healthy_correct` | 0.781250 | 0.716348 | 1.000000 | 0.881179 | 1.000000 | 1.000000 |
+| `weak_overlap_010` | 0.449037 | 0.543168 | 0.999462 | 0.999671 | 1.000000 | 1.000000 |
+| `weak_overlap_005` | 0.228808 | 0.405637 | 0.999964 | 0.999964 | 1.000000 | 1.000000 |
+| `weak_overlap_001` | 0.063024 | 0.269518 | 1.000000 | 1.000000 | 1.000000 | 1.000000 |
 
-Under correctly specified propensities, exact Hoeffding and empirical-Bernstein coverage in these controls is at least 0.95; the width can approach the full [0,1] reward range. That conservatism is not hidden: the benchmark reports exact coverage, undercoverage probability, mean width and worst per-state width. A vacuous 100%-wide interval is not a practical victory.
+The central negative result is that Wald coverage degrades sharply with weak overlap. At logging propensity 0.99 for action A, a nominal 95% Wald interval covers only about 6.30% of samples with average width about 0.270. Hoeffding is essentially 100% covering in this fixture, but its expected width is essentially the entire [0,1] reward range. Empirical-Bernstein is equally conservative here. The comparison therefore makes the coverage–width tradeoff visible instead of hiding it behind a single score.
+
+These values are exact for this DGP, not external-validity results. The benchmark intentionally reports uncertainty width rather than assuming more conservative is automatically more useful.
 
 ## Machine-readable receipt
 
