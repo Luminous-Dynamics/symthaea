@@ -453,7 +453,10 @@ impl FragmentAssembler {
             let final_chunk_start = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
             let inferred = self.expected_payload_size.checked_sub(final_chunk_start)?;
             let max_payload_len = data_count.checked_mul(PAYLOAD_SIZE)?;
-            if inferred == 0 || inferred > PAYLOAD_SIZE || self.expected_payload_size > max_payload_len {
+            if inferred == 0
+                || inferred > PAYLOAD_SIZE
+                || self.expected_payload_size > max_payload_len
+            {
                 return None;
             }
             Some(inferred)
