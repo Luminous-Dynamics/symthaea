@@ -1,6 +1,6 @@
 {
   "schema": "symthaea-policy-risk-binding-summary-v1",
-  "status": "VALIDATION_HELPER_ONLY_NOT_PRODUCTION_RUST_INTEGRATION",
+  "status": "PYTHON_VALIDATION_HELPER_AND_RUST_MODULE_COMMITTED_RUST_TESTS_NOT_EXECUTED",
   "source_path": "validation/policy_risk_binding.py",
   "source_git_blob_sha1": "66cccbbf9b6bbe9d04fce05ac998a3fc0e576b27",
   "source_sha256": "c2c709906a91dc6b9c80d313c6d5497be96c2ea55b04977a5ab977951a1b4c4b",
@@ -42,5 +42,15 @@
   "test_cases_added": [
     "build manifest from the Symthaea finite-game risk tensor and reject a row permutation",
     "reject reordered policy labels against the same risk tensor"
-  ]
+  ],
+  "rust_source_path": "crates/domains/symthaea-subterranean/src/policy_risk_binding.rs",
+  "rust_source_git_blob_sha1": "63c4e9aacfe5b7db5971e701c42ae38ac226c4c3",
+  "rust_inline_unit_tests_authored": 8,
+  "rust_unit_tests_executed": false,
+  "rust_toolchain_available_locally": false,
+  "crate_manifest_git_blob_sha1": "45de998db181d6459983e417942db27aee528e0e",
+  "crate_lib_git_blob_sha1": "525647bb48110711bddecc813879b66be5e7e707",
+  "cargo_lock_git_blob_sha1": "5701d38370bb363508872871a15eb27537f8d645",
+  "production_dispatch_integrated": false,
+  "next_gate": "Run cargo test -p symthaea-subterranean on exact branch head, then add signed receipt verification and wire binding checks pre-optimization and pre-dispatch."
 }
