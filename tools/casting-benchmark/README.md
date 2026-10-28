@@ -387,7 +387,7 @@ The acquisition is intentionally labelled a **heuristic**, not exact Bayesian va
 
 The default synthetic matrix now contains 7 policies and 9,072 planned runs (6×6 objective/constraint compositions, 3 dimensions, 4 severities including the exact zero-mismatch control, 3 diagnostic seeds, 7 policies). This count is a plan, **not executed results**.
 
-Next comparison gate: matched cost budgets and paired seeds against pinned BoTorch MF-HVKG/MOMF, plus appropriate single-fidelity baselines; use COCO's native performance methodology on `bbob-biobj`. The 2026 consequential-improvement method remains a separate single-objective track until its authors' implementation is available or an independently derived scalarized baseline is separately locked. No SOTA or foundry-validity claim follows from synthetic replay alone.
+Next comparison gate: matched cost budgets and paired seeds against pinned BoTorch MF-HVKG/MOMF and the public MF-JESMOC implementation, plus appropriate single-fidelity baselines; use COCO's native performance methodology on `bbob-biobj`. Pin MF-JESMOC to an immutable repository revision and environment before any run. The 2026 consequential-improvement method remains a separate single-objective track until its authors' implementation is available or an independently derived scalarized baseline is separately locked. No SOTA or foundry-validity claim follows from synthetic replay alone.
 
 References:
 - BoTorch multi-fidelity multi-objective BO: https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO
