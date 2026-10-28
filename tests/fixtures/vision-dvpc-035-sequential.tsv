@@ -1,0 +1,6 @@
+scenario_id	horizon	target_probability_a	true_logging_probability_a	estimated_logging_probability_a	reward_mean_a	reward_mean_b
+healthy_correct	8	0.5	0.5	0.5	0.2	0.8
+weak_overlap_010	8	0.5	0.9	0.9	0.2	0.8
+weak_overlap_001	8	0.5	0.99	0.99	0.2	0.8
+propensity_misspecified	8	0.5	0.5	0.7	0.2	0.8
+zero_support	8	0.5	1.0	1.0	0.2	0.8
