@@ -42,6 +42,35 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  casting-decision-robustness:
+    name: Casting decision robustness (stdlib Python)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate decision robustness evaluator and bake-off adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 tools/casting-benchmark/test_decision_robustness_eval.py
+          python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
+          python3 tools/casting-benchmark/decision_robustness_eval.py \
+            tools/casting-benchmark/fixtures/decision_robustness_toy.json \
+            --output /tmp/casting-decision-robustness-receipt.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("/tmp/casting-decision-robustness-receipt.json").read_text())
+          assert receipt["receipt_label"] == "POST_SELECTION_SHIFT_AUDIT_NOT_PHYSICAL_CERTIFICATION"
+          assert receipt["metrics"]["selected_false_feasible_count"] == 1
+          assert receipt["metrics"]["selected_feasibility_rate"] == 0.5
+          assert receipt["metrics"]["finite_pool_normalized_regret_worst_shift"] == 1.0
+          assert receipt["source_run"]["candidate_pool_sha256"] == "d" * 64
+          print("known-answer receipt validated")
+          PY
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
