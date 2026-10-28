@@ -68,4 +68,4 @@ The results are not an SOTA comparison. Direct, same-split baselines should incl
 - Test SHA-256: **aef228cd788a83cf5d3a55a9685d786800f8298c9dea832e95e9d22cf3ee96b7**
 - Raw JSON SHA-256: **519da9c0f6b1f05dc8c058c0205e9321616d961b1341c5417bddeb347ce4e9e5**
 - Local regression tests: 4/4 passed. The test suite re-runs the fixed-seed experiment; runtime about 11.6 seconds.
-- No remote CI pass is claimed; the PR's current CI/governance workflows were skipped at last check.
+- Latest remote check: CI was skipped and PR Governance remained in progress. No remote CI pass is claimed.
