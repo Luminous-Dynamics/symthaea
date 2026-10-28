@@ -104,6 +104,18 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     if not any("never remove a requirement or test" in rule for rule in trace_definition.get("denominator_rules", [])):
         errors.append("requirement_to_test_traceability_denominator_drift")
 
+    baseline_target = data.get("proposed_targets", {}).get("per_test_baseline_oracle_alignment_pct", {})
+    if baseline_target.get("target") != 100 or baseline_target.get("status") != "target_not_measured":
+        errors.append("per_test_baseline_oracle_target_drift")
+    baseline_current = data.get("current_measurements", {}).get("per_test_baseline_oracle_alignment_pct", {})
+    if baseline_current.get("value") is not None or baseline_current.get("eligible") is not False:
+        errors.append("per_test_baseline_oracle_score_fabricated")
+    baseline_definition = data.get("metric_definitions", {}).get("per_test_baseline_oracle_alignment", {})
+    if baseline_definition.get("composite_weighted_score") is not False:
+        errors.append("per_test_baseline_oracle_must_not_use_weighted_score")
+    if not any("cannot be dropped" in rule for rule in baseline_definition.get("denominator_rules", [])):
+        errors.append("per_test_baseline_oracle_denominator_drift")
+
     claim_metric = data.get("current_measurements", {}).get("source_claim_false_support_rate_pct", {})
     if claim_metric.get("value") is not None or claim_metric.get("eligible") is not False:
         errors.append("source_claim_false_support_rate_fabricated")

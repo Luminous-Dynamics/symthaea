@@ -232,6 +232,18 @@
         "all traced observables belong to the task observable inventory",
         "independent task/receipt auditor passes at the exact scored head"
       ]
+    },
+    "per_test_baseline_oracle_alignment_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "For each scored task, every concrete executable test ID has a frozen baseline expectation derived from reviewed baseline evidence, and the observed baseline log matches that expectation exactly.",
+      "requirements": [
+        "every mapped executable test has exactly one baseline expectation",
+        "baseline expectation is either passed or failed and is frozen before candidate execution",
+        "the baseline log matches every expected status, not merely one global failure",
+        "the reference implementation passes every required mapped test",
+        "missing or ambiguous logs remain unresolved and cannot be dropped from the denominator"
+      ]
     }
   },
   "current_measurements": {
@@ -302,6 +314,12 @@
       "eligible": false,
       "status": "not_measured",
       "reason": "The traceability schema and auditor gate are draft work in PR #8801. No locked confirmatory cohort has passed exact-head CI and independent task admission."
+    },
+    "per_test_baseline_oracle_alignment_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "Per-test baseline expectations are implemented in draft PR #8801, but the exact-head suite has not passed and no locked confirmatory cohort has been evaluated."
     }
   },
   "metric_definitions": {
@@ -379,6 +397,22 @@
         "freeze task contract and requirement IDs before candidate evaluation",
         "never remove a requirement or test after observing candidate results",
         "report missing trace rows and unmapped tests separately; headline admission requires both dimensions to be complete"
+      ],
+      "composite_weighted_score": false
+    },
+    "per_test_baseline_oracle_alignment": {
+      "formula": "concrete executable test IDs whose observed baseline status matches the preregistered expected status / all concrete executable test IDs mapped by scored task contracts",
+      "pass_requirements": [
+        "each expected baseline status is independently reviewed and frozen before candidate evaluation",
+        "every mapped test has one expected status",
+        "actual baseline execution log matches the expectation for each concrete test",
+        "the reference patch passes all mapped tests"
+      ],
+      "denominator_rules": [
+        "freeze expected status values before observing the candidate outcome",
+        "unknown, missing, ambiguous, or mismatched test results remain unresolved or failed and cannot be dropped",
+        "report overall two-sided baseline/reference gate separately from per-test alignment",
+        "composite_weighted_score is false"
       ],
       "composite_weighted_score": false
     }
