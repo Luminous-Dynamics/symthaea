@@ -845,23 +845,29 @@ impl CodingAgent {
             // Prefer the evidence identity already attached to this CycleResult.
             // A valid numeric scalar without cycle metadata is not enough to
             // manufacture decision-time provenance.
-            let prediction_evidence = cycle_result
+            let decision_evidence = cycle_result
                 .metadata
                 .prediction_evidence
                 .as_ref()
                 .map(|metadata| {
-                    PredictionErrorEvidence::from_comparison(
+                    let evidence = PredictionErrorEvidence::from_comparison(
                         metadata.status,
                         (cycle_result.prediction_error_valid
                             && cycle_result.prediction_error.is_finite())
                         .then_some(cycle_result.prediction_error),
                         metadata.prediction_cycle,
                         metadata.observation_cycle,
-                    )
+                    );
+                    (metadata.observation_cycle, evidence)
                 });
+            let (decision_cycle, prediction_evidence) = match decision_evidence {
+                Some((cycle, evidence)) => (Some(cycle), Some(evidence)),
+                None => (None, None),
+            };
             self.pending_reasoning_outcome =
                 Some(consciousness_bridge::PendingReasoningOutcome::capture_with_evidence(
                     &reasoning,
+                    decision_cycle,
                     prediction_evidence,
                 ));
         }
