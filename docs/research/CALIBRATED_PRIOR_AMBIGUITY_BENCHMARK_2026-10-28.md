@@ -45,6 +45,21 @@ Every row's numerical policy certificate closed to the declared tolerance. The r
 
 The 4-row machine-readable output is committed as `validation/CALIBRATED_PRIOR_AMBIGUITY_TARGET_SWEEP_2026-10-28.json` (2,529 bytes, SHA-256 `5dcfe5ed14daa4efbc2a40b873cecd95870c2068cc4ceb05baf288c58a7e047a`). Total local runtime was about 5.22 seconds for four calibration/test runs. The target sweep shares the source-version mismatch boundary described above and is not evidence of real-world coverage.
 
+## Additional experiment: observation-budget sweep
+
+A separate matched-seed sweep varied the multinomial observation budget per prior estimate while holding the synthetic meta-population, 400 calibration episodes, 120 independent test episodes, and nominal 90% coverage target fixed.
+
+| Observations per prior estimate | Calibrated radius | Empirical feature coverage | Mean joint regret (bits) | p95 joint regret (bits) |
+|---:|---:|---:|---:|---:|
+| 30 | 0.195652 | 93.33% | 0.060990 | 0.127922 |
+| 60 | 0.131248 | 91.67% | 0.029917 | 0.090475 |
+| 120 | 0.091397 | 89.17% | 0.015433 | 0.053561 |
+| 240 | 0.066754 | 94.17% | 0.007632 | 0.032041 |
+
+As expected in this synthetic setting, more observations narrow the calibrated feature uncertainty set, and both mean and p95 joint regret decrease monotonically from 30 to 240 observations. The empirical coverage is not monotone because it is estimated on only 120 test draws; all results remain compatible with sampling variability around the nominal 90% marginal target. This is a matched-seed diagnostic, not a real-world rate guarantee or proof that more observations always reduce deployed regret.
+
+The exact 4-row JSON is `validation/CALIBRATED_PRIOR_OBSERVATION_BUDGET_SWEEP_2026-10-28.json` (7,690 bytes, SHA-256 `56ee43b2d2e13a87ce4f1dcb3c9e90c46c3434abda99e0af4c2893ac6041586f`). The losslessly compressed artifact is committed as `validation/CALIBRATED_PRIOR_OBSERVATION_BUDGET_SWEEP_2026-10-28.json.gz` (1,283 bytes, SHA-256 `a0110c50ed6dfec9d037abe2b049dd43b33d9ca7767691a83db738972da928b8`, Git blob `3ec7bd83c4cb7dd48b4ff3f3606102b5f1d88aa4`). Combined local runtime for the four sweep points was approximately 6.36 seconds.
+
 ## Important failure mode: marginal coverage is not conditional coverage
 
 Coverage by sampled regime was:
