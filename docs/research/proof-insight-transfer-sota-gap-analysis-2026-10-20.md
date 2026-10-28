@@ -397,3 +397,10 @@ See also [PITB's exploratory power-planning sensitivity illustration](pitb-power
 ### 24 October correction: align the planned interval to the registered paired estimator
 
 The power-planning implementation has since been corrected to use the paired component-percentile-bootstrap interval from PITB's success-cost frontier analysis, not the t-interval approximation described in an earlier section above. The bootstrap replicate count is an explicit, schema-bound input. The linked sensitivity note's tables were refreshed under that component-bootstrap rule using a separate exploratory Monte Carlo implementation; they are not Rust output or measured PITB performance. The next design gate remains the real component-size distribution after the independently reviewed relationship/quarantine audit, followed by a preregistered grid and independent statistical review.
+
+
+### 28 October update: stress-test inference under heterogeneous effects
+
+Added the [weak-null calibration audit](../../blob/research/proof-insight-transfer-v0/data/benchmarks/proof-insight-transfer-v0/weak-null-calibration-audit-2026-10-28.md). In one exploratory synthetic family with zero target-weighted average effect but mixed component-level effects, the simple cluster-paired t interval rejected too often under severe component-size imbalance (4.95% at a 2.5% reference rate), while the component-percentile bootstrap had a 3.15% rejection rate; an unqualified restricted wild-cluster comparator reached 6.10%. These figures include Monte Carlo uncertainty and are not project performance.
+
+The result does not select a universal interval. Inference remains unqualified until PITB's actual eligible component distribution and estimand are frozen, interval availability is reported separately, a broader preregistered calibration grid is run, and an independent statistician reviews the final design. The current head still has no measured transfer-utility result; indexing, synthetic schemas, and calibration simulations must not be reported as a SOTA win.
