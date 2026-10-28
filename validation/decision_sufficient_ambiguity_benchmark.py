@@ -66,7 +66,7 @@ def summarize(rows, method, geometry_kind, radius_for_regime):
         sub=[r["methods"][method]["covered"] for r in rows if r["regime"]==name]
         groups[name]={"covered":sum(sub),"n":len(sub),"rate":float(np.mean(sub)),"wilson95":g.wilson(sum(sub),len(sub))}
     regrets=np.asarray([v["regret_bits"] for v in vals])
-    return {"geometry":"unrestricted_prior" if method=="full_prior" else geometry_kind,
+    s={"geometry":"unrestricted_prior" if method=="full_prior" else geometry_kind,
        "coverage_semantics":("all priors admitted by definition" if method=="full_prior" else
           "coverage of 10 prior features" if geometry_kind=="prior_feature_space" else "coverage of the vector of 8 candidate-policy expected risks"),
        "coverage":{"covered":int(covered),"n":n,"rate":float(covered/n),"wilson95":g.wilson(covered,n)},
@@ -74,6 +74,13 @@ def summarize(rows, method, geometry_kind, radius_for_regime):
        "mean_regret_bits":float(regrets.mean()),"p95_regret_bits":float(np.quantile(regrets,.95)),
        "mean_radius":None if method=="full_prior" else float(np.mean([r["methods"][method]["radius"] for r in rows])),
        "max_certificate_gap_bits":float(max(v["certificate_gap_bits"] for v in vals))}
+    if method.startswith("risk_"):
+        covered_rows=[r for r in rows if r["methods"][method]["covered"]]
+        violations=[r for r in covered_rows if r["methods"][method]["regret_bits"] > 2.0*r["methods"][method]["radius"] + 1e-7]
+        s["covered_case_regret_bound_2r"]={"covered_cases":len(covered_rows),"violations":len(violations),
+            "max_regret_over_2r":float(max((r["methods"][method]["regret_bits"]/(2.0*r["methods"][method]["radius"]) for r in covered_rows if r["methods"][method]["radius"] > 0),default=0.0)),
+            "statement":"when the true candidate-policy risk vector lies inside this radius-r region, regret is at most 2r for the fixed finite policy set and exact risk matrix"}
+    return s
 
 
 def paired_bootstrap_ci(delta, seed, reps=2000):
