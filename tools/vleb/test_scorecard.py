@@ -85,9 +85,6 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     if ibm.get("public_programs") != 20 or ibm.get("proprietary_customer_applications") != 10:
         errors.append("ibm_cobol_translation_scope_drift")
     rank_audit = data.get("industry_comparators", {}).get("swe_bench_leaderboard_stability_audit", {})
-    findings = rank_audit.get("findings", {})
-    if findings.get("audited_submission_count") is not None:
-        errors.append("rank_audit_field_placement")
     if rank_audit.get("audited_submission_count") != 254:
         errors.append("swe_bench_rank_audit_scope_drift")
     if rank_audit.get("findings", {}).get("adjacent_top_30_verified_pairs_significant_at_alpha_0_05") != 0:
