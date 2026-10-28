@@ -220,8 +220,8 @@ def make_task(
             )
             observations.append({"x": x, "y": slope * x + intercept + err})
         roots = [row["x"] for row in observations]
-        challenge_index = float(samples) + 1.0
-        challenge_x = x_start + challenge_index * narrow_step
+        challenge_index = float(samples) + 10.0
+        challenge_x = x_start + challenge_index * x_step
         policy_input = {
             "instruction": instruction,
             "observations": observations,
