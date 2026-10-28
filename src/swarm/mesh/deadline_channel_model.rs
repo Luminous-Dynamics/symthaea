@@ -209,6 +209,83 @@ fn loss_threshold_ppm(
     }
 }
 
+
+fn encode_gap_varints(indices: &[usize]) -> Vec<u8> {
+    let mut encoded = Vec::new();
+    let mut previous_exclusive = 0usize;
+    for &index in indices {
+        assert!(index >= previous_exclusive);
+        let mut gap = index - previous_exclusive;
+        loop {
+            let low = (gap & 0x7f) as u8;
+            gap >>= 7;
+            if gap == 0 {
+                encoded.push(low);
+                break;
+            }
+            encoded.push(low | 0x80);
+        }
+        previous_exclusive = index + 1;
+    }
+    encoded
+}
+
+/// Strict test codec for a proposed delta-index format. Gaps are bounded by the
+/// 16,384-bit vector and non-canonical, truncated, overflowing or count-mismatched
+/// input is rejected. This is research code, not a deployed wire decoder.
+fn decode_gap_varints(encoded: &[u8], expected_count: usize) -> Option<Vec<usize>> {
+    const HV_BITS: usize = 16_384;
+    let mut decoded = Vec::with_capacity(expected_count.min(HV_BITS));
+    let mut previous_exclusive = 0usize;
+    let mut cursor = 0usize;
+
+    while cursor < encoded.len() {
+        if decoded.len() >= expected_count {
+            return None;
+        }
+        let mut value = 0usize;
+        let mut shift = 0u32;
+        loop {
+            if cursor >= encoded.len() || shift >= 14 {
+                return None;
+            }
+            let byte = encoded[cursor];
+            cursor += 1;
+            let low = usize::from(byte & 0x7f);
+            value |= low << shift;
+            if byte & 0x80 == 0 {
+                if shift > 0 && low == 0 {
+                    return None;
+                }
+                break;
+            }
+            shift += 7;
+        }
+        let index = previous_exclusive.checked_add(value)?;
+        if index >= HV_BITS {
+            return None;
+        }
+        decoded.push(index);
+        previous_exclusive = index.checked_add(1)?;
+    }
+
+    (decoded.len() == expected_count).then_some(decoded)
+}
+
+fn deterministic_flip_positions(hamming_bits: usize, seed: u64) -> Vec<usize> {
+    const HV_BITS: usize = 16_384;
+    assert!(hamming_bits <= HV_BITS);
+    let mut positions: Vec<usize> = (0..HV_BITS).collect();
+    let mut rng = TraceRng::new(seed);
+    for i in (1..positions.len()).rev() {
+        let j = (rng.next_u64() % (i as u64 + 1)) as usize;
+        positions.swap(i, j);
+    }
+    positions.truncate(hamming_bits);
+    positions.sort_unstable();
+    positions
+}
+
 fn frame_lengths_for_bytes(payload_len: usize) -> Vec<usize> {
     let payload = vec![0xA5; payload_len];
     let frames = fragment(0xC0DE, &payload);
@@ -655,4 +732,82 @@ fn packet_aead_adds_nonce_and_tag_to_current_envelope() {
         "packet AEAD prepends a 12-byte nonce and a 16-byte tag"
     );
     assert_eq!(encrypted.len(), PACKET_AEAD_ENVELOPE_BYTES);
+}
+
+#[test]
+fn gap_coded_delta_reconstructs_exact_hv_and_reports_airtime_break_even() {
+    const HV_BITS: usize = 16_384;
+    const HV_BYTES: usize = HV_BITS / 8;
+    const DELTA_FIXED_BYTES: usize = 95;
+    let full_plain_airtime = frame_lengths_for_bytes(BASELINE_ENVELOPE_BYTES)
+        .iter()
+        .map(|size| lora_time_on_air_us_for_sf(*size, 7))
+        .sum::<u64>();
+    let full_aead_airtime = frame_lengths_for_bytes(PACKET_AEAD_ENVELOPE_BYTES)
+        .iter()
+        .map(|size| lora_time_on_air_us_for_sf(*size, 7))
+        .sum::<u64>();
+    let flip_rates = [0usize, 16, 82, 164, 327, 819, 1311, 1638, 2048, 2458, 3277, 8192, 16_384];
+
+    for (sample, flips) in flip_rates.into_iter().enumerate() {
+        let positions = deterministic_flip_positions(flips, 0xD311_A000 + sample as u64);
+        let encoded = encode_gap_varints(&positions);
+        let decoded = decode_gap_varints(&encoded, positions.len())
+            .expect("valid encoded gap list must decode");
+        assert_eq!(decoded, positions);
+
+        let mut rng = TraceRng::new(0x4241_5345 + sample as u64);
+        let mut base = vec![0u8; HV_BYTES];
+        for byte in &mut base {
+            *byte = rng.next_u64() as u8;
+        }
+        let mut target = base.clone();
+        for index in &positions {
+            target[index / 8] ^= 1u8 << (index % 8);
+        }
+        let mut reconstructed = base;
+        for index in &decoded {
+            reconstructed[index / 8] ^= 1u8 << (index % 8);
+        }
+        assert_eq!(reconstructed, target, "Hamming flips={flips}");
+
+        let delta_bytes = DELTA_FIXED_BYTES + encoded.len();
+        let delta_airtime = frame_lengths_for_bytes(delta_bytes)
+            .iter()
+            .map(|size| lora_time_on_air_us_for_sf(*size, 7))
+            .sum::<u64>();
+        let encrypted_delta_bytes = delta_bytes + 12 + 16;
+        let encrypted_delta_airtime = frame_lengths_for_bytes(encrypted_delta_bytes)
+            .iter()
+            .map(|size| lora_time_on_air_us_for_sf(*size, 7))
+            .sum::<u64>();
+        eprintln!(
+            "mesh-hdc-delta sf=7 flips={} hamming_pct_milli={} delta_bytes={} delta_airtime_us={} full_airtime_us={} encrypted_delta_airtime_us={} encrypted_full_airtime_us={}",
+            flips,
+            flips * 1_000_000 / HV_BITS,
+            delta_bytes,
+            delta_airtime,
+            full_plain_airtime,
+            encrypted_delta_airtime,
+            full_aead_airtime,
+        );
+        if flips <= 819 {
+            assert!(delta_airtime < full_plain_airtime);
+        }
+        if flips >= 2048 {
+            assert!(delta_airtime > full_plain_airtime);
+        }
+    }
+}
+
+#[test]
+fn delta_gap_decoder_rejects_malformed_and_noncanonical_inputs() {
+    assert_eq!(decode_gap_varints(&[], 0), Some(Vec::new()));
+    assert_eq!(decode_gap_varints(&[0x00], 1), Some(vec![0]));
+    assert!(decode_gap_varints(&[0x80], 1).is_none());
+    assert!(decode_gap_varints(&[0x80, 0x00], 1).is_none());
+    assert!(decode_gap_varints(&[0x80, 0x80, 0x01], 1).is_none());
+    assert!(decode_gap_varints(&[0x00], 0).is_none());
+    assert!(decode_gap_varints(&[0xff, 0x7f], 1).is_some());
+    assert!(decode_gap_varints(&[0x80, 0x7f], 1).is_none(), "decoded index out of range");
 }
