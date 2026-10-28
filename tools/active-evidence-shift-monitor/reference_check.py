@@ -110,8 +110,9 @@ CUSUM_LOWER_INCREMENT = 13
 CUSUM_FIELDS = (
     "direction", "scenario", "scenario_class", "horizon", "change_after", "p0", "stream_pre_p", "p1",
     "null_lower", "null_upper", "threshold_scaled", "threshold_score",
-    "matched_reference_alarm_probability", "calibration_boundary_alarm_probability",
-    "family_worst_case_union_bound", "scenario_or_pre_shift_alarm_probability",
+    "matched_reference_family_alarm_probability", "matched_direction_alarm_probability",
+    "calibration_boundary_alarm_probability", "family_worst_case_union_bound",
+    "scenario_or_pre_shift_alarm_probability",
     "post_shift_detection_probability", "mean_post_shift_detection_delay",
     "median_post_shift_detection_delay", "p90_post_shift_detection_delay", "per_cell_alpha",
     "survival_probability",
@@ -986,8 +987,9 @@ def composite_boundary_reference_alarm_probability(horizon=1000, tables=None):
 def cusum_reference_rows():
     horizon = HORIZONS[-1]
     tables = eprocess_family_alarm_tables(horizon)
-    matched_reference_alarm = composite_boundary_reference_alarm_probability(horizon, tables)
-    threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm)
+    matched_reference_family_alarm = composite_boundary_reference_alarm_probability(horizon, tables)
+    matched_direction_alarm = matched_reference_family_alarm / 2.0
+    threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm)
     calibration_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER)
     family_union_bound = 2.0 * calibration_alarm
     rows = []
@@ -1008,7 +1010,8 @@ def cusum_reference_rows():
                     "null_upper": f"{COMPOSITE_NULL_UPPER:.12f}",
                     "threshold_scaled": str(threshold),
                     "threshold_score": f"{threshold / CUSUM_SCALE:.12f}",
-                    "matched_reference_alarm_probability": f"{matched_reference_alarm:.12f}",
+                    "matched_reference_family_alarm_probability": f"{matched_reference_family_alarm:.12f}",
+                    "matched_direction_alarm_probability": f"{matched_direction_alarm:.12f}",
                     "calibration_boundary_alarm_probability": f"{calibration_alarm:.12f}",
                     "family_worst_case_union_bound": f"{family_union_bound:.12f}",
                     "scenario_or_pre_shift_alarm_probability": metrics["scenario_or_pre_shift_alarm_probability"],
@@ -1040,8 +1043,9 @@ def check_cusum_csv(path):
     )
     numeric_fields = (
         "p0", "stream_pre_p", "null_lower", "null_upper", "threshold_score",
-        "matched_reference_alarm_probability", "calibration_boundary_alarm_probability",
-        "family_worst_case_union_bound", "scenario_or_pre_shift_alarm_probability",
+        "matched_reference_family_alarm_probability", "matched_direction_alarm_probability",
+        "calibration_boundary_alarm_probability", "family_worst_case_union_bound",
+        "scenario_or_pre_shift_alarm_probability",
         "per_cell_alpha", "survival_probability",
     )
     optional_numeric_fields = (
@@ -1105,8 +1109,10 @@ def check_cusum_csv(path):
         union_bound = float(got["family_worst_case_union_bound"])
         if union_bound > float(got["per_cell_alpha"]) + EPS:
             raise ValueError(f"CUSUM two-direction union bound exceeds per-cell alpha on line {line}")
-        if float(got["calibration_boundary_alarm_probability"]) > float(got["matched_reference_alarm_probability"]) + EPS:
-            raise ValueError(f"CUSUM calibration boundary exceeds the matched reference FPR on line {line}")
+        if union_bound > float(got["matched_reference_family_alarm_probability"]) + EPS:
+            raise ValueError(f"CUSUM union bound exceeds the matched reference family FPR on line {line}")
+        if float(got["calibration_boundary_alarm_probability"]) > float(got["matched_direction_alarm_probability"]) + EPS:
+            raise ValueError(f"CUSUM calibration boundary exceeds the matched direction FPR on line {line}")
         survival = float(got["survival_probability"])
         if abs(alarm + detection + survival - 1.0) > 1e-9:
             raise ValueError(f"CUSUM probability mass does not conserve on line {line}")
@@ -1116,26 +1122,29 @@ def check_cusum_csv(path):
             class_name in ("stationary_null", "within_band_transition_control")
             or (class_name == "baseline_misspecification"
                 and COMPOSITE_NULL_LOWER <= stream_p <= COMPOSITE_NULL_UPPER)
-        ) and alarm > matched_reference_alarm + EPS and not is_target_shift:
-            raise ValueError(f"CUSUM exceeded the matched reference edge FPR on an accepted-null scenario on line {line}")
-        if is_target_shift and alarm > matched_reference_alarm + EPS:
-            raise ValueError(f"CUSUM pre-shift alarm exceeded the matched reference edge FPR on line {line}")
+        ) and alarm > float(got["matched_direction_alarm_probability"]) + EPS and not is_target_shift:
+            raise ValueError(f"CUSUM exceeded the matched direction FPR on an accepted-null scenario on line {line}")
+        if is_target_shift and alarm > float(got["matched_direction_alarm_probability"]) + EPS:
+            raise ValueError(f"CUSUM pre-shift alarm exceeded the matched direction FPR on line {line}")
     print(f"PASS: independently recomputed and semantically checked all {len(expected)} exact-DP CUSUM rows")
 
 
 def cusum_self_test():
     horizon = HORIZONS[-1]
     tables = eprocess_family_alarm_tables(horizon)
-    matched_reference_alarm = composite_boundary_reference_alarm_probability(horizon, tables)
-    if abs(matched_reference_alarm - 0.0008915879337992225) > 5e-10:
+    matched_reference_family_alarm = composite_boundary_reference_alarm_probability(horizon, tables)
+    if abs(matched_reference_family_alarm - 0.0008915879337992225) > 5e-10:
         raise ValueError("composite reference edge FPR changed; review the preregistered calibration target")
-    threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm)
-    if threshold != 1374:
-        raise ValueError(f"CUSUM threshold changed from preregistered 1374: got {threshold}")
+    matched_direction_alarm = matched_reference_family_alarm / 2.0
+    threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm)
+    if threshold != 1444:
+        raise ValueError(f"family-matched CUSUM threshold changed from preregistered 1444: got {threshold}")
     boundary_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER)
     previous_alarm = cusum_alarm_probability(horizon, threshold - 1, COMPOSITE_NULL_UPPER)
-    if boundary_alarm > matched_reference_alarm + EPS or previous_alarm <= matched_reference_alarm + EPS:
-        raise ValueError("CUSUM threshold is not the minimum threshold at the matched reference FPR")
+    if boundary_alarm > matched_direction_alarm + EPS or previous_alarm <= matched_direction_alarm + EPS:
+        raise ValueError("CUSUM threshold is not the minimum threshold at the matched direction FPR")
+    if 2.0 * boundary_alarm > matched_reference_family_alarm + EPS:
+        raise ValueError("CUSUM union bound exceeds the matched reference family FPR")
     if 2.0 * boundary_alarm > PER_CELL_ALPHA + EPS:
         raise ValueError("CUSUM two-direction union bound exceeds the per-cell alpha allocation")
     symmetric_lower_alarm = cusum_alarm_probability(
@@ -1158,7 +1167,7 @@ def cusum_self_test():
         metrics = simulate_cusum_scenario(direction, scenario, threshold)[-1]
         alarm = float(metrics["scenario_or_pre_shift_alarm_probability"])
         survival = float(metrics["survival_probability"])
-        if alarm > matched_reference_alarm + EPS:
+        if alarm > matched_direction_alarm + EPS:
             raise ValueError(f"{direction} exceeded its finite-horizon null allocation on {scenario}")
         if abs(alarm + survival - 1.0) > 1e-9:
             raise ValueError(f"{direction} did not conserve mass on {scenario}")
@@ -1206,7 +1215,7 @@ def cusum_self_test():
             direction, threshold, horizon,
             lambda n, _state: 0.52 if n % 2 == 0 else 0.48,
         )
-        if alternating_alarm > matched_reference_alarm + EPS:
+        if alternating_alarm > matched_direction_alarm + EPS:
             raise ValueError(f"{direction} exceeded matched edge FPR on alternating null schedule")
         if abs(alternating_alarm + alternating_survival - 1.0) > 1e-9:
             raise ValueError(f"{direction} alternating schedule failed mass conservation")
@@ -1220,7 +1229,7 @@ def cusum_self_test():
         feedback_alarm, feedback_survival = simulate_cusum_null_schedule(
             direction, threshold, horizon, feedback_rate
         )
-        if feedback_alarm > matched_reference_alarm + EPS:
+        if feedback_alarm > matched_direction_alarm + EPS:
             raise ValueError(f"{direction} exceeded matched edge FPR on predictable feedback schedule")
         if abs(feedback_alarm + feedback_survival - 1.0) > 1e-9:
             raise ValueError(f"{direction} feedback schedule failed mass conservation")
