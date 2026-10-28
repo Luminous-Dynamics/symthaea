@@ -17,7 +17,24 @@ BOUNDARIES = (
     "time_uniform_alpha_spending",
     "beta_mixture_e_process",
 )
-SCENARIOS = ("stationary_null", "step_shift")
+SCENARIOS = (
+    "stationary_null",
+    "step_down_010", "step_down_020", "step_down_030", "step_down_040", "step_down_045",
+    "step_up_055", "step_up_060", "step_up_070", "step_up_080", "step_up_090",
+)
+SHIFT_PROBABILITIES = {
+    "stationary_null": None,
+    "step_down_010": 0.10,
+    "step_down_020": 0.20,
+    "step_down_030": 0.30,
+    "step_down_040": 0.40,
+    "step_down_045": 0.45,
+    "step_up_055": 0.55,
+    "step_up_060": 0.60,
+    "step_up_070": 0.70,
+    "step_up_080": 0.80,
+    "step_up_090": 0.90,
+}
 FIELDS = (
     "boundary", "scenario", "horizon", "change_after", "p0", "p1",
     "false_alarm_probability", "detection_probability", "mean_detection_delay",
@@ -66,7 +83,7 @@ def should_alarm(boundary, n, successes, horizon):
 
 
 def simulate(boundary, scenario, horizon):
-    post_shift_p = P1 if scenario == "step_shift" else None
+    post_shift_p = SHIFT_PROBABILITIES[scenario]
     change_after = CHANGE_AFTER if post_shift_p is not None else 0
     active = [0.0] * (horizon + 1)
     active[0] = 1.0
@@ -120,9 +137,9 @@ def reference_rows():
                     "boundary": boundary,
                     "scenario": scenario,
                     "horizon": str(horizon),
-                    "change_after": str(CHANGE_AFTER) if scenario == "step_shift" else "NA",
+                    "change_after": str(CHANGE_AFTER) if SHIFT_PROBABILITIES[scenario] is not None else "NA",
                     "p0": f"{P0:.12f}",
-                    "p1": f"{P1:.12f}" if scenario == "step_shift" else "NA",
+                    "p1": f"{SHIFT_PROBABILITIES[scenario]:.12f}" if SHIFT_PROBABILITIES[scenario] is not None else "NA",
                     "false_alarm_probability": f"{false_alarm:.12f}",
                     "detection_probability": as_text(detection),
                     "mean_detection_delay": as_text(delay),
@@ -183,8 +200,8 @@ def self_test():
     if fixed_reused <= PER_CELL_ALPHA:
         raise ValueError(f"negative control failed to expose repeated-look inflation: {fixed_reused}")
 
-    shifted = simulate("time_uniform_alpha_spending", "step_shift", 500)
-    beta_shifted = simulate("beta_mixture_e_process", "step_shift", 500)
+    shifted = simulate("time_uniform_alpha_spending", "step_up_080", 500)
+    beta_shifted = simulate("beta_mixture_e_process", "step_up_080", 500)
     if shifted[1] < 0.95 or shifted[2] is None:
         raise ValueError(f"time-uniform shift detection failed expected pilot gate: {shifted}")
     if beta_shifted[1] < 0.95 or beta_shifted[2] is None:
