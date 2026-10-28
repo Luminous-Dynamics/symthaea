@@ -80,7 +80,7 @@ def valid_manifest() -> dict[str, Any]:
             "sha256": h("4"),
             "receipt_path": "receipt.json",
             "receipt_sha256": h("5"),
-            "artifact_count": 12,
+            "artifact_count": 9,
         },
         "provenance": {
             "attestation_required": True,
