@@ -1,0 +1,63 @@
+name: VIS-DVPC-024 anytime-valid sequential gate
+
+on:
+  pull_request:
+    paths:
+      - 'tools/vision-dvpc-anytime-gate.rs'
+      - 'tests/fixtures/vision-dvpc-024-*'
+      - 'docs/research/VIS_DVPC_024_ANYTIME_VALID_SEQUENTIAL_GATE_V1.md'
+      - '.github/workflows/vis-dvpc-024-anytime-valid-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/vision-dvpc-anytime-gate.rs'
+      - 'tests/fixtures/vision-dvpc-024-*'
+      - 'docs/research/VIS_DVPC_024_ANYTIME_VALID_SEQUENTIAL_GATE_V1.md'
+      - '.github/workflows/vis-dvpc-024-anytime-valid-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and fixture
+        uses: actions/checkout@v4
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Verify frozen sequential grid
+        run: sha256sum -c tests/fixtures/vision-dvpc-024.SHA256SUMS
+      - name: Format standalone scorer
+        run: rustfmt --edition 2024 tools/vision-dvpc-anytime-gate.rs
+      - name: Run sequential validity tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-anytime-gate.rs -o /tmp/vis-dvpc-024-tests
+          /tmp/vis-dvpc-024-tests
+      - name: Build and score frozen sequential scenarios
+        run: |
+          rustc --edition=2024 tools/vision-dvpc-anytime-gate.rs -o /tmp/vis-dvpc-024
+          /tmp/vis-dvpc-024 --sweep | tee /tmp/vis-dvpc-024-sweep.tsv
+          test "$(grep -c '^RISK[[:space:]]' /tmp/vis-dvpc-024-sweep.tsv)" = "20"
+          test "$(grep -c '^VALUE[[:space:]]' /tmp/vis-dvpc-024-sweep.tsv)" = "20"
+          grep '^PEEKING_CONTROL[[:space:]]' /tmp/vis-dvpc-024-sweep.tsv
+          grep '^SUMMARY[[:space:]]' /tmp/vis-dvpc-024-sweep.tsv
+      - name: Create exact-source reproducibility receipt
+        run: |
+          {
+            printf 'VIS_DVPC_024_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-anytime-gate.rs tests/fixtures/vision-dvpc-024-sequential-grid.tsv /tmp/vis-dvpc-024-sweep.tsv
+          } > /tmp/vis-dvpc-024-receipt.tsv
+      - name: Publish sequential sweep and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-024-sequential-${{ github.sha }}
+          path: |
+            /tmp/vis-dvpc-024-sweep.tsv
+            /tmp/vis-dvpc-024-receipt.tsv
+          retention-days: 90
