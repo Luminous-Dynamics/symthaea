@@ -55,6 +55,8 @@ pub struct PendingReasoningOutcome {
     pub gate_evaluated: bool,
     pub gate_passed: bool,
     pub reasoning_confidence: f32,
+    /// Decision cycle at which the gate/attempt was chosen, when known.
+    pub decision_cycle: Option<u64>,
     /// Compatibility scalar captured at decision time. It is only usable when
     /// finite; typed evidence below takes precedence for the live integration.
     pub prediction_error_at_decision: Option<f64>,
@@ -71,31 +73,49 @@ impl PendingReasoningOutcome {
             gate_evaluated: reasoning.gate_evaluated,
             gate_passed: !reasoning.gate_blocked,
             reasoning_confidence: reasoning.reasoning_confidence,
+            decision_cycle: None,
             prediction_error_at_decision: prediction_error.filter(|value| value.is_finite()),
             prediction_evidence_at_decision: None,
         }
     }
 
-    /// Capture a decision-time evidence object, preserving its original cycle
-    /// identity for later posthoc resolution.
+    /// Capture typed evidence and bind it to the decision cycle. A valid PE from
+    /// another cycle is retained as an explicitly stale diagnostic, never as PE.
     pub fn capture_with_evidence(
         reasoning: &ReasoningFeedback,
+        decision_cycle: Option<u64>,
         prediction_evidence: Option<PredictionErrorEvidence>,
     ) -> Self {
-        let prediction_error_at_decision = prediction_evidence
-            .as_ref()
-            .and_then(|evidence| evidence.value_for_observation(evidence.observation_cycle()))
+        let prediction_evidence = prediction_evidence.map(|evidence| {
+            let expected_status = match decision_cycle {
+                Some(cycle) => evidence.status_for_observation(cycle),
+                None => crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable,
+            };
+            if expected_status == evidence.status() {
+                evidence
+            } else {
+                PredictionErrorEvidence::from_comparison(
+                    expected_status,
+                    None,
+                    evidence.prediction_cycle(),
+                    evidence.observation_cycle(),
+                )
+            }
+        });
+        let prediction_error_at_decision = decision_cycle
+            .zip(prediction_evidence.as_ref())
+            .and_then(|(cycle, evidence)| evidence.value_for_observation(cycle))
             .map(f64::from);
         Self {
             gate_evaluated: reasoning.gate_evaluated,
             gate_passed: !reasoning.gate_blocked,
             reasoning_confidence: reasoning.reasoning_confidence,
+            decision_cycle,
             prediction_error_at_decision,
             prediction_evidence_at_decision: prediction_evidence,
         }
     }
 }
-
 pub struct CodeSignals {
     pub type_confidence: f64,
     pub involves_unsafe: bool,
