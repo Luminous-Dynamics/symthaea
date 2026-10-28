@@ -41,7 +41,7 @@ From the repository root when a Rust toolchain is available:
 cargo test -p symthaea-broca --lib memory_pipeline_evolution
 ```
 
-Ten unit tests are authored for: valid candidate tree; held-out leakage to optimizer; candidate built from held-out feedback; missing parent/cycle; quality promotion; cost/non-inferiority promotion; mismatched protocol/case set; governance incident blocking promotion; insufficient independent groups; and iteration/manifest-digest pinning.
+Twelve unit tests are authored for: valid candidate tree; held-out leakage to optimizer; candidate built from held-out feedback; missing parent/cycle; quality promotion; cost/non-inferiority promotion; rejecting a cost win when the confidence bound misses non-inferiority; mismatched protocol/cases; governance incident blocking promotion; insufficient independent groups; invalid policy parameters; and iteration/manifest-digest pinning.
 
 No Rust compiler is available in the code-authoring environment, so these tests are authored, not passed. CI results are not counted unless an executed, current-head run is inspected.
 
