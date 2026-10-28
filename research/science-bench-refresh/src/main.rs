@@ -121,7 +121,8 @@ fn run(args: &[String]) -> ExitCode {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&report).expect("reveal verification report serializes")
+                serde_json::to_string_pretty(&report)
+                    .expect("reveal verification report serializes")
             );
             if report.verified {
                 ExitCode::SUCCESS
