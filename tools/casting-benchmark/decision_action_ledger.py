@@ -108,7 +108,7 @@ def _validate_event(event: Any) -> dict[str, Any]:
             f"extra={sorted(set(event) - EVENT_FIELDS)}"
         )
 
-    if event["record_type"] not in {"decision", "outcome"}:
+    if not isinstance(event["record_type"], str) or event["record_type"] not in {"decision", "outcome"}:
         raise ValueError("record_type must be decision or outcome")
     for field in ("task_id", "run_id", "reason_code"):
         _text(event[field], field)
@@ -317,14 +317,16 @@ def verify_ledger_bytes(raw: bytes) -> dict[str, Any]:
         if record["record_type"] == "decision":
             decision_count += 1
             if record["disposition"] in ACTION_DISPOSITIONS:
-                assert key_action is not None
+                if key_action is None:
+                    raise ValueError("action decision is missing its action identity")
                 if key_action in decisions:
                     raise ValueError("duplicate action_id decision in task/run")
                 decisions[key_action] = record
                 total_estimated += float(record["estimated_cost_units"])
         else:
             outcome_count += 1
-            assert key_action is not None
+            if key_action is None:
+                raise ValueError("outcome is missing its action identity")
             if key_action not in decisions:
                 raise ValueError("outcome does not reference a prior action decision")
             if key_action in completed:
