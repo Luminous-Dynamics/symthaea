@@ -16,6 +16,12 @@ The hypothesis is:
 
 The falsifier is simple: if an episode-aware arm fails to improve complete-chain retrieval on these fixed probes, or only improves by returning more evidence, its extra complexity has not earned its place.
 
+## First controlled ablation: same/adjacent-step expansion
+
+`episode_expand.py` is a deliberately simple non-graph baseline. It takes the ranked BM25 candidate pool, expands each seed to source fields from the same trajectory step and one adjacent step, uses a fixed action/observation/thought/URL priority, removes duplicates and stops at exactly k. It reads trajectory content and BM25 audit candidates, **not** support labels or gold answers. Use `test_episode_expand.py` for negative controls.
+
+This is not a causal graph and does not solve currentness. The stale-address adversarial test intentionally demonstrates that neighboring-step expansion can reintroduce a retired fact. That failure is informative: currentness must be represented by explicit update/supersession semantics, not inferred from proximity or the highest step index. Report both complete-chain improvement and stale-support regressions.
+
 ## What is in the package
 
 - `fixtures/trajectories.jsonl`: five small web-agent trajectories with explicit action and observation fields.
@@ -32,16 +38,27 @@ From the Symthaea repository root, after the worker compiles:
 
     python3 research/broca-causal-episode-probe-v1/run_probe.py \
       --worker target/debug/broca-lme-worker \
-      --k 5 \
-      --output /tmp/broca-causal-probe-predictions.jsonl
+      --k 5 --candidate-k 20 \
+      --output /tmp/broca-causal-probe-candidates.jsonl
 
+    # Baseline uses the first five BM25 candidates.
     python3 research/broca-causal-episode-probe-v1/score_probe.py \
-      --predictions /tmp/broca-causal-probe-predictions.jsonl \
-      --k 5
+      --predictions /tmp/broca-causal-probe-candidates.jsonl \
+      --k 5 --output /tmp/broca-bm25-score.json
+
+    # Ablation expands a BM25 seed into same/adjacent trajectory steps.
+    python3 research/broca-causal-episode-probe-v1/episode_expand.py \
+      --predictions /tmp/broca-causal-probe-candidates.jsonl \
+      --k 5 --window 1 \
+      --output /tmp/broca-episode-expanded.jsonl
+    python3 research/broca-causal-episode-probe-v1/score_probe.py \
+      --predictions /tmp/broca-episode-expanded.jsonl \
+      --k 5 --output /tmp/broca-episode-expanded-score.json
 
     python3 research/broca-causal-episode-probe-v1/test_score_probe.py
+    python3 research/broca-causal-episode-probe-v1/test_episode_expand.py
 
-The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixture hashes, scope, top-k, protocol, and question count. Preserve these artifacts with any reported metric. To compare methods fairly, each arm must use the identical fixtures and question set and the same top-k evidence budget.
+The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixture hashes, scope, candidate pool, evaluation budget, protocol, and question count. The candidate pool (`--candidate-k`) must be at least as large as the final budget (`--k`). The baseline is scored using the first k BM25 results. The episode-expansion arm uses the same BM25 ranking as seeds, then adds indexed evidence from the same or adjacent trajectory steps until the identical k-item budget is reached. Its manifest binds the input candidate artifact and output ranking. Preserve all manifests with every metric.
 
 ## Metrics and interpretation
 
