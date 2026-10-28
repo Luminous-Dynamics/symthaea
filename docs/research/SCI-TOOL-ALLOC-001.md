@@ -19,7 +19,7 @@ NewtonBench evaluates interactive scientific law discovery over 324 tasks across
 - NewtonBench public repository: https://github.com/HKUST-KnowComp/NewtonBench
 - CoSR progressive law discovery, accepted 6 October 2026: https://doi.org/10.1103/f2kp-pp4q
 - Science-Gym, data collection + experiment design + equation discovery: https://doi.org/10.1007/s10994-025-06914-x
-- **AgentIdeaBench** (released September 2026) compares active versus static literature access across 33 matched models and 40 subfields. Its reported tool effect varies with baseline capability, with weaker-model groups losing and stronger groups gaining. This is adjacent scientific-ideation evidence—not a law-discovery result or a substitute for NewtonBench: https://github.com/HKUST-KnowComp/AgentIdeaBench
+- **AgentIdeaBench** (arXiv:2609.07611, submitted 7 September 2026) compares active versus static literature access across 33 matched models and 40 subfields. The authors report an active-minus-static effect correlated with static capability (r = +0.69, p < 10⁻⁴, n = 28), with the weakest quartile losing 0.18 and strongest gaining 0.76 on their scientific-ideation score. This is adjacent ideation evidence—not a law-discovery result or a direct NewtonBench comparison: https://arxiv.org/abs/2609.07611 ; https://github.com/HKUST-KnowComp/AgentIdeaBench
 - 2026 symbolic-regression survey: https://doi.org/10.1007/s11831-026-10681-w
 
 The contribution is not another scientific evaluator or tool-use framework. It is a controlled application of prospective metareasoning to a task where tool effects can be measured against independently known answers.
