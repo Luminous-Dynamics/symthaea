@@ -20,7 +20,7 @@ use super::{ContinuousEntropyEstimator, TruePhiCalculator};
 /// fields are not a qualification claim that the full IIT 4.0 formalism is computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IIT4Result {
-    /// Intrinsic difference (id) - fundamental measure
+    /// Average histogram JSD-style distribution-difference proxy; not formal IIT id without qualification.
     pub intrinsic_difference: f64,
     /// HDC proxy for a mechanism-level irreducibility-like quantity; not formal φ without qualification.
     pub small_phi: f64,
@@ -59,7 +59,7 @@ pub struct ConceptStructure {
     pub cause_effect_power: f64,
 }
 
-/// IIT 4.0 Calculator
+/// IIT-4.0-inspired HDC proxy calculator (historical type name retained).
 ///
 /// Computes IIT-inspired statistics over continuous HDC representations.
 ///
@@ -116,10 +116,10 @@ impl IIT4Calculator {
         }
     }
 
-    /// Compute intrinsic difference between two distributions
+    /// Compute a histogram-based Jensen–Shannon-style difference proxy between vectors.
     ///
-    /// id(p, q) = D_KL(p || m) + D_KL(q || m)
-    /// where m = (p + q) / 2 (Jensen-Shannon style)
+    /// This is an estimator over binned vector coordinates; it is not automatically
+    /// the formal IIT intrinsic-difference quantity over cause/effect repertoires.
     pub fn intrinsic_difference(&self, p: &ContinuousHV, q: &ContinuousHV) -> f64 {
         let n = p.values.len().min(q.values.len());
         if n == 0 {
