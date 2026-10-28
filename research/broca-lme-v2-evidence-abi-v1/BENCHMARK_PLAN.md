@@ -126,12 +126,13 @@ Track answer/task quality against end-to-end latency, memory footprint, context 
 This branch currently provides a binary-query API, not a complete benchmark backend. Proceed in this order:
 
 1. Compile and run focused tests on the exact head; keep the PR draft until results are known.
-2. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
-3. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. **The immutable generation-bound inverted index is now implemented** and its exact digest is bound by the V3 commit manifest. Indexed ranking eliminates per-query tokenization and text-digest hashing, but recovery still parses and structurally validates the entire lexical artifact, reconstructs evidence records, and scans the HDC checksum. The next optimization is a manifest-digest-keyed verified-generation cache or seekable/mmap posting layout, measured against this exact correctness reference.
-4. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
-5. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
-6. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
-7. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
-8. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
+2. Verify upgrade compatibility from a real prior V2 committed generation: recovery must retain the V2 snapshot/HDC invariants, rebuild the lexical index in memory without mutating old bytes, and publish V3 with a digest-bound index on the next typed commit.
+3. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
+4. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. **The immutable generation-bound inverted index is now implemented** and its exact digest is bound by the V3 commit manifest. Indexed ranking eliminates per-query tokenization and text-digest hashing, but recovery still parses and structurally validates the entire lexical artifact, reconstructs evidence records, and scans the HDC checksum. The next optimization is a manifest-digest-keyed verified-generation cache or seekable/mmap posting layout, measured against this exact correctness reference.
+5. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
+6. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
+7. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
+8. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
+9. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
 
 **Current claim boundary:** the exact-HDC and BM25 query APIs and tests are authored on this branch. They are not compiled or executed in this environment. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
