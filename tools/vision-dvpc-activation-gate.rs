@@ -37,13 +37,18 @@ struct Campaign {
     failures: usize,
     alpha_ppm: u64,
     risk_cap_ppm: u64,
-    net_value_lcb_milli: i64,
+    value_samples_n: usize,
+    value_sum_milli: i64,
+    value_min_milli: i64,
+    value_max_milli: i64,
+    value_alpha_ppm: u64,
     min_net_value_lcb_milli: i64,
     activation_count: u64,
     eligible_count: u64,
     min_activation_bps: u64,
     provenance_ok: bool,
     action_digest_ok: bool,
+    value_evidence_digest_ok: bool,
     target_calibrated: bool,
     target_shift_detected: bool,
     sealed_touched: bool,
@@ -70,8 +75,8 @@ fn parse_flag(value: &str, field: &str, line: usize) -> Result<bool, String> {
 
 fn parse_campaign(line_text: &str, line: usize) -> Result<Campaign, String> {
     let f: Vec<&str> = line_text.split('\t').collect();
-    if f.len() != 20 {
-        return Err(format!("line {line}: expected 20 TSV fields, found {}", f.len()));
+    if f.len() != 25 {
+        return Err(format!("line {line}: expected 25 TSV fields, found {}", f.len()));
     }
     if f[0].is_empty() || f[0].chars().any(char::is_whitespace) {
         return Err(format!("line {line}: invalid campaign ID"));
@@ -82,21 +87,26 @@ fn parse_campaign(line_text: &str, line: usize) -> Result<Campaign, String> {
         failures: parse_num(f[2], "failures", line)?,
         alpha_ppm: parse_num(f[3], "alpha_ppm", line)?,
         risk_cap_ppm: parse_num(f[4], "risk_cap_ppm", line)?,
-        net_value_lcb_milli: parse_num(f[5], "net_value_lcb_milli", line)?,
-        min_net_value_lcb_milli: parse_num(f[6], "min_net_value_lcb_milli", line)?,
-        activation_count: parse_num(f[7], "activation_count", line)?,
-        eligible_count: parse_num(f[8], "eligible_count", line)?,
-        min_activation_bps: parse_num(f[9], "min_activation_bps", line)?,
-        provenance_ok: parse_flag(f[10], "provenance_ok", line)?,
-        action_digest_ok: parse_flag(f[11], "action_digest_ok", line)?,
-        target_calibrated: parse_flag(f[12], "target_calibrated", line)?,
-        target_shift_detected: parse_flag(f[13], "target_shift_detected", line)?,
-        sealed_touched: parse_flag(f[14], "sealed_touched", line)?,
-        all_in_cost_units: parse_num(f[15], "all_in_cost_units", line)?,
-        cost_budget_units: parse_num(f[16], "cost_budget_units", line)?,
-        required_campaign_units: parse_num(f[17], "required_campaign_units", line)?,
-        available_campaign_units: parse_num(f[18], "available_campaign_units", line)?,
-        expected: Verdict::parse(f[19])?,
+        value_samples_n: parse_num(f[5], "value_samples_n", line)?,
+        value_sum_milli: parse_num(f[6], "value_sum_milli", line)?,
+        value_min_milli: parse_num(f[7], "value_min_milli", line)?,
+        value_max_milli: parse_num(f[8], "value_max_milli", line)?,
+        value_alpha_ppm: parse_num(f[9], "value_alpha_ppm", line)?,
+        min_net_value_lcb_milli: parse_num(f[10], "min_net_value_lcb_milli", line)?,
+        activation_count: parse_num(f[11], "activation_count", line)?,
+        eligible_count: parse_num(f[12], "eligible_count", line)?,
+        min_activation_bps: parse_num(f[13], "min_activation_bps", line)?,
+        provenance_ok: parse_flag(f[14], "provenance_ok", line)?,
+        action_digest_ok: parse_flag(f[15], "action_digest_ok", line)?,
+        value_evidence_digest_ok: parse_flag(f[16], "value_evidence_digest_ok", line)?,
+        target_calibrated: parse_flag(f[17], "target_calibrated", line)?,
+        target_shift_detected: parse_flag(f[18], "target_shift_detected", line)?,
+        sealed_touched: parse_flag(f[19], "sealed_touched", line)?,
+        all_in_cost_units: parse_num(f[20], "all_in_cost_units", line)?,
+        cost_budget_units: parse_num(f[21], "cost_budget_units", line)?,
+        required_campaign_units: parse_num(f[22], "required_campaign_units", line)?,
+        available_campaign_units: parse_num(f[23], "available_campaign_units", line)?,
+        expected: Verdict::parse(f[24])?,
     };
     validate_campaign(&campaign)?;
     Ok(campaign)
@@ -111,6 +121,18 @@ fn validate_campaign(c: &Campaign) -> Result<(), String> {
     }
     if c.risk_cap_ppm == 0 || c.risk_cap_ppm >= 1_000_000 {
         return Err(format!("{}: risk cap must be strictly between 0 and 1", c.id));
+    }
+    if c.value_samples_n == 0 || c.value_min_milli > c.value_max_milli {
+        return Err(format!("{}: bounded-value sample size/range is invalid", c.id));
+    }
+    if c.value_alpha_ppm == 0 || c.value_alpha_ppm >= 1_000_000 {
+        return Err(format!("{}: value alpha must be strictly between 0 and 1", c.id));
+    }
+    let n = c.value_samples_n as i128;
+    let minimum_sum = (c.value_min_milli as i128) * n;
+    let maximum_sum = (c.value_max_milli as i128) * n;
+    if (c.value_sum_milli as i128) < minimum_sum || (c.value_sum_milli as i128) > maximum_sum {
+        return Err(format!("{}: value sum is inconsistent with declared bounds", c.id));
     }
     if c.eligible_count == 0 || c.activation_count > c.eligible_count {
         return Err(format!("{}: activation counts are invalid", c.id));
@@ -176,6 +198,23 @@ fn exact_binomial_upper(n: usize, failures: usize, alpha: f64) -> Result<f64, St
     Ok(high)
 }
 
+/// Hoeffding lower confidence bound for independent bounded observations.
+/// The sample sum/count are bound to the frozen evidence receipt; the range is preregistered.
+fn bounded_mean_lcb(c: &Campaign) -> Result<f64, String> {
+    if c.value_samples_n == 0 || c.value_min_milli > c.value_max_milli {
+        return Err("require positive value sample count and ordered bounds".to_string());
+    }
+    let alpha = c.value_alpha_ppm as f64 / PPM;
+    if !(0.0 < alpha && alpha < 1.0) {
+        return Err("require 0 < value alpha < 1".to_string());
+    }
+    let n = c.value_samples_n as f64;
+    let mean = c.value_sum_milli as f64 / n;
+    let range = (c.value_max_milli as f64) - (c.value_min_milli as f64);
+    let penalty = range * ((-alpha.ln()) / (2.0 * n)).sqrt();
+    Ok(mean - penalty)
+}
+
 fn required_zero_failure_trials(alpha: f64, max_risk: f64) -> Result<usize, String> {
     if !(0.0 < alpha && alpha < 1.0 && 0.0 < max_risk && max_risk < 1.0) {
         return Err("require 0 < alpha < 1 and 0 < max_risk < 1".to_string());
@@ -187,35 +226,37 @@ fn required_zero_failure_trials(alpha: f64, max_risk: f64) -> Result<usize, Stri
     Ok(n as usize)
 }
 
-fn evaluate(c: &Campaign) -> Result<(Verdict, f64), String> {
+fn evaluate(c: &Campaign) -> Result<(Verdict, f64, f64), String> {
     let alpha = c.alpha_ppm as f64 / PPM;
     let risk_cap = c.risk_cap_ppm as f64 / PPM;
     let risk_upper = exact_binomial_upper(c.trials, c.failures, alpha)?;
+    let value_lcb = bounded_mean_lcb(c)?;
 
     // Invalid or non-transportable evidence is a hard denial, never a statistical pass.
     if !c.provenance_ok
         || !c.action_digest_ok
+        || !c.value_evidence_digest_ok
         || !c.target_calibrated
         || c.target_shift_detected
         || c.sealed_touched
     {
-        return Ok((Verdict::Denied, risk_upper));
+        return Ok((Verdict::Denied, risk_upper, value_lcb));
     }
     if c.all_in_cost_units > c.cost_budget_units
         || c.required_campaign_units > c.available_campaign_units
-        || c.net_value_lcb_milli < c.min_net_value_lcb_milli
+        || value_lcb < c.min_net_value_lcb_milli as f64
     {
-        return Ok((Verdict::Denied, risk_upper));
+        return Ok((Verdict::Denied, risk_upper, value_lcb));
     }
     let activated_bps_lhs = (c.activation_count as u128) * 10_000;
     let minimum_bps_rhs = (c.min_activation_bps as u128) * (c.eligible_count as u128);
     if activated_bps_lhs < minimum_bps_rhs {
-        return Ok((Verdict::Denied, risk_upper));
+        return Ok((Verdict::Denied, risk_upper, value_lcb));
     }
     if risk_upper > risk_cap + 1e-12 {
-        return Ok((Verdict::InsufficientEvidence, risk_upper));
+        return Ok((Verdict::InsufficientEvidence, risk_upper, value_lcb));
     }
-    Ok((Verdict::Authorized, risk_upper))
+    Ok((Verdict::Authorized, risk_upper, value_lcb))
 }
 
 fn parsed_fixture() -> Result<Vec<Campaign>, String> {
@@ -234,12 +275,12 @@ fn parsed_fixture() -> Result<Vec<Campaign>, String> {
 
 fn score_fixture() -> Result<String, String> {
     let campaigns = parsed_fixture()?;
-    let mut output = String::from("case_id\tverdict\trisk_upper_bound\trisk_cap\texpected\n");
+    let mut output = String::from("case_id\tverdict\trisk_upper_bound\trisk_cap\tvalue_lcb_milli\texpected\n");
     let mut authorized = 0usize;
     let mut denied = 0usize;
     let mut insufficient = 0usize;
     for campaign in &campaigns {
-        let (actual, risk_upper) = evaluate(campaign)?;
+        let (actual, risk_upper, value_lcb) = evaluate(campaign)?;
         if actual != campaign.expected {
             return Err(format!(
                 "{}: expected {}, got {} (risk upper {:.9})",
@@ -256,11 +297,12 @@ fn score_fixture() -> Result<String, String> {
         }
         let _ = writeln!(
             output,
-            "{}\t{}\t{:.9}\t{:.6}\t{}",
+            "{}\t{}\t{:.9}\t{:.6}\t{:.3}\t{}",
             campaign.id,
             actual.as_str(),
             risk_upper,
             campaign.risk_cap_ppm as f64 / PPM,
+            value_lcb,
             campaign.expected.as_str()
         );
     }
@@ -332,6 +374,16 @@ mod tests {
     }
 
     #[test]
+    fn bounded_value_lcb_is_computed_not_supplied() {
+        let campaigns = parsed_fixture().unwrap();
+        let good = campaigns.iter().find(|x| x.id == "positive_59_zero").unwrap();
+        let good_lcb = bounded_mean_lcb(good).unwrap();
+        assert!(good_lcb > good.min_net_value_lcb_milli as f64);
+        let no_op = campaigns.iter().find(|x| x.id == "no_op").unwrap();
+        assert!(bounded_mean_lcb(no_op).unwrap() < no_op.min_net_value_lcb_milli as f64);
+    }
+
+    #[test]
     fn tiny_zero_failure_sample_is_not_authorized() {
         let c = parsed_fixture().unwrap().into_iter().find(|x| x.id == "tiny_3_zero").unwrap();
         assert_eq!(evaluate(&c).unwrap().0, Verdict::InsufficientEvidence);
@@ -340,7 +392,7 @@ mod tests {
     #[test]
     fn no_op_shift_seal_and_provenance_controls_fail_closed() {
         let campaigns = parsed_fixture().unwrap();
-        for id in ["no_op", "source_shift", "sealed_confirmation_touched", "provenance_missing", "digest_mismatch"] {
+        for id in ["no_op", "source_shift", "sealed_confirmation_touched", "provenance_missing", "digest_mismatch", "value_digest_mismatch"] {
             let c = campaigns.iter().find(|x| x.id == id).unwrap();
             assert_eq!(evaluate(c).unwrap().0, Verdict::Denied, "{id}");
         }
