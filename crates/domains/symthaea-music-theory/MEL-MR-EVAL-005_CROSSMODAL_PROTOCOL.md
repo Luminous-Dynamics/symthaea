@@ -29,8 +29,9 @@ Start with cases where a symbolic target is explicit and independently checkable
 
 ### A. Before scoring
 
-1. Verify every file digest and codec header; reject path traversal and missing assets.
-2. Verify license, attribution, source lineage, renderer name/version/config digest, sample rate, channels, gain/loudness policy, and exact preprocessing.
+1. Verify every file digest and codec header; reject absolute paths, POSIX traversal, backslash paths, and missing assets.
+2. Enforce cross-field invariants that JSON Schema cannot express alone: `edit.target_symbolic_sha256 == assets.expected_target_symbolic.sha256`; every region must satisfy `0 <= start_seconds < end_seconds <= source_audio.duration_seconds`; target/protected masks must follow the case's declared overlap policy; renderer configuration digest must identify the exact config bytes.
+3. Verify license, attribution, source lineage, renderer name/version/config digest, sample rate, channels, gain/loudness policy, and exact preprocessing.
 3. Deduplicate source recordings, performances, MIDI variants and near-duplicates before splitting.
 4. Group splits by source family, composition, performer/recording lineage, and arrangement where applicable. No closely related arrangement may cross dev/calibration/test.
 5. Freeze detector versions, thresholds and target-region rules on development/calibration data. Publish a preregistration digest before test evaluation.
