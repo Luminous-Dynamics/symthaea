@@ -407,6 +407,26 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.assertIn("witness_receipt_output_digest_mismatch", codes)
         self.assertIn("witness_receipt_artifact_binding_mismatch", codes)
 
+    def test_rehashed_receipt_cannot_substitute_an_unapproved_command(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_path = self.bundle.root / witness["execution_receipt_path"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["invocation"]["argv"][0] = "/tmp/unapproved-verifier"
+        receipt["invocation"]["argv_sha256"] = verifier.canonical_invocation_digest(
+            receipt["invocation"]["argv"],
+            receipt["invocation"]["working_directory"],
+            receipt["invocation"]["timeout_ms"],
+        )
+        raw = jbytes(receipt)
+        receipt_path.write_bytes(raw)
+        witness["execution_receipt_sha256"] = sha(raw)
+        claim_path.write_bytes(jbytes(claim))
+
+        issues = self.audit_one_execution_receipt()
+        self.assertIn("witness_receipt_invocation_mismatch", {row["code"] for row in issues})
+
     def test_execution_receipt_rejects_wrong_external_verifier_pin(self) -> None:
         claim = json.loads((self.bundle.root / self.bundle.paths["claim"]).read_text(encoding="utf-8"))
         witness = claim["witnesses"][0]
