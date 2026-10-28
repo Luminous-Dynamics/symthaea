@@ -1154,6 +1154,60 @@ mod tests {
     }
 
     #[test]
+    fn legacy_v2_typed_generation_recovers_and_rebuilds_lexical_index_in_memory() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            active_evidence(7, "legacy cart checkout evidence"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+
+        let store_root = root.path().join("evidence-generations");
+        let disk = EvidenceDiskStore::open(&store_root).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        // Convert the typed V3 fixture into the exact legacy V2 shape: the
+        // HDC/evidence manifest fields remain intact, but no lexical digest or
+        // lexical artifact exists in the old generation.
+        let old_dir = generation_path(&store_root, 1);
+        let old_pointer: CurrentPointer =
+            serde_json::from_slice(&fs::read(store_root.join(CURRENT_FILE)).unwrap()).unwrap();
+        let mut manifest_value: serde_json::Value =
+            serde_json::from_slice(&fs::read(old_dir.join(MANIFEST_FILE)).unwrap()).unwrap();
+        manifest_value["schema_version"] = serde_json::Value::String(
+            "BROCA-EVIDENCE-COMMIT-MANIFEST-V2".into(),
+        );
+        manifest_value.as_object_mut().unwrap().remove("lexical_index_sha256");
+        let legacy_manifest = serde_json::to_vec(&manifest_value).unwrap();
+        let legacy_digest = sha256_hex(&legacy_manifest);
+        fs::write(old_dir.join(MANIFEST_FILE), &legacy_manifest).unwrap();
+        fs::remove_file(old_dir.join(LEXICAL_FILE)).unwrap();
+
+        let new_dir = store_root.join("generations").join(generation_directory_name(1, &legacy_digest));
+        fs::rename(&old_dir, &new_dir).unwrap();
+        let legacy_pointer = CurrentPointer {
+            schema_version: CURRENT_SCHEMA_VERSION.into(),
+            generation: old_pointer.generation,
+            manifest_sha256: legacy_digest,
+        };
+        fs::write(store_root.join(CURRENT_FILE), serde_json::to_vec(&legacy_pointer).unwrap()).unwrap();
+
+        let recovered = disk.recover().unwrap().unwrap();
+        assert_eq!(recovered.generation, 1);
+        assert!(recovered.lexical_index.is_some(), "legacy lexical index should be rebuilt from verified snapshot");
+        assert_eq!(recovered.manifest.lexical_index_sha256(), None);
+
+        let result = disk.query_committed_text_context(
+            "cart checkout", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().unwrap();
+        assert_eq!(result.generation, 1);
+        assert_eq!(result.resolved_context[0].item.value, "legacy cart checkout evidence");
+    }
+
+    #[test]
     fn committed_text_query_returns_grounded_lexical_context_with_provenance() {
         let root = tempdir().unwrap();
         let hdc_path = root.path().join("canonical.hdc");
