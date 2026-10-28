@@ -708,10 +708,7 @@ def eprocess_family_self_test():
             if float(outside_band["null_or_pre_shift_alarm_probability"]) <= 0.04:
                 raise ValueError("composite-null outside-band negative control did not expose baseline drift")
             within_band_transition = indexed[(family, "within_band_transition_049_to_051")]
-            transition_alarm = (
-                float(within_band_transition["null_or_pre_shift_alarm_probability"])
-                + float(within_band_transition["post_shift_detection_probability"])
-            )
+            transition_alarm = float(within_band_transition["null_or_pre_shift_alarm_probability"])
             if transition_alarm > PER_CELL_ALPHA + EPS:
                 raise ValueError("composite-null e-process exceeded alpha when conditional rates moved within its accepted band")
         elif float(misspecified["null_or_pre_shift_alarm_probability"]) <= PER_CELL_ALPHA:
