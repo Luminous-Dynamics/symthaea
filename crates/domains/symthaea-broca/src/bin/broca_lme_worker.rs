@@ -182,7 +182,6 @@ impl Worker {
             trajectory,
             &trajectory_id,
             &self.scope_id,
-            &source_bytes,
             &source_sha256,
         )?;
         if records.is_empty() {
@@ -284,7 +283,6 @@ fn collect_trajectory_evidence(
     trajectory: &Value,
     trajectory_id: &str,
     scope_id: &str,
-    source_bytes: &[u8],
     source_sha256: &str,
 ) -> Result<Vec<EvidenceRecord>, String> {
     let mut fields: Vec<(String, String, Option<usize>)> = Vec::new();
@@ -385,11 +383,8 @@ fn collect_trajectory_evidence(
         });
     }
 
-    // The argument is used in tests as a guard that extraction and pointer
-    // materialization agree on the same exact source JSON bytes.
-    if records.iter().any(|record| record.verify_source_bytes(source_bytes).is_err()) {
-        return Err("trajectory extraction produced an invalid source pointer or digest".into());
-    }
+    // Source bytes and every pointer are verified once, atomically, by
+    // EvidenceIndex::insert_batch_atomic before any mutation is committed.
     Ok(records)
 }
 
@@ -524,7 +519,6 @@ mod tests {
             &trajectory,
             "trajectory-17",
             "web",
-            &source,
             &source_hash,
         ).unwrap();
 
@@ -553,8 +547,8 @@ mod tests {
         });
         let bytes = serde_json::to_vec(&trajectory).unwrap();
         let digest = sha256_hex(&bytes);
-        let a = collect_trajectory_evidence(&trajectory, "trajectory-18", "web", &bytes, &digest).unwrap();
-        let b = collect_trajectory_evidence(&trajectory, "trajectory-18", "web", &bytes, &digest).unwrap();
+        let a = collect_trajectory_evidence(&trajectory, "trajectory-18", "web", &digest).unwrap();
+        let b = collect_trajectory_evidence(&trajectory, "trajectory-18", "web", &digest).unwrap();
         assert_eq!(a, b);
 
         let mut worker = Worker::new();
