@@ -26,6 +26,10 @@ from multifidelity_decision_value_policy import (
     POLICY_ID as DECISION_VALUE_POLICY_ID,
     decision_value_of_information_policy,
 )
+from multifidelity_joint_action_policy import (
+    POLICY_ID as JOINT_ACTION_POLICY_ID,
+    joint_action_cost_aware_policy,
+)
 from multifidelity_scenario_suite import (
     DEFAULT_DESIGN_COUNT,
     DEFAULT_DIMENSIONS,
@@ -43,6 +47,7 @@ DEFAULT_COMPOSITION_SEVERITIES = (0.0, *DEFAULT_SEVERITIES)
 POLICIES = {
     **EXISTING_POLICIES,
     DECISION_VALUE_POLICY_ID: decision_value_of_information_policy,
+    JOINT_ACTION_POLICY_ID: joint_action_cost_aware_policy,
 }
 
 
@@ -51,16 +56,24 @@ def _required_policy_costs(costs: dict[str, int]) -> dict[str, int]:
     required[DECISION_VALUE_POLICY_ID] = (
         60 * costs["low"] + 8 * costs["medium"] + 4 * costs["high"]
     )
+    # Only the six-call space-filling bootstrap is fixed. Remaining fidelity
+    # allocations are chosen online, so this is a viability floor, not a template.
+    required[JOINT_ACTION_POLICY_ID] = (
+        6 * costs["low"] + costs["medium"] + costs["high"]
+    )
     return required
 
 
 SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_decision_value_policy.py",
+    "tools/casting-benchmark/multifidelity_joint_action_policy.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
     "docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json",
+    "docs/research/CASTING_BENCHMARK_PROTOCOL_V1.json",
+    "docs/research/CASTING_RESEARCH_FRONTIER_2026-10-28.md",
     "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json",
 )
 
@@ -232,6 +245,7 @@ def run_one(
         "normalized_hypervolume_fraction": observed_hv / true_hv if true_hv > 0.0 else 0.0,
         "promotion_records": promotions,
         "decision_value_trace": getattr(evaluator, "decision_value_trace", []),
+        "joint_action_trace": getattr(evaluator, "joint_action_trace", []),
         "predicted_feasible_promotion_count": predicted_feasible,
         "false_promotion_count": false_promotions,
         "false_promotion_rate": false_promotions / predicted_feasible if predicted_feasible else None,
