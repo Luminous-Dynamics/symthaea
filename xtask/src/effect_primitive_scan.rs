@@ -451,8 +451,10 @@ mod tests {
     #[test]
     fn classifies_command_dispatch_methods_but_not_unrelated_output_methods() {
         let source = r#"
-            std::process::Command::new("sh").arg("-c").arg("true").output();
-            report.output();
+            fn main() {
+                std::process::Command::new("sh").arg("-c").arg("true").output();
+                report.output();
+            }
         "#;
         let file = syn::parse_file(source).unwrap();
         let source_sha = format!("{:x}", sha2::Sha256::digest(source.as_bytes()));
@@ -480,8 +482,10 @@ mod tests {
     #[test]
     fn classifies_file_handle_writes_through_unwrap_chains() {
         let source = r#"
-            std::fs::File::create("sentinel").unwrap().write_all(b"effect");
-            report.write_all(b"not a file");
+            fn main() {
+                std::fs::File::create("sentinel").unwrap().write_all(b"effect");
+                report.write_all(b"not a file");
+            }
         "#;
         let file = syn::parse_file(source).unwrap();
         let source_sha = format!("{:x}", sha2::Sha256::digest(source.as_bytes()));
