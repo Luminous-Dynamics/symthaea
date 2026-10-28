@@ -4,7 +4,7 @@
 //! Synthetic contract-composition example for aviation calibration and robust
 //! recovery. This is not a real-data benchmark and does not establish savings.
 
-use std::fmt::Write as FmtWrite;
+use std::fmt::Write as _;
 use std::process;
 
 use symthaea_operations_research::aviation_calibration_protocol::{
