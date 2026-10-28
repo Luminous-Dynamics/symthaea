@@ -1,0 +1,38 @@
+name: Scientific Tool Allocation Auditor
+
+on:
+  pull_request:
+    paths:
+      - "research/scientific-tool-allocation-auditor/**"
+      - ".github/workflows/scientific-tool-allocation-auditor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scientific-tool-allocation-auditor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-audit:
+    name: Focused Rust audit contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml --all-targets -- -D warnings
