@@ -5,13 +5,13 @@
 
 ## Implementation status at prototype revision
 
-The PR now includes an isolated Rust reference implementation in `src/compositional_motif.rs`, exported by the crate root. It has versioned descriptors, independent per-axis evidence, monotonic edit alignment, coverage/gap gates, invalid-input rejection, and a 1,000,000-cell DP budget. Unit tests are authored for compound transformations, adversarial axis violations, bounded insertions, invalid/range claims, the computation budget, temporal-origin invariance, and the committed smoke corpus.
+The PR now includes an isolated Rust reference implementation in `src/compositional_motif.rs`, exported by the crate root. It has versioned descriptors, independent per-axis evidence, monotonic edit alignment, coverage/gap gates, invalid-input rejection, and a 1,000,000-cell DP budget. Unit tests are authored for compound transformations, adversarial axis violations, bounded insertions and deletions with provenance, fragment source-index provenance, invalid/range claims, the computation budget, temporal-origin invariance, constant-pitch inversion non-identifiability, and the committed smoke corpus with JSON receipt round-trips.
 
 **Execution boundary:** those Rust tests have not been compiled or executed in this environment. Exact-head GitHub CI records are skipped. An independent local Python simulation of the intended alignment/verdict rules produced zero mismatches on the 108-case smoke corpus; this is algorithm-level fixture checking, not Rust execution or scientific validation.
 
 The returned evidence is a JSON-serializable receipt containing the exact descriptor and threshold configuration, the target start offset, every matched source/target index pair and its pitch/onset/duration residuals, explicit unmatched indices, per-axis summaries, and failure reasons. Non-finite residual arithmetic returns an input error rather than emitting NaN or infinity into a purported receipt.
 
-Current API scope is deliberately monophonic: events must have strictly increasing onsets. Simultaneous notes, explicit rests, retrograde, ornament operators, audio realization, and historical restoration lineage are not supported by this contract and must not be inferred.
+Inversion is rejected as unsupported when every selected pitch equals the first pitch: no interval evidence exists to distinguish inversion from identity. Current API scope is deliberately monophonic: events must have strictly increasing onsets. Simultaneous notes, explicit rests, retrograde, ornament operators, audio realization, and historical restoration lineage are not supported by this contract and must not be inferred.
 
 ## Motivation: move beyond a single transformation label
 
