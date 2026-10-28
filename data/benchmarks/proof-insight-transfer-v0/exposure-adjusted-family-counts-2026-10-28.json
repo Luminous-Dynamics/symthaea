@@ -1,0 +1,55 @@
+{
+  "schema_version": "pitb.exposure-adjusted-family-counts.v0",
+  "as_of": "2026-10-28",
+  "upstream": {
+    "repository": "https://github.com/openai/math",
+    "commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+  },
+  "frozen_split": {
+    "path": "data/benchmarks/proof-insight-transfer-v0/splits.json",
+    "partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+    "assignment_changed": false
+  },
+  "count_semantics": "Counts are family assignments only. They are not counts of eligible Lean theorem tasks, completed outcomes, independent components, or proof-transfer trials.",
+  "raw_family_assignment_counts": {
+    "train": 260,
+    "validation": 56,
+    "test": 56,
+    "external_challenge": 0,
+    "total": 372
+  },
+  "researcher_exposure": {
+    "training_families_used_for_development_annotations": [
+      "025",
+      "026",
+      "156",
+      "157",
+      "184"
+    ],
+    "validation_families_excluded_from_baseline_selection_and_threshold_tuning": [
+      {
+        "family_id": "012",
+        "reason": "Inspected as a development-only prime/density near-neighbour negative control; see exposure-audit.md E-003."
+      }
+    ],
+    "test_families_excluded_from_confirmatory_denominators": [
+      {
+        "family_id": "089",
+        "reason": "Inspected before its split assignment was checked; see exposure-audit.md E-001."
+      }
+    ]
+  },
+  "remaining_family_counts_after_known_exposure_exclusions": {
+    "train": 260,
+    "validation": 55,
+    "test": 55,
+    "external_challenge": 0,
+    "total": 370
+  },
+  "limitations": [
+    "The original frozen split is preserved. Exclusions live in this derived manifest and the exposure audit; do not edit or reshuffle splits.json.",
+    "Family counts do not imply that every remaining family has an eligible theorem task. Preserve raw, eligible, excluded, unknown, missing-artifact, and not-attempted task counts separately.",
+    "Known researcher-side exposure is not proof of model pretraining contamination, and a clean exposure log cannot prove the absence of pretraining contamination.",
+    "Training-family use for source annotations and curated development controls is intentional and does not reduce the training assignment count."
+  ]
+}
