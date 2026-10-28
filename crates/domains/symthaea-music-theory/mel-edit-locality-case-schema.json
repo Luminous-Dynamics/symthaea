@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MEL-EDIT-LOCALITY-SMOKE-1.0 Case",
+  "type": "object",
+  "required": [
+    "case_id",
+    "dataset_version",
+    "split",
+    "source_family_id",
+    "source_events",
+    "target_events",
+    "edit_request",
+    "expected_requested_property_passed",
+    "expected_protected_properties_passed",
+    "expected_verdict",
+    "notes",
+    "provenance"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "const": "MEL-EDIT-LOCALITY-SMOKE-1.0"
+    },
+    "split": {
+      "enum": [
+        "development",
+        "calibration",
+        "test"
+      ]
+    },
+    "source_family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_events": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "target_events": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "edit_request": {
+      "type": "object",
+      "required": [
+        "operation"
+      ],
+      "properties": {
+        "operation": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "semitones"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "transpose"
+                },
+                "semitones": {
+                  "type": "integer",
+                  "minimum": -24,
+                  "maximum": 24
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "factor"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "scale_durations"
+                },
+                "factor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 8
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "factor",
+                "target_start_beats"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "scale_onsets"
+                },
+                "factor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 8
+                },
+                "target_start_beats": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "index",
+                "semitones"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pitch_at"
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "semitones": {
+                  "type": "integer",
+                  "minimum": -24,
+                  "maximum": 24
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "index",
+                "factor"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "duration_at"
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "factor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 8
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected_requested_property_passed": {
+      "type": "boolean"
+    },
+    "expected_protected_properties_passed": {
+      "type": "boolean"
+    },
+    "expected_verdict": {
+      "enum": [
+        "accept",
+        "reject"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "provenance": {
+      "const": "deterministic synthetic fixture; not human annotated"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "event": {
+      "type": "object",
+      "required": [
+        "pitch_midi",
+        "onset_beats",
+        "duration_beats"
+      ],
+      "properties": {
+        "pitch_midi": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "onset_beats": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_beats": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -10,6 +10,7 @@ license = "AGPL-3.0-or-later"
 # test against a textbook fact.
 [dependencies]
 serde = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 # Spec JSON round-trip test.
