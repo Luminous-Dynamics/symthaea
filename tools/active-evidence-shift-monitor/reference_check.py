@@ -981,7 +981,6 @@ def check_cusum_csv(path):
     key_fields = ("direction", "scenario", "horizon")
     text_fields = (
         "direction", "scenario", "scenario_class", "horizon", "change_after", "p1", "threshold_scaled",
-        "post_shift_detection_probability", "mean_post_shift_detection_delay",
     )
     numeric_fields = (
         "p0", "stream_pre_p", "null_lower", "null_upper", "threshold_score",
@@ -989,12 +988,27 @@ def check_cusum_csv(path):
         "family_worst_case_union_bound", "scenario_or_pre_shift_alarm_probability",
         "per_cell_alpha", "survival_probability",
     )
+    optional_numeric_fields = (
+        "post_shift_detection_probability", "mean_post_shift_detection_delay",
+    )
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
             raise ValueError(f"CUSUM row key mismatch on line {line}")
         for field in text_fields:
             if got[field] != want[field]:
                 raise ValueError(f"CUSUM {field} mismatch on line {line}: {got[field]} != {want[field]}")
+        for field in optional_numeric_fields:
+            if want[field] == "NA":
+                if got[field] != "NA":
+                    raise ValueError(f"CUSUM {field} should be NA on line {line}")
+                continue
+            try:
+                value = float(got[field])
+                target = float(want[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid CUSUM optional numeric {field} on line {line}") from exc
+            if not math.isfinite(value) or abs(value - target) > 5e-10:
+                raise ValueError(f"CUSUM {field} mismatch on line {line}: {value} != {target}")
         for field in numeric_fields:
             try:
                 value = float(got[field])
