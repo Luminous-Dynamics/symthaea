@@ -12,7 +12,7 @@ from decision_robustness_eval import BENCHMARK_ID, score_document, validate_docu
 
 def fixture() -> dict:
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "benchmark_id": BENCHMARK_ID,
         "task_id": "known-answer-1",
         "run_id": "seed-17",
@@ -25,7 +25,10 @@ def fixture() -> dict:
         "source_run": {
             "sweep_sha256": "c" * 64,
             "adapter_sha256": "9" * 64,
+            "manifest_generator_sha256": "8" * 64,
             "candidate_pool_sha256": "d" * 64,
+            "nominal_prediction_source": "test_low_fidelity_reference",
+            "evidence_class": "synthetic",
             "objective_family": "local_bias_island",
             "constraint_family": "constraint_boundary",
             "dimension": 2,
