@@ -58,6 +58,7 @@ class WitnessRecorderTests(unittest.TestCase):
     def run_recorder(
         self, *, command_code: str, timeout_ms: int = 1000,
         result: str = "supports", expected_invocation_sha256: str | None = None,
+        claimed_verifier_sha256: str | None = None, verdict_claim_id: str = "COPY.BANK.REC",
     ) -> tuple[int, dict]:
         command_argv = [sys.executable, "verifier.py"]
         if expected_invocation_sha256 is None:
@@ -70,7 +71,7 @@ verifier_sha256 = hashlib.sha256(Path("verifier.py").read_bytes()).hexdigest()
 verdict = {{
     "schema_version": "vleb-witness-verdict-v1",
     "task_id": "vleb-private-task-0001",
-    "claim_id": "COPY.BANK.REC",
+    "claim_id": {verdict_claim_id!r},
     "source_sha256": source_sha256,
     "verifier_sha256": verifier_sha256,
     "result": {result!r},
@@ -82,7 +83,8 @@ finally:
     Path("verdict.json").write_text(json.dumps(verdict, sort_keys=True), encoding="utf-8")
 """
         (self.root / "verifier.py").write_text(verifier_script, encoding="utf-8")
-        verifier_sha256 = sha((self.root / "verifier.py").read_bytes())
+        actual_verifier_sha256 = sha((self.root / "verifier.py").read_bytes())
+        verifier_sha256 = claimed_verifier_sha256 or actual_verifier_sha256
         args = [
             "--artifact-root", str(self.root),
             "--task-id", "vleb-private-task-0001",
@@ -169,6 +171,34 @@ finally:
         self.assertEqual(code, 0, self.stderr.getvalue())
         self.assertEqual(receipt["process"]["exit_code"], 3)
         self.assertEqual(receipt["observed_result"], "inconclusive")
+
+    def test_nonzero_verifier_exit_cannot_be_recorded_as_contradiction(self) -> None:
+        code, receipt = self.run_recorder(
+            command_code="from pathlib import Path; Path('index.json').write_text('{}'); raise SystemExit(3)",
+            result="contradicts",
+        )
+        self.assertEqual(code, 0, self.stderr.getvalue())
+        self.assertEqual(receipt["process"]["exit_code"], 3)
+        self.assertEqual(receipt["observed_result"], "inconclusive")
+
+    def test_claimed_verifier_digest_must_match_the_actual_verifier_file(self) -> None:
+        marker = self.root / "must-not-run.txt"
+        code, _ = self.run_recorder(
+            command_code=f"from pathlib import Path; Path({str(marker)!r}).touch()",
+            claimed_verifier_sha256="0" * 64,
+        )
+        self.assertEqual(code, 2)
+        self.assertFalse(marker.exists())
+        self.assertIn("verifier file bytes differ", self.stderr.getvalue())
+
+    def test_verdict_identity_mismatch_becomes_inconclusive(self) -> None:
+        code, receipt = self.run_recorder(
+            command_code="from pathlib import Path; Path('index.json').write_text('{}')",
+            verdict_claim_id="OTHER.CLAIM",
+        )
+        self.assertEqual(code, 0, self.stderr.getvalue())
+        self.assertEqual(receipt["observed_result"], "inconclusive")
+        self.assertTrue(any("verdict claim ID differs" in issue for issue in json.loads(self.stdout.getvalue())["verdict_errors"]))
 
     def test_missing_trusted_run_context_fails_before_command_executes(self) -> None:
         marker = self.root / "should-not-exist.txt"
