@@ -14,7 +14,11 @@ fn fixed_format_fixture_reports_source_anchors_without_claiming_semantics() {
         .output()
         .expect("run COBOL indexer");
 
-    assert!(output.status.success(), "stderr={}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let json = String::from_utf8(output.stdout).expect("JSON is UTF-8");
     assert!(json.contains("\"schema_version\": \"vleb-cobol-index-v1\""));
     assert!(json.contains("\"program_id\": {\"name\":\"SETTLE01\""));
@@ -31,11 +35,12 @@ fn fixed_format_fixture_reports_source_anchors_without_claiming_semantics() {
 
 #[test]
 fn source_format_must_be_explicit() {
-    let output = Command::new(binary())
-        .output()
-        .expect("run COBOL indexer");
+    let output = Command::new(binary()).output().expect("run COBOL indexer");
     assert_eq!(output.status.code(), Some(64));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("source format must be declared explicitly"));
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("source format must be declared explicitly")
+    );
 }
 
 #[test]
@@ -47,7 +52,9 @@ fn free_format_is_rejected_instead_of_guessed() {
         .output()
         .expect("run COBOL indexer");
     assert_eq!(output.status.code(), Some(64));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("only explicit fixed format is supported"));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("only explicit fixed format is supported")
+    );
 }
 
 #[test]
