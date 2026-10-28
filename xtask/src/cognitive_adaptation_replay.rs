@@ -592,6 +592,67 @@ mod tests {
     }
 
     #[test]
+    fn deployable_policy_prefix_decisions_are_invariant_to_hidden_future_targets() {
+        // This is a metamorphic regression test for the current simulator, not proof of sandboxing.
+        // Keep the observed feature stream fixed, alter only hidden outcomes at and after a cutoff,
+        // and assert that deployable policies cannot retroactively change earlier decisions.
+        const TICKS: usize = 64;
+        const CUTS: [usize; 3] = [16, 32, 48];
+        let modes = [
+            PolicyMode::NoAdapt,
+            PolicyMode::DetectorTriggered,
+            PolicyMode::BenefitGated,
+            PolicyMode::StagedVerifyRollback,
+        ];
+
+        for scenario in REQUIRED_SCENARIOS {
+            for seed in 0..8_u64 {
+                let generated = build_synthetic_run(scenario, TICKS, seed)
+                    .expect("synthetic fixture generation");
+                let shift_tick = TICKS / 2;
+                let targets: Vec<f64> = (0..TICKS)
+                    .map(|tick| target_at(scenario, tick, TICKS, shift_tick, seed))
+                    .collect();
+
+                for cutoff in CUTS {
+                    let mut altered_targets = targets.clone();
+                    for tick in cutoff..TICKS {
+                        altered_targets[tick] += 0.25 + deterministic_noise(seed.wrapping_add(91), tick) * 0.1;
+                    }
+                    assert_ne!(targets[cutoff], altered_targets[cutoff],
+                        "the hidden suffix mutation must be non-vacuous");
+
+                    for mode in modes {
+                        let arm = generated.receipt.arms.iter()
+                            .find(|arm| arm.arm_id == mode.id())
+                            .expect("generated policy arm exists");
+                        let baseline = simulate_policy(
+                            mode, scenario, seed, &targets, shift_tick,
+                            &generated.receipt.events, &generated.receipt.event_ledger_sha256,
+                            &arm.repository_head_sha, &arm.configuration_digest,
+                        ).expect("baseline policy execution");
+                        let perturbed = simulate_policy(
+                            mode, scenario, seed, &altered_targets, shift_tick,
+                            &generated.receipt.events, &generated.receipt.event_ledger_sha256,
+                            &arm.repository_head_sha, &arm.configuration_digest,
+                        ).expect("future-perturbed policy execution");
+
+                        let baseline_prefix = serde_json::to_value(&baseline.replay_arm.decisions[..cutoff])
+                            .expect("baseline prefix serializes");
+                        let perturbed_prefix = serde_json::to_value(&perturbed.replay_arm.decisions[..cutoff])
+                            .expect("perturbed prefix serializes");
+                        assert_eq!(
+                            baseline_prefix, perturbed_prefix,
+                            "policy {} used hidden outcomes at/after tick {} to change an earlier decision (scenario={scenario}, seed={seed})",
+                            mode.id(), cutoff
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn synthetic_receipt_cannot_be_mislabeled_as_measured() {
         let mut generated = build_synthetic_run("abrupt", 64, 17).expect("fixture generation");
         generated.receipt.run_kind = "replay".to_owned();
