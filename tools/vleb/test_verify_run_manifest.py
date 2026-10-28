@@ -53,8 +53,13 @@ class ManifestBundle:
             "receipt": "receipt.json",
             "claim_auditor": "audit_legacy_claim.py",
             "claim_schema": "legacy-claim-evidence.schema.json",
+            "witness_receipt_schema": "witness-execution-receipt.schema.json",
+            "witness_receipt_producer": "record_witness_execution.py",
             "claim_source": "legacy.cbl",
             "claim_witness": "index.json",
+            "claim_stdout": "index.stdout",
+            "claim_stderr": "index.stderr",
+            "claim_execution_receipt": "claims/COPY.BANK.REC.receipt.json",
             "claim": "claims/COPY.BANK.REC.json",
         }
         files = {
@@ -70,8 +75,13 @@ class ManifestBundle:
             "receipt": jbytes({"outcome": "pass"}),
             "claim_auditor": b"copied from repository below",
             "claim_schema": b"copied from repository below",
+            "witness_receipt_schema": b"copied from repository below",
+            "witness_receipt_producer": b"copied from repository below",
             "claim_source": b"       COPY BANK-REC.\n",
             "claim_witness": b'{"copy_references":["BANK-REC"]}\n',
+            "claim_stdout": b'indexed COPY BANK-REC\n',
+            "claim_stderr": b"",
+            "claim_execution_receipt": b"written from fixture below",
             "claim": b"written from fixture below",
         }
         for key, rel in self.paths.items():
@@ -81,8 +91,58 @@ class ManifestBundle:
                 target.write_bytes(files[key])
         shutil.copyfile(ROOT / "tools/vleb/audit_legacy_claim.py", self.root / self.paths["claim_auditor"])
         shutil.copyfile(ROOT / "tools/vleb/legacy-claim-evidence.schema.json", self.root / self.paths["claim_schema"])
+        shutil.copyfile(ROOT / "tools/vleb/witness-execution-receipt.schema.json", self.root / self.paths["witness_receipt_schema"])
+        shutil.copyfile(ROOT / "tools/vleb/record_witness_execution.py", self.root / self.paths["witness_receipt_producer"])
         source_raw = (self.root / self.paths["claim_source"]).read_bytes()
         witness_raw = (self.root / self.paths["claim_witness"]).read_bytes()
+        stdout_raw = (self.root / self.paths["claim_stdout"]).read_bytes()
+        stderr_raw = (self.root / self.paths["claim_stderr"]).read_bytes()
+        witness_producer_sha = sha((self.root / self.paths["witness_receipt_producer"]).read_bytes())
+        witness_receipt_schema_sha = sha((self.root / self.paths["witness_receipt_schema"]).read_bytes())
+        verifier_sha = "d" * 64
+        witness_receipt = {
+            "schema_version": "vleb-witness-execution-receipt-v1",
+            "task_id": "vleb-private-task-0001",
+            "claim_id": "COPY.BANK.REC",
+            "source_sha256": sha(source_raw),
+            "run_binding": {
+                "repository_full_name": "Luminous-Dynamics/symthaea",
+                "repository_id": 123456789,
+                "run_id": "90001",
+                "run_attempt": 1,
+                "source_repository_digest": "4" * 40,
+                "source_repository_ref": "refs/heads/main",
+                "candidate_checkout_revision": "2" * 40,
+                "workflow_sha": "1" * 40,
+                "workflow_ref": "refs/heads/main",
+            },
+            "runtime": {
+                "immutable_image_id": "sha256:" + "d" * 64,
+                "network_mode": "none",
+                "network_mode_observed": True,
+            },
+            "producer": {
+                "id": "vleb-record-witness-execution",
+                "source_sha256": witness_producer_sha,
+            },
+            "verifier": {"kind": "source_index", "id": "test-source-indexer", "sha256": verifier_sha},
+            "invocation": {
+                "argv": ["vleb-cobol-index", "--format", "fixed", "legacy.cbl"],
+                "working_directory": ".",
+                "timeout_ms": 120000,
+                "environment_sha256": "e" * 64,
+            },
+            "inputs": [{"path": self.paths["claim_source"], "sha256": sha(source_raw)}],
+            "outputs": [
+                {"path": self.paths["claim_stdout"], "sha256": sha(stdout_raw), "role": "stdout"},
+                {"path": self.paths["claim_stderr"], "sha256": sha(stderr_raw), "role": "stderr"},
+                {"path": self.paths["claim_witness"], "sha256": sha(witness_raw), "role": "artifact"},
+            ],
+            "process": {"exit_code": 0, "signal": None, "timed_out": False},
+            "observed_result": "supports",
+        }
+        execution_receipt_raw = jbytes(witness_receipt)
+        (self.root / self.paths["claim_execution_receipt"]).write_bytes(execution_receipt_raw)
         claim = {
             "schema_version": "vleb-legacy-claim-v1",
             "task_id": "vleb-private-task-0001",
@@ -107,8 +167,10 @@ class ManifestBundle:
                 "kind": "source_index",
                 "artifact_path": self.paths["claim_witness"],
                 "artifact_sha256": sha(witness_raw),
+                "execution_receipt_path": self.paths["claim_execution_receipt"],
+                "execution_receipt_sha256": sha(execution_receipt_raw),
                 "verifier_id": "test-source-indexer",
-                "verifier_sha256": "d" * 64,
+                "verifier_sha256": verifier_sha,
                 "observed_result": "supports",
             }],
             "unresolved_reason": None,
@@ -161,6 +223,10 @@ class ManifestBundle:
             "auditor_sha256": h["claim_auditor"],
             "schema_path": self.paths["claim_schema"],
             "schema_sha256": h["claim_schema"],
+            "witness_receipt_schema_path": self.paths["witness_receipt_schema"],
+            "witness_receipt_schema_sha256": h["witness_receipt_schema"],
+            "witness_receipt_producer_path": self.paths["witness_receipt_producer"],
+            "witness_receipt_producer_sha256": h["witness_receipt_producer"],
             "claims": [{
                 "claim_id": "COPY.BANK.REC",
                 "claim_path": self.paths["claim"],
@@ -222,6 +288,14 @@ class ManifestBundle:
             expected_claim_schema_sha256=kwargs.pop(
                 "expected_claim_schema_sha256",
                 sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            ),
+            expected_witness_receipt_schema_sha256=kwargs.pop(
+                "expected_witness_receipt_schema_sha256",
+                sha((ROOT / "tools/vleb/witness-execution-receipt.schema.json").read_bytes()),
+            ),
+            expected_witness_receipt_producer_sha256=kwargs.pop(
+                "expected_witness_receipt_producer_sha256",
+                sha((ROOT / "tools/vleb/record_witness_execution.py").read_bytes()),
             ),
             trusted_claim_verifier_pins=kwargs.pop(
                 "trusted_claim_verifier_pins", {"source_index": "d" * 64}
