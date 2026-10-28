@@ -413,6 +413,28 @@ mod tests {
     }
 
     #[test]
+    fn beta_mixture_improves_power_for_a_moderate_shift_in_this_fixture() {
+        let hoeffding = evaluate(
+            Boundary::TimeUniform,
+            NOMINAL_P,
+            Some(0.40),
+            CHANGE_AFTER,
+            1000,
+        );
+        let beta = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            Some(0.40),
+            CHANGE_AFTER,
+            1000,
+        );
+        assert!(beta.false_alarm_probability <= PER_CELL_ALPHA + EPS);
+        assert!(beta.detection_probability > 0.90);
+        assert!(hoeffding.detection_probability < 0.40);
+        assert!(beta.detection_probability > hoeffding.detection_probability + 0.50);
+    }
+
+    #[test]
     fn beta_mixture_e_value_matches_beta_binomial_formula_at_known_values() {
         // With n=2 and one success, Beta(1/2,1/2) marginal probability is 1/8;
         // under p0=1/2, the observed-sequence likelihood is 1/4, so the BF is 1/2.
