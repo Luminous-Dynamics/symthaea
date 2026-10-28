@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "CASTING-MF-COMPOSITION-001",
+  "title": "Crossed objective and feasibility discrepancy benchmark",
+  "status": "preregistered_synthetic_diagnostic_not_external_sota",
+  "implementation": "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+  "scorer": "tools/casting-benchmark/score_compositional_bakeoff.py",
+  "tests": "tools/casting-benchmark/test_compositional_bakeoff.py",
+  "parent_protocol": "docs/research/CASTING_MULTIFIDELITY_POLICY_SCENARIOS_V1.json",
+  "candidate_pool": {
+    "source": "Seed-offset Halton pool from the existing scenario contract",
+    "design_count": 128,
+    "dimensions": [
+      2,
+      5,
+      10
+    ],
+    "pairing": "Exact same coordinates for every policy within a seed/scenario-composition/dimension/severity cell",
+    "truth": "Existing analytic truth, identical across fidelity-discrepancy families"
+  },
+  "composition_contract": {
+    "objective_component": "Objectives returned by objective_family at each fidelity",
+    "constraint_component": "Constraint margin returned by constraint_family at each fidelity",
+    "high_fidelity": "Both components resolve to the same analytic truth function",
+    "diagonal_cells": "Expected to reproduce each existing single-family mismatch mechanism",
+    "off_diagonal_cells": "Create crossed objective/constraint mismatch combinations; report separately from diagonal controls",
+    "intended_question": "Do policies tuned or inspected only on isolated mismatch families preserve decision quality when objective ranking errors and feasibility errors arise from different mechanisms?",
+    "caveat": "This is a compositional synthetic stress test, not evidence that its compositions match empirical foundry distributions."
+  },
+  "scenarios": {
+    "objective_families": [
+      "smooth_stationary",
+      "local_bias_island",
+      "warped_coordinates",
+      "constraint_boundary",
+      "discontinuous_step",
+      "heteroscedastic_noise"
+    ],
+    "constraint_families": [
+      "smooth_stationary",
+      "local_bias_island",
+      "warped_coordinates",
+      "constraint_boundary",
+      "discontinuous_step",
+      "heteroscedastic_noise"
+    ]
+  },
+  "design_space": {
+    "dimensions": [
+      2,
+      5,
+      10
+    ],
+    "domain": [
+      0,
+      1
+    ],
+    "objectives": 2,
+    "direction": "minimize_all",
+    "constraint": "margin >= 0",
+    "reference_point": [
+      1.2,
+      1.2
+    ]
+  },
+  "budget": {
+    "costs": {
+      "low": 1,
+      "medium": 5,
+      "high": 25
+    },
+    "budget_units": 200,
+    "charge_rule": "Every fidelity oracle call is charged its configured cost; no extra truth query is given to the policy. Audit truth is queried after policy termination."
+  },
+  "policies": [
+    {
+      "id": "high_only",
+      "role": "high-fidelity sampling control"
+    },
+    {
+      "id": "low_screen",
+      "role": "low-fidelity screen and promote"
+    },
+    {
+      "id": "fixed_top_k",
+      "role": "fixed top-k fidelity ladder"
+    },
+    {
+      "id": "discrepancy_aware",
+      "role": "paired discrepancy correction heuristic"
+    },
+    {
+      "id": "adaptive_budget",
+      "role": "cost-responsive heuristic"
+    }
+  ],
+  "default_sweep": {
+    "objective_families": 6,
+    "constraint_families": 6,
+    "composition_cells": 36,
+    "dimensions": [
+      2,
+      5,
+      10
+    ],
+    "severities": [
+      0.5,
+      1,
+      2
+    ],
+    "seeds": [
+      17,
+      23,
+      29
+    ],
+    "policies": 5,
+    "run_count": 4860,
+    "raw_runs_preserved": true
+  },
+  "outputs": [
+    "Per-run raw evaluation ledger",
+    "SHA-256 hash of candidate pool",
+    "Per-fidelity calls and spent cost",
+    "Finite-pool normalized feasible hypervolume",
+    "False-feasible promotion count/rate",
+    "Paired-seed contrasts versus high_only on each cell",
+    "Independent response replay and source-byte digests"
+  ],
+  "acceptance_gates": {
+    "execution": "Authored tests must pass locally before any empirical statement; runner artifacts must be retained.",
+    "replay": "Independent scorer must reject any changed evaluation value, cost count, candidate-pool hash, promotion margin, or result identity.",
+    "composition": "Diagonal cells must numerically match the corresponding existing scenario runner under matched inputs; test this as a property gate.",
+    "statistics": "Three-seed defaults are diagnostic only. Minimum 20 paired seeds; target 30 for inferential comparisons; preregister multiple-comparison correction and report per-cell effects.",
+    "external": "No SOTA claim until pinned BoTorch MF-HVKG/MOMF and suitable single-fidelity baselines are executed under matched budgets; retain COCO-native scoring on COCO tasks.",
+    "physical": "No casting-validity claim without validated multiphysics models, documented solver uncertainty, and held-out physical measurements."
+  },
+  "evidence_label": "COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
+  "provenance": {
+    "source_digest_paths": [
+      "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+      "tools/casting-benchmark/score_compositional_bakeoff.py",
+      "tools/casting-benchmark/multifidelity_scenario_suite.py",
+      "tools/casting-benchmark/multifidelity_stress.py",
+      "docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json",
+      "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+    ],
+    "limitation": "SHA-256 digests establish byte identity, not signer identity or proof of execution. This receipt is unsigned and synthetic."
+  },
+  "research_references": [
+    "https://doi.org/10.1145/3801959",
+    "https://doi.org/10.1007/s11831-025-10392-8",
+    "https://link.springer.com/article/10.1007/s43939-026-00685-5",
+    "https://botorch.org/docs/tutorials/Multi_objective_multi_fidelity_BO",
+    "https://coco-platform.org/data-archive/index.html"
+  ]
+}
