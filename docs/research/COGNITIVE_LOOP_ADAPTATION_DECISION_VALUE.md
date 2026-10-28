@@ -218,6 +218,7 @@ Run it with:
 ```bash
 cargo run --locked -p xtask -- audit-cognitive-adaptation-panel \
   --input path/to/audit-bundle.json \
+  --expected-bundle-sha256 PUBLISHED_64_CHARACTER_SHA256 \
   --out reports/cognitive-adaptation-audit.json
 ```
 
