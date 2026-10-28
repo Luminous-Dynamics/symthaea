@@ -75,12 +75,17 @@ EPROCESS_FAMILY_PRIORS = {
     "beta_5_5": (5.0, 5.0),
     "beta_20_20": (20.0, 20.0),
 }
+COMPOSITE_NULL_LOWER = 0.48
+COMPOSITE_NULL_UPPER = 0.52
+COMPOSITE_BETTING_FRACTIONS = (0.05, 0.1, 0.2, 0.4, 0.8)
+COMPOSITE_FAMILY = "composite_band_betting_0.48_0.52"
 EPROCESS_FAMILY_ORDER = (
     "beta_0.5_0.5",
     "beta_1_1",
     "beta_5_5",
     "beta_20_20",
     "equal_portfolio_4_priors",
+    COMPOSITE_FAMILY,
 )
 EPROCESS_FAMILY_SCENARIOS = (
     "stationary_null",
@@ -405,6 +410,43 @@ def _beta_log_e_from_parameters(n, successes, p0, a, b, prior_log_beta=None):
     )
 
 
+def composite_band_log_e_value(n, successes, lower=COMPOSITE_NULL_LOWER,
+                              upper=COMPOSITE_NULL_UPPER):
+    """Log e-value from a fixed mixture of directional bets valid on p in [lower, upper]."""
+    if n <= 0 or not (0 <= successes <= n):
+        raise ValueError("invalid composite-null e-process state")
+    if not (0.0 <= lower < upper <= 1.0):
+        raise ValueError("invalid composite-null rate interval")
+
+    failures = n - successes
+    upper_logs = []
+    lower_logs = []
+    for lam in COMPOSITE_BETTING_FRACTIONS:
+        if not (lam >= 0.0 and lam * upper <= 1.0 and lam * (1.0 - lower) <= 1.0):
+            raise ValueError("betting fraction yields a negative factor")
+        upper_logs.append(
+            successes * math.log1p(lam * (1.0 - upper))
+            + failures * math.log1p(-lam * upper)
+        )
+        lower_logs.append(
+            successes * math.log1p(-lam * (1.0 - lower))
+            + failures * math.log1p(lam * lower)
+        )
+
+    def log_mean_exp(values):
+        maximum = max(values)
+        return maximum + math.log(sum(math.exp(value - maximum) for value in values)
+                                  / len(values))
+
+    upper_log_e = log_mean_exp(upper_logs)
+    lower_log_e = log_mean_exp(lower_logs)
+    maximum = max(upper_log_e, lower_log_e)
+    return maximum + math.log(
+        0.5 * math.exp(upper_log_e - maximum)
+        + 0.5 * math.exp(lower_log_e - maximum)
+    )
+
+
 def eprocess_family_alarm_tables(horizon=1000):
     """Precompute every family boundary once for exact DP/reference parity."""
     threshold = math.log(1.0 / PER_CELL_ALPHA)
@@ -449,6 +491,12 @@ def eprocess_family_alarm_tables(horizon=1000):
                 + math.log(
                     sum(0.25 * math.exp(value - maximum) for value in components)
                 )
+            )
+            log_values[COMPOSITE_FAMILY][n] = (
+                log_values[COMPOSITE_FAMILY][n] or [None] * (n + 1)
+            )
+            log_values[COMPOSITE_FAMILY][n][successes] = composite_band_log_e_value(
+                n, successes, COMPOSITE_NULL_LOWER, COMPOSITE_NULL_UPPER
             )
 
     return {
@@ -587,7 +635,16 @@ def eprocess_family_self_test():
         if float(selected["false_alarm_probability"]) < 0.99:
             raise ValueError(f"{family} failed the selection-bias negative control")
         misspecified = indexed[(family, "stable_baseline_rate_048")]
-        if float(misspecified["false_alarm_probability"]) <= PER_CELL_ALPHA:
+        if family == COMPOSITE_FAMILY:
+            if float(misspecified["false_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+                raise ValueError("composite-null e-process exceeded alpha at p=0.48 within its null interval")
+            upper_edge = indexed[(family, "stable_baseline_rate_052")]
+            if float(upper_edge["false_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+                raise ValueError("composite-null e-process exceeded alpha at p=0.52 within its null interval")
+            outside_band = indexed[(family, "stable_baseline_rate_045")]
+            if float(outside_band["false_alarm_probability"]) <= 0.04:
+                raise ValueError("composite-null outside-band negative control did not expose baseline drift")
+        elif float(misspecified["false_alarm_probability"]) <= PER_CELL_ALPHA:
             raise ValueError(f"{family} did not expose nominal-rate misspecification")
         for scenario in EPROCESS_FAMILY_SCENARIOS:
             row = indexed[(family, scenario)]
@@ -603,7 +660,11 @@ def eprocess_family_self_test():
     portfolio = float(indexed[("equal_portfolio_4_priors", "step_up_055")]["detection_probability"])
     if portfolio <= jeffreys + 0.04:
         raise ValueError("fixed prior portfolio did not improve weak-shift power in this fixture")
-    print("PASS: family row count, anytime null budget, selection-bias and nominal-rate controls, mass conservation and weak-shift portfolio gate")
+    composite_mild = float(indexed[(COMPOSITE_FAMILY, "step_up_060")]["detection_probability"])
+    composite_large = float(indexed[(COMPOSITE_FAMILY, "step_up_080")]["detection_probability"])
+    if composite_mild < 0.70 or composite_large < 0.99:
+        raise ValueError("composite-null power controls were outside their preregistered fixture gates")
+    print("PASS: family row count, point/composite null controls, selection bias, mass conservation and portfolio/power gates")
 
 
 def self_test():
