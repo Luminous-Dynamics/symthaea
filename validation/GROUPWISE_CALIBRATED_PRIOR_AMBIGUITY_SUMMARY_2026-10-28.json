@@ -164,21 +164,45 @@
       "numpy": "2.3.5",
       "scipy": "1.17.0"
     },
-    "local_source_sha256": "f509f056270b670d6ab0f00e03a1c7102f2c624169912079258bc344a183219c",
-    "local_test_sha256": "39bb8e67f7aff18a2b7b13e09334fb4a6a3576bad988a41fd743f80f9fae2f4c",
-    "local_result_json": {
+    "local_source": {
+      "path": "validation/groupwise_calibrated_prior_ambiguity_benchmark.py",
+      "bytes": 7437,
+      "sha256": "f509f056270b670d6ab0f00e03a1c7102f2c624169912079258bc344a183219c",
+      "git_blob": "8621fd0bb4b4e6d4fe3a218f2d4c4804f94f84e0"
+    },
+    "branch_source": {
+      "path": "validation/groupwise_calibrated_prior_ambiguity_benchmark.py",
+      "bytes": 7437,
+      "git_blob": "d2f11ec5114cb07307e4c85fe1228a7749b8948c",
+      "byte_identical_to_local": false
+    },
+    "local_test": {
+      "path": "validation/test_groupwise_calibrated_prior_ambiguity_benchmark.py",
+      "bytes": 1184,
+      "sha256": "39bb8e67f7aff18a2b7b13e09334fb4a6a3576bad988a41fd743f80f9fae2f4c",
+      "git_blob": "2ca8d6ca2be60af6bebdf2660353fcd903bb7836"
+    },
+    "branch_test": {
+      "path": "validation/test_groupwise_calibrated_prior_ambiguity_benchmark.py",
+      "bytes": 1184,
+      "git_blob": "2ca8d6ca2be60af6bebdf2660353fcd903bb7836",
+      "byte_identical_to_local": true
+    },
+    "local_results": {
       "filename": "GROUPWISE_CALIBRATED_PRIOR_AMBIGUITY_RESULTS_2026-10-28.json",
       "bytes": 73433,
-      "sha256": "3cfb6350f12db29e6cb871409f2c3e79cfe390fce00e73ea456062de22033085"
+      "sha256": "3cfb6350f12db29e6cb871409f2c3e79cfe390fce00e73ea456062de22033085",
+      "committed_to_repository": false
     },
-    "local_result_gzip": {
+    "local_compressed_results": {
       "filename": "GROUPWISE_CALIBRATED_PRIOR_AMBIGUITY_RESULTS_2026-10-28.json.gz",
       "bytes": 6100,
-      "sha256": "be8953084b09c72e49d1296cc141adfe15920deb5acbedea7462f201f27fb9da"
+      "sha256": "be8953084b09c72e49d1296cc141adfe15920deb5acbedea7462f201f27fb9da",
+      "committed_to_repository": false
     },
+    "exact_head_execution": false,
     "repository_scm_integration": false,
-    "external_benchmark_run": false,
-    "speedup_claim": false
+    "external_benchmark_run": false
   },
   "limitations": [
     "Synthetic six-regime prior meta-population",
