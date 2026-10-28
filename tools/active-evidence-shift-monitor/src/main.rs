@@ -732,6 +732,7 @@ fn probability_range_sum(values: &[f64], start: usize, end: usize) -> f64 {
     values[start..=end.min(values.len() - 1)].iter().sum()
 }
 
+#[cfg(test)]
 fn evaluate_cusum_null_schedule<P>(
     direction: CusumDirection,
     threshold: usize,
