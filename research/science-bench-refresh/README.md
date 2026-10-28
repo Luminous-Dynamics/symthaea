@@ -7,7 +7,8 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
 - `schema/task-set.schema.json`: strict schema for evaluator-held tasks with separate policy-visible and evaluator-only fields.
-- `fixtures/generation-manifest.example.json`: non-scoring placeholder fixture.
+- `fixtures/generation-manifest.example.json`: non-scoring placeholder manifest fixture.
+- `fixtures/task-set.example.json`: eight-task, non-scoring task-set fixture aligned to the manifest's expected denominator and family counts.
 - `src/lib.rs` and `src/main.rs`: standalone Rust validator, commitment calculator, task-set contract checker, and post-run reveal verifier.
 
 ## Validate a manifest
@@ -61,7 +62,7 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
 
 ### Important limits
 
-Commit–reveal proves that the revealed bytes match the pre-run frozen context. It does **not** prove that the seed was secret before the run, that the runner prevented oracle access, that the declared generator actually produced the task set, or that the task set is scientifically valid. Those require separate runner isolation evidence, task regeneration from the revealed seed and pinned generator, and evaluator/duplicate/leakage controls.
+Commit–reveal proves that the revealed bytes match the frozen context. To establish that the commitment existed before outcomes were observed, independently anchor the protocol/manifest commitment before execution (for example, an append-only receipt or immutable commit) and retain that anchor with the run. A digest stored only in the final mutable manifest is not a trusted timestamp. Commit–reveal does **not** prove that the seed was secret before the run, that the runner prevented oracle access, that the declared generator actually produced the task set, or that the task set is scientifically valid. Those require separate runner isolation evidence, task regeneration from the revealed seed and pinned generator, and evaluator/duplicate/leakage controls.
 
 The repository example is a **non-scoring fixture**: its revision says `NOT_IMPLEMENTED_YET` and its hashes are all zeros. It must never be reused for an actual experiment. The validator reports manifest-declared eligibility rather than pretending to certify execution isolation.
 
