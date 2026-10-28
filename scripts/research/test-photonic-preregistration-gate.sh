@@ -74,6 +74,7 @@ jq -e '
   and .gate_id == "PHOT-CTRL-004"
   and (.manifest_sha256 | test("^[0-9a-f]{64}$"))
   and (.checker_sha256 | test("^[0-9a-f]{64}$"))
+  and (.readiness_schema_sha256 | test("^[0-9a-f]{64}$"))
   and (.scope | contains("completeness-only"))
 ' "$TMP/ready-receipt.json" >/dev/null
 echo "PASS: synthetic complete fixture produces a content-bound readiness receipt."
