@@ -65,6 +65,7 @@ pub mod codegate;
 pub mod emotional_gating_integration;
 pub mod language_gates;
 pub mod memory_bridge;
+pub mod memory_pipeline_evolution;
 
 // Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
 #[cfg(feature = "speech-data")]
