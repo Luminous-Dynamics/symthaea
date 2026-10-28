@@ -80,11 +80,11 @@ Report:
 
 ## Finite-sample radius calibration
 
-The adjacent `aviation_probability_calibration.rs` module derives a conservative TV radius from a frozen nominal scenario distribution and observed calibration frequencies. It separates the empirical TV discrepancy from a union-Hoeffding sampling allowance and reports the declared failure probability, episode count, whether the result saturates at 100%, and the required radius. The synthetic example feeds this radius into the DRO evaluator.
+The adjacent `aviation_probability_calibration.rs` module derives a conservative TV radius from a frozen nominal scenario distribution and observed calibration frequencies. Its regime-envelope API calibrates each declared weather/airport/season regime separately, divides a requested family-wise failure budget across regimes, and returns the largest required radius for a common policy. It separates the empirical TV discrepancy from a union-Hoeffding sampling allowance and reports the declared failure probability, episode count, whether the result saturates at 100%, and the required radius. The synthetic example feeds this radius into the DRO evaluator.
 
 This bound assumes independent complete disruption episodes drawn from one fixed finite-support distribution. Airline data can violate that assumption through temporal dependence, seasonality and regime shifts. Use event episodes rather than rows, report subgroup/time-block calibration, and use a predeclared envelope across regimes rather than pooling incompatible distributions. A wide or saturated bound is a meaningful indication that the calibration sample is inadequate.
 
-Tracking: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787).
+Tracking: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787). The regime-envelope tests cover the per-regime Bonferroni budget, maximum radius, deterministic ordering and invalid regimes.
 
 ## Runnable contract-composition example
 
