@@ -312,6 +312,10 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.assertEqual(result["claim_count"], 1)
         self.assertEqual(result["unresolved"], 1)
         self.assertEqual(result["claims"][0]["status"], "unresolved")
+        self.assertEqual(
+            result["supported"] + result["contradicted"] + result["unresolved"] + result["failed"],
+            result["claim_count"],
+        )
         self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
 
     def test_claim_audit_rejects_witness_artifact_tampering(self) -> None:
@@ -343,6 +347,11 @@ class RunManifestVerifierTests(unittest.TestCase):
             trusted_claim_verifier_pins={"source_index": "d" * 64},
         )
         self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failed"], 1)
+        self.assertEqual(
+            result["supported"] + result["contradicted"] + result["unresolved"] + result["failed"],
+            result["claim_count"],
+        )
         self.assertIn("claim_input_invalid", {row["code"] for row in result["issues"]})
 
     def test_claim_audit_malformed_witness_kind_fails_closed_without_crashing(self) -> None:
