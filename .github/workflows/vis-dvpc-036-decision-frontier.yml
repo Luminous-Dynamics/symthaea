@@ -48,6 +48,13 @@ jobs:
           grep -Fq $'SCENARIO\thealthy_null_h8\t8\tALPHA_SPENDING_HOEFFDING_CS\tNULL_THRESHOLD_EQUALS_TRUTH\tever_threshold_crossing_probability\t0.000000000000' /tmp/vis-dvpc-036-results.tsv
           grep -Fq $'SCENARIO\tweak_null_p099_h256\t256\t-\tNULL_THRESHOLD_EQUALS_TRUTH\tpath_enumeration\tNOT_USED' /tmp/vis-dvpc-036-results.tsv
           grep -Fq 'POSITIVE_MARGIN_ALTERNATIVE' /tmp/vis-dvpc-036-results.tsv
+          # Independent vectorized exact-DP reference values for horizon 256.
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="WALD_FIXED_TIME" && $6=="sequence_coverage" { d=$7-0.279085312040; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="WALD_FIXED_TIME" && $6=="ever_threshold_crossing_probability" { d=$7-0.391474262622; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="sequence_coverage" { d=$7-0.999988677860; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="ever_threshold_crossing_probability" { d=$7-0.000005661070; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_alt_clear_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="ever_threshold_crossing_probability" { d=$7-0.021819334588; if (d<0) d=-d; if (d>0) exit 1; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="weak_null_p099_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="ever_threshold_crossing_probability" { if ($7 < 0.000000003 || $7 > 0.000000006) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
           awk -F '\t' '$1=="DP_LOOK" && $6=="probability_mass" { if ($7 < 0.99999999 || $7 > 1.00000001) exit 1; count++ } END { if (count != 1288) exit 1 }' /tmp/vis-dvpc-036-results.tsv
           grep '^SCENARIO' /tmp/vis-dvpc-036-results.tsv > /tmp/vis-dvpc-036-summaries.tsv
       - name: Create exact-source and result receipt
