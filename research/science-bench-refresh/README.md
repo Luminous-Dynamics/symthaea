@@ -7,9 +7,11 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
 - `schema/task-set.schema.json`: strict schema for evaluator-held tasks with separate policy-visible and evaluator-only fields.
+- `schema/generator-config.schema.json`: versioned schema for deterministic synthetic task constructors.
 - `fixtures/generation-manifest.example.json`: non-scoring placeholder manifest fixture.
 - `fixtures/task-set.example.json`: eight-task, non-scoring task-set fixture aligned to the manifest's expected denominator and family counts.
-- `src/lib.rs` and `src/main.rs`: standalone Rust validator, commitment calculator, task-set contract checker, and post-run reveal verifier.
+- `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
+- `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 
 ## Validate a manifest
 
@@ -65,6 +67,24 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
 Commit–reveal proves that the revealed bytes match the frozen context. To establish that the commitment existed before outcomes were observed, independently anchor the protocol/manifest commitment before execution (for example, an append-only receipt or immutable commit) and retain that anchor with the run. A digest stored only in the final mutable manifest is not a trusted timestamp. Commit–reveal does **not** prove that the seed was secret before the run, that the runner prevented oracle access, that the declared generator actually produced the task set, or that the task set is scientifically valid. Those require separate runner isolation evidence, task regeneration from the revealed seed and pinned generator, and evaluator/duplicate/leakage controls.
 
 The repository example is a **non-scoring fixture**: its revision says `NOT_IMPLEMENTED_YET` and its hashes are all zeros. It must never be reused for an actual experiment. The validator reports manifest-declared eligibility rather than pretending to certify execution isolation.
+
+## Deterministic task regeneration
+
+The standalone Rust module supports four bounded synthetic constructor families: known coordinate reparameterization, noisy linear-law recovery, common-cause/null discovery, and narrow-domain identifiability/abstention. It uses a deterministic SHA-256-derived stream keyed by the revealed seed, generation ID, family ID, task index, and field name; it does not depend on platform RNG state.
+
+Useful commands:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  generate-task-set MANIFEST.json REVEALED_SEED.bin GENERATOR_CONFIG.json OUTPUT_TASK_SET.json
+
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-regeneration MANIFEST.json REVEALED_SEED.bin GENERATOR_CONFIG.json COMMITTED_TASK_SET.json
+```
+
+`generate-task-set` refuses a config whose exact bytes do not match `generator.configuration_sha256`, refuses a seed that does not match its context-bound commitment, requires a valid pinned sealed-refresh manifest, and checks generated task-family counts against the expected denominator. `verify-regeneration` reproduces the exact task-set bytes and compares them with the revealed artifact in addition to checking reveal commitments and the task-set contract.
+
+The task constructors are **synthetic protocol fixtures**, not a qualified physical/scientific benchmark. They test determinism, family-count closure, input/oracle field separation, and reproducible generation. They do not establish that the task distribution is scientifically representative, that the answer labels are correct for a physical domain, or that the evaluated policy cannot access evaluator-only data. The `generator-config.example.json` is a recipe example; real scored manifests must pin the exact config bytes and immutable generator source revision.
 
 ## Current implementation boundary
 
