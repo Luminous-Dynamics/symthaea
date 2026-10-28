@@ -1,0 +1,63 @@
+name: VIS-DVPC-031 region-aware decision gate
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-region-gate.rs"
+      - "docs/research/VIS_DVPC_031_REGION_GATE_V1.md"
+      - ".github/workflows/vis-dvpc-031-region-gate.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-region-gate.rs"
+      - "docs/research/VIS_DVPC_031_REGION_GATE_V1.md"
+      - ".github/workflows/vis-dvpc-031-region-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Format gate source
+        run: rustfmt --edition 2024 tools/vision-dvpc-region-gate.rs
+      - name: Run gate unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-region-gate.rs -o /tmp/vis-dvpc-031-tests
+          /tmp/vis-dvpc-031-tests
+      - name: Run frozen decision examples
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-region-gate.rs -o /tmp/vis-dvpc-031
+          /tmp/vis-dvpc-031 --evaluate 0.1 0.6 0.01 0.03 0.5 0.05 | tee /tmp/vis-dvpc-031-partial.tsv
+          grep -Fq $'SUMMARY\tdecision\tINSUFFICIENT_EVIDENCE' /tmp/vis-dvpc-031-partial.tsv
+          /tmp/vis-dvpc-031 --evaluate 0.6 0.8 0.01 0.04 0.5 0.05 | tee /tmp/vis-dvpc-031-authorized.tsv
+          grep -Fq $'SUMMARY\tdecision\tAUTHORIZED' /tmp/vis-dvpc-031-authorized.tsv
+          /tmp/vis-dvpc-031 --evaluate NA NA 0.06 0.09 0.5 0.05 | tee /tmp/vis-dvpc-031-denied.tsv
+          grep -Fq $'SUMMARY\tdecision\tDENIED' /tmp/vis-dvpc-031-denied.tsv
+      - name: Create reproducibility receipt
+        run: |
+          {
+            printf 'VIS_DVPC_031_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-region-gate.rs /tmp/vis-dvpc-031-partial.tsv /tmp/vis-dvpc-031-authorized.tsv /tmp/vis-dvpc-031-denied.tsv
+          } > /tmp/vis-dvpc-031-receipt.tsv
+          cat /tmp/vis-dvpc-031-receipt.tsv
+      - name: Publish decision outputs and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-031-region-gate-${{ github.sha }}
+          path: |
+            /tmp/vis-dvpc-031-partial.tsv
+            /tmp/vis-dvpc-031-authorized.tsv
+            /tmp/vis-dvpc-031-denied.tsv
+            /tmp/vis-dvpc-031-receipt.tsv
+          retention-days: 90
