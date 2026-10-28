@@ -434,6 +434,24 @@ class RunManifestVerifierTests(unittest.TestCase):
         codes = {row["code"] for row in issues}
         self.assertIn("witness_receipt_output_digest_mismatch", codes)
 
+    def test_execution_receipt_rejects_verifier_file_tampering(self) -> None:
+        verifier_path = self.bundle.root / self.bundle.paths["claim_verifier"]
+        verifier_path.write_bytes(b"tampered verifier bytes\\n")
+        issues = self.audit_one_execution_receipt()
+        codes = {row["code"] for row in issues}
+        self.assertIn("witness_verifier_file_digest_mismatch", codes)
+        self.assertIn("witness_receipt_input_digest_mismatch", codes)
+
+    def test_execution_receipt_rejects_verdict_tampering(self) -> None:
+        verdict_path = self.bundle.root / self.bundle.paths["claim_verdict"]
+        verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+        verdict["result"] = "contradicts"
+        verdict_path.write_bytes(jbytes(verdict))
+        issues = self.audit_one_execution_receipt()
+        codes = {row["code"] for row in issues}
+        self.assertIn("witness_receipt_output_digest_mismatch", codes)
+        self.assertIn("witness_claim_result_mismatch", codes)
+
     def test_rehashed_receipt_cannot_substitute_an_unapproved_command(self) -> None:
         claim_path = self.bundle.root / self.bundle.paths["claim"]
         claim = json.loads(claim_path.read_text(encoding="utf-8"))
