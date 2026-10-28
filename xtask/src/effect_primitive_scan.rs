@@ -7,7 +7,6 @@
 //! A scan cannot prove reachability, effect occurrence, or authorization.
 
 use anyhow::{bail, Context, Result};
-use proc_macro2::Span;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -15,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use syn::{spanned::Spanned, visit::Visit, Expr, ExprCall, File};
+use syn::{spanned::Spanned, visit::Visit, Expr, ExprCall};
 
 const SCAN_SCHEMA: &str = "symthaea.effect_primitive_scan.v1";
 
@@ -243,7 +242,6 @@ fn classify_call(path: &syn::Path) -> Option<(&'static str, &'static str)> {
             | "set_permissions" => {
                 return Some(("filesystem_mutation", "heuristic"));
             }
-            "OpenOptions" | "File" if false => unreachable!(),
             _ => {}
         }
     }
@@ -305,6 +303,7 @@ fn git_head(root: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use sha2::Digest;
     use syn::parse_quote;
 
     use super::{CandidateVisitor, classify_call};
