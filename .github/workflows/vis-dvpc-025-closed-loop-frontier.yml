@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout exact source and fixtures
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install Rust and rustfmt
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -33,7 +35,7 @@ jobs:
         run: sha256sum -c tests/fixtures/vision-dvpc-025.SHA256SUMS
       - name: Record committed source and format standalone scorer
         run: |
-          git show "$GITHUB_SHA:tools/vision-dvpc-closed-loop-frontier.rs" | sha256sum | cut -d ' ' -f1 > /tmp/vis-dvpc-025-committed-source.sha256
+          git show "$(git rev-parse HEAD):tools/vision-dvpc-closed-loop-frontier.rs" | sha256sum | cut -d ' ' -f1 > /tmp/vis-dvpc-025-committed-source.sha256
           rustfmt --edition 2024 tools/vision-dvpc-closed-loop-frontier.rs
       - name: Compile and run unit tests
         run: |
@@ -55,7 +57,7 @@ jobs:
         run: |
           {
             printf 'VIS_DVPC_025_RECEIPT\tformat\tv1\n'
-            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'commit_sha\t%s\n' "$(git rev-parse HEAD)"
             printf 'rustc\t%s\n' "$(rustc --version)"
             printf 'committed_source_sha256\t%s\n' "$(cat /tmp/vis-dvpc-025-committed-source.sha256)"
             printf 'formatted_build_source_sha256\t%s\n' "$(sha256sum tools/vision-dvpc-closed-loop-frontier.rs | cut -d ' ' -f1)"
