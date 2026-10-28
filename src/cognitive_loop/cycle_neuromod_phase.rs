@@ -291,6 +291,11 @@ impl CognitiveLoopService {
         if let Some(ref mut bus) = self.experience_bus {
             bus.current_signals = crate::experience::PrincipledSignals {
                 prediction_error,
+                // cycle() increments total_cycles before phases run, so cycle 1 is
+                // the first loop iteration and has no prior cycle-level comparison.
+                // This finite/first-cycle guard is only a minimum; full upstream
+                // degeneracy/status provenance still belongs in the typed PEV follow-up.
+                prediction_error_valid: self.stats.total_cycles > 1 && prediction_error.is_finite(),
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,

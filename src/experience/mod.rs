@@ -214,8 +214,8 @@ impl ExperienceBus {
     /// - Low coherence → boost Coherence ("Does this hang together?")
     /// - High uncertainty → boost Play ("What haven't I tried?")
     pub fn update_wisdom_from_signals(&mut self) {
-        self.wisdom.update_from_experience(
-            self.current_signals.prediction_error,
+        self.wisdom.update_from_optional_experience(
+            self.current_signals.prediction_error_value(),
             self.current_signals.uncertainty,
             self.current_signals.coherence,
         );
@@ -374,14 +374,22 @@ impl ExperienceBus {
         input_hdv: &ContinuousHV,
         similar_experiences: &[(&ExperienceRecord, f32)],
     ) -> PrincipledSignals {
-        // Prediction Error: How different is this from expected?
-        let prediction_error = if similar_experiences.is_empty() {
-            1.0 // No similar experiences = high surprise
+        // No retrieved comparisons means PE is unavailable, not maximal surprise.
+        let prediction_error = if similar_experiences.is_empty()
+            || similar_experiences.iter().any(|(_, similarity)| !similarity.is_finite())
+        {
+            None
         } else {
-            let avg_similarity: f32 = similar_experiences.iter().map(|(_, sim)| sim).sum::<f32>()
-                / similar_experiences.len() as f32;
-            1.0 - avg_similarity
+            let avg_similarity = similar_experiences
+                .iter()
+                .map(|(_, similarity)| *similarity as f64)
+                .sum::<f64>()
+                / similar_experiences.len() as f64;
+            let error = (1.0_f64 - avg_similarity) as f32;
+            error.is_finite().then_some(error)
         };
+        let prediction_error_valid = prediction_error.is_some();
+        let prediction_error = prediction_error.unwrap_or(0.5);
 
         // Uncertainty: Based on GIS state and experience variance
         let uncertainty = self.compute_uncertainty(similar_experiences);
@@ -400,6 +408,7 @@ impl ExperienceBus {
 
         PrincipledSignals {
             prediction_error,
+            prediction_error_valid,
             uncertainty,
             coherence,
             confidence,
@@ -480,9 +489,12 @@ impl ExperienceBus {
         }
 
         // Rule 2: High prediction error → PROBE
-        if signals.prediction_error > 0.5 {
+        if signals
+            .prediction_error_value()
+            .is_some_and(|prediction_error| prediction_error > 0.5)
+        {
             primitives.push("PROBE".to_string());
-            rules_applied.push("R2: prediction_error > 0.5 → PROBE".to_string());
+            rules_applied.push("R2: valid prediction_error > 0.5 → PROBE".to_string());
         }
 
         // Rule 3: Low coherence → RESTRUCTURE
@@ -732,12 +744,24 @@ mod tests {
     fn test_signal_computation() {
         let bus = ExperienceBus::with_defaults();
 
-        // With no experiences, prediction error should be high
+        // With no comparisons, PE is unavailable rather than maximum surprise.
         let hdv = ContinuousHV::random(16384, 42);
         let similar = bus.retrieve_similar_experiences(&hdv);
         let signals = bus.compute_signals(&hdv, &similar);
 
-        assert_eq!(signals.prediction_error, 1.0); // No similar = high surprise
+        assert_eq!(signals.prediction_error, 0.5); // Neutral numeric placeholder only.
+        assert!(!signals.prediction_error_valid);
+        assert_eq!(signals.prediction_error_value(), None);
+    }
+
+    #[test]
+    fn invalid_numeric_pe_does_not_select_probe() {
+        let mut bus = ExperienceBus::with_defaults();
+        bus.current_signals.prediction_error = 0.99;
+        bus.current_signals.prediction_error_valid = false;
+        bus.current_signals.uncertainty = 0.1;
+        let (primitives, _) = bus.select_primitives_principled();
+        assert!(!primitives.contains(&"PROBE".to_string()));
     }
 
     #[test]
@@ -836,6 +860,7 @@ mod tests {
 
         // Simulate high prediction error experience
         bus.current_signals.prediction_error = 0.9;
+        bus.current_signals.prediction_error_valid = true;
         bus.current_signals.uncertainty = 0.7;
         bus.current_signals.coherence = 0.3;
 

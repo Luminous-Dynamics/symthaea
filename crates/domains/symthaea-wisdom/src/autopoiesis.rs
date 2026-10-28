@@ -69,23 +69,48 @@ impl AutopoieticMonitor {
         }
     }
 
-    /// Record a cognitive cycle
+    /// Record a cognitive cycle with a measured prediction error.
+    ///
+    /// A non-finite PE is treated as unavailable, while a finite coherence
+    /// observation and the cycle itself are still recorded.
     pub fn record_cycle(&mut self, prediction_error: f32, coherence: f32) {
-        // Add to history
-        if self.prediction_error_history.len() >= MAX_HISTORY {
-            self.prediction_error_history.pop_front();
-        }
-        self.prediction_error_history.push_back(prediction_error);
+        self.record_cycle_with_optional_prediction_error(Some(prediction_error), coherence);
+    }
 
-        if self.coherence_history.len() >= MAX_HISTORY {
-            self.coherence_history.pop_front();
+    /// Record a cognitive cycle when no usable prediction-error comparison exists.
+    ///
+    /// Coherence and cycle accounting remain live; missing PE is not inserted
+    /// into the error history as zero or as a fabricated maximum-surprise value.
+    pub fn record_cycle_without_prediction_error(&mut self, coherence: f32) {
+        self.record_cycle_with_optional_prediction_error(None, coherence);
+    }
+
+    fn record_cycle_with_optional_prediction_error(
+        &mut self,
+        prediction_error: Option<f32>,
+        coherence: f32,
+    ) {
+        if let Some(prediction_error) = prediction_error.filter(|value| value.is_finite()) {
+            if self.prediction_error_history.len() >= MAX_HISTORY {
+                self.prediction_error_history.pop_front();
+            }
+            self.prediction_error_history.push_back(prediction_error);
         }
-        self.coherence_history.push_back(coherence);
+
+        if coherence.is_finite() {
+            if self.coherence_history.len() >= MAX_HISTORY {
+                self.coherence_history.pop_front();
+            }
+            self.coherence_history.push_back(coherence);
+        }
 
         self.production_cycles += 1;
-
-        // Update closure estimate
         self.update_closure_estimate();
+    }
+
+    /// Count usable prediction-error observations held in the rolling history.
+    pub fn prediction_error_observation_count(&self) -> usize {
+        self.prediction_error_history.len()
     }
 
     /// Record a boundary violation (external override of internal state)
@@ -157,7 +182,8 @@ impl AutopoieticMonitor {
 
     fn average_prediction_error(&self) -> f32 {
         if self.prediction_error_history.is_empty() {
-            return 0.0;
+            // Neutral prior: absence of a comparison is not evidence of zero error.
+            return 0.5;
         }
         let sum: f32 = self.prediction_error_history.iter().sum();
         sum / self.prediction_error_history.len() as f32
@@ -165,7 +191,8 @@ impl AutopoieticMonitor {
 
     fn average_coherence(&self) -> f32 {
         if self.coherence_history.is_empty() {
-            return 1.0; // Assume coherent until proven otherwise
+            // Neutral prior: no observations do not establish perfect coherence.
+            return 0.5;
         }
         let sum: f32 = self.coherence_history.iter().sum();
         sum / self.coherence_history.len() as f32
@@ -181,9 +208,9 @@ impl AutopoieticMonitor {
     }
 
     fn self_production_rate(&self) -> f32 {
-        // Production rate is just cycles per window
-        // Normalized to 0-1 where 1 = MAX_HISTORY cycles achieved
-        (self.prediction_error_history.len() as f32 / MAX_HISTORY as f32).min(1.0)
+        // Count cycles independently from PE availability. A missing PE value
+        // must not erase evidence that the subsystem completed a cognitive cycle.
+        (self.production_cycles as f32 / MAX_HISTORY as f32).min(1.0)
     }
 }
 
@@ -276,6 +303,32 @@ mod tests {
 
         assert!(monitor.closure_maintained());
         assert!(monitor.closure() > 0.7);
+    }
+
+
+    #[test]
+    fn missing_prediction_error_preserves_coherence_and_cycle_accounting() {
+        let mut monitor = AutopoieticMonitor::new();
+        monitor.record_cycle_without_prediction_error(0.9);
+
+        let metrics = monitor.metrics();
+        let closure = monitor.operational_closure();
+        assert_eq!(metrics.total_cycles, 1);
+        assert_eq!(monitor.prediction_error_observation_count(), 0);
+        assert!((metrics.average_prediction_error - 0.5).abs() < f32::EPSILON);
+        assert!((metrics.average_coherence - 0.9).abs() < f32::EPSILON);
+        assert!((closure.model_world_alignment - 0.5).abs() < f32::EPSILON);
+        assert!((closure.self_production_rate - 0.01).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn nonfinite_prediction_error_does_not_poison_autopoietic_history() {
+        let mut monitor = AutopoieticMonitor::new();
+        monitor.record_cycle(f32::NAN, 0.8);
+
+        assert_eq!(monitor.prediction_error_observation_count(), 0);
+        assert!((monitor.metrics().average_prediction_error - 0.5).abs() < f32::EPSILON);
+        assert!((monitor.metrics().average_coherence - 0.8).abs() < f32::EPSILON);
     }
 
     #[test]

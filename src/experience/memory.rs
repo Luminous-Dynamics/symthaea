@@ -49,6 +49,9 @@ pub struct ExperienceRecord {
 
     // ===== Principled Signals at this moment =====
     pub prediction_error: f32,
+    /// Whether the stored prediction error came from a usable comparison.
+    #[serde(default)]
+    pub prediction_error_valid: bool,
     pub uncertainty: f32,
     pub coherence: f32,
     pub confidence: f32,
@@ -79,6 +82,7 @@ impl ExperienceRecord {
             context_hash: String::new(),
             user_id: None,
             prediction_error: 0.5,
+            prediction_error_valid: false,
             uncertainty: 0.5,
             coherence: 0.5,
             confidence: 0.5,
@@ -102,7 +106,8 @@ impl ExperienceRecord {
             thought_primitives: Vec::new(),
             context_hash: String::new(),
             user_id: None,
-            prediction_error: signals.prediction_error,
+            prediction_error: signals.prediction_error_value().unwrap_or(0.5),
+            prediction_error_valid: signals.prediction_error_value().is_some(),
             uncertainty: signals.uncertainty,
             coherence: signals.coherence,
             confidence: signals.confidence,
@@ -164,7 +169,11 @@ impl ExperienceRecord {
     /// Compute learning value (how valuable for learning)
     pub fn learning_value(&self) -> f32 {
         // High prediction error + has outcome = valuable for learning
-        let surprise_value = self.prediction_error * 0.3;
+        let surprise_value = if self.prediction_error_valid && self.prediction_error.is_finite() {
+            self.prediction_error * 0.3
+        } else {
+            0.0
+        };
         let outcome_value = if self.outcome.is_some() { 0.4 } else { 0.0 };
         let recency_value = 1.0 / (1.0 + (self.age_seconds() as f32 / 86400.0)); // Decay over days
 
@@ -544,6 +553,16 @@ mod tests {
         let mem =
             ExperienceRecord::new("test-002", "test").with_outcome(ExperienceOutcome::success());
         assert!(mem.was_successful());
+    }
+
+    #[test]
+    fn experience_record_preserves_missing_pe_as_invalid() {
+        let signals = PrincipledSignals::new();
+        let record = ExperienceRecord::from_signals("missing-pe", "query", &signals);
+        assert_eq!(record.prediction_error, 0.5);
+        assert!(!record.prediction_error_valid);
+        // With unavailable PE, learning value must not receive the PE bonus.
+        assert!(record.learning_value() <= 1.01);
     }
 
     #[test]

@@ -101,16 +101,42 @@ impl WisdomState {
         self.meta_cognition.accuracy()
     }
 
-    /// Update wisdom state based on an experience
+    /// Update wisdom state based on a measured prediction error and other signals.
     pub fn update_from_experience(
         &mut self,
         prediction_error: f32,
         uncertainty: f32,
         coherence: f32,
     ) {
-        // High prediction error → boost Wisdom (what don't I know?)
-        if prediction_error > 0.5 {
-            self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
+        self.update_from_optional_experience(Some(prediction_error), uncertainty, coherence);
+    }
+
+    /// Update wisdom from signals when prediction-error evidence may be absent.
+    ///
+    /// Missing/non-finite PE skips surprise-driven Wisdom and self-model updates.
+    /// Autopoiesis still records valid coherence and cycle accounting using a
+    /// neutral PE prior, without inventing an error observation.
+    pub fn update_from_optional_experience(
+        &mut self,
+        prediction_error: Option<f32>,
+        uncertainty: f32,
+        coherence: f32,
+    ) {
+        let prediction_error = prediction_error.filter(|value| value.is_finite());
+
+        match prediction_error {
+            Some(prediction_error) => {
+                self.autopoiesis.record_cycle(prediction_error, coherence);
+
+                // High prediction error → boost Wisdom (what don't I know?)
+                if prediction_error > 0.5 {
+                    self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
+                }
+
+                // The meta-self-model requires a measured PE outcome.
+                self.meta_cognition.update_self_model(prediction_error);
+            }
+            None => self.autopoiesis.record_cycle_without_prediction_error(coherence),
         }
 
         // High uncertainty → boost Play (what haven't I tried?)
@@ -122,12 +148,6 @@ impl WisdomState {
         if coherence < 0.4 {
             self.harmonics.boost(ActiveHarmonic::Coherence, 0.15);
         }
-
-        // Update autopoietic monitoring
-        self.autopoiesis.record_cycle(prediction_error, coherence);
-
-        // Update meta-cognitive model
-        self.meta_cognition.update_self_model(prediction_error);
 
         // Decay back toward balance
         self.harmonics.decay_toward_balance(0.02);
@@ -160,6 +180,17 @@ mod tests {
 
         let final_wisdom = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
         assert!(final_wisdom > initial_wisdom);
+    }
+
+    #[test]
+    fn missing_prediction_error_skips_pe_dependent_wisdom_updates() {
+        let mut wisdom = init_wisdom();
+        let initial_wisdom = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
+        wisdom.update_from_optional_experience(None, 0.3, 0.7);
+        assert_eq!(wisdom.harmonics.get(ActiveHarmonic::Wisdom), initial_wisdom);
+        assert_eq!(wisdom.autopoiesis.metrics().total_cycles, 1);
+        assert_eq!(wisdom.autopoiesis.prediction_error_observation_count(), 0);
+        assert!((wisdom.autopoiesis.metrics().average_coherence - 0.7).abs() < f32::EPSILON);
     }
 
     #[test]
