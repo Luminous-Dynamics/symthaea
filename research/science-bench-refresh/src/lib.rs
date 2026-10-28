@@ -81,8 +81,8 @@ pub struct ValidationReportV1 {
     pub schema: String,
     pub manifest_sha256: String,
     pub valid: bool,
-    pub admissible_for_scoring: bool,
-    pub eligible_for_sealed_generalization_claim: bool,
+    pub manifest_declares_scoring_eligible: bool,
+    pub manifest_declares_sealed_generalization_profile: bool,
     pub expected_task_count: u64,
     pub planned_task_count: u64,
     pub task_family_weight_sum: f64,
@@ -325,21 +325,21 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     }
 
     let valid = issues.is_empty();
-    let admissible_for_scoring = valid
+    let manifest_declares_scoring_eligible = valid
         && is_qualified
         && matches!(
             manifest.lane.as_str(),
             "immutable_anchor" | "sealed_refresh" | "reproducible_open"
         );
-    let eligible_for_sealed_generalization_claim =
-        admissible_for_scoring && manifest.lane == "sealed_refresh";
+    let manifest_declares_sealed_generalization_profile =
+        manifest_declares_scoring_eligible && manifest.lane == "sealed_refresh";
     let admission_reason = if !valid {
         "manifest failed one or more validation checks".to_owned()
     } else if !is_qualified {
         "protocol fixture is explicitly not admissible for scoring".to_owned()
     } else if manifest.lane == "public_development" {
         "public development tasks are not confirmatory scoring evidence".to_owned()
-    } else if eligible_for_sealed_generalization_claim {
+    } else if manifest_declares_sealed_generalization_profile {
         "eligible under the declared sealed-refresh contract; actual runner isolation still requires independent evidence".to_owned()
     } else if manifest.lane == "reproducible_open" {
         "scoring may be reported as open/reproducible, but this lane is not sealed generalization evidence".to_owned()
@@ -353,8 +353,8 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
         schema: REPORT_SCHEMA.to_owned(),
         manifest_sha256: sha256_hex(bytes),
         valid,
-        admissible_for_scoring,
-        eligible_for_sealed_generalization_claim,
+        manifest_declares_scoring_eligible,
+        manifest_declares_sealed_generalization_profile,
         expected_task_count: manifest.expected_task_count,
         planned_task_count,
         task_family_weight_sum: weight_sum,
@@ -430,8 +430,8 @@ mod tests {
         ))
         .expect("example fixture has the v1 shape");
         assert!(report.valid, "{:?}", report.issues);
-        assert!(!report.admissible_for_scoring);
-        assert!(!report.eligible_for_sealed_generalization_claim);
+        assert!(!report.manifest_declares_scoring_eligible);
+        assert!(!report.manifest_declares_sealed_generalization_profile);
         assert_eq!(report.expected_task_count, 8);
         assert_eq!(report.planned_task_count, 8);
         assert!((report.task_family_weight_sum - 1.0).abs() < WEIGHT_TOLERANCE);
@@ -441,8 +441,8 @@ mod tests {
     fn valid_synthetic_sealed_manifest_is_scoring_admissible_only_at_contract_level() {
         let report = validate_value(&valid_qualified_manifest("sealed_refresh")).unwrap();
         assert!(report.valid, "{:?}", report.issues);
-        assert!(report.admissible_for_scoring);
-        assert!(report.eligible_for_sealed_generalization_claim);
+        assert!(report.manifest_declares_scoring_eligible);
+        assert!(report.manifest_declares_sealed_generalization_profile);
         assert!(report
             .admission_reason
             .contains("runner isolation still requires independent evidence"));
@@ -454,7 +454,7 @@ mod tests {
         value["expected_task_count"] = json!(3);
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(!report.admissible_for_scoring);
+        assert!(!report.manifest_declares_scoring_eligible);
         assert!(report.issues.iter().any(|issue| issue.contains("denominator mismatch")));
     }
 
@@ -500,7 +500,7 @@ mod tests {
         value["evaluator"]["oracle_separation"] = json!("not_qualified_example");
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(!report.admissible_for_scoring);
+        assert!(!report.manifest_declares_scoring_eligible);
         assert!(report
             .issues
             .iter()
@@ -523,15 +523,15 @@ mod tests {
     fn public_development_is_not_scoring_admissible() {
         let report = validate_value(&valid_qualified_manifest("public_development")).unwrap();
         assert!(!report.valid); // Qualified public-development artifacts are a contract mismatch.
-        assert!(!report.admissible_for_scoring);
+        assert!(!report.manifest_declares_scoring_eligible);
     }
 
     #[test]
     fn reproducible_open_is_not_sealed_generalization_evidence() {
         let report = validate_value(&valid_qualified_manifest("reproducible_open")).unwrap();
         assert!(report.valid, "{:?}", report.issues);
-        assert!(report.admissible_for_scoring);
-        assert!(!report.eligible_for_sealed_generalization_claim);
+        assert!(report.manifest_declares_scoring_eligible);
+        assert!(!report.manifest_declares_sealed_generalization_profile);
         assert!(report.admission_reason.contains("not sealed generalization evidence"));
     }
 
@@ -583,4 +583,28 @@ mod tests {
         assert!(first.valid && second.valid);
         assert_ne!(first.manifest_sha256, second.manifest_sha256);
     }
+    #[test]
+    fn schema_document_is_valid_json_and_matches_manifest_version() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/generation-manifest.schema.json"
+        ))
+        .expect("schema document must be valid JSON");
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(MANIFEST_SCHEMA)
+        );
+        assert!(schema["required"]
+            .as_array()
+            .expect("required fields array")
+            .iter()
+            .any(|field| field.as_str() == Some("expected_task_count")));
+    }
+
+    #[test]
+    fn malformed_json_is_rejected() {
+        let error = validate_manifest_bytes(b"{not-json")
+            .expect_err("malformed JSON must not produce a report");
+        assert!(error.contains("strict v1 shape"));
+    }
+
 }
