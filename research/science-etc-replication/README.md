@@ -43,8 +43,8 @@ cargo run --locked --manifest-path research/science-etc-replication/Cargo.toml -
 
 The validator checks the expected eight-arm grid, native-metric preservation, exact task-slice identity and model coverage, pinned source/model/judge identities for qualified runs, sorted measurement caps, enforced over-budget rejection, and preregistered primary contrast references. It reports the expected attempt count separately for each budget profile.
 
-The example fixture should validate structurally but must fail if invoked with `--require-qualified`. The placeholder hashes and unresolved model/upstream identities prevent admission for scoring.
+The example fixture includes eight fixed arms and 12 predeclared example contrasts, split across measurement-matched and interaction-matched budget profiles. It should validate structurally but must fail if invoked with `--require-qualified`. The placeholder hashes and unresolved model/upstream identities prevent admission for scoring.
 
 ## Validation boundary
 
-21 Rust unit tests are authored for the manifest contract, with two additional CLI argument tests. They must not be reported as passing until exact-head CI runs. No NewtonBench experiment is included in this PR tranche. The schema/validator does not authenticate a hosted model snapshot or prove that the NewtonBench runner executed a declared configuration.
+23 Rust unit tests are authored in the library for the manifest contract, with two additional CLI argument tests (25 total). They must not be reported as passing until exact-head CI runs. No NewtonBench experiment is included in this PR tranche. The schema/validator does not authenticate a hosted model snapshot or prove that the NewtonBench runner executed a declared configuration.
