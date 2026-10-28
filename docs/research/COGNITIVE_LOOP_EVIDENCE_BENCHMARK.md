@@ -212,7 +212,7 @@ The validator fails closed on duplicate suite/case/baseline identifiers, missing
 
 A KDD 2026 evaluation framework compares 14 detector families on seven real-world data streams across class-prior, label-swap, feature-permutation, and feature-filtering drifts, each abrupt and gradual. It recommends randomized drift onset and leave-one-dataset-out hyperparameter tuning; SEED and STEPD are strong F1 references, while ABCD offers a useful false-alarm trade-off. [Paper](https://doi.org/10.1145/3770855.3819070) · [Reproduction repository](https://github.com/vcerqueira/experiments-drift_evaluation).
 
-The manifest pins the exact 14-family inventory and a seven-dataset name list for later version/licence verification: Asfault, Electricity, Covertype, GasSensorArray, NOAA, Posture, and Rialto. There are now **25 comparator definitions**, because several published families have separate error-stream and feature-stream contracts, and Symthaea also needs PE-only controls plus separate unsupervised and adaptive-threshold references. The published KDD-compatible error-stream track uses a pinned Hoeffding Tree with prequential test-then-train and an observed per-instance correctness/error stream; do not compare those scores directly to a different Symthaea PE stream. To compare detector algorithms fairly, run them over the same pinned error stream with identical label timing and update order.
+The manifest pins the exact 14-family inventory and a seven-dataset name list for later version/licence verification: Asfault, Electricity, Covertype, GasSensorArray, NOAA, Posture, and Rialto. There are now **26 comparator definitions**, because several published families have separate error-stream and feature-stream contracts, and Symthaea also needs PE-only controls plus separate unsupervised and adaptive-threshold references. The published KDD-compatible error-stream track uses a pinned Hoeffding Tree with prequential test-then-train and an observed per-instance correctness/error stream; do not compare those scores directly to a different Symthaea PE stream. To compare detector algorithms fairly, run them over the same pinned error stream with identical label timing and update order.
 
 The manifest now includes the complete eight-cell core drift matrix and the published KDD error-stream reference set (ADWIN, CUSUM, DDM, EDDM, EWMA, GMA, HDDMA, HDDMW, PH, RDDM, SEED, STEPD, ABCD and STUDD+ADWIN), with ABCD(X) explicitly represented as a feature-only variant. Dynamic Threshold Determination (DTD), D3/IBDD/SPLL, and simpler PE-only controls remain separate. These are not yet runnable adapters or measured results. DTD is especially relevant because its AAAI 2026 work argues that adaptive threshold selection can outperform any single fixed threshold in its studied settings ([paper](https://doi.org/10.1609/aaai.v40i29.39586)).
 
@@ -361,4 +361,34 @@ cargo run --locked -p xtask -- run-cognitive-drift-baseline \
 cargo test --locked -p xtask cognitive_drift_baselines
 ```
 
-For a meaningful state-of-the-art comparison, compare this fixed-bet portfolio against the published ONS PRM, CCTM, ADWIN/Page-Hinkley and KDD 2026 baselines using identical held-out streams. Report empirical anytime false-alarm rate over the entire stream (not per-cycle alarms treated as independent), detection delay, missed shifts, task-loss improvement, and intervention cost. Until an audited PRNG/independent-seed model and null-calibration study are complete, label this as an implementation prototype with a martingale-inspired contract, not a formally certified detector.
+For a meaningful state-of-the-art comparison, compare both the fixed-bet control and the adaptive ONS portfolio against CCTM, ADWIN/Page-Hinkley, dynamic-threshold selection, and the KDD 2026 baselines using identical held-out streams. Report empirical anytime false-alarm rate over the entire stream (not per-cycle alarms treated as independent), detection delay, missed shifts, task-loss improvement, and intervention cost. Until an audited PRNG/independent-seed model and null-calibration study are complete, label this as an implementation prototype with a martingale-inspired contract, not a formally certified detector.
+
+## Fifth executable reference control: predictive rank martingale with ONS
+
+The runner now has a separate `predictive-rank-martingale-ons-portfolio` implementation rather than folding the research algorithm into the fixed-bet control. It maintains one Order PRM and one Dispersion PRM e-process, each with a predictable ONS coefficient, and combines them with equal weights. The coefficient update follows Kuang and Xia (2026): `g_t = Z_t / (1 + lambda_t * Z_t)`, `A_t = A_(t-1) + g_t^2`, and `lambda_(t+1)` is projected after the rank-count update using step size `(9/2) / A_t`. The predictable feasible radius is computed from the maximum possible centered feature magnitude, preserving a positive betting factor.
+
+The separate fixture `benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-ons-run.json` and focused CI smoke check cover the CLI contract, first-crossing boundary, score linkage, and output digests. Unit tests exercise the ONS execution path and projection-radius invariant. These checks are executable contracts, not a null-calibration study or performance claim.
+
+```bash
+cargo run --locked -p xtask -- run-cognitive-drift-baseline \
+  --input benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-ons-run.json \
+  --out reports/predictive-rank-martingale-ons-smoke.json
+cargo test --locked -p xtask cognitive_drift_baselines
+```
+
+The implementation retains the same explicit limitations as the fixed-bet PRM: the seed-derived tie-break is reproducible but not independent randomization conditional on a fixed seed; the theoretical anytime false-alarm guarantee assumes an IID null with the paper’s randomization conditions; informative missingness and autocorrelation need separate treatment; and the prototype has not reproduced the paper’s empirical results. Run both variants against identical null and shifted streams with independent seeds, include CCTM and adaptive-threshold baselines, and compare empirical false-alarm probability over the whole horizon, detection delay, shift-family power, and decision-level utility before claiming superiority.
+
+## Independent receipt-to-panel audit
+
+`audit-cognitive-adaptation-panel` goes beyond the panel’s receipt-link metadata. It reopens the protocol, panel input, each per-cell utility input, and every replay receipt; independently re-runs the receipt-bound scorer for each registered cell; requires exact equality with the stored score; rejects reused identities and unsafe paths; and recomputes the panel comparison.
+
+The command requires an external `--expected-bundle-sha256` supplied by a preregistration record independent of the outcome bundle. It also checks the protocol metric version, declared 7 × 50 × 8 grid, and exact scenario set. This makes an audit reproducible against an independently pinned bundle rather than trusting the digest embedded in that same bundle.
+
+```bash
+cargo run --locked -p xtask -- audit-cognitive-adaptation-panel \
+  --input path/to/audit-bundle.json \
+  --expected-bundle-sha256 PUBLISHED_64_CHARACTER_SHA256 \
+  --out reports/cognitive-adaptation-audit.json
+```
+
+A pass establishes consistency and reproducibility of the supplied artifacts; it does not prove honest runner execution, actual isolation of oracle information, dataset representativeness, or production superiority. The protocol and bundle digest should be frozen in an independent timestamped record before held-out outcomes are inspected.
