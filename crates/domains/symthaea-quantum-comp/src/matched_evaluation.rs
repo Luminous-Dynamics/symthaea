@@ -236,7 +236,7 @@ pub enum CandidateVerification {
 /// One attempted solver run, including failed and unverified outcomes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchedTrialRecord {
-    /// Unique identifier for this attempted run within an arm.
+    /// Globally unique identifier for this attempted run across all comparison arms.
     pub trial_id: String,
     /// Pair identifier shared by the corresponding baseline/candidate trial.
     pub pair_id: String,
@@ -886,6 +886,22 @@ pub fn compare_matched_arms(
 ) -> Result<MatchedComparisonSummary, MatchedEvaluationError> {
     baseline.validate()?;
     candidate.validate()?;
+
+    // Receipt context includes trial ID but not arm ID. Enforce global uniqueness across
+    // both arms so the same run identity cannot be reused for two different methods.
+    let baseline_trial_ids: HashSet<&str> = baseline
+        .trials
+        .iter()
+        .map(|trial| trial.trial_id.as_str())
+        .collect();
+    if let Some(duplicate) = candidate
+        .trials
+        .iter()
+        .find(|trial| baseline_trial_ids.contains(trial.trial_id.as_str()))
+    {
+        return Err(MatchedEvaluationError::DuplicateTrialId(duplicate.trial_id.clone()));
+    }
+
     if !time_tie_tolerance_ms.is_finite() || time_tie_tolerance_ms < 0.0 {
         return Err(MatchedEvaluationError::InvalidTieTolerance);
     }
@@ -1814,6 +1830,24 @@ mod tests {
         assert!(matches!(
             wrong_protocol.validate(),
             Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "protocol_sha256", .. })
+        ));
+    }
+
+    #[test]
+    fn matched_arms_reject_globally_reused_trial_id() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("same-run", "pair", 7, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("same-run", "pair", 7, 5, costs(40.0), EnergyRecord::not_measured())],
+        );
+        assert!(matches!(
+            compare_matched_arms(&baseline, &candidate, 0.0),
+            Err(MatchedEvaluationError::DuplicateTrialId(id)) if id == "same-run"
         ));
     }
 
