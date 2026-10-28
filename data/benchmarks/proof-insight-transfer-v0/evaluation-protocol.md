@@ -451,7 +451,7 @@ A regression test sends 20 identical positive family deltas through the actual d
 
 ### 2026-10-28 amendment — weak-null family-effect heterogeneity enters the power gate
 
-The prior power planner tested the strict null by setting every family effect to zero. That is insufficient for a target-weighted average-effect estimand: individual families can benefit or regress while the average true effect is zero. The power report is therefore versioned as `pitb.power-report.v1` and must include a separate **36-cell weak-null grid** varying family-effect heterogeneity, family ICC, and paired-outcome association.
+The prior power planner tested the strict null by setting every family effect to zero. That is insufficient for a target-weighted average-effect estimand: individual families can benefit or regress while the average true effect is zero. The weak-null amendment therefore adds a separate **36-cell heterogeneity grid**. A further paired-association consistency audit has versioned the primary report as `pitb.power-report.v2` and expanded the strict-null/positive-effect grid to 48 cells: four true effects × four ICCs × three paired-outcome association levels.
 
 - Heterogeneity SDs requested: **5, 10 and 20 percentage points**.
 - Baseline family ICCs: **0, 0.05, 0.10 and 0.20**.
