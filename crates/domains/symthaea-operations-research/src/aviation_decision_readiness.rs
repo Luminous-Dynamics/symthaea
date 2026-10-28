@@ -65,8 +65,6 @@ pub struct DecisionReadinessInput<'a> {
     pub decision_time_epoch_seconds: i64,
     /// Preregistered maximum age for the calibration receipt, in seconds.
     pub max_calibration_age_seconds: u64,
-    /// Timestamp of the latest observation successfully ingested by the monitor.
-    pub latest_monitor_observation_epoch_seconds: Option<i64>,
     /// Preregistered maximum age for online monitoring evidence, in seconds.
     pub max_monitor_observation_age_seconds: u64,
 }
@@ -130,7 +128,16 @@ pub fn assess_decision_readiness(input: DecisionReadinessInput<'_>) -> DecisionR
         blockers.push(DecisionReadinessBlock::CalibrationExpired);
     }
 
-    match input.latest_monitor_observation_epoch_seconds {
+    // Derive freshness from the monitor report itself. Never trust a separately
+    // supplied timestamp that can make stale evidence look recent.
+    let monitor_timestamp = if input.drift_monitor.observations_seen == 0
+        || input.drift_monitor.last_event_id.trim().is_empty()
+    {
+        None
+    } else {
+        Some(input.drift_monitor.last_event_time_epoch_seconds)
+    };
+    match monitor_timestamp {
         None => blockers.push(DecisionReadinessBlock::MonitoringObservationMissing),
         Some(timestamp) if timestamp < 0 || input.decision_time_epoch_seconds < 0 => {
             blockers.push(DecisionReadinessBlock::InvalidMonitoringObservationTimestamp);
@@ -178,7 +185,7 @@ pub fn assess_decision_readiness(input: DecisionReadinessInput<'_>) -> DecisionR
             None
         },
         max_calibration_age_seconds: input.max_calibration_age_seconds,
-        monitor_observation_age_seconds: input.latest_monitor_observation_epoch_seconds
+        monitor_observation_age_seconds: monitor_timestamp
             .filter(|timestamp| *timestamp >= 0 && input.decision_time_epoch_seconds >= *timestamp)
             .map(|timestamp| (input.decision_time_epoch_seconds - timestamp) as u64),
         max_monitor_observation_age_seconds: input.max_monitor_observation_age_seconds,
@@ -249,13 +256,13 @@ mod tests {
             50_000,
         ).unwrap();
         match status {
-            DriftMonitorStatus::InControl => monitor.report(),
+            DriftMonitorStatus::InControl => monitor.observe("routine", 190, "routine").unwrap(),
             DriftMonitorStatus::DriftAlarm => {
-                monitor.observe("e1", 1, "disruption").unwrap();
-                monitor.observe("e2", 2, "disruption").unwrap()
+                monitor.observe("e1", 198, "disruption").unwrap();
+                monitor.observe("e2", 199, "disruption").unwrap()
             }
             DriftMonitorStatus::SupportShiftAlarm => {
-                monitor.observe("e1", 1, "unmodeled").unwrap()
+                monitor.observe("e1", 199, "unmodeled").unwrap()
             }
         }
     }
@@ -323,7 +330,6 @@ mod tests {
             calibration_created_at_epoch_seconds: 100,
             decision_time_epoch_seconds: 200,
             max_calibration_age_seconds: 1_000,
-            latest_monitor_observation_epoch_seconds: Some(190),
             max_monitor_observation_age_seconds: 30,
         })
     }
@@ -478,11 +484,33 @@ mod tests {
         assert_eq!(stale.blockers, vec![DecisionReadinessBlock::MonitoringObservationStale]);
     }
 
+    fn drift_report_with_timestamp(timestamp: Option<i64>) -> DriftMonitorReport {
+        let mut monitor = OnlineDriftMonitor::new(
+            vec![
+                DriftScenarioProbability { scenario_id: "routine".into(), probability_ppm: 900_000 },
+                DriftScenarioProbability { scenario_id: "disruption".into(), probability_ppm: 100_000 },
+            ],
+            vec![DriftAlternative {
+                alternative_id: "shift".into(),
+                mixture_weight_ppm: 1_000_000,
+                probabilities: vec![
+                    DriftScenarioProbability { scenario_id: "routine".into(), probability_ppm: 500_000 },
+                    DriftScenarioProbability { scenario_id: "disruption".into(), probability_ppm: 500_000 },
+                ],
+            }],
+            50_000,
+        ).unwrap();
+        match timestamp {
+            Some(time) => monitor.observe("freshness-event", time, "routine").unwrap(),
+            None => monitor.report(),
+        }
+    }
+
     fn assess_with_feed_time(latest: Option<i64>) -> DecisionReadinessReport {
         let feature = feature(AuditStatus::Accept);
         let split = split(SplitAuditStatus::Accept);
         let plan = verification(VerificationStatus::Verified);
-        let drift = drift(DriftMonitorStatus::InControl);
+        let drift = drift_report_with_timestamp(latest);
         let distributional = distributional(true);
         let network = network(true);
         assess_decision_readiness(DecisionReadinessInput {
@@ -497,7 +525,6 @@ mod tests {
             calibration_created_at_epoch_seconds: 100,
             decision_time_epoch_seconds: 200,
             max_calibration_age_seconds: 1_000,
-            latest_monitor_observation_epoch_seconds: latest,
             max_monitor_observation_age_seconds: 10,
         })
     }
