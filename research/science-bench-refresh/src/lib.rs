@@ -13,6 +13,7 @@ pub const MANIFEST_SCHEMA: &str = "symthaea.science_bench_refresh_manifest.v1";
 pub const REPORT_SCHEMA: &str = "symthaea.science_bench_refresh_validation_report.v1";
 pub const TASK_SET_SCHEMA: &str = "symthaea.science_bench_refresh_task_set.v1";
 pub const BUILT_GENERATOR_SOURCE_REVISION: &str = env!("SBR_GENERATOR_SOURCE_REVISION");
+pub const BUILT_GENERATOR_WORKTREE_CLEAN: &str = env!("SBR_GENERATOR_WORKTREE_CLEAN");
 
 pub mod generator;
 pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
