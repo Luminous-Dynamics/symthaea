@@ -29,7 +29,7 @@ mod anytime_quality;
 pub use self::anytime_quality::{
     AnytimeTerminalOutcome, VerifiedAnytimeQualityError, VerifiedAnytimeQualityEvent,
     VerifiedAnytimeQualitySummary, VerifiedAnytimeQualityTrace,
-    compare_verified_anytime_quality,
+    compare_verified_anytime_quality, compare_verified_anytime_quality_from_bundle,
 };
 
 /// Opaque evidence minted by the MIS verifier and scoped to one experiment trial.
