@@ -686,6 +686,69 @@ mod tests {
     }
 
     #[test]
+    fn trial_context_changes_receipt_and_prevents_cross_trial_substitution() {
+        const PROTOCOL: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let candidate_bytes = candidate(&[0, 2]);
+        let context_a = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-1", 7).unwrap();
+        let context_b = MisEvidenceContext::new(PROTOCOL, "trial-b", "pair-1", 7).unwrap();
+
+        let evidence_a =
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, context_a.clone()).unwrap();
+        let evidence_b =
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, context_b.clone()).unwrap();
+
+        assert_ne!(evidence_a.receipt_bytes(), evidence_b.receipt_bytes());
+        assert_ne!(evidence_a.receipt_sha256(), evidence_b.receipt_sha256());
+        assert_eq!(evidence_a.context().unwrap().trial_id(), "trial-a");
+        assert_eq!(evidence_b.context().unwrap().trial_id(), "trial-b");
+
+        assert!(verify_mis_candidate_for_trial_with_receipt(
+            GRAPH,
+            &candidate_bytes,
+            2,
+            VERIFIER,
+            context_b,
+            evidence_a.receipt_bytes(),
+        ).is_err());
+
+        let mut changed_pair = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-2", 7).unwrap();
+        let changed_pair_evidence =
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, changed_pair.clone()).unwrap();
+        assert_ne!(evidence_a.receipt_sha256(), changed_pair_evidence.receipt_sha256());
+
+        changed_pair = MisEvidenceContext::new(PROTOCOL, "trial-a", "pair-1", 8).unwrap();
+        let changed_seed_evidence =
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, changed_pair.clone()).unwrap();
+        assert_ne!(evidence_a.receipt_sha256(), changed_seed_evidence.receipt_sha256());
+
+        changed_pair = MisEvidenceContext::new("d".repeat(64).as_str(), "trial-a", "pair-1", 7).unwrap();
+        let changed_protocol_evidence =
+            verify_mis_candidate_for_trial(GRAPH, &candidate_bytes, 2, VERIFIER, changed_pair).unwrap();
+        assert_ne!(evidence_a.receipt_sha256(), changed_protocol_evidence.receipt_sha256());
+    }
+
+    #[test]
+    fn rejects_invalid_trial_context_identifiers() {
+        let protocol = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        assert!(matches!(
+            MisEvidenceContext::new(protocol, "", "pair-1", 1),
+            Err(MisEvidenceError::InvalidTrialContext)
+        ));
+        assert!(matches!(
+            MisEvidenceContext::new(protocol, "trial id with spaces", "pair-1", 1),
+            Err(MisEvidenceError::InvalidTrialContext)
+        ));
+        assert!(matches!(
+            MisEvidenceContext::new(protocol, "trial-1", "pair\\n1", 1),
+            Err(MisEvidenceError::InvalidTrialContext)
+        ));
+        assert!(matches!(
+            MisEvidenceContext::new(&"A".repeat(64), "trial-1", "pair-1", 1),
+            Err(MisEvidenceError::InvalidVerifierDigest)
+        ));
+    }
+
+    #[test]
     fn detects_conflicting_selected_vertices_without_fabricating_a_hit() {
         let bytes = candidate(&[0, 1, 2]);
         let evidence = verify_mis_candidate(GRAPH, &bytes, 2, VERIFIER).unwrap();
