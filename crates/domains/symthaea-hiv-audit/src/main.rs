@@ -68,6 +68,28 @@ fn run() -> Result<(), String> {
         }
     }
 
+    let allowed: &[&str] = match command.as_str() {
+        "capture" => &[
+            "--manifest",
+            "--dataset",
+            "--data-dir",
+            "--source-archive",
+            "--output",
+            "--source-commit",
+        ],
+        "verify" => &[
+            "--manifest",
+            "--dataset",
+            "--data-dir",
+            "--source-archive",
+            "--receipt",
+        ],
+        _ => return Err(format!("unknown command {command:?}\\n{}", usage())),
+    };
+    if let Some(unexpected) = values.keys().find(|key| !allowed.contains(&key.as_str())) {
+        return Err(format!("unexpected argument {unexpected:?} for command {command:?}"));
+    }
+
     let required = |key: &str| -> Result<String, String> {
         values.get(key).cloned().ok_or_else(|| format!("required argument {key} is missing"))
     };
