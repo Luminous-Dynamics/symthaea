@@ -145,13 +145,15 @@ fn seed_word(
 ) -> u64 {
     let mut hasher = Sha256::new();
     hasher.update(TASK_GENERATOR_DOMAIN);
-    for part in [
+    let index_bytes = local_index.to_be_bytes();
+    let parts: [&[u8]; 5] = [
         seed,
         generation_id.as_bytes(),
         family_id.as_bytes(),
-        &local_index.to_be_bytes(),
+        &index_bytes,
         field.as_bytes(),
-    ] {
+    ];
+    for part in parts {
         hasher.update(u64::try_from(part.len()).unwrap_or(u64::MAX).to_be_bytes());
         hasher.update(part);
     }
@@ -205,7 +207,8 @@ fn generate_one_task(
     recipe: &FamilyRecipeV1,
     index: u64,
 ) -> Result<Value, String> {
-    let slope = 1.0 + unit_fraction(seed, generation_id, &recipe.family_id, index, "slope") * 4.0;
+    let slope =
+        1.0 + unit_fraction(seed, generation_id, &recipe.family_id, index, "slope") * 4.0;
     let intercept = coefficient(seed, generation_id, &recipe.family_id, index, "intercept");
     let instruction = recipe.instruction.clone();
     let count = usize::try_from(recipe.samples_per_task)
@@ -215,14 +218,20 @@ fn generate_one_task(
     let (policy_input, evaluator_only) = match recipe.kind.as_str() {
         "semantic_invariance" => {
             let scales = [0.25_f64, 0.5, 2.0, 4.0];
-            let scale_index =
-                usize::try_from(seed_word(seed, generation_id, &recipe.family_id, index, "scale") % 4)
-                    .unwrap_or(0);
+            let scale_index = usize::try_from(seed_word(
+                seed,
+                generation_id,
+                &recipe.family_id,
+                index,
+                "scale",
+            ) % 4)
+            .unwrap_or(0);
             let scale = scales[scale_index];
             let offset = coefficient(seed, generation_id, &recipe.family_id, index, "coordinate_offset");
             let observations: Vec<Value> = (0..count)
                 .map(|sample| {
-                    let latent_x = recipe.x_start + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
+                    let latent_x = recipe.x_start
+                        + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
                     let visible_u = scale * latent_x + offset;
                     let y = slope * latent_x + intercept;
                     json!({"u": visible_u, "y": y})
@@ -248,7 +257,8 @@ fn generate_one_task(
         "sampling_noise_shift" => {
             let observations: Vec<Value> = (0..count)
                 .map(|sample| {
-                    let x = recipe.x_start + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
+                    let x = recipe.x_start
+                        + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
                     let err = noise(
                         seed, generation_id, &recipe.family_id, index,
                         u64::try_from(sample).unwrap_or(0), recipe.noise_amplitude,
@@ -305,7 +315,8 @@ fn generate_one_task(
             let narrow_step = recipe.x_step / 100.0;
             let observations: Vec<Value> = (0..count)
                 .map(|sample| {
-                    let x = recipe.x_start + f64::from(u32::try_from(sample).unwrap_or(0)) * narrow_step;
+                    let x = recipe.x_start
+                        + f64::from(u32::try_from(sample).unwrap_or(0)) * narrow_step;
                     let err = noise(
                         seed, generation_id, &recipe.family_id, index,
                         u64::try_from(sample).unwrap_or(0), recipe.noise_amplitude,
@@ -437,7 +448,9 @@ pub fn verify_regeneration(
     let seed_commitment_matches = reveal_report.seed_commitment_matches;
     let mut issues = reveal_report.issues;
     if !byte_exact_match {
-        issues.push("regenerated task-set bytes differ from the revealed committed bytes".to_owned());
+        issues.push(
+            "regenerated task-set bytes differ from the revealed committed bytes".to_owned(),
+        );
     }
     let verified = seed_commitment_matches
         && task_set_commitment_matches
