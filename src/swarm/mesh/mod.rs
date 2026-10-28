@@ -388,6 +388,8 @@ pub enum MeshError {
     NoTransport,
     /// Transport I/O error.
     Io(String),
+    /// The requested encryption/framing combination has no qualified wire profile.
+    UnsupportedEncryptionProfile,
     /// Fragment reassembly failed (too many losses).
     ReassemblyFailed,
     /// Payload too large for fragmentation.
@@ -399,6 +401,10 @@ impl std::fmt::Display for MeshError {
         match self {
             Self::NoTransport => write!(f, "no mesh transport available"),
             Self::Io(msg) => write!(f, "mesh I/O error: {msg}"),
+            Self::UnsupportedEncryptionProfile => write!(
+                f,
+                "requested encryption/framing profile is not supported by this protocol version"
+            ),
             Self::ReassemblyFailed => write!(f, "fragment reassembly failed"),
             Self::PayloadTooLarge => write!(f, "payload exceeds max fragment count"),
         }
