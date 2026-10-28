@@ -21,6 +21,8 @@
 //!   from frozen calibration-partition frequencies, with explicit sampling allowance.
 //! - [`aviation_online_drift`]: frozen-reference, anytime-valid likelihood-ratio monitoring
 //!   for predeclared categorical alternatives, with a separate out-of-support alarm.
+//! - [`aviation_decision_readiness`]: composed fail-closed human-review gate over feature,
+//!   split, plan verification, active calibration, drift and robust-cost assessments.
 //! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
 //!   over paired candidate/baseline costs, with read-only reports and robust gates.
 //! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
@@ -37,6 +39,7 @@
 
 pub mod aviation_calibration_protocol;
 pub mod aviation_data_contract;
+pub mod aviation_decision_readiness;
 pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
 pub mod aviation_robustness;
