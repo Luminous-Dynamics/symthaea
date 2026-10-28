@@ -79,6 +79,7 @@ The source paper itself warns that further work is needed, including functional 
 - [Industry and SOTA comparison](INDUSTRY_AND_SOTA.md) — task-matched comparators and prospective superiority gates.
 - [Initial candidate research questions](CANDIDATE_HYPOTHESES.md) — published priors separated from proposed tests.
 - [Rust dataset audit CLI](../../../crates/domains/symthaea-hiv-audit/README.md) — local checksums, CSV shape, UUID uniqueness and pairwise joins.
+- [Dryad acquisition script](../../../scripts/research/acquire_hiv_reservoir_dryad.sh) — reproducible public-source download with a strict archive-member allowlist.
 
 ## Primary scientific sources
 
