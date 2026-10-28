@@ -1013,6 +1013,11 @@ def check_cusum_csv(path):
             raise ValueError(f"CUSUM non-target scenario was mislabeled as a target detection on line {line}")
         alarm = float(got["scenario_or_pre_shift_alarm_probability"])
         detection = 0.0 if detection_text == "NA" else float(detection_text)
+        union_bound = float(got["family_worst_case_union_bound"])
+        if union_bound > float(got["per_cell_alpha"]) + EPS:
+            raise ValueError(f"CUSUM two-direction union bound exceeds per-cell alpha on line {line}")
+        if float(got["calibration_boundary_alarm_probability"]) > float(got["matched_reference_alarm_probability"]) + EPS:
+            raise ValueError(f"CUSUM calibration boundary exceeds the matched reference FPR on line {line}")
         survival = float(got["survival_probability"])
         if abs(alarm + detection + survival - 1.0) > 1e-9:
             raise ValueError(f"CUSUM probability mass does not conserve on line {line}")
@@ -1022,9 +1027,9 @@ def check_cusum_csv(path):
             class_name in ("stationary_null", "within_band_transition_control")
             or (class_name == "baseline_misspecification"
                 and COMPOSITE_NULL_LOWER <= stream_p <= COMPOSITE_NULL_UPPER)
-        ) and alarm > CUSUM_SIDE_ALPHA + EPS and not is_target_shift:
+        ) and alarm > matched_reference_alarm + EPS and not is_target_shift:
             raise ValueError(f"CUSUM exceeded per-side alpha on an accepted-null scenario on line {line}")
-        if is_target_shift and alarm > CUSUM_SIDE_ALPHA + EPS:
+        if is_target_shift and alarm > matched_reference_alarm + EPS:
             raise ValueError(f"CUSUM pre-shift alarm exceeded per-side alpha on line {line}")
     print(f"PASS: independently recomputed and semantically checked all {len(expected)} exact-DP CUSUM rows")
 
