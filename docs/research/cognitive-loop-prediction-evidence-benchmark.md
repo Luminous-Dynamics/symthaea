@@ -223,3 +223,34 @@ where \(r_i\) is the calibrated reliability of a valid sample, \(n_i\) is an ind
 - **Protocol:** same stream order, task resets, buffer capacity, optimizer/training budget, and seeds for all methods. Use at least 10 paired seeds for the internal study and preserve every failure trace. Report mean and dispersion as well as worst-task outcomes.
 
 This experiment can establish whether reliability-aware replay helps Symthaea's chosen workloads. It cannot establish a general SOTA win without running the external benchmark's complete protocol under comparable conditions.
+
+
+## 11. MuseManager: input evidence is not the musical effect
+
+Muse must treat snapshot prediction error as an input event, not as the mutable `MusicalState.prediction_error` field. Admission occurs once per observation cycle through `PredictionEvidenceCursor::admit_evidence`. Invalid or missing PE advances the observed cycle watermark but does not overwrite the last admitted input value. Duplicate and older observations cannot replace it; a valid same-cycle retry after an invalid observation remains possible once.
+
+Downstream musical transforms (for example peer-distress sonification or allostatic modulation) may change the musical state. Those transformed values are effects, not new evidence, and must never become the fallback input for the next cycle. The manager therefore stores `last_admitted_prediction_error` separately and maps only that held input value into a fresh musical state.
+
+Muse checkpoint contract:
+- The manager checkpoint stores `MPEV`, checkpoint version 1, finite held PE, and the shared 23-byte PEVC v2 extension (32 bytes total).
+- PEVC v2 preserves observed and admitted cycle watermarks independently.
+- Empty legacy/stateless checkpoint restores reset this PE admission substate to defaults.
+- Malformed/noncanonical PEVC data must be rejected before any manager PE/cursor state mutates.
+- This checkpoint preserves PE admission state only. It does not claim to serialize the StreamingSynth DSP state, accumulated audio, or pending composition exports.
+
+### Muse required counterfactuals
+
+1. Valid observation advances held value and admitted watermark exactly once.
+2. A changed payload for an already admitted cycle has no effect.
+3. Invalid newer evidence holds the last numeric input while advancing the observed watermark.
+4. Delayed older valid evidence is rejected after a newer invalid observation.
+5. A valid retry for the same invalid observation cycle is admitted once.
+6. Checkpoint/restore preserves the held value plus independent observed/admitted watermarks.
+7. Invalid checkpoint version, magic, size, presence flag, nonfinite held value, or impossible cursor ordering leaves manager state unchanged.
+8. Musical effects may alter rendered `MusicalState.prediction_error` but must not alter `last_admitted_prediction_error`.
+
+The tests are authored in the Muse manager source. Until a supported Rust toolchain executes them on the exact final branch SHA, they are acceptance criteria, not verified passes.
+
+### Explicit next consumer gap
+
+`src/experience/signals.rs` remains a separate audit target: `SignalComputer::compute_prediction_error(&[])` currently returns a numeric maximum-surprise sentinel for empty comparisons, and `smooth()` has no provenance/validity field. Do not silently fold this different API migration into the Muse fix. Treat missing comparisons as unavailable in a dedicated follow-up, preserve non-PE signal smoothing, and evaluate every caller before changing the public signal contract.
