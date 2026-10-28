@@ -411,6 +411,100 @@ pub fn select_network_candidate(
     })
 }
 
+/// One candidate's result in a Pareto-frontier comparison.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParetoAssessment {
+    pub candidate_index: usize,
+    pub nondominated: bool,
+    pub exclusion: Option<NetworkComparisonError>,
+    pub report: Option<NetworkExternalityReport>,
+}
+
+/// Pareto frontier over system cost, worst-actor regression, non-cancelled delay,
+/// cancellations, and CO2e. No hidden scalar weights are introduced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkParetoFrontier {
+    /// Candidate indices in original input order.
+    pub frontier_indices: Vec<usize>,
+    /// Assessments for all candidates, including explicit rejection reasons.
+    pub assessments: Vec<ParetoAssessment>,
+}
+
+fn dominates_network_outcome(a: &NetworkExternalityReport, b: &NetworkExternalityReport) -> bool {
+    let no_worse = a.candidate_total_cost_units <= b.candidate_total_cost_units
+        && a.worst_actor_regression_units <= b.worst_actor_regression_units
+        && a.candidate_non_cancelled_delay_minutes <= b.candidate_non_cancelled_delay_minutes
+        && a.candidate_cancelled_flights <= b.candidate_cancelled_flights
+        && a.candidate_total_co2e_kg <= b.candidate_total_co2e_kg;
+    let strictly_better = a.candidate_total_cost_units < b.candidate_total_cost_units
+        || a.worst_actor_regression_units < b.worst_actor_regression_units
+        || a.candidate_non_cancelled_delay_minutes < b.candidate_non_cancelled_delay_minutes
+        || a.candidate_cancelled_flights < b.candidate_cancelled_flights
+        || a.candidate_total_co2e_kg < b.candidate_total_co2e_kg;
+    no_worse && strictly_better
+}
+
+/// Return all non-dominated candidate outcomes relative to the same baseline.
+///
+/// Objectives remain separate: modeled total cost, worst actor regression,
+/// non-cancelled delay, cancellations and kg CO2e. The frontier avoids selecting
+/// arbitrary weights; a downstream governance policy may apply predeclared hard
+/// constraints to the frontier. Invalid candidate ledgers are excluded but
+/// retained in the assessments list; an invalid baseline is a hard error.
+pub fn network_pareto_frontier(
+    objective: &NetworkObjective,
+    baseline: &NetworkOutcome,
+    candidates: &[NetworkOutcome],
+) -> Result<NetworkParetoFrontier, NetworkComparisonError> {
+    let _ = compare_network_outcomes(objective, baseline, baseline)?;
+    let mut reports: Vec<(usize, NetworkExternalityReport)> = Vec::new();
+    let mut assessments: Vec<Option<ParetoAssessment>> =
+        std::iter::repeat_with(|| None).take(candidates.len()).collect();
+
+    for (index, candidate) in candidates.iter().enumerate() {
+        match compare_network_outcomes(objective, baseline, candidate) {
+            Ok(report) => {
+                reports.push((index, report.clone()));
+                assessments[index] = Some(ParetoAssessment {
+                    candidate_index: index,
+                    nondominated: false,
+                    exclusion: None,
+                    report: Some(report),
+                });
+            }
+            Err(error) => {
+                assessments[index] = Some(ParetoAssessment {
+                    candidate_index: index,
+                    nondominated: false,
+                    exclusion: Some(error),
+                    report: None,
+                });
+            }
+        }
+    }
+
+    let mut frontier_indices = Vec::new();
+    for (index, report) in &reports {
+        let is_dominated = reports.iter().any(|(other_index, other)| {
+            other_index != index && dominates_network_outcome(other, report)
+        });
+        if !is_dominated {
+            frontier_indices.push(*index);
+            if let Some(assessment) = assessments[*index].as_mut() {
+                assessment.nondominated = true;
+            }
+        }
+    }
+    frontier_indices.sort_unstable();
+
+    Ok(NetworkParetoFrontier {
+        frontier_indices,
+        assessments: assessments.into_iter().map(|entry| {
+            entry.expect("each candidate receives a success or rejection assessment")
+        }).collect(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,4 +624,30 @@ mod tests {
             Err(NetworkComparisonError::OutcomeNotVerified { side: PolicySide::Baseline, .. })
         ));
     }
+
+    #[test]
+    fn pareto_frontier_retains_real_tradeoffs_and_removes_dominated_candidate() {
+        let mut dominated = bounded_harm();
+        for actor in &mut dominated.actors {
+            actor.direct_cost_units += 1;
+        }
+        let candidates = vec![externalizing(), bounded_harm(), dominated];
+        let frontier = network_pareto_frontier(&objective(), &base(), &candidates).unwrap();
+        assert_eq!(frontier.frontier_indices, vec![0, 1]);
+        assert!(frontier.assessments[0].nondominated);
+        assert!(frontier.assessments[1].nondominated);
+        assert!(!frontier.assessments[2].nondominated);
+    }
+
+    #[test]
+    fn pareto_frontier_keeps_invalid_candidates_visible_but_excludes_them() {
+        let mut invalid = externalizing();
+        invalid.actors.pop();
+        let candidates = vec![invalid, bounded_harm()];
+        let frontier = network_pareto_frontier(&objective(), &base(), &candidates).unwrap();
+        assert_eq!(frontier.frontier_indices, vec![1]);
+        assert!(frontier.assessments[0].exclusion.is_some());
+        assert!(frontier.assessments[1].exclusion.is_none());
+    }
+
 }
