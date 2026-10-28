@@ -693,6 +693,8 @@ pub fn generate_task_set_bytes(
             task_set_issues.join("; ")
         ));
     }
+    validate_synthetic_task_semantics(&bytes)
+        .map_err(|error| format!("generated task set failed semantic qualification: {error}"))?;
     Ok(bytes)
 }
 
@@ -715,6 +717,13 @@ pub fn verify_regeneration(
     let task_set_contract_valid = reveal_report.task_set_contract_valid;
     let seed_commitment_matches = reveal_report.seed_commitment_matches;
     let mut issues = reveal_report.issues;
+    let synthetic_semantics_valid = match validate_synthetic_task_semantics(committed_task_set_bytes) {
+        Ok(()) => true,
+        Err(error) => {
+            issues.push(format!("committed task set failed semantic qualification: {error}"));
+            false
+        }
+    };
     if !byte_exact_match {
         issues.push(
             "regenerated task-set bytes differ from the revealed committed bytes".to_owned(),
@@ -723,6 +732,7 @@ pub fn verify_regeneration(
     let verified = seed_commitment_matches
         && task_set_commitment_matches
         && task_set_contract_valid
+        && synthetic_semantics_valid
         && byte_exact_match;
 
     Ok(RegenerationReportV1 {
@@ -740,6 +750,7 @@ pub fn verify_regeneration(
             .map_err(|_| "committed bytes exceed u64".to_owned())?,
         byte_exact_match,
         task_set_contract_valid,
+        synthetic_semantics_valid,
         verified,
         issues,
     })
