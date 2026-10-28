@@ -155,3 +155,18 @@ Since the time weights sum to one, the latter retains familywise coverage over a
 For an efficiency frontier, compare the same acquisition objective under fixed-sample Hoeffding, alpha-spending Hoeffding, and a variance-adaptive empirical-Bernstein confidence sequence. Use matched label and compute budgets; report interval width and acquisition regret, not coverage alone. Relevant foundations: Howard et al., *Time-uniform, nonparametric, nonasymptotic confidence sequences* (Annals of Statistics, 2021, https://doi.org/10.1214/20-AOS1991), and Waudby-Smith & Ramdas, *Estimating means of bounded random variables by betting* (JRSS B, 2024, https://doi.org/10.1093/jrsssb/qkad009).
 
 Exploratory implementation and independent Python checks live in [PR #8723](https://github.com/Luminous-Dynamics/symthaea/pull/8723). They are not yet Rust-qualified until exact-head workflow checks finish.
+
+
+## 16. Feature-support-aware acquisition is a separate OOD problem
+
+A peer-reviewed open-access article published 24 October 2026, “When active learning fails, uncalibrated out of distribution uncertainty quantification might be the problem” (npj Computational Materials, DOI https://doi.org/10.1038/s41524-026-02368-4), evaluates uncertainty estimation/calibration for solubility, bandgap, and formation-energy tasks. It reports calibrated uncertainties were generally unsuccessful at reducing data needs for OOD model generalization versus random acquisition and uncalibrated uncertainties, and points to uncertainty in feature-input space as a potential bottleneck. This is a domain-specific result, not proof that active learning generally fails; it does demonstrate that in-domain calibration alone is not enough to justify OOD acquisition claims.
+
+Tracked experiment: [issue #8749](https://github.com/Luminous-Dynamics/symthaea/issues/8749).
+
+Add matched arms for random, entropy/margin, Uncertainty Herding where compatible, plug-in/robust EVSI, feature-space support/coverage acquisition, support-gated robust EVSI, and a randomized sentinel-audit budget. Keep the oracle separate. All arms must share initial labels, query costs, pool, update schedule, compute allowance, and target data boundary.
+
+The test matrix must split by task/source/domain rather than random rows only. Include in-support covariate shift, feature-support OOD, high-confidence conditional shift, irrelevant outliers, rare groups, and compound shifts. Report (a) predictive risk/calibration, (b) downstream decision regret, (c) feature-support coverage and high-risk uncovered mass, (d) false-confident errors in unsupported regions, (e) query-cost and regret frontiers, and (f) sentinel false alarms/delay and budget share. Do not collapse these into one weighted score without a prespecified utility and sensitivity analysis.
+
+Critical falsification controls: an uncertainty estimator calibrated only in-domain; high-confidence OOD examples with a changed conditional mechanism; OOD anomalies irrelevant to target decisions; a held-out feature cluster; and corrupted/omitted support metadata. Sentinel benefits must be measured after including the labels and compute they consume. Use independent task/source families for uncertainty intervals, not query rows.
+
+The proposed success criterion is not “lower calibration error.” It is a preregistered improvement in the selected primary OOD objective (predictive risk or decision regret) versus the strongest matched non-oracle baseline, accompanied by no material IID/in-support regression and a transparent robustness tax. This is a new research track, not a result established by the current synthetic Bernoulli fixtures.
