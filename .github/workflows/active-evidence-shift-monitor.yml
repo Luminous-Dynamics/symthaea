@@ -90,14 +90,14 @@ jobs:
           source, target = sys.argv[1:]
           with open(source, newline="", encoding="utf-8") as stream:
               rows = list(csv.DictReader(stream))
-          rows[0]["false_alarm_probability"] = "0.9"
+          rows[0]["null_or_pre_shift_alarm_probability"] = "0.9"
           with open(target, "w", newline="", encoding="utf-8") as stream:
               writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
               writer.writeheader()
               writer.writerows(rows)
           PY
           if python3 tools/active-evidence-shift-monitor/reference_check.py "$temp_dir/mutated.csv"; then
-            echo "reference checker accepted a mutated false-alarm probability" >&2
+            echo "reference checker accepted a mutated null-or-pre-shift alarm probability" >&2
             exit 1
           fi
 
@@ -116,7 +116,7 @@ jobs:
               writer.writerows(rows)
           PY
           if python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget "$temp_dir/sentinel-mutated.csv"; then
-            echo "sentinel-budget checker accepted a mutated detection probability" >&2
+            echo "sentinel-budget checker accepted a mutated post-shift detection probability" >&2
             exit 1
           fi
 
@@ -128,14 +128,14 @@ jobs:
           source, target = sys.argv[1:]
           with open(source, newline="", encoding="utf-8") as stream:
               rows = list(csv.DictReader(stream))
-          rows[1]["detection_probability"] = "0.01"
+          rows[1]["post_shift_detection_probability"] = "0.01"
           with open(target, "w", newline="", encoding="utf-8") as stream:
               writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
               writer.writeheader()
               writer.writerows(rows)
           PY
           if python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family "$temp_dir/eprocess-family-mutated.csv"; then
-            echo "e-process family checker accepted a mutated detection probability" >&2
+            echo "e-process family checker accepted a mutated post-shift detection probability" >&2
             exit 1
           fi
 
