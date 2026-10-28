@@ -1,0 +1,75 @@
+name: VIS-DVPC-025 closed-loop frontier
+
+on:
+  pull_request:
+    paths:
+      - 'tools/vision-dvpc-closed-loop-frontier.rs'
+      - 'tests/fixtures/vision-dvpc-025-*'
+      - 'docs/research/VIS_DVPC_025_CLOSED_LOOP_FRONTIER_V1.md'
+      - '.github/workflows/vis-dvpc-025-closed-loop-frontier.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/vision-dvpc-closed-loop-frontier.rs'
+      - 'tests/fixtures/vision-dvpc-025-*'
+      - 'docs/research/VIS_DVPC_025_CLOSED_LOOP_FRONTIER_V1.md'
+      - '.github/workflows/vis-dvpc-025-closed-loop-frontier.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and fixtures
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Verify frozen public actions and separate oracle bytes
+        run: sha256sum -c tests/fixtures/vision-dvpc-025.SHA256SUMS
+      - name: Record committed source and format standalone scorer
+        run: |
+          git show "$(git rev-parse HEAD):tools/vision-dvpc-closed-loop-frontier.rs" | sha256sum | cut -d ' ' -f1 > /tmp/vis-dvpc-025-committed-source.sha256
+          rustfmt --edition 2024 tools/vision-dvpc-closed-loop-frontier.rs
+      - name: Compile and run unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-closed-loop-frontier.rs -o /tmp/vis-dvpc-025-tests
+          /tmp/vis-dvpc-025-tests
+      - name: Score every campaign and matched baseline
+        run: |
+          rustc --edition=2024 tools/vision-dvpc-closed-loop-frontier.rs -o /tmp/vis-dvpc-025
+          /tmp/vis-dvpc-025 --score | tee /tmp/vis-dvpc-025-frontier.tsv
+          test "$(awk -F '\t' '$1 == "RESULT" && $2 != "campaign_id" { n++ } END { print n+0 }' /tmp/vis-dvpc-025-frontier.tsv)" = "117"
+          test "$(grep -c '^SUMMARY[[:space:]]' /tmp/vis-dvpc-025-frontier.tsv)" = "9"
+          grep '^SUMMARY[[:space:]]forced_adapt[[:space:]]' /tmp/vis-dvpc-025-frontier.tsv | grep 'uncertified_activations=13'
+          awk -F '\t' '$1 == "RESULT" && $2 == "C01-positive" && $4 == "decision_value_fixed" { if ($6 != "true" || $7 != "AUTHORIZED" || $8 != "false" || $13 <= 0) exit 1; found=1 } END { if (!found) exit 1 }' /tmp/vis-dvpc-025-frontier.tsv
+          awk -F '\t' '$1 == "RESULT" && $2 == "C01-positive" && $4 == "decision_value_anytime" { if ($6 != "true" || $7 != "AUTHORIZED" || $8 != "false" || $13 <= 0 || $5 !~ /m-high/ || $5 !~ /m-good/) exit 1; found=1 } END { if (!found) exit 1 }' /tmp/vis-dvpc-025-frontier.tsv
+          awk -F '\t' '$1 == "RESULT" && $2 == "C06-clustered" && $4 == "highest_uncertainty" { if ($7 != "INSUFFICIENT_EVIDENCE" || $6 != "false") exit 1; found=1 } END { if (!found) exit 1 }' /tmp/vis-dvpc-025-frontier.tsv
+          awk -F '\t' '$1 == "RESULT" && $2 == "C13-repeated-look" && $4 == "naive_fixed_peeking_unsafe" { if ($6 != "true" || $7 != "AUTHORIZED" || $8 != "false" || $9 != "true") exit 1; found=1 } END { if (!found) exit 1 }' /tmp/vis-dvpc-025-frontier.tsv
+          awk -F '\t' '$1 == "RESULT" && $2 == "C13-repeated-look" && $4 == "highest_uncertainty" { if ($7 != "INSUFFICIENT_EVIDENCE" || $6 != "false") exit 1; found=1 } END { if (!found) exit 1 }' /tmp/vis-dvpc-025-frontier.tsv
+      - name: Write exact-source receipt
+        run: |
+          {
+            printf 'VIS_DVPC_025_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$(git rev-parse HEAD)"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            printf 'committed_source_sha256\t%s\n' "$(cat /tmp/vis-dvpc-025-committed-source.sha256)"
+            printf 'formatted_build_source_sha256\t%s\n' "$(sha256sum tools/vision-dvpc-closed-loop-frontier.rs | cut -d ' ' -f1)"
+            sha256sum tests/fixtures/vision-dvpc-025-visible-actions.tsv \
+              tests/fixtures/vision-dvpc-025-oracle.tsv \
+              /tmp/vis-dvpc-025-frontier.tsv
+          } > /tmp/vis-dvpc-025-receipt.tsv
+      - name: Publish raw frontier and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-025-frontier-${{ github.sha }}
+          path: |
+            /tmp/vis-dvpc-025-frontier.tsv
+            /tmp/vis-dvpc-025-receipt.tsv
+          retention-days: 90
