@@ -1,0 +1,209 @@
+{
+  "schema_version": "1.0",
+  "last_literature_review_date": "2026-10-29",
+  "overall_status": "candidate_sources_not_yet_downloaded_or_reanalysed",
+  "use_limit": "Research benchmarking only. No clinical recommendations or claims of HIV cure, therapeutic efficacy, or safety.",
+  "entries": [
+    {
+      "id": "dryad_k3j9kd5dw",
+      "title": "A cohort-based study of host gene expression: tumor suppressor and innate immune/inflammatory pathways associated with the HIV reservoir size",
+      "source_url": "https://doi.org/10.5061/dryad.k3j9kd5dw",
+      "publication_url": "https://doi.org/10.1371/journal.ppat.1011114",
+      "repository": "Dryad",
+      "accessions": [],
+      "described_biological_unit": "participant",
+      "described_cohort_size": 191,
+      "assay": [
+        "bulk RNA-seq of peripheral CD4-enriched T cells",
+        "clinical reservoir measurements",
+        "intact HIV DNA ddPCR",
+        "protein/cytokine validation subsets"
+      ],
+      "proposed_role": [
+        "primary reproduction",
+        "patient-level prediction if data quality supports it"
+      ],
+      "primary_outcomes_candidate": [
+        "total HIV DNA copies per million CD4+ T cells",
+        "residual HIV RNA copies per million, after data dictionary verification"
+      ],
+      "cautions": [
+        "Published report found many undetectable intact-DNA values",
+        "The paper reports no significant differential host-gene expression association with intact HIV DNA",
+        "Ancestry covariates used in the paper may not all be present in the released file set",
+        "Published associations are reproduction targets, not novel discoveries"
+      ],
+      "data_files_described": [
+        "data_rnaseq_count.csv",
+        "data_clinical.csv",
+        "data_intact_dna.csv",
+        "data_cd4_protein.csv",
+        "data_plasma_protein.csv",
+        "README.md"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse260588",
+      "title": "Transcriptomic HIV-1 reservoir profiling reveals a role for mitochondrial functionality in HIV-1 latency",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE260588",
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE260588"
+      ],
+      "described_biological_unit": "cell population / donor structure to verify from metadata",
+      "assay": [
+        "RNA-seq after flow-FISH sorting"
+      ],
+      "proposed_role": [
+        "latency-state mechanism replication",
+        "independent direction check for declared pathways"
+      ],
+      "cautions": [
+        "Confirm donor-level sample structure before splitting",
+        "Do not treat population-sorted cells as independent participants"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse242997",
+      "title": "Integrated single-cell multiomic analysis of HIV latency reversal — primary CD4+ T-cell data",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE242997",
+      "related_accessions": [
+        "GSE210146"
+      ],
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE242997"
+      ],
+      "described_biological_unit": "cell nested within donor; exact structure to verify from metadata",
+      "assay": [
+        "single-cell multiomic data; exact matrices and modalities to pin during acquisition"
+      ],
+      "proposed_role": [
+        "latency-reversal state task",
+        "mechanistic triangulation"
+      ],
+      "cautions": [
+        "Keep primary-cell and 2D10 cell-line data separate",
+        "Cells from one donor must not span train/test folds"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse210146",
+      "title": "2D10 cell-line data associated with integrated single-cell multiomic analysis of HIV latency reversal",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE210146",
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE210146"
+      ],
+      "described_biological_unit": "cell-line experiment; replicate structure to verify",
+      "assay": [
+        "study-associated latency-reversal assay"
+      ],
+      "proposed_role": [
+        "cell-line mechanism replication",
+        "cell-model shift comparison"
+      ],
+      "cautions": [
+        "Not a substitute for primary-cell or patient-level validation"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse241723",
+      "title": "Molecular signatures of HIV latency established in different conditions revealed by single-cell RNA sequencing",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE241723",
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE241723"
+      ],
+      "described_biological_unit": "cell nested within in-vitro model and replicate",
+      "assay": [
+        "single-cell RNA-seq"
+      ],
+      "proposed_role": [
+        "in-vitro model-shift stress test",
+        "latency-signature robustness"
+      ],
+      "cautions": [
+        "Both described models are in vitro; do not equate their endpoints with in-vivo reservoir size"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse221687",
+      "title": "The latent HIV reservoir in the brain of people with HIV under ART — scRNA-seq",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE221687",
+      "related_accessions": [
+        "GSE221686",
+        "GSE221685"
+      ],
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE221687",
+        "GSE221686",
+        "GSE221685"
+      ],
+      "described_biological_unit": "tissue sample and cell nested within donor; three male donors described in the GEO summary",
+      "assay": [
+        "GSE221687 scRNA-seq",
+        "GSE221686 scATAC-seq",
+        "GSE221685 ChIP-seq"
+      ],
+      "proposed_role": [
+        "exploratory tissue-shift stress test",
+        "cross-modal mechanistic triangulation"
+      ],
+      "cautions": [
+        "Very small donor count",
+        "Not adequate for population-level claims or as a held-out patient reservoir-size cohort",
+        "Keep modalities and donor grouping explicit"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse310195",
+      "title": "HIV-1 expression is heterogeneous among clones of CD4+ T cells carrying authentic intact latent proviruses",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE310195",
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE310195"
+      ],
+      "described_biological_unit": "clone nested within source participant; verify sample metadata",
+      "assay": [
+        "HIV expression profiling"
+      ],
+      "proposed_role": [
+        "mechanistic triangulation of expression heterogeneity in intact latent proviruses"
+      ],
+      "cautions": [
+        "Clone-level observations do not increase participant-level n",
+        "Do not pool as though it were a comparable patient-level reservoir measurement"
+      ],
+      "status": "listed_not_acquired"
+    },
+    {
+      "id": "geo_gse268010",
+      "title": "Transcription of HIV-1 at sites of intact latent provirus integration",
+      "source_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE268010",
+      "repository": "NCBI GEO",
+      "accessions": [
+        "GSE268010"
+      ],
+      "described_biological_unit": "experiment / integration site / cell model to verify from series metadata",
+      "assay": [
+        "transcription profiling and genome binding/occupancy profiling, per GEO record"
+      ],
+      "proposed_role": [
+        "integration-context mechanistic task"
+      ],
+      "cautions": [
+        "The exact comparable outcome and replicate structure must be predeclared",
+        "Not interchangeable with participant-level reservoir-size prediction"
+      ],
+      "status": "listed_not_acquired"
+    }
+  ]
+}
