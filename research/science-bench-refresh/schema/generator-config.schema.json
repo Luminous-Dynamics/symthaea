@@ -55,15 +55,19 @@
             "maximum": 10000
           },
           "x_start": {
-            "type": "number"
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
           },
           "x_step": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000
           },
           "noise_amplitude": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           }
         }
       }
