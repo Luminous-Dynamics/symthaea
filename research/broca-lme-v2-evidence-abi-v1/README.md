@@ -1,6 +1,6 @@
 # Broca evidence payload ABI for LongMemEval-V2
 
-**State:** Rust evidence-contract prototype plus deterministic snapshot/restore and paired-artifact commit-manifest primitives. Unit tests are authored but not compiled in this environment; this is not a completed benchmark integration.
+**State:** Rust evidence-contract prototype plus deterministic snapshot/restore, generation-bound commit manifest, and a fail-closed Unix disk-generation store with deterministic interruption hooks. Tests are authored but not compiled in this environment; this is not a completed LongMemEval-V2 integration or persistence qualification.
 
 ## The concrete interface mismatch
 
@@ -32,6 +32,28 @@ Report these as distinct retrieval arms. Do not label a lexical feature hash as 
 - text payload digests are verified before emission; image paths are canonicalized under a trusted payload root and their file-byte digests are checked;
 - duplicate HDC/evidence IDs, malformed digests, invalid lifecycle shapes, path traversal, and corrupt payloads fail closed;
 - resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained.
+
+## Disk-generation persistence prototype
+
+`crates/domains/symthaea-broca/src/memory_evidence_persistence.rs` now exposes a single-writer store:
+
+```rust
+let store = EvidenceDiskStore::open("/var/lib/broca/memory")?;
+let generation = store.commit(&serialized_hdc_index, &evidence_index)?;
+let recovered = store.recover()?.ok_or("no committed generation")?;
+assert_eq!(recovered.generation, generation);
+```
+
+The exact API may evolve during review; the example communicates intended use, not a compiled integration result.
+
+- Data is staged in an immutable generation directory. HDC-index and evidence-snapshot bytes are synced; the manifest is written and verified; then `CURRENT` is atomically replaced last.
+- Recovery verifies the pointer, manifest digest, artifact digests and snapshot invariants. It never falls back to an older generation on corruption.
+- A delete tombstone survives disk restore, and a previous ID cannot be reinserted in the restored evidence index.
+- An exclusive writer lock prevents concurrent committers. A process crash may leave the lock behind; operators must verify that the prior writer is gone before removing it.
+- The implementation currently requires Unix directory fsync and same-filesystem rename semantics. It does not claim portable power-loss guarantees or malicious-writer authenticity.
+- The coordinator cannot infer whether arbitrary supplied HDC bytes semantically match an EvidenceIndex. The caller must produce both from the same logical state.
+
+Authored unit tests include successful generation rollover, delete/restart non-resurrection, interruption at six commit boundaries, fail-closed corrupt artifacts, lock refusal, dangling CURRENT symlink rejection, empty-index rejection, and corrupt snapshot rejection. They have **not** been compiled or executed in this environment. In-process failpoints are not equivalent to actual process-kill or power-cut tests.
 
 ## Intended end-to-end path
 
