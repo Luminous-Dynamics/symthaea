@@ -8,6 +8,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -62,8 +63,15 @@ class ManifestBundle:
             "receipt": jbytes({"outcome": "pass"}),
         }
         for key, rel in self.paths.items():
-            (self.root / rel).write_bytes(files[key])
-        h = {key: sha(files[key]) for key in files}
+            if key != "bundle":
+                (self.root / rel).write_bytes(files[key])
+        self.create_bundle()
+        h = {
+            key: sha((self.root / rel).read_bytes())
+            for key, rel in self.paths.items()
+            if key != "bundle"
+        }
+        h["bundle"] = sha((self.root / self.paths["bundle"]).read_bytes())
 
         self.manifest = valid_manifest()
         self.manifest["run_kind"] = "development_smoke"
@@ -106,6 +114,14 @@ class ManifestBundle:
         self.manifest_path = self.root / "run-manifest.json"
         self.write_manifest()
         self.trusted_sha = sha(self.manifest_path.read_bytes())
+
+    def create_bundle(self) -> None:
+        bundle_path = self.root / self.paths["bundle"]
+        with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for key, rel in self.paths.items():
+                if key == "bundle":
+                    continue
+                archive.write(self.root / rel, arcname=rel)
 
     def write_manifest(self) -> None:
         self.manifest_path.write_bytes(jbytes(self.manifest))
@@ -187,9 +203,24 @@ class RunManifestVerifierTests(unittest.TestCase):
         result = self.bundle.audit(expected_manifest_sha256="0" * 64)
         self.assert_issue(result, "manifest_pin_mismatch")
 
-    def test_referenced_file_digest_is_recomputed(self) -> None:
-        (self.bundle.root / self.bundle.paths["patch"]).write_bytes(b"changed after manifest lock")
-        self.assert_issue(self.bundle.audit(), "artifact_digest_mismatch")
+    def test_unbundled_loose_file_cannot_override_attested_bytes(self) -> None:
+        (self.bundle.root / self.bundle.paths["patch"]).write_bytes(b"changed only outside the sealed ZIP")
+        result = self.bundle.audit()
+        self.assertTrue(result["eligible"], result["issues"])
+
+    def test_referenced_file_digest_is_recomputed_from_attested_bundle(self) -> None:
+        (self.bundle.root / self.bundle.paths["patch"]).write_bytes(b"changed inside rebuilt ZIP")
+        self.bundle.create_bundle()
+        bundle_path = self.bundle.root / self.bundle.paths["bundle"]
+        self.bundle.manifest["evidence_bundle"]["sha256"] = sha(bundle_path.read_bytes())
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "artifact_digest_mismatch")
+
+    def test_bundle_path_traversal_is_rejected(self) -> None:
+        bundle_path = self.bundle.root / self.bundle.paths["bundle"]
+        with zipfile.ZipFile(bundle_path, "w") as archive:
+            archive.writestr("../outside.txt", b"must not escape")
+        self.bundle.manifest["evidence_bundle"]["sha256"] = sha(bundle_path.read_bytes())
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "evidence_bundle_invalid")
 
     def test_path_traversal_is_rejected_by_schema(self) -> None:
         self.bundle.manifest["protocol"]["path"] = "../protocol.md"
