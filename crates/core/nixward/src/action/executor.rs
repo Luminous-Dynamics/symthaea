@@ -1456,12 +1456,26 @@ mod tests {
             expected_args: vec!["switch".to_owned(), "--flake".to_owned(), ".#expected".to_owned()],
             witness_path: witness_path.clone(),
         };
-        let unexpected_args = vec!["switch".to_owned(), "--flake".to_owned(), ".#unexpected".to_owned()];
+        let wrong_executable_args = vec![
+            "switch".to_owned(),
+            "--flake".to_owned(),
+            ".#expected".to_owned(),
+        ];
+        let wrong_executable = runner
+            .run("sh", &wrong_executable_args)
+            .await;
+        assert!(wrong_executable.is_err());
 
-        let result = runner.run("nixos-rebuild", &unexpected_args).await;
-        assert!(result.is_err());
-        assert_eq!(invocations.load(Ordering::SeqCst), 1);
-        assert_eq!(observed_calls.lock().unwrap().len(), 1);
+        let unexpected_args = vec![
+            "switch".to_owned(),
+            "--flake".to_owned(),
+            ".#unexpected".to_owned(),
+        ];
+        let wrong_argv = runner.run("nixos-rebuild", &unexpected_args).await;
+        assert!(wrong_argv.is_err());
+
+        assert_eq!(invocations.load(Ordering::SeqCst), 2);
+        assert_eq!(observed_calls.lock().unwrap().len(), 2);
         assert!(!witness_path.exists());
     }
 
