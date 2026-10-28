@@ -116,7 +116,11 @@ fn diagnostic(
     });
 }
 
-fn physical_records(input: &str, options: IndexOptions, diagnostics: &mut Vec<Diagnostic>) -> Vec<FixedRecord> {
+fn physical_records(
+    input: &str,
+    options: IndexOptions,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<FixedRecord> {
     let physical_lines: Vec<&str> = input.split('\n').collect();
     let mut records = Vec::new();
     let mut opaque_continued_literal = false;
@@ -406,7 +410,9 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
     for record in &records {
         let record_tokens = tokenize_record(record, &mut diagnostics);
         if record.continuation {
-            if let (Some(previous), Some(first)) = (previous_last_token.as_ref(), record_tokens.first()) {
+            if let (Some(previous), Some(first)) =
+                (previous_last_token.as_ref(), record_tokens.first())
+            {
                 if previous.kind == TokenKind::Word
                     && first.kind == TokenKind::Word
                     && previous.location.line + 1 == first.location.line
@@ -438,9 +444,13 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
         let token = &tokens[i];
 
         if (is_word(token, "IDENTIFICATION")
-            && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION")))
+            && tokens
+                .get(i + 1)
+                .is_some_and(|next| is_word(next, "DIVISION")))
             || (is_word(token, "ID")
-                && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION")))
+                && tokens
+                    .get(i + 1)
+                    .is_some_and(|next| is_word(next, "DIVISION")))
         {
             let name = "IDENTIFICATION".to_owned();
             active_division = Some(name.clone());
@@ -449,7 +459,9 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                 location: token.location.clone(),
             });
         } else if is_word(token, "ENVIRONMENT")
-            && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION"))
+            && tokens
+                .get(i + 1)
+                .is_some_and(|next| is_word(next, "DIVISION"))
         {
             active_division = Some("ENVIRONMENT".to_owned());
             divisions.push(NamedSpan {
@@ -457,7 +469,9 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                 location: token.location.clone(),
             });
         } else if is_word(token, "DATA")
-            && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION"))
+            && tokens
+                .get(i + 1)
+                .is_some_and(|next| is_word(next, "DIVISION"))
         {
             active_division = Some("DATA".to_owned());
             divisions.push(NamedSpan {
@@ -465,7 +479,9 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                 location: token.location.clone(),
             });
         } else if is_word(token, "PROCEDURE")
-            && tokens.get(i + 1).is_some_and(|next| is_word(next, "DIVISION"))
+            && tokens
+                .get(i + 1)
+                .is_some_and(|next| is_word(next, "DIVISION"))
         {
             active_division = Some("PROCEDURE".to_owned());
             divisions.push(NamedSpan {
@@ -477,7 +493,8 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
         if is_word(token, "PROGRAM-ID") {
             if let Some(name_index) = next_non_period(&tokens, i + 1) {
                 let name_token = &tokens[name_index];
-                if name_token.kind == TokenKind::Word || name_token.kind == TokenKind::StringLiteral {
+                if name_token.kind == TokenKind::Word || name_token.kind == TokenKind::StringLiteral
+                {
                     if program_id.is_some() {
                         diagnostic(
                             &mut diagnostics,
@@ -540,7 +557,9 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
             });
         }
 
-        if (is_word(token, "FD") || is_word(token, "SD")) && active_division.as_deref() == Some("DATA") {
+        if (is_word(token, "FD") || is_word(token, "SD"))
+            && active_division.as_deref() == Some("DATA")
+        {
             if let Some(name_index) = next_non_period(&tokens, i + 1) {
                 if tokens[name_index].kind == TokenKind::Word {
                     file_descriptions.push(NamedSpan {
@@ -557,7 +576,10 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
             && token.value.bytes().all(|byte| byte.is_ascii_digit())
         {
             let level = token.value.parse::<u8>().unwrap_or(0);
-            if matches!(level, 1 | 5 | 10 | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 49 | 66 | 77 | 78 | 88) {
+            if matches!(
+                level,
+                1 | 5 | 10 | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 49 | 66 | 77 | 78 | 88
+            ) {
                 let Some(name_index) = next_non_period(&tokens, i + 1) else {
                     diagnostic(
                         &mut diagnostics,
@@ -574,10 +596,26 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                 let end = statement_end(&tokens, name_index + 1);
                 let entry_tokens = &tokens[name_index + 1..end];
                 let clause_starts = [
-                    "USAGE", "VALUE", "VALUES", "REDEFINES", "OCCURS", "SIGN",
-                    "SYNC", "SYNCHRONIZED", "JUSTIFIED", "BLANK", "GLOBAL",
-                    "EXTERNAL", "COMP", "COMP-3", "COMP-5", "BINARY", "DISPLAY",
-                    "PACKED-DECIMAL", "INDEX", "POINTER",
+                    "USAGE",
+                    "VALUE",
+                    "VALUES",
+                    "REDEFINES",
+                    "OCCURS",
+                    "SIGN",
+                    "SYNC",
+                    "SYNCHRONIZED",
+                    "JUSTIFIED",
+                    "BLANK",
+                    "GLOBAL",
+                    "EXTERNAL",
+                    "COMP",
+                    "COMP-3",
+                    "COMP-5",
+                    "BINARY",
+                    "DISPLAY",
+                    "PACKED-DECIMAL",
+                    "INDEX",
+                    "POINTER",
                 ];
 
                 let mut picture = None;
@@ -589,7 +627,9 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                         }
                         let picture_start = k;
                         while k < entry_tokens.len()
-                            && !clause_starts.iter().any(|clause| is_word(&entry_tokens[k], clause))
+                            && !clause_starts
+                                .iter()
+                                .any(|clause| is_word(&entry_tokens[k], clause))
                         {
                             k += 1;
                         }
@@ -606,9 +646,19 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                 }
 
                 let usage_words = [
-                    "DISPLAY", "COMP", "COMP-1", "COMP-2", "COMP-3", "COMP-4",
-                    "COMP-5", "COMPUTATIONAL", "COMPUTATIONAL-3", "BINARY",
-                    "PACKED-DECIMAL", "INDEX", "POINTER",
+                    "DISPLAY",
+                    "COMP",
+                    "COMP-1",
+                    "COMP-2",
+                    "COMP-3",
+                    "COMP-4",
+                    "COMP-5",
+                    "COMPUTATIONAL",
+                    "COMPUTATIONAL-3",
+                    "BINARY",
+                    "PACKED-DECIMAL",
+                    "INDEX",
+                    "POINTER",
                 ];
                 let mut usage = None;
                 for j in 0..entry_tokens.len() {
@@ -625,7 +675,10 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                         }
                         break;
                     }
-                    if usage_words.iter().any(|word| is_word(&entry_tokens[j], word)) {
+                    if usage_words
+                        .iter()
+                        .any(|word| is_word(&entry_tokens[j], word))
+                    {
                         usage = Some(entry_tokens[j].value.clone());
                         break;
                     }
@@ -770,51 +823,84 @@ impl CobolIndex {
 
         output.push_str("  \"divisions\": [");
         for (i, item) in self.divisions.iter().enumerate() {
-            if i > 0 { output.push(','); }
-            let _ = write!(output, "{{\"name\":{},\"location\":{}}}", q(&item.name), loc_json(&item.location));
+            if i > 0 {
+                output.push(',');
+            }
+            let _ = write!(
+                output,
+                "{{\"name\":{},\"location\":{}}}",
+                q(&item.name),
+                loc_json(&item.location)
+            );
         }
         output.push_str("],\n  \"copy_references\": [");
         for (i, item) in self.copy_references.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"name\":{},\"location\":{},\"has_replacing_clause\":{}}}",
-                q(&item.name), loc_json(&item.location), item.has_replacing_clause
+                q(&item.name),
+                loc_json(&item.location),
+                item.has_replacing_clause
             );
         }
         output.push_str("],\n  \"file_descriptions\": [");
         for (i, item) in self.file_descriptions.iter().enumerate() {
-            if i > 0 { output.push(','); }
-            let _ = write!(output, "{{\"name\":{},\"location\":{}}}", q(&item.name), loc_json(&item.location));
+            if i > 0 {
+                output.push(',');
+            }
+            let _ = write!(
+                output,
+                "{{\"name\":{},\"location\":{}}}",
+                q(&item.name),
+                loc_json(&item.location)
+            );
         }
         output.push_str("],\n  \"data_items\": [");
         for (i, item) in self.data_items.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"level\":{},\"name\":{},\"picture\":{},\"usage\":{},\"redefines\":{},\"location\":{}}}",
-                item.level, q(&item.name), optional_string_json(&item.picture),
-                optional_string_json(&item.usage), optional_string_json(&item.redefines),
+                item.level,
+                q(&item.name),
+                optional_string_json(&item.picture),
+                optional_string_json(&item.usage),
+                optional_string_json(&item.redefines),
                 loc_json(&item.location)
             );
         }
         output.push_str("],\n  \"embedded_blocks\": [");
         for (i, item) in self.embedded_blocks.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"kind\":{},\"location\":{},\"has_end_exec\":{}}}",
-                q(&item.kind), loc_json(&item.location), item.has_end_exec
+                q(&item.kind),
+                loc_json(&item.location),
+                item.has_end_exec
             );
         }
         output.push_str("],\n  \"diagnostics\": [");
         for (i, item) in self.diagnostics.iter().enumerate() {
-            if i > 0 { output.push(','); }
+            if i > 0 {
+                output.push(',');
+            }
             let _ = write!(
                 output,
                 "{{\"code\":{},\"message\":{},\"location\":{}}}",
-                q(&item.code), q(&item.message),
-                item.location.as_ref().map(loc_json).unwrap_or_else(|| "null".to_owned())
+                q(&item.code),
+                q(&item.message),
+                item.location
+                    .as_ref()
+                    .map(loc_json)
+                    .unwrap_or_else(|| "null".to_owned())
             );
         }
         output.push_str("]\n}\n");
@@ -840,27 +926,44 @@ mod tests {
             "           STOP RUN.\n"
         );
         let result = index(source);
-        assert_eq!(result.program_id.as_ref().map(|p| p.name.as_str()), Some("SETTLE01"));
-        assert_eq!(result.program_id.as_ref().unwrap().location.line, 2);
-        assert_eq!(result.program_id.as_ref().unwrap().location.column_start, 20);
         assert_eq!(
-            result.divisions.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+            result.program_id.as_ref().map(|p| p.name.as_str()),
+            Some("SETTLE01")
+        );
+        assert_eq!(result.program_id.as_ref().unwrap().location.line, 2);
+        assert_eq!(
+            result.program_id.as_ref().unwrap().location.column_start,
+            20
+        );
+        assert_eq!(
+            result
+                .divisions
+                .iter()
+                .map(|d| d.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["IDENTIFICATION", "DATA", "PROCEDURE"]
         );
     }
 
     #[test]
     fn ignores_comments_and_identification_area_after_column_72() {
-        let mut source = String::from(
-            "      * PROGRAM-ID. COMMENT-ID.\n       IDENTIFICATION DIVISION.\n",
-        );
+        let mut source =
+            String::from("      * PROGRAM-ID. COMMENT-ID.\n       IDENTIFICATION DIVISION.\n");
         let mut record = format!("{:<72}", "       PROGRAM-ID. REALID.");
         record.push_str(" PROGRAM-ID. FALSEID.\n");
         source.push_str(&record);
 
         let result = index(&source);
-        assert_eq!(result.program_id.as_ref().map(|p| p.name.as_str()), Some("REALID"));
-        assert!(!result.diagnostics.iter().any(|d| d.code == "duplicate_program_id"));
+        assert_eq!(
+            result.program_id.as_ref().map(|p| p.name.as_str()),
+            Some("REALID")
+        );
+        assert!(
+            !result
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "duplicate_program_id")
+        );
     }
 
     #[test]
@@ -888,10 +991,18 @@ mod tests {
             "       01 WS-RAW REDEFINES WS-AMOUNT PIC X(5).\n",
         );
         let result = index(source);
-        let packed = result.data_items.iter().find(|item| item.name == "WS-AMOUNT").unwrap();
+        let packed = result
+            .data_items
+            .iter()
+            .find(|item| item.name == "WS-AMOUNT")
+            .unwrap();
         assert_eq!(packed.picture.as_deref(), Some("S9(7)V99"));
         assert_eq!(packed.usage.as_deref(), Some("COMP-3"));
-        let redef = result.data_items.iter().find(|item| item.name == "WS-RAW").unwrap();
+        let redef = result
+            .data_items
+            .iter()
+            .find(|item| item.name == "WS-RAW")
+            .unwrap();
         assert_eq!(redef.redefines.as_deref(), Some("WS-AMOUNT"));
     }
 
@@ -910,8 +1021,20 @@ mod tests {
         let result = index(source);
         assert_eq!(result.file_descriptions.len(), 1);
         assert_eq!(result.file_descriptions[0].name, "FD:SETTLEMENT-FILE");
-        assert_eq!(result.embedded_blocks.iter().map(|block| block.kind.as_str()).collect::<Vec<_>>(), vec!["SQL", "CICS"]);
-        assert!(result.embedded_blocks.iter().all(|block| block.has_end_exec));
+        assert_eq!(
+            result
+                .embedded_blocks
+                .iter()
+                .map(|block| block.kind.as_str())
+                .collect::<Vec<_>>(),
+            vec!["SQL", "CICS"]
+        );
+        assert!(
+            result
+                .embedded_blocks
+                .iter()
+                .all(|block| block.has_end_exec)
+        );
     }
 
     #[test]
@@ -932,7 +1055,12 @@ mod tests {
         assert!(codes.contains(&"unknown_fixed_format_indicator"));
         assert!(codes.contains(&"tab_in_fixed_format_record"));
         assert!(codes.contains(&"non_ascii_fixed_format_record"));
-        assert!(!result.copy_references.iter().any(|copy| copy.name == "NOT-A-COPY"));
+        assert!(
+            !result
+                .copy_references
+                .iter()
+                .any(|copy| copy.name == "NOT-A-COPY")
+        );
     }
 
     #[test]
@@ -944,11 +1072,25 @@ mod tests {
             "           DISPLAY \"COPY NOT-A-COPY *> STILL-LITERAL.\". *> COPY COMMENT-COPY.\n",
         );
         let result = index(source);
-        assert_eq!(result.program_id.as_ref().map(|p| p.name.as_str()), Some("INLINE1"));
-        assert_eq!(result.divisions.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
-            vec!["IDENTIFICATION", "PROCEDURE"]);
+        assert_eq!(
+            result.program_id.as_ref().map(|p| p.name.as_str()),
+            Some("INLINE1")
+        );
+        assert_eq!(
+            result
+                .divisions
+                .iter()
+                .map(|d| d.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["IDENTIFICATION", "PROCEDURE"]
+        );
         assert!(result.copy_references.is_empty());
-        assert!(!result.diagnostics.iter().any(|d| d.code == "duplicate_program_id"));
+        assert!(
+            !result
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "duplicate_program_id")
+        );
     }
 
     #[test]
@@ -972,9 +1114,13 @@ mod tests {
         assert!(json.starts_with("{\n  \"schema_version\": \"vleb-cobol-index-v1\""));
         assert!(json.contains("\"source_format\": \"fixed\""));
         assert!(json.contains("\"program_id\": {\"name\":\"JSONTEST\""));
-        assert_eq!(json, index_fixed_format(
-            "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. JSONTEST.\n",
-            IndexOptions::default()
-        ).to_json());
+        assert_eq!(
+            json,
+            index_fixed_format(
+                "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. JSONTEST.\n",
+                IndexOptions::default()
+            )
+            .to_json()
+        );
     }
 }
