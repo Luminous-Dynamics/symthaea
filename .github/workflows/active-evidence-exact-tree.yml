@@ -56,6 +56,8 @@ jobs:
           cmp "$temp_dir/tree-first.csv" "$temp_dir/tree-second.csv"
           python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py --self-test
           python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py "$temp_dir/tree-first.csv"
+          python3 tools/active-evidence-exact-tree/compare_cost_frontiers.py "$temp_dir/greedy-first.csv" "$temp_dir/tree-first.csv" > "$temp_dir/cost-frontier.csv"
+          test "$(wc -l < "$temp_dir/cost-frontier.csv")" -eq 10
 
       - name: Reject mutated aggregate outputs
         shell: bash
