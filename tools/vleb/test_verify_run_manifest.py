@@ -304,6 +304,9 @@ class RunManifestVerifierTests(unittest.TestCase):
             trusted_claim_verifier_pins={},
         )
         self.assertEqual(result["status"], "unresolved")
+        self.assertEqual(result["claim_count"], 1)
+        self.assertEqual(result["unresolved"], 1)
+        self.assertEqual(result["claims"][0]["status"], "unresolved")
         self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
 
     def test_claim_audit_rejects_witness_artifact_tampering(self) -> None:
