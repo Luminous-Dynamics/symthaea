@@ -252,7 +252,14 @@ pub struct MatchedTrialRecord {
     pub verification: CandidateVerification,
     /// Number of graph-edge conflicts reported by the verifier, if available.
     pub conflict_count: Option<usize>,
-    /// Stage-by-stage time costs. Missing stages remain unknown.
+    /// Direct monotonic-clock elapsed time from request/job entry (including queue wait)
+    /// through persistence of the verified result. None means not observed.
+    pub deployment_elapsed_ms: Option<f64>,
+    /// Direct monotonic-clock elapsed time for the standardized algorithm interval,
+    /// excluding queue and compile/init and ending at the verified result boundary.
+    /// This is independently measured, not a sum of stage components.
+    pub standardized_algorithm_elapsed_ms: Option<f64>,
+    /// Per-stage cost diagnostics. Components may overlap and are never summed as latency.
     pub costs: StageCostsMs,
     /// Energy measurement and scope.
     pub energy: EnergyRecord,
@@ -420,6 +427,33 @@ impl MatchedTrialRecord {
                         field,
                     });
                 }
+            }
+        }
+
+        for (field, value) in [
+            ("deployment_elapsed_ms", self.deployment_elapsed_ms),
+            ("standardized_algorithm_elapsed_ms", self.standardized_algorithm_elapsed_ms),
+        ] {
+            if let Some(value) = value {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(MatchedEvaluationError::InvalidObservedElapsed {
+                        trial_id: self.trial_id.clone(),
+                        field,
+                        value,
+                    });
+                }
+            }
+        }
+        if let (Some(deployment_ms), Some(algorithm_ms)) = (
+            self.deployment_elapsed_ms,
+            self.standardized_algorithm_elapsed_ms,
+        ) {
+            if algorithm_ms > deployment_ms {
+                return Err(MatchedEvaluationError::AlgorithmElapsedExceedsDeployment {
+                    trial_id: self.trial_id.clone(),
+                    algorithm_ms,
+                    deployment_ms,
+                });
             }
         }
 
@@ -713,12 +747,12 @@ pub enum MatchedEvaluationError {
     VerifierReceiptMismatch { trial_id: String, field: &'static str },
     /// A stage cost is negative or non-finite.
     InvalidStageCost { trial_id: String, stage: &'static str, value: f64 },
-    /// Complete all-in measured cost is non-finite or non-positive.
-    InvalidAllInCost { trial_id: String, value: f64 },
+    /// A direct monotonic-clock elapsed measurement is non-finite or non-positive.
+    InvalidObservedElapsed { trial_id: String, field: &'static str, value: f64 },
+    /// Standardized algorithm interval exceeds the encompassing deployment interval.
+    AlgorithmElapsedExceedsDeployment { trial_id: String, algorithm_ms: f64, deployment_ms: f64 },
     /// A derived speed ratio overflowed or was non-finite.
     InvalidRatio { quantity: &'static str },
-    /// Complete measured algorithm runtime is non-finite or non-positive.
-    InvalidAlgorithmRuntime { trial_id: String, value: f64 },
     /// Energy is present despite the scope being NotMeasured.
     EnergyValueWithNotMeasuredScope,
     /// A measured energy scope has no joule value.
@@ -778,17 +812,17 @@ impl fmt::Display for MatchedEvaluationError {
             Self::InvalidStageCost { trial_id, stage, value } => {
                 write!(f, "trial {trial_id} has invalid {stage} value {value}")
             }
-            Self::InvalidAllInCost { trial_id, value } => write!(
+            Self::InvalidObservedElapsed { trial_id, field, value } => write!(
                 f,
-                "trial {trial_id} has invalid all-in cost {value}; it must be finite and positive"
+                "trial {trial_id} has invalid {field} elapsed value {value}; it must be finite and positive"
+            ),
+            Self::AlgorithmElapsedExceedsDeployment { trial_id, algorithm_ms, deployment_ms } => write!(
+                f,
+                "trial {trial_id} standardized algorithm interval {algorithm_ms} ms exceeds deployment interval {deployment_ms} ms"
             ),
             Self::InvalidRatio { quantity } => write!(
                 f,
                 "derived {quantity} ratio was not finite and positive"
-            ),
-            Self::InvalidAlgorithmRuntime { trial_id, value } => write!(
-                f,
-                "trial {trial_id} has invalid algorithm runtime {value}; it must be finite and positive"
             ),
             Self::EnergyValueWithNotMeasuredScope => {
                 write!(f, "energy value supplied with NotMeasured scope")
