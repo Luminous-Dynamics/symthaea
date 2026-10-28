@@ -118,6 +118,21 @@ pub struct ComparisonSummaryV1 {
     pub mean_rounds_delta_tool_minus_vanilla: Option<f64>,
     pub tokens_pair_count: usize,
     pub mean_tokens_delta_tool_minus_vanilla: Option<f64>,
+    pub rmsle_delta_standard_error: Option<f64>,
+    pub rmsle_delta_ci95_lower: Option<f64>,
+    pub rmsle_delta_ci95_upper: Option<f64>,
+    pub exact_accuracy_delta_standard_error: Option<f64>,
+    pub exact_accuracy_delta_ci95_lower: Option<f64>,
+    pub exact_accuracy_delta_ci95_upper: Option<f64>,
+    pub experiments_delta_standard_error: Option<f64>,
+    pub experiments_delta_ci95_lower: Option<f64>,
+    pub experiments_delta_ci95_upper: Option<f64>,
+    pub rounds_delta_standard_error: Option<f64>,
+    pub rounds_delta_ci95_lower: Option<f64>,
+    pub rounds_delta_ci95_upper: Option<f64>,
+    pub tokens_delta_standard_error: Option<f64>,
+    pub tokens_delta_ci95_lower: Option<f64>,
+    pub tokens_delta_ci95_upper: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -140,6 +155,21 @@ pub struct StratumSummaryV1 {
     pub mean_rounds_delta_tool_minus_vanilla: Option<f64>,
     pub tokens_pair_count: usize,
     pub mean_tokens_delta_tool_minus_vanilla: Option<f64>,
+    pub rmsle_delta_standard_error: Option<f64>,
+    pub rmsle_delta_ci95_lower: Option<f64>,
+    pub rmsle_delta_ci95_upper: Option<f64>,
+    pub exact_accuracy_delta_standard_error: Option<f64>,
+    pub exact_accuracy_delta_ci95_lower: Option<f64>,
+    pub exact_accuracy_delta_ci95_upper: Option<f64>,
+    pub experiments_delta_standard_error: Option<f64>,
+    pub experiments_delta_ci95_lower: Option<f64>,
+    pub experiments_delta_ci95_upper: Option<f64>,
+    pub rounds_delta_standard_error: Option<f64>,
+    pub rounds_delta_ci95_lower: Option<f64>,
+    pub rounds_delta_ci95_upper: Option<f64>,
+    pub tokens_delta_standard_error: Option<f64>,
+    pub tokens_delta_ci95_lower: Option<f64>,
+    pub tokens_delta_ci95_upper: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -548,6 +578,45 @@ fn mean(values: impl Iterator<Item = f64>) -> Option<f64> {
     }
 }
 
+/// Approximate paired 95% Student-t interval for the mean difference.
+/// Intervals are absent with fewer than two complete paired observations.
+fn standard_error_ci95(values: &[f64]) -> (Option<f64>, Option<f64>, Option<f64>) {
+    if values.len() < 2 {
+        return (None, None, None);
+    }
+
+    const T_CRITICAL_DF_1_TO_30: [f64; 30] = [
+        12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
+        2.201, 2.179, 2.160, 2.145, 2.131, 2.120, 2.110, 2.101, 2.093, 2.086,
+        2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042,
+    ];
+
+    let n = values.len();
+    let average = values.iter().sum::<f64>() / n as f64;
+    let squared_error = values
+        .iter()
+        .map(|value| (value - average).powi(2))
+        .sum::<f64>();
+    let sample_variance = squared_error / (n - 1) as f64;
+    let standard_error = (sample_variance / n as f64).sqrt();
+    if !average.is_finite() || !standard_error.is_finite() {
+        return (None, None, None);
+    }
+
+    let degrees_freedom = n - 1;
+    let critical = if degrees_freedom <= T_CRITICAL_DF_1_TO_30.len() {
+        T_CRITICAL_DF_1_TO_30[degrees_freedom - 1]
+    } else {
+        1.96
+    };
+    let margin = critical * standard_error;
+    (
+        Some(standard_error),
+        Some(average - margin),
+        Some(average + margin),
+    )
+}
+
 fn sum_optional(values: impl Iterator<Item = Option<u64>>) -> u64 {
     values.flatten().sum()
 }
@@ -632,6 +701,11 @@ fn summarize_stratum(key: StratumKey, rows: &[&PairedTrialV1]) -> StratumSummary
         .filter_map(|row| row.tokens_delta_tool_minus_vanilla)
         .map(|value| value as f64)
         .collect::<Vec<_>>();
+    let (rmsle_se, rmsle_lower, rmsle_upper) = standard_error_ci95(&rmsle);
+    let (accuracy_se, accuracy_lower, accuracy_upper) = standard_error_ci95(&accuracy);
+    let (experiments_se, experiments_lower, experiments_upper) = standard_error_ci95(&experiments);
+    let (rounds_se, rounds_lower, rounds_upper) = standard_error_ci95(&rounds);
+    let (tokens_se, tokens_lower, tokens_upper) = standard_error_ci95(&tokens);
     StratumSummaryV1 {
         module_name: key.module_name,
         noise_level: f64::from_bits(key.noise_bits),
@@ -658,7 +732,22 @@ fn summarize_stratum(key: StratumKey, rows: &[&PairedTrialV1]) -> StratumSummary
         rounds_pair_count: rounds.len(),
         mean_rounds_delta_tool_minus_vanilla: mean(rounds.into_iter()),
         tokens_pair_count: tokens.len(),
-        mean_tokens_delta_tool_minus_vanilla: mean(tokens.into_iter()),
+        mean_tokens_delta_tool_minus_vanilla: mean(tokens.iter().copied()),
+        rmsle_delta_standard_error: rmsle_se,
+        rmsle_delta_ci95_lower: rmsle_lower,
+        rmsle_delta_ci95_upper: rmsle_upper,
+        exact_accuracy_delta_standard_error: accuracy_se,
+        exact_accuracy_delta_ci95_lower: accuracy_lower,
+        exact_accuracy_delta_ci95_upper: accuracy_upper,
+        experiments_delta_standard_error: experiments_se,
+        experiments_delta_ci95_lower: experiments_lower,
+        experiments_delta_ci95_upper: experiments_upper,
+        rounds_delta_standard_error: rounds_se,
+        rounds_delta_ci95_lower: rounds_lower,
+        rounds_delta_ci95_upper: rounds_upper,
+        tokens_delta_standard_error: tokens_se,
+        tokens_delta_ci95_lower: tokens_lower,
+        tokens_delta_ci95_upper: tokens_upper,
     }
 }
 
@@ -823,6 +912,11 @@ pub fn audit(
         manifest.expected_pairs.len(),
         &code_assisted,
     );
+    let (rmsle_se, rmsle_lower, rmsle_upper) = standard_error_ci95(&rmsle_deltas);
+    let (accuracy_se, accuracy_lower, accuracy_upper) = standard_error_ci95(&accuracy_deltas);
+    let (experiments_se, experiments_lower, experiments_upper) = standard_error_ci95(&experiment_deltas);
+    let (rounds_se, rounds_lower, rounds_upper) = standard_error_ci95(&round_deltas);
+    let (tokens_se, tokens_lower, tokens_upper) = standard_error_ci95(&token_deltas);
     let comparison = ComparisonSummaryV1 {
         expected_pairs: manifest.expected_pairs.len(),
         both_observed_pairs,
@@ -836,7 +930,22 @@ pub fn audit(
         rounds_pair_count: round_deltas.len(),
         mean_rounds_delta_tool_minus_vanilla: mean(round_deltas.into_iter()),
         tokens_pair_count: token_deltas.len(),
-        mean_tokens_delta_tool_minus_vanilla: mean(token_deltas.into_iter()),
+        mean_tokens_delta_tool_minus_vanilla: mean(token_deltas.iter().copied()),
+        rmsle_delta_standard_error: rmsle_se,
+        rmsle_delta_ci95_lower: rmsle_lower,
+        rmsle_delta_ci95_upper: rmsle_upper,
+        exact_accuracy_delta_standard_error: accuracy_se,
+        exact_accuracy_delta_ci95_lower: accuracy_lower,
+        exact_accuracy_delta_ci95_upper: accuracy_upper,
+        experiments_delta_standard_error: experiments_se,
+        experiments_delta_ci95_lower: experiments_lower,
+        experiments_delta_ci95_upper: experiments_upper,
+        rounds_delta_standard_error: rounds_se,
+        rounds_delta_ci95_lower: rounds_lower,
+        rounds_delta_ci95_upper: rounds_upper,
+        tokens_delta_standard_error: tokens_se,
+        tokens_delta_ci95_lower: tokens_lower,
+        tokens_delta_ci95_upper: tokens_upper,
     };
 
     let mut grouped: BTreeMap<StratumKey, Vec<&PairedTrialV1>> = BTreeMap::new();
@@ -1149,6 +1258,19 @@ mod tests {
                 .unwrap_err()
                 .contains("duplicate expected trial identity")
         );
+    }
+
+    #[test]
+    fn paired_confidence_interval_is_absent_for_one_pair_and_finite_for_multiple_pairs() {
+        let (se, lower, upper) = standard_error_ci95(&[-0.1]);
+        assert_eq!(se, None);
+        assert_eq!(lower, None);
+        assert_eq!(upper, None);
+
+        let (se, lower, upper) = standard_error_ci95(&[-0.1, 0.1, 0.2, -0.2]);
+        assert!(se.unwrap().is_finite() && se.unwrap() > 0.0);
+        assert!(lower.unwrap() < 0.0);
+        assert!(upper.unwrap() > 0.0);
     }
 
     #[test]
