@@ -13,10 +13,13 @@ usage() {
   echo "Downloads Dryad DOI 10.5061/dryad.k3j9kd5dw using the documented public API." >&2
 }
 
-if [[ $# -ne 1 || "$1" == "-h" || "$1" == "--help" ]]; then
+if [[ $# -ne 1 ]]; then
   usage
-  [[ $# -eq 1 ]] && exit 0
   exit 2
+fi
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
+  exit 0
 fi
 
 for command in curl unzip sha256sum diff sort find awk date mktemp mv dirname basename rm; do
