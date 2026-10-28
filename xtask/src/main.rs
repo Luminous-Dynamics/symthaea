@@ -9,6 +9,7 @@ mod cognitive_adaptation_utility;
 mod cognitive_adaptation_panel;
 mod cognitive_drift_baselines;
 mod cognitive_replay_receipt;
+mod cognitive_replay_driver;
 mod cognitive_adaptation_audit;
 mod cognitive_adaptation_replay;
 mod duplicate_scan;
