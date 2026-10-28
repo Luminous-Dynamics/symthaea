@@ -127,7 +127,7 @@ This branch currently provides a binary-query API, not a complete benchmark back
 
 1. Compile and run focused tests on the exact head; keep the PR draft until results are known.
 2. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
-3. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. The current implementation recomputes eligible-document statistics per query; next replace it with an immutable generation-bound inverted index and include its digest in the commit manifest so queries can use postings without rescanning all documents.
+3. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. **The immutable generation-bound inverted index is now implemented** and its exact digest is bound by the V3 commit manifest. Indexed ranking eliminates per-query tokenization and text-digest hashing, but recovery still parses and structurally validates the entire lexical artifact, reconstructs evidence records, and scans the HDC checksum. The next optimization is a manifest-digest-keyed verified-generation cache or seekable/mmap posting layout, measured against this exact correctness reference.
 4. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
 5. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
 6. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
