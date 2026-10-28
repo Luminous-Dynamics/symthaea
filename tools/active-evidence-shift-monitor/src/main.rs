@@ -16,19 +16,23 @@ const SHIFTED_P: f64 = 0.8;
 const CHANGE_AFTER: usize = 100;
 const HORIZONS: [usize; 4] = [100, 250, 500, 1000];
 const EPS: f64 = 1.0e-12;
+const BETA_PRIOR_A: f64 = 0.5;
+const BETA_PRIOR_B: f64 = 0.5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Boundary {
     FixedFinalOnly,
     FixedTimeRepeated,
     TimeUniform,
+    BetaMixtureEProcess,
 }
 
 impl Boundary {
-    const ALL: [Self; 3] = [
+    const ALL: [Self; 4] = [
         Self::FixedFinalOnly,
         Self::FixedTimeRepeated,
         Self::TimeUniform,
+        Self::BetaMixtureEProcess,
     ];
 
     fn name(self) -> &'static str {
@@ -36,6 +40,7 @@ impl Boundary {
             Self::FixedFinalOnly => "fixed_time_final_only",
             Self::FixedTimeRepeated => "fixed_time_reused_each_look",
             Self::TimeUniform => "time_uniform_alpha_spending",
+            Self::BetaMixtureEProcess => "beta_mixture_e_process",
         }
     }
 
@@ -52,8 +57,26 @@ impl Boundary {
             Self::TimeUniform => {
                 (2.0 * CELLS * n as f64 * (n + 1) as f64 / ALPHA).ln()
             }
+            Self::BetaMixtureEProcess => {
+                unreachable!("Beta-mixture e-process does not use a Hoeffding radius")
+            }
         };
         (log_term / (2.0 * n as f64)).sqrt()
+    }
+
+    fn should_alarm(self, n: usize, successes: usize, horizon: usize, p0: f64) -> bool {
+        if !self.should_check(n, horizon) {
+            return false;
+        }
+        if self == Self::BetaMixtureEProcess {
+            return beta_mixture_log_e_value(n, successes, p0)
+                >= (1.0 / PER_CELL_ALPHA).ln();
+        }
+        let estimate = successes as f64 / n as f64;
+        let width = self.radius(n);
+        let lower = (estimate - width).max(0.0);
+        let upper = (estimate + width).min(1.0);
+        p0 < lower || p0 > upper
     }
 }
 
@@ -85,6 +108,47 @@ const SCENARIOS: [Scenario; 2] = [
     },
 ];
 
+/// Lanczos approximation for log-gamma on positive values.
+fn log_gamma(value: f64) -> f64 {
+    const COEFFICIENTS: [f64; 9] = [
+        0.999_999_999_999_809_9,
+        676.520_368_121_885_1,
+        -1_259.139_216_722_402_8,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
+        12.507_343_278_686_905,
+        -0.138_571_095_265_720_12,
+        9.984_369_578_019_572e-6,
+        1.505_632_735_149_311_6e-7,
+    ];
+    let shifted = value - 1.0;
+    let mut sum = COEFFICIENTS[0];
+    for (index, coefficient) in COEFFICIENTS.iter().enumerate().skip(1) {
+        sum += coefficient / (shifted + index as f64);
+    }
+    let t = shifted + 7.5;
+    0.918_938_533_204_672_7 + (shifted + 0.5) * t.ln() - t + sum.ln()
+}
+
+fn log_beta(a: f64, b: f64) -> f64 {
+    log_gamma(a) + log_gamma(b) - log_gamma(a + b)
+}
+
+/// Log Beta-Bernoulli mixture likelihood ratio against the simple null p0.
+/// The e-value M_n has expectation one under iid Bernoulli(p0); Ville's inequality
+/// therefore bounds P(sup_n M_n >= 1/delta) <= delta under the null. A Beta(1/2,1/2)
+/// alternative mixture is fixed before observing data.
+fn beta_mixture_log_e_value(n: usize, successes: usize, p0: f64) -> f64 {
+    assert!(n > 0 && successes <= n);
+    assert!(p0 > 0.0 && p0 < 1.0);
+    log_beta(
+        successes as f64 + BETA_PRIOR_A,
+        (n - successes) as f64 + BETA_PRIOR_B,
+    ) - log_beta(BETA_PRIOR_A, BETA_PRIOR_B)
+        - successes as f64 * p0.ln()
+        - (n - successes) as f64 * (-p0).ln_1p()
+}
+
 /// Exact dynamic program over the number of successes among streams that have not alarmed.
 /// Each path's probability is integrated exactly; no Monte Carlo sampling is used.
 fn evaluate(
@@ -114,15 +178,7 @@ fn evaluate(
                 (successes, mass * (1.0 - probability)),
                 (successes + 1, mass * probability),
             ] {
-                let should_alarm = if boundary.should_check(n, horizon) {
-                    let estimate = next_successes as f64 / n as f64;
-                    let radius = boundary.radius(n);
-                    let lower = (estimate - radius).max(0.0);
-                    let upper = (estimate + radius).min(1.0);
-                    p0 < lower || p0 > upper
-                } else {
-                    false
-                };
+                let should_alarm = boundary.should_alarm(n, next_successes, horizon, p0);
 
                 if should_alarm {
                     first_alarm[n] += branch_mass;
@@ -320,5 +376,47 @@ mod tests {
         for n in 1..=1000 {
             assert!(Boundary::TimeUniform.radius(n) >= Boundary::FixedTimeRepeated.radius(n));
         }
+    }
+
+    #[test]
+    fn beta_mixture_e_process_controls_null_alarm_and_detects_step_shift_faster() {
+        let beta_null = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            None,
+            0,
+            1000,
+        );
+        assert!(beta_null.false_alarm_probability <= PER_CELL_ALPHA + EPS);
+
+        let beta_shift = evaluate(
+            Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
+            Some(SHIFTED_P),
+            CHANGE_AFTER,
+            500,
+        );
+        let hoeffding_shift = evaluate(
+            Boundary::TimeUniform,
+            NOMINAL_P,
+            Some(SHIFTED_P),
+            CHANGE_AFTER,
+            500,
+        );
+        assert!(beta_shift.false_alarm_probability <= PER_CELL_ALPHA + EPS);
+        assert!(beta_shift.detection_probability > 0.95);
+        assert!(
+            beta_shift.mean_detection_delay.unwrap()
+                < hoeffding_shift.mean_detection_delay.unwrap()
+        );
+    }
+
+    #[test]
+    fn beta_mixture_e_value_matches_beta_binomial_formula_at_known_values() {
+        // With n=2 and one success, Beta(1/2,1/2) marginal probability is 1/8;
+        // under p0=1/2, the observed-sequence likelihood is 1/4, so the BF is 1/2.
+        let value = beta_mixture_log_e_value(2, 1, 0.5).exp();
+        assert!((value - 0.5).abs() <= 1.0e-10);
+        assert!((log_beta(0.5, 0.5) - std::f64::consts::PI.ln()).abs() <= 1.0e-10);
     }
 }
