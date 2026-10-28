@@ -159,7 +159,7 @@ fn main() {
     let mut json = String::new();
     writeln!(
         &mut json,
-        "{{\n  \"benchmark\": \"aviation-calibration-robustness-contract\",\n  \"run_status\": \"ACCEPTED\",\n  \"claim_ceiling\": \"synthetic fixtures only\",\n  \"split_audit\": {{\n    \"status\": \"{:?}\",\n    \"partitions\": [",
+        "{{\n  \"benchmark\": \"aviation-calibration-robustness-contract\",\n  \"contract_status\": \"ACCEPTED\",\n  \"decision_status\": \"EVALUATED_NOT_SELECTED\",\n  \"claim_ceiling\": \"synthetic fixtures only; policy performance is not certified\",\n  \"split_audit\": {{\n    \"status\": \"{:?}\",\n    \"partitions\": [",
         split.status
     ).expect("write to String");
     for (index, stats) in split.partitions.iter().enumerate() {
