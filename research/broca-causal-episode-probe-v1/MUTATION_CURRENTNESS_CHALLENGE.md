@@ -20,7 +20,7 @@ The ABA case matters: if an office address changes A → B → A, an old A recor
 - `fixtures/mutations/trajectories.jsonl`: 9 synthetic event histories.
 - `fixtures/mutations/questions.jsonl`: 12 questions with source-pointer ground truth for required, forbidden/stale, and distractor evidence.
 - `run_probe.py`: accepts optional fixture paths while preserving the original defaults.
-- `score_probe.py`: scores complete-support rate, required-support recall, forbidden/stale hits, and distractor retrieval at the same fixed top-k budget.
+- `score_probe.py`: scores required-support recall, ordinary complete-chain rate, **stale-aware complete-chain rate**, forbidden/stale hits, and distractor retrieval at the same fixed top-k budget.
 
 From the repository root, after compiling the Rust worker:
 
@@ -49,7 +49,8 @@ The labels are intentionally visible because this is a development diagnostic; i
 ## Required result table
 
 Report every method at the same top-k and with the same corpus:
-- complete support-chain rate;
+- **ordinary complete-chain rate:** all required evidence is present, regardless of whether stale evidence is also present;
+- **stale-aware complete-chain rate:** all required evidence is present and no annotated forbidden evidence appears in the same top-k context;
 - required-support recall;
 - question-level stale/forbidden hit rate;
 - forbidden-support item hit rate;
@@ -57,7 +58,9 @@ Report every method at the same top-k and with the same corpus:
 - p50/p95/p99 retrieval latency;
 - context size and total write/index/query cost.
 
-Do not collapse these into a single accuracy number. A method that raises recall by flooding context or reintroducing stale facts has not won.
+The stale-aware complete-chain metric is a local diagnostic gate inspired by the problem targeted by Memora's Forgetting-Aware Memory Accuracy (FAMA); it is **not** the official FAMA formula and must not be labeled FAMA. FAMA research reports that memory systems frequently reuse invalid memories and fail to reconcile evolving facts. Compare against Memora/FAMA separately if the official implementation and evaluation setup are available. <https://aclanthology.org/2026.findings-acl.1337/>
+
+Do not collapse these into a single accuracy number. A method that raises ordinary recall by returning both the current answer and obsolete evidence has not won.
 
 ## Research gates
 
@@ -66,6 +69,12 @@ Do not collapse these into a single accuracy number. A method that raises recall
 3. **Currentness:** zero forbidden-hit observations in this small suite is only a smoke test, never a zero-risk claim.
 4. **Efficiency:** compare at matched context budgets and publish the entire lifecycle cost, not just query latency.
 5. **Generalization:** freeze a held-out set before tuning; test natural-language updates, contradictory sources, delayed updates, and A → B → A reversions separately.
+
+## Why the evaluation needs two chain metrics
+
+The ordinary complete-chain metric can reward a retrieval set that contains every required item **and** a superseded item. The stale-aware metric deliberately makes that case fail, while preserving the separate forbidden-hit rates so severity and frequency remain visible. Keep both metrics: the gap between them quantifies cases where recall alone hides a currentness defect.
+
+This distinction mirrors a wider finding in recent memory evaluation: temporal update and forgetting are separate capabilities, not just retrieval recall. Memora/FAMA evaluates reuse of obsolete or invalidated memories; MRAgent evaluates active reconstruction from associative evidence; Mem2ActBench checks whether memory translates into correct tool selection and argument grounding. Use them as distinct comparison lanes rather than combining their scores.
 
 ## Next architecture implication
 
