@@ -12,6 +12,8 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Run-manifest schema and adversarial tests](test_run_manifest.py)
 - [Run-manifest verifier tests](test_verify_run_manifest.py)
 - [Confirmatory-run provenance procedure](CONFIRMATORY_RUNS.md)
+- [Language capability matrix](language-capability-matrix.json)
+- [Language capability claim-boundary tests](test_language_capability_matrix.py)
 - [Synthetic ledger task contract](examples/ledger-reconciliation/task.json)
 - [Rust reference implementation and test instructions](ledger-reconcile/README.md)
 - [Fixture integrity gate](check-fixture-integrity.sh)
