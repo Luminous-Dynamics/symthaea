@@ -1,7 +1,7 @@
 # Fail-Closed Policy-to-Risk-Matrix Binding
 
 **Date:** 2026-10-28  
-**Status:** executable validation helper and tests; not yet integrated into production Rust control path.
+**Status:** Python validation helper plus a typed Rust validator and inline unit tests are committed. The Rust tests have not been executed in this environment because no Rust/Cargo toolchain is installed. The verifier is not yet wired into production action dispatch.
 
 ## Why this gate is needed
 
@@ -31,6 +31,12 @@ At a planning boundary, verify_binding rejects:
 
 The matrix is normalized to a stable canonical binary representation, so C- vs Fortran-contiguous storage does not change the digest.
 
+## Rust implementation
+
+A typed implementation now lives at crates/domains/symthaea-subterranean/src/policy_risk_binding.rs and is exposed by the subterranean crate. The crate manifest and Cargo.lock were updated for the workspace's existing sha2 dependency. Its eight inline unit tests cover canonical manifest round-trip, row permutations, policy and hypothesis order, execution order, trusted-anchor/self-digest tampering, invalid matrix values/shape, and signed-zero normalization.
+
+This Rust module is **authored but not locally compiled or tested**: the current environment has no cargo or rustc executable, and the PR's latest CI run was skipped. Its committed file has Git blob 63c4e9aacfe5b7db5971e701c42ae38ac226c4c3; the crate manifest blob is 45de998db181d6459983e417942db27aee528e0e; lib.rs blob is 525647bb48110711bddecc813879b66be5e7e707; Cargo.lock blob is 5701d38370bb363508872871a15eb27537f8d645.
+
 ## Trust model caveat
 
 A digest is an integrity binding, not authentication. The trusted manifest SHA-256 must come from a separately authenticated signed release/receipt or trusted control-plane record. If an attacker can replace both the matrix and the purported trusted digest, this helper alone cannot establish authenticity. The helper does not itself execute actions or prevent a compromised caller from bypassing the gate.
@@ -44,7 +50,7 @@ Eight local tests pass, covering deterministic canonicalization, row permutation
 
 ## Next production integration gate
 
-1. Add a typed Rust manifest with a trusted signature/release-receipt binding—not Python-only enforcement.
+1. Compile and run the new Rust unit tests, then add trusted signature/release-receipt verification (the current Rust module checks integrity digests but not authenticity).
 2. Bind the risk tensor digest, policy ID order, hypothesis order, objective/schema version, simulator build identity, model revision, calibration receipt, and execution artifact digest into one signed decision receipt.
 3. Verify this receipt immediately before optimization and again before dispatch; any mismatch should reject the proposed action and use a prequalified safe baseline or abstain.
 4. Add mutation/property tests: reorder rows/IDs, substitute a policy while retaining its label, replay stale matrices, mutate a hypothesis schema, and replace the risk tensor after certification.
