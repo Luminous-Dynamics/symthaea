@@ -297,6 +297,6 @@ Follow-up: [AVIATION-ENTERPRISE-008 #8752](https://github.com/Luminous-Dynamics/
 
 The new [ACSP-001 calibration and split-integrity protocol](./AVIATION_CALIBRATION_AND_SPLIT_INTEGRITY.md) adds declared-data audits for row-ID uniqueness, event-cluster leakage across Training/Calibration/Validation/Test, minimum distinct-cluster counts, optional strict chronological boundaries, missing timestamps, and explicit tuning provenance. A selected uncertainty radius or decision threshold that declares the final Test split as its selection source is rejected. The module also emits per-split counts and time bounds.
 
-The key claim ceiling is explicit: these checks validate supplied metadata only. They cannot prove that cluster identifiers reflect real independent events or that analysts did not inspect test outcomes outside the declared provenance. Thirteen unit tests and five integration-oracle tests are defined but not executed due to the missing Rust toolchain.
+The key claim ceiling is explicit: these checks validate supplied metadata only. They cannot prove that cluster identifiers reflect real independent events or that analysts did not inspect test outcomes outside the declared provenance. Fourteen unit tests and five integration-oracle tests are defined but not executed due to the missing Rust toolchain.
 
 Follow-up: [AVIATION-ENTERPRISE-009 #8770](https://github.com/Luminous-Dynamics/symthaea/issues/8770).
