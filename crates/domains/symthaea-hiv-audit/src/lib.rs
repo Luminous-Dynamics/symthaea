@@ -399,6 +399,19 @@ fn audit_source_archive(path: &Path) -> Result<SourceArchiveAudit, String> {
         .ok_or_else(|| "source archive path has no UTF-8 filename".to_owned())?
         .to_owned();
     validate_plain_filename(&filename)?;
+    if !path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("zip")) {
+        return Err("source archive must have a .zip extension".to_owned());
+    }
+    let mut prefix = [0u8; 4];
+    File::open(path)
+        .and_then(|mut file| file.read_exact(&mut prefix))
+        .map_err(|e| format!("read ZIP signature from {}: {e}", path.display()))?;
+    if prefix != [0x50, 0x4b, 0x03, 0x04]
+        && prefix != [0x50, 0x4b, 0x05, 0x06]
+        && prefix != [0x50, 0x4b, 0x07, 0x08]
+    {
+        return Err("source archive does not have a recognized ZIP signature".to_owned());
+    }
     let byte_length = fs::metadata(path)
         .map_err(|e| format!("stat source archive {}: {e}", path.display()))?.len();
     let sha256 = sha256_file(path)?;
