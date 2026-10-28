@@ -102,7 +102,13 @@ def validate_fixtures(trajectories: list[dict[str, Any]], questions: list[dict[s
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", required=True, type=Path, help="built broca-lme-worker executable")
-    parser.add_argument("--k", type=int, default=5, help="retrieval budget/top-k (1..100)")
+    parser.add_argument("--k", type=int, default=5, help="final comparison budget/top-k (1..100)")
+    parser.add_argument(
+        "--candidate-k",
+        type=int,
+        default=20,
+        help="BM25 candidate pool to retain for fixed-budget retrieval ablations (must be >= k)",
+    )
     parser.add_argument("--timeout-seconds", type=float, default=60.0)
     parser.add_argument("--output", required=True, type=Path, help="output prediction JSONL path")
     args = parser.parse_args()
@@ -113,6 +119,8 @@ def main() -> int:
         raise SystemExit(f"worker must exist and be executable: {worker}")
     if not 1 <= args.k <= 100:
         raise SystemExit("--k must be in [1, 100]")
+    if isinstance(args.candidate_k, bool) or not args.k <= args.candidate_k <= 100:
+        raise SystemExit("--candidate-k must be in [k, 100]")
     if not 0.1 <= args.timeout_seconds <= 3600:
         raise SystemExit("--timeout-seconds must be in [0.1, 3600]")
 
@@ -134,7 +142,7 @@ def main() -> int:
             "init",
             scope_id="web",
             now_unix_ms=0,
-            bm25={"k1": 1.2, "b": 0.75, "max_items": args.k},
+            bm25={"k1": 1.2, "b": 0.75, "max_items": args.candidate_k},
         )
     ]
     expected_ids: list[str] = ["probe:init"]
@@ -222,7 +230,8 @@ def main() -> int:
         "worker_path": str(worker),
         "worker_sha256": sha256_bytes(worker.read_bytes()),
         "scope_id": "web",
-        "bm25": {"k1": 1.2, "b": 0.75, "max_items": args.k},
+        "bm25": {"k1": 1.2, "b": 0.75, "max_items": args.candidate_k},
+        "evaluation_k": args.k,
         "protocol": "bounded JSONL; worker request_id and ok checked",
         "trajectory_fixture_sha256": sha256_bytes(trajectory_path.read_bytes()),
         "question_fixture_sha256": sha256_bytes(question_path.read_bytes()),
