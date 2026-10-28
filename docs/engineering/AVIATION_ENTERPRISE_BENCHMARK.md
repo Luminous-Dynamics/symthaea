@@ -282,3 +282,12 @@ The current industry comparator is EUROCONTROL's network-level Capacity and Weat
 A new Rust module, `crates/domains/symthaea-operations-research/src/aviation_network_robustness.rs`, evaluates candidate outcomes across identical frozen scenarios and reports mean benefit, worst-case system result, empirical upper-tail regression and worst per-actor regression. It joins by scenario ID rather than list position, requires a stable actor universe/domain mapping across the ensemble and rejects rejected/indeterminate outcomes. The assessment binds the configured tail fraction to the one used to calculate the report.
 
 The companion protocol is [AVIATION_NETWORK_ROBUSTNESS_BENCHMARK.md](./AVIATION_NETWORK_ROBUSTNESS_BENCHMARK.md). This extends AVNX's single-scenario Pareto/harm guard into a finite stress ensemble. It does not provide a distribution-free guarantee over unseen disruptions, generate plans, or replace an independent feasibility checker. Twelve unit tests are defined but not compiled or executed in this environment.
+
+
+## Distribution-shift sensitivity (28 October 2026)
+
+The new [distributionally robust benchmark](./AVIATION_DISTRIBUTIONALLY_ROBUST_BENCHMARK.md) asks whether a candidate remains useful when nominal disruption probabilities are wrong. The module `aviation_distributional_robustness.rs` computes the worst expected candidate-minus-baseline cost over a finite total-variation ball around declared scenario probabilities. It reports the nominal value, worst-case value, worst individual scenario, and adversarial probability distribution; the assessment is bound to the evaluated TV radius and a predeclared single-scenario regression cap.
+
+This is intentionally a narrow, exact finite-support subproblem—not a generic Wasserstein-DRO solver, an estimator of real disruption probabilities, or a guarantee about omitted events. An additional three-test integration oracle enumerates tiny probability grids independently of the production greedy method. Both unit and integration tests remain unexecuted because this environment lacks a Rust toolchain.
+
+Follow-up: [AVIATION-ENTERPRISE-008 #8752](https://github.com/Luminous-Dynamics/symthaea/issues/8752).
