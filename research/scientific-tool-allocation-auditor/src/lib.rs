@@ -780,6 +780,26 @@ mod tests {
     }
 
     #[test]
+    fn empty_trial_file_reports_all_assigned_cells_missing() {
+        let manifest_bytes = serde_json::to_vec(&manifest()).unwrap();
+        let report = audit(&manifest_bytes, b"").unwrap();
+        assert_eq!(report.body.expected_cell_count, 10);
+        assert_eq!(report.body.observed_cell_count, 0);
+        assert_eq!(report.body.missing_cell_count, 10);
+        let no_tool = report
+            .body
+            .treatment_summaries
+            .iter()
+            .find(|summary| summary.treatment == Treatment::NoTool)
+            .unwrap();
+        assert_eq!(no_tool.assigned_runs, 2);
+        assert_eq!(no_tool.missing_runs, 2);
+        assert_eq!(no_tool.recovery_rate_all_assigned, 0.0);
+        assert_eq!(no_tool.recovery_rate_completed, None);
+        assert!(report.verify_receipt());
+    }
+
+    #[test]
     fn missing_cell_keeps_manifest_denominator_and_marks_pair_incomplete() {
         let (manifest_bytes, trial_bytes) = input_bytes(Some((
             "law-hard".to_owned(),
