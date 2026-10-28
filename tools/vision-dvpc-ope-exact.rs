@@ -7,6 +7,7 @@ use std::env;
 use std::fmt::Write as _;
 
 const GRID: &str = include_str!("../tests/fixtures/vision-dvpc-028-scenarios.tsv");
+const SCENARIO_HEADER: &str = "scenario_id\\tn\\ttarget_probability_a\\ttrue_logging_probability_a\\testimated_logging_probability_a\\treward_mean_a\\treward_mean_b\\tqhat_a\\tqhat_b\\tclip_cap";
 const EPS: f64 = 1e-10;
 
 #[derive(Clone, Debug)]
@@ -94,7 +95,7 @@ fn parse_grid(input: &str) -> Result<Vec<Scenario>, String> {
         }
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.len() != 10 {
-            return Err(invalid(format!("line {}: expected nine fields", index + 2)));
+            return Err(invalid(format!("line {}: expected ten fields", index + 2)));
         }
         if fields[0].is_empty() || !ids.insert(fields[0].to_owned()) {
             return Err(invalid(format!("line {}: empty or duplicate scenario_id", index + 2)));
@@ -209,10 +210,14 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
             let estimator_logging_p = if action_a { s.estimated_logging_a } else { estimated_logging_b };
             let target_p = if action_a { s.target_a } else { target_b };
             let qhat = if action_a { s.qhat_a } else { s.qhat_b };
-            if estimator_logging_p <= 0.0 {
-                return Err(invalid("estimated logging propensity is zero for an observed action"));
+            if target_p <= 0.0 {
+                weights[row] = 0.0;
+            } else {
+                if estimator_logging_p <= 0.0 {
+                    return Err(invalid("estimated logging propensity is zero for an observed target-supported action"));
+                }
+                weights[row] = target_p / estimator_logging_p;
             }
-            weights[row] = target_p / estimator_logging_p;
             rewards[row] = reward;
             q_selected[row] = qhat;
         }
@@ -488,7 +493,7 @@ mod tests {
     #[test]
     fn malformed_scenarios_fail_closed() {
         assert!(parse_grid("bad header\n").is_err());
-        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap\nx\t0\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n").is_err());
-        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap\nx\t6\t1.4\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n").is_err());
+        assert!(parse_grid(&format!("{SCENARIO_HEADER}\nx\t0\t0.5\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n")).is_err());
+        assert!(parse_grid(&format!("{SCENARIO_HEADER}\nx\t6\t1.4\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n")).is_err());
     }
 }
