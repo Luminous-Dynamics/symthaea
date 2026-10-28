@@ -427,14 +427,20 @@ fn make_check(property: &str, errors: &[f64], tolerance: f64) -> PropertyCheck {
         };
     }
     let max_error = errors.iter().copied().fold(0.0_f64, f64::max);
-    let mean_error = errors.iter().sum::<f64>() / errors.len() as f64;
+    // Divide each term before summing so a long finite vector cannot overflow
+    // solely because the sum is accumulated before normalization.
+    let mean_error = errors
+        .iter()
+        .map(|error| *error / errors.len() as f64)
+        .sum::<f64>();
+    let finite_summary = max_error.is_finite() && mean_error.is_finite();
     PropertyCheck {
         property: property.to_owned(),
-        max_error: Some(max_error),
-        mean_error: Some(mean_error),
+        max_error: finite_summary.then_some(max_error),
+        mean_error: finite_summary.then_some(mean_error),
         tolerance,
         checked_values: errors.len(),
-        passed: max_error <= tolerance,
+        passed: finite_summary && max_error <= tolerance,
     }
 }
 
