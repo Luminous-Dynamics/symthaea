@@ -1140,8 +1140,23 @@ impl CognitiveLoopService {
         outcome_good: bool,
         prediction_error: f64,
     ) {
+        self.record_reasoning_posthoc_with_optional_pe(
+            gate_passed,
+            outcome_good,
+            Some(prediction_error),
+        );
+    }
+
+    /// Record gate/outcome calibration even when this cycle has no valid PE comparison.
+    #[cfg(feature = "reasoning_engine")]
+    pub fn record_reasoning_posthoc_with_optional_pe(
+        &mut self,
+        gate_passed: bool,
+        outcome_good: bool,
+        prediction_error: Option<f64>,
+    ) {
         if let Some(ref mut re) = self.reasoning_engine {
-            re.record_posthoc(gate_passed, outcome_good, prediction_error);
+            re.record_posthoc_with_optional_pe(gate_passed, outcome_good, prediction_error);
         }
     }
 }
