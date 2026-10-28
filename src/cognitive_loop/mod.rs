@@ -1166,12 +1166,18 @@ impl CognitiveLoopService {
     #[cfg(feature = "reasoning_engine")]
     pub fn record_reasoning_posthoc_with_evidence(
         &mut self,
+        decision_cycle: Option<u64>,
         gate_passed: bool,
         outcome_good: bool,
         prediction_evidence: Option<PredictionErrorEvidence>,
     ) {
         if let Some(ref mut re) = self.reasoning_engine {
-            re.record_posthoc_with_evidence(gate_passed, outcome_good, prediction_evidence);
+            re.record_posthoc_with_evidence(
+                decision_cycle,
+                gate_passed,
+                outcome_good,
+                prediction_evidence,
+            );
         }
     }
 }
