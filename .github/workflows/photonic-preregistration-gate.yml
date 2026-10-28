@@ -1,0 +1,35 @@
+name: Photonic Preregistration Readiness Gate
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/quantum/benchmarks/PHOT-CTRL-003A-PREREGISTRATION-TEMPLATE.json"
+      - "docs/research/quantum/benchmarks/PHOT-CTRL-003A-MANIFEST-SCHEMA.json"
+      - "scripts/research/photonic-preregistration-gate.sh"
+      - "scripts/research/test-photonic-preregistration-gate.sh"
+      - ".github/workflows/photonic-preregistration-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preregistration-readiness:
+    name: Fail-closed PHOT-CTRL-004 readiness tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Check source template stays blocked
+        run: |
+          set -euo pipefail
+          jq -e . docs/research/quantum/benchmarks/PHOT-CTRL-003A-PREREGISTRATION-TEMPLATE.json >/dev/null
+          jq -e . docs/research/quantum/benchmarks/PHOT-CTRL-003A-MANIFEST-SCHEMA.json >/dev/null
+          bash scripts/research/photonic-preregistration-gate.sh \
+            --assert-template-blocked \
+            docs/research/quantum/benchmarks/PHOT-CTRL-003A-PREREGISTRATION-TEMPLATE.json
+
+      - name: Run positive and negative readiness fixtures
+        run: bash scripts/research/test-photonic-preregistration-gate.sh
