@@ -10,6 +10,8 @@ The release describes 451 questions across web and enterprise, up to 500 traject
 
 Minimum matched arms: `no_retrieval`, `rag_query_to_slice`, and Broca. Add `rag_query_to_slice_notes`, AgentRunbook-R, vanilla Codex and AgentRunbook-C where feasible. Pin upstream code, dataset and harness digests, model revisions, prompts, token limits, tier, per-domain outputs and official aggregate. Report the official frontier metric plus paired per-question outcomes, lifecycle costs and p50/p95 latency.
 
+**Current-upstream baseline caveat (checked 2026-10-28):** the official repository also has an `agentrunbook_c_v2` implementation and runner, but `leaderboard/compute_lafs.py` still defines the released fixed reference frontier using the historical AgentRunbook-C point. For a defensible comparison, pin one upstream commit and (a) compute the official LAFS gain against that commit's unchanged fixed frontier, and (b) report AgentRunbook-C V2 as a separately named measured arm / supplementary operating point. Do not silently replace the reference frontier or label C-V2 scores as the official historical C result. Keep any later official leaderboard revision as a new benchmark protocol version, not a retroactive substitution.
+
 The existing receipt gate PR #8653 validates artifact completeness and digest consistency only. It is not the adapter, scorer or benchmark result.
 
 ## Priority 1: Mem2ActBench
