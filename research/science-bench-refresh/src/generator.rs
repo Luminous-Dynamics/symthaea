@@ -950,8 +950,10 @@ mod tests {
             .iter_mut()
             .find(|task| task["family_id"] == "semantic_invariance")
             .unwrap();
-        task["evaluator_only"]["visible_coordinate_law"]["slope"] =
-            json!(task["evaluator_only"]["visible_coordinate_law"]["slope"].as_f64().unwrap() + 0.5);
+        let slope = task["evaluator_only"]["visible_coordinate_law"]["slope"]
+            .as_f64()
+            .unwrap();
+        task["evaluator_only"]["visible_coordinate_law"]["slope"] = json!(slope + 0.5);
         let mutated = serde_json::to_vec(&task_set).unwrap();
         let error = validate_synthetic_task_semantics(&mutated)
             .expect_err("a broken coordinate transform must fail semantic qualification");
