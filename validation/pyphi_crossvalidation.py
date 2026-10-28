@@ -74,6 +74,7 @@ class ValidationResult:
     topology_name: str
     n_nodes: int
     model_sha256: str
+    rust_payload_blake3: Optional[str] = None
     candidate_phi: Optional[float] = None
     pyphi_phi_s: Optional[float] = None
     pyphi_computation_time: float = 0.0
@@ -390,6 +391,7 @@ class PyPhiValidator:
             "metric_id",
             "formalism_profile",
             "model_sha256",
+            "request_blake3",
             "n_nodes",
             "state",
             "value",
@@ -399,6 +401,9 @@ class PyPhiValidator:
             raise RuntimeError(f"Rust TPM adapter output missing fields {missing}; no score produced")
         if output["schema_version"] != "symthaea-iit3-tpm-output-v1":
             raise RuntimeError(f"Unsupported Rust output schema: {output['schema_version']!r}")
+        request_blake3 = output["request_blake3"]
+        if not isinstance(request_blake3, str) or not (len(request_blake3) == 64 and all(ch in "0123456789abcdef" for ch in request_blake3)):
+            raise RuntimeError("Rust adapter request_blake3 must be 64 lowercase hexadecimal characters")
         if output["metric_id"] != RUST_CANDIDATE_METRIC_ID:
             raise RuntimeError(f"Unexpected Rust metric identity: {output['metric_id']!r}")
         for key in ("formalism_profile", "model_sha256", "n_nodes", "state"):
@@ -412,7 +417,7 @@ class PyPhiValidator:
         value = float(value)
         if not math.isfinite(value) or value < 0.0:
             raise RuntimeError(f"Rust adapter returned invalid candidate score {value!r}")
-        return value, elapsed, output["metric_id"]
+        return value, elapsed, output["metric_id"], request_blake3
 
     def validate_topology(self, topology: TopologySpec) -> ValidationResult:
         """Compare both methods on one exact TPM, state, profile, and model digest."""
@@ -431,10 +436,11 @@ class PyPhiValidator:
 
         errors: List[str] = []
         try:
-            value, elapsed, metric_id = self.compute_candidate_phi(payload)
+            value, elapsed, metric_id, request_blake3 = self.compute_candidate_phi(payload)
             result.candidate_phi = value
             result.candidate_computation_time = elapsed
             result.candidate_metric_id = metric_id
+            result.rust_payload_blake3 = request_blake3
         except Exception as exc:
             errors.append(f"candidate: {type(exc).__name__}: {exc}")
 
@@ -609,8 +615,8 @@ class PyPhiValidator:
             "",
             "## Per-case results",
             "",
-            "| Case | Nodes | Model SHA-256 | Candidate score | PyPhi φ_s | Abs. error | Status |",
-            "|---|---:|---|---:|---:|---:|---|",
+            "| Case | Nodes | Host model SHA-256 | Rust request BLAKE3 | Candidate score | PyPhi φ_s | Abs. error | Status |",
+            "|---|---:|---|---|---:|---:|---:|---|",
         ])
         for result in report.results:
             paired = result.candidate_phi is not None and result.pyphi_phi_s is not None and result.error_message is None
@@ -621,7 +627,7 @@ class PyPhiValidator:
             status = "PAIRED" if paired else "FAILED / UNPAIRED"
             md.append(
                 f"| {result.topology_name} | {result.n_nodes} | {result.model_sha256 or 'N/A'} | "
-                f"{candidate} | {reference} | {error_text} | {status} |"
+                f"{result.rust_payload_blake3 or 'N/A'} | {candidate} | {reference} | {error_text} | {status} |"
             )
             if result.error_message:
                 md.append("")
@@ -632,7 +638,7 @@ class PyPhiValidator:
             "",
             "- TPM rows are state-by-node; state ordering is little-endian (unit 0 is the least significant bit).",
             "- Both implementations receive the same TPM, candidate state, topology-derived connectivity, and IIT_3_0 profile.",
-            "- The model SHA-256 is computed over the canonical JSON model description and returned by the Rust adapter; a mismatched digest fails the pair.",
+            "- Host model SHA-256 is computed over the canonical model description; Rust independently computes BLAKE3 over the exact raw stdin request bytes and records it alongside the candidate output.",
             "- The current acceptance status is for this finite fixture set only; held-out generator families and independent known-answer fixtures remain separate gates.",
             "",
         ])
