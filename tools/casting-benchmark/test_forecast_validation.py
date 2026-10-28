@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import io
+import json
 import math
+import tempfile
 import unittest
+from pathlib import Path
 
-from forecast_validation import make_outcome_record, score_forecasts
+from forecast_validation import main, make_outcome_record, score_forecasts
 
 
 MODEL = "a" * 64
@@ -102,6 +108,66 @@ class ForecastValidationTests(unittest.TestCase):
         outcomes[0]["outcome_index"] = 2
         with self.assertRaisesRegex(ValueError, "outside the forecast class range"):
             score_forecasts(forecasts, outcomes)
+
+    def test_cli_binds_exact_input_manifest_bytes_and_evaluator(self):
+        forecasts = [forecast("f1", [0.7, 0.3])]
+        outcomes = outcomes_for(forecasts, [0])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            forecast_path = root / "forecasts.json"
+            outcome_path = root / "outcomes.json"
+            output_path = root / "receipt.json"
+            forecast_path.write_text(json.dumps(forecasts, separators=(",", ":")), encoding="utf-8")
+            outcome_path.write_text(json.dumps(outcomes, separators=(",", ":")), encoding="utf-8")
+            forecast_bytes = forecast_path.read_bytes()
+            outcome_bytes = outcome_path.read_bytes()
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main([
+                    str(forecast_path), str(outcome_path),
+                    "--output", str(output_path), "--bins", "5",
+                ])
+            self.assertEqual(code, 0)
+            receipt = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["receipt_label"], "PREQUENTIAL_PREDICTIVE_SCORING_NOT_CALIBRATION_CERTIFICATION")
+            self.assertEqual(
+                receipt["source_artifacts"]["forecast_manifest_sha256"],
+                hashlib.sha256(forecast_bytes).hexdigest(),
+            )
+            self.assertEqual(
+                receipt["source_artifacts"]["outcome_manifest_sha256"],
+                hashlib.sha256(outcome_bytes).hexdigest(),
+            )
+            self.assertEqual(len(receipt["evaluator_sha256"]), 64)
+
+    def test_cli_rejects_duplicate_json_keys_and_emits_no_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            forecast_path = root / "forecasts.json"
+            outcome_path = root / "outcomes.json"
+            output_path = root / "receipt.json"
+            forecast_path.write_text('[{"forecast_id":"x","forecast_id":"y"}]', encoding="utf-8")
+            outcome_path.write_text("[]", encoding="utf-8")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = main([str(forecast_path), str(outcome_path), "--output", str(output_path)])
+            self.assertEqual(code, 2)
+            self.assertIn("duplicate JSON key", stderr.getvalue())
+            self.assertFalse(output_path.exists())
+
+    def test_cli_refuses_to_overwrite_an_input(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            forecast_path = root / "forecasts.json"
+            outcome_path = root / "outcomes.json"
+            forecast_path.write_text("[]", encoding="utf-8")
+            original = forecast_path.read_bytes()
+            outcome_path.write_text("[]", encoding="utf-8")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = main([str(forecast_path), str(outcome_path), "--output", str(forecast_path)])
+            self.assertEqual(code, 2)
+            self.assertEqual(forecast_path.read_bytes(), original)
 
     def test_reliability_bins_are_fixed_and_descriptive(self):
         forecasts = [
