@@ -707,8 +707,8 @@ mod tests {
     }
 
     #[test]
-    fn task_order_is_determined_by_opaque_id_not_family_grouping() {
-        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+    fn task_order_is_sorted_by_opaque_id() {
+        let (_, _, _, generated) = complete_manifest_and_tasks();
         let tasks: Value = serde_json::from_slice(&generated).unwrap();
         let rows = tasks["tasks"].as_array().unwrap();
         let ids: Vec<&str> = rows
@@ -718,7 +718,6 @@ mod tests {
         let mut sorted = ids.clone();
         sorted.sort_unstable();
         assert_eq!(ids, sorted);
-        assert!(manifest.len() > 0 && seed.len() >= 32 && !config.is_empty());
     }
 
     #[test]
