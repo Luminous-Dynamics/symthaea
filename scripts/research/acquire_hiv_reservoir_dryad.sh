@@ -19,7 +19,7 @@ if [[ $# -ne 1 || "$1" == "-h" || "$1" == "--help" ]]; then
   exit 2
 fi
 
-for command in curl unzip sha256sum diff sort find awk date mktemp; do
+for command in curl unzip sha256sum diff sort find awk date mktemp mv dirname basename; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "ERROR: required command not found: $command" >&2
     exit 2
