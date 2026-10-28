@@ -733,6 +733,35 @@ mod tests {
     }
 
     #[test]
+    fn account_totals_sum_to_global_totals() {
+        let report = reconcile_csv(INPUT).expect("fixture ledger is valid");
+        let account_credits: u64 = report.accounts.iter().map(|account| account.credits_minor).sum();
+        let account_debits: u64 = report.accounts.iter().map(|account| account.debits_minor).sum();
+        let account_net: i128 = report.accounts.iter().map(|account| account.net_minor).sum();
+        let account_transactions: u64 = report.accounts.iter().map(|account| account.unique_transactions).sum();
+        assert_eq!(account_credits, report.credits_minor);
+        assert_eq!(account_debits, report.debits_minor);
+        assert_eq!(account_net, report.net_minor);
+        assert_eq!(account_transactions, report.unique_transactions);
+    }
+
+    #[test]
+    fn global_totals_net_is_credits_minus_debits() {
+        let report = reconcile_csv(INPUT).expect("fixture ledger is valid");
+        assert_eq!(report.credits_minor, 2049);
+        assert_eq!(report.debits_minor, 350);
+        assert_eq!(report.net_minor, 1699);
+        assert_eq!(report.net_minor, i128::from(report.credits_minor) - i128::from(report.debits_minor));
+    }
+
+    #[test]
+    fn exact_duplicate_count_matches_input_multiplicity() {
+        let report = reconcile_csv(INPUT).expect("fixture ledger is valid");
+        assert_eq!(report.unique_transactions, 4);
+        assert_eq!(report.exact_duplicate_rows_ignored, 1);
+    }
+
+    #[test]
     fn bare_carriage_return_is_rejected() {
         let input = "transaction_id,account_id,side,amount_minor\rTX-1,AC-1,CREDIT,1";
         assert!(reconcile_csv(input).is_err());
