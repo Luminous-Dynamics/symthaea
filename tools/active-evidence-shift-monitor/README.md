@@ -187,13 +187,14 @@ This benchmark now allows the next experiment to sweep not only sentinel share b
 
 ## 20. A fixed portfolio of anytime-valid e-processes
 
-The new `--eprocess-family-csv` report compares five predeclared monitoring strategies under the same Ville threshold (1/\delta), with per-cell (delta=0.05/12), horizon 1,000, and a step change after observation 100:
+The new `--eprocess-family-csv` report compares six predeclared monitoring strategies under the same Ville threshold (1/\delta), with per-cell (delta=0.05/12), horizon 1,000, and a step change after observation 100:
 
 - Beta(1/2, 1/2), the existing Jeffreys mixture.
 - Beta(1, 1), a uniform alternative.
 - Beta(5, 5), a moderately concentrated alternative.
 - Beta(20, 20), a local alternative concentrated near the nominal rate p0=0.5.
-- Equal-weight portfolio of all four e-processes, with weights fixed at 1/4 before observations.
+- Equal-weight portfolio of all four point-null e-processes, with weights fixed at 1/4 before observations.
+- Composite-null band-betting process for the preregistered interval p in [0.48, 0.52], using an equal mixture of five fixed stakes {0.05, 0.10, 0.20, 0.40, 0.80} in each direction. Its guarantee covers any conditional Bernoulli rate that stays inside the interval; its interval is part of the null hypothesis, not a learned estimate.
 
 A convex mixture of e-processes is again an e-process under the same null, so the portfolio retains the anytime-valid Ville guarantee. It does not choose the prior after seeing the observed shift. The CSV includes stationary-null and selection-bias controls, downward and upward step shifts spanning p1=0.10–0.45 and p1=0.55–0.90, and six stable streams whose actual event rate differs from the declared p0=0.5 by 0.01–0.05. This makes symmetry explicit for the p0=0.5, symmetric-prior fixture and adds a negative control for baseline misspecification. It records stationary alarm probability, false alarms before a true shift, post-shift detection probability, and conditional delay. The 18 scenarios across five families produce 90 rows.
 
@@ -206,8 +207,9 @@ An independent exact-DP Python prototype gave the following horizon-1,000 result
 | Beta(5, 5) | 0.002667 | 19.39% | 97.13% | 99.90% | 99.90% |
 | Beta(20, 20) | 0.001884 | 22.83% | 97.92% | 99.99% | 99.99% |
 | Equal portfolio | 0.002778 | 17.93% | 96.75% | 99.84% | 99.84% |
+| Composite band [0.48, 0.52] | 0.000213 | 1.77% | 73.53% | 99.9867% | 99.9867% |
 
-These are exact finite-Bernoulli probabilities for the predeclared model and horizon—not real-world results or evidence that Beta(20,20) is universally better. The single-prior policies have different realized null alarm probabilities below the common theoretical bound; the equal portfolio raises weak-shift power versus the original Jeffreys monitor in this fixture. We must not choose a default based only on this grid.
+These are exact finite-Bernoulli probabilities for the predeclared model and horizon—not real-world results or evidence that a prior or composite interval is universally better. The single-prior policies have different realized null alarm probabilities below the common theoretical bound; the equal portfolio raises weak-shift power versus the original Jeffreys monitor in this fixture. The composite-band e-process buys validity for every conditional rate in [0.48, 0.52], but is deliberately less sensitive to shifts just outside that interval: at p1=0.55 its post-shift detection is 1.77%, versus 11.84% for the point-null Jeffreys process. At p1=0.60 the composite process detects 73.53%; at p1=0.70 and p1=0.80 it detects approximately 99.99%. This is a robustness/power trade-off, not an overall winner.
 
 **Important protocol distinction:** the family report uses the same Ville threshold for every policy, so each remains anytime-valid. It is not a matched-realized-false-alarm leaderboard; actual null alarm probabilities are emitted so the trade-offs stay visible. The next calibration experiment should compare power at matched empirical false-alarm budgets without calling finite-horizon-calibrated thresholds anytime-valid.
 
@@ -220,17 +222,24 @@ The e-process guarantee assumes that the declared nominal probability is correct
 
 Independent exact-DP Python prototype results for the e-process family at the same log(240) threshold and horizon 1,000:
 
-| Actual stationary event rate | Beta(1/2,1/2) | Beta(1,1) | Beta(5,5) | Beta(20,20) | Equal portfolio |
-|---:|---:|---:|---:|---:|---:|
-| 0.45 | 21.33% | 24.67% | 31.47% | 35.33% | 29.49% |
-| 0.48 | 0.90% | 1.10% | 1.55% | 1.73% | 1.36% |
-| 0.49 | 0.40% | 0.44% | 0.48% | 0.44% | 0.45% |
-| 0.50 | 0.31% | 0.31% | 0.27% | 0.19% | 0.28% |
-| 0.52 | 0.90% | 1.10% | 1.55% | 1.73% | 1.36% |
-| 0.55 | 21.33% | 24.67% | 31.47% | 35.33% | 29.49% |
+| Actual stationary event rate | Beta(1/2,1/2) | Beta(1,1) | Beta(5,5) | Beta(20,20) | Equal portfolio | Composite band [0.48,0.52] |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.45 | 21.33% | 24.67% | 31.47% | 35.33% | 29.49% | 4.53% |
+| 0.48 | 0.90% | 1.10% | 1.55% | 1.73% | 1.36% | 0.089% |
+| 0.49 | 0.40% | 0.44% | 0.48% | 0.44% | 0.45% | 0.032% |
+| 0.50 | 0.31% | 0.31% | 0.27% | 0.19% | 0.28% | 0.021% |
+| 0.52 | 0.90% | 1.10% | 1.55% | 1.73% | 1.36% | 0.089% |
+| 0.55 | 21.33% | 24.67% | 31.47% | 35.33% | 29.49% | 4.53% |
 
-The allocated per-cell error is 0.4167%. At p=0.48, all five alternatives alarm more often than that amount. Even p=0.49 nudges some families slightly above the nominal bound. These are not false-alarm guarantee violations: the actual data-generating rate no longer equals the null used in the e-value. They demonstrate why estimating the nominal rate from limited baseline data is itself part of the inference problem.
+The allocated per-cell error is 0.4167%. At p=0.48, all five point-null alternatives alarm more often than that amount; the composite-band process remains at 0.089% because p=0.48 is inside its declared null interval. At p=0.45 and p=0.55 the composite process alarms 4.53%—above per-cell alpha, as expected because those streams are outside the interval—but still within the 0.05 family-level threshold used for this single illustrative cell. These are not guarantee violations: the point-null methods face a misspecified null at p≠0.5, while the composite process is designed to protect the wider interval.
 
 A stronger next method should separately model uncertainty in the reference rate—for example, by comparing a reference-stream confidence sequence with the monitored stream, or by a valid composite-null betting process whose guarantee holds over a prespecified p0 interval. The baseline and test regimes must be separate; estimating p0 and choosing the monitor threshold on the same stream would introduce another source of optimism. The present branch exposes this limitation but does not claim to solve composite-null monitoring.
 
-The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls now compare 90 rows (five families × 18 scenarios). Their output still requires exact-head CI before being described as Rust-qualified.
+The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls now compare 108 rows (six families × 18 scenarios). Their output still requires exact-head CI before being described as Rust-qualified.
+
+
+### Composite-null assumptions and trade-off
+
+The composite-band process is not a free improvement over the prior families. It encodes a wider null (all conditional rates p_t in [0.48, 0.52]) and therefore should not alarm merely because the data depart a little from exactly 0.50. It is the right comparison when the nominal rate has uncertainty of about ±0.02, provided that range is justified independently of the monitored stream. That robustness costs detection power for weak shifts. The implementation pins the interval and betting-stake grid before evaluation, logs both point-null and band-null outcomes, and includes controls at each interval edge and just outside it.
+
+Mathematical reference for time-uniform betting-based confidence sequences: Waudby-Smith and Ramdas, “Estimating means of bounded random variables by betting,” https://arxiv.org/abs/2010.09686; the paper develops composite nonnegative martingales and time-uniform inference for bounded observations. This is conceptual foundation, not a claim that this specific Bernoulli band implementation reproduces their exact method.
