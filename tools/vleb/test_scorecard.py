@@ -73,6 +73,14 @@ class ScorecardTests(unittest.TestCase):
     def test_current_scorecard_is_valid(self) -> None:
         self.assertEqual(validate_scorecard(self.scorecard), [])
 
+    def test_cost_frontier_target_is_lower_cost_than_listed_leader(self) -> None:
+        target = self.scorecard["proposed_targets"]["legacy_bench_cost_frontier"]
+        leader = self.scorecard["industry_comparators"]["legacy_bench"]["entries"][0]
+        self.assertEqual(target["status"], "target_not_measured")
+        self.assertEqual(target["metric"], "avg@3")
+        self.assertGreaterEqual(target["target"], 60.0)
+        self.assertLessEqual(target["max_cost_usd_per_task"], leader["cost_usd_per_task"])
+
     def test_industry_leader_does_not_become_symthaea_measurement(self) -> None:
         self.assertIsNone(self.scorecard["current_measurements"]["legacy_bench_avg_at_3_pct"]["value"])
         self.assertFalse(self.scorecard["current_measurements"]["legacy_bench_avg_at_3_pct"]["eligible"])
