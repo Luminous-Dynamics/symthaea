@@ -52,6 +52,7 @@ pub struct RegenerationReportV1 {
     pub committed_bytes: u64,
     pub byte_exact_match: bool,
     pub task_set_contract_valid: bool,
+    pub synthetic_semantics_valid: bool,
     pub verified: bool,
     pub issues: Vec<String>,
 }
@@ -408,6 +409,204 @@ fn generate_one_task(
         "policy_input": policy_input,
         "evaluator_only": evaluator_only
     }))
+}
+
+
+fn finite_number(value: &Value, label: &str) -> Result<f64, String> {
+    value
+        .as_f64()
+        .filter(|number| number.is_finite())
+        .ok_or_else(|| format!("{label} must be a finite JSON number"))
+}
+
+fn required_text<'a>(value: &'a Value, label: &str) -> Result<&'a str, String> {
+    value
+        .as_str()
+        .filter(|text| !text.trim().is_empty())
+        .ok_or_else(|| format!("{label} must be a non-empty string"))
+}
+
+fn required_array<'a>(value: &'a Value, label: &str) -> Result<&'a [Value], String> {
+    value
+        .as_array()
+        .map(Vec::as_slice)
+        .ok_or_else(|| format!("{label} must be an array"))
+}
+
+fn close_enough(actual: f64, expected: f64) -> bool {
+    actual.is_finite()
+        && expected.is_finite()
+        && (actual - expected).abs() <= 1.0e-9 * actual.abs().max(expected.abs()).max(1.0)
+}
+
+/// Validate constructor-specific semantics on the evaluator-side artifact.
+/// This is a synthetic generator/evaluator consistency check, not proof of
+/// physical truth or a guarantee that a real-world law is identifiable.
+pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), String> {
+    let set: Value = serde_json::from_slice(task_set_bytes)
+        .map_err(|error| format!("cannot parse task set for semantic validation: {error}"))?;
+    if required_text(&set["schema"], "task_set.schema")? != crate::TASK_SET_SCHEMA {
+        return Err("semantic validation received the wrong task-set schema".to_owned());
+    }
+    let tasks = required_array(&set["tasks"], "task_set.tasks")?;
+    if tasks.is_empty() {
+        return Err("semantic validation requires at least one task".to_owned());
+    }
+
+    for task in tasks {
+        let id = required_text(&task["task_id"], "task.task_id")?;
+        let family = required_text(&task["family_id"], "task.family_id")?;
+        let input = &task["policy_input"];
+        let oracle = &task["evaluator_only"];
+        let observations = required_array(
+            &input["observations"],
+            &format!("{id}.policy_input.observations"),
+        )?;
+        if observations.is_empty() {
+            return Err(format!("{id} has no observations"));
+        }
+
+        match family {
+            "semantic_invariance" => {
+                if required_text(&oracle["target_kind"], &format!("{id}.target_kind"))?
+                    != "unique_law_under_declared_reparameterization"
+                {
+                    return Err(format!("{id} has incorrect target_kind"));
+                }
+                let visible = &oracle["visible_coordinate_law"];
+                let latent = &oracle["latent_law"];
+                let transform = &oracle["inverse_coordinate_transform"];
+                let visible_slope = finite_number(&visible["slope"], &format!("{id}.visible_slope"))?;
+                let visible_intercept =
+                    finite_number(&visible["intercept"], &format!("{id}.visible_intercept"))?;
+                let latent_slope = finite_number(&latent["slope"], &format!("{id}.latent_slope"))?;
+                let latent_intercept =
+                    finite_number(&latent["intercept"], &format!("{id}.latent_intercept"))?;
+                let scale = finite_number(&transform["scale"], &format!("{id}.scale"))?;
+                let offset = finite_number(&transform["offset"], &format!("{id}.offset"))?;
+                if scale <= 0.0
+                    || !close_enough(visible_slope, latent_slope / scale)
+                    || !close_enough(visible_intercept, latent_intercept - latent_slope * offset / scale)
+                {
+                    return Err(format!("{id} visible law is not equivalent to its latent law"));
+                }
+                for (index, row) in observations.iter().enumerate() {
+                    let u = finite_number(&row["u"], &format!("{id}.observations[{index}].u"))?;
+                    let y = finite_number(&row["y"], &format!("{id}.observations[{index}].y"))?;
+                    let recovered_x = (u - offset) / scale;
+                    if !close_enough(y, visible_slope * u + visible_intercept)
+                        || !close_enough(y, latent_slope * recovered_x + latent_intercept)
+                    {
+                        return Err(format!("{id} observation {index} violates invariance"));
+                    }
+                }
+            }
+            "sampling_noise_shift" => {
+                if required_text(&oracle["target_kind"], &format!("{id}.target_kind"))?
+                    != "noisy_linear_law"
+                {
+                    return Err(format!("{id} has incorrect noisy-law target_kind"));
+                }
+                let law = &oracle["law"];
+                let slope = finite_number(&law["slope"], &format!("{id}.slope"))?;
+                let intercept = finite_number(&law["intercept"], &format!("{id}.intercept"))?;
+                let amplitude =
+                    finite_number(&oracle["noise_amplitude"], &format!("{id}.noise_amplitude"))?;
+                if amplitude <= 0.0 {
+                    return Err(format!("{id} noise amplitude must be positive"));
+                }
+                for (index, row) in observations.iter().enumerate() {
+                    let x = finite_number(&row["x"], &format!("{id}.observations[{index}].x"))?;
+                    let y = finite_number(&row["y"], &format!("{id}.observations[{index}].y"))?;
+                    if (y - (slope * x + intercept)).abs() > amplitude + 1.0e-9 * amplitude.max(1.0) {
+                        return Err(format!("{id} observation {index} exceeds noise bound"));
+                    }
+                }
+            }
+            "confounding_null" => {
+                if required_text(&oracle["target_kind"], &format!("{id}.target_kind"))?
+                    != "no_direct_effect"
+                    || finite_number(&oracle["direct_effect"], &format!("{id}.direct_effect"))?
+                        != 0.0
+                    || required_text(&oracle["common_cause"], &format!("{id}.common_cause"))?
+                        != "z"
+                {
+                    return Err(format!("{id} is not a valid common-cause null"));
+                }
+                let amplitude =
+                    finite_number(&oracle["noise_amplitude"], &format!("{id}.noise_amplitude"))?;
+                if amplitude <= 0.0 {
+                    return Err(format!("{id} noise amplitude must be positive"));
+                }
+                let limit = amplitude + 1.0e-9 * amplitude.max(1.0);
+                for (index, row) in observations.iter().enumerate() {
+                    let z = finite_number(&row["z"], &format!("{id}.observations[{index}].z"))?;
+                    let x = finite_number(&row["x"], &format!("{id}.observations[{index}].x"))?;
+                    let y = finite_number(&row["y"], &format!("{id}.observations[{index}].y"))?;
+                    if (x - z).abs() > limit || (y - z).abs() > limit {
+                        return Err(format!("{id} observation {index} violates common-cause bounds"));
+                    }
+                }
+            }
+            "identifiability_abstention" => {
+                if required_text(&oracle["target_kind"], &format!("{id}.target_kind"))?
+                    != "not_identifiable_from_declared_sample"
+                {
+                    return Err(format!("{id} has incorrect identifiability target_kind"));
+                }
+                let one = &oracle["one_compatible_law"];
+                let alternative = &oracle["alternative_compatible_law"];
+                if required_text(&alternative["kind"], &format!("{id}.alternative.kind"))?
+                    != "linear_plus_vanishing_polynomial"
+                    || !close_enough(
+                        finite_number(&one["slope"], &format!("{id}.one.slope"))?,
+                        finite_number(&alternative["base_slope"], &format!("{id}.alternative.slope"))?,
+                    )
+                    || !close_enough(
+                        finite_number(&one["intercept"], &format!("{id}.one.intercept"))?,
+                        finite_number(&alternative["base_intercept"], &format!("{id}.alternative.intercept"))?,
+                    )
+                    || finite_number(&alternative["coefficient"], &format!("{id}.alternative.coefficient"))?
+                        == 0.0
+                {
+                    return Err(format!("{id} lacks a distinct, compatible alternative law"));
+                }
+                let roots = required_array(&alternative["roots"], &format!("{id}.alternative.roots"))?;
+                if roots.len() != observations.len() {
+                    return Err(format!("{id} alternative-law root count mismatch"));
+                }
+                let mut xs = Vec::with_capacity(observations.len());
+                for (index, (root, row)) in roots.iter().zip(observations).enumerate() {
+                    let root = finite_number(root, &format!("{id}.roots[{index}]"))?;
+                    let x = finite_number(&row["x"], &format!("{id}.observations[{index}].x"))?;
+                    if !close_enough(root, x) {
+                        return Err(format!("{id} alternative law misses observed root {index}"));
+                    }
+                    xs.push(x);
+                }
+                if xs.windows(2).any(|pair| pair[1] <= pair[0]) {
+                    return Err(format!("{id} observed roots are not strictly increasing"));
+                }
+                let witness = &oracle["identifiability_witness"];
+                if witness["equal_on_observed_x"].as_bool() != Some(true)
+                    || witness["challenge_x_is_observed"].as_bool() != Some(false)
+                {
+                    return Err(format!("{id} identifiability witness flags are invalid"));
+                }
+                let challenge_x = finite_number(
+                    &witness["challenge_x_outside_observed_range"],
+                    &format!("{id}.challenge_x"),
+                )?;
+                if challenge_x <= xs[xs.len() - 1] || xs.contains(&challenge_x) {
+                    return Err(format!("{id} challenge point is not out of domain"));
+                }
+                // The nonzero polynomial product is zero at every listed observed root,
+                // while its out-of-domain challenge point is not one of those roots.
+            }
+            other => return Err(format!("{id} has unsupported synthetic family {other}")),
+        }
+    }
+    Ok(())
 }
 
 /// Generate the exact canonical task-set bytes from a valid sealed manifest,
