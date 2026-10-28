@@ -140,12 +140,21 @@ impl LoRaFragmentV2 {
         encoded_len: u16,
         payload: &[u8],
     ) -> u16 {
-        let mut bytes = Vec::with_capacity(2 + 4 + 2 + payload.len());
-        bytes.extend_from_slice(&thought_id.to_le_bytes());
-        bytes.extend_from_slice(&[fragment_index, total_fragments, payload_len, flags]);
-        bytes.extend_from_slice(&encoded_len.to_le_bytes());
-        bytes.extend_from_slice(payload);
-        crc16_ccitt(&bytes)
+        // The checksum input is an 8-byte metadata prefix plus at most one
+        // V2 payload. Keep this hot validation path allocation-free.
+        debug_assert!(payload.len() <= V2_PAYLOAD_SIZE);
+        let mut bytes = [0u8; 8 + V2_PAYLOAD_SIZE];
+        bytes[0..2].copy_from_slice(&thought_id.to_le_bytes());
+        bytes[2..6].copy_from_slice(&[
+            fragment_index,
+            total_fragments,
+            payload_len,
+            flags,
+        ]);
+        bytes[6..8].copy_from_slice(&encoded_len.to_le_bytes());
+        let payload_end = 8 + payload.len();
+        bytes[8..payload_end].copy_from_slice(payload);
+        crc16_ccitt(&bytes[..payload_end])
     }
 
     fn is_well_formed(&self) -> bool {
@@ -469,6 +478,25 @@ mod tests {
             *byte = (state >> 24) as u8;
         }
         bytes
+    }
+
+    #[test]
+    fn checksum_layout_matches_golden_vector() {
+        // CRC-16/CCITT over:
+        // 34 12 | 02 04 03 02 | 7f 02 | aa bb cc
+        // thought_id | index/count/len/flags | encoded_len | payload
+        assert_eq!(
+            LoRaFragmentV2::checksum_for(
+                0x1234,
+                2,
+                4,
+                3,
+                V2_FLAG_LENGTH_BOUND,
+                0x027f,
+                &[0xaa, 0xbb, 0xcc],
+            ),
+            0x9fa6
+        );
     }
 
     #[test]
