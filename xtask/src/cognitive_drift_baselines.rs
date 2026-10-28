@@ -1058,6 +1058,59 @@ mod tests {
             result.diagnostics.stopped_at_first_crossing,
             !result.detections.is_empty()
         );
+        let repeated = run_scalar_detector(
+            fixture(ScalarDetectorMethod::PredictiveRankMartingaleOnsPortfolio),
+        )
+        .expect("identical seeded ONS run should reproduce");
+        assert_eq!(result, repeated);
+    }
+
+    #[test]
+    fn predictive_rank_ons_bets_have_unit_conditional_null_mean() {
+        let n = 8usize;
+        let order: Vec<f64> = (0..=n).map(|j| j as f64 / n as f64 - 0.5).collect();
+        let dispersion: Vec<f64> = (0..=n)
+            .map(|j| (2.0 * j as f64 / n as f64 - 1.0).abs() - 0.5)
+            .collect();
+        let base_sums = [order.iter().sum::<f64>(), dispersion.iter().sum::<f64>()];
+        let histories = [
+            vec![],
+            vec![0, 8],
+            vec![4, 4, 4],
+            vec![0, 1, 8, 2, 7],
+        ];
+
+        for prior_ranks in histories {
+            let mut history_sums = [0.0_f64; 2];
+            for rank in &prior_ranks {
+                history_sums[0] += order[*rank];
+                history_sums[1] += dispersion[*rank];
+            }
+            let denominator = (n + prior_ranks.len() + 1) as f64;
+            let expected = [
+                (base_sums[0] + history_sums[0]) / denominator,
+                (base_sums[1] + history_sums[1]) / denominator,
+            ];
+            let features = [&order[..], &dispersion[..]];
+            for feature in 0..2 {
+                let radius = ons_projection_radius(feature_bound(features[feature], expected[feature]));
+                // This coefficient is measurable with respect to prior ranks only.
+                let lambda = radius * if prior_ranks.len() % 2 == 0 { 0.31 } else { -0.27 };
+                let mut conditional_expectation = 0.0_f64;
+                for rank in 0..=n {
+                    let count = prior_ranks.iter().filter(|prior| **prior == rank).count();
+                    let pi = (1.0 + count as f64) / denominator;
+                    let centered = features[feature][rank] - expected[feature];
+                    let factor = 1.0 + lambda * centered;
+                    assert!(factor.is_finite() && factor >= 0.25 - 1e-12);
+                    conditional_expectation += pi * factor;
+                }
+                assert!(
+                    (conditional_expectation - 1.0).abs() < 1e-12,
+                    "ONS PRM feature {feature} lost its conditional null mean-one property"
+                );
+            }
+        }
     }
 
     #[test]
