@@ -100,6 +100,67 @@
       "deployable": false
     }
   ],
+  "missingness_and_latency_contract": {
+    "status": "proposed-preregister-before-confirmatory-runs",
+    "principle": "Outcome availability is part of the observation process, not merely a nuisance parameter. Missingness and delay can carry information about hidden outcomes; the evaluation mechanism must be pinned and separated from what the policy can observe.",
+    "mechanism_classes": [
+      {
+        "id": "mcar",
+        "meaning": "Outcome revelation/missingness is independent of features and the hidden outcome under the registered randomization."
+      },
+      {
+        "id": "mar",
+        "meaning": "Outcome revelation/missingness depends only on registered observed covariates available by the decision time."
+      },
+      {
+        "id": "mnar-outcome-dependent",
+        "meaning": "Delay or missingness depends on the hidden outcome or outcome-derived severity; the mechanism is evaluator-side and its values are not exposed to the policy."
+      },
+      {
+        "id": "mnar-error-dependent",
+        "meaning": "Delay or missingness depends on pre-registered outcome error/severity. Any error-derived mechanism must specify the information it consumes and avoid future predictions or outcomes not yet available."
+      }
+    ],
+    "policy_observability_tracks": [
+      {
+        "id": "explicit-missingness-notice",
+        "meaning": "A status-only notice is delivered exactly at declared_at_tick, with outcome identity and timing but no target value or future schedule. The decision receipt records which notice IDs were delivered, eligible, and consumed."
+      },
+      {
+        "id": "silent-pending-or-censored",
+        "meaning": "No missingness notice is sent; an unresolved outcome remains evaluator-side until the registered evaluation horizon and is recorded as right-censored."
+      }
+    ],
+    "required_scenarios": [
+      "balanced MCAR control with equal missingness rate",
+      "MAR based on a covariate visible at decision time",
+      "MNAR outcome-dependent delay with outcome strata and matched marginal delay",
+      "MNAR outcome-dependent missingness with fixed overall missing rate",
+      "adverse-outcome-overrepresented-late stress case",
+      "missingness mechanism shifts after concept drift",
+      "explicit missingness notice versus silent absence under otherwise matched outcomes",
+      "out-of-order reveals, missing outcomes, and right-censoring at the same replay horizon"
+    ],
+    "required_metrics": [
+      "observed-outcome coverage by outcome stratum",
+      "delay distribution by outcome stratum",
+      "post-shift task loss",
+      "recovery delay",
+      "calibration by outcome-availability stratum",
+      "paired effect versus the same policy under MCAR",
+      "resource cost per corrected error",
+      "worst-stratum task loss and uncertainty"
+    ],
+    "hard_gates": [
+      "No policy access to the complete outcome plan, hidden target, or unannounced missingness mechanism.",
+      "A MissingOutcomeNotice cannot be delivered before its declared_at_tick.",
+      "Missingness notices contain no outcome value.",
+      "Right-censored status at the replay horizon is evaluator-side and is not retroactively exposed to earlier decisions.",
+      "Confirmatory comparisons pin the exact mechanism implementation, schedule digest, seed, and visibility track.",
+      "A result that only holds under MCAR cannot be described as robust to informative missingness."
+    ],
+    "limitation": "This protocol describes proposed experiment cells; no MNAR robustness or adaptation improvement is claimed until pinned execution and held-out results exist."
+  },
   "policy_arms": [
     {
       "id": "no-adapt",
