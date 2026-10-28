@@ -29,22 +29,17 @@ All candidate attempts remain in the trace, including verifier errors, infeasibl
 
 ## Curve definition
 
-Let (n=|V|) be the frozen vertex count and (H>0) the frozen horizon in deployment milliseconds. Let (C(t)) be the largest cardinality among independently verified feasible candidates whose persisted verification event time is at or before (t), or zero if none exists. Define
+Let n = |V| be the frozen vertex count and H > 0 the frozen horizon in deployment milliseconds. Let C(t) be the largest cardinality among independently verified feasible candidates whose persisted verification event time is at or before t, or zero if none exists. Define q(t) = C(t) / n and the normalized area under the quality curve as:
 
-[
-q(t)=rac{C(t)}{n}, qquad
-A_Q(H)=rac{1}{H}int_0^H q(t),dt.
-]
+A_Q(H) = (1 / H) ∫₀ᴴ q(t) dt
 
-Treat (q(t)) as a right-continuous step function: a verified candidate starts contributing at its recorded verification/persistence time. Do not linearly interpolate between checkpoints, backdate a solution to solver discovery time, or infer an incumbent from an unverified objective log. The quality ratio is bounded in ([0,1]) for an unweighted independent set.
+Treat q(t) as a right-continuous step function: a verified candidate starts contributing at its recorded verification/persistence time. Do not linearly interpolate between checkpoints, backdate a solution to solver discovery time, or infer an incumbent from an unverified objective log. The quality ratio is bounded in [0, 1] for an unweighted independent set.
 
-For event times sorted as (0 < t_1 le ldots le t_m), include the endpoints (0) and (H), update the incumbent only from valid events at or before the current time, and integrate each incumbent value over the following interval. Multiple events at the same timestamp use the maximum verified cardinality at that time; their file order cannot change the score. Events after (H) remain in the artifact and in separate target/TTS reporting, but do not change (A_Q(H)).
+For event times sorted as 0 < t₁ ≤ ... ≤ tₘ, include endpoints 0 and H, update the incumbent only from valid events at or before the current time, and integrate each incumbent value over the following interval. Multiple events at the same timestamp use the maximum verified cardinality at that time; their file order cannot change the score. Events after H remain in the artifact and in separate target/TTS reporting, but do not change A_Q(H).
 
-The example trace has (n=10), (H=1000) ms, a purported cardinality-8 event at 20 ms without a verifier receipt, a verified cardinality-2 candidate at 100 ms, and a verified cardinality-4 candidate at 350 ms. The unverified claim is ignored. Thus the normalized quality is 0 for the first 100 ms, 0.2 for the next 250 ms, and 0.4 for the final 650 ms:
+The example trace has n = 10, H = 1000 ms, a purported cardinality-8 event at 20 ms without a verifier receipt, a verified cardinality-2 candidate at 100 ms, and a verified cardinality-4 candidate at 350 ms. The unverified claim is ignored. Thus the normalized quality is 0 for the first 100 ms, 0.2 for the next 250 ms, and 0.4 for the final 650 ms:
 
-[
-A_Q(1000)=rac{0\cdot100+0.2\cdot250+0.4\cdot650}{1000}=0.31.
-]
+A_Q(1000) = (0 × 100 + 0.2 × 250 + 0.4 × 650) / 1000 = 0.31.
 
 This fixture illustrates the semantics only; it is not a solver measurement.
 
