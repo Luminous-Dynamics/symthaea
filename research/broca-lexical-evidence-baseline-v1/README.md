@@ -72,7 +72,7 @@ Only `web` or `enterprise` is allowed for LongMemEval-V2. Defaults are BM25 `k1=
 {"request_id":"2","op":"insert","trajectory":{"id":"traj-1","goal":"Open billing settings","start_url":"https://example.invalid/","states":[{"url":"https://example.invalid/billing","action":"click Billing Settings","text":"Billing Settings page"}]}}
 ```
 
-The worker canonicalizes the trajectory with `serde_json`, derives deterministic IDs from the trajectory digest and JSON Pointer, then validates the complete batch atomically. Each returned text must exactly match the source string selected by its pointer. Root `outcome` and evaluator/question metadata are never candidate fields.
+The worker converts the parsed trajectory into a worker-defined stable sorted-key JSON encoding (recursively sorted object keys, preserved array order; not a claim of full RFC 8785 compliance), derives deterministic IDs from that source digest and JSON Pointer, then validates the complete batch atomically. Both public `states` and legacy `content`/`metadata.original_goal` schemas are supported. Each returned text must exactly match the source string selected by its pointer. Root `outcome` and evaluator/question metadata are never candidate fields.
 
 ### Query
 
