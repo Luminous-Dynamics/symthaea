@@ -36,3 +36,12 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --locked --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml --all-targets -- -D warnings
+
+      - name: Exercise CLI on an empty assigned trial matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml -- research/scientific-tool-allocation-auditor/fixtures/manifest.json research/scientific-tool-allocation-auditor/fixtures/trials.jsonl > /tmp/audit-1.json
+          cargo run --locked --quiet --manifest-path research/scientific-tool-allocation-auditor/Cargo.toml -- research/scientific-tool-allocation-auditor/fixtures/manifest.json research/scientific-tool-allocation-auditor/fixtures/trials.jsonl > /tmp/audit-2.json
+          cmp /tmp/audit-1.json /tmp/audit-2.json
+          grep -q '"missing_cell_count": 2' /tmp/audit-1.json
