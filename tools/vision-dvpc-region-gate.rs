@@ -5,8 +5,6 @@
 use std::env;
 use std::fmt::Write as _;
 
-const EPS: f64 = 1e-12;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EvidenceState {
     Cleared,
@@ -82,8 +80,8 @@ fn validate_interval(interval: Option<(f64, f64)>, name: &str) -> Result<(), Str
 fn assess_value(region: Option<(f64, f64)>, floor: f64) -> EvidenceState {
     match region {
         None => EvidenceState::Missing,
-        Some((_, upper)) if upper + EPS < floor => EvidenceState::Rejected,
-        Some((lower, _)) if lower + EPS >= floor => EvidenceState::Cleared,
+        Some((_, upper)) if upper < floor => EvidenceState::Rejected,
+        Some((lower, _)) if lower >= floor => EvidenceState::Cleared,
         Some(_) => EvidenceState::Unresolved,
     }
 }
@@ -91,8 +89,8 @@ fn assess_value(region: Option<(f64, f64)>, floor: f64) -> EvidenceState {
 fn assess_risk(region: Option<(f64, f64)>, cap: f64) -> EvidenceState {
     match region {
         None => EvidenceState::Missing,
-        Some((lower, _)) if lower > cap + EPS => EvidenceState::Rejected,
-        Some((_, upper)) if upper <= cap + EPS => EvidenceState::Cleared,
+        Some((lower, _)) if lower > cap => EvidenceState::Rejected,
+        Some((_, upper)) if upper <= cap => EvidenceState::Cleared,
         Some(_) => EvidenceState::Unresolved,
     }
 }
@@ -238,6 +236,16 @@ mod tests {
     #[test]
     fn intervals_that_touch_value_floor_but_extend_below_do_not_authorize() {
         let result = evaluate(Some((0.1, 0.5)), Some((0.01, 0.04)), VALUE_FLOOR, RISK_CAP).unwrap();
+        assert_eq!(result.decision, Decision::InsufficientEvidence);
+    }
+
+    #[test]
+    fn near_threshold_values_do_not_gain_authorization_from_epsilon_tolerance() {
+        let just_below_floor = 0.5 - 5e-13;
+        let result = evaluate(Some((just_below_floor, 0.7)), Some((0.01, 0.05)), VALUE_FLOOR, RISK_CAP).unwrap();
+        assert_eq!(result.decision, Decision::InsufficientEvidence);
+        let just_above_cap = 0.05 + 5e-13;
+        let result = evaluate(Some((0.6, 0.8)), Some((0.01, just_above_cap)), VALUE_FLOOR, RISK_CAP).unwrap();
         assert_eq!(result.decision, Decision::InsufficientEvidence);
     }
 
