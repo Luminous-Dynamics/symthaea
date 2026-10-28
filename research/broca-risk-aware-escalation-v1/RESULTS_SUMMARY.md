@@ -62,5 +62,7 @@ This is evidence that the calibration set/model combination is too data-ineffici
 
 - Raw outcome JSONL SHA-256: `f8b2aaee93569621d316decdc94b04ba7a0281b1fd1f7de6dd3c3d541c40f2be` (local-only, 150,000 rows).
 - Configuration SHA-256: `3f1ac8ba5c80885d5b744e8dfe354f52006db2c5e8a0d7486638af37d5483de7`.
-- Corrected local source SHA-256: `ec0bf7a910e54dd22c34cf65f284509482307bfaf6233c8226d63cbb74c94ee0`.
-- Local machine-readable summary, report, receipt and frontier CSVs are packaged with the full artifact bundle.
+- Benchmark source SHA-256: `6ca3caf5c1fc61a406a9989483921a381bcd7a45640aadd5d04a1bac6e81806f` (Git blob SHA-1 `dd192d891d9899b80ccc41481c5ba72b7bea34ee`, byte-identical to the published branch file).
+- Independent verifier SHA-256: `62a1c8e0576000a6d5928213a6016a1c4d7c195e005ac700fd2c458966a50c40` (Git blob SHA-1 `960d6cdb5ff72278f98b99e274177b752366c5ee`, byte-identical to the published branch file).
+- Summary SHA-256: `dc5f3850218b6899f9acd1c8266be30fe6e0f0e111b1bf0d7b3eaa794751c210`; report SHA-256: `bf6c0fce12645780f1a98386dff7c6faed62bbda9e80e57b5ed0ad5048c1da46`.
+- The full raw JSONL and receipt are local-only and are available in the full artifact bundle; the compact source bundle intentionally omits the 104 MiB raw output. The verifier should be run against the full bundle, not the compact source bundle.
