@@ -19,7 +19,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v0";
+const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v1";
 const RUN_RESULTS_SCHEMA: &str = "pitb.target-outcome.v0";
 const ANALYSIS_REPORT_SCHEMA: &str = "pitb.analysis-report.v0";
 const EXPECTED_PROTOCOL_ID: &str = "proof-insight-transfer-v0";
@@ -27,8 +27,9 @@ const EXPECTED_UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a
 const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
 // Conservative minimum, not a substitute for run-specific simulation-based power.
 const MIN_CONFIRMATORY_FAMILY_CLUSTERS: usize = 20;
-const POWER_ASSOCIATION_SIMULTANEOUS_Z: f64 = 2.13;
-const REQUIRED_EXPOSED_FAMILY: &str = "089";
+const POWER_ASSOCIATION_SIMULTANEOUS_Z: f64 = 2.394;
+const REQUIRED_EXPOSED_VALIDATION_FAMILY: &str = "012";
+const REQUIRED_EXPOSED_TEST_FAMILY: &str = "089";
 const EXPECTED_SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
 const EXPECTED_SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
 const ARMS: [&str; 9] = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
@@ -44,7 +45,8 @@ struct RunConfig {
     split_manifest_sha256: String,
     partition_digest_sha256: String,
     baseline_selection_receipt_sha256: String,
-    known_exposed_family_ids: Vec<String>,
+    known_exposed_validation_family_ids: Vec<String>,
+    known_exposed_test_family_ids: Vec<String>,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
     model_version: String,
@@ -216,7 +218,8 @@ struct AnalysisReport {
     eligible_family_count: usize,
     excluded_target_count: usize,
     unknown_eligibility_target_count: usize,
-    known_exposed_family_ids: Vec<String>,
+    known_exposed_validation_family_ids: Vec<String>,
+    known_exposed_test_family_ids: Vec<String>,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
     family_aggregates: Vec<FamilyAggregate>,
@@ -333,6 +336,8 @@ struct PowerReport {
     analyzer_source_sha256: String,
     upstream_commit: String,
     selected_baseline_arm: String,
+    known_exposed_validation_family_ids: Vec<String>,
+    known_exposed_test_family_ids: Vec<String>,
     eligible_validation_target_count: usize,
     eligible_validation_family_count: usize,
     validation_baseline_semantic_success_rate: f64,
@@ -522,7 +527,8 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
             .iter()
             .filter(|row| row.eligibility == Eligibility::Unknown)
             .count(),
-        known_exposed_family_ids: config.known_exposed_family_ids,
+        known_exposed_validation_family_ids: config.known_exposed_validation_family_ids.clone(),
+        known_exposed_test_family_ids: config.known_exposed_test_family_ids.clone(),
         bootstrap_replicates: config.bootstrap_replicates,
         bootstrap_seed: config.bootstrap_seed,
         family_aggregates,
@@ -789,6 +795,8 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         analyzer_source_sha256: sha256_hex(include_bytes!("analyze_pitb_results.rs")),
         upstream_commit: split_manifest.upstream.commit,
         selected_baseline_arm: receipt.selected_arm,
+        known_exposed_validation_family_ids: config.known_exposed_validation_family_ids.clone(),
+        known_exposed_test_family_ids: config.known_exposed_test_family_ids.clone(),
         eligible_validation_target_count: eligible_validation.len(),
         eligible_validation_family_count: family_target_counts.len(),
         validation_baseline_semantic_success_rate: baseline_rate,
@@ -900,7 +908,7 @@ fn simultaneous_null_upper_bound(successes: usize, trials: usize) -> f64 {
 // preregistered paired-outcome-association settings for the +20pp / ICC .20
 // design gate. z=2.394 exceeds Phi^-1(1 - .05/(2*3)).
 fn simultaneous_power_lower_bound(successes: usize, trials: usize) -> f64 {
-    wilson_interval_with_z(successes, trials, 2.394).0
+    wilson_interval_with_z(successes, trials, POWER_ASSOCIATION_SIMULTANEOUS_Z).0
 }
 
 fn simulate_power_scenario(
@@ -1601,10 +1609,17 @@ fn validate_config(
         .iter()
         .map(|family| (family.family_id.as_str(), family.split.as_str()))
         .collect();
-    for exposed in &config.known_exposed_family_ids {
+    for exposed in &config.known_exposed_validation_family_ids {
+        if exposed_splits.get(exposed.as_str()).copied() != Some("validation") {
+            bail!(
+                "known-exposed validation family {exposed} is absent from or not assigned to the frozen validation split"
+            );
+        }
+    }
+    for exposed in &config.known_exposed_test_family_ids {
         if exposed_splits.get(exposed.as_str()).copied() != Some("test") {
             bail!(
-                "known-exposed family {exposed} is absent from or not assigned to the frozen test split"
+                "known-exposed test family {exposed} is absent from or not assigned to the frozen test split"
             );
         }
     }
@@ -1617,23 +1632,48 @@ fn validate_config(
     if config.model_version.trim().is_empty() || config.checker_version.trim().is_empty() {
         bail!("model and checker versions must be explicit");
     }
-    if config.known_exposed_family_ids.is_empty()
+    if config.known_exposed_validation_family_ids.is_empty()
         || !config
-            .known_exposed_family_ids
+            .known_exposed_validation_family_ids
             .iter()
-            .any(|family| family == REQUIRED_EXPOSED_FAMILY)
+            .any(|family| family == REQUIRED_EXPOSED_VALIDATION_FAMILY)
     {
         bail!(
-            "known-exposed family {REQUIRED_EXPOSED_FAMILY} must remain excluded from confirmatory scoring"
+            "known-exposed validation family {REQUIRED_EXPOSED_VALIDATION_FAMILY} must remain excluded from validation baseline selection"
         );
     }
-    let exposed_unique: BTreeSet<&str> = config
-        .known_exposed_family_ids
+    if config.known_exposed_test_family_ids.is_empty()
+        || !config
+            .known_exposed_test_family_ids
+            .iter()
+            .any(|family| family == REQUIRED_EXPOSED_TEST_FAMILY)
+    {
+        bail!(
+            "known-exposed test family {REQUIRED_EXPOSED_TEST_FAMILY} must remain excluded from confirmatory scoring"
+        );
+    }
+    let exposed_validation_unique: BTreeSet<&str> = config
+        .known_exposed_validation_family_ids
         .iter()
         .map(String::as_str)
         .collect();
-    if exposed_unique.len() != config.known_exposed_family_ids.len() {
-        bail!("known_exposed_family_ids contains duplicates");
+    if exposed_validation_unique.len() != config.known_exposed_validation_family_ids.len() {
+        bail!("known_exposed_validation_family_ids contains duplicates");
+    }
+    let exposed_test_unique: BTreeSet<&str> = config
+        .known_exposed_test_family_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    if exposed_test_unique.len() != config.known_exposed_test_family_ids.len() {
+        bail!("known_exposed_test_family_ids contains duplicates");
+    }
+    if exposed_validation_unique
+        .intersection(&exposed_test_unique)
+        .next()
+        .is_some()
+    {
+        bail!("a family cannot be listed as exposed in both validation and test");
     }
     Ok(())
 }
@@ -1872,6 +1912,11 @@ fn validate_power_report(
     }
     if report.selected_baseline_arm != receipt.selected_arm {
         bail!("power report baseline arm does not match the validation-selected baseline");
+    }
+    if report.known_exposed_validation_family_ids != config.known_exposed_validation_family_ids
+        || report.known_exposed_test_family_ids != config.known_exposed_test_family_ids
+    {
+        bail!("power report exposure quarantine differs from the frozen run config");
     }
     let selected_rate = validation_scores
         .get(&receipt.selected_arm)
@@ -2490,7 +2535,13 @@ fn validate_outcomes<'a>(
 
         match target.eligibility {
             Eligibility::Eligible => {
-                if config.known_exposed_family_ids.contains(&target.family_id) {
+                if config
+                    .known_exposed_validation_family_ids
+                    .contains(&target.family_id)
+                    || config
+                        .known_exposed_test_family_ids
+                        .contains(&target.family_id)
+                {
                     bail!(
                         "known-exposed family {} was included as eligible",
                         target.family_id
@@ -3218,13 +3269,58 @@ mod tests {
 
     #[test]
     fn known_exposed_family_cannot_enter_confirmatory_denominator() {
-        let target = test_target(REQUIRED_EXPOSED_FAMILY, "target-exposed", false, false);
+        let target = test_target(REQUIRED_EXPOSED_TEST_FAMILY, "target-exposed", false, false);
         let config = test_config();
         let frozen_families =
-            BTreeMap::from([(REQUIRED_EXPOSED_FAMILY.to_string(), "test".to_string())]);
+            BTreeMap::from([(REQUIRED_EXPOSED_TEST_FAMILY.to_string(), "test".to_string())]);
         let error = validate_outcomes(&[target], &config, &frozen_families, "test")
             .expect_err("known-exposed family must be rejected");
         assert!(error.to_string().contains("known-exposed family 089"));
+    }
+
+    #[test]
+    fn known_exposed_validation_family_cannot_enter_baseline_denominator() {
+        let mut target = test_target(
+            REQUIRED_EXPOSED_VALIDATION_FAMILY,
+            "target-exposed-validation",
+            false,
+            false,
+        );
+        target.split = "validation".to_string();
+        let config = test_config();
+        let frozen_families = BTreeMap::from([(
+            REQUIRED_EXPOSED_VALIDATION_FAMILY.to_string(),
+            "validation".to_string(),
+        )]);
+        let error = validate_outcomes(&[target], &config, &frozen_families, "validation")
+            .expect_err("known-exposed validation family must not enter baseline tuning");
+        assert!(error
+            .to_string()
+            .contains("known-exposed family 012 was included as eligible"));
+    }
+
+    #[test]
+    fn known_exposed_validation_family_can_be_kept_as_explicit_exclusion() {
+        let mut target = test_target(
+            REQUIRED_EXPOSED_VALIDATION_FAMILY,
+            "target-exposed-validation-excluded",
+            false,
+            false,
+        );
+        target.split = "validation".to_string();
+        target.eligibility = Eligibility::Excluded;
+        target.exclusion_reason = Some(
+            "Known researcher exposure; excluded from validation baseline selection".to_string(),
+        );
+        target.arms.clear();
+        let config = test_config();
+        let frozen_families = BTreeMap::from([(
+            REQUIRED_EXPOSED_VALIDATION_FAMILY.to_string(),
+            "validation".to_string(),
+        )]);
+        let eligible = validate_outcomes(&[target], &config, &frozen_families, "validation")
+            .expect("explicit exposure exclusion remains auditable");
+        assert!(eligible.is_empty());
     }
 
     #[test]
@@ -3564,7 +3660,10 @@ mod tests {
             split_manifest_sha256: "b".repeat(64),
             partition_digest_sha256: "c".repeat(64),
             baseline_selection_receipt_sha256: "d".repeat(64),
-            known_exposed_family_ids: vec![REQUIRED_EXPOSED_FAMILY.to_string()],
+            known_exposed_validation_family_ids: vec![
+                REQUIRED_EXPOSED_VALIDATION_FAMILY.to_string(),
+            ],
+            known_exposed_test_family_ids: vec![REQUIRED_EXPOSED_TEST_FAMILY.to_string()],
             bootstrap_replicates: EXPECTED_BOOTSTRAP_REPLICATES,
             bootstrap_seed: 20261020,
             model_version: "test-model-v1".to_string(),
