@@ -54,3 +54,10 @@ The independent Python 3.13.5 / NumPy 2.3.5 / SciPy 1.17.0 implementation and co
 ## Connection to benchmark validity
 
 This work qualifies only the statistical decision layer. It says nothing about model capability or SOTA. PITB's separate semantic gates remain necessary: exact target-statement correspondence, audited dependencies/axioms, negative mutations, family leakage quarantine, pinned checker/prover/resource budgets, and content-addressed receipts. A statistical interval cannot turn invalid or leaked proof outcomes into valid successes.
+
+
+## Production-scoring integration update (2026-10-28; unverified source change)
+
+The primary analyzer source now contains a separate weak-null power grid: requested target-weighted family-effect SDs of 5, 10 and 20 percentage points crossed with ICC values 0, 0.05, 0.10 and 0.20. Each simulated study centers its family effects to a zero target-weighted mean and uses a single common feasibility scale to keep treatment rates in [0,1]. The report records false-claim counts/rates, degenerate intervals and realized effect-SD diagnostics; analyze mode is authored to replay every grid cell from the validation-derived family-size vector and frozen seed. The report schema was advanced to `pitb.power-report.v1`, and the confirmatory power screen now requires both strict-null and heterogeneous weak-null upper bounds to be no greater than 5%.
+
+This is the **source implementation contract**, not a replacement for the independent simulation tables above. No Rust compiler or exact-head Actions result was available when this change was authored; the new simulation and replay tests are present in source but unexecuted. In addition, the current Wilson bounds are per scenario rather than familywise simultaneous across the 12 heterogeneous cells, and the new model still assumes independent arm outcomes conditional on family difficulty. Pair-association, selective missingness, alternative component-size mechanisms and multiplicity-controlled simultaneous bounds remain required before treating this as qualified weak-null inference.
