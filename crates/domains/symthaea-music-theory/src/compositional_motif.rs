@@ -653,6 +653,13 @@ mod tests {
         );
         assert!(verify_compositional_transform(&source, &source, 0.0, &invalid_scale).is_err());
 
+        let source_high: Vec<_> = source
+            .iter()
+            .map(|event| SymbolicEvent {
+                pitch_midi: event.pitch_midi + 50,
+                ..*event
+            })
+            .collect();
         let out_of_range = descriptor(
             PitchOrientation::Preserve,
             24,
@@ -660,10 +667,11 @@ mod tests {
             1.0,
             SelectionMode::Full,
             0,
-            source.len(),
+            source_high.len(),
         );
-        let target = transform_sequence(&source, out_of_range, 0.0);
-        assert!(verify_compositional_transform(&source, &target, 0.0, &out_of_range).is_err());
+        assert!(
+            verify_compositional_transform(&source_high, &source_high, 0.0, &out_of_range).is_err()
+        );
     }
 
     #[test]
