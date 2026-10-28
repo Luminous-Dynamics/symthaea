@@ -40,6 +40,7 @@ pub mod experiment;
 pub mod fixtures;
 pub mod interop;
 pub mod matrix;
+pub mod matched_evaluation;
 pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
@@ -108,6 +109,11 @@ pub use fixtures::{
     FixtureExpectation, FixtureIntent, FixtureSpec, fixture_catalog, fixture_names, named_fixture,
 };
 pub use interop::{AdapterAuthority, IntegrationDeclaration, IntegrationTarget};
+pub use matched_evaluation::{
+    CandidateVerification, EnergyRecord, EnergyScope, MatchedArmReport,
+    MatchedComparisonSummary, MatchedEvaluationError, MatchedPairResult,
+    MatchedTrialRecord, StageCostsMs, TimeWinner, TrialTermination, compare_matched_arms,
+};
 pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
 };
