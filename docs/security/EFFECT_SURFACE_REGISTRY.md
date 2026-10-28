@@ -185,3 +185,20 @@ For Symthaea, comparisons should therefore:
 - publish the corpus, exact source and profile digests, full raw rows, failed/missing runs and analysis code.
 
 This makes a stronger research claim possible than "100% on our fixtures": independent parties can reproduce both what the agent tried to do and what the enforcement boundary actually permitted to happen. The current 41-case corpus is a contract seed, nowhere near the scale required for a broad adversarial generalization claim.
+
+
+## Latest external benchmark evidence and what it changes
+
+The public Mergen v1.0.0 report now describes its live deterministic gate on 551 fixtures (322 attacks, 229 benign): 322/322 attacks caught, 0/229 benign commands blocked at the policy layer, and measured gate latency p50 2.935 ms / p95 5.069 ms / p99 10.169 ms over 2,755 evaluations. Its own methodology is explicit that the command gate is scored in decide-only mode; the benign corpus also lacks several human-interruption shapes seen in recorded use. Treat it as a strong, reproducible *gate regression* baseline, not a proof of real side effects or comprehensive operational safety. See [Mergen methodology](https://mergen.app/docs/agent-security-benchmark) and [benchmark report](https://mergen.app/benchmarks).
+
+APort's September 21, 2026 replay study is a second important result: replay protocol changed Level 2 request rate from 0.40% to 3.18%, while at Level 4 a net difference of 69 concealed 355 per-case disagreements (212 requests on one track only versus 143 on the other). Ranking associations remained positive, but rates and individual decisions were not invariant. The dataset includes 14 models and session-bootstrap intervals. This is evidence that matched replay tracks and per-case disagreement counts matter more than aggregate rate alone. See [Beyond Model Rankings](https://sandbox.aport.io/research/beyond-model-rankings-evaluating-ai-payment-agents/).
+
+The APS benchmark reports L0 verifier-core p50/p99 of 420/470 ns, L2 SDK p50/p99 of 6.5/8.1 µs, L3 queued-durable p50/p99 of 7.6/13.2 µs, and L4 gateway round-trip p50/p99 of 822 µs/6.0 ms on its canonical EPYC 7313P host. It says a synchronous fsync per action is about 1.3 ms on its server SSD and that layer tails are environment-dependent. These are published APS measurements, not Symthaea measurements; the right goal is a paired, same-host, same-durability comparison. See [APS benchmark protocol/results](https://agent-passport.org/benchmarks.html).
+
+### Revised external-comparison protocol
+
+- Reproduce a deterministic gate baseline separately from a model-mediated task benchmark. In the former, identical typed operations go through the actual runtime gate; in the latter, prompts may lead to different requested operations, which are separately recorded.
+- Use matched prompts, model/configuration, policy, and replay pair identifiers. Publish disagreement/transition tables; a stable aggregate request rate must not hide different per-case decisions.
+- Bootstrap at the independent source-session or prompt-cluster level for model-mediated comparisons. Repeated turns from one session are correlated and should not be counted as independent observations.
+- Publish attack/benign results by category, false blocks, adapter invocations, witnessed effects, independent postconditions, outcome-unknown events, errors, timeouts and missing trials. Preserve every raw row and frozen corpus digest.
+- The 41-vector Symthaea v1 corpus is only a contract-integrity seed. Do not rank it against the larger public corpora until an executable harness runs the vectors, the corpus is expanded, and the task and enforcement layers are comparable.
