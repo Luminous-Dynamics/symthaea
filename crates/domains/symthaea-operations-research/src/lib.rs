@@ -30,6 +30,7 @@
 pub mod aviation_data_contract;
 pub mod aviation_enterprise;
 pub mod aviation_robustness;
+pub mod aviation_network_externalities;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
