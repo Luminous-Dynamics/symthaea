@@ -464,10 +464,32 @@ def _replay_diwa_run(run: dict, errors: list[str]) -> None:
     if not isinstance(ledger, list) or len(ledger) != 72 or any(not isinstance(row, dict) for row in ledger):
         errors.append(f"{label}: expected 72 ordered evaluation objects")
         return
+    for index, row in enumerate(ledger):
+        cid, fidelity = row.get("candidate_id"), row.get("fidelity")
+        objectives, margin, cost_units = row.get("objectives"), row.get("constraint_margin"), row.get("cost_units")
+        if (
+            isinstance(cid, bool) or not isinstance(cid, int)
+            or not isinstance(fidelity, str) or fidelity not in {"low", "medium", "high"}
+            or not isinstance(objectives, list) or len(objectives) != 2
+            or any(not _finite(value) for value in objectives)
+            or not _finite(margin) or not _finite(cost_units)
+        ):
+            errors.append(f"{label}: malformed evaluation record at index {index}")
+            return
     raw_promotions = run.get("promotion_records")
     if not isinstance(raw_promotions, list) or any(not isinstance(promotion, dict) for promotion in raw_promotions):
         errors.append(f"{label}: expected a list of promotion objects")
         return
+    for index, promotion in enumerate(raw_promotions):
+        if (
+            isinstance(promotion.get("candidate_id"), bool)
+            or not isinstance(promotion.get("candidate_id"), int)
+            or not _finite(promotion.get("predicted_margin"))
+            or not _finite(promotion.get("observed_high_margin"))
+            or not isinstance(promotion.get("method"), str)
+        ):
+            errors.append(f"{label}: malformed promotion record at index {index}")
+            return
     if any(row.get("fidelity") != "low" for row in ledger[:60]):
         errors.append(f"{label}: first 60 evaluations must be low fidelity")
         return
@@ -618,6 +640,7 @@ def score_document(
     # useful for rapid diagnosis, but must be explicitly labelled as such rather
     # than receiving an indistinguishable valid receipt.
     manifest_path = root / "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+    manifest: dict[str, Any] = {}
     try:
         manifest = loads_no_duplicate_keys(manifest_path.read_text(encoding="utf-8"))
         manifest_defaults = {
