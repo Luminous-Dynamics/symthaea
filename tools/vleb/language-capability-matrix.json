@@ -1,0 +1,207 @@
+{
+  "schema_version": "vleb-language-capability-matrix-v1",
+  "audit_date": "2026-10-28",
+  "scope": "Static audit of the central execution dispatch; not a complete audit of every parser, generator, compiler integration, or repository feature.",
+  "source_snapshot": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "branch": "fix/fail-closed-language-execution-2026-10-24",
+    "commit_sha": "ffac9a0ea3172f0622d9b1a0ab031284722fc70f",
+    "pull_request_url": "https://github.com/Luminous-Dynamics/symthaea/pull/8631",
+    "source_file": "src/language/code_executor.rs",
+    "source_sha256_git_blob": "000f95dc8be2deb64408eded5719875688e81014",
+    "source_evidence": [
+      "execute_language dispatches Rust to execute_rust or execute_rust_with_inline_tests",
+      "execute_language dispatches Python to execute_python",
+      "execute_language dispatches Nix to evaluate_nix",
+      "supports_language returns true only for rust, python, nix",
+      "unknown languages produce unsupported_language result"
+    ]
+  },
+  "stage_definitions": {
+    "dispatch_recognition": "Does the central dispatcher recognize a language label and select a declared backend?",
+    "parser": "Can the project parse the language into a reliable syntactic/semantic representation?",
+    "generation": "Can the project generate valid code in the target language/dialect?",
+    "compile_or_runtime": "Can source be built or evaluated in a declared, pinned runtime?",
+    "test_execution": "Can task-specific tests actually execute and report raw outputs/exit status?",
+    "independent_semantic_verification": "Can a separate verifier establish task-specific behavior beyond agent-reported success?",
+    "held_out_benchmark": "Has this language been scored on independently reviewed, held-out tasks?"
+  },
+  "languages": [
+    {
+      "language": "Rust",
+      "dialects": [
+        "Rust toolchain pinned in task environment"
+      ],
+      "dispatch_recognition": "supported",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "backend_declared",
+      "test_execution": "partially_evidenced",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [
+        "execute_rust",
+        "execute_rust_with_inline_tests"
+      ],
+      "caveat": "A dispatch entry and inline-test helper do not establish broad code-generation or semantic-verification coverage."
+    },
+    {
+      "language": "Python",
+      "dialects": [
+        "Python version/runtime must be pinned per task"
+      ],
+      "dispatch_recognition": "supported",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "backend_declared",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [
+        "execute_python"
+      ],
+      "caveat": "Backend dispatch is not evidence of version compatibility, test completeness, or independent semantic correctness."
+    },
+    {
+      "language": "Nix",
+      "dialects": [
+        "Nix evaluator semantics must be pinned per task"
+      ],
+      "dispatch_recognition": "supported",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "evaluator_backend_declared",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [
+        "evaluate_nix",
+        "nix_eval"
+      ],
+      "caveat": "Expression evaluation is not a substitute for a build test or deployment verification."
+    },
+    {
+      "language": "COBOL",
+      "dialects": [
+        "IBM Enterprise COBOL",
+        "GnuCOBOL"
+      ],
+      "dispatch_recognition": "unsupported",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "unsupported_in_central_dispatch",
+      "test_execution": "not_run",
+      "independent_semantic_verification": "not_run",
+      "held_out_benchmark": "not_run",
+      "evidence": [
+        "supports_language rejects cobol",
+        "execute_language falls through to unsupported-language result"
+      ],
+      "caveat": "GnuCOBOL parsing/compilation alone would not establish IBM z/OS behavioral equivalence."
+    },
+    {
+      "language": "Assembly / HLASM",
+      "dialects": [
+        "HLASM",
+        "x86-64 Assembly",
+        "ARM64 Assembly"
+      ],
+      "dispatch_recognition": "unsupported",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "unsupported_in_central_dispatch",
+      "test_execution": "not_run",
+      "independent_semantic_verification": "not_run",
+      "held_out_benchmark": "not_run",
+      "evidence": [
+        "supports_language rejects asm",
+        "execute_language falls through to unsupported-language result"
+      ],
+      "caveat": "Assembler dialect, ABI, architecture, condition codes, register and storage semantics need separate evidence."
+    },
+    {
+      "language": "C89",
+      "dialects": [
+        "ANSI C89/C90"
+      ],
+      "dispatch_recognition": "not_audited",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "not_audited",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [],
+      "caveat": "Do not treat absence from the explicit dispatch as proof that every other code path lacks partial support."
+    },
+    {
+      "language": "Fortran",
+      "dialects": [
+        "Fortran 77",
+        "modern Fortran"
+      ],
+      "dispatch_recognition": "not_audited",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "not_audited",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [],
+      "caveat": "Legacy numerical semantics, fixed-form source and floating-point reproducibility need explicit task contracts."
+    },
+    {
+      "language": "Java",
+      "dialects": [
+        "Java 7"
+      ],
+      "dispatch_recognition": "not_audited",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "not_audited",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [],
+      "caveat": "Do not infer language support from dependencies, mentions, or prompt examples."
+    },
+    {
+      "language": "BASIC",
+      "dialects": [
+        "Dialect must be stated per task"
+      ],
+      "dispatch_recognition": "not_audited",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "not_audited",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [],
+      "caveat": "BASIC dialect variation makes task-level dialect pinning mandatory."
+    },
+    {
+      "language": "PL/I",
+      "dialects": [
+        "Compiler dialect must be stated per task"
+      ],
+      "dispatch_recognition": "not_audited",
+      "parser": "not_audited",
+      "generation": "not_audited",
+      "compile_or_runtime": "not_audited",
+      "test_execution": "not_audited",
+      "independent_semantic_verification": "not_audited",
+      "held_out_benchmark": "not_run",
+      "evidence": [],
+      "caveat": "Record layout, decimal arithmetic and condition handling need explicit legacy-system contracts."
+    }
+  ],
+  "reporting_rule": "Never collapse recognition, parsing, generation, execution, test execution, independent verification and held-out performance into a single 'language supported' boolean.",
+  "next_validation_work": [
+    "Audit parser and generator paths independently, with exact source SHA and test inventory.",
+    "Add positive and negative backend controls for each declared language.",
+    "For COBOL, begin with read-only source/copybook/JCL/Db2 analysis before generation or state-changing tasks.",
+    "For Assembly/HLASM, require architecture/dialect pinning, assembler evidence and ABI/condition-code tests.",
+    "Only mark a language benchmarked after independently reviewed held-out tasks and evidence receipts exist."
+  ]
+}
