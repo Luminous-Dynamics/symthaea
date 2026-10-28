@@ -170,3 +170,20 @@ The test matrix must split by task/source/domain rather than random rows only. I
 Critical falsification controls: an uncertainty estimator calibrated only in-domain; high-confidence OOD examples with a changed conditional mechanism; OOD anomalies irrelevant to target decisions; a held-out feature cluster; and corrupted/omitted support metadata. Sentinel benefits must be measured after including the labels and compute they consume. Use independent task/source families for uncertainty intervals, not query rows.
 
 The proposed success criterion is not “lower calibration error.” It is a preregistered improvement in the selected primary OOD objective (predictive risk or decision regret) versus the strongest matched non-oracle baseline, accompanied by no material IID/in-support regression and a transparent robustness tax. This is a new research track, not a result established by the current synthetic Bernoulli fixtures.
+
+
+## 17. Sequential shift monitoring is a separate acquisition-system metric
+
+A selector may inspect calibration or monitoring evidence after each query, so fixed-time intervals reused at every look are not valid substitutes for anytime-valid evidence. Tracking implementation: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744).
+
+The exact Bernoulli monitor microbenchmark compares four arms:
+- one valid fixed-time look at a preregistered horizon;
+- fixed-time Hoeffding intervals reused at every observation (negative control);
+- time-uniform Hoeffding with explicit alpha spending across 12 cells;
+- a predeclared Beta(1/2, 1/2) mixture likelihood-ratio e-process, with Ville threshold 1/(alpha/12).
+
+On the synthetic p0=0.5 stationary null, exact DP gives false-alarm probability by horizon 1,000 of 0.000442 for the final-only interval, 0.009366 for repeatedly reused fixed-time intervals (above per-cell alpha 0.004167), 0.000000451 for alpha-spending Hoeffding, and 0.003059 for the Beta-mixture e-process. Under an abrupt p=0.5 to p=0.8 shift after 100 observations, the time-uniform Hoeffding detector's horizon-500 detection probability / conditional mean delay is 0.999999604 / 157.50 observations, versus 0.997539 / 94.76 for the Beta mixture. Across a wider shift-magnitude grid at horizon 1,000, the Beta mixture raises detection for p=0.40 from 30.95% (Hoeffding) to 94.28%, and for p=0.45 from approximately 0.05% to 11.84%. These are exact computations for a finite synthetic Bernoulli monitor, not production drift-detection performance.
+
+This is an explicit **false-alarm / detection-delay / power frontier**, not a single winner: the Beta mixture is less conservative and faster for some alternatives while slightly reducing detection probability for the p=0.8 scenario. Repeated fixed-time peeking appears fastest but violates the requested null false-alarm budget and is only a negative control. The next monitor benchmark should also include gradual ramps, temporary bursts, serial dependence, cell multiplicity, and selection-biased streams.
+
+The integrated future selector should report monitor false alarms and detection delay jointly with cumulative decision regret, feature-support coverage, label and compute costs, and the randomized sentinel budget. A shift alarm is not itself evidence that an additional label improves the target decision; the system should update the ambiguity set or abstain only under an explicitly validated policy.
