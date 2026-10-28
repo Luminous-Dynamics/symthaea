@@ -16,6 +16,16 @@
 //! boundary must independently validate the receipt artifact before constructing
 //! the reference.
 
+#[path = "mis_evidence.rs"]
+mod mis_evidence;
+pub use self::mis_evidence::{
+    MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, sha256_hex,
+    verify_mis_candidate, verify_mis_candidate_with_receipt,
+};
+
+/// Evidence minted only by re-hashing and independently verifying canonical MIS artifacts.
+pub type VerifierReceiptEvidence = VerifiedMisCandidate;
+
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
@@ -240,31 +250,6 @@ pub enum CandidateVerification {
     VerificationFailed,
 }
 
-/// Metadata extracted from an independently validated verifier-receipt artifact.
-///
-/// The digest identifies the immutable receipt bytes. This evaluator checks that
-/// the receipt metadata agrees with the candidate/report but does not fetch those
-/// bytes or authenticate their signature; receipt ingestion must do that first.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifierReceiptEvidence {
-    /// SHA-256 of the canonical verifier receipt bytes.
-    pub receipt_sha256: String,
-    /// SHA-256 of the canonical original graph bytes covered by the receipt.
-    pub instance_sha256: String,
-    /// SHA-256 of the verifier build/source that produced the receipt.
-    pub verifier_sha256: String,
-    /// SHA-256 of the exact candidate bytes covered by the receipt.
-    pub candidate_sha256: String,
-    /// Frozen MIS target cardinality covered by the receipt.
-    pub target_size: usize,
-    /// Candidate cardinality covered by the receipt.
-    pub candidate_size: usize,
-    /// Conflict count produced by the verifier; None when no count was returned.
-    pub conflict_count: Option<usize>,
-    /// Verification disposition recorded by the verifier.
-    pub verdict: CandidateVerification,
-}
-
 /// One attempted solver run, including failed and unverified outcomes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchedTrialRecord {
@@ -314,15 +299,15 @@ impl MatchedTrialRecord {
         };
         size >= target_size
             && validate_sha256("candidate_sha256", candidate_sha256).is_ok()
-            && validate_sha256("verifier_receipt_sha256", &receipt.receipt_sha256).is_ok()
-            && validate_sha256("receipt_instance_sha256", &receipt.instance_sha256).is_ok()
-            && validate_sha256("receipt_verifier_sha256", &receipt.verifier_sha256).is_ok()
-            && validate_sha256("receipt_candidate_sha256", &receipt.candidate_sha256).is_ok()
-            && receipt.verdict == CandidateVerification::VerifiedIndependentSet
-            && receipt.target_size == target_size
-            && receipt.candidate_size == size
-            && receipt.conflict_count == Some(0)
-            && receipt.candidate_sha256 == candidate_sha256
+            && validate_sha256("verifier_receipt_sha256", receipt.receipt_sha256()).is_ok()
+            && validate_sha256("receipt_instance_sha256", receipt.instance_sha256()).is_ok()
+            && validate_sha256("receipt_verifier_sha256", receipt.verifier_sha256()).is_ok()
+            && validate_sha256("receipt_candidate_sha256", receipt.candidate_sha256()).is_ok()
+            && receipt.verdict() == MisEvidenceVerdict::VerifiedIndependentSet
+            && receipt.target_size() == target_size
+            && receipt.candidate_size() == size
+            && receipt.conflict_count() == 0
+            && receipt.candidate_sha256() == candidate_sha256
     }
 
     fn validate(
@@ -434,13 +419,19 @@ impl MatchedTrialRecord {
                 MatchedEvaluationError::InconsistentCandidateRecord(self.trial_id.clone())
             })?;
             for (field, matches) in [
-                ("instance_sha256", receipt.instance_sha256 == instance_sha256),
-                ("verifier_sha256", receipt.verifier_sha256 == verifier_sha256),
-                ("candidate_sha256", receipt.candidate_sha256 == candidate_sha256),
-                ("target_size", receipt.target_size == target_size),
-                ("candidate_size", receipt.candidate_size == candidate_size),
-                ("conflict_count", receipt.conflict_count == self.conflict_count),
-                ("verdict", receipt.verdict == self.verification),
+                ("instance_sha256", receipt.instance_sha256() == instance_sha256),
+                ("verifier_sha256", receipt.verifier_sha256() == verifier_sha256),
+                ("candidate_sha256", receipt.candidate_sha256() == candidate_sha256),
+                ("target_size", receipt.target_size() == target_size),
+                ("candidate_size", receipt.candidate_size() == candidate_size),
+                ("conflict_count", Some(receipt.conflict_count()) == self.conflict_count),
+                ("verdict", match self.verification {
+                    CandidateVerification::VerifiedIndependentSet =>
+                        receipt.verdict() == MisEvidenceVerdict::VerifiedIndependentSet,
+                    CandidateVerification::VerifiedConflict =>
+                        receipt.verdict() == MisEvidenceVerdict::VerifiedConflict,
+                    _ => false,
+                }),
             ] {
                 if !matches {
                     return Err(MatchedEvaluationError::VerifierReceiptMismatch {
@@ -1051,6 +1042,52 @@ mod tests {
         }
     }
 
+    const TEST_GRAPH: &[u8] = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 6\\nedges 0\\n";
+    const TEST_VERIFIER: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
+    fn candidate_bytes(size: usize) -> Vec<u8> {
+        let mut bytes = format!("SYMTHEA-MIS-CANDIDATE-V1\\ncount {size}\\n");
+        for vertex in 0..size {
+            bytes.push_str(&format!("{vertex}\\n"));
+        }
+        bytes.into_bytes()
+    }
+
+    fn verified_trial_for(
+        id: &str,
+        pair: &str,
+        seed: u64,
+        size: usize,
+        target: usize,
+        graph_bytes: &[u8],
+        verifier_sha256: &str,
+        stage_costs: StageCostsMs,
+        energy: EnergyRecord,
+    ) -> MatchedTrialRecord {
+        let candidate = candidate_bytes(size);
+        let evidence = verify_mis_candidate(graph_bytes, &candidate, target, verifier_sha256)
+            .expect("synthetic candidate and graph are canonical");
+        let (verification, conflicts) = match evidence.verdict() {
+            MisEvidenceVerdict::VerifiedIndependentSet =>
+                (CandidateVerification::VerifiedIndependentSet, Some(0)),
+            MisEvidenceVerdict::VerifiedConflict =>
+                (CandidateVerification::VerifiedConflict, Some(evidence.conflict_count())),
+        };
+        MatchedTrialRecord {
+            trial_id: id.to_owned(),
+            pair_id: pair.to_owned(),
+            seed,
+            termination: TrialTermination::Completed,
+            candidate_size: Some(size),
+            candidate_sha256: Some(evidence.candidate_sha256().to_owned()),
+            verifier_receipt: Some(evidence),
+            verification,
+            conflict_count: conflicts,
+            costs: stage_costs,
+            energy,
+        }
+    }
+
     fn verified_trial(
         id: &str,
         pair: &str,
@@ -1059,37 +1096,14 @@ mod tests {
         stage_costs: StageCostsMs,
         energy: EnergyRecord,
     ) -> MatchedTrialRecord {
-        let candidate_sha256 = "1".repeat(64);
-        let verifier_receipt = VerifierReceiptEvidence {
-            receipt_sha256: "2".repeat(64),
-            instance_sha256: "a".repeat(64),
-            verifier_sha256: "c".repeat(64),
-            candidate_sha256: candidate_sha256.clone(),
-            target_size: 5,
-            candidate_size: size,
-            conflict_count: Some(0),
-            verdict: CandidateVerification::VerifiedIndependentSet,
-        };
-        MatchedTrialRecord {
-            trial_id: id.to_owned(),
-            pair_id: pair.to_owned(),
-            seed,
-            termination: TrialTermination::Completed,
-            candidate_size: Some(size),
-            candidate_sha256: Some(candidate_sha256),
-            verifier_receipt: Some(verifier_receipt),
-            verification: CandidateVerification::VerifiedIndependentSet,
-            conflict_count: Some(0),
-            costs: stage_costs,
-            energy,
-        }
+        verified_trial_for(id, pair, seed, size, 5, TEST_GRAPH, TEST_VERIFIER, stage_costs, energy)
     }
 
     fn report(arm_id: &str, method_id: &str, trials: Vec<MatchedTrialRecord>) -> MatchedArmReport {
         MatchedArmReport {
             arm_id: arm_id.to_owned(),
             method_id: method_id.to_owned(),
-            instance_sha256: "a".repeat(64),
+            instance_sha256: sha256_hex(TEST_GRAPH),
             protocol_sha256: "b".repeat(64),
             target_size: 5,
             per_trial_solver_budget_ms: 1_000.0,
@@ -1394,7 +1408,7 @@ mod tests {
 
 
     #[test]
-    fn verified_target_requires_content_addressed_receipt_bound_to_report_and_candidate() {
+    fn verified_target_requires_opaque_evidence_bound_to_report_and_candidate() {
         let good = report(
             "baseline",
             "classical",
@@ -1409,29 +1423,29 @@ mod tests {
             Err(MatchedEvaluationError::MissingVerifierReceipt(_))
         ));
 
-        let mut invalid_digest = good.clone();
-        invalid_digest.trials[0].verifier_receipt.as_mut().unwrap().receipt_sha256 = "not-a-sha".into();
+        let mut bad_candidate = good.clone();
+        bad_candidate.trials[0].candidate_sha256 = Some("3".repeat(64));
         assert!(matches!(
-            invalid_digest.validate(),
-            Err(MatchedEvaluationError::InvalidSha256 { field: "verifier_receipt_sha256" })
-        ));
-
-        let mut wrong_candidate = good.clone();
-        wrong_candidate.trials[0].verifier_receipt.as_mut().unwrap().candidate_sha256 = "3".repeat(64);
-        assert!(matches!(
-            wrong_candidate.validate(),
+            bad_candidate.validate(),
             Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "candidate_sha256", .. })
         ));
 
+        let mut malformed_candidate = good.clone();
+        malformed_candidate.trials[0].candidate_sha256 = Some("not-a-sha".into());
+        assert!(matches!(
+            malformed_candidate.validate(),
+            Err(MatchedEvaluationError::InvalidSha256 { field: "candidate_sha256" })
+        ));
+
         let mut wrong_verifier = good.clone();
-        wrong_verifier.trials[0].verifier_receipt.as_mut().unwrap().verifier_sha256 = "4".repeat(64);
+        wrong_verifier.verifier_sha256 = "4".repeat(64);
         assert!(matches!(
             wrong_verifier.validate(),
             Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "verifier_sha256", .. })
         ));
 
         let mut wrong_instance = good.clone();
-        wrong_instance.trials[0].verifier_receipt.as_mut().unwrap().instance_sha256 = "5".repeat(64);
+        wrong_instance.instance_sha256 = "5".repeat(64);
         assert!(matches!(
             wrong_instance.validate(),
             Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "instance_sha256", .. })
