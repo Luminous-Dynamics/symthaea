@@ -316,19 +316,20 @@ class BrocaRustMemoryAdapterTests(unittest.TestCase):
         self.assertIsNone(reference())
         self.assertIsNotNone(process.poll())
 
-    def test_save_load_journal_replays_trajectory_and_checks_digest(self):
+    def test_save_load_journal_replays_deletion_tombstone_and_checks_digest(self):
         adapter = self.make_adapter()
         adapter.insert(self.trajectory())
+        adapter.delete_evidence("e" * 64)
         saved = self.root / "saved"
         adapter.save_memory(saved)
 
         second = self.make_adapter()
         second._load_backend(saved)
         self.assertEqual(second._trajectory_count, 1)
+        self.assertEqual(second._event_count, 2)
         second.set_query_context(query_invocation_id="loaded-query")
         try:
-            items = second.query("billing")
-            self.assertEqual(items[0]["value"], "billing panel")
+            self.assertEqual(second.query("billing"), [])
         finally:
             second.clear_query_context()
 
@@ -337,6 +338,17 @@ class BrocaRustMemoryAdapterTests(unittest.TestCase):
         third = self.make_adapter()
         with self.assertRaises(RuntimeError):
             third._load_backend(saved)
+
+    def test_revocation_is_journaled_and_blocks_future_query(self):
+        adapter = self.make_adapter()
+        adapter.insert(self.trajectory())
+        adapter.revoke_evidence("e" * 64)
+        adapter.set_query_context(query_invocation_id="revoked-query")
+        try:
+            self.assertEqual(adapter.query("billing"), [])
+        finally:
+            adapter.clear_query_context()
+        self.assertEqual(adapter._event_count, 2)
 
 
 if __name__ == "__main__":
