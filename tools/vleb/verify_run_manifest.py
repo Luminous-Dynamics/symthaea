@@ -32,6 +32,19 @@ def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key: {key!r}")
+        value[key] = item
+    return value
+
+
+def parse_unique_json(raw: bytes) -> Any:
+    return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=_unique_json_object)
+
+
 def canonical_invocation_digest(argv: list[str], working_directory: str, timeout_ms: int) -> str:
     canonical = json.dumps(
         {
@@ -354,10 +367,44 @@ def audit_witness_execution_receipt(
         verifier.get("kind") != kind
         or verifier.get("id") != witness.get("verifier_id")
         or verifier.get("sha256") != witness.get("verifier_sha256")
+        or verifier.get("path") != witness.get("verifier_path")
+        or verifier.get("argv_index") != witness.get("verifier_argv_index")
         or expected_verifier is None
         or verifier.get("sha256") != expected_verifier
     ):
         issues.append({"code": "witness_receipt_verifier_mismatch", "message": "receipt verifier identity differs from witness and out-of-band pin"})
+
+    try:
+        verifier_path_value = witness.get("verifier_path")
+        verifier_file = safe_file(evidence_root, verifier_path_value)
+        actual_verifier_sha256 = digest(verifier_file.read_bytes())
+        argv_index = witness.get("verifier_argv_index")
+        if actual_verifier_sha256 != expected_verifier or actual_verifier_sha256 != verifier.get("sha256"):
+            issues.append({
+                "code": "witness_verifier_file_digest_mismatch",
+                "message": "verifier file bytes do not match the out-of-band verifier digest",
+            })
+        if (
+            not isinstance(argv_index, int)
+            or isinstance(argv_index, bool)
+            or argv_index < 0
+            or argv_index >= len(receipt["invocation"]["argv"])
+            or receipt["invocation"]["argv"][argv_index] != verifier_path_value
+        ):
+            issues.append({
+                "code": "witness_verifier_invocation_binding_mismatch",
+                "message": "the pinned verifier file is not the exact argv entry at the evaluator-pinned index",
+            })
+        if not any(row.get("path") == verifier_path_value and row.get("sha256") == actual_verifier_sha256 for row in receipt["inputs"]):
+            issues.append({
+                "code": "witness_verifier_input_missing",
+                "message": "receipt inputs do not bind the actual verifier file bytes",
+            })
+    except (OSError, ValueError, TypeError) as exc:
+        issues.append({
+            "code": "witness_verifier_file_invalid",
+            "message": str(exc),
+        })
 
     invocation = receipt["invocation"]
     try:
@@ -431,10 +478,96 @@ def audit_witness_execution_receipt(
             "message": "claim witness artifact must be bound to a matching role=artifact output digest in its execution receipt",
         })
     process = receipt["process"]
-    if process.get("timed_out") and receipt["observed_result"] != "inconclusive":
-        issues.append({"code": "witness_receipt_timeout_misclassified", "message": "timed-out executions must be inconclusive"})
     if process.get("timed_out") is not True and process.get("exit_code") is None:
         issues.append({"code": "witness_receipt_process_status_missing", "message": "non-timeout execution must record an exit code"})
+
+    verdict_rows = [row for row in outputs if row.get("role") == "verdict"]
+    verdict: dict[str, Any] | None = None
+    verdict_valid = False
+    if len(verdict_rows) != 1:
+        issues.append({
+            "code": "witness_verdict_output_count_invalid",
+            "message": "exactly one verifier-produced verdict output is required",
+        })
+    else:
+        verdict_row = verdict_rows[0]
+        if verdict_row.get("path") != witness.get("verdict_path"):
+            issues.append({
+                "code": "witness_verdict_path_mismatch",
+                "message": "verdict output path differs from the evaluator-pinned claim witness",
+            })
+        try:
+            verdict_path = safe_file(evidence_root, verdict_row["path"])
+            verdict_raw = verdict_path.read_bytes()
+            verdict_value = parse_unique_json(verdict_raw)
+            expected_fields = {
+                "schema_version", "task_id", "claim_id",
+                "source_sha256", "verifier_sha256", "result",
+            }
+            if not isinstance(verdict_value, dict) or set(verdict_value) != expected_fields:
+                issues.append({
+                    "code": "witness_verdict_shape_invalid",
+                    "message": "verdict must contain exactly the pinned v1 identity fields and result",
+                })
+            else:
+                verdict = verdict_value
+                expected_verdict_bindings = {
+                    "schema_version": "vleb-witness-verdict-v1",
+                    "task_id": manifest["task"]["task_id"],
+                    "claim_id": claim.get("claim_id"),
+                    "source_sha256": claim.get("source", {}).get("sha256"),
+                    "verifier_sha256": expected_verifier,
+                }
+                for key, expected in expected_verdict_bindings.items():
+                    if verdict.get(key) != expected:
+                        issues.append({
+                            "code": "witness_verdict_binding_mismatch",
+                            "message": f"verdict {key} does not match the evaluator-pinned identity",
+                        })
+                if verdict.get("result") not in ("supports", "contradicts", "inconclusive"):
+                    issues.append({
+                        "code": "witness_verdict_result_invalid",
+                        "message": "verdict result is outside the closed result vocabulary",
+                    })
+                verdict_valid = not any(
+                    issue["code"] in {
+                        "witness_verdict_shape_invalid",
+                        "witness_verdict_binding_mismatch",
+                        "witness_verdict_result_invalid",
+                    }
+                    for issue in issues
+                )
+        except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+            issues.append({
+                "code": "witness_verdict_invalid",
+                "message": f"verdict output is not valid unique-key JSON: {exc}",
+            })
+
+    execution_completed = (
+        process.get("timed_out") is False
+        and process.get("signal") is None
+        and process.get("exit_code") == 0
+    )
+    derived_result = (
+        verdict["result"]
+        if execution_completed and verdict_valid and verdict is not None
+        else "inconclusive"
+    )
+    if receipt["observed_result"] != derived_result:
+        issues.append({
+            "code": "witness_receipt_result_not_derived",
+            "message": "receipt result must be derived from the verifier verdict and successful process status",
+        })
+    if witness.get("observed_result") != derived_result:
+        issues.append({
+            "code": "witness_claim_result_mismatch",
+            "message": "claim witness result differs from independently derived verdict",
+        })
+    if not execution_completed and receipt["observed_result"] != "inconclusive":
+        issues.append({
+            "code": "witness_receipt_execution_misclassified",
+            "message": "failed, signalled or timed-out invocations must be inconclusive",
+        })
 
     return issues
 
