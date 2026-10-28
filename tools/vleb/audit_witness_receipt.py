@@ -106,12 +106,14 @@ def validate_receipt(
     expected_verifier_sha256: str,
     expected_runtime_image_digest: str,
     expected_toolchain_sha256: str,
+    expected_runtime_sha256: str,
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
     for label, value in (("receipt", expected_receipt_sha256), ("schema", expected_schema_sha256),
                          ("source", expected_source_sha256), ("source_spans", expected_source_spans_sha256),
                          ("invocation", expected_invocation_sha256), ("inputs", expected_inputs_sha256),
-                         ("verifier", expected_verifier_sha256), ("toolchain", expected_toolchain_sha256)):
+                         ("verifier", expected_verifier_sha256), ("toolchain", expected_toolchain_sha256),
+                         ("runtime_object", expected_runtime_sha256)):
         if not isinstance(value, str) or not HEX.fullmatch(value):
             issues.append({"code": f"invalid_external_{label}_pin", "message": f"external {label} pin must be a lowercase SHA-256"})
     if not isinstance(expected_workflow_sha, str) or not HEX40.fullmatch(expected_workflow_sha):
@@ -176,10 +178,12 @@ def validate_receipt(
         observed_source_spans_sha256 = canonical_digest(receipt["source"]["spans"])
         observed_invocation_sha256 = canonical_digest(receipt["invocation"])
         observed_inputs_sha256 = canonical_digest(receipt["inputs"])
+        observed_runtime_sha256 = canonical_digest(receipt["runtime"])
         for label, observed, expected, code in (
             ("source_spans", observed_source_spans_sha256, expected_source_spans_sha256, "source_spans_pin_mismatch"),
             ("invocation", observed_invocation_sha256, expected_invocation_sha256, "invocation_pin_mismatch"),
             ("inputs", observed_inputs_sha256, expected_inputs_sha256, "input_inventory_pin_mismatch"),
+            ("runtime", observed_runtime_sha256, expected_runtime_sha256, "runtime_object_pin_mismatch"),
         ):
             if observed != expected:
                 issues.append({"code": code, "message": f"{label} differ from the evaluator-pinned canonical digest"})
@@ -266,6 +270,7 @@ def validate_receipt(
         "observed_source_spans_sha256": canonical_digest(receipt["source"]["spans"]) if isinstance(receipt, dict) and isinstance(receipt.get("source"), dict) and isinstance(receipt["source"].get("spans"), list) else None,
         "observed_invocation_sha256": canonical_digest(receipt["invocation"]) if isinstance(receipt, dict) and isinstance(receipt.get("invocation"), dict) else None,
         "observed_inputs_sha256": canonical_digest(receipt["inputs"]) if isinstance(receipt, dict) and isinstance(receipt.get("inputs"), list) else None,
+        "observed_runtime_sha256": canonical_digest(receipt["runtime"]) if isinstance(receipt, dict) and isinstance(receipt.get("runtime"), dict) else None,
         "issues": issues,
         "assurance_boundary": "Receipt audit checks pinned identity, replay bindings and artifact integrity; producer authentication and semantic truth require the outer attestation gate and trusted verifier execution policy.",
     }
@@ -298,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-verifier-sha256", required=True)
     parser.add_argument("--expected-runtime-image-digest", required=True)
     parser.add_argument("--expected-toolchain-sha256", required=True)
+    parser.add_argument("--expected-runtime-sha256", required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     result = validate_receipt(
@@ -324,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         expected_verifier_sha256=args.expected_verifier_sha256,
         expected_runtime_image_digest=args.expected_runtime_image_digest,
         expected_toolchain_sha256=args.expected_toolchain_sha256,
+        expected_runtime_sha256=args.expected_runtime_sha256,
     )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:

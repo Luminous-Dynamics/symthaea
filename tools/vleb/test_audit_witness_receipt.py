@@ -83,6 +83,13 @@ class WitnessReceiptAuditTests(unittest.TestCase):
             "claim_result": "supports",
         }
         self.receipt_path = self.root / "receipt.json"
+        # Evaluator pins are frozen from the pristine fixture and never recomputed
+        # from subsequently mutated receipt fields.
+        self.expected_source_sha256 = self.receipt["source"]["sha256"]
+        self.expected_source_spans_sha256 = canonical_sha(self.receipt["source"]["spans"])
+        self.expected_invocation_sha256 = canonical_sha(self.receipt["invocation"])
+        self.expected_inputs_sha256 = canonical_sha(self.receipt["inputs"])
+        self.expected_runtime_sha256 = canonical_sha(self.receipt["runtime"])
         self.write_receipt()
 
     def write_receipt(self) -> None:
@@ -105,15 +112,16 @@ class WitnessReceiptAuditTests(unittest.TestCase):
             "expected_task_id": "COBOL.SETTLEMENT.001",
             "expected_claim_id": "BALANCE.PIC",
             "expected_source_path": "source.cbl",
-            "expected_source_sha256": self.receipt["source"]["sha256"],
-            "expected_source_spans_sha256": canonical_sha(self.receipt["source"]["spans"]),
-            "expected_invocation_sha256": canonical_sha(self.receipt["invocation"]),
-            "expected_inputs_sha256": canonical_sha(self.receipt["inputs"]),
+            "expected_source_sha256": self.expected_source_sha256,
+            "expected_source_spans_sha256": self.expected_source_spans_sha256,
+            "expected_invocation_sha256": self.expected_invocation_sha256,
+            "expected_inputs_sha256": self.expected_inputs_sha256,
             "expected_verifier_kind": "independent_execution",
             "expected_verifier_id": "ledger-reference-v1",
             "expected_verifier_sha256": "b" * 64,
             "expected_runtime_image_digest": "sha256:" + "c" * 64,
             "expected_toolchain_sha256": "d" * 64,
+            "expected_runtime_sha256": self.expected_runtime_sha256,
         }
         values.update(overrides)
         return validate_receipt(self.receipt_path, self.schema_path, self.root, **values)
@@ -178,6 +186,40 @@ class WitnessReceiptAuditTests(unittest.TestCase):
         self.assertIn("verifier_id_mismatch", {issue["code"] for issue in result["issues"]})
         result = self.audit(expected_verifier_sha256="e" * 64)
         self.assertIn("verifier_digest_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_complete_runtime_object_is_pinned(self) -> None:
+        self.receipt["runtime"]["network_mode"] = "unrestricted"
+        result = self.audit()
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+        self.receipt["runtime"]["network_mode"] = "disabled"
+        self.receipt["runtime"]["architecture"] = "aarch64"
+        result = self.audit()
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_runtime_mutation_keeps_the_original_evaluator_pin(self) -> None:
+        self.receipt["runtime"]["network_mode"] = "unrestricted"
+        result = self.audit()
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_span_mutation_keeps_the_original_evaluator_pin(self) -> None:
+        self.receipt["source"]["spans"][0]["column_start"] += 1
+        result = self.audit()
+        self.assertIn("source_spans_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_invocation_mutation_keeps_the_original_evaluator_pin(self) -> None:
+        self.receipt["invocation"]["argv"][1] = "--different-scenario"
+        result = self.audit()
+        self.assertIn("invocation_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_input_inventory_mutation_keeps_the_original_evaluator_pin(self) -> None:
+        self.receipt["inputs"][0]["sha256"] = "e" * 64
+        result = self.audit()
+        self.assertIn("input_inventory_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_runtime_object_pin_must_be_valid_and_match(self) -> None:
+        result = self.audit(expected_runtime_sha256="e" * 64)
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
 
     def test_runtime_and_toolchain_are_pinned(self) -> None:
         result = self.audit(expected_runtime_image_digest="sha256:" + "e" * 64)
