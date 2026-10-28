@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import gc
 import json
 import os
 from pathlib import Path
 import sys
 import tempfile
+import time
+import weakref
 import textwrap
 import threading
 import types
@@ -256,6 +259,23 @@ class BrocaRustMemoryAdapterTests(unittest.TestCase):
                 "goal": "x" * 2000,
                 "states": [{"text": "billing"}],
             })
+
+
+    def test_unreferenced_per_question_adapter_releases_its_worker(self):
+        adapter = self.make_adapter()
+        process = adapter._process
+        reference = weakref.ref(adapter)
+        self.instances.remove(adapter)
+        del adapter
+        gc.collect()
+
+        deadline = time.monotonic() + 2.0
+        while process.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+            gc.collect()
+
+        self.assertIsNone(reference())
+        self.assertIsNotNone(process.poll())
 
     def test_save_load_journal_replays_trajectory_and_checks_digest(self):
         adapter = self.make_adapter()
