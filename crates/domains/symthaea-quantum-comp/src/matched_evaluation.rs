@@ -76,16 +76,17 @@ impl EnergyRecord {
     }
 }
 
-/// Stage-by-stage wall-clock cost in milliseconds.
+/// Per-stage wall-time or work-duration diagnostics in milliseconds.
 ///
-/// Each field is Option-valued: None means unknown or not measured, while
-/// Some(0.0) means the stage was measured and consumed zero milliseconds at the
-/// chosen clock resolution. The all-in total is unavailable if any stage is
-/// unknown. Zero must never be used as a placeholder for missing data.
+/// These components may overlap, run concurrently, or be measured at different
+/// instrumentation boundaries. They must **not** be summed and presented as
+/// end-to-end latency. Direct monotonic-clock intervals live on
+/// `MatchedTrialRecord` as `deployment_elapsed_ms` and
+/// `standardized_algorithm_elapsed_ms`. Every field is Option-valued: None means
+/// unknown/not measured; Some(0.0) means measured at the chosen resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StageCostsMs {
     /// External queue wait before a solver or sampler becomes available.
-    /// Some(0.0) means measured or known not to apply; None means unknown.
     pub queue_wait_ms: Option<f64>,
     /// Trajectory acquisition / device execution.
     pub acquisition_ms: Option<f64>,
@@ -123,27 +124,25 @@ impl StageCostsMs {
         ]
     }
 
-    /// Returns true when every required cost stage is measured.
+    /// Returns true when every diagnostic stage component is measured.
     pub fn is_complete(&self) -> bool {
         self.values().iter().all(Option::is_some)
     }
 
-    /// Returns the all-in cost in milliseconds, or None if any stage is unknown.
-    ///
-    /// Call validate_trial / MatchedArmReport::validate before treating this as
-    /// audited evidence; a complete all-zero vector is invalid for an actual run.
-    pub fn all_in_total_ms(&self) -> Option<f64> {
+    /// Sum of diagnostic stage components, not an end-to-end latency measurement.
+    /// Returns None if any component is unknown or the sum is non-finite.
+    pub fn sum_all_stage_costs_ms(&self) -> Option<f64> {
         let values = self.values();
         if values.iter().any(Option::is_none) {
             return None;
         }
-        Some(values.into_iter().flatten().sum())
+        let total: f64 = values.into_iter().flatten().sum();
+        total.is_finite().then_some(total)
     }
 
-    /// Runtime used for normalized algorithm comparisons. Excludes queue wait and
-    /// amortized compilation/initialization, following common benchmark reporting
-    /// conventions. Returns None if any included algorithm stage is unknown.
-    pub fn algorithm_runtime_ms(&self) -> Option<f64> {
+    /// Sum of algorithm-stage diagnostic components, excluding queue and
+    /// amortized compile/init. This is not a wall-clock algorithm runtime.
+    pub fn sum_algorithm_stage_costs_ms(&self) -> Option<f64> {
         let values = [
             self.acquisition_ms,
             self.preprocessing_ms,
@@ -157,11 +156,12 @@ impl StageCostsMs {
         if values.iter().any(Option::is_none) {
             return None;
         }
-        Some(values.into_iter().flatten().sum())
+        let total: f64 = values.into_iter().flatten().sum();
+        total.is_finite().then_some(total)
     }
 
-    /// True when every stage used by algorithm_runtime_ms is measured.
-    pub fn is_algorithm_runtime_complete(&self) -> bool {
+    /// True when each component used in the algorithm-stage sum is measured.
+    pub fn has_complete_algorithm_stage_costs(&self) -> bool {
         [
             self.acquisition_ms,
             self.preprocessing_ms,
@@ -197,25 +197,6 @@ impl StageCostsMs {
                         value,
                     });
                 }
-            }
-        }
-
-        if self.is_complete() {
-            let total = self.all_in_total_ms().unwrap_or(f64::NAN);
-            if !total.is_finite() || total <= 0.0 {
-                return Err(MatchedEvaluationError::InvalidAllInCost {
-                    trial_id: trial_id.to_owned(),
-                    value: total,
-                });
-            }
-        }
-        if self.is_algorithm_runtime_complete() {
-            let runtime = self.algorithm_runtime_ms().unwrap_or(f64::NAN);
-            if !runtime.is_finite() || runtime <= 0.0 {
-                return Err(MatchedEvaluationError::InvalidAlgorithmRuntime {
-                    trial_id: trial_id.to_owned(),
-                    value: runtime,
-                });
             }
         }
         Ok(())
