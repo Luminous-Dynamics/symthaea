@@ -13,6 +13,7 @@ This fixture fixes a nominal Bernoulli probability p0 = 0.5 and a post-change pr
 1. fixed_time_final_only: evaluate a fixed-time Hoeffding interval once at the prespecified horizon. This is valid for one planned look; it cannot stop early.
 2. fixed_time_reused_each_look: deliberately reuses the fixed-time interval after every observation and stops at the first alarm. This is a negative control for optional-stopping inflation, not a valid anytime monitor.
 3. time_uniform_alpha_spending: checks an anytime-valid Hoeffding sequence with per-cell/time error mass alpha/[M*n*(n+1)]. The sum over all n and M cells is at most alpha under independent stationary Bernoulli streams.
+4. beta_mixture_e_process: checks a predeclared Beta(1/2,1/2)-mixture likelihood-ratio e-process against p0. Ville's inequality controls the first crossing over all looks.
 
 At observation n, the monitor alarms if the nominal p0 falls outside the confidence interval around the running empirical mean. The boundary only has a false-alarm guarantee when p0 is actually the stationary Bernoulli parameter and observations meet the sampling assumptions. Under the step-shift scenario, nonstationarity is the alternative; the measured detection power and delay are characteristics of this synthetic scenario, not a coverage guarantee.
 
@@ -55,7 +56,7 @@ The alpha-spending method is extremely conservative here; that is a measurable e
 ## Limits
 
 - One Bernoulli cell and one known nominal probability are monitored.
-- The shift is a single abrupt step, not gradual drift, oscillation, or a compound shift.
+- The alternatives are single abrupt steps of varied direction and magnitude; gradual ramps, oscillation, serial dependence and compound shifts are not yet covered.
 - Alpha is assigned to a cell; combining 12 concurrently monitored cells needs the stated multiplicity control.
 - This monitor only indicates a mismatch with the nominal Bernoulli rate. It does not identify the cause, repair the predictive model, or prove that every shift is harmful.
 - The fixed-time-reused arm is intentionally invalid when inspected repeatedly; it is included only to show why optional-stopping control matters.
