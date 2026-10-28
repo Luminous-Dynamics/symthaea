@@ -1025,8 +1025,8 @@ mod tests {
                 other => panic!("unhandled fixture verdict {other} for {case_id}"),
             }
         }
-        assert_eq!(seen.len(), 108);
+        assert_eq!(seen.len(), 120);
         assert_eq!(accepted, 60);
-        assert_eq!(rejected, 48);
+        assert_eq!(rejected, 60);
     }
 }
