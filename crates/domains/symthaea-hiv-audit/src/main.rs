@@ -84,7 +84,7 @@ fn run() -> Result<(), String> {
             "--source-archive",
             "--receipt",
         ],
-        _ => return Err(format!("unknown command {command:?}\\n{}", usage())),
+        _ => return Err(format!("unknown command {command:?}\n{}", usage())),
     };
     if let Some(unexpected) = values.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(format!("unexpected argument {unexpected:?} for command {command:?}"));
