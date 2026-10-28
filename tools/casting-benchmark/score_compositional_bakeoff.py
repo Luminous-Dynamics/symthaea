@@ -447,8 +447,12 @@ def _replay_diwa_run(run: dict, errors: list[str]) -> None:
         errors.append(f"{label}: expected two sequential acquisition decisions")
         return
     ledger = run.get("evaluations")
-    if not isinstance(ledger, list) or len(ledger) != 72:
-        errors.append(f"{label}: expected 72 ordered evaluation records")
+    if not isinstance(ledger, list) or len(ledger) != 72 or any(not isinstance(row, dict) for row in ledger):
+        errors.append(f"{label}: expected 72 ordered evaluation objects")
+        return
+    raw_promotions = run.get("promotion_records")
+    if not isinstance(raw_promotions, list) or any(not isinstance(promotion, dict) for promotion in raw_promotions):
+        errors.append(f"{label}: expected a list of promotion objects")
         return
     if any(row.get("fidelity") != "low" for row in ledger[:60]):
         errors.append(f"{label}: first 60 evaluations must be low fidelity")
@@ -469,11 +473,11 @@ def _replay_diwa_run(run: dict, errors: list[str]) -> None:
         errors.append(f"{label}: duplicate candidate within low or medium sample")
         return
     anchor_promotions = [
-        promotion for promotion in run["promotion_records"]
+        promotion for promotion in raw_promotions
         if promotion.get("method") == "decision_impact_anchor"
     ]
     confirmation_promotions = [
-        promotion for promotion in run["promotion_records"]
+        promotion for promotion in raw_promotions
         if promotion.get("method") == "decision_impact_confirmation"
     ]
     if len(anchor_promotions) != 2 or len(confirmation_promotions) != 2:
@@ -501,7 +505,10 @@ def _replay_diwa_run(run: dict, errors: list[str]) -> None:
     if anchor_ids != [int(expected_anchor_first["candidate_id"]), int(expected_anchor_second["candidate_id"])]:
         errors.append(f"{label}: anchor selection does not match the frozen anchor rule")
     anchor_high = high[:2]
-    promotions_by_id = {int(p["candidate_id"]): p for p in run["promotion_records"]}
+    promotions_by_id = {
+        int(p["candidate_id"]): p for p in raw_promotions
+        if isinstance(p.get("candidate_id"), int) and not isinstance(p.get("candidate_id"), bool)
+    }
     for high_obs in anchor_high:
         cid = int(high_obs["candidate_id"])
         _near(
