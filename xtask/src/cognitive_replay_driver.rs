@@ -28,8 +28,9 @@ pub struct RevealedOutcome {
     pub value: f64,
 }
 
-/// Evaluator-side outcome status. These plans never enter PolicyObservation; the adapter sees
-/// only outcomes actually revealed at the current tick.
+/// Evaluator-side outcome schedule. The complete plan never enters PolicyObservation.
+/// Only a status-only MissingOutcomeNotice is delivered at its registered declaration tick;
+/// future statuses, the missingness mechanism, and hidden target values remain evaluator-side.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutcomeDisposition {
