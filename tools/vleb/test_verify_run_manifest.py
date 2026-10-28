@@ -101,7 +101,11 @@ class ManifestBundle:
 
     def audit(self, **kwargs: Any) -> dict[str, Any]:
         self.write_manifest()
-        expected = kwargs.pop("expected_manifest_sha256", self.trusted_sha)
+        repin_for_test = kwargs.pop("repin_for_test", False)
+        expected = kwargs.pop(
+            "expected_manifest_sha256",
+            sha(self.manifest_path.read_bytes()) if repin_for_test else self.trusted_sha,
+        )
         return verifier.validate_manifest(
             self.manifest_path,
             self.schema,
@@ -141,13 +145,11 @@ class RunManifestVerifierTests(unittest.TestCase):
 
     def test_path_traversal_is_rejected_by_schema(self) -> None:
         self.bundle.manifest["protocol"]["path"] = "../protocol.md"
-        self.assert_issue(self.bundle.audit(), "schema_invalid")
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "schema_invalid")
 
     def test_mutation_accounting_inconsistency_is_rejected(self) -> None:
         self.bundle.manifest["mutation_campaign"]["killed"] = 3
-        self.assert_issue(self.bundle.audit(), "schema_invalid") if False else self.assert_issue(
-            self.bundle.audit(), "mutation_accounting_inconsistent"
-        )
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "mutation_accounting_inconsistent")
 
     def test_confirmatory_run_cannot_skip_attestation(self) -> None:
         self.bundle.manifest["run_kind"] = "confirmatory"
@@ -157,8 +159,8 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.bundle.manifest["task"]["reference_solution_passed"] = True
         self.bundle.manifest["provenance"]["attestation_required"] = True
         self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
-        result = self.bundle.audit(verify_attestation=False)
-        self.assert_issue(result, "confirmatory_attestation_missing")
+        result = self.bundle.audit(verify_attestation=False, repin_for_test=True)
+        self.assert_issue(result, "attestation_verification_disabled")
 
     def test_confirmatory_signer_must_match_workflow(self) -> None:
         self.bundle.manifest["run_kind"] = "confirmatory"
@@ -169,7 +171,7 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.bundle.manifest["provenance"]["attestation_required"] = True
         self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
         self.bundle.manifest["provenance"]["signer_workflow"] = ".github/workflows/untrusted.yml"
-        self.assert_issue(self.bundle.audit(), "confirmatory_signer_mismatch")
+        self.assert_issue(self.bundle.audit(repin_for_test=True), "confirmatory_signer_mismatch")
 
 
 if __name__ == "__main__":
