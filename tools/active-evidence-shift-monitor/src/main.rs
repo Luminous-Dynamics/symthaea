@@ -196,13 +196,18 @@ fn print_csv() {
                     "NA".to_owned()
                 };
                 println!(
-                    "{},{scenario_name},{horizon},{change_after},{NOMINAL_P:.12},{p1},{:.12},{},{},{PER_CELL_ALPHA:.12},{:.12}",
+                    "{},{},{},{},{:.12},{},{:.12},{},{},{:.12},{:.12}",
                     boundary.name(),
+                    scenario.name,
+                    horizon,
+                    change_after,
+                    NOMINAL_P,
+                    p1,
                     metrics.false_alarm_probability,
                     csv_optional(scenario.post_shift_p.map(|_| metrics.detection_probability)),
                     csv_optional(metrics.mean_detection_delay),
-                    metrics.survival_probability,
-                    scenario_name = scenario.name
+                    PER_CELL_ALPHA,
+                    metrics.survival_probability
                 );
             }
         }
