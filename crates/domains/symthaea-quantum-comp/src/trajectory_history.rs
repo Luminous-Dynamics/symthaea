@@ -292,6 +292,15 @@ impl TrajectoryHistorySummary {
                 let mut flips = 0_usize;
                 let mut late_flips = 0_usize;
                 let mut last_flip: Option<f64> = None;
+                let mut first_valid_time: Option<f64> = None;
+                let mut last_valid_time: Option<f64> = None;
+                for frame in &history.frames {
+                    let x = frame.in_phase_x[vertex];
+                    if x.abs() > zero_tolerance {
+                        first_valid_time.get_or_insert(frame.normalized_time);
+                        last_valid_time = Some(frame.normalized_time);
+                    }
+                }
 
                 for pair in history.frames.windows(2) {
                     let left_x = pair[0].in_phase_x[vertex];
@@ -322,15 +331,18 @@ impl TrajectoryHistorySummary {
                 }
 
                 if history.outcome == HistoryOutcome::Completed && seen_pairs > 0 {
-                    let start = history.frames.first().expect("seen pair implies frame").normalized_time;
-                    let end = history.frames.last().expect("seen pair implies frame").normalized_time;
-                    let duration = end - start;
-                    if duration > 0.0 {
-                        let stable_suffix = last_flip.map_or(1.0, |time| {
-                            ((end - time) / duration).clamp(0.0, 1.0)
-                        });
-                        stable_suffix_sum[vertex] += stable_suffix;
-                        stable_suffix_count[vertex] += 1;
+                    // Stop the measured window at the last valid sign observation.
+                    // An ambiguous terminal x value must not be counted as evidence
+                    // that the preceding spin remained stable until the planned end.
+                    if let (Some(start), Some(end)) = (first_valid_time, last_valid_time) {
+                        let duration = end - start;
+                        if duration > 0.0 {
+                            let stable_suffix = last_flip.map_or(1.0, |time| {
+                                ((end - time) / duration).clamp(0.0, 1.0)
+                            });
+                            stable_suffix_sum[vertex] += stable_suffix;
+                            stable_suffix_count[vertex] += 1;
+                        }
                     }
                 }
             }
@@ -508,6 +520,23 @@ mod tests {
         assert_eq!(vertex.flip_count, 0);
         assert_eq!(vertex.mean_flip_rate, None);
         assert_eq!(vertex.terminal_selection_frequency, Some(1.0));
+    }
+
+    #[test]
+    fn ambiguous_terminal_sample_does_not_extend_stability_window() {
+        let histories = vec![history("terminal-ambiguous", HistoryOutcome::Completed, vec![
+            frame(0.0, &[-1.0]),
+            frame(0.5, &[1.0]),
+            frame(0.75, &[1.0]),
+            frame(1.0, &[0.0]),
+        ])];
+        let summary = TrajectoryHistorySummary::from_histories(1, &histories, 1e-9).unwrap();
+        let stable = summary.vertices[0]
+            .mean_completed_stable_suffix_fraction
+            .expect("two valid observed transitions");
+        assert!((stable - (1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(summary.vertices[0].terminal_sample_count, 0);
+        assert_eq!(summary.vertices[0].terminal_selection_frequency, None);
     }
 
     #[test]
