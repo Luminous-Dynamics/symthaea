@@ -14,7 +14,9 @@
 //! simulate interruption boundaries in-process; true power-loss qualification
 //! must be performed on each claimed filesystem/device configuration.
 
-use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex};
+use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity};
+use std::collections::BTreeSet;
+use symthaea_hdc_store::{HdcStore, HdcStoreReader, IndexOpenPolicy};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -116,6 +118,46 @@ impl EvidenceDiskStore {
         self.commit_with_fault(hdc_index_bytes, evidence_index, None)
     }
 
+    /// Production commit path for a real HdcStore. The exact live IDs and logical
+    /// checksum are captured from one generation-pinned read view after syncing.
+    /// Active evidence IDs must match the live vector IDs exactly.
+    pub fn commit_hdc_store(
+        &self,
+        hdc_store: &mut HdcStore,
+        evidence_index: &EvidenceIndex,
+    ) -> Result<u64, String> {
+        hdc_store.sync_all()
+            .map_err(|error| format!("failed to sync canonical HDC store: {error}"))?;
+        let (identity, hdc_live_ids) = {
+            let view = hdc_store.read_view();
+            let checksum = view.content_checksum();
+            let live_ids = view.ids().collect::<BTreeSet<_>>();
+            (
+                HdcStoreIdentity {
+                    store_generation: view.generation(),
+                    live_count: checksum.live_count,
+                    checksum_version: checksum.version,
+                    checksum_hex: checksum.hex(),
+                },
+                live_ids,
+            )
+        };
+        let evidence_live_ids = evidence_index.active_hdc_ids();
+        if hdc_live_ids != evidence_live_ids {
+            let missing_payloads: Vec<u64> = hdc_live_ids.difference(&evidence_live_ids).copied().collect();
+            let missing_vectors: Vec<u64> = evidence_live_ids.difference(&hdc_live_ids).copied().collect();
+            return Err(format!(
+                "HDC/evidence live-ID mismatch; vectors_without_active_evidence={missing_payloads:?}; active_evidence_without_vector={missing_vectors:?}"
+            ));
+        }
+        let hdc_index_bytes = fs::read(hdc_store.path())
+            .map_err(|error| format!("failed to read synced canonical HDC store: {error}"))?;
+        if hdc_index_bytes.is_empty() {
+            return Err("canonical HDC store file is empty".into());
+        }
+        self.commit_with_identity_and_fault(&hdc_index_bytes, evidence_index, Some(identity), None)
+    }
+
     /// Recover only the CURRENT generation. No fallback is attempted on error.
     pub fn recover(&self) -> Result<Option<RecoveredEvidenceGeneration>, String> {
         let current_path = self.root.join(CURRENT_FILE);
@@ -140,6 +182,16 @@ impl EvidenceDiskStore {
         evidence_index: &EvidenceIndex,
         fault: Option<CommitFaultPoint>,
     ) -> Result<u64, String> {
+        self.commit_with_identity_and_fault(hdc_index_bytes, evidence_index, None, fault)
+    }
+
+    fn commit_with_identity_and_fault(
+        &self,
+        hdc_index_bytes: &[u8],
+        evidence_index: &EvidenceIndex,
+        hdc_identity: Option<HdcStoreIdentity>,
+        fault: Option<CommitFaultPoint>,
+    ) -> Result<u64, String> {
         let _local = self.local_writer.lock()
             .map_err(|_| "evidence store writer mutex is poisoned".to_string())?;
         let _process = self.acquire_process_lock()?;
@@ -155,7 +207,12 @@ impl EvidenceDiskStore {
         };
 
         let snapshot_bytes = evidence_index.snapshot_bytes(generation)?;
-        let manifest = EvidenceCommitManifest::new(generation, hdc_index_bytes, &snapshot_bytes)?;
+        let manifest = match hdc_identity {
+            Some(identity) => EvidenceCommitManifest::new_with_hdc_identity(
+                generation, hdc_index_bytes, &snapshot_bytes, identity,
+            )?,
+            None => EvidenceCommitManifest::new(generation, hdc_index_bytes, &snapshot_bytes)?,
+        };
         let manifest_bytes = manifest.to_json_bytes()?;
         let manifest_sha256 = sha256_hex(&manifest_bytes);
         let pointer = CurrentPointer {
@@ -281,6 +338,28 @@ impl EvidenceDiskStore {
         }
         manifest.verify(&index_bytes, &snapshot_bytes)?;
         let evidence_index = EvidenceIndex::restore_snapshot(&snapshot_bytes)?;
+        if let Some(identity) = manifest.hdc_store_identity() {
+            identity.validate_for_recovery()?;
+            let reader = HdcStoreReader::open_with_index_policy(
+                &dir.join(INDEX_FILE),
+                IndexOpenPolicy::Rebuild,
+            ).map_err(|error| format!("committed HDC store failed independent reopen: {error}"))?;
+            if reader.generation() != identity.store_generation {
+                return Err("committed HDC internal generation does not match manifest identity".into());
+            }
+            let checksum = reader.content_checksum();
+            if reader.live_count() != identity.live_count
+                || checksum.version != identity.checksum_version
+                || checksum.live_count != identity.live_count
+                || checksum.hex() != identity.checksum_hex
+            {
+                return Err("committed HDC logical content checksum does not match manifest identity".into());
+            }
+            let hdc_live_ids = reader.ids().collect::<BTreeSet<_>>();
+            if hdc_live_ids != evidence_index.active_hdc_ids() {
+                return Err("committed HDC live IDs do not match active evidence IDs".into());
+            }
+        }
         Ok(RecoveredEvidenceGeneration {
             generation: pointer.generation,
             hdc_index_bytes: index_bytes,
