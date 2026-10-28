@@ -37,7 +37,7 @@ These adjacent directions test when an agent should abstain or recognize evidenc
 
 ## Priority 1: Evolving the memory pipeline (MemPro)
 
-Paper: https://aclanthology.org/2026.emnlp-main.XXXX/  
+Paper: https://aclanthology.org/2026.emnlp-main.1364/  
 Code: https://github.com/wanghai673/MemPro
 
 MemPro's core direction is to treat the **whole memory pipeline as a versioned, evolvable program** instead of assuming that one fixed retrieve/summarize/consolidate recipe is optimal. Each candidate pipeline should be treated as an independently versioned system and evaluated under a fixed development budget; it must not be tuned on the final held-out set.
@@ -53,7 +53,7 @@ This is a **system-level optimization** lane, not a new retrieval metric. LongMe
 
 ## Priority 1: Compile evidence into guarded reusable skills (MSCE)
 
-Paper: https://aclanthology.org/2026.findings-emnlp.XXXX/
+Paper: https://aclanthology.org/2026.findings-emnlp.1637/
 
 The recent Memory-to-Skill Co-Evolution line argues that repeatedly useful experience can become a callable skill, but a memory-derived skill must preserve its evidence, applicability boundary, verification requirements and reliability. This is distinct from storing a text summary.
 
@@ -68,7 +68,7 @@ The contribution worth testing is not “skills are novel”; it is **auditable 
 
 ## Priority 1: Implicit personalized safety (PerMemSafe)
 
-Paper: https://aclanthology.org/2026.findings-acl.XXXX/
+Paper: https://aclanthology.org/2026.findings-acl.320/
 
 Personalization can improve helpfulness while also making a system more likely to act on unsafe inferred preferences or to overgeneralize from past user behavior. A memory policy should therefore be evaluated for helpfulness and safety independently.
 
@@ -92,6 +92,48 @@ Model it as four coupled but separately testable decisions:
 
 Do not optimize these all at once in an opaque reward. First qualify each subsystem with a simple baseline and contract tests; then evaluate the joint system against frozen baselines. The joint policy should be allowed to lose to simpler retrieval. Complexity is justified only by measured held-out task, cost or safety gains.
 
+## Priority 1: Stability–plasticity diagnostics (MemProbe)
+
+Paper: https://aclanthology.org/2026.emnlp-main.2473/
+
+MemProbe isolates a common hidden trade-off in memory systems: whether an update corrects a stale fact or overwrites a still-valid one. It introduces diagnostic paradigms for interference, misinformation, consolidation strength, and reconsolidation windows, with behavioral profiles rather than only aggregate accuracy.
+
+Broca experiment:
+- Use a separate memory-maintenance suite for update, preservation, source attribution, and temporal ordering.
+- Cross correction authority and recency: an old fact can be authoritative, while a newer observation can be weak or mistaken.
+- Measure correct update rate, destructive overwrite rate, misinformation susceptibility, source-attribution accuracy, correction propagation latency, and cross-session generalization.
+- Evaluate a grid of update strength and consolidation frequency. Plot accuracy and destructive forgetting against write cost and retrieval cost.
+- Keep the full-context and exact-state controller baselines; don't assume a sophisticated consolidation algorithm is better.
+
+MemProbe should be treated as a diagnostic track, not merged into LongMemEval's end-to-end score.
+
+## Priority 1: Epistemic memory governance (HELM)
+
+Paper: https://aclanthology.org/2026.emnlp-main.721/
+
+HELM's direction is closely related to the evidence ABI here: memory records carry provenance and epistemic status, and retrieval is filtered/reranked using status, freshness, consistency, recency and provenance. The paper also argues that governance-only ablations account for a large share of reliability improvement.
+
+Broca experiment:
+- Compare BM25 alone, BM25 plus source/validity gating, and the full sequential answer/escalate/abstain policy under the same corpus and reader.
+- Ablate freshness, contradiction handling, provenance checks and calibration separately.
+- Include a governance-only arm so any quality gain from retrieval ranking isn't misattributed to policy checks.
+- Track invalid-evidence exposure, stale-use events, epistemic error rate, retrieved context tokens and end-to-end success on held-out tasks.
+
+This is the clearest empirical bridge from the current lexical baseline to a later HDC/hybrid architecture: first show the value of evidence governance with retrieval held constant.
+
+## Priority 1: Evidence-gated skill lifecycle (SkillsVote)
+
+Paper: https://aclanthology.org/2026.emnlp-main.281/  
+Code: https://github.com/MemTensor/skills-vote
+
+SkillsVote targets collection, recommendation, attribution and evolution of reusable skills, and tests agentic coding tasks such as Terminal-Bench 2.0 and SWE-Bench Pro. It adds another useful baseline for the memory-to-skill part of Broca: successful execution alone is not sufficient to justify a general reusable skill.
+
+Broca experiment:
+- Require evidence-backed preconditions, environment/applicability bounds, verification tests, observed reuse count and rollback lineage for each promoted skill.
+- Attribute outcomes among skill-guided steps, free exploration, tool/environment changes and task result.
+- Measure false promotion, harmful skill activation, cross-environment transfer, regression after skill updates, and the cost of discovering/verifying a skill.
+- Evaluate on coding/tool-use benchmarks separately from LongMemEval. LongMemEval can establish recall; it does not establish safe execution or coding-agent improvement.
+
 ## Priority 2: LongMemEval-V1 and LoCoMo
 
 Original LongMemEval: https://github.com/xiaowu0162/LongMemEval
@@ -112,5 +154,5 @@ Use for long conversational memory and temporal reasoning, but keep V1 and V2 as
 1. Finish and qualify the source-bound text adapter: run Rust/Python tests, verify the pinned harness installer on a clean checkout, and preserve all failures and receipts.
 2. Run the LongMemEval-V2 small tier on both web and enterprise with matched `no_retrieval`, `rag_query_to_slice`, BM25, and separately named AgentRunbook-C V2 arms. Use the official evaluator and unchanged reference frontier.
 3. Add an evolutionary outer-loop experiment only after the fixed baselines are stable. Freeze candidate-generation budget, manifest format, development feedback and held-out suite before optimization.
-4. Add Mem2ActBench for action grounding; TimlMemBench/FAMA and PerMemSafe for lifecycle and personalized safety; a separate evidence-grounded skill-transfer lane for MSCE-style promotion. Keep all metric families separate.
+4. Add Mem2ActBench for action grounding; TimlMemBench/FAMA, MemProbe and HELM-style governance ablations for state maintenance; PerMemSafe for personalized safety; and MSCE/SkillsVote-style evidence-gated skill promotion in a separate skill-transfer lane. Keep all metric families separate.
 5. Publish quality–latency–lifecycle-cost Pareto curves and a version tree of tried pipelines. If conventional raw-slice RAG wins at equal cost/quality, simplify Broca. If a complex winner is fragile across seeds or shifts, do not promote it.
