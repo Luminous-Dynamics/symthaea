@@ -820,6 +820,14 @@ jobs:
           try: validator.validate(bad)
           except ValidationError: pass
           else: raise SystemExit("schema accepted incomplete inventory as qualified")
+          bad = copy.deepcopy(clean); bad["cross_split_component_count"] = 1
+          try: validator.validate(bad)
+          except ValidationError: pass
+          else: raise SystemExit("schema accepted qualification with cross-split component")
+          bad = copy.deepcopy(clean); bad["relationship_inventory_status"] = "incomplete"; bad["coverage_receipt_sha256"] = None
+          try: validator.validate(bad)
+          except ValidationError: pass
+          else: raise SystemExit("schema accepted incomplete coverage as a qualifying inventory")
           bad = copy.deepcopy(clean); bad["families"].pop()
           try: validator.validate(bad)
           except ValidationError: pass

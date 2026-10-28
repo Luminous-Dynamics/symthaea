@@ -44,9 +44,13 @@
       ]
     },
     "coverage_receipt_sha256": {
-      "type": [
-        "string",
-        "null"
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "total_family_count": {
@@ -264,6 +268,90 @@
           }
         }
       }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "relationship_inventory_status": {
+            "const": "incomplete"
+          }
+        },
+        "required": [
+          "relationship_inventory_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "coverage_receipt_sha256": {
+            "type": "null"
+          },
+          "qualified_for_confirmatory_resampling": {
+            "const": false
+          },
+          "qualification_status": {
+            "const": "not_qualified_incomplete_inventory"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_status": {
+            "const": "qualified_complete_same_split_components"
+          }
+        },
+        "required": [
+          "qualification_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relationship_inventory_status": {
+            "const": "independently_reviewed_complete"
+          },
+          "coverage_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "cross_split_component_count": {
+            "const": 0
+          },
+          "qualified_for_confirmatory_resampling": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_status": {
+            "const": "not_qualified_cross_split_hard_relationships"
+          }
+        },
+        "required": [
+          "qualification_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relationship_inventory_status": {
+            "const": "independently_reviewed_complete"
+          },
+          "cross_split_component_count": {
+            "minimum": 1
+          },
+          "qualified_for_confirmatory_resampling": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
 }
