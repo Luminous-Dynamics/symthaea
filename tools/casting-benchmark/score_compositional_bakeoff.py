@@ -27,19 +27,24 @@ SUPPORTED_FAMILIES = (
     "heteroscedastic_noise",
 )
 SUPPORTED_DIMENSIONS = (2, 5, 10)
-POLICY_ORDER = ("high_only", "low_screen", "fixed_top_k", "discrepancy_aware", "adaptive_budget")
+POLICY_ORDER = (
+    "high_only", "low_screen", "fixed_top_k", "discrepancy_aware",
+    "adaptive_budget", "decision_value_of_information",
+)
 ALLOWED_PROMOTION_METHODS = {
     "high_only": set(),
     "low_screen": {"low_predicted_margin"},
     "fixed_top_k": {"medium_top_k"},
     "discrepancy_aware": {"discrepancy_anchor", "discrepancy_corrected"},
     "adaptive_budget": {"adaptive_discrepancy_anchor", "adaptive_cost_aware_corrected"},
+    "decision_value_of_information": {"decision_impact_anchor", "decision_impact_confirmation"},
 }
 REFERENCE_POINT = (1.2, 1.2)
 TOL = 1e-9
 PRIMES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53)
 SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+    "tools/casting-benchmark/multifidelity_decision_value_policy.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
@@ -207,6 +212,7 @@ def expected_call_counts(policy: str, costs: dict[str, int], budget: int, design
         "low_screen": {"low": 75, "medium": 0, "high": 5},
         "fixed_top_k": {"low": 50, "medium": 10, "high": 4},
         "discrepancy_aware": {"low": 55, "medium": 4, "high": 5},
+        "decision_value_of_information": {"low": 60, "medium": 8, "high": 4},
     }
     if policy in fixed:
         return fixed[policy]
