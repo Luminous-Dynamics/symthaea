@@ -1010,7 +1010,7 @@ mod tests {
         assert_eq!(result.both_target_hits, 1);
         assert_eq!(result.both_hit_costed_pairs, 0);
         assert_eq!(result.candidate_uncosted_target_hits, 1);
-        assert_eq!(result.median_time_speedup, None);
+        assert_eq!(result.median_time_speedup_given_both_hit, None);
         assert_eq!(result.pairs[0].candidate_all_in_ms, None);
     }
 
@@ -1103,7 +1103,7 @@ mod tests {
         );
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.mismatched_energy_scope_pairs, 1);
-        assert_eq!(result.median_energy_speedup, None);
+        assert_eq!(result.median_energy_speedup_given_both_hit, None);
         assert_eq!(result.pairs[0].energy_speedup_baseline_over_candidate, None);
     }
 
