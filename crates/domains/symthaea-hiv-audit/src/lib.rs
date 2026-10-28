@@ -396,7 +396,8 @@ pub fn verify_receipt(
     let (actual_files, actual_joins) = scan_dataset(entry, data_dir)?;
     if receipt.files != actual_files {
         return Err(
-            "file receipt mismatch: size, SHA-256, CSV schema, rows, or UUID-set hash changed".to_owned(),
+            "file receipt mismatch: size, SHA-256, CSV schema, rows, or UUID-set hash changed"
+                .to_owned(),
         );
     }
     if receipt.pairwise_uuid_joins != actual_joins {
@@ -504,6 +505,39 @@ mod tests {
     fn sha256_uses_standard_known_vector() {
         assert_eq!(sha256_bytes(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    #[test]
+    fn source_archive_requires_zip_extension_and_signature() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-hiv-audit-source-{}.zip",
+            std::process::id()
+        ));
+        fs::write(&path, [0x50, 0x4b, 0x03, 0x04]).expect("write ZIP-signature fixture");
+        let audit = audit_source_archive(&path).expect("accept recognized ZIP signature");
+        assert_eq!(audit.byte_length, 4);
+        assert_eq!(audit.filename, path.file_name().unwrap().to_string_lossy());
+        let _ = fs::remove_file(&path);
+
+        let not_zip = std::env::temp_dir().join(format!(
+            "symthaea-hiv-audit-not-zip-{}.zip",
+            std::process::id()
+        ));
+        fs::write(&not_zip, b"not a zip").expect("write non-ZIP fixture");
+        assert!(audit_source_archive(&not_zip).is_err());
+        let _ = fs::remove_file(not_zip);
+    }
+
+    #[test]
+    fn csv_rows_with_wrong_width_fail_closed() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-hiv-audit-width-{}.csv",
+            std::process::id()
+        ));
+        fs::write(&path, "uuid,gene_a,gene_b\nparticipant-a,2\n")
+            .expect("write malformed CSV fixture");
+        assert!(audit_csv(&path).is_err());
+        let _ = fs::remove_file(path);
     }
 
     #[test]
