@@ -99,7 +99,6 @@ Evaluate with identical evidence, query set and length-bounded context budget:
 - Current BM25 state records with repeated trajectory metadata.
 - Normalized state text plus a separately indexed trajectory-level note.
 - **New opt-in candidate policy (draft PR #8810):** oversample lexical candidates, then cap at a configured number of text states per source trajectory. The implementation preserves ranking scores and order semantics, deduplicates IDs, and rechecks scope/lifecycle/time validity. It is deliberately post-ranking and does not change the BM25 reference score.
-- Normalized state text plus a separately indexed trajectory-level note.
 - Query-conditioned adjacent-state expansion for transition/workflow questions only, compared against the no-expansion baseline.
 - Oracle span selection, clearly labeled as a diagnostic upper bound and never included as a competitive method score.
 
