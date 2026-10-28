@@ -18,6 +18,8 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Read-only fixed-format COBOL indexer](cobol-index/README.md)
 - [COBOL index output schema](cobol-index/index-output.schema.json)
 - [COBOL index output integration tests](test_cobol_index_output.py)
+- [Atomic legacy claim evidence schema](legacy-claim-evidence.schema.json)
+- [Atomic legacy claim evidence negative controls](test_legacy_claim_evidence.py)
 - [Synthetic ledger task contract](examples/ledger-reconciliation/task.json)
 - [Rust reference implementation and test instructions](ledger-reconcile/README.md)
 - [Fixture integrity gate](check-fixture-integrity.sh)
@@ -38,3 +40,7 @@ The run-manifest schema, verifier and its tests were added after that passing ba
 The scorecard deliberately keeps the Legacy-Bench model score, AASSR, security correctness and cost per independently verified fix at **not measured**. The public ledger task is a development fixture only. Its 4/4 mutation result is an oracle smoke test, not the 90% broad mutation target, and is not evidence of production banking or mainframe equivalence.
 
 When follow-on commits change files under `tools/vleb/`, check the VLEB workflow at the exact new PR head. A passed result on an ancestor commit does not automatically validate the current head.
+
+## Legacy claim evidence
+
+The atomic legacy claim contract separates textual anchors, static structure, and runtime behavior. A static index witness cannot certify a transaction or numeric-behavior claim; those require an independent execution witness. Witness hashes are integrity fields and must still be checked against trusted external pins by a future claim auditor.
