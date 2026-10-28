@@ -154,7 +154,7 @@ Secondary:
 - number and fraction of evaluation actions that change the final recommendation;
 - decision flips avoided by escalation or abstention;
 - evaluations allocated to candidates near constraint boundaries;
-- prediction calibration/coverage only when true probabilistic output and an appropriate held-out design exist;
+- prediction calibration/coverage only when true probabilistic output and an appropriate held-out design exist; for VOI, separately validate the observation likelihoods/prior with held-out predictive log score or Brier score and reliability checks, since a mathematically correct VOI calculation can still rank queries badly under a misspecified model;
 - nominal regression, wall time, memory, and cost accounting discrepancies.
 
 Finite candidate-pool regret is not global regret. Synthetic candidates/shifts do not establish physical risk bounds. Candidate × shift rows are dependent; do not treat them as IID observations to manufacture narrow confidence intervals. Use a preregistered cluster-aware procedure over independently generated tasks/seeds and state exactly what the independent unit is.
@@ -206,7 +206,7 @@ Check that a recommendation does not become safer merely by excluding difficult 
 
 - Palazzolo, Binois & Giraldi, **MF-SCBO** (2026 preprint): https://arxiv.org/abs/2609.29941; implementation https://github.com/Nemo-Virtual-Lab/MF-SCBO.
 - Xie et al., **Cost-aware Stopping for Bayesian Optimization**, ICML 2026: https://proceedings.mlr.press/v306/xie26c.html.
-- Aydogdu et al., **Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization**, published 27 March 2026 / issue September 2026: https://doi.org/10.1007/s11081-026-10078-5. This already jointly selects a sample/fidelity around consequential high-fidelity improvement; include as a comparator if an executable implementation can be obtained and locked. The paper notes future work on multi-objective extension and more complex cost structures, making the multi-objective casting robustness track a better differentiator than claiming generic joint sample/fidelity selection as new.
+- Aydogdu et al., **Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization**, published 27 March 2026 / issue September 2026: https://doi.org/10.1007/s11081-026-10078-5. This already jointly selects a sample/fidelity around consequential high-fidelity improvement; include as a comparator if an executable implementation can be obtained and locked. The paper reports code/data available upon reasonable request rather than a clearly linked public implementation. It notes future work on multi-objective extension and more complex cost structures, making multi-objective casting robustness a better differentiator than claiming generic joint sample/fidelity selection as new.
 - NIST AMS 100-85 (5 October 2026), risk-based uncertainty quantification and VVUQ: https://doi.org/10.6028/NIST.AMS.100-85.
 - Multifidelity benchmark methodology and fourteen analytical problems (2025): https://doi.org/10.1007/s11831-025-10392-8.
 - COCO constrained suite: https://coco-platform.org/data-archive/index.html.
