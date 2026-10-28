@@ -55,14 +55,16 @@ The SHA-256 implementation is dependency-free and has known-answer vectors for e
 
 The following files were added with the verifier follow-up:
 
-- `QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv` pins the 50 graph file paths, Git blob SHA-1s, byte sizes, immutable QOBLIB commit, and data-license reference.
-- `crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs` is a Rust CLI that validates the checkout's exact commit, checks the complete `.gph` inventory, validates each file's size and Git blob ID, and emits the **raw-source SHA-256** and **canonical-graph SHA-256** from the file bytes.
-- Invocation after obtaining a clean QOBLIB clone at the pinned commit:
-  `cargo run -p symthaea-quantum-comp --example qoblib_mis_manifest -- <qoblib-root> docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv <output-manifest.tsv>`
+- `QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv` pins the 50 graph file paths, Git blob SHA-1s, byte sizes, expected vertex/edge counts, immutable QOBLIB commit, and data-license reference.
+- `crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs` is a Rust CLI that validates the exact checkout commit, complete `.gph` inventory, each file's size and Git blob ID, and the actual canonicalized vertex/edge counts against the pinned catalog. It emits **raw-source SHA-256** and **canonical-graph SHA-256** from the file bytes.
+- The CLI compiles standalone, avoiding Cargo workspace discovery:
+  `rustc --edition=2024 -Awarnings crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs -o /tmp/qoblib-mis-manifest`
+  `/tmp/qoblib-mis-manifest <qoblib-root> docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv <output-manifest.tsv>`
+- `.github/workflows/qoblib-mis-input-integrity.yml` checks out the immutable QOBLIB commit, runs standalone Rust verifier/parser tests, compiles the CLI, validates all 50 input files and graph dimensions, and uploads the generated digest manifest as a workflow artifact on success.
 
-The raw source hash preserves dataset provenance; the canonical graph hash identifies the exact semantic graph bytes consumed by the independent verifier. Keep both. The generated manifest is not populated into the preregistration template until the tool has run successfully against the pinned graph bytes and the split/target/budget fields are frozen.
+The raw source hash preserves dataset provenance; the canonical graph hash identifies the exact semantic graph bytes consumed by the independent verifier. Keep both. The generated digests are not populated into the preregistration template until the full 50-file workflow succeeds and the split/target/budget fields are frozen.
 
-The CLI parser and canonicalizer/verifier have standalone `rustc --test` coverage in `scripts/research/run-photonic-contract-tests.sh`. Those tests exercise the parser and algorithm contracts; they do **not** execute the real Git checkout and 50-file hashing loop. That integration run remains necessary before declaring the data manifest complete.
+The standalone tests exercise parser and canonicalizer/verifier contracts; only the dedicated integrity workflow executes the actual Git checkout and hashes the complete source set. At this writing, that exact-head integration workflow has not yet been observed passing, so the data manifest is still pending validation.
 
 ## Negative controls in unit tests
 
