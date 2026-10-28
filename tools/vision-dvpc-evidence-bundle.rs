@@ -43,9 +43,9 @@ fn rows(input: &str) -> Vec<Vec<&str>> {
 }
 
 fn universe_value(input: &str, key: &str) -> Result<String, String> {
-    let matches: Vec<&Vec<&str>> = rows(input).iter()
+    let parsed = rows(input);
+    let matches: Vec<&Vec<&str>> = parsed.iter()
         .filter(|row| row.len() == 4 && row[0] == "SUMMARY" && row[1] == "-" && row[2] == key)
-        .map(|row| row as &Vec<&str>)
         .collect();
     if matches.len() != 1 {
         return Err(invalid(format!("universe report must contain exactly one SUMMARY/-/{key} field")));
