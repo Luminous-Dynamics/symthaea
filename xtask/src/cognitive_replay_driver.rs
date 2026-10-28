@@ -7,6 +7,7 @@
 //! does not protect against malicious code with independent access to the source dataset.
 use anyhow::{ensure, Context};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -80,6 +81,10 @@ pub struct ReplayRunReceipt {
     /// Only labels that actually became available during the replay horizon.
     pub revealed_outcomes: Vec<RevealedOutcome>,
     pub decisions: Vec<DriverDecision>,
+    /// Digest of the canonical serialized feature source stream.
+    pub feature_stream_sha256: String,
+    /// Digest of this receipt with this field set to the empty string.
+    pub receipt_sha256: String,
 }
 
 #[derive(Debug, Clone)]
@@ -205,7 +210,8 @@ impl ReplayScenario {
             });
         }
 
-        let receipt = ReplayRunReceipt {
+        let feature_stream_sha256 = sha256_hex(&serde_json::to_vec(&self.feature_events)?);
+        let mut receipt = ReplayRunReceipt {
             schema_version: 1,
             stream_id: self.stream_id.clone(),
             stream_length_ticks: ticks,
@@ -213,7 +219,10 @@ impl ReplayScenario {
             feature_events: self.feature_events.clone(),
             revealed_outcomes,
             decisions,
+            feature_stream_sha256,
+            receipt_sha256: String::new(),
         };
+        seal_receipt(&mut receipt)?;
         audit_receipt(&receipt)?;
         Ok(receipt)
     }
@@ -225,6 +234,17 @@ pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
     ensure!(!receipt.stream_id.trim().is_empty(), "stream_id must not be empty");
     ensure!(receipt.stream_length_ticks > 0, "stream_length_ticks must be positive");
     ensure!(receipt.label_delay_ticks > 0, "label_delay_ticks must be positive");
+    validate_sha256(&receipt.feature_stream_sha256, "feature_stream_sha256")?;
+    validate_sha256(&receipt.receipt_sha256, "receipt_sha256")?;
+    let actual_feature_stream_sha256 = sha256_hex(&serde_json::to_vec(&receipt.feature_events)?);
+    ensure!(
+        receipt.feature_stream_sha256 == actual_feature_stream_sha256,
+        "feature_stream_sha256 does not match canonical feature events"
+    );
+    ensure!(
+        receipt.receipt_sha256 == computed_receipt_sha256(receipt)?,
+        "receipt_sha256 does not match canonical replay receipt"
+    );
     ensure!(
         receipt.decisions.len() as u64 == receipt.stream_length_ticks,
         "receipt must contain one decision per stream tick"
@@ -317,6 +337,30 @@ pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
         validate_consumed_ids(&decision.consumed_feature_ids, &decision.eligible_feature_ids, "feature", tick)?;
         validate_consumed_ids(&decision.consumed_outcome_ids, &decision.eligible_outcome_ids, "outcome", tick)?;
     }
+    Ok(())
+}
+
+fn seal_receipt(receipt: &mut ReplayRunReceipt) -> anyhow::Result<()> {
+    receipt.receipt_sha256.clear();
+    receipt.receipt_sha256 = computed_receipt_sha256(receipt)?;
+    Ok(())
+}
+
+fn computed_receipt_sha256(receipt: &ReplayRunReceipt) -> anyhow::Result<String> {
+    let mut unsigned = receipt.clone();
+    unsigned.receipt_sha256.clear();
+    Ok(sha256_hex(&serde_json::to_vec(&unsigned)?))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn validate_sha256(value: &str, field: &str) -> anyhow::Result<()> {
+    ensure!(
+        value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        "{field} must be a lowercase 64-character SHA-256 digest"
+    );
     Ok(())
 }
 
@@ -450,6 +494,7 @@ mod tests {
         let mut receipt = scenario(vec![10.0, 11.0, 12.0, 13.0, 14.0, 15.0])
             .run(&mut policy).expect("driver run");
         receipt.decisions[0].eligible_outcome_ids.push("outcome-00000000".to_owned());
+        seal_receipt(&mut receipt).expect("reseal mutated adversarial receipt");
         let error = audit_receipt(&receipt).expect_err("receipt must reject future outcome");
         assert!(error.to_string().contains("eligible outcome set does not match reveal history"));
     }
@@ -483,8 +528,18 @@ mod tests {
             decision.delivered_outcome_ids.retain(|id| id != "outcome-00000001");
             decision.consumed_outcome_ids.retain(|id| id != "outcome-00000001");
         }
+        seal_receipt(&mut receipt).expect("reseal internally consistent but incomplete receipt");
         let error = audit_receipt(&receipt).expect_err("auditor must detect an omitted due outcome");
         assert!(error.to_string().contains("omits one or more outcomes"));
+    }
+
+    #[test]
+    fn receipt_audit_rejects_feature_stream_mutation_without_commitment_update() {
+        let mut policy = ConsumeDeliveredPolicy;
+        let mut receipt = scenario(vec![0.0; 6]).run(&mut policy).expect("driver run");
+        receipt.feature_events[0].value += 0.5;
+        let error = audit_receipt(&receipt).expect_err("feature mutation must invalidate digest");
+        assert!(error.to_string().contains("feature_stream_sha256 does not match"));
     }
 
     #[test]
@@ -495,6 +550,7 @@ mod tests {
             "feature-00000001".to_owned(),
             "feature-00000001".to_owned(),
         ];
+        seal_receipt(&mut receipt).expect("reseal mutated adversarial receipt");
         let error = audit_receipt(&receipt).expect_err("duplicated consumption must fail");
         assert!(error.to_string().contains("duplicate consumed feature ID"));
     }
