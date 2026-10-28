@@ -8,6 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::cognitive_loop::PredictionErrorEvidence;
+
 use crate::consciousness::counterfactual::CausalQueryOutcome;
 use crate::consciousness::epistemic_conflict::{
     ConflictKind, ConflictMatrix, MultiTheoryMetrics, TheoryId,
@@ -516,9 +518,13 @@ pub struct PosthocOutcome {
     pub gate_passed: bool,
     /// Whether the outcome was good.
     pub outcome_good: bool,
-    /// Measured prediction error after action, unavailable when no valid comparison exists.
+    /// Measured PE scalar retained for compatibility and existing reports.
+    /// Derived from typed evidence on the live provenance-aware path.
     #[serde(default)]
     pub prediction_error: Option<f64>,
+    /// Immutable decision-time PE provenance; None for legacy scalar-only callers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_evidence: Option<PredictionErrorEvidence>,
 }
 
 impl ReasoningEvent {
