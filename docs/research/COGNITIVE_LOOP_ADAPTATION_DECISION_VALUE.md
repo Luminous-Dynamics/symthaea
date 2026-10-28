@@ -251,12 +251,12 @@ The JSON bundle manifest is version 1 and includes `panel_path`, `panel_sha256`,
 
 A Rust contract prototype now exists in `xtask/src/cognitive_replay_driver.rs`. It gives adapters only newly delivered features and newly revealed outcomes, keeps hidden targets in driver-owned state, records each decision's eligible and consumed evidence IDs, and independently audits delivery sets and reveal timing. It is not yet connected to the production cognitive loop or the confirmatory 2,800-cell panel. The typed API limits accidental information leakage; it is not a security sandbox against adapter code that has independent access to the source dataset.
 
-The current prototype uses a fixed positive label delay. That is only Phase A. A research-grade replay driver should treat at least two clocks independently:
+The driver now supports both a fixed-delay convenience constructor and an explicit per-outcome schedule with `RevealAt`, `Missing`, and `CensoredAt` dispositions. The schedule is evaluator-side and is not exposed to policy adapters; revealed labels may arrive out of prediction order. This remains a contract prototype rather than an integrated production replay engine. The research protocol must also treat at least two clocks independently:
 
 - **Label-reveal latency:** when the outcome associated with an earlier prediction or decision becomes observable.
 - **Intervention-effect latency:** how long after staging/committing an intervention before its task-level benefit or harm can be estimated.
 
-These clocks should be independently preregistered and varied. The driver should ultimately support per-outcome reveal schedules, out-of-order arrivals, explicitly missing labels, and right-censored outcomes. A label that has not arrived is not a zero loss, evidence of no benefit, or permission to substitute a later sample.
+These clocks should be independently preregistered and varied. The per-outcome schedule prototype can encode variable reveal times, out-of-order arrivals, labels declared missing within the horizon, and right-censoring at the horizon. It does not yet model realistic missingness mechanisms, checkpoint recovery, or delayed intervention-effect identification. A label that has not arrived is not a zero loss, evidence of no benefit, or permission to substitute a later sample.
 
 ### Required latency and censoring experiment matrix
 
@@ -288,9 +288,9 @@ Research motivation: the KDD 2026 drift benchmark advocates controlled perturbat
 
 ## Replay completeness and causal scope (October 2026 addendum)
 
-The driver-owned receipt auditor now requires the complete set of outcomes that should be revealed under its fixed-delay, fully observed-label contract. An attacker cannot remove a due outcome and then rewrite every later eligible/delivered/consumed-ID list to make the remaining receipt look internally consistent. The corresponding negative-control test is `receipt_audit_rejects_omitted_revealed_outcome_even_if_decisions_are_rewritten`. This narrows artifact inconsistency; it does not prove the recorded values came from a trusted evaluator.
+The driver-owned receipt auditor now requires one explicit outcome disposition per prediction tick. For each `RevealAt` plan entry it requires the matching outcome record at the registered availability tick; it rejects omissions even if later eligible/delivered/consumed-ID lists are rewritten. The negative-control test is `receipt_audit_rejects_omitted_revealed_outcome_even_if_decisions_are_rewritten`. The variable-schedule test covers out-of-order labels, a label declared missing, and right-censored outcomes. These are contract tests, not an empirical missingness study.
 
-**Do not solve missing-label support by weakening the complete-label gate.** When variable delay, missingness, or censoring is implemented, the receipt schema must represent each prediction's outcome status explicitly (e.g. pending, revealed, missing by registered policy, censored at horizon) and bind that status to a preregistered reveal/censoring plan. The auditor should verify the plan's expected statuses. An absent record without a registered reason is a contract failure; a legitimately censored outcome is not a numeric zero.
+**Do not treat a declared missing outcome as ignorable by default.** The current schema distinguishes a planned missing label from right-censoring, but it does not yet estimate the missingness mechanism or correct selection bias. Later work must preregister missingness assumptions, distinguish pending/missing/censored/revealed states, and mark policy effects unidentified when selection assumptions do not support an estimate. A legitimately censored outcome is not a numeric zero.
 
 A second boundary must be preregistered: **open-loop replay versus action-coupled closed-loop evaluation.** The current scalar-regression harness and the new driver prototype study predictive/adaptation policies whose actions do not change the source target stream. Sharing the same exogenous stream across arms is an appropriate matched control in this case. It is not, by itself, a causal evaluation when actions affect future states, observations, label availability, or rewards.
 
