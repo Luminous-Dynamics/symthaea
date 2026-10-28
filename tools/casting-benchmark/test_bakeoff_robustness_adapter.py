@@ -192,6 +192,24 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cost_spent disagrees"):
             adapt_documents(sweep, updated_raw, selection, _canonical(selection), holdout, _canonical(holdout))
 
+    def test_rejects_malformed_source_digest(self) -> None:
+        sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
+        sweep["source_sha256"]["tools/casting-benchmark/example.py"] = "bad-digest"
+        updated_raw = _canonical(sweep)
+        selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
+        holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
+        with self.assertRaisesRegex(ValueError, "64-character SHA-256"):
+            adapt_documents(sweep, updated_raw, selection, _canonical(selection), holdout, _canonical(holdout))
+
+    def test_rejects_source_lock_path_traversal(self) -> None:
+        sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
+        sweep["source_sha256"] = {"../unsafe.py": "f" * 64}
+        updated_raw = _canonical(sweep)
+        selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
+        holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
+        with self.assertRaisesRegex(ValueError, "invalid source-lock path"):
+            adapt_documents(sweep, updated_raw, selection, _canonical(selection), holdout, _canonical(holdout))
+
     def test_rejects_selection_id_outside_candidate_pool(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         selection["selected_candidate_ids"] = [75]
