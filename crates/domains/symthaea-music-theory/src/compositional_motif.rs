@@ -712,6 +712,62 @@ mod tests {
     }
 
     #[test]
+    fn composed_transformations_pass_across_temporal_scales_and_offsets() {
+        let source = simple_source();
+        let variants = [
+            (PitchOrientation::Preserve, 7, 2.0, 2.0),
+            (PitchOrientation::Invert, -5, 0.5, 0.5),
+            (PitchOrientation::Invert, 12, 1.0, 2.0),
+            (PitchOrientation::Preserve, -7, 0.5, 2.0),
+        ];
+        for (orientation, transpose, onset_scale, duration_scale) in variants {
+            let claim = descriptor(
+                orientation,
+                transpose,
+                onset_scale,
+                duration_scale,
+                SelectionMode::Full,
+                0,
+                source.len(),
+            );
+            for start in [0.0, 3.25, 17.75] {
+                let target = transform_sequence(&source, claim, start);
+                let evidence =
+                    verify_compositional_transform(&source, &target, start, &claim).unwrap();
+                assert!(
+                    evidence.passed,
+                    "compound claim {claim:?} at offset {start} failed: {evidence:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn shifting_target_and_declared_offset_preserves_verification_evidence() {
+        let source = simple_source();
+        let claim = descriptor(
+            PitchOrientation::Invert,
+            7,
+            2.0,
+            0.5,
+            SelectionMode::Full,
+            0,
+            source.len(),
+        );
+        let target_a = transform_sequence(&source, claim, 3.25);
+        let target_b = transform_sequence(&source, claim, 27.75);
+        let a = verify_compositional_transform(&source, &target_a, 3.25, &claim).unwrap();
+        let b = verify_compositional_transform(&source, &target_b, 27.75, &claim).unwrap();
+        assert_eq!(a.passed, b.passed);
+        assert_eq!(a.matched_events, b.matched_events);
+        assert_eq!(a.coverage, b.coverage);
+        assert_eq!(a.gap_fraction, b.gap_fraction);
+        assert_eq!(a.pitch.max_error, b.pitch.max_error);
+        assert_eq!(a.onset.max_error, b.onset.max_error);
+        assert_eq!(a.duration.max_error, b.duration.max_error);
+    }
+
+    #[test]
     fn committed_smoke_corpus_replays_against_rust_verifier() {
         let mut seen = std::collections::HashSet::new();
         let mut accepted = 0;
