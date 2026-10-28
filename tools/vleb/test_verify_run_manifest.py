@@ -310,6 +310,7 @@ class RunManifestVerifierTests(unittest.TestCase):
         cert = output[0]["verificationResult"]["signature"]["certificate"]
         cert["sourceRepositoryRef"] = "refs/heads/untrusted"
         cert["buildSignerURI"] = "https://github.com/untrusted/repo/.github/workflows/other.yml@refs/heads/main"
+        cert["subjectAlternativeName"]["value"] = "https://github.com/untrusted/repo/.github/workflows/other.yml@refs/heads/main"
         codes = {row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)}
         self.assertIn("attestation_source_ref_mismatch", codes)
         self.assertIn("attestation_signer_uri_mismatch", codes)
