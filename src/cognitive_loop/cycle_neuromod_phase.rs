@@ -291,6 +291,9 @@ impl CognitiveLoopService {
         if let Some(ref mut bus) = self.experience_bus {
             bus.current_signals = crate::experience::PrincipledSignals {
                 prediction_error,
+                // The first cognitive cycle has no prior cycle-level comparison;
+                // non-finite values are unavailable rather than surprising.
+                prediction_error_valid: self.stats.total_cycles > 0 && prediction_error.is_finite(),
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,
