@@ -229,6 +229,8 @@ def run_experiment(n_per_arm: int = 512, seed: int = 20261028, replicates: int =
         "status": "PASS_CAUSAL_REPLAY_REFERENCE_ONLY",
         "seed": seed, "pairs_per_arm": n_per_arm, "total_paired_runs": len(pairs) * 2,
         "bootstrap_replicates_per_arm": replicates, "audit_panel_accepted": panel["accepted"],
+        "intervention_arm_counts": panel["arm_counts"],
+        "invalid_payload_variant_counts": panel["invalid_payload_counts"],
         "valid_pe_effect": valid_stats,
         "invalid_pe_placebo_effect": placebo_stats,
         "placebo_equivalence_margin": equivalence_margin,
