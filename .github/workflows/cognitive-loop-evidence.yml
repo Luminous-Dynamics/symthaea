@@ -13,6 +13,7 @@ on:
       - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_replay_driver.rs"
+      - "xtask/src/cognitive_missingness.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -35,6 +36,7 @@ on:
       - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_replay_driver.rs"
+      - "xtask/src/cognitive_missingness.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -102,6 +104,8 @@ jobs:
 
       - name: Test counterfactual adaptation utility failure modes
         run: cargo test --locked -p xtask cognitive_adaptation_utility
+      - name: Test informative-missingness bounds and sensitivity
+        run: cargo test --locked -p xtask cognitive_missingness
 
       - name: Test adaptation panel coverage and aggregation
         run: cargo test --locked -p xtask cognitive_adaptation_panel
@@ -402,3 +406,21 @@ jobs:
             (.canonical_receipt_sha256 | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/cognitive-adaptation-synthetic/receipt-validation-recheck.json"
+      - name: Run informative-missingness CLI against the ranking-reversal fixture
+        run: |
+          cargo run --locked -p xtask -- score-cognitive-missingness --input benchmarks/cognitive-loop-evidence/synthetic-informative-missingness.json --out "$RUNNER_TEMP/informative-missingness-score.json"
+          jq -e '
+            .metric_version == "informative-missingness-partial-identification-v1" and
+            .dataset_id == "synthetic-informative-missingness-not-measured" and
+            .candidate.observed_count == 2 and
+            .candidate.eligible_count == 10 and
+            .candidate.observed_outcome_fraction > 0.19 and
+            .candidate.observed_outcome_fraction < 0.21 and
+            .candidate_minus_reference_loss_lower_bound < 0 and
+            .candidate_minus_reference_loss_upper_bound > 0 and
+            .identification_interval_excludes_zero_in_candidate_favor == false and
+            (.sensitivity_surface | length) == 16 and
+            (.source_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64 and
+            (.interpretation_guard | contains("not a confidence interval"))
+          ' "$RUNNER_TEMP/informative-missingness-score.json"
