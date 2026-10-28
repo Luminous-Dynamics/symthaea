@@ -588,6 +588,96 @@ impl EvidenceIndex {
         old.validate()
     }
 
+    /// Deterministic BM25 lexical retrieval over eligible text evidence.
+    ///
+    /// This is a transparent lexical baseline, not a semantic encoder. It reads
+    /// only validated active records in the requested scope and validity window;
+    /// revoked, superseded, deleted, expired, and cross-scope items do not
+    /// influence document statistics or ranking. Text payload digests are
+    /// verified before indexing. Image payloads are excluded from this arm.
+    pub fn rank_text(
+        &self,
+        query_text: &str,
+        scope_id: &str,
+        now_ms: u64,
+        max_candidates: usize,
+    ) -> Result<Vec<(u64, f32)>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if max_candidates == 0 {
+            return Ok(Vec::new());
+        }
+        let query_terms: BTreeSet<String> = lexical_tokens(query_text).into_iter().collect();
+        if query_terms.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        const K1: f64 = 1.2;
+        const B: f64 = 0.75;
+        let mut documents: Vec<(u64, BTreeMap<String, usize>, usize)> = Vec::new();
+        let mut document_frequency: BTreeMap<String, usize> = BTreeMap::new();
+        let mut total_length = 0usize;
+
+        for (hdc_id, record) in &self.records {
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            let EvidencePayload::Text { value } = &record.payload else {
+                continue;
+            };
+            if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                return Err(format!("text content_sha256 mismatch for eligible evidence HDC ID {hdc_id}"));
+            }
+            let tokens = lexical_tokens(value);
+            if tokens.is_empty() {
+                continue;
+            }
+            let mut frequencies = BTreeMap::<String, usize>::new();
+            for token in &tokens {
+                *frequencies.entry(token.clone()).or_default() += 1;
+            }
+            for token in frequencies.keys() {
+                *document_frequency.entry(token.clone()).or_default() += 1;
+            }
+            total_length = total_length.saturating_add(tokens.len());
+            documents.push((*hdc_id, frequencies, tokens.len()));
+        }
+
+        let document_count = documents.len();
+        if document_count == 0 {
+            return Ok(Vec::new());
+        }
+        let average_length = total_length as f64 / document_count as f64;
+        if average_length <= 0.0 {
+            return Ok(Vec::new());
+        }
+
+        let mut ranked = Vec::with_capacity(documents.len());
+        for (hdc_id, frequencies, document_length) in documents {
+            let length_norm = 1.0 - B + B * (document_length as f64 / average_length);
+            let mut score = 0.0f64;
+            for term in &query_terms {
+                let Some(&tf) = frequencies.get(term) else {
+                    continue;
+                };
+                let df = *document_frequency.get(term).unwrap_or(&0) as f64;
+                let n = document_count as f64;
+                let inverse_document_frequency = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+                let tf = tf as f64;
+                score += inverse_document_frequency * (tf * (K1 + 1.0)) / (tf + K1 * length_norm);
+            }
+            if score > 0.0 {
+                ranked.push((hdc_id, score as f32));
+            }
+        }
+        ranked.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+        ranked.truncate(max_candidates);
+        Ok(ranked)
+    }
+
     /// Resolve ranked HDC IDs to safe context items with source provenance.
     ///
     /// Missing IDs, duplicates, inactive records, invalid times and cross-scope
@@ -652,6 +742,25 @@ impl EvidenceIndex {
     }
 }
 
+/// Lowercase alphanumeric tokenization, deterministic and dependency-free.
+/// No stemming, learned embeddings, external corpus statistics, or query labels
+/// are used; keep this arm labeled as lexical retrieval in benchmark reports.
+fn lexical_tokens(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for character in input.chars().flat_map(char::to_lowercase) {
+        if character.is_alphanumeric() {
+            current.push(character);
+        } else if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
 fn resolve_image_path(payload_root: &Path, path: &str) -> Result<PathBuf, String> {
     let root = fs::canonicalize(payload_root)
         .map_err(|error| format!("invalid payload root: {error}"))?;
@@ -709,6 +818,49 @@ mod tests {
             valid_until_unix_ms: None,
             superseded_by: None,
         }
+    }
+
+
+    #[test]
+    fn lexical_bm25_ranks_relevant_text_and_filters_scope_time_and_lifecycle() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-relevant", "web", "cart checkout button opens the shopping cart"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(8, "evidence-unrelated", "web", "mountain trails and hiking boots"), b"canonical trajectory bytes").unwrap();
+
+        let mut private = text_record(9, "evidence-private", "enterprise", "cart checkout button opens shopping cart");
+        index.insert(private.clone(), b"canonical trajectory bytes").unwrap();
+
+        private.hdc_id = 10;
+        private.evidence_id = "evidence-expired".into();
+        private.scope_id = "web".into();
+        private.valid_until_unix_ms = Some(150);
+        private.content_sha256 = hash(b"cart checkout button opens shopping cart");
+        index.insert(private, b"canonical trajectory bytes").unwrap();
+
+        let ranked = index.rank_text("Where is the cart checkout button?", "web", 150, 10).unwrap();
+        assert_eq!(ranked.first().map(|item| item.0), Some(7));
+        assert!(ranked.iter().all(|(id, _)| *id != 9 && *id != 10));
+        assert!(ranked.iter().all(|(_, score)| score.is_finite() && *score > 0.0));
+        assert!(index.rank_text("!!!", "web", 150, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn lexical_bm25_fails_closed_on_corrupt_eligible_text() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-valid", "web", "canonical answer"), b"canonical trajectory bytes").unwrap();
+        index.records.get_mut(&7).unwrap().content_sha256 = hash(b"wrong bytes");
+        assert!(index.rank_text("canonical", "web", 150, 10).is_err());
+    }
+
+    #[test]
+    fn lexical_bm25_ties_are_deterministic_by_hdc_id() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(9, "evidence-nine", "web", "identical lexical terms"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(3, "evidence-three", "web", "identical lexical terms"), b"canonical trajectory bytes").unwrap();
+        let first = index.rank_text("identical lexical terms", "web", 150, 10).unwrap();
+        let second = index.rank_text("identical lexical terms", "web", 150, 10).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.iter().map(|pair| pair.0).collect::<Vec<_>>(), vec![3, 9]);
     }
 
     #[test]
