@@ -15,6 +15,39 @@ fn test_coding_agent_creation() {
 }
 
 #[test]
+fn coding_agent_does_not_relabel_confidence_gap_as_measured_pe() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = CodingAgentConfig {
+        max_iterations: 2,
+        working_dir: dir.path().to_path_buf(),
+        target_file: Some(PathBuf::from("pe-provenance.rs")),
+        ..Default::default()
+    };
+    let mut agent = CodingAgent::new(config).unwrap();
+
+    // The cold-start cycle has no prior prediction; its numeric PE compatibility
+    // payload must not be accepted as measured evidence.
+    let cycle = agent.cognitive_loop.cycle("cold-start provenance probe");
+    assert!(!cycle.prediction_error_valid);
+
+    agent.confidence_gap_history.extend([0.7, 0.6]);
+    let signals = agent.extract_consciousness_signals(&cycle);
+    assert_eq!(signals.prediction_error, cycle.prediction_error);
+    assert!(!signals.prediction_error_valid);
+    assert!(
+        (signals.confidence_gap - (1.0 - agent.cognitive_loop.prediction_confidence()) as f32).abs()
+            < f32::EPSILON
+    );
+    assert_ne!(signals.confidence_gap, signals.prediction_error);
+
+    // Invalid PE does not become an entry in measured-error history, while the
+    // independent confidence-gap track remains available for confidence velocity.
+    assert!(agent.prediction_error_history.is_empty());
+    assert_eq!(agent.confidence_gap_history.len(), 2);
+    assert!(signals.confidence_velocity.is_finite());
+}
+
+#[test]
 fn test_coding_agent_runs_and_generates() {
     let dir = tempfile::tempdir().unwrap();
     let config = CodingAgentConfig {
