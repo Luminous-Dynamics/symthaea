@@ -32,6 +32,8 @@ pub struct DatasetEntry {
     pub title: String,
     pub source_url: String,
     #[serde(default)]
+    pub source_version: Option<String>,
+    #[serde(default)]
     pub described_cohort_size: Option<usize>,
     #[serde(default)]
     pub data_files_described: Vec<String>,
@@ -43,6 +45,7 @@ pub struct DatasetReceipt {
     pub dataset_id: String,
     pub dataset_title: String,
     pub source_url: String,
+    pub source_version: Option<String>,
     pub cohort_size_reported_by_source: Option<usize>,
     pub captured_at_unix_seconds: u64,
     pub source_commit: String,
@@ -355,6 +358,7 @@ pub fn capture_receipt(
         dataset_id: entry.id.clone(),
         dataset_title: entry.title.clone(),
         source_url: entry.source_url.clone(),
+        source_version: entry.source_version.clone(),
         cohort_size_reported_by_source: entry.described_cohort_size,
         captured_at_unix_seconds: now,
         source_commit: source_commit.to_owned(),
@@ -385,6 +389,7 @@ pub fn verify_receipt(
         return Err("receipt dataset id/source URL does not match the current registry".to_owned());
     }
     if receipt.dataset_title != entry.title
+        || receipt.source_version != entry.source_version
         || receipt.cohort_size_reported_by_source != entry.described_cohort_size
     {
         return Err("receipt dataset metadata differs from the current registry".to_owned());
@@ -478,6 +483,7 @@ fn temporary_path(path: &Path) -> PathBuf {
 pub fn print_receipt_summary(receipt: &DatasetReceipt) {
     println!("dataset_id: {}", receipt.dataset_id);
     println!("source_url: {}", receipt.source_url);
+    println!("source_version: {}", receipt.source_version.as_deref().unwrap_or("not registered"));
     println!("source_commit: {}", receipt.source_commit);
     println!("captured_at_unix_seconds: {}", receipt.captured_at_unix_seconds);
     println!("source_archive: {} ({} bytes, sha256={})",
