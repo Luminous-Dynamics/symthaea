@@ -24,7 +24,14 @@
     "policy": "low_screen",
     "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
     "cost_budget": 200,
-    "cost_spent": 130
+    "cost_spent": 130,
+    "audit_accounting": {
+      "nominal_prediction_evaluations": 2,
+      "nominal_prediction_fidelity": "low",
+      "nominal_prediction_cost_units": 2,
+      "shift_evaluation_count": 4,
+      "shift_cost_accounting": "synthetic_analytic_not_priced"
+    }
   },
   "reference_point": [1.2, 1.2],
   "candidate_set": [
