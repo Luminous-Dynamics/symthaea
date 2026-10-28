@@ -45,6 +45,18 @@ pub enum ReceiptStatus {
     NotRun,
 }
 
+#[derive(Serialize)]
+struct CandidateManifestBody<'a> {
+    candidate_id: &'a str,
+    parent_candidate_id: &'a Option<String>,
+    source_sha256: &'a str,
+    retrieval_config_sha256: &'a str,
+    lifecycle_policy_sha256: &'a str,
+    prompt_sha256: &'a str,
+    edit_iteration: u32,
+    built_from_receipt_ids: &'a [String],
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PipelineCandidate {
     pub candidate_id: String,
@@ -143,6 +155,26 @@ pub struct PromotionAssessment {
     pub reason: String,
 }
 
+
+/// Compute the digest binding a candidate's immutable system and derivation
+/// inputs. Mutable orchestration state (Draft/Frozen/Promoted) is intentionally
+/// excluded so evaluation does not alter the artifact identity.
+pub fn candidate_manifest_sha256(candidate: &PipelineCandidate) -> Result<String, String> {
+    let body = CandidateManifestBody {
+        candidate_id: &candidate.candidate_id,
+        parent_candidate_id: &candidate.parent_candidate_id,
+        source_sha256: &candidate.source_sha256,
+        retrieval_config_sha256: &candidate.retrieval_config_sha256,
+        lifecycle_policy_sha256: &candidate.lifecycle_policy_sha256,
+        prompt_sha256: &candidate.prompt_sha256,
+        edit_iteration: candidate.edit_iteration,
+        built_from_receipt_ids: &candidate.built_from_receipt_ids,
+    };
+    let bytes = serde_json::to_vec(&body)
+        .map_err(|error| format!("cannot serialize candidate manifest: {error}"))?;
+    Ok(sha256_hex(&bytes))
+}
+
 /// Validate candidate lineage, receipt references, digests and optimizer-visible
 /// splits. Held-out receipts may exist in the trace but cannot be optimization
 /// feedback or a candidate's build source.
@@ -174,6 +206,17 @@ pub fn validate_evolution_trace(trace: &PipelineEvolutionTrace) -> Result<(), Ve
             if !is_sha256(digest) {
                 errors.push(format!("candidate {} has invalid {name}", candidate.candidate_id));
             }
+        }
+        match candidate_manifest_sha256(candidate) {
+            Ok(expected) if expected != candidate.manifest_sha256 => errors.push(format!(
+                "candidate {} immutable manifest digest mismatch",
+                candidate.candidate_id
+            )),
+            Err(error) => errors.push(format!(
+                "candidate {} manifest serialization failed: {error}",
+                candidate.candidate_id
+            )),
+            _ => {}
         }
     }
 
@@ -517,10 +560,10 @@ mod tests {
     }
 
     fn candidate(id: &str, parent: Option<&str>, iteration: u32, state: CandidateState) -> PipelineCandidate {
-        PipelineCandidate {
+        let mut candidate = PipelineCandidate {
             candidate_id: id.to_string(),
             parent_candidate_id: parent.map(ToString::to_string),
-            manifest_sha256: digest(&format!("{id}:manifest")),
+            manifest_sha256: String::new(),
             source_sha256: digest(&format!("{id}:source")),
             retrieval_config_sha256: digest(&format!("{id}:retrieval")),
             lifecycle_policy_sha256: digest(&format!("{id}:lifecycle")),
@@ -528,7 +571,9 @@ mod tests {
             state,
             edit_iteration: iteration,
             built_from_receipt_ids: Vec::new(),
-        }
+        };
+        candidate.manifest_sha256 = candidate_manifest_sha256(&candidate).unwrap();
+        candidate
     }
 
     fn receipt(id: &str, candidate: &PipelineCandidate, split: EvaluationSplit, accuracy: f64, cost: f64) -> EvaluationReceipt {
@@ -593,6 +638,11 @@ mod tests {
     fn rejects_candidate_built_from_heldout_feedback() {
         let mut trace = matched_trace();
         trace.candidates[1].built_from_receipt_ids.push("trial-heldout".to_string());
+        let updated_manifest = candidate_manifest_sha256(&trace.candidates[1]).unwrap();
+        trace.candidates[1].manifest_sha256 = updated_manifest.clone();
+        for receipt in trace.receipts.iter_mut().filter(|receipt| receipt.candidate_id == "trial") {
+            receipt.candidate_manifest_sha256 = updated_manifest.clone();
+        }
         assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("built from held-out")));
     }
 
@@ -684,10 +734,14 @@ mod tests {
     fn edit_iteration_and_receipt_manifest_digest_are_pinned() {
         let mut trace = matched_trace();
         trace.candidates[1].edit_iteration = 0;
-        assert!(validate_evolution_trace(&trace).is_err());
+        assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("immutable manifest digest")));
+
+        let mut trace = matched_trace();
+        trace.candidates[1].retrieval_config_sha256 = digest("mutated retrieval config");
+        assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("immutable manifest digest")));
 
         let mut trace = matched_trace();
         trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().candidate_manifest_sha256 = digest("mutated candidate");
-        assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("manifest digest")));
+        assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("candidate manifest digest mismatch")));
     }
 }
