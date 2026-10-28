@@ -43,21 +43,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          artifact_dir="${RUNNER_TEMP}/active-evidence-exact-tree-artifact"
           temp_dir="$(mktemp -d)"
+          rm -rf "$artifact_dir"
+          mkdir -p "$artifact_dir"
           trap 'rm -rf "$temp_dir"' EXIT
 
-          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > "$temp_dir/greedy-first.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > "$artifact_dir/greedy-policy-results.csv"
           cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > "$temp_dir/greedy-second.csv"
-          cmp "$temp_dir/greedy-first.csv" "$temp_dir/greedy-second.csv"
-          python3 tools/active-evidence-exact-tree/reference_check.py "$temp_dir/greedy-first.csv"
+          cmp "$artifact_dir/greedy-policy-results.csv" "$temp_dir/greedy-second.csv"
+          python3 tools/active-evidence-exact-tree/reference_check.py "$artifact_dir/greedy-policy-results.csv"
 
-          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > "$temp_dir/tree-first.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > "$artifact_dir/robust-tree-results.csv"
           cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > "$temp_dir/tree-second.csv"
-          cmp "$temp_dir/tree-first.csv" "$temp_dir/tree-second.csv"
+          cmp "$artifact_dir/robust-tree-results.csv" "$temp_dir/tree-second.csv"
           python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py --self-test
-          python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py "$temp_dir/tree-first.csv"
-          python3 tools/active-evidence-exact-tree/compare_cost_frontiers.py "$temp_dir/greedy-first.csv" "$temp_dir/tree-first.csv" > "$temp_dir/cost-frontier.csv"
-          test "$(wc -l < "$temp_dir/cost-frontier.csv")" -eq 10
+          python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py "$artifact_dir/robust-tree-results.csv"
+          python3 tools/active-evidence-exact-tree/compare_cost_frontiers.py "$artifact_dir/greedy-policy-results.csv" "$artifact_dir/robust-tree-results.csv" > "$artifact_dir/matched-cost-frontier.csv"
+          test "$(wc -l < "$artifact_dir/matched-cost-frontier.csv")" -eq 10
+
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "workflow_run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "rustc_version=$(rustc --version)"
+            echo "cargo_version=$(cargo --version)"
+            echo "runner_os=$(uname -a)"
+            (cd "$artifact_dir" && sha256sum greedy-policy-results.csv robust-tree-results.csv matched-cost-frontier.csv)
+          } > "$artifact_dir/provenance-receipt.txt"
 
       - name: Reject mutated aggregate outputs
         shell: bash
@@ -102,3 +116,12 @@ jobs:
             echo "robust-tree checker accepted a mutated aggregate row" >&2
             exit 1
           fi
+
+      - name: Upload exact-source benchmark results and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: active-evidence-exact-tree-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/active-evidence-exact-tree-artifact/
+          if-no-files-found: warn
+          retention-days: 14
