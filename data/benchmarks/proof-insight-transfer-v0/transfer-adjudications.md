@@ -49,3 +49,17 @@ Before claiming positive transfer utility:
 5. Keep every result above labeled as proposed until executable fixtures, positive controls, and the matcher have actually run.
 
 A broad match in topic or proof shape is a retrieval hypothesis, not mathematical transfer.
+
+## Adjudication C: family 026 eventual-density transport → family 012 largest-prime-factor ordering
+
+- **Source family 026 (train):** [`Problem344.large_gaps_and_ratio_density`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/ComparatorChallenges/PrimeGaps.lean), scoped in [`lean/docs/026.md`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/docs/026.md).
+- **Target family 012 (validation, now development-exposed):** [`JointDickmanPaper.increasing_order`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/ComparatorChallenges/JointDickman.lean), scoped in [`lean/docs/012.md`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/docs/012.md).
+- **Disposition:** provisional direct-transfer rejection; `object_type`, `predicate_mismatch`, `premise_unavailable`. Development-only negative control, never a confirmatory validation result in this version.
+
+Family 026 defines the source predicate over indices of the prime sequence: `p_n / n < p_(n+1) / (n+1)`. Its candidate insight moves from a positive lower bound on a source set's initial count, through eventual inclusion and finite-prefix accounting, to a positive lower asymptotic density. Family 012's target predicate is over integers whose consecutive largest prime factors satisfy `P⁺(n) < P⁺(n+1)`, and its declared result proves an ordinary natural density of one half as a corollary of the joint Dickman law.
+
+The two claims share vocabulary about primes and density, but the predicates are not the same and the inspected target contract supplies no eventual-inclusion relation from the source set. The source insight cannot discharge that missing bridge merely because both conclusions mention positive density. The direct transfer should be rejected unless a separate, audited intermediate lemma establishes the exact set relation and compatible counting conventions.
+
+**Evidence boundary:** this is a provisional curator judgment based on the pinned family scope notes and comparator statement signatures. The comparator files include `sorry` placeholders, so this record does not claim the full source/target proofs were rebuilt or that the transfer was experimentally attempted. It is not an observed model false-accept.
+
+**Exposure handling:** inspection happened after checking the immutable split assignment. Family `012` is therefore recorded in `exposure-audit.md` as development-exposed and excluded from validation baseline selection/tuning for this benchmark version. `splits.json` remains unchanged; original and exposure-adjusted counts must be reported separately.
