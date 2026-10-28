@@ -1,0 +1,101 @@
+name: Active Evidence Shift Monitor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/active-evidence-shift-monitor/**"
+      - ".github/workflows/active-evidence-shift-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact sequential shift-monitor qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --check
+
+      - name: Locked Rust tests
+        run: cargo test --locked --manifest-path tools/active-evidence-shift-monitor/Cargo.toml
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path tools/active-evidence-shift-monitor/Cargo.toml --all-targets -- -D warnings
+
+      - name: Deterministic output and independent exact reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${RUNNER_TEMP}/active-evidence-shift-monitor-artifact"
+          temp_dir="$(mktemp -d)"
+          rm -rf "$artifact_dir"
+          mkdir -p "$artifact_dir"
+          trap 'rm -rf "$temp_dir"' EXIT
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > "$artifact_dir/shift-monitor-results.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > "$temp_dir/second.csv"
+          cmp "$artifact_dir/shift-monitor-results.csv" "$temp_dir/second.csv"
+          python3 tools/active-evidence-shift-monitor/reference_check.py --self-test
+          python3 tools/active-evidence-shift-monitor/reference_check.py "$artifact_dir/shift-monitor-results.csv"
+
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "workflow_run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "rustc_version=$(rustc --version)"
+            echo "cargo_version=$(cargo --version)"
+            echo "runner_os=$(uname -a)"
+            (cd "$artifact_dir" && sha256sum shift-monitor-results.csv)
+          } > "$artifact_dir/provenance-receipt.txt"
+
+      - name: Reject mutated outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > "$temp_dir/original.csv"
+          python3 - "$temp_dir/original.csv" "$temp_dir/mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[0]["false_alarm_probability"] = "0.9"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-shift-monitor/reference_check.py "$temp_dir/mutated.csv"; then
+            echo "reference checker accepted a mutated false-alarm probability" >&2
+            exit 1
+          fi
+
+      - name: Upload exact-source result and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: active-evidence-shift-monitor-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/active-evidence-shift-monitor-artifact/
+          if-no-files-found: warn
+          retention-days: 14
