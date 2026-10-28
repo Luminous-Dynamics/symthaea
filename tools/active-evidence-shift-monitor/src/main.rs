@@ -732,6 +732,55 @@ fn probability_range_sum(values: &[f64], start: usize, end: usize) -> f64 {
     values[start..=end.min(values.len() - 1)].iter().sum()
 }
 
+fn evaluate_cusum_null_schedule<P>(
+    direction: CusumDirection,
+    threshold: usize,
+    horizon: usize,
+    conditional_p_at: P,
+) -> CusumMetrics
+where
+    P: Fn(usize, usize) -> f64,
+{
+    let mut active = vec![0.0_f64; threshold];
+    active[0] = 1.0;
+    let mut alarm_probability = 0.0;
+
+    for n in 1..=horizon {
+        let mut next = vec![0.0_f64; threshold];
+        let reachable_states = threshold.min((n - 1) * CUSUM_UPPER_INCREMENT + 1);
+        for (state, &mass) in active.iter().take(reachable_states).enumerate() {
+            if mass == 0.0 {
+                continue;
+            }
+            let conditional_p = conditional_p_at(n, state);
+            assert!(
+                (COMPOSITE_NULL_LOWER..=COMPOSITE_NULL_UPPER).contains(&conditional_p),
+                "predictable CUSUM null schedule escaped the accepted rate band: p={conditional_p}"
+            );
+            let event_probability = direction.event_probability(conditional_p);
+            for (event, branch_mass) in [
+                (true, mass * event_probability),
+                (false, mass * (1.0 - event_probability)),
+            ] {
+                let next_state = cusum_next_state(state, event);
+                if next_state >= threshold {
+                    alarm_probability += branch_mass;
+                } else {
+                    next[next_state] += branch_mass;
+                }
+            }
+        }
+        active = next;
+    }
+
+    CusumMetrics {
+        scenario_or_pre_shift_alarm_probability: alarm_probability,
+        post_shift_detection_probability: None,
+        mean_post_shift_detection_delay: None,
+        survival_probability: active.iter().sum(),
+    }
+}
+
 /// Run the exact CUSUM dynamic program once to the largest requested horizon and
 /// return typed metrics at each checkpoint.
 fn evaluate_cusum_scenario(
@@ -1774,5 +1823,63 @@ mod tests {
             "matched-edge CUSUM did not improve moderate-shift power: CUSUM={cusum_060}, composite={composite_060}"
         );
     }
+    #[test]
+    fn cusum_controls_predictable_alternating_and_feedback_null_schedules() {
+        let horizon = HORIZONS[HORIZONS.len() - 1];
+        let matched_reference_alarm_probability =
+            composite_boundary_reference_alarm_probability(horizon);
+        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+
+        for direction in CusumDirection::ALL {
+            let alternating = evaluate_cusum_null_schedule(
+                direction,
+                threshold,
+                horizon,
+                |n, _state| if n % 2 == 0 { 0.52 } else { 0.48 },
+            );
+            assert!(
+                alternating.scenario_or_pre_shift_alarm_probability
+                    <= matched_reference_alarm_probability + EPS,
+                "CUSUM exceeded matched edge rate on alternating null schedule: direction={}, alarm={}",
+                direction.name(),
+                alternating.scenario_or_pre_shift_alarm_probability
+            );
+            assert!(
+                (alternating.scenario_or_pre_shift_alarm_probability
+                    + alternating.survival_probability
+                    - 1.0)
+                    .abs()
+                    <= 1.0e-9
+            );
+
+            // This rate choice is predictable: it depends only on the CUSUM state
+            // before the next observation. It preferentially feeds evidence while the
+            // statistic is low and damps evidence after the statistic grows.
+            let feedback = evaluate_cusum_null_schedule(
+                direction,
+                threshold,
+                horizon,
+                |_n, state| match (direction, state < threshold / 2) {
+                    (CusumDirection::Upper, true) | (CusumDirection::Lower, false) => 0.52,
+                    (CusumDirection::Upper, false) | (CusumDirection::Lower, true) => 0.48,
+                },
+            );
+            assert!(
+                feedback.scenario_or_pre_shift_alarm_probability
+                    <= matched_reference_alarm_probability + EPS,
+                "CUSUM exceeded matched edge rate on predictable feedback null: direction={}, alarm={}",
+                direction.name(),
+                feedback.scenario_or_pre_shift_alarm_probability
+            );
+            assert!(
+                (feedback.scenario_or_pre_shift_alarm_probability
+                    + feedback.survival_probability
+                    - 1.0)
+                    .abs()
+                    <= 1.0e-9
+            );
+        }
+    }
+
 
 }
