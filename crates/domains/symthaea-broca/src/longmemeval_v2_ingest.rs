@@ -201,9 +201,17 @@ pub fn canonical_source_bytes(
     trajectory: &LongMemEvalTrajectory,
     state: &LongMemEvalState,
 ) -> Result<Vec<u8>, String> {
+    // Hash only the fields that substantiate this evidence row. Including the
+    // full states array here would serialize the whole trajectory once per
+    // state, creating avoidable quadratic ingestion work for long histories.
     let envelope = serde_json::json!({
         "schema_version": LME_V2_INGEST_SCHEMA_VERSION,
-        "trajectory": trajectory,
+        "trajectory_id": &trajectory.id,
+        "domain": &trajectory.domain,
+        "environment": &trajectory.environment,
+        "goal": &trajectory.goal,
+        "outcome": &trajectory.outcome,
+        "start_url": &trajectory.start_url,
         "state": state,
     });
     let canonical = canonicalize_value(envelope);
@@ -407,6 +415,19 @@ mod tests {
         let trajectory: LongMemEvalTrajectory = serde_json::from_value(value).unwrap();
         let canonical = canonical_source_bytes(&trajectory, &trajectory.states[0]).unwrap();
         assert!(left.verify_source_bytes(&canonical).is_ok());
+    }
+
+    #[test]
+    fn changing_a_sibling_state_does_not_change_another_states_source_digest() {
+        let mut value: Value = serde_json::from_str(&sample_line()).unwrap();
+        let trajectory: LongMemEvalTrajectory = serde_json::from_value(value.clone()).unwrap();
+        let original = canonical_source_bytes(&trajectory, &trajectory.states[0]).unwrap();
+
+        value["states"][1]["thought"] = Value::String("a different later observation".into());
+        let changed: LongMemEvalTrajectory = serde_json::from_value(value).unwrap();
+        let after = canonical_source_bytes(&changed, &changed.states[0]).unwrap();
+
+        assert_eq!(original, after);
     }
 
     #[test]
