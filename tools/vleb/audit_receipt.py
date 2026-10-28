@@ -52,11 +52,32 @@ def digest(raw: bytes) -> str:
 def sha256_path(path: Path) -> str:
     return digest(path.read_bytes())
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_non_finite_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant {value!r} rejected")
+
+
+def strict_json_loads(source: str) -> Any:
+    """Parse strict JSON without duplicate keys, NaN, or Infinity."""
+    return json.loads(
+        source,
+        object_pairs_hook=_reject_duplicate_json_keys,
+        parse_constant=_reject_non_finite_json_constant,
+    )
+
 
 def json_object(path: Path, label: str, issues: list[dict[str, str]]) -> dict[str, Any] | None:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        value = strict_json_loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
         issues.append({"code": "invalid_json", "message": f"{label}: {exc}"})
         return None
     if not isinstance(value, dict):

@@ -309,6 +309,22 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.assertIn(code, codes, result)
         self.assertFalse(result["eligible"])
 
+    def test_duplicate_json_object_keys_are_rejected(self) -> None:
+        raw = self.bundle.task_path.read_text(encoding="utf-8")
+        anchor = '"task_id": "vleb-private-auditor-001",'
+        self.assertIn(anchor, raw)
+        raw = raw.replace(anchor, anchor + '\n  "task_id": "attacker/relabelled-task",', 1)
+        self.bundle.task_path.write_text(raw, encoding="utf-8")
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "invalid_json")
+
+    def test_nonstandard_json_nan_is_rejected(self) -> None:
+        raw = self.bundle.task_path.read_text(encoding="utf-8")
+        raw = raw.replace('"task_id": "vleb-private-auditor-001",', '"task_id": "vleb-private-auditor-001",\n  "unexpected_numeric": NaN,', 1)
+        self.bundle.task_path.write_text(raw, encoding="utf-8")
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "invalid_json")
+
     def test_valid_synthetic_bundle_passes(self) -> None:
         result = self.bundle.run_audit()
         self.assertTrue(result["eligible"], result["issues"])
