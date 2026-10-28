@@ -933,13 +933,14 @@ fn composite_boundary_reference_alarm_probability(horizon: usize) -> f64 {
 
 fn print_cusum_baseline_csv() {
     let horizon = HORIZONS[HORIZONS.len() - 1];
-    let matched_reference_alarm_probability = composite_boundary_reference_alarm_probability(horizon);
-    let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+    let matched_reference_family_alarm_probability = composite_boundary_reference_alarm_probability(horizon);
+    let matched_direction_alarm_probability = matched_reference_family_alarm_probability / 2.0;
+    let threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm_probability);
     let calibration_boundary_alarm_probability =
         cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER);
     let family_worst_case_union_bound = 2.0 * calibration_boundary_alarm_probability;
     println!(
-        "direction,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_lower,null_upper,threshold_scaled,threshold_score,matched_reference_alarm_probability,calibration_boundary_alarm_probability,family_worst_case_union_bound,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,median_post_shift_detection_delay,p90_post_shift_detection_delay,per_cell_alpha,survival_probability"
+        "direction,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_lower,null_upper,threshold_scaled,threshold_score,matched_reference_family_alarm_probability,matched_direction_alarm_probability,calibration_boundary_alarm_probability,family_worst_case_union_bound,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,median_post_shift_detection_delay,p90_post_shift_detection_delay,per_cell_alpha,survival_probability"
     );
     for direction in CusumDirection::ALL {
         for scenario in SCENARIOS {
@@ -954,7 +955,7 @@ fn print_cusum_baseline_csv() {
                     .map(|p| format!("{p:.12}"))
                     .unwrap_or_else(|| "NA".to_owned());
                 println!(
-                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{:.12},{},{:.12},{:.12},{:.12},{:.12},{:.12},{},{},{},{},{:.12},{:.12}",
+                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{:.12},{},{:.12},{:.12},{:.12},{:.12},{:.12},{:.12},{},{},{},{},{:.12},{:.12}",
                     direction.name(),
                     scenario.name,
                     scenario.class.name(),
@@ -967,7 +968,8 @@ fn print_cusum_baseline_csv() {
                     COMPOSITE_NULL_UPPER,
                     threshold,
                     threshold as f64 / CUSUM_SCALE as f64,
-                    matched_reference_alarm_probability,
+                    matched_reference_family_alarm_probability,
+                    matched_direction_alarm_probability,
                     calibration_boundary_alarm_probability,
                     family_worst_case_union_bound,
                     metrics.scenario_or_pre_shift_alarm_probability,
@@ -1717,20 +1719,25 @@ mod tests {
     #[test]
     fn cusum_threshold_is_exactly_calibrated_at_the_composite_null_edge() {
         let horizon = HORIZONS[HORIZONS.len() - 1];
-        let matched_reference_alarm_probability =
+        let matched_reference_family_alarm_probability =
             composite_boundary_reference_alarm_probability(horizon);
         assert!(
-            (matched_reference_alarm_probability - 0.0008915879337992225).abs() <= 5.0e-10,
+            (matched_reference_family_alarm_probability - 0.0008915879337992225).abs() <= 5.0e-10,
             "composite reference edge FPR changed; update the preregistered calibration target"
         );
-        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
-        assert_eq!(threshold, 1374, "matched-edge CUSUM threshold changed; review benchmark protocol");
+        let matched_direction_alarm_probability = matched_reference_family_alarm_probability / 2.0;
+        let threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm_probability);
+        assert_eq!(threshold, 1444, "family-matched CUSUM threshold changed; review benchmark protocol");
         let upper_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER);
         let lower_alarm =
             cusum_alarm_probability(horizon, threshold, 1.0 - COMPOSITE_NULL_LOWER);
-        assert!(upper_alarm <= matched_reference_alarm_probability + EPS);
-        assert!(lower_alarm <= matched_reference_alarm_probability + EPS);
+        assert!(upper_alarm <= matched_direction_alarm_probability + EPS);
+        assert!(lower_alarm <= matched_direction_alarm_probability + EPS);
         assert!((upper_alarm - lower_alarm).abs() <= EPS);
+        assert!(
+            2.0 * upper_alarm <= matched_reference_family_alarm_probability + EPS,
+            "two-direction CUSUM union bound exceeds matched reference family alarm rate"
+        );
         assert!(
             2.0 * upper_alarm <= PER_CELL_ALPHA + EPS,
             "two-direction CUSUM union bound exceeds the per-cell alpha allocation"
@@ -1739,8 +1746,8 @@ mod tests {
             let previous =
                 cusum_alarm_probability(horizon, threshold - 1, COMPOSITE_NULL_UPPER);
             assert!(
-                previous > matched_reference_alarm_probability + EPS,
-                "calibration did not find the minimum threshold: previous={previous}, target={matched_reference_alarm_probability}"
+                previous > matched_direction_alarm_probability + EPS,
+                "calibration did not find the minimum threshold: previous={previous}, target={matched_direction_alarm_probability}"
             );
         }
     }
@@ -1748,9 +1755,10 @@ mod tests {
     #[test]
     fn cusum_scenario_metrics_preserve_semantics_and_probability_mass() {
         let horizon = HORIZONS[HORIZONS.len() - 1];
-        let matched_reference_alarm_probability =
+        let matched_reference_family_alarm_probability =
             composite_boundary_reference_alarm_probability(horizon);
-        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+        let matched_direction_alarm_probability = matched_reference_family_alarm_probability / 2.0;
+        let threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm_probability);
         for direction in CusumDirection::ALL {
             for scenario in SCENARIOS {
                 for (horizon, metrics) in evaluate_cusum_scenario(direction, threshold, scenario) {
@@ -1785,7 +1793,7 @@ mod tests {
                                     .contains(&scenario.pre_shift_p));
                     if is_accepted_null_control {
                         assert!(
-                            metrics.scenario_or_pre_shift_alarm_probability <= matched_reference_alarm_probability + EPS,
+                            metrics.scenario_or_pre_shift_alarm_probability <= matched_direction_alarm_probability + EPS,
                             "CUSUM violated matched-reference boundary on an accepted-null scenario: direction={}, scenario={}, horizon={}, alarm={}",
                             direction.name(),
                             scenario.name,
@@ -1824,9 +1832,10 @@ mod tests {
     #[test]
     fn cusum_improves_weak_and_moderate_step_power_at_matched_edge_fpr() {
         let horizon = HORIZONS[HORIZONS.len() - 1];
-        let matched_reference_alarm_probability =
+        let matched_reference_family_alarm_probability =
             composite_boundary_reference_alarm_probability(horizon);
-        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+        let matched_direction_alarm_probability = matched_reference_family_alarm_probability / 2.0;
+        let threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm_probability);
         let composite_table = family_alarm_table(
             EProcessFamily::CompositeBandBetting,
             NOMINAL_P,
@@ -1872,7 +1881,7 @@ mod tests {
         .detection_probability;
 
         assert!(
-            cusum_055 > composite_055 + 0.04,
+            cusum_055 > composite_055 + 0.025,
             "matched-edge CUSUM did not improve weak-shift power: CUSUM={cusum_055}, composite={composite_055}"
         );
         assert!(
@@ -1883,9 +1892,10 @@ mod tests {
     #[test]
     fn cusum_controls_predictable_alternating_and_feedback_null_schedules() {
         let horizon = HORIZONS[HORIZONS.len() - 1];
-        let matched_reference_alarm_probability =
+        let matched_reference_family_alarm_probability =
             composite_boundary_reference_alarm_probability(horizon);
-        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+        let matched_direction_alarm_probability = matched_reference_family_alarm_probability / 2.0;
+        let threshold = calibrate_cusum_threshold(horizon, matched_direction_alarm_probability);
 
         for direction in CusumDirection::ALL {
             let alternating = evaluate_cusum_null_schedule(
@@ -1896,7 +1906,7 @@ mod tests {
             );
             assert!(
                 alternating.scenario_or_pre_shift_alarm_probability
-                    <= matched_reference_alarm_probability + EPS,
+                    <= matched_direction_alarm_probability + EPS,
                 "CUSUM exceeded matched edge rate on alternating null schedule: direction={}, alarm={}",
                 direction.name(),
                 alternating.scenario_or_pre_shift_alarm_probability
@@ -1923,7 +1933,7 @@ mod tests {
             );
             assert!(
                 feedback.scenario_or_pre_shift_alarm_probability
-                    <= matched_reference_alarm_probability + EPS,
+                    <= matched_direction_alarm_probability + EPS,
                 "CUSUM exceeded matched edge rate on predictable feedback null: direction={}, alarm={}",
                 direction.name(),
                 feedback.scenario_or_pre_shift_alarm_probability
