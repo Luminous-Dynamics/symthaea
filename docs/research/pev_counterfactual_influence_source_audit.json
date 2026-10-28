@@ -1,0 +1,22 @@
+{
+  "checks": [
+    {"check":"dependency-free standard library imports only","passed":true},
+    {"check":"audits paired no-PE baseline","passed":true},
+    {"check":"checks same input and initial state","passed":true},
+    {"check":"checks exact-once positive control","passed":true},
+    {"check":"checks protected-channel invariance","passed":true},
+    {"check":"checks independent outcome calibration","passed":true},
+    {"check":"declares production Rust unexecuted","passed":true},
+    {"check":"100000 generated paired trials recorded","passed":true},
+    {"check":"900000 branch summaries recorded","passed":true},
+    {"check":"all seven mutations detected","passed":true}
+  ],
+  "checks_passed":10,
+  "checks_total":10,
+  "counterfactual_harness_self_test_status":"PASS_COUNTERFACTUAL_REFERENCE_AUDITOR_ONLY",
+  "python_syntax_compile":"PASS",
+  "results_sha256":"c064735a95734e22479cedc6e53dbe5d7a8f1c0392dedab0367416a0cbd77446",
+  "rust_compiled_or_executed":false,
+  "source_sha256":"a62dd6c2ac9f5abb6739bc9c1f2f9c90d5afcc16a5e4e7cdd38f1f06c464f02b",
+  "status":"PASS_SOURCE_AND_RESULT_CONTRACT_SCAN_NOT_PRODUCTION_TEST"
+}
