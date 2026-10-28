@@ -241,6 +241,141 @@ CLAIM_WITNESS_KINDS = {
 }
 
 
+
+def audit_runtime_execution_witness(
+    manifest: dict[str, Any],
+    claim_item: dict[str, Any],
+    claim_data: dict[str, Any],
+    evidence_root: Path,
+    *,
+    expected_witness_auditor_sha256: str | None,
+    expected_witness_receipt_schema_sha256: str | None,
+    expected_witness_plan_schema_sha256: str | None,
+    expected_witness_runner_sha256: str | None,
+    trusted_claim_verifier_pins: dict[str, str],
+) -> dict[str, Any]:
+    """Validate a runtime claim's one evaluator-pinned execution receipt."""
+    out: dict[str, Any] = {"required": True, "status": "failed", "issues": []}
+    cfg = claim_item.get("execution_witness")
+    toolchain = manifest.get("claim_audit", {}).get("execution_witness_toolchain")
+    if not isinstance(cfg, dict) or not isinstance(toolchain, dict):
+        out["status"] = "unresolved"
+        out["issues"].append({"code": "runtime_execution_witness_missing", "message": "runtime claim lacks a pinned execution receipt/plan/toolchain"})
+        return out
+    expected = {
+        "auditor_sha256": expected_witness_auditor_sha256,
+        "receipt_schema_sha256": expected_witness_receipt_schema_sha256,
+        "plan_schema_sha256": expected_witness_plan_schema_sha256,
+        "runner_sha256": expected_witness_runner_sha256,
+    }
+    for key, value in expected.items():
+        if not isinstance(value, str) or not HEX.fullmatch(value):
+            out["status"] = "unresolved"
+            out["issues"].append({"code": "runtime_witness_trust_pin_missing", "message": f"missing protected evaluator pin: {key}"})
+        elif toolchain.get(key) != value:
+            out["issues"].append({"code": "runtime_witness_toolchain_pin_mismatch", "message": f"manifest {key} differs from evaluator pin"})
+    verifier_sha = trusted_claim_verifier_pins.get("independent_execution")
+    if not isinstance(verifier_sha, str) or not HEX.fullmatch(verifier_sha):
+        out["status"] = "unresolved"
+        out["issues"].append({"code": "runtime_witness_verifier_pin_missing", "message": "independent_execution verifier has no out-of-band pin"})
+    if out["issues"]:
+        if out["status"] != "unresolved":
+            out["status"] = "failed"
+        return out
+
+    try:
+        file_specs = (
+            ("runner", "runner_path", "runner_sha256", expected_witness_runner_sha256),
+            ("auditor", "auditor_path", "auditor_sha256", expected_witness_auditor_sha256),
+            ("receipt_schema", "receipt_schema_path", "receipt_schema_sha256", expected_witness_receipt_schema_sha256),
+            ("plan_schema", "plan_schema_path", "plan_schema_sha256", expected_witness_plan_schema_sha256),
+        )
+        paths: dict[str, Path] = {}
+        for name, path_key, digest_key, pin in file_specs:
+            path = safe_file(evidence_root, toolchain[path_key])
+            if digest(path.read_bytes()) != pin or toolchain[digest_key] != pin:
+                out["issues"].append({"code": "runtime_witness_tool_digest_mismatch", "message": f"{name} bytes differ from protected pin"})
+            paths[name] = path
+        receipt_path = safe_file(evidence_root, cfg["receipt_path"])
+        plan_path = safe_file(evidence_root, cfg["plan_path"])
+        if digest(receipt_path.read_bytes()) != cfg["receipt_sha256"]:
+            out["issues"].append({"code": "runtime_witness_receipt_digest_mismatch", "message": "receipt bytes differ from manifest pin"})
+        if digest(plan_path.read_bytes()) != cfg["plan_sha256"]:
+            out["issues"].append({"code": "runtime_witness_plan_digest_mismatch", "message": "plan bytes differ from manifest pin"})
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        out["status"] = "failed"
+        out["issues"].append({"code": "runtime_witness_artifact_invalid", "message": str(exc)})
+        return out
+    if out["issues"]:
+        out["status"] = "failed"
+        return out
+
+    witnesses = claim_data.get("witnesses", [])
+    executions = [
+        witness for witness in witnesses
+        if isinstance(witness, dict) and witness.get("kind") == "independent_execution"
+    ] if isinstance(witnesses, list) else []
+    if len(executions) != 1:
+        out["status"] = "failed"
+        out["issues"].append({"code": "runtime_witness_claim_cardinality", "message": "runtime claim must reference exactly one independent_execution witness"})
+        return out
+    witness = executions[0]
+    if witness.get("artifact_path") != cfg["receipt_path"] or witness.get("artifact_sha256") != cfg["receipt_sha256"] or witness.get("verifier_sha256") != verifier_sha:
+        out["status"] = "failed"
+        out["issues"].append({"code": "runtime_witness_claim_binding_mismatch", "message": "claim witness does not bind pinned receipt and execution-verifier digest"})
+        return out
+
+    repo = manifest["repository"]
+    runtime = manifest["runtime"]
+    argv = [
+        sys.executable, str(paths["auditor"]),
+        "--receipt", cfg["receipt_path"],
+        "--plan", cfg["plan_path"],
+        "--schema", toolchain["receipt_schema_path"],
+        "--plan-schema", toolchain["plan_schema_path"],
+        "--evidence-root", str(evidence_root.resolve()),
+        "--expected-receipt-sha256", cfg["receipt_sha256"],
+        "--expected-auditor-sha256", expected_witness_auditor_sha256,
+        "--expected-schema-sha256", expected_witness_receipt_schema_sha256,
+        "--expected-plan-schema-sha256", expected_witness_plan_schema_sha256,
+        "--expected-runner-sha256", expected_witness_runner_sha256,
+        "--expected-plan-sha256", cfg["plan_sha256"],
+        "--expected-verifier-sha256", verifier_sha,
+        "--expected-task-id", manifest["task"]["task_id"],
+        "--expected-claim-id", claim_item["claim_id"],
+        "--expected-repository", repo["full_name"],
+        "--expected-repository-id", str(repo["repository_id"]),
+        "--expected-run-id", repo["run_id"],
+        "--expected-run-attempt", str(repo["run_attempt"]),
+        "--expected-candidate-revision", manifest["candidate"]["checkout_revision"],
+        "--expected-source-sha256", claim_item["source_sha256"],
+        "--expected-runtime-image-id", runtime["immutable_image_id"],
+        "--expected-platform", runtime["platform"],
+        "--expected-network-mode", runtime["network_mode"],
+    ]
+    try:
+        completed = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, timeout=180)
+        out["command_sha256"] = digest("\\0".join(argv).encode())
+        out["output_sha256"] = digest(completed.stdout)
+        try:
+            parsed = json.loads(completed.stdout.decode("utf-8", errors="strict"))
+        except (UnicodeError, json.JSONDecodeError):
+            parsed = None
+        out["evidence_valid"] = isinstance(parsed, dict) and parsed.get("evidence_valid") is True
+        out["execution_contract_passed"] = isinstance(parsed, dict) and parsed.get("execution_contract_passed") is True
+        out["receipt_sha256"] = parsed.get("receipt_sha256") if isinstance(parsed, dict) else None
+        out["plan_sha256"] = parsed.get("plan_sha256") if isinstance(parsed, dict) else None
+        if completed.returncode == 0 and out["evidence_valid"] and out["execution_contract_passed"]:
+            out["status"] = "passed"
+        else:
+            out["status"] = "unresolved" if not out["evidence_valid"] else "failed"
+            out["issues"].append({"code": "runtime_execution_witness_audit_failed", "message": "pinned auditor did not validate a passing execution contract"})
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        out["status"] = "unresolved"
+        out["issues"].append({"code": "runtime_execution_witness_audit_unavailable", "message": str(exc)})
+    return out
+
+
 def audit_claim_evidence_bundle(
     manifest: dict[str, Any],
     evidence_root: Path,
@@ -248,6 +383,10 @@ def audit_claim_evidence_bundle(
     expected_claim_auditor_sha256: str | None,
     expected_claim_schema_sha256: str | None,
     trusted_claim_verifier_pins: dict[str, str],
+    expected_witness_auditor_sha256: str | None = None,
+    expected_witness_receipt_schema_sha256: str | None = None,
+    expected_witness_plan_schema_sha256: str | None = None,
+    expected_witness_runner_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Audit every evaluator-pinned claim after attested bundle extraction.
 
@@ -262,6 +401,8 @@ def audit_claim_evidence_bundle(
         "supported": 0,
         "contradicted": 0,
         "unresolved": 0,
+        "runtime_claims": 0,
+        "execution_witnesses_audited": 0,
         "claims": [],
         "issues": [],
     }
@@ -445,24 +586,58 @@ def audit_claim_evidence_bundle(
                 and parsed.get("claim_id") == item["claim_id"]
                 and parsed.get("task_id") == task_id
             )
-            if valid:
-                verdict = parsed["claim_verdict"]
-                if verdict not in ("supported", "contradicted", "unresolved"):
-                    valid = False
+            verdict = parsed.get("claim_verdict") if isinstance(parsed, dict) else None
+            scope = parsed.get("claim_scope") if isinstance(parsed, dict) else None
+            if valid and scope == "runtime_behavior":
+                result["runtime_claims"] += 1
+                runtime_check = audit_runtime_execution_witness(
+                    manifest,
+                    item,
+                    claim_data,
+                    evidence_root,
+                    expected_witness_auditor_sha256=expected_witness_auditor_sha256,
+                    expected_witness_receipt_schema_sha256=expected_witness_receipt_schema_sha256,
+                    expected_witness_plan_schema_sha256=expected_witness_plan_schema_sha256,
+                    expected_witness_runner_sha256=expected_witness_runner_sha256,
+                    trusted_claim_verifier_pins=trusted_claim_verifier_pins,
+                )
+                row["execution_witness"] = runtime_check
+                if runtime_check["status"] == "passed":
+                    result["execution_witnesses_audited"] += 1
                 else:
-                    result[verdict] += 1
-            if valid:
-                row["status"] = "passed"
-            else:
-                row["status"] = "failed"
+                    valid = False
+                    result["issues"].extend(runtime_check["issues"])
+            if not valid or verdict not in ("supported", "contradicted", "unresolved"):
+                row["status"] = "unresolved"
+                result["unresolved"] += 1
                 result["issues"].append({
                     "code": "claim_evidence_audit_failed",
-                    "message": f"{item['claim_id']}: claim auditor did not validate the pinned evidence chain",
+                    "message": f"{item['claim_id']}: claim or required execution witness did not validate",
+                })
+                all_valid = False
+            elif verdict == "supported":
+                result["supported"] += 1
+                row["status"] = "passed"
+            elif verdict == "contradicted":
+                result["contradicted"] += 1
+                row["status"] = "contradicted"
+                result["issues"].append({
+                    "code": "claim_contradicted",
+                    "message": f"{item['claim_id']}: evaluator evidence contradicts the claimed behavior",
+                })
+                all_valid = False
+            else:
+                result["unresolved"] += 1
+                row["status"] = "unresolved"
+                result["issues"].append({
+                    "code": "claim_unresolved",
+                    "message": f"{item['claim_id']}: claim remains unresolved and cannot pass confirmatory scoring",
                 })
                 all_valid = False
         except (OSError, subprocess.TimeoutExpired) as exc:
             row["status"] = "unresolved"
             row["error"] = str(exc)
+            result["unresolved"] += 1
             result["issues"].append({
                 "code": "claim_evidence_audit_unavailable",
                 "message": f"{item['claim_id']}: {exc}",
@@ -488,6 +663,10 @@ def validate_manifest(
     expected_claim_auditor_sha256: str | None = None,
     expected_claim_schema_sha256: str | None = None,
     trusted_claim_verifier_pins: dict[str, str] | None = None,
+    expected_witness_auditor_sha256: str | None = None,
+    expected_witness_receipt_schema_sha256: str | None = None,
+    expected_witness_plan_schema_sha256: str | None = None,
+    expected_witness_runner_sha256: str | None = None,
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
     for pin_name, pin in (
@@ -783,6 +962,10 @@ def validate_manifest(
                 expected_claim_auditor_sha256=expected_claim_auditor_sha256,
                 expected_claim_schema_sha256=expected_claim_schema_sha256,
                 trusted_claim_verifier_pins=trusted_claim_verifier_pins or {},
+                expected_witness_auditor_sha256=expected_witness_auditor_sha256,
+                expected_witness_receipt_schema_sha256=expected_witness_receipt_schema_sha256,
+                expected_witness_plan_schema_sha256=expected_witness_plan_schema_sha256,
+                expected_witness_runner_sha256=expected_witness_runner_sha256,
             )
             if claim_audit_result["status"] != "passed":
                 issues.extend(claim_audit_result["issues"])
@@ -847,6 +1030,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-claim-auditor-sha256")
     parser.add_argument("--expected-claim-schema-sha256")
     parser.add_argument("--trusted-claim-verifier", action="append", default=[], metavar="KIND=SHA256")
+    parser.add_argument("--expected-witness-auditor-sha256")
+    parser.add_argument("--expected-witness-receipt-schema-sha256")
+    parser.add_argument("--expected-witness-plan-schema-sha256")
+    parser.add_argument("--expected-witness-runner-sha256")
     parser.add_argument("--gh-executable", default="gh")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
@@ -877,6 +1064,10 @@ def main(argv: list[str] | None = None) -> int:
         expected_claim_auditor_sha256=args.expected_claim_auditor_sha256,
         expected_claim_schema_sha256=args.expected_claim_schema_sha256,
         trusted_claim_verifier_pins=parse_claim_verifier_pins(args.trusted_claim_verifier),
+        expected_witness_auditor_sha256=args.expected_witness_auditor_sha256,
+        expected_witness_receipt_schema_sha256=args.expected_witness_receipt_schema_sha256,
+        expected_witness_plan_schema_sha256=args.expected_witness_plan_schema_sha256,
+        expected_witness_runner_sha256=args.expected_witness_runner_sha256,
     )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
