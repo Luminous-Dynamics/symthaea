@@ -18,7 +18,7 @@ The module trajectory_budget.rs defines:
 - a frozen configuration with vertex count, top-k length, minimum attempted runs, minimum valid projections, minimum projection yield, required stable batches, and maximum attempted-run budget;
 - a batch record with an ID, attempted count, valid-projection count, and an optional complete vertex ordering;
 - derived cumulative yield (callers cannot supply a misleading ratio);
-- strict input validation for duplicate IDs, invalid counts, out-of-range/repeated vertices, malformed ranking length, and cap overruns;
+- strict input validation for duplicate IDs, invalid counts, out-of-range/repeated vertices, malformed ranking length, and cap overruns; a batch with zero valid projections cannot carry a ranking that would increase the stability streak;
 - a stability streak over the ordered top-k signature;
 - a missing/unavailable recommendation that resets the stability streak;
 - three distinct decision statuses: Continue, StableRanking, and BudgetExhausted.
