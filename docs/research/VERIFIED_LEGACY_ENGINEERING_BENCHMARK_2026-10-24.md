@@ -68,6 +68,7 @@ For financial and mainframe migration tasks, add state-transition traces as firs
 ### Proposed target additions (not achieved)
 
 - Keep the Legacy-Bench target at **65%+ avg@3** under a matched full-benchmark protocol.
+- Add a cost–quality Pareto target: **at least 60% avg@3 at no more than $0.25/task** on the full authorized Legacy-Bench under matched budgets. This is a proposed target relative to the October 22 leader listing of 62% at $0.49/task, not an achieved result. Source: [Legacy-Bench index](https://fireworks.ai/specialized-intelligence-index/benchmarks/code-generation/legacy-bench).
 - Require **100% of scored tasks** to pass two-sided oracle admission and independent review.
 - Maintain **>=90% mutation kill rate** for reviewed non-equivalent compilable mutants, reported by mutation family.
 - Track the gap between ordinary resolution and **Assurance-Adjusted Semantic Success Rate (AASSR)**; the goal is to reduce that gap without sacrificing raw resolution.
