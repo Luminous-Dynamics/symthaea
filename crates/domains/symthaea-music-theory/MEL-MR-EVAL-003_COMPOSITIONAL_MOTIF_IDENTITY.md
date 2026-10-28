@@ -70,9 +70,23 @@ Do not claim “better than Suno/Udio” from this benchmark. The direct differe
 5. Add the edit-locality benchmark and measure preservation of non-targeted pitch, rhythm, harmony, voice-leading, and form.
 6. Run blinded motif-recognition and full-piece preference studies only after symbolic controls are stable. Compare these results separately from verifier correctness and report confidence intervals.
 
+## Industry/research comparator map
+
+| Reference | Useful comparator | What it does not prove for this project |
+|---|---|---|
+| CMI-RewardBench (ICML 2026) | Fine-grained compositional multimodal instruction following and reward-model evaluation; includes pseudo-labelled and human-annotated preference data | It is not a direct score-symbolic motif verifier benchmark |
+| TimingBench (August 2026) | Timestamped instructions for instrument entries, pauses and tempo; detector-level timing error auditing | Symbolic beat alignment does not itself prove rendered-audio timing/control |
+| ComMU (NeurIPS 2022) | Combinatorial symbolic generation with structured metadata conditions | Dataset performance alone does not establish long-form motif identity or edit locality |
+| Artificial Analysis | Standardized blind pairwise preference comparisons of finished audio | Human preference cannot replace exact symbolic-constraint verification |
+| 2026 music-generation survey | Cross-modal synthesis of musicality, consistency, control, representation and fragmented evaluation | A survey is not a reproducible baseline result |
+
+The right competitive claim is therefore a *complementary benchmark*: verifiable compositional symbolic control linked to separate rendered-audio timing and listening evaluations—not a single score that conflates all three.
+
 ## References
 
-- Wang et al., Recent advances in music generation: methods, evaluation, and challenges (2026): https://link.springer.com/article/10.1007/s10462-026-11582-x
+- Ma et al., CMI-RewardBench: Evaluating Music Reward Models with Compositional Multimodal Instruction (ICML/PMLR 2026): https://proceedings.mlr.press/v306/ma26am.html
 - Bhake et al., TimingBench (August 2026): https://taan.ai/research/rushing-or-dragging/
+- Lee et al., ComMU: Dataset for Combinatorial Music Generation (NeurIPS 2022): https://neurips.cc/virtual/2022/poster/55747
+- Wang et al., Recent advances in music generation: methods, evaluation, and challenges (2026): https://link.springer.com/article/10.1007/s10462-026-11582-x
 - Carone, Roman & Ripollés, LLMs can read music, but struggle to hear it (PMLR 303, 2026): https://proceedings.mlr.press/v303/carone26a.html
 - Artificial Analysis, Music Generation Benchmarking Methodology: https://artificialanalysis.ai/methodology/music
