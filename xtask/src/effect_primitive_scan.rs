@@ -311,8 +311,8 @@ fn classify_method_call(method: &str, receiver: &Expr) -> Option<(&'static str, 
 fn is_command_receiver(expr: &Expr) -> bool {
     match expr {
         Expr::Call(call) => matches!(call.func.as_ref(), Expr::Path(path)
-            if path.path.segments.iter().any(|segment| segment.ident == "Command")
-                && path.path.segments.last().is_some_and(|segment| segment.ident == "new")),
+            if path.path.segments.iter().any(|segment| segment.ident.to_string() == "Command")
+                && path.path.segments.last().is_some_and(|segment| segment.ident.to_string() == "new")),
         Expr::MethodCall(call) => is_command_receiver(&call.receiver),
         Expr::Paren(expr) => is_command_receiver(&expr.expr),
         Expr::Reference(expr) => is_command_receiver(&expr.expr),
@@ -407,7 +407,7 @@ mod tests {
     use sha2::Digest;
     use syn::parse_quote;
 
-    use super::{CandidateVisitor, classify_call, classify_method_call};
+    use super::{CandidateVisitor, classify_call};
 
     #[test]
     fn classifies_direct_process_construction() {
