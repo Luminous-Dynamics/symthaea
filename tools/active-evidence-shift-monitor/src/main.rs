@@ -710,8 +710,8 @@ fn cusum_alarm_probability(horizon: usize, threshold: usize, event_probability: 
     alarm_probability
 }
 
-/// Find the smallest integer threshold that keeps the exact boundary alarm
-/// probability at or below the per-direction allocation.
+/// Find the smallest integer threshold whose exact boundary alarm probability
+/// is no greater than the requested false-alarm operating point.
 fn calibrate_cusum_threshold(horizon: usize, alpha: f64) -> usize {
     let mut low = 1;
     let mut high = horizon * CUSUM_UPPER_INCREMENT + 1;
@@ -920,11 +920,7 @@ fn evaluate_cusum_scenario(
 }
 
 fn composite_boundary_reference_alarm_probability(horizon: usize) -> f64 {
-    let table = family_alarm_table(
-        EProcessFamily::CompositeBandBetting,
-        NOMINAL_P,
-        horizon,
-    );
+    let table = family_alarm_table(EProcessFamily::CompositeBandBetting, NOMINAL_P, horizon);
     evaluate_with_alarm(
         COMPOSITE_NULL_UPPER,
         None,
@@ -1724,16 +1720,9 @@ mod tests {
         let matched_reference_alarm_probability =
             composite_boundary_reference_alarm_probability(horizon);
         let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
-        let upper_alarm = cusum_alarm_probability(
-            horizon,
-            threshold,
-            COMPOSITE_NULL_UPPER,
-        );
-        let lower_alarm = cusum_alarm_probability(
-            horizon,
-            threshold,
-            1.0 - COMPOSITE_NULL_LOWER,
-        );
+        let upper_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER);
+        let lower_alarm =
+            cusum_alarm_probability(horizon, threshold, 1.0 - COMPOSITE_NULL_LOWER);
         assert!(upper_alarm <= matched_reference_alarm_probability + EPS);
         assert!(lower_alarm <= matched_reference_alarm_probability + EPS);
         assert!((upper_alarm - lower_alarm).abs() <= EPS);
@@ -1742,11 +1731,8 @@ mod tests {
             "two-direction CUSUM union bound exceeds the per-cell alpha allocation"
         );
         if threshold > 1 {
-            let previous = cusum_alarm_probability(
-                horizon,
-                threshold - 1,
-                COMPOSITE_NULL_UPPER,
-            );
+            let previous =
+                cusum_alarm_probability(horizon, threshold - 1, COMPOSITE_NULL_UPPER);
             assert!(
                 previous > matched_reference_alarm_probability + EPS,
                 "calibration did not find the minimum threshold: previous={previous}, target={matched_reference_alarm_probability}"
@@ -1821,8 +1807,12 @@ mod tests {
         assert!(down_power > 0.99, "lower CUSUM missed large down-shift: {down_power}");
         let selected = SCENARIOS.iter().copied()
             .find(|s| s.name == "selection_bias_no_environment_shift").unwrap();
-        let selected_alarm = evaluate_cusum_scenario(CusumDirection::Upper, threshold, selected)
-            .last().unwrap().1.scenario_or_pre_shift_alarm_probability;
+        let selected_alarm =
+            evaluate_cusum_scenario(CusumDirection::Upper, threshold, selected)
+                .last()
+                .unwrap()
+                .1
+                .scenario_or_pre_shift_alarm_probability;
         assert!(selected_alarm > 0.99, "selection-bias control did not alarm: {selected_alarm}");
     }
 
