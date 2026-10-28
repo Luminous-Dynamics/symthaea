@@ -217,9 +217,12 @@ const EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-INDEX-SNAPS
 #[serde(deny_unknown_fields)]
 struct EvidenceIndexSnapshot {
     schema_version: String,
+    /// Generation supplied by the persistence coordinator; starts at 1.
+    generation: u64,
     /// HDC-ID-sorted records include revoked, superseded and deleted tombstones.
     records: Vec<EvidenceRecord>,
-    records_sha256: String,
+    /// Digest covers schema version, generation, and the ordered records.
+    snapshot_sha256: String,
 }
 
 /// Binds the exact vector-index bytes and evidence snapshot to one generation.
@@ -245,7 +248,12 @@ impl EvidenceCommitManifest {
         if generation == 0 {
             return Err("evidence commit generation must start at 1".into());
         }
-        // Refuse to bind a manifest to an invalid or corrupt evidence snapshot.
+        // Refuse to bind to a snapshot from a different generation.
+        let snapshot: EvidenceIndexSnapshot = serde_json::from_slice(evidence_snapshot_bytes)
+            .map_err(|error| format!("invalid evidence snapshot: {error}"))?;
+        if snapshot.generation != generation {
+            return Err("evidence snapshot generation does not match commit manifest".into());
+        }
         EvidenceIndex::restore_snapshot(evidence_snapshot_bytes)?;
         Ok(Self {
             schema_version: EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string(),
@@ -276,6 +284,11 @@ impl EvidenceCommitManifest {
         }
         if sha256_hex(evidence_snapshot_bytes) != self.evidence_snapshot_sha256 {
             return Err("evidence snapshot digest does not match commit manifest".into());
+        }
+        let snapshot: EvidenceIndexSnapshot = serde_json::from_slice(evidence_snapshot_bytes)
+            .map_err(|error| format!("invalid evidence snapshot: {error}"))?;
+        if snapshot.generation != self.generation {
+            return Err("evidence snapshot generation does not match commit manifest".into());
         }
         EvidenceIndex::restore_snapshot(evidence_snapshot_bytes)?;
         Ok(())
@@ -320,7 +333,10 @@ impl EvidenceIndex {
     /// Records are serialized in ascending HDC ID order. The embedded digest
     /// covers the canonical serialized record vector and detects partial or
     /// accidental changes; it does not authenticate the writer.
-    pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
+    pub fn snapshot_bytes(&self, generation: u64) -> Result<Vec<u8>, String> {
+        if generation == 0 {
+            return Err("evidence snapshot generation must start at 1".into());
+        }
         let records: Vec<EvidenceRecord> = self.records.values().cloned().collect();
         let mut evidence_ids = BTreeSet::new();
 
@@ -350,12 +366,17 @@ impl EvidenceIndex {
             }
         }
 
-        let records_json = serde_json::to_vec(&records)
-            .map_err(|error| format!("failed to serialize evidence records: {error}"))?;
+        // Bind schema and generation into the digest, not only the record vector.
+        let snapshot_body = serde_json::to_vec(&(
+            EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION,
+            generation,
+            &records,
+        )).map_err(|error| format!("failed to serialize evidence snapshot body: {error}"))?;
         let snapshot = EvidenceIndexSnapshot {
             schema_version: EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION.to_string(),
+            generation,
             records,
-            records_sha256: sha256_hex(&records_json),
+            snapshot_sha256: sha256_hex(&snapshot_body),
         };
         serde_json::to_vec(&snapshot)
             .map_err(|error| format!("failed to serialize evidence snapshot: {error}"))
@@ -373,13 +394,19 @@ impl EvidenceIndex {
         if snapshot.schema_version != EVIDENCE_INDEX_SNAPSHOT_SCHEMA_VERSION {
             return Err("unsupported evidence snapshot schema version".into());
         }
-        if !is_sha256(&snapshot.records_sha256) {
-            return Err("snapshot records_sha256 must be lowercase SHA-256".into());
+        if snapshot.generation == 0 {
+            return Err("evidence snapshot generation must start at 1".into());
         }
-        let records_json = serde_json::to_vec(&snapshot.records)
-            .map_err(|error| format!("failed to serialize restored records: {error}"))?;
-        if sha256_hex(&records_json) != snapshot.records_sha256 {
-            return Err("evidence snapshot record digest mismatch".into());
+        if !is_sha256(&snapshot.snapshot_sha256) {
+            return Err("snapshot_sha256 must be lowercase SHA-256".into());
+        }
+        let snapshot_body = serde_json::to_vec(&(
+            &snapshot.schema_version,
+            snapshot.generation,
+            &snapshot.records,
+        )).map_err(|error| format!("failed to serialize restored snapshot body: {error}"))?;
+        if sha256_hex(&snapshot_body) != snapshot.snapshot_sha256 {
+            return Err("evidence snapshot digest mismatch".into());
         }
 
         let mut index = Self::new();
@@ -583,7 +610,7 @@ mod tests {
         index.insert(text_record(8, "evidence-active", "web", "current route"), b"canonical trajectory bytes").unwrap();
         index.mark_deleted(7).unwrap();
 
-        let snapshot = index.snapshot_bytes().unwrap();
+        let snapshot = index.snapshot_bytes(3).unwrap();
         let restored = EvidenceIndex::restore_snapshot(&snapshot).unwrap();
         let items = restored.resolve(&[7, 8, 7], "web", 150, Path::new("."), 10).unwrap();
         assert_eq!(items.len(), 1);
@@ -592,14 +619,14 @@ mod tests {
             text_record(7, "evidence-resurrection", "web", "resurrected route"),
             b"canonical trajectory bytes",
         ).is_err());
-        assert_eq!(restored.snapshot_bytes().unwrap(), snapshot);
+        assert_eq!(restored.snapshot_bytes(3).unwrap(), snapshot);
     }
 
     #[test]
     fn snapshot_rejects_record_tampering_and_noncanonical_envelopes() {
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "trusted route"), b"canonical trajectory bytes").unwrap();
-        let snapshot = index.snapshot_bytes().unwrap();
+        let snapshot = index.snapshot_bytes(3).unwrap();
 
         let mut value: serde_json::Value = serde_json::from_slice(&snapshot).unwrap();
         value["records"][0]["payload"]["value"] = serde_json::Value::String("tampered route".into());
@@ -614,10 +641,14 @@ mod tests {
     fn snapshot_rebuild_rejects_duplicate_ids_even_with_recomputed_digest() {
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "route one"), b"canonical trajectory bytes").unwrap();
-        let snapshot = index.snapshot_bytes().unwrap();
+        let snapshot = index.snapshot_bytes(3).unwrap();
         let mut envelope: EvidenceIndexSnapshot = serde_json::from_slice(&snapshot).unwrap();
         envelope.records.push(envelope.records[0].clone());
-        envelope.records_sha256 = hash(&serde_json::to_vec(&envelope.records).unwrap());
+        envelope.snapshot_sha256 = hash(&serde_json::to_vec(&(
+            &envelope.schema_version,
+            envelope.generation,
+            &envelope.records,
+        )).unwrap());
         let crafted = serde_json::to_vec(&envelope).unwrap();
         assert!(EvidenceIndex::restore_snapshot(&crafted).is_err());
     }
@@ -627,7 +658,7 @@ mod tests {
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "current route"), b"canonical trajectory bytes").unwrap();
         index.mark_deleted(7).unwrap();
-        let evidence_bytes = index.snapshot_bytes().unwrap();
+        let evidence_bytes = index.snapshot_bytes(3).unwrap();
         let hdc_bytes = b"canonical HDC index generation 3";
 
         let manifest = EvidenceCommitManifest::new(3, hdc_bytes, &evidence_bytes).unwrap();
@@ -641,7 +672,7 @@ mod tests {
 
         let mut other_index = EvidenceIndex::new();
         other_index.insert(text_record(7, "evidence-a", "web", "different route"), b"canonical trajectory bytes").unwrap();
-        let mismatched_evidence = other_index.snapshot_bytes().unwrap();
+        let mismatched_evidence = other_index.snapshot_bytes(3).unwrap();
         assert!(restored.verify(hdc_bytes, &mismatched_evidence).is_err());
     }
 
@@ -650,8 +681,9 @@ mod tests {
         assert!(EvidenceCommitManifest::new(0, b"index", b"not a snapshot").is_err());
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "current route"), b"canonical trajectory bytes").unwrap();
-        let evidence_bytes = index.snapshot_bytes().unwrap();
+        let evidence_bytes = index.snapshot_bytes(3).unwrap();
         assert!(EvidenceCommitManifest::new(0, b"index", &evidence_bytes).is_err());
+        assert!(EvidenceCommitManifest::new(4, b"index", &evidence_bytes).is_err());
     }
 
     #[test]
