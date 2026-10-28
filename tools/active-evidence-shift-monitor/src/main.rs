@@ -139,7 +139,7 @@ struct Scenario {
     change_after: usize,
 }
 
-const SCENARIOS: [Scenario; 18] = [
+const SCENARIOS: [Scenario; 19] = [
     Scenario {
         name: "stationary_null",
         pre_shift_p: NOMINAL_P,
@@ -254,6 +254,15 @@ const SCENARIOS: [Scenario; 18] = [
         pre_shift_p: 0.55,
         post_shift_p: None,
         change_after: 0,
+    },
+    // The process changes from p=.49 to p=.51, but both conditional rates remain inside
+    // the composite null band [.48,.52]. A valid composite-null monitor should control the
+    // total alarm probability across this predictable transition.
+    Scenario {
+        name: "within_band_transition_049_to_051",
+        pre_shift_p: 0.49,
+        post_shift_p: Some(0.51),
+        change_after: CHANGE_AFTER,
     },
 ];
 
@@ -551,6 +560,7 @@ fn print_eprocess_family_csv() {
                     | "stable_baseline_rate_051"
                     | "stable_baseline_rate_052"
                     | "stable_baseline_rate_055"
+                    | "within_band_transition_049_to_051"
             ) {
                 continue;
             }
@@ -1067,6 +1077,22 @@ mod tests {
                     misspecified_baseline.false_alarm_probability > PER_CELL_ALPHA,
                     "family {} hid the declared-p0 misspecification control",
                     family.name()
+                );
+            }
+
+            if family == EProcessFamily::CompositeBandBetting {
+                let within_band_transition = evaluate_with_alarm(
+                    0.49,
+                    Some(0.51),
+                    CHANGE_AFTER,
+                    FAMILY_HORIZON,
+                    |n, successes| table[n][successes],
+                );
+                assert!(
+                    within_band_transition.false_alarm_probability
+                        + within_band_transition.detection_probability
+                        <= PER_CELL_ALPHA + EPS,
+                    "composite-null family exceeded alpha for a transition within the accepted band"
                 );
             }
 
