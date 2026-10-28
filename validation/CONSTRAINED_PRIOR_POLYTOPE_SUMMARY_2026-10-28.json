@@ -165,7 +165,8 @@
       "git_blob": "374f5b1217de29d7869f1ee65ddbe390606afe3c"
     },
     "exact_head_execution": false,
-    "ci_status": "latest observed CI and PR Governance workflows skipped; no remote pass claimed"
+    "ci_status": "current head returned empty combined status and workflow-run lists; a previously checked head had CI and PR Governance skipped; no remote pass claimed",
+    "current_branch_head": "0c5a150f36aff13841683067ec09a89c9ece51ac"
   },
   "limitations": [
     "synthetic likelihood, not Symthaea repository SCM implementation",
