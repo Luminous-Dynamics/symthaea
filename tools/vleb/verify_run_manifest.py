@@ -455,6 +455,14 @@ def audit_witness_execution_receipt(
     if not any(row.get("path") == source_path and row.get("sha256") == claim["source"]["sha256"] for row in inputs):
         issues.append({"code": "witness_receipt_source_input_missing", "message": "receipt inputs do not bind the exact claimed source bytes"})
     input_paths: list[str] = []
+    input_integrity_valid = True
+    declared_drift = receipt.get("input_drift_paths")
+    if declared_drift != []:
+        issues.append({
+            "code": "witness_receipt_input_drift_declared",
+            "message": "receipt declares input drift; semantic result cannot be trusted",
+        })
+        input_integrity_valid = False
     for row in inputs:
         path_value = row["path"]
         input_paths.append(path_value)
@@ -462,6 +470,7 @@ def audit_witness_execution_receipt(
             path = safe_file(evidence_root, path_value)
             if digest(path.read_bytes()) != row["sha256"]:
                 issues.append({"code": "witness_receipt_input_digest_mismatch", "message": f"input bytes changed: {path_value}"})
+                input_integrity_valid = False
         except (OSError, ValueError) as exc:
             issues.append({"code": "witness_receipt_input_invalid", "message": f"{path_value}: {exc}"})
     if len(input_paths) != len(set(input_paths)):
@@ -570,6 +579,8 @@ def audit_witness_execution_receipt(
         process.get("timed_out") is False
         and process.get("signal") is None
         and process.get("exit_code") == 0
+        and input_integrity_valid
+        and declared_drift == []
     )
     derived_result = (
         verdict["result"]
