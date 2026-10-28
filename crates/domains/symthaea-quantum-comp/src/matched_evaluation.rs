@@ -1015,6 +1015,31 @@ mod tests {
     }
 
     #[test]
+    fn unknown_queue_delay_suppresses_deployment_latency_but_not_standardized_runtime() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "pair", 1, 5, costs(100.0), EnergyRecord::not_measured())],
+        );
+        let mut candidate_costs = costs(50.0);
+        candidate_costs.queue_wait_ms = None;
+        let candidate = report(
+            "candidate",
+            "trajectory",
+            vec![verified_trial("c", "pair", 1, 5, candidate_costs, EnergyRecord::not_measured())],
+        );
+
+        let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
+        assert_eq!(result.both_target_hits, 1);
+        assert_eq!(result.both_hit_costed_pairs, 0);
+        assert_eq!(result.both_hit_algorithm_costed_pairs, 1);
+        assert_eq!(result.median_time_speedup_given_both_hit, None);
+        assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
+        assert_eq!(result.pairs[0].candidate_all_in_ms, None);
+        assert!(result.pairs[0].candidate_algorithm_runtime_ms.is_some());
+    }
+
+    #[test]
     fn unverified_candidate_above_target_is_not_a_target_hit() {
         let baseline = report(
             "baseline",
