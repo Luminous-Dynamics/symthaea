@@ -164,7 +164,13 @@ fn seed_word(
     ])
 }
 
-fn unit_fraction(seed: &[u8], generation_id: &str, family_id: &str, index: u64, field: &str) -> f64 {
+fn unit_fraction(
+    seed: &[u8],
+    generation_id: &str,
+    family_id: &str,
+    index: u64,
+    field: &str,
+) -> f64 {
     let raw = seed_word(seed, generation_id, family_id, index, field) % 1_000_001;
     raw as f64 / 1_000_000.0
 }
@@ -227,7 +233,13 @@ fn generate_one_task(
             ) % 4)
             .unwrap_or(0);
             let scale = scales[scale_index];
-            let offset = coefficient(seed, generation_id, &recipe.family_id, index, "coordinate_offset");
+            let offset = coefficient(
+                seed,
+                generation_id,
+                &recipe.family_id,
+                index,
+                "coordinate_offset",
+            );
             let observations: Vec<Value> = (0..count)
                 .map(|sample| {
                     let latent_x = recipe.x_start
@@ -242,14 +254,19 @@ fn generate_one_task(
             (
                 json!({
                     "instruction": instruction,
-                    "coordinate_semantics": format!("visible coordinate u = {scale} * x + ({offset})"),
+                    "coordinate_semantics": format!(
+                        "visible coordinate u = {scale} * x + ({offset})"
+                    ),
                     "observations": observations,
                     "declared_measurement_noise": 0.0
                 }),
                 json!({
                     "target_kind": "unique_law_under_declared_reparameterization",
                     "latent_law": {"slope": slope, "intercept": intercept},
-                    "visible_coordinate_law": {"slope": visible_slope, "intercept": visible_intercept},
+                    "visible_coordinate_law": {
+                        "slope": visible_slope,
+                        "intercept": visible_intercept
+                    },
                     "inverse_coordinate_transform": {"scale": scale, "offset": offset}
                 }),
             )
@@ -283,7 +300,8 @@ fn generate_one_task(
         "confounding_null" => {
             let observations: Vec<Value> = (0..count)
                 .map(|sample| {
-                    let z = recipe.x_start + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
+                    let z = recipe.x_start
+                        + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
                     let x_err = noise(
                         seed, generation_id, &recipe.family_id, index,
                         u64::try_from(sample).unwrap_or(0).wrapping_mul(2), recipe.noise_amplitude,
@@ -334,7 +352,11 @@ fn generate_one_task(
                 }),
                 json!({
                     "target_kind": "not_identifiable_from_declared_sample",
-                    "one_compatible_law": {"kind": "linear", "slope": slope, "intercept": intercept},
+                    "one_compatible_law": {
+                        "kind": "linear",
+                        "slope": slope,
+                        "intercept": intercept
+                    },
                     "claim_limit": "the observations do not uniquely establish a global law"
                 }),
             )
@@ -393,7 +415,9 @@ pub fn generate_task_set_bytes(
         .collect();
     let config_families: BTreeSet<&str> = recipe_by_family.keys().map(String::as_str).collect();
     if manifest_families != config_families {
-        return Err("generator config recipe families must equal the manifest family set".to_owned());
+        return Err(
+            "generator config recipe families must equal the manifest family set".to_owned(),
+        );
     }
 
     let mut tasks = Vec::new();
@@ -551,8 +575,6 @@ mod tests {
         let seed = vec![0x6d; 32];
         let manifest = manifest_for_test(&config, &seed);
         let generated = generate_task_set_bytes(&manifest, &seed, &config).unwrap();
-        let provisional = serde_json::from_slice::<Value>(&manifest).unwrap();
-        let _ = provisional;
         (manifest, seed, config, generated)
     }
 
@@ -560,7 +582,7 @@ mod tests {
     fn verify_regeneration_accepts_exact_replay_and_task_commitment() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let final_manifest =
-            manifest_with_task_commitment(&manifest, &seed, &config, &generated);
+            manifest_with_task_commitment(&manifest, &generated);
         let report = verify_regeneration(&final_manifest, &seed, &config, &generated).unwrap();
         assert!(report.verified, "{:?}", report.issues);
         assert!(report.seed_commitment_matches);
@@ -574,7 +596,7 @@ mod tests {
     fn different_seed_cannot_reproduce_committed_task_set() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let final_manifest =
-            manifest_with_task_commitment(&manifest, &seed, &config, &generated);
+            manifest_with_task_commitment(&manifest, &generated);
         let mut different_seed = seed.clone();
         different_seed[0] ^= 1;
         let error = verify_regeneration(&final_manifest, &different_seed, &config, &generated)
@@ -606,7 +628,7 @@ mod tests {
     fn generated_task_count_and_family_counts_match_manifest() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let report = crate::verify_reveal(
-            &manifest_with_task_commitment(&manifest, &seed, &config, &generated),
+            &manifest_with_task_commitment(&manifest, &generated),
             &seed,
             &generated,
         );
@@ -615,18 +637,11 @@ mod tests {
         assert_eq!(task_set["tasks"].as_array().unwrap().len(), 8);
     }
 
-    fn manifest_with_task_commitment(
-        manifest: &[u8],
-        seed: &[u8],
-        config: &[u8],
-        task_set: &[u8],
-    ) -> Vec<u8> {
+    fn manifest_with_task_commitment(manifest: &[u8], task_set: &[u8]) -> Vec<u8> {
         let mut value: Value = serde_json::from_slice(manifest).unwrap();
         value["task_set_commitment_sha256"] = json!(
             compute_artifact_commitment(manifest, "task-set", task_set).unwrap()
         );
-        let _ = seed;
-        let _ = config;
         serde_json::to_vec_pretty(&value).unwrap()
     }
 
