@@ -323,7 +323,9 @@ fn main() {
     let mut json = String::new();
     writeln!(
         &mut json,
-        "{{\n  \"benchmark\": \"aviation-calibration-robustness-contract\",\n  \"contract_status\": \"ACCEPTED\",\n  \"decision_status\": \"EVALUATED_NOT_SELECTED\",\n  \"claim_ceiling\": \"synthetic fixtures only; policy performance is not certified\",\n  \"split_audit\": {{\n    \"status\": \"{:?}\",\n    \"partitions\": [",
+        "{{\n  \"benchmark\": \"aviation-calibration-robustness-contract\",\n  \"contract_status\": \"ACCEPTED\",\n  \"decision_status\": \"{:?}\",\n  \"decision_gate_blockers\": [{}],\n  \"claim_ceiling\": \"synthetic fixtures only; policy performance is not certified\",\n  \"split_audit\": {{\n    \"status\": \"{:?}\",\n    \"partitions\": [",
+        readiness_report.status,
+        readiness_blockers_json,
         split.status
     ).expect("write to String");
     for (index, stats) in split.partitions.iter().enumerate() {
@@ -343,8 +345,6 @@ fn main() {
         &mut json,
         "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"online_drift_monitor\": {{\"status\": \"{:?}\", \"evidence\": \"{:?}\", \"observations_seen\": {}, \"log_e_value\": {}}},\n  \"radius_calibration\": {{\"regime_count\": {}, \"family_failure_probability_ppm\": {}, \"per_regime_failure_probability_ppm\": {}, \"maximum_required_tv_radius_ppm\": {}, \"any_regime_capped_at_maximum\": {}, \"regimes\": [",
         tuning.status,
-        readiness_report.status,
-        readiness_blockers_json,
         drift_report.status,
         drift_report.evidence,
         drift_report.observations_seen,
