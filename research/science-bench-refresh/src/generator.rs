@@ -843,6 +843,7 @@ mod tests {
         assert!(report.seed_commitment_matches);
         assert!(report.task_set_commitment_matches);
         assert!(report.task_set_contract_valid);
+        assert!(report.synthetic_semantics_valid);
         assert!(report.byte_exact_match);
         assert_eq!(report.regenerated_task_set_sha256, report.committed_task_set_sha256);
     }
@@ -931,6 +932,81 @@ mod tests {
         }
         assert_eq!(tasks.len(), 8);
         assert!(!manifest.is_empty() && !seed.is_empty() && !config.is_empty());
+    }
+
+    #[test]
+    fn generated_tasks_pass_constructor_specific_semantic_gate() {
+        let (_, _, _, generated) = complete_manifest_and_tasks();
+        assert!(validate_synthetic_task_semantics(&generated).is_ok());
+    }
+
+    #[test]
+    fn changed_invariance_target_fails_semantic_gate() {
+        let (_, _, _, generated) = complete_manifest_and_tasks();
+        let mut task_set: Value = serde_json::from_slice(&generated).unwrap();
+        let task = task_set["tasks"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|task| task["family_id"] == "semantic_invariance")
+            .unwrap();
+        task["evaluator_only"]["visible_coordinate_law"]["slope"] =
+            json!(task["evaluator_only"]["visible_coordinate_law"]["slope"].as_f64().unwrap() + 0.5);
+        let mutated = serde_json::to_vec(&task_set).unwrap();
+        let error = validate_synthetic_task_semantics(&mutated)
+            .expect_err("a broken coordinate transform must fail semantic qualification");
+        assert!(error.contains("visible law is not equivalent"));
+    }
+
+    #[test]
+    fn identifiability_alternative_matches_observed_roots_and_out_of_domain_point() {
+        let (_, _, _, generated) = complete_manifest_and_tasks();
+        let task_set: Value = serde_json::from_slice(&generated).unwrap();
+        let task = task_set["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|task| task["family_id"] == "identifiability_abstention")
+            .unwrap();
+        let observations = task["policy_input"]["observations"].as_array().unwrap();
+        let oracle = &task["evaluator_only"];
+        let roots = oracle["alternative_compatible_law"]["roots"].as_array().unwrap();
+        assert_eq!(roots.len(), observations.len());
+        for (root, observation) in roots.iter().zip(observations) {
+            assert_eq!(root.as_f64(), observation["x"].as_f64());
+            let x = observation["x"].as_f64().unwrap();
+            let mut product = 1.0_f64;
+            for observed_root in roots {
+                product *= x - observed_root.as_f64().unwrap();
+            }
+            assert_eq!(product, 0.0);
+        }
+        let witness = &oracle["identifiability_witness"];
+        let challenge = witness["challenge_x_outside_observed_range"].as_f64().unwrap();
+        assert!(challenge > observations.last().unwrap()["x"].as_f64().unwrap());
+        assert!(roots.iter().all(|root| root.as_f64() != Some(challenge)));
+        let mut out_of_domain_product = 1.0_f64;
+        for root in roots {
+            out_of_domain_product *= challenge - root.as_f64().unwrap();
+        }
+        assert_ne!(out_of_domain_product, 0.0);
+    }
+
+    #[test]
+    fn falsified_alternative_root_is_rejected() {
+        let (_, _, _, generated) = complete_manifest_and_tasks();
+        let mut task_set: Value = serde_json::from_slice(&generated).unwrap();
+        let task = task_set["tasks"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|task| task["family_id"] == "identifiability_abstention")
+            .unwrap();
+        task["evaluator_only"]["alternative_compatible_law"]["roots"][0] = json!(999.0);
+        let mutated = serde_json::to_vec(&task_set).unwrap();
+        let error = validate_synthetic_task_semantics(&mutated)
+            .expect_err("wrong root cannot establish observational equivalence");
+        assert!(error.contains("alternative law misses observed root"));
     }
 
     #[test]
