@@ -9,7 +9,7 @@
   "benchmark_sources": [
     {
       "name": "QOBLIB-MIS",
-      "revision_or_release": "live catalog metadata snapshot dated 2026-10-28; immutable QOBLIB repository revision still TBD",
+      "revision_or_release": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
       "instance_ids": [
         "aves-sparrow-social",
         "brock200-1",
@@ -64,7 +64,10 @@
       ],
       "instance_manifest_sha256": null,
       "catalog_snapshot_path": "docs/research/quantum/benchmarks/QOBLIB-MIS-CATALOG-SNAPSHOT-2026-10-28.json",
-      "catalog_snapshot_sha256": null
+      "catalog_snapshot_sha256": null,
+      "immutable_revision_url": "https://github.com/ZIB-AOPT/QOBLIB/tree/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances",
+      "data_license": "CC-BY-4.0",
+      "note": "Git blob SHA-1 and byte sizes are pinned in QOBLIB-MIS-CATALOG-SNAPSHOT-2026-10-28.json; compute SHA-256 from downloaded raw bytes and canonical bytes before preregistration."
     }
   ],
   "supplemental_sources": [],
