@@ -88,6 +88,17 @@ pub struct MemoryContextItem {
     pub value: String,
 }
 
+/// A resolved context item with the exact record and trajectory location that
+/// supplied it. Benchmark adapters may project `item` to the official
+/// `type/value` ABI while retaining this envelope for attribution and audits.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolvedMemoryContextItem {
+    pub hdc_id: u64,
+    pub evidence_id: String,
+    pub source: EvidenceSource,
+    pub item: MemoryContextItem,
+}
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -570,24 +581,20 @@ impl EvidenceIndex {
             return Err("only active evidence can be superseded".into());
         }
         if old.scope_id != new_scope {
-            return Err("evidence cannot be superseded across scopes".into());
-        }
-        old.lifecycle = EvidenceLifecycle::Superseded;
-        old.superseded_by = Some(new_evidence_id);
-        old.validate()
-    }
-
-    /// Resolve ranked HDC IDs to safe context items. Missing IDs, duplicates,
-    /// inactive records, invalid times and cross-scope records are skipped.
-    /// A present but corrupt payload is an error, not accepted evidence.
-    pub fn resolve(
+         /// Resolve ranked HDC IDs to safe context items with source provenance.
+    ///
+    /// Missing IDs, duplicates, inactive records, invalid times and cross-scope
+    /// records are skipped. A present but corrupt payload is an error, not
+    /// accepted evidence. The order follows the candidate ranking after
+    /// ineligible records are omitted.
+    pub fn resolve_with_provenance(
         &self,
         hdc_hits: &[u64],
         scope_id: &str,
         now_ms: u64,
         payload_root: &Path,
         max_items: usize,
-    ) -> Result<Vec<MemoryContextItem>, String> {
+    ) -> Result<Vec<ResolvedMemoryContextItem>, String> {
         if scope_id.trim().is_empty() {
             return Err("scope_id must be non-empty".into());
         }
@@ -604,6 +611,38 @@ impl EvidenceIndex {
                 continue;
             }
             let Some(record) = self.records.get(hdc_id) else {
+                // A stale vector hit with no payload mapping must never turn
+                // into evidence via a fallback to caller-supplied text.
+                continue;
+            };
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            output.push(ResolvedMemoryContextItem {
+                hdc_id: *hdc_id,
+                evidence_id: record.evidence_id.clone(),
+                source: record.source.clone(),
+                item: record.context_item(payload_root)?,
+            });
+        }
+        Ok(output)
+    }
+
+    /// ABI projection for consumers that require only official `type/value`
+    /// context items. Use `resolve_with_provenance` when an audit trail is needed.
+    pub fn resolve(
+        &self,
+        hdc_hits: &[u64],
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: &Path,
+        max_items: usize,
+    ) -> Result<Vec<MemoryContextItem>, String> {
+        Ok(self.resolve_with_provenance(hdc_hits, scope_id, now_ms, payload_root, max_items)?
+            .into_iter()
+            .map(|resolved| resolved.item)
+            .collect())
+    }           let Some(record) = self.records.get(hdc_id) else {
                 // A stale vector hit with no payload mapping must never turn
                 // into evidence via a fallback to caller-supplied text.
                 continue;
