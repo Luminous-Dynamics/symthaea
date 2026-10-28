@@ -16,8 +16,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     if args.len() != 3 {
         return Err(
-            "usage: newtonbench-native-scorecard MANIFEST.json VANILLA_TRIALS_DIR CODE_ASSISTED_TRIALS_DIR"
-                .into(),
+            concat!(
+                "usage: newtonbench-native-scorecard MANIFEST.json ",
+                "VANILLA_TRIALS_DIR CODE_ASSISTED_TRIALS_DIR"
+            )
+            .into(),
         );
     }
 
