@@ -135,7 +135,8 @@
     "False-feasible promotion count/rate",
     "Paired-seed contrasts versus high_only on each cell",
     "Independent response replay and source-byte digests",
-    "Decision-impact acquisition score and uncertainty components for the new candidate policy"
+    "Decision-impact acquisition score and uncertainty components for the new candidate policy",
+    "Full candidate-level acquisition-score trace for both sequential confirmation decisions"
   ],
   "acceptance_gates": {
     "execution": "Authored tests must pass locally before any empirical statement; runner artifacts must be retained.",
@@ -194,6 +195,20 @@
       "Uncertainty is estimated from small paired low/medium/high residual samples, not a calibrated posterior.",
       "Weights are heuristic and must be frozen before the measured comparison; run a separate preregistered weight-sensitivity track.",
       "Two high-fidelity anchors limit calibration quality; this is a hypothesis to benchmark, not an established improvement."
-    ]
+    ],
+    "fixed_parameters": {
+      "neighborhood_size": 4,
+      "inverse_distance_offset": 0.02,
+      "uncertainty_boundary_scale": 0.08,
+      "objective_uncertainty_scale": 0.2,
+      "frontier_distance_scale": 0.1,
+      "robust_sigma_mad_multiplier": 1.4826,
+      "uncertainty_extrapolation_multiplier": 0.35,
+      "minimum_sigma": 0.000001,
+      "medium_probe_rule": "two closest absolute constraint margins, best observed value for each objective, then diverse scalarization picks to fill eight unique candidates",
+      "anchor_rule": "first medium candidate closest to the feasibility boundary; second maximizes input-space RMS distance from the first",
+      "confirmation_rule": "recompute all remaining low-sample candidate predictions after each high call and choose the maximum independently replayable score; ties break on lowest candidate ID",
+      "audit": "For each of the two confirmation decisions, store all eligible candidate scores and prediction components. The scorer independently recomputes predictions, score components, score ordering and selected candidate from the raw trace."
+    }
   }
 }
