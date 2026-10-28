@@ -1,0 +1,42 @@
+{
+  "schema": "symthaea.science_bench_refresh_generator_config.v1",
+  "config_version": "synthetic-law-worlds-v1",
+  "recipes": [
+    {
+      "family_id": "semantic_invariance",
+      "kind": "semantic_invariance",
+      "instruction": "Recover the relationship invariant under the declared coordinate transformation.",
+      "samples_per_task": 6,
+      "x_start": -2,
+      "x_step": 1,
+      "noise_amplitude": 0
+    },
+    {
+      "family_id": "sampling_noise_shift",
+      "kind": "sampling_noise_shift",
+      "instruction": "Recover the relationship under declared measurement noise and report uncertainty.",
+      "samples_per_task": 8,
+      "x_start": -1.5,
+      "x_step": 0.5,
+      "noise_amplitude": 0.05
+    },
+    {
+      "family_id": "confounding_null",
+      "kind": "confounding_null",
+      "instruction": "Decide whether the apparent association is a direct effect or explained by a common cause.",
+      "samples_per_task": 10,
+      "x_start": -2,
+      "x_step": 0.5,
+      "noise_amplitude": 0.04
+    },
+    {
+      "family_id": "identifiability_abstention",
+      "kind": "identifiability_abstention",
+      "instruction": "Determine what is identifiable from the narrow observed domain; state an equivalence class or abstain.",
+      "samples_per_task": 6,
+      "x_start": 0,
+      "x_step": 0.5,
+      "noise_amplitude": 0.03
+    }
+  ]
+}
