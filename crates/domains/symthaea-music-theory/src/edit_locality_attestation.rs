@@ -186,6 +186,9 @@ mod tests {
         let other_role = event_sequence_sha256(&events, "target");
         assert_eq!(first, second);
         assert_ne!(first, other_role);
+        // Golden vectors pin the byte-level format for cross-language replay.
+        assert_eq!(first, "80fd0eb14eab4b0fb1f710bff6ed371ac983f73c4d3139213ebeec4e113db74f");
+        assert_eq!(other_role, "7011cc57d1457f4358134a7874c6966c8c1e0e3dacac8365887566040f9b1f02");
     }
 
     #[test]
