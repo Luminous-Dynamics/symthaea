@@ -39,7 +39,7 @@
 //! let phi_values = vec![0.8, 0.3];  // First input has a higher supplied proxy score
 //!
 //! let result = gate.forward(&inputs, &phi_values);
-//! // result.output will be dominated by first input due to higher Phi
+//! // result.output is influenced by the first input's higher supplied score
 //! ```
 
 use serde::{Deserialize, Serialize};
@@ -354,12 +354,12 @@ impl PhiAttentionGate {
         }
     }
 
-    /// Get running mean of Phi values
+    /// Get running mean of caller-supplied scores
     pub fn phi_mean(&self) -> f32 {
         self.phi_mean
     }
 
-    /// Get running variance of Phi values
+    /// Get running variance of caller-supplied scores
     pub fn phi_variance(&self) -> f32 {
         self.phi_variance
     }
@@ -443,10 +443,10 @@ impl PhiAttentionResult {
 /// Gradients for Phi attention parameters
 #[derive(Debug, Clone)]
 pub struct PhiAttentionGradients {
-    /// Raw input Phi values
+    /// Raw caller-supplied scalar scores (legacy field name retained)
     pub raw_phi: Vec<f32>,
 
-    /// Transformed Phi values
+    /// Transformed caller-supplied scores (legacy field name retained)
     pub transformed_phi: Vec<f32>,
 
     /// Computed attention weights
@@ -460,13 +460,15 @@ pub struct PhiAttentionGradients {
 // STANDALONE FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Compute attention weights from Phi values
+/// Compute attention weights from caller-supplied scalar scores.
 ///
-/// This is the core function implementing Phi-guided attention weighting.
+/// The historical parameter name is retained for API compatibility. Its semantics
+/// are determined by the caller; this function only transforms scores and applies
+/// softmax. It does not calculate or validate IIT.
 ///
 /// # Arguments
 /// * `inputs` - Input hypervectors (used only for dimension validation)
-/// * `phi_values` - Phi values for each input (should be in [0, 1])
+/// * `phi_values` - Legacy-named scores for each input; the caller must define scaling
 ///
 /// # Returns
 /// Attention weights that sum to 1.0
@@ -486,7 +488,7 @@ pub fn compute_attention_weights(
 
     let n = inputs.len().min(phi_values.len());
 
-    // Transform Phi values
+    // Transform the caller-supplied scores
     let transformed: Vec<f32> = phi_values
         .iter()
         .take(n)
@@ -543,7 +545,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_compute_attention_weights_basic() {
+    fn test_compute_attention_weights_from_supplied_scores() {
         let inputs = vec![
             ContinuousHV::random(256, 42),
             ContinuousHV::random(256, 43),
@@ -562,36 +564,36 @@ mod tests {
             sum
         );
 
-        // Higher Phi should get higher weight
+        // Higher supplied score should get higher weight under this configuration
         assert!(
             weights[0] > weights[1],
-            "Higher Phi should get higher weight"
+            "Higher supplied score should get higher weight"
         );
         assert!(
             weights[0] > weights[2],
-            "Highest Phi should get highest weight"
+            "Highest supplied score should get highest weight"
         );
     }
 
     #[test]
-    fn test_high_phi_dominates_output() {
+    fn test_higher_supplied_score_dominates_output_under_default_mapping() {
         let mut gate = PhiAttentionGate::new(PhiAttentionConfig::sharp());
 
         let high_phi_input = ContinuousHV::random(256, 100);
         let low_phi_input = ContinuousHV::random(256, 200);
 
         let inputs = vec![high_phi_input.clone(), low_phi_input.clone()];
-        let phi_values = vec![0.9, 0.1]; // First has much higher Phi
+        let phi_values = vec![0.9, 0.1]; // First has a higher supplied proxy score
 
         let result = gate.forward(&inputs, &phi_values);
 
-        // Output should be more similar to high-Phi input
+        // Output should be more similar to the higher-scored input
         let sim_high = result.output.similarity(&high_phi_input);
         let sim_low = result.output.similarity(&low_phi_input);
 
         assert!(
             sim_high > sim_low,
-            "Output should be more similar to high-Phi input: sim_high={}, sim_low={}",
+            "Output should be more similar to higher-scored input: sim_high={}, sim_low={}",
             sim_high,
             sim_low
         );
