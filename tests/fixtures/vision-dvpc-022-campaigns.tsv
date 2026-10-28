@@ -1,0 +1,16 @@
+case_id	trials	failures	alpha_ppm	risk_cap_ppm	net_value_lcb_milli	min_net_value_lcb_milli	activation_count	eligible_count	min_activation_bps	provenance_ok	action_digest_ok	target_calibrated	target_shift_detected	sealed_touched	all_in_cost_units	cost_budget_units	required_campaign_units	available_campaign_units	expected_decision
+positive_59_zero	59	0	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	4	10	20	40	AUTHORIZED
+boundary_58_zero	58	0	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	4	10	20	40	INSUFFICIENT_EVIDENCE
+tiny_3_zero	3	0	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	4	10	20	40	INSUFFICIENT_EVIDENCE
+positive_100_one_failure	100	1	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	4	10	20	40	AUTHORIZED
+one_failure_59	59	1	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	4	10	20	40	INSUFFICIENT_EVIDENCE
+no_op	100	0	50000	50000	0	1000	20	100	1000	1	1	1	0	0	4	10	20	40	DENIED
+source_shift	100	0	50000	50000	5000	1000	20	100	1000	1	1	1	1	0	4	10	20	40	DENIED
+target_not_calibrated	100	0	50000	50000	5000	1000	20	100	1000	1	1	0	0	0	4	10	20	40	DENIED
+activation_too_rare	100	0	50000	50000	5000	1000	5	100	1000	1	1	1	0	0	4	10	20	40	DENIED
+negative_net_value	100	0	50000	50000	500	1000	20	100	1000	1	1	1	0	0	4	10	20	40	DENIED
+budget_overrun	100	0	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	12	10	20	40	DENIED
+campaign_truncated	100	0	50000	50000	5000	1000	20	100	1000	1	1	1	0	0	4	10	60	40	DENIED
+sealed_confirmation_touched	100	0	50000	50000	5000	1000	20	100	1000	1	1	1	0	1	4	10	20	40	DENIED
+provenance_missing	100	0	50000	50000	5000	1000	20	100	1000	0	1	1	0	0	4	10	20	40	DENIED
+digest_mismatch	100	0	50000	50000	5000	1000	20	100	1000	1	0	1	0	0	4	10	20	40	DENIED
