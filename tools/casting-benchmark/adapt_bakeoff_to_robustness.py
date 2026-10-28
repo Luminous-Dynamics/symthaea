@@ -310,6 +310,7 @@ def adapt_documents(
         "run_id": f'{selector["policy"]}__seed{selector["seed"]}__budget{run.get("cost_budget")}',
         "source_run": {
             "sweep_sha256": sweep_sha,
+            "adapter_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
             "candidate_pool_sha256": candidate_pool_sha,
             "objective_family": selector["objective_family"],
             "constraint_family": selector["constraint_family"],
