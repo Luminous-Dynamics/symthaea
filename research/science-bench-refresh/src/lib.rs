@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 
 pub const MANIFEST_SCHEMA: &str = "symthaea.science_bench_refresh_manifest.v1";
 pub const REPORT_SCHEMA: &str = "symthaea.science_bench_refresh_validation_report.v1";
+pub const TASK_SET_SCHEMA: &str = "symthaea.science_bench_refresh_task_set.v1";
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,6 +48,24 @@ pub struct EvaluatorV1 {
     pub version: String,
     pub source_sha256: String,
     pub oracle_separation: String,
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskSetArtifactV1 {
+    pub schema: String,
+    pub generation_id: String,
+    pub tasks: Vec<TaskSetRecordV1>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskSetRecordV1 {
+    pub task_id: String,
+    pub family_id: String,
+    pub policy_input: serde_json::Value,
+    pub evaluator_only: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -120,6 +139,7 @@ pub struct RevealVerificationReportV1 {
     pub task_set_commitment_expected: String,
     pub task_set_commitment_recomputed: String,
     pub task_set_commitment_matches: bool,
+    pub task_set_contract_valid: bool,
     pub seed_bytes: u64,
     pub task_set_bytes: u64,
     pub verified: bool,
@@ -232,6 +252,110 @@ pub fn compute_artifact_commitment(
     artifact_commitment_for(kind, &protocol_commitment, artifact_bytes)
 }
 
+
+fn scan_policy_input_for_oracle_fields(value: &serde_json::Value, path: &str, issues: &mut Vec<String>) {
+    const FORBIDDEN_KEYS: &[&str] = &[
+        "answer_key",
+        "evaluator_only",
+        "ground_truth",
+        "hidden_law",
+        "hidden_target",
+        "oracle_answer",
+        "true_equation",
+        "target_equation",
+    ];
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, nested) in fields {
+                let normalized = key.to_ascii_lowercase();
+                if FORBIDDEN_KEYS.contains(&normalized.as_str()) {
+                    issues.push(format!(
+                        "policy_input contains forbidden oracle field at {path}.{key}"
+                    ));
+                }
+                scan_policy_input_for_oracle_fields(nested, &format!("{path}.{key}"), issues);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, nested) in items.iter().enumerate() {
+                scan_policy_input_for_oracle_fields(nested, &format!("{path}[{index}]"), issues);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn validate_task_set_contract(
+    manifest: &GenerationManifestV1,
+    task_set_bytes: &[u8],
+) -> Vec<String> {
+    let task_set: TaskSetArtifactV1 = match serde_json::from_slice(task_set_bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            return vec![format!("task-set artifact does not match the strict v1 shape: {error}")];
+        }
+    };
+    let mut issues = Vec::new();
+    if task_set.schema != TASK_SET_SCHEMA {
+        issues.push(format!("task-set schema must be {TASK_SET_SCHEMA}"));
+    }
+    if task_set.generation_id != manifest.generation_id {
+        issues.push("task-set generation_id does not match the frozen manifest".to_owned());
+    }
+    if u64::try_from(task_set.tasks.len()).ok() != Some(manifest.expected_task_count) {
+        issues.push(format!(
+            "task-set record count does not match expected_task_count={}",
+            manifest.expected_task_count
+        ));
+    }
+
+    let mut expected_by_family = std::collections::BTreeMap::<String, u64>::new();
+    for family in &manifest.task_family_mixture {
+        expected_by_family.insert(family.family_id.clone(), family.planned_task_count);
+    }
+    let mut observed_by_family = std::collections::BTreeMap::<String, u64>::new();
+    let mut task_ids = BTreeSet::new();
+
+    for (index, task) in task_set.tasks.iter().enumerate() {
+        let prefix = format!("tasks[{index}]");
+        if task.task_id.trim().is_empty() {
+            issues.push(format!("{prefix}.task_id must not be empty"));
+        } else if !task_ids.insert(task.task_id.as_str()) {
+            issues.push(format!("duplicate task_id: {}", task.task_id));
+        }
+        if !expected_by_family.contains_key(&task.family_id) {
+            issues.push(format!("{prefix} has undeclared family_id {}", task.family_id));
+        }
+        let observed = observed_by_family.entry(task.family_id.clone()).or_default();
+        match observed.checked_add(1) {
+            Some(total) => *observed = total,
+            None => issues.push(format!("task count overflows for family {}", task.family_id)),
+        }
+        if !task.policy_input.is_object() {
+            issues.push(format!("{prefix}.policy_input must be a JSON object"));
+        } else {
+            scan_policy_input_for_oracle_fields(
+                &task.policy_input,
+                &format!("{prefix}.policy_input"),
+                &mut issues,
+            );
+        }
+        if !task.evaluator_only.is_object() {
+            issues.push(format!("{prefix}.evaluator_only must be a JSON object"));
+        }
+    }
+
+    for (family_id, expected_count) in expected_by_family {
+        let observed_count = observed_by_family.get(&family_id).copied().unwrap_or(0);
+        if observed_count != expected_count {
+            issues.push(format!(
+                "task-set family count mismatch for {family_id}: expected {expected_count}, observed {observed_count}"
+            ));
+        }
+    }
+    issues
+}
+
 /// Verify a post-run reveal against the exact precommitted protocol, seed and
 /// task-set bytes. This establishes byte-level commitment consistency only;
 /// it cannot prove the runner enforced secrecy or executed the declared policy.
@@ -263,20 +387,22 @@ pub fn verify_reveal(
         return Err("revealed task-set artifact must not be empty".to_owned());
     }
 
+    let task_set_issues = validate_task_set_contract(&manifest, task_set_bytes);
+    let task_set_contract_valid = task_set_issues.is_empty();
     let protocol_computed = protocol_commitment_for_manifest(&manifest)?;
     let seed_computed = artifact_commitment_for("seed", &protocol_computed, seed_bytes)?;
     let task_set_computed =
         artifact_commitment_for("task-set", &protocol_computed, task_set_bytes)?;
     let seed_matches = seed_computed == manifest.seed_commitment_sha256;
     let task_set_matches = task_set_computed == manifest.task_set_commitment_sha256;
-    let mut issues = Vec::new();
+    let mut issues = task_set_issues;
     if !seed_matches {
         issues.push("revealed seed does not match the manifest commitment".to_owned());
     }
     if !task_set_matches {
         issues.push("revealed task-set bytes do not match the manifest commitment".to_owned());
     }
-    let verified = seed_matches && task_set_matches;
+    let verified = seed_matches && task_set_matches && task_set_contract_valid;
 
     Ok(RevealVerificationReportV1 {
         schema: REVEAL_REPORT_SCHEMA.to_owned(),
@@ -290,6 +416,7 @@ pub fn verify_reveal(
         task_set_commitment_expected: manifest.task_set_commitment_sha256,
         task_set_commitment_recomputed: task_set_computed,
         task_set_commitment_matches: task_set_matches,
+        task_set_contract_valid,
         seed_bytes: u64::try_from(seed_bytes.len())
             .map_err(|_| "seed artifact exceeds u64 byte length".to_owned())?,
         task_set_bytes: u64::try_from(task_set_bytes.len())
