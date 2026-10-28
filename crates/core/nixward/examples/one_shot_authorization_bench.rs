@@ -18,6 +18,7 @@ use nixward::action::authorization::{
     CommandBinding, ExecutionAuthorizationLedger,
 };
 
+const WARMUP_CASES: usize = 1_000;
 const CASES: usize = 10_000;
 
 #[derive(Clone, Copy)]
@@ -79,14 +80,6 @@ fn percentile(sorted_ns: &[u64], percentile: usize) -> u64 {
 }
 
 fn main() {
-    let mut ledger = ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
-        .expect("benchmark ledger lifetime is valid");
-    // A separate ledger exercises the wrong-ledger defense. Such a denial
-    // cannot burn the permit in its owning ledger, which is intentionally
-    // outside the rejecting ledger's authority.
-    let mut wrong_ledger = ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
-        .expect("benchmark foreign ledger lifetime is valid");
-
     let mut latencies_ns = Vec::with_capacity(CASES);
     let mut scenario_latencies_ns: [Vec<u64>; 9] =
         std::array::from_fn(|_| Vec::with_capacity(CASES / 9 + 1));
@@ -96,10 +89,34 @@ fn main() {
     let mut allowed = 0usize;
     let mut denied = 0usize;
 
-    for index in 0..CASES {
-        let scenario_index = index % Scenario::ALL.len();
+    // Warm up before recording latency. Each sample uses a fresh small ledger
+    // so measured cost is not confounded by collection growth across 10,000
+    // historical decisions. Large-ledger scaling belongs in a separate lane.
+    let harness_start = Instant::now();
+    for index in 0..(WARMUP_CASES + CASES) {
+        let measured = index >= WARMUP_CASES;
+        let sample_index = index.saturating_sub(WARMUP_CASES);
+        let scenario_index = if measured {
+            sample_index % Scenario::ALL.len()
+        } else {
+            index % Scenario::ALL.len()
+        };
         let scenario = Scenario::ALL[scenario_index];
-        scenario_counts[scenario_index] += 1;
+        if measured {
+            scenario_counts[scenario_index] += 1;
+        }
+
+        let mut ledger = ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
+            .expect("benchmark ledger lifetime is valid");
+        // A foreign ledger cannot consume or burn a permit owned by this ledger.
+        let mut wrong_ledger = if matches!(scenario, Scenario::WrongLedger) {
+            Some(
+                ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
+                    .expect("benchmark foreign ledger lifetime is valid"),
+            )
+        } else {
+            None
+        };
 
         let decision_id = format!("microbench-decision-{index:05}");
         let request_binding = match scenario {
@@ -192,25 +209,32 @@ fn main() {
         // setup are outside this timer, so this is not end-to-end latency.
         let start = Instant::now();
         let outcome = if matches!(scenario, Scenario::WrongLedger) {
-            wrong_ledger.consume(&permit, &attempt)
+            wrong_ledger
+                .as_mut()
+                .expect("foreign ledger is constructed for this scenario")
+                .consume(&permit, &attempt)
         } else {
             ledger.consume(&permit, &attempt)
         };
         let elapsed_ns = start.elapsed().as_nanos().min(u64::MAX as u128) as u64;
-        latencies_ns.push(elapsed_ns);
-        scenario_latencies_ns[scenario_index].push(elapsed_ns);
+        if measured {
+            latencies_ns.push(elapsed_ns);
+            scenario_latencies_ns[scenario_index].push(elapsed_ns);
+        }
 
         let actual_allow = outcome.is_ok();
-        if actual_allow {
-            allowed += 1;
-        } else {
-            denied += 1;
-        }
-        if actual_allow && !scenario.expected_allow() {
-            false_permits += 1;
-        }
-        if !actual_allow && scenario.expected_allow() {
-            false_blocks += 1;
+        if measured {
+            if actual_allow {
+                allowed += 1;
+            } else {
+                denied += 1;
+            }
+            if actual_allow && !scenario.expected_allow() {
+                false_permits += 1;
+            }
+            if !actual_allow && scenario.expected_allow() {
+                false_blocks += 1;
+            }
         }
 
         // Keep scenario labels and policy expectations separate from the
@@ -224,6 +248,7 @@ fn main() {
             );
         }
     }
+    let harness_elapsed_ns = harness_start.elapsed().as_nanos().min(u64::MAX as u128) as u64;
 
     latencies_ns.sort_unstable();
     for samples in &mut scenario_latencies_ns {
@@ -231,7 +256,13 @@ fn main() {
     }
 
     println!("benchmark=one_shot_authorization_ledger");
+    println!("warmup_cases={WARMUP_CASES}");
     println!("cases={CASES}");
+    println!("measured_ledger_state=one_fresh_permit_per_sample");
+    println!("harness_elapsed_ns={harness_elapsed_ns}");
+    println!("harness_cases_per_sec={:.2}",
+        (WARMUP_CASES + CASES) as f64 * 1_000_000_000.0 / harness_elapsed_ns.max(1) as f64
+    );
     println!("allowed_outcomes={allowed}");
     println!("denied_outcomes={denied}");
     println!("false_permits={false_permits}");
