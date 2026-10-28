@@ -195,7 +195,7 @@ The new `--eprocess-family-csv` report compares five predeclared monitoring stra
 - Beta(20, 20), a local alternative concentrated near the nominal rate p0=0.5.
 - Equal-weight portfolio of all four e-processes, with weights fixed at 1/4 before observations.
 
-A convex mixture of e-processes is again an e-process under the same null, so the portfolio retains the anytime-valid Ville guarantee. It does not choose the prior after seeing the observed shift. The CSV includes the stationary-null alarm probability, false alarms before a true shift, post-shift detection probability and conditional delay, as well as the selection-bias negative control.
+A convex mixture of e-processes is again an e-process under the same null, so the portfolio retains the anytime-valid Ville guarantee. It does not choose the prior after seeing the observed shift. The CSV includes stationary-null and selection-bias controls plus downward and upward step shifts spanning p1=0.10–0.45 and p1=0.55–0.90. This makes symmetry explicit for the p0=0.5, symmetric-prior fixture and verifies it through a separate reference. It records the stable-null alarm probability, false alarms before a true shift, post-shift detection probability, and conditional delay.
 
 An independent exact-DP Python prototype gave the following horizon-1,000 results at the fixed anytime-valid threshold:
 
@@ -211,4 +211,4 @@ These are exact finite-Bernoulli probabilities for the predeclared model and hor
 
 **Important protocol distinction:** the family report uses the same Ville threshold for every policy, so each remains anytime-valid. It is not a matched-realized-false-alarm leaderboard; actual null alarm probabilities are emitted so the trade-offs stay visible. The next calibration experiment should compare power at matched empirical false-alarm budgets without calling finite-horizon-calibrated thresholds anytime-valid.
 
-The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls are now included in the branch. Their output still requires exact-head CI before being described as Rust-qualified.
+The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls now compare 60 rows (five families × 12 scenarios) in the branch. Their output still requires exact-head CI before being described as Rust-qualified.
