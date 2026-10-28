@@ -404,6 +404,8 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.lines().filter(|line| line.starts_with("COVERAGE\t")).count(), 1521);
         assert!(first.contains("SHIFT_CONTROL\t72\t10000\t200000"));
+        assert!(first.contains("SHIFT_CONTROL\t72\t10000\t200000\t0.000000677322\tTARGET_CALIBRATED_FALSE"));
+        assert!(first.contains("SUMMARY\tn_grid=9\tp_grid=13\tcoverage_rows=1521\tmin_risk_coverage=0.975105719381\tmin_value_coverage=0.995679250158\tmin_joint_union_lower=0.971935593801\tjoint_target=0.950000"));
         assert!(first.contains("TARGET_CALIBRATED_FALSE"));
     }
 }
