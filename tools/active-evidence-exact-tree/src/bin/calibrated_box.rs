@@ -461,6 +461,25 @@ mod tests {
     }
 
     #[test]
+    fn anytime_radius_matches_the_declared_alpha_spending_schedule() {
+        for n in SAMPLE_SIZES {
+            let radius = interval_radius(n, true);
+            let two_sided_hoeffding_bound = 2.0 * (-2.0 * n as f64 * radius * radius).exp();
+            let allotted_cell_time_alpha = ALPHA / (CELLS * n as f64 * (n + 1) as f64);
+            assert!(
+                (two_sided_hoeffding_bound - allotted_cell_time_alpha).abs() <= 1.0e-15,
+                "n={n}: Hoeffding bound does not match alpha spending"
+            );
+        }
+        let partial_sum: f64 = (1..=100_000)
+            .map(|n| ALPHA / (CELLS * n as f64 * (n + 1) as f64))
+            .sum();
+        let telescoping_limit = ALPHA / CELLS;
+        assert!(partial_sum <= telescoping_limit + 1.0e-15);
+        assert!((telescoping_limit - partial_sum - telescoping_limit / 100_001.0).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn exact_binomial_coverage_grid_respects_the_bonferroni_budget() {
         let per_cell_target = 1.0 - ALPHA / CELLS;
         for anytime in [false, true] {
