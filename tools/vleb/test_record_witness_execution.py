@@ -201,6 +201,15 @@ finally:
         self.assertFalse(marker.exists())
         self.assertIn("verifier file bytes differ", self.stderr.getvalue())
 
+    def test_mutating_a_declared_input_forces_inconclusive_receipt(self) -> None:
+        code, receipt = self.run_recorder(
+            command_code="from pathlib import Path; Path('index.json').write_text('{}'); Path('legacy.cbl').write_text('       COPY OTHER-REC.\\n')",
+        )
+        self.assertEqual(code, 0, self.stderr.getvalue())
+        self.assertEqual(receipt["input_drift_paths"], ["legacy.cbl"])
+        self.assertEqual(receipt["source_sha256"], sha(b"       COPY BANK-REC.\\n"))
+        self.assertEqual(receipt["observed_result"], "inconclusive")
+
     def test_verdict_identity_mismatch_becomes_inconclusive(self) -> None:
         code, receipt = self.run_recorder(
             command_code="from pathlib import Path; Path('index.json').write_text('{}')",
