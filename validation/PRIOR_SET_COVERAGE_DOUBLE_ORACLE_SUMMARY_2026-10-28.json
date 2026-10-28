@@ -1,0 +1,67 @@
+{
+  "schema": "symthaea-prior-set-coverage-double-oracle-summary-v1",
+  "date": "2026-10-28",
+  "status": "STANDALONE_SYNTHETIC_FINITE_GAME_NOT_REPOSITORY_INTEGRATION",
+  "model": {
+    "latent_hypotheses": 16,
+    "graph_classes": 4,
+    "kernel_classes": 4,
+    "actions": 2,
+    "observations_per_step": 2,
+    "horizon": 2,
+    "deterministic_policy_trees": 8,
+    "candidate_prior_scenarios": 6,
+    "full_simplex_vertices": 16,
+    "objectives": ["graph", "kernel", "joint"]
+  },
+  "results": [
+    {
+      "objective": "graph",
+      "six_prior_value_bits": 1.474374,
+      "full_simplex_value_bits": 1.815263,
+      "value_understatement_bits": 0.340889,
+      "six_prior_solution_full_simplex_regret_bits": 0.0,
+      "double_oracle_iterations": 2,
+      "certificate_interval_width_bits": 2.0e-9
+    },
+    {
+      "objective": "kernel",
+      "six_prior_value_bits": 1.528545,
+      "full_simplex_value_bits": 1.853951,
+      "value_understatement_bits": 0.325406,
+      "six_prior_solution_full_simplex_regret_bits": 0.0,
+      "double_oracle_iterations": 5,
+      "certificate_interval_width_bits": 2.0003e-9
+    },
+    {
+      "objective": "joint",
+      "six_prior_value_bits": 3.389536,
+      "full_simplex_value_bits": 3.794190,
+      "value_understatement_bits": 0.404654,
+      "six_prior_solution_full_simplex_regret_bits": 0.081206,
+      "double_oracle_iterations": 4,
+      "certificate_interval_width_bits": 2.0e-9
+    }
+  ],
+  "verification": {
+    "local_tests": "11/11_PASS",
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "max_raw_double_oracle_vs_full_game_difference_bits": 3.2085445411667024e-13,
+    "outward_numerical_margin_each_side_bits": 1.0e-9,
+    "margin_is_formal_interval_arithmetic_proof": false,
+    "standalone_benchmark_source_sha256": "d7ceb9b79ee06869e7835cfaec14f67a0bd59a017fc0f85fec972572dc0b8bb3",
+    "standalone_tests_sha256": "1e94d7884c315b93520cff5b8daa67918e085039e3ae30dc289467c9c4bb19e8",
+    "standalone_results_sha256": "b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435"
+  },
+  "limitations": [
+    "synthetic likelihood; not the Symthaea repository SCM evaluator",
+    "only eight deterministic policies at horizon two",
+    "full-simplex guarantee is restricted to prior weights over the fixed 16-hypothesis support",
+    "no external causal discovery benchmark was executed",
+    "runtime numbers do not establish speedup",
+    "the standalone source, tests and exact result matrix are not committed by this documentation-only change"
+  ],
+  "next_gate": "Integrate against the exact Symthaea action/likelihood code, then qualify held-out causal recovery and compare exact frontier, epsilon pruning, column generation and prior/world double oracle at equal certificate tolerances."
+}
