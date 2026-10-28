@@ -39,6 +39,12 @@ At target 90%, pooled decision-risk calibration reduced observed mean regret aga
 
 The unrestricted-prior minimax baseline admitted every prior but had mean regret 0.10661 bits and p95 regret 0.21243 bits in this toy game.
 
+## Decision-regret bound for the risk-space region
+
+For the fixed finite candidate-policy set and an exact risk matrix, suppose every candidate policy's true expected loss lies within radius r of its calibrated center. The robust minimax policy's value cannot exceed the worst-case loss of the plug-in best policy, which is at most the minimum center loss plus r. The true best-policy loss is at least the minimum center loss minus r. Thus regret is at most 2r whenever the true risk vector is inside the calibrated region. This does not automatically hold for a misspecified risk matrix, an unenumerated deployed policy, or a calibration/deployment shift.
+
+The completed pilot recorded zero violations of regret <= 2r among covered cases across both risk-space methods and all six target/budget settings. The largest observed regret/(2r) ratio was 0.2646. This is an empirical invariant check for the derived finite-policy bound, not a proof of future coverage.
+
 ## Coverage diagnostic
 
 At target 90%, pooled decision-risk-region coverage / worst-regime coverage was 90.3% / 75.0% at budget 60, 95.8% / 75.0% at 120, and 91.7% / 83.3% at 240. The max-over-regime risk radius recorded 100% / 100% at budgets 60 and 120, and 95.8% / 83.3% at 240. At target 95%, pooled risk-vector coverage was 94.4%, 98.6%, and 95.8%; max-over-regime was 100%, 100%, and 97.2% at budgets 60, 120, 240. With only 12 test cases per regime, each test case shifts subgroup coverage by 8.3 percentage points. These are pilot frequencies, not future-coverage guarantees.
@@ -65,10 +71,10 @@ Status: SYNTHETIC FINITE GAME, NOT A REAL SCM OR EXTERNAL SOTA BENCHMARK.
 
 Source: validation/decision_sufficient_ambiguity_benchmark.py  
 Tests: validation/test_decision_sufficient_ambiguity_benchmark.py  
-Source SHA-256: 867239a0e0c6b22b41f3b097867f6f99855430cac5f62a3fd64fc8d32438ec78  
-Test SHA-256: 1aa212622ad7c9058d358addc9007b1ccc3eeb950258384cbf351ce4f801f7dd  
-Raw result SHA-256: 158eed4c09bedbf9ee8368bad3a960715065ecd7386c30567df23b3c7c64c07e  
-Gzip result SHA-256: a01ad8348e0f808c4fbca0233c885f104270e64a8ab2d5cc6517472ee03695b9  
-Summary SHA-256: 1a602d215ac3527e767f55cff1417ec7166832809e469f19b8bbc3bb3a4e8c2d
+Source SHA-256: e7e75f7023992d7458472fb4e0739bebd0b255bde4807fe9602b59c00b9adebb  
+Test SHA-256: e77913383a628a723ff09fb75311890fdd3db09ee6fd3a55f2fc57aee2970bf0  
+Raw result SHA-256: 06ea37045fdc23a77438077d4bed61d7428feda4708467be8e89dedef6b62e49  
+Gzip result SHA-256: 6c5507b99223ea598794864311abc0dcb6436bbb9d00f857b2a02d0a69ea1e61  
+Summary SHA-256: b59470b69bbf4742d9f0c11a779aa5a2df11ef169035cd1b2aac64eae02439a1
 
 The attempted 100-calibration / 30-test-per-regime run timed out and produced no valid result. Only the completed 50-calibration / 12-test-per-regime run is reported. Four local tests passed. No remote CI pass is claimed.
