@@ -61,6 +61,7 @@ pub mod motif;
 pub mod motif_family;
 pub mod motif_foundry;
 pub mod motif_return;
+pub mod compositional_motif;
 pub mod obligation;
 pub mod opera;
 pub mod passacaglia;
@@ -112,6 +113,12 @@ pub use motif_foundry::{
     FoundryConfig, FoundryDiversityReport, canonical_fingerprint, config_for_dna,
     foundry_diversity_report, generate_candidate, generate_family, generate_with_foundry,
     is_valid_candidate,
+};
+pub use compositional_motif::{
+    AxisEvidence, COMPOSITIONAL_MOTIF_CONTRACT_VERSION, CompositionalMotifEvidence,
+    CompositionalTransform, CompositionalVerificationConfig, CompositionalVerificationError,
+    PitchOrientation, SelectionMode, SourceSelection, SymbolicEvent,
+    verify_compositional_transform, verify_compositional_transform_with_config,
 };
 pub use motif_return::{
     MOTIF_RETURN_MEASUREMENT_VERSION, MotifReturnEvidence, compare_melodic_regions,
