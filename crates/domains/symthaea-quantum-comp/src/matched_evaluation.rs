@@ -947,10 +947,12 @@ pub fn compare_matched_arms(
             neither_target_hit += 1;
         }
 
-        let baseline_all_in_ms = baseline_trial.costs.all_in_total_ms();
-        let candidate_all_in_ms = candidate_trial.costs.all_in_total_ms();
-        let baseline_algorithm_runtime_ms = baseline_trial.costs.algorithm_runtime_ms();
-        let candidate_algorithm_runtime_ms = candidate_trial.costs.algorithm_runtime_ms();
+        // Overall latency is a directly observed monotonic-clock interval. Stage components
+        // are diagnostics and may overlap; never sum them to invent an end-to-end runtime.
+        let baseline_all_in_ms = baseline_trial.deployment_elapsed_ms;
+        let candidate_all_in_ms = candidate_trial.deployment_elapsed_ms;
+        let baseline_algorithm_runtime_ms = baseline_trial.standardized_algorithm_elapsed_ms;
+        let candidate_algorithm_runtime_ms = candidate_trial.standardized_algorithm_elapsed_ms;
 
         if baseline_hit && baseline_all_in_ms.is_none() {
             baseline_untimed_target_hits += 1;
