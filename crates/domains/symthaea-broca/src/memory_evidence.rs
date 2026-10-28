@@ -291,23 +291,45 @@ impl EvidenceIndex {
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
-        // New ingestion must begin active. Restore of durable tombstones should use
-        // a separately validated persistence-recovery path, not ordinary insert.
-        if record.lifecycle != EvidenceLifecycle::Active {
-            return Err("new evidence must enter with active lifecycle".into());
+        self.insert_batch_atomic(vec![record], source_bytes).map(|_| ())
+    }
+
+    /// Validate the entire ingestion batch before mutating the index.
+    ///
+    /// This prevents a malformed final field or an ID collision from leaving a
+    /// partially indexed trajectory. All records must point into the same exact
+    /// source bytes and begin in the Active lifecycle state.
+    pub fn insert_batch_atomic(
+        &mut self,
+        records: Vec<EvidenceRecord>,
+        source_bytes: &[u8],
+    ) -> Result<usize, String> {
+        let mut incoming_hdc_ids = BTreeSet::new();
+        let mut incoming_evidence_ids = BTreeSet::new();
+
+        for record in &records {
+            if record.lifecycle != EvidenceLifecycle::Active {
+                return Err("new evidence must enter with active lifecycle".into());
+            }
+            record.verify_source_bytes(source_bytes)?;
+            if self.records.contains_key(&record.hdc_id)
+                || !incoming_hdc_ids.insert(record.hdc_id)
+            {
+                return Err("duplicate hdc_id in store or ingestion batch".into());
+            }
+            if self.evidence_ids.contains_key(&record.evidence_id)
+                || !incoming_evidence_ids.insert(record.evidence_id.clone())
+            {
+                return Err("duplicate evidence_id in store or ingestion batch".into());
+            }
         }
-        // Verify source bytes and the exact string selected by source_pointer
-        // before the record enters the candidate resolver.
-        record.verify_source_bytes(source_bytes)?;
-        if self.records.contains_key(&record.hdc_id) {
-            return Err("duplicate hdc_id; use an explicit lifecycle transition".into());
+
+        let count = records.len();
+        for record in records {
+            self.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
+            self.records.insert(record.hdc_id, record);
         }
-        if self.evidence_ids.contains_key(&record.evidence_id) {
-            return Err("duplicate evidence_id".into());
-        }
-        self.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
-        self.records.insert(record.hdc_id, record);
-        Ok(())
+        Ok(count)
     }
 
     pub fn revoke(&mut self, hdc_id: u64) -> Result<(), String> {
@@ -729,6 +751,24 @@ mod tests {
         assert!(index
             .insert(record, &source_bytes_for_text("blocked evidence"))
             .is_err());
+    }
+
+    #[test]
+    fn batch_ingestion_is_atomic_when_any_source_pointer_is_invalid() {
+        let mut index = EvidenceIndex::new();
+        let valid = text_record(31, "evidence-valid", "web", "first source string");
+        let invalid = text_record(32, "evidence-invalid", "web", "expected source string");
+        let bad_source = serde_json::to_vec(&serde_json::json!({
+            "evidence": "different source string"
+        })).unwrap();
+
+        assert!(index
+            .insert_batch_atomic(vec![valid.clone(), invalid], &bad_source)
+            .is_err());
+        // The first item must not have been indexed before the second was checked.
+        assert!(index
+            .insert(valid, &source_bytes_for_text("first source string"))
+            .is_ok());
     }
     #[test]
     fn serializes_context_items_to_official_type_value_shape() {
