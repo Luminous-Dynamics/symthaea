@@ -1,0 +1,111 @@
+# Active-evidence selection under distribution shift: benchmark protocol v2.0
+
+**Status:** research protocol proposal; not an implementation or performance claim.
+**Date frozen for review:** 2026-10-28
+**Related tracking:** https://github.com/Luminous-Dynamics/symthaea/issues/8691
+**Claim ceiling:** v1.9's 19×19 interpolated risk grid is synthetic sensitivity analysis. Its 361 cells are not independent experiments and do not establish real-world superiority.
+
+## 1. Research question
+
+Can decision-aware robust acquisition reduce cumulative downstream decision regret under previously unseen distribution shifts while retaining most of the value of cheaper, less conservative acquisition when the predictive model is correctly specified?
+
+This is a two-sided question. A robust policy can fail by being too optimistic under shift, or by paying a robustness tax under IID conditions. We must measure both.
+
+## 2. Experimental unit and leakage boundary
+
+The primary experimental unit is a **task × held-out shift family × seed** trajectory, not a scenario-grid cell, individual query, or repeated row from one synthetic risk surface.
+
+Partition data into development tasks for implementation/debugging, validation tasks/shifts for hyperparameters and ambiguity-set construction, and sealed test tasks and shift mechanisms used once after the protocol is frozen. Where possible, split by source, domain, environment, time, or causal mechanism. Never randomly split correlated rows from the same source into train and test. Keep the test generator seed and hidden shift settings outside policy code.
+
+## 3. Baseline set
+
+Every method gets the same initial labeled set, candidate pool, label oracle, per-query costs, compute allowance, and stopping rules.
+
+1. Random/uniform sampling.
+2. Entropy sampling.
+3. Margin sampling.
+4. Diversity/coverage baseline; evaluate Uncertainty Herding only if implementation matches its objective and budget semantics.
+5. Cost-normalized uncertainty.
+6. Plug-in EVSI using the same downstream action/loss model as the robust method.
+7. Robust EVSI / predictive-ambiguity acquisition.
+8. Optional R-IDeA-compatible arm only after its representativeness, informativeness, and error-de-amplification terms are implemented faithfully and documented.
+9. Hindsight oracle that knows the true evaluation distribution, labelled **unattainable reference**, never counted as a deployable baseline.
+
+No baseline may receive hidden test labels, target-domain prevalence, or true shift parameters unless that information is explicitly part of its deployment contract.
+
+## 4. Shift matrix
+
+Evaluate separate and compound regimes: IID/correct specification; class-prior shift; covariate shift; conditional/concept shift; class-conditional asymmetric measurement errors; rare classes and worst-group prevalence; class-dependent label noise; cost shift and missing/failed queries; in-ambiguity-set shift; out-of-ambiguity-set shift; and compound shift combining at least two mechanisms.
+
+Use multiple severity levels fixed before test. State which assumptions make importance weighting or calibration valid. The out-of-set regime is essential: a robustness guarantee is conditional on the declared ambiguity set, not a guarantee against arbitrary shift.
+
+## 5. Multi-round protocol
+
+At each round, a policy receives only its permitted state: current labeled examples, unlabeled pool, allowed model outputs, costs, and declared uncertainty/ambiguity information. It selects one query or abstains. The label is revealed, the model/calibrator is updated by a frozen procedure, and the next round begins.
+
+Freeze initial labeled-set sizes and class/group composition; pool construction and label-oracle behavior; update/retraining schedule; candidate-query cost model; policy random seeds and tie-breaking; total budgets and checkpoint budgets; handling of failed, invalid, duplicate, and abstained queries; stopping and model-selection rules.
+
+Use a budget curve rather than a single budget. Prefer at least 20 paired seeds for an initial confirmatory run when computationally feasible; determine the final seed count using a predeclared power/precision analysis on development data, never by repeatedly inspecting held-out results.
+
+## 6. Primary metrics
+
+### Primary outcome
+**Cumulative downstream decision regret per unit acquisition cost**, with regret defined against the best action under the evaluation truth/loss model, not the policy's own assumed model.
+
+Report regret at fixed cumulative-cost checkpoints; area under regret-versus-cost curve; paired difference against the strongest non-oracle baseline; task/shift-level clustered confidence interval; mean and median plus 95th percentile, worst 5%, and CVaR where sample size supports it.
+
+### Secondary outcomes
+- Downstream task utility/loss.
+- Label efficiency at predeclared target quality.
+- Harmful-acquisition rate and magnitude (queries that increase expected downstream regret versus abstention).
+- Abstention rate and decision coverage.
+- Calibration and ambiguity-set coverage, separately from decision quality.
+- Worst-group and rare-class performance.
+- Query latency, wall-clock, peak memory, and acquisition compute.
+- Regret under correctly specified IID conditions (robustness tax).
+
+Do not collapse all outcomes into one score unless the scalar utility and weights are predeclared and sensitivity analysis is reported.
+
+## 7. Statistical analysis
+
+Use paired seeds and identical task/shift draws for all policies. Resample at the independent task/source/shift-family level; do not bootstrap query rows as if independent. Report per-regime estimates before any pooled estimate. Predeclare the primary contrast, interval method, multiplicity handling, and missing-run policy. Publish every seed and task result; aggregate metrics must be regenerated from those rows.
+
+Distinguish confidence intervals for a population-level estimate from exact enumeration over a finite synthetic grid. Keep exploratory scenario discovery separate from the sealed confirmatory evaluation. If the number of independent task families is too small for reliable inference, label results exploratory and report descriptive intervals without overstating generalization.
+
+## 8. Provisional gates
+
+These are engineering goals, not industry standards. Freeze or revise them using development data before the confirmatory run.
+
+- **Shift benefit:** at least 20% lower mean cumulative decision regret than the strongest non-oracle baseline on the prespecified held-out shift aggregate, with the paired interval excluding no improvement.
+- **IID robustness tax:** no more than 1% relative degradation in the primary IID task metric against the strongest matched baseline.
+- **Budget consistency:** improvement must persist at multiple predeclared budgets, not one favorable point.
+- **Tail safety:** no material regression in worst-group/tail regret; set a numeric bound before test.
+- **Efficiency:** report acquisition overhead and regret per cost; no success claim if savings disappear after accounting for query costs or compute.
+- **Integrity:** all frozen-input checks and negative controls pass; no result qualifies if required inputs, rows, or digests are missing.
+
+Failure of a gate is a valid result. Do not tune on the sealed test set or weaken gates after observing results.
+
+## 9. Reproducibility and adversarial controls
+
+The release artifact must contain source revision and exact file digests; frozen parent and child contracts as actual files, not just hashes; environment/toolchain metadata and one-command runner; raw per-trajectory outcomes, derived metrics, and an independent aggregate verifier; deterministic seeds and explicit tie-breaking; negative controls for missing contracts, one-byte contract mutation, swapped parent/child, altered output rows, duplicate trajectories, and leakage of test-only fields; and a clean-room run from a fresh checkout with no pre-existing generated files.
+
+A digest match proves byte identity, not correctness. An aggregate verifier must recompute metrics from raw rows rather than trust the evaluator's summary JSON. Keep arithmetic/reference checks, Rust compilation/tests, workflow checks, and empirical evaluation as distinct evidence classes.
+
+## 10. Decision rule for research claims
+
+- **Synthetic sensitivity only:** deterministic scenarios derived from fixed assumptions.
+- **Finite simulator result:** independently generated trajectories under a stated simulator, with uncertainty scoped to that simulator.
+- **Benchmark result:** matched baselines, held-out task/shift families, preregistered metrics, raw outcomes, and statistical uncertainty.
+- **Deployment evidence:** prospectively collected target-domain evidence and monitored operational outcomes.
+
+Do not describe any earlier evidence class as a later one. A win over plug-in EVSI alone is insufficient; compare against strong simple baselines and test whether robustification helps when it should and abstains when it cannot justify a recommendation.
+
+## 11. Literature alignment
+
+- [Uncertainty Herding, ICLR 2025](https://proceedings.iclr.cc/paper_files/paper/2025/hash/0302fb83c62991efbccf0a003e4f5a92-Abstract-Conference.html): compare only with a compatible implementation and matched budget.
+- [R-IDeA, AISTATS 2026](https://proceedings.mlr.press/v300/tang26d.html): useful framing for representativeness, informativeness, and error de-amplification under misspecification; this protocol does not claim to reproduce it.
+- [NIST AI 800-3](https://doi.org/10.6028/NIST.AI.800-3): motivates explicit estimands and statistical modeling rather than generalizing from one fixed benchmark.
+
+## 12. Current blocker
+
+The local v1.9 report states that the evaluator checks both the v1.9 contract and parent v1.8 digest, but the reproducible-package audit found two referenced frozen contract files missing. Recover the original exact bytes or mark the v1.9 package incomplete. Do not fabricate replacements from aggregate metrics. The v2.0 confirmatory run is blocked until the v1.9 provenance issue is resolved or the work is explicitly forked into a new version with new frozen inputs.
