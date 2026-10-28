@@ -53,5 +53,6 @@
     "max_wall_clock_seconds": 3600
   },
   "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "post_run_reveal_policy": "reveal_seed_and_task_bytes_after_submission"
+  "post_run_reveal_policy": "reveal_seed_and_task_bytes_after_submission",
+  "protocol_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }
