@@ -128,8 +128,9 @@
     },
     "local_test": {
       "path": "validation/test_constrained_prior_polytope_benchmark.py",
-      "sha256": "418ecbb4b62b9faa199228a1cee6cc2da0a454dc7d856755f865deb5125c7688",
-      "git_blob": "ac5cd9c3ccc33a46692aba61ebbc7ba55cb8fff4"
+      "sha256": "b114dac568eaf1d76bc317011fe530cb5f01346bb7206f509fa3e29e2455c607",
+      "git_blob": "5db477315953f554d7bc0b1c716464d783d73988",
+      "bytes": 2597
     },
     "committed_test_at_write_time": {
       "path": "validation/test_constrained_prior_polytope_benchmark.py",
@@ -166,7 +167,8 @@
     },
     "exact_head_execution": false,
     "ci_status": "current head returned empty combined status and workflow-run lists; a previously checked head had CI and PR Governance skipped; no remote pass claimed",
-    "current_branch_head": "0c5a150f36aff13841683067ec09a89c9ece51ac"
+    "current_branch_head": "0c5a150f36aff13841683067ec09a89c9ece51ac",
+    "local_combined_test_suite": "17/17_PASS_AFTER_LOCAL_REWRITE_2026-10-28"
   },
   "limitations": [
     "synthetic likelihood, not Symthaea repository SCM implementation",
