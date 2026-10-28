@@ -78,8 +78,8 @@ enum Commands {
         #[arg(long)]
         require_evidence_records: bool,
     },
-    /// Discover candidate direct-call sites for process, filesystem, and socket effects.
-    /// Candidate discovery does not establish reachability or authorization correctness.
+    /// Discover selected direct-call and receiver-chain process/filesystem/socket effect candidates.
+    /// Syntactic candidate discovery does not establish reachability or authorization correctness.
     EffectPrimitiveScan {
         #[arg(long, default_value = ".")]
         root: PathBuf,
