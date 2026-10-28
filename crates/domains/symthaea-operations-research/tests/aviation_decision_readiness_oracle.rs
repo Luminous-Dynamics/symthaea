@@ -57,12 +57,12 @@ fn drift(status: DriftMonitorStatus) -> DriftMonitorReport {
         50_000,
     ).unwrap();
     match status {
-        DriftMonitorStatus::InControl => monitor.report(),
+        DriftMonitorStatus::InControl => monitor.observe("routine", 190, "routine").unwrap(),
         DriftMonitorStatus::DriftAlarm => {
-            monitor.observe("e1", 1, "disruption").unwrap();
-            monitor.observe("e2", 2, "disruption").unwrap()
+            monitor.observe("e1", 198, "disruption").unwrap();
+            monitor.observe("e2", 199, "disruption").unwrap()
         }
-        DriftMonitorStatus::SupportShiftAlarm => monitor.observe("e1", 1, "unmodeled").unwrap(),
+        DriftMonitorStatus::SupportShiftAlarm => monitor.observe("e1", 199, "unmodeled").unwrap(),
     }
 }
 
