@@ -344,7 +344,6 @@ fn evaluate(
     horizon: usize,
 ) -> AlarmMetrics {
     evaluate_with_alarm(
-        p0,
         pre_shift_p,
         post_shift_p,
         change_after,
@@ -354,7 +353,6 @@ fn evaluate(
 }
 
 fn evaluate_with_alarm<F>(
-    p0: f64,
     pre_shift_p: f64,
     post_shift_p: Option<f64>,
     change_after: usize,
@@ -447,7 +445,6 @@ fn print_eprocess_family_csv() {
             }
 
             let metrics = evaluate_with_alarm(
-                NOMINAL_P,
                 scenario.pre_shift_p,
                 scenario.post_shift_p,
                 scenario.change_after,
@@ -910,7 +907,6 @@ mod tests {
             let table = family_alarm_table(family, NOMINAL_P, FAMILY_HORIZON);
             let null = evaluate_with_alarm(
                 NOMINAL_P,
-                NOMINAL_P,
                 None,
                 0,
                 FAMILY_HORIZON,
@@ -923,7 +919,6 @@ mod tests {
             );
 
             let weak_shift = evaluate_with_alarm(
-                NOMINAL_P,
                 NOMINAL_P,
                 Some(0.55),
                 CHANGE_AFTER,
