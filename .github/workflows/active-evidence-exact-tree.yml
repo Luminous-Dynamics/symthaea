@@ -156,7 +156,7 @@ jobs:
               rows = list(csv.DictReader(stream))
           rows[0]["cell_coverage"] = "0"
           with open(target, "w", newline="", encoding="utf-8") as stream:
-              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\\n")
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
               writer.writeheader()
               writer.writerows(rows)
           PY
