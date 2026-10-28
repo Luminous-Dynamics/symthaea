@@ -1,0 +1,88 @@
+{
+  "protocol_id": "BROCA-RISK-ESCALATION-V1",
+  "run_status": "verified_local_synthetic_run",
+  "run_date": "2026-10-28",
+  "evidence_classification": "synthetic_only_not_Broca_runtime_or_external_benchmark",
+  "source": {
+    "path": "research/broca-risk-aware-escalation-v1/benchmark.py",
+    "sha256": "6ca3caf5c1fc61a406a9989483921a381bcd7a45640aadd5d04a1bac6e81806f",
+    "git_blob_sha1": "dd192d891d9899b80ccc41481c5ba72b7bea34ee",
+    "byte_match_to_published_branch_source": true
+  },
+  "verifier": {
+    "path": "research/broca-risk-aware-escalation-v1/verify_run.py",
+    "sha256": "62a1c8e0576000a6d5928213a6016a1c4d7c195e005ac700fd2c458966a50c40",
+    "git_blob_sha1": "960d6cdb5ff72278f98b99e274177b752366c5ee",
+    "byte_match_to_published_branch_verifier": true
+  },
+  "data": {
+    "development_cases": 3000,
+    "training_cases": 1500,
+    "calibration_cases": 1500,
+    "test_cases": 10000,
+    "held_out_regimes": [
+      "iid",
+      "high_similarity_distractor",
+      "stale_revision",
+      "scope_shift",
+      "compound_shift"
+    ],
+    "policies": 15,
+    "outcome_rows": 150000,
+    "raw_outcome_file": "run-20261028-remote-equivalent/per_case_policy_outcomes.jsonl",
+    "raw_outcome_sha256": "f8b2aaee93569621d316decdc94b04ba7a0281b1fd1f7de6dd3c3d541c40f2be",
+    "raw_output_committed_to_git": false,
+    "raw_output_available_in_full_bundle": true
+  },
+  "artifacts": {
+    "config_sha256": "3f1ac8ba5c80885d5b744e8dfe354f52006db2c5e8a0d7486638af37d5483de7",
+    "summary_sha256": "dc5f3850218b6899f9acd1c8266be30fe6e0f0e111b1bf0d7b3eaa794751c210",
+    "report_sha256": "bf6c0fce12645780f1a98386dff7c6faed62bbda9e80e57b5ed0ad5048c1da46",
+    "policy_frontier_csv_sha256": "0d0c8c351e58d02e012cbc454f221920f073bf52ed4840a1beb61eb92c2c7871",
+    "primary_paired_contrasts_csv_sha256": "00ea8b00ba05b7b32f95121e3d4ef70914370f459e4b1f60b2c15204ad1d32d8",
+    "receipt_sha256": "473f99aabe5a7c568cad72fbceb0d2853876c4149c7a22eab697e4fd5635c3d1"
+  },
+  "validation": {
+    "tests_passed": 15,
+    "tests_failed": 0,
+    "raw_outcome_digest_verified": true,
+    "summary_recomputed_from_raw_outcomes": true,
+    "policy_case_matrix_verified": true,
+    "configuration_digest_verified": true,
+    "source_digest_verified": true,
+    "confidence_intervals": "paired episode-group bootstrap over synthetic cases; not external uncertainty",
+    "remote_ci_status": "not run in this execution; a skipped workflow is not a pass"
+  },
+  "illustrative_iid_metrics": {
+    "always_answer": {
+      "task_success": 0.5485,
+      "harmful_rate": 0.4515,
+      "assumed_tokens_per_query": 450,
+      "net_utility": -0.4355
+    },
+    "evidence_threshold": {
+      "task_success": 0.5975,
+      "harmful_rate": 0.0305,
+      "assumed_tokens_per_query": 272,
+      "net_utility": 0.1623
+    },
+    "calibrated_5_percent_risk": {
+      "task_success": 0.7065,
+      "harmful_rate": 0.028,
+      "assumed_tokens_per_query": 691,
+      "net_utility": 0.2648
+    },
+    "calibrated_5_percent_vs_evidence_threshold_task_success_delta": 0.109,
+    "calibrated_5_percent_vs_evidence_threshold_task_success_ci95": [
+      0.093,
+      0.1255
+    ],
+    "matched_cost_advantage_claimed": false
+  },
+  "limitations": [
+    "All cases, features, correctness rates, and costs are generated or assumed by the synthetic benchmark.",
+    "No Symthaea/Broca runtime, LLM endpoint, or official LongMemEval-V2 evaluator was executed.",
+    "Wilson-bound calibration is empirical and not a distribution-free guarantee under shift.",
+    "No SOTA or real-world generalization claim is made."
+  ]
+}
