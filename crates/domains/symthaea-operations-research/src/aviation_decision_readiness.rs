@@ -78,6 +78,11 @@ pub struct DecisionReadinessReport {
     pub blockers: Vec<DecisionReadinessBlock>,
     pub candidate_calibration_receipt_id: String,
     pub active_calibration_receipt_id: String,
+    pub decision_time_epoch_seconds: i64,
+    pub calibration_age_seconds: Option<u64>,
+    pub max_calibration_age_seconds: u64,
+    pub monitor_observation_age_seconds: Option<u64>,
+    pub max_monitor_observation_age_seconds: u64,
     pub drift_evidence: DriftEvidence,
 }
 
@@ -164,6 +169,19 @@ pub fn assess_decision_readiness(input: DecisionReadinessInput<'_>) -> DecisionR
         blockers,
         candidate_calibration_receipt_id: input.candidate_calibration_receipt_id.into(),
         active_calibration_receipt_id: input.active_calibration_receipt_id.into(),
+        decision_time_epoch_seconds: input.decision_time_epoch_seconds,
+        calibration_age_seconds: if input.calibration_created_at_epoch_seconds >= 0
+            && input.decision_time_epoch_seconds >= input.calibration_created_at_epoch_seconds
+        {
+            Some((input.decision_time_epoch_seconds - input.calibration_created_at_epoch_seconds) as u64)
+        } else {
+            None
+        },
+        max_calibration_age_seconds: input.max_calibration_age_seconds,
+        monitor_observation_age_seconds: input.latest_monitor_observation_epoch_seconds
+            .filter(|timestamp| *timestamp >= 0 && input.decision_time_epoch_seconds >= *timestamp)
+            .map(|timestamp| (input.decision_time_epoch_seconds - timestamp) as u64),
+        max_monitor_observation_age_seconds: input.max_monitor_observation_age_seconds,
         drift_evidence: input.drift_monitor.evidence,
     }
 }
@@ -510,6 +528,17 @@ mod tests {
         assert!(report.blockers.contains(&DecisionReadinessBlock::InvalidFreshnessPolicy));
         assert!(report.blockers.contains(&DecisionReadinessBlock::FutureCalibrationReceipt));
         assert!(report.blockers.contains(&DecisionReadinessBlock::FutureMonitoringObservation));
+    }
+
+ 
+    #[test]
+    fn report_exposes_calibration_and_feed_age_for_audit() {
+        let report = assess_with_feed_time(Some(190));
+        assert_eq!(report.decision_time_epoch_seconds, 200);
+        assert_eq!(report.calibration_age_seconds, Some(100));
+        assert_eq!(report.max_calibration_age_seconds, 1_000);
+        assert_eq!(report.monitor_observation_age_seconds, Some(10));
+        assert_eq!(report.max_monitor_observation_age_seconds, 10);
     }
 
 }
