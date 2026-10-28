@@ -483,6 +483,7 @@ mod tests {
     use crate::{compute_protocol_commitment, sha256_hex};
     use serde_json::json;
 
+    #[rustfmt::skip]
     fn demo_config() -> Vec<u8> {
         serde_json::to_vec_pretty(&json!({
             "schema": GENERATOR_CONFIG_SCHEMA,
@@ -497,6 +498,7 @@ mod tests {
         .expect("config serializes")
     }
 
+    #[rustfmt::skip]
     fn manifest_for_test(config_bytes: &[u8], seed: &[u8]) -> Vec<u8> {
         let mut manifest = json!({
             "schema": crate::MANIFEST_SCHEMA,
@@ -650,6 +652,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn unknown_recipe_family_is_rejected() {
         let config = serde_json::to_vec(&json!({
             "schema": GENERATOR_CONFIG_SCHEMA,
