@@ -51,13 +51,13 @@ The policy-row mismatch should also be rejected by the identity binding—not re
 ## Reproducibility
 
 - Source path: validation/decision_risk_certified_fallback.py
-- Source Git blob: 093762836d0b2a238aa9cc8d46c35d57aa70a62d
-- Source SHA-256: a00411b9e68df4746613557b595939fd2f6839e6aaab64201f97faa240cdc881
+- Source Git blob: 601730dc86f927e8ea673170aa974134d8902bb2
+- Source SHA-256: a0e920f90ed2921e319a66b5a5bdf0d32fdb4ca407e39f412fa4b202ff90473c
 - Test path: validation/test_decision_risk_certified_fallback.py
 - Test Git blob: d18d5fd0da75c16c253adafba948b266517675f5
 - Test SHA-256: d1167b41b3c41bcabc957ed557318924668a93a146fc1f14c14469509fdb555d
-- Raw result JSON SHA-256: 363b3f3e98a077d09caf0b1b3b62e98f6115067b84ad18cb92c4ca7a6eeaf977
-- Compressed result SHA-256: 452f365ff861490fda3fec442a21683486faf33f8a652ed28e2f492000bb0709
-- Combined Python validation: 19/19 tests passed in 16.816 seconds; full log SHA-256 21e0abde673150f15d48a87f16ce53013b73793f146b629518c76148c2e7d656.
+- Raw result JSON SHA-256: dca33d04f5f48ca8f63b518647c3991f75b67e8f95c7d25794b350e68b021a78
+- Compressed result SHA-256: 4b51c7c86e893bdb64254f3a942892109414520920b9dc2f94b5bd3a5eccce95
+- Combined Python validation: 19/19 tests passed in 16.816 seconds; full log SHA-256 e2c0aaf9058db9e55289c2fde9fe6d2cc6d34731e50eb9b25fb9723c6d818533.
 - The Rust policy-risk binding module and its eight inline Rust tests are committed separately but unexecuted: no cargo/rustc is installed in this environment, and the draft PR CI was skipped. No Rust build or remote CI pass is claimed.
-- Downloadable bundle SHA-256: c7ce1154d64263a49d1a63c618c6657ea2a9373aaf316d3d1abc59ed404df4a0.
+- Downloadable bundle SHA-256: 0f836386e2d74e7eb0d739daf2dda37cc6470db1f967b410afdc727086664112.
