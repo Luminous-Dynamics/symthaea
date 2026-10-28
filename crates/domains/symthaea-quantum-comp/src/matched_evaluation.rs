@@ -1338,37 +1338,32 @@ mod tests {
             vec![verified_trial("b", "pair-1", 1, 5, costs(100.0), EnergyRecord::not_measured())],
         );
 
+        let other_graph: &[u8] = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 6\\nedges 1\\n0 1\\n";
         let mut candidate = report(
             "candidate",
             "trajectory",
-            vec![verified_trial("c", "pair-1", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+            vec![verified_trial_for("c", "pair-1", 1, 5, 5, other_graph, TEST_VERIFIER, costs(50.0), EnergyRecord::not_measured())],
         );
-        candidate.instance_sha256 = "9".repeat(64);
-        candidate.trials[0].verifier_receipt.as_mut().unwrap().instance_sha256 =
-            candidate.instance_sha256.clone();
+        candidate.instance_sha256 = sha256_hex(other_graph);
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::InstanceMismatch)));
 
         candidate.instance_sha256 = baseline.instance_sha256.clone();
-        candidate.trials[0].verifier_receipt.as_mut().unwrap().instance_sha256 =
-            candidate.instance_sha256.clone();
         candidate.target_size = 6;
-        candidate.trials[0].verifier_receipt.as_mut().unwrap().target_size = 6;
+        candidate.trials[0] = verified_trial_for("c", "pair-1", 1, 5, 6, TEST_GRAPH, TEST_VERIFIER, costs(50.0), EnergyRecord::not_measured());
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::TargetMismatch)));
 
         candidate.target_size = 5;
-        candidate.trials[0].verifier_receipt.as_mut().unwrap().target_size = 5;
+        candidate.trials[0] = verified_trial_for("c", "pair-1", 1, 5, 5, TEST_GRAPH, TEST_VERIFIER, costs(50.0), EnergyRecord::not_measured());
         candidate.per_trial_solver_budget_ms = 999.0;
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::SolverBudgetMismatch)));
 
         candidate.per_trial_solver_budget_ms = baseline.per_trial_solver_budget_ms;
         candidate.verifier_sha256 = "8".repeat(64);
-        candidate.trials[0].verifier_receipt.as_mut().unwrap().verifier_sha256 =
-            candidate.verifier_sha256.clone();
+        candidate.trials[0] = verified_trial_for("c", "pair-1", 1, 5, 5, TEST_GRAPH, &candidate.verifier_sha256, costs(50.0), EnergyRecord::not_measured());
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::VerifierMismatch)));
 
         candidate.verifier_sha256 = baseline.verifier_sha256.clone();
-        candidate.trials[0].verifier_receipt.as_mut().unwrap().verifier_sha256 =
-            candidate.verifier_sha256.clone();
+        candidate.trials[0] = verified_trial_for("c", "pair-1", 1, 5, 5, TEST_GRAPH, TEST_VERIFIER, costs(50.0), EnergyRecord::not_measured());
         candidate.trials[0].pair_id = "other-pair".into();
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::PairSetMismatch)));
     }
