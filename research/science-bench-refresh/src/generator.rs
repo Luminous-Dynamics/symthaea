@@ -504,8 +504,7 @@ pub fn verify_regeneration(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compute_protocol_commitment, sha256_hex};
-    use serde_json::json;
+    use crate::compute_protocol_commitment;
 
     #[rustfmt::skip]
     fn demo_config() -> Vec<u8> {
