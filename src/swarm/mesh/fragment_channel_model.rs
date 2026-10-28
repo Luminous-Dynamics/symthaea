@@ -147,8 +147,16 @@ fn wire_len(payload_len: u8) -> usize {
 /// parity-frame outcome in the no-parity retry strategy. The schedules are:
 /// initial data at slots 0..N-1; XOR/hybrid parity at N; selective-retry feedback
 /// turnaround at N; hybrid feedback turnaround at N+1; retries then consume
-/// slots in actual send order. Retry strategies assume ideal feedback and at
-/// most one retry per missing data frame; ACK bytes/loss are not modelled.
+/// slots in actual send order.
+///
+/// Every paired trial reserves a fixed 2N+2-slot window. If a strategy finishes
+/// before the window ends, the remaining slots are idle so every strategy's
+/// next trial starts at the same exogenous channel state. This supports paired
+/// per-message comparison, but is not a back-to-back throughput simulation;
+/// continuous-operation throughput needs a separate event-driven workload model.
+///
+/// Retry strategies assume ideal feedback and at most one retry per missing
+/// data frame; ACK bytes/loss are not modelled.
 fn run_benchmark(
     payload: &[u8],
     model: LossModel,
