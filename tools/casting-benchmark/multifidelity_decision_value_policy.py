@@ -159,13 +159,12 @@ def _predict(
     return predicted, margin, sigma
 
 
-def _decision_impact_score(
-    candidate_id: int,
+def _decision_impact_components(
     predicted_objectives: tuple[float, float],
     predicted_margin: float,
     sigma: tuple[float, float, float],
     feasible_archive: list[Observation],
-) -> float:
+) -> dict[str, float]:
     sigma_f0, sigma_f1, sigma_margin = sigma
     p_feasible = _normal_cdf(predicted_margin, sigma_margin)
     current_hv = hypervolume_2d([obs.objectives for obs in feasible_archive])
@@ -179,12 +178,18 @@ def _decision_impact_score(
     distance = _frontier_distance(predicted_objectives, feasible_archive)
     frontier_proximity = math.exp(-distance / 0.10)
     objective_information = objective_uncertainty * frontier_proximity
-    return (
+    score = (
         SCORE_WEIGHTS["expected_hypervolume_gain"] * p_feasible * normalized_gain
         + SCORE_WEIGHTS["constraint_boundary_information"] * boundary_information
         + SCORE_WEIGHTS["frontier_objective_information"] * objective_information
     )
-
+    return {
+        "probability_feasible_proxy": p_feasible,
+        "normalized_expected_hypervolume_gain": normalized_gain,
+        "boundary_information": boundary_information,
+        "objective_information": objective_information,
+        "score": score,
+    }
 
 def decision_value_of_information_policy(evaluator: PolicyEvaluator, seed: int) -> None:
     """Spend 60 low + 8 medium + 4 high calls under the standard 200-unit budget.
@@ -194,6 +199,7 @@ def decision_value_of_information_policy(evaluator: PolicyEvaluator, seed: int) 
     discrepancy anchors and two sequential confirmations.
     """
     costs = evaluator.fidelity_costs
+    evaluator.decision_value_trace = []
     required = LOW_CALLS * costs["low"] + MEDIUM_CALLS * costs["medium"] + HIGH_CALLS * costs["high"]
     if evaluator.cost_budget < required:
         raise ValueError(
@@ -253,21 +259,37 @@ def decision_value_of_information_policy(evaluator: PolicyEvaluator, seed: int) 
 
     while evaluator.remaining_budget >= costs["high"] and len(evaluator.high_observations) < HIGH_CALLS:
         high_ids = {obs.candidate_id for obs in evaluator.high_observations}
+        high_before = [obs.candidate_id for obs in evaluator.high_observations]
         feasible_archive = [obs for obs in evaluator.high_observations if obs.constraint_margin >= 0.0]
         options = []
+        candidate_scores = []
         for candidate_id in low_ids:
             if candidate_id in high_ids:
                 continue
             predicted_objectives, predicted_margin, sigma = _predict(
                 candidate_id, low_by_id, medium, high_anchors, evaluator
             )
-            score = _decision_impact_score(
-                candidate_id, predicted_objectives, predicted_margin, sigma, feasible_archive
+            components = _decision_impact_components(
+                predicted_objectives, predicted_margin, sigma, feasible_archive
             )
-            options.append((score, candidate_id, predicted_margin))
+            candidate_scores.append({
+                "candidate_id": candidate_id,
+                "predicted_objectives": list(predicted_objectives),
+                "predicted_margin": predicted_margin,
+                "sigma": list(sigma),
+                **components,
+            })
+            options.append((components["score"], candidate_id, predicted_margin))
         if not options:
             break
         _, winner, predicted_margin = max(options, key=lambda item: (item[0], -item[1]))
+        candidate_scores.sort(key=lambda row: (-row["score"], row["candidate_id"]))
+        evaluator.decision_value_trace.append({
+            "step": len(evaluator.decision_value_trace) + 1,
+            "high_fidelity_candidates_before_decision": high_before,
+            "candidate_scores": candidate_scores,
+            "selected_candidate_id": winner,
+        })
         evaluator.record_promotion_basis(
             winner, predicted_margin, "decision_impact_confirmation"
         )
