@@ -542,6 +542,10 @@ def check_eprocess_family_csv(path):
             if got[field] != want[field]:
                 raise ValueError(f"{field} mismatch on line {line}: {got[field]} != {want[field]}")
         for field in numeric_fields:
+            if want[field] == "NA":
+                if got[field] != "NA":
+                    raise ValueError(f"{field} should be NA on line {line}")
+                continue
             try:
                 value = float(got[field])
             except (TypeError, ValueError) as exc:
