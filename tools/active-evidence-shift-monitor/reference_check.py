@@ -223,6 +223,10 @@ def check_csv(path):
             if got[field] != want[field]:
                 raise ValueError(f"{field} mismatch on line {line}: {got[field]} != {want[field]}")
         for field in numeric_fields:
+            if want[field] == "NA":
+                if got[field] != "NA":
+                    raise ValueError(f"{field} should be NA on line {line}")
+                continue
             try:
                 value = float(got[field])
             except (TypeError, ValueError) as exc:
@@ -526,11 +530,10 @@ def check_eprocess_family_csv(path):
     key_fields = ("family", "scenario", "horizon")
     text_fields = (
         "family", "scenario", "horizon", "change_after", "p0", "stream_pre_p", "p1",
-        "detection_probability", "mean_detection_delay",
     )
     numeric_fields = (
-        "false_alarm_probability", "per_cell_alpha", "survival_probability",
-        "log_e_threshold",
+        "false_alarm_probability", "detection_probability", "mean_detection_delay",
+        "per_cell_alpha", "survival_probability", "log_e_threshold",
     )
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
