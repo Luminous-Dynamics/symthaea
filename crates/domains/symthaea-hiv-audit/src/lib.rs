@@ -170,7 +170,10 @@ pub fn scan_dataset(
         if !path.is_file() {
             continue;
         }
-        let is_csv = path.extension().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("csv"));
+        let is_csv = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .is_some_and(|s| s.eq_ignore_ascii_case("csv"));
         if is_csv {
             let name = path.file_name().and_then(|s| s.to_str()).unwrap_or_default();
             if !expected.contains(name) {
@@ -186,7 +189,11 @@ pub fn scan_dataset(
             .map_err(|e| format!("stat {}: {e}", path.display()))?
             .len();
         let sha256 = sha256_file(&path)?;
-        let (csv, uuids) = if path.extension().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("csv")) {
+        let (csv, uuids) = if path
+            .extension()
+            .and_then(|s| s.to_str())
+            .is_some_and(|s| s.eq_ignore_ascii_case("csv"))
+        {
             let (audit, ids) = audit_csv(&path)?;
             if audit.duplicate_uuid_rows != 0 {
                 return Err(format!(
@@ -294,11 +301,14 @@ fn audit_csv(path: &Path) -> Result<(CsvAudit, HashSet<String>), String> {
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file = File::open(path).map_err(|e| format!("open {} for hashing: {e}", path.display()))?;
+    let mut file = File::open(path)
+        .map_err(|e| format!("open {} for hashing: {e}", path.display()))?;
     let mut digest = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
     loop {
-        let read = file.read(&mut buffer).map_err(|e| format!("read {} for hashing: {e}", path.display()))?;
+        let read = file
+            .read(&mut buffer)
+            .map_err(|e| format!("read {} for hashing: {e}", path.display()))?;
         if read == 0 { break; }
         digest.update(&buffer[..read]);
     }
@@ -379,11 +389,15 @@ pub fn verify_receipt(
 
     let actual_archive = audit_source_archive(source_archive_path)?;
     if receipt.source_archive != actual_archive {
-        return Err("source archive receipt mismatch: filename, byte length, or SHA-256 changed".to_owned());
+        return Err(
+            "source archive receipt mismatch: filename, byte length, or SHA-256 changed".to_owned(),
+        );
     }
     let (actual_files, actual_joins) = scan_dataset(entry, data_dir)?;
     if receipt.files != actual_files {
-        return Err("file receipt mismatch: size, SHA-256, CSV schema, rows, or UUID-set hash changed".to_owned());
+        return Err(
+            "file receipt mismatch: size, SHA-256, CSV schema, rows, or UUID-set hash changed".to_owned(),
+        );
     }
     if receipt.pairwise_uuid_joins != actual_joins {
         return Err("pairwise UUID join audit differs from the captured receipt".to_owned());
@@ -399,7 +413,11 @@ fn audit_source_archive(path: &Path) -> Result<SourceArchiveAudit, String> {
         .ok_or_else(|| "source archive path has no UTF-8 filename".to_owned())?
         .to_owned();
     validate_plain_filename(&filename)?;
-    if !path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("zip")) {
+    if !path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"))
+    {
         return Err("source archive must have a .zip extension".to_owned());
     }
     let mut prefix = [0u8; 4];
@@ -429,7 +447,8 @@ fn validate_commit(commit: &str) -> Result<(), String> {
 
 pub fn write_receipt_atomic(path: &Path, receipt: &DatasetReceipt) -> Result<(), String> {
     let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    fs::create_dir_all(parent).map_err(|e| format!("create receipt directory {}: {e}", parent.display()))?;
+    fs::create_dir_all(parent)
+        .map_err(|e| format!("create receipt directory {}: {e}", parent.display()))?;
 
     let temporary = temporary_path(path);
     let bytes = serde_json::to_vec_pretty(receipt).map_err(|e| format!("serialize receipt: {e}"))?;
@@ -457,7 +476,10 @@ pub fn print_receipt_summary(receipt: &DatasetReceipt) {
     println!("source_commit: {}", receipt.source_commit);
     println!("captured_at_unix_seconds: {}", receipt.captured_at_unix_seconds);
     println!("source_archive: {} ({} bytes, sha256={})",
-        receipt.source_archive.filename, receipt.source_archive.byte_length, receipt.source_archive.sha256);
+        receipt.source_archive.filename,
+        receipt.source_archive.byte_length,
+        receipt.source_archive.sha256
+    );
     println!("files: {}", receipt.files.len());
     for file in &receipt.files {
         print!("  {}: {} bytes sha256={}", file.path, file.byte_length, file.sha256);
