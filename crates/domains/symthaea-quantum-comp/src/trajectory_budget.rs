@@ -118,6 +118,8 @@ pub enum AcquisitionBudgetError {
         attempted_runs: usize,
         valid_projections: usize,
     },
+    /// A batch with no valid projections must not manufacture a new stable ranking.
+    RankingWithoutValidProjections { batch_id: String },
     /// Batch input contained a complete ranking with the wrong vertex count.
     RankingLengthMismatch {
         batch_id: String,
@@ -175,6 +177,10 @@ impl fmt::Display for AcquisitionBudgetError {
             } => write!(
                 f,
                 "batch {batch_id} has {valid_projections} valid projections but only {attempted_runs} attempts"
+            ),
+            Self::RankingWithoutValidProjections { batch_id } => write!(
+                f,
+                "batch {batch_id} has a ranking but no valid projections"
             ),
             Self::RankingLengthMismatch { batch_id, expected, actual } => write!(
                 f,
@@ -277,6 +283,12 @@ impl TrajectoryAcquisitionGate {
                 batch_id: batch.batch_id,
                 attempted_runs: batch.attempted_runs,
                 valid_projections: batch.valid_projections,
+            });
+        }
+
+        if batch.valid_projections == 0 && batch.ordering.is_some() {
+            return Err(AcquisitionBudgetError::RankingWithoutValidProjections {
+                batch_id: batch.batch_id,
             });
         }
 
@@ -499,6 +511,20 @@ mod tests {
             }
             other => panic!("low projection yield must not stop acquisition: {other:?}"),
         }
+    }
+
+    #[test]
+    fn a_zero_valid_batch_cannot_inflate_ranking_stability() {
+        let mut gate = TrajectoryAcquisitionGate::new(config()).unwrap();
+        let order = vec![0, 1, 2, 3];
+        gate.observe(batch("b1", 2, 2, Some(order.clone()))).unwrap();
+        let before = gate.current_snapshot();
+        assert!(matches!(
+            gate.observe(batch("b2-no-valid", 2, 0, Some(order))),
+            Err(AcquisitionBudgetError::RankingWithoutValidProjections { .. })
+        ));
+        // Invalid input is rejected before counters or stability change.
+        assert_eq!(gate.current_snapshot(), before);
     }
 
     #[test]
