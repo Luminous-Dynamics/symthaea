@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vleb-paired-results.schema.json",
+  "title": "VLEB paired confirmatory results",
+  "description": "Task-paired outcomes for deterministic statistical analysis. The analysis script is not an evidence-authentication or score-admission gate; upstream protected evaluator outputs must be authenticated and pinned.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cohort_id", "protocol_sha256", "analysis_plan", "candidates", "tasks"],
+  "properties": {
+    "schema_version": {"const": "vleb-paired-results-v1"},
+    "cohort_id": {"type": "string", "minLength": 3, "maxLength": 256},
+    "protocol_sha256": {"$ref": "#/$defs/sha256"},
+    "analysis_plan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["primary_metric", "pairwise_test", "confidence_level", "attempt_aggregation", "cost_currency", "cluster_bootstrap_replicates", "cluster_bootstrap_seed"],
+      "properties": {
+        "primary_metric": {"const": "assurance_adjusted_semantic_success_rate"},
+        "pairwise_test": {"const": "exact_mcnemar_two_sided"},
+        "confidence_level": {"type": "number", "minimum": 0.8, "maximum": 0.9999},
+        "attempt_aggregation": {"type": "string", "minLength": 1, "maxLength": 512},
+        "cost_currency": {"const": "USD"},
+        "cluster_bootstrap_replicates": {"type": "integer", "minimum": 1000, "maximum": 100000},
+        "cluster_bootstrap_seed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "candidates": {
+      "type": "object", "additionalProperties": false,
+      "required": ["A", "B"],
+      "properties": {
+        "A": {"$ref": "#/$defs/candidate"},
+        "B": {"$ref": "#/$defs/candidate"}
+      }
+    },
+    "tasks": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["task_id", "cluster_id", "lane", "candidate_A", "candidate_B", "exclusion"],
+        "properties": {
+          "task_id": {"type": "string", "minLength": 1, "maxLength": 512},
+          "cluster_id": {"type": "string", "minLength": 1, "maxLength": 512},
+          "lane": {"type": "string", "minLength": 1, "maxLength": 128},
+          "candidate_A": {"$ref": "#/$defs/outcome"},
+          "candidate_B": {"$ref": "#/$defs/outcome"},
+          "exclusion": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["reason", "adjudicated_before_unblinding", "adjudication_sha256"],
+                "properties": {
+                  "reason": {"type": "string", "minLength": 1, "maxLength": 2000},
+                  "adjudicated_before_unblinding": {"const": true},
+                  "adjudication_sha256": {"$ref": "#/$defs/sha256"}
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "configuration_sha256"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "configuration_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "outcome": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "cost_usd", "duration_ms"],
+      "properties": {
+        "outcome": {"enum": ["assured_pass", "raw_pass_unverified", "fail", "unresolved", "abstained"]},
+        "cost_usd": {"type": "number", "minimum": 0},
+        "duration_ms": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
