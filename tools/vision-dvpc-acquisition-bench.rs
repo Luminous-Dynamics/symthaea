@@ -393,7 +393,7 @@ fn analyze(action_bytes:&[u8],expected_actions_sha:&str,oracle_bytes:&[u8],expec
         let o=oracle.outcomes.get(id).ok_or_else(||invalid("selected oracle outcome missing"))?;
         let credited=if o.terminal_state=="SUCCESS"{o.realized_regret_reduction}else{0.0};
         total_regret+=credited;
-        match o.terminal_state{"FAILED"=>failed+=1,"CENSORED"=>censored+=1,"MISSING"=>missing+=1,_=>{}}
+        match o.terminal_state.as_str(){"FAILED"=>failed+=1,"CENSORED"=>censored+=1,"MISSING"=>missing+=1,_=>{}}
         let used_l=o.actual_latency.unwrap_or_else(||{incomplete+=1;c.latency_cost_ucb});
         let used_e=o.actual_energy.unwrap_or_else(||{if o.actual_latency.is_some(){incomplete+=1;}c.energy_cost_ucb});
         if used_l>c.latency_cost_ucb||used_e>c.energy_cost_ucb{overrun+=1;}
