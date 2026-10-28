@@ -24,6 +24,7 @@ SCENARIOS = (
     "selection_bias_no_environment_shift",
     "stable_baseline_rate_045", "stable_baseline_rate_048", "stable_baseline_rate_049",
     "stable_baseline_rate_051", "stable_baseline_rate_052", "stable_baseline_rate_055",
+    "within_band_transition_049_to_051",
 )
 SHIFT_PROBABILITIES = {
     "stationary_null": None,
@@ -44,6 +45,7 @@ SHIFT_PROBABILITIES = {
     "stable_baseline_rate_051": None,
     "stable_baseline_rate_052": None,
     "stable_baseline_rate_055": None,
+    "within_band_transition_049_to_051": 0.51,
 }
 PRE_SHIFT_PROBABILITIES = {scenario: P0 for scenario in SCENARIOS}
 PRE_SHIFT_PROBABILITIES["selection_bias_no_environment_shift"] = 0.74
@@ -53,6 +55,7 @@ PRE_SHIFT_PROBABILITIES["stable_baseline_rate_049"] = 0.49
 PRE_SHIFT_PROBABILITIES["stable_baseline_rate_051"] = 0.51
 PRE_SHIFT_PROBABILITIES["stable_baseline_rate_052"] = 0.52
 PRE_SHIFT_PROBABILITIES["stable_baseline_rate_055"] = 0.55
+PRE_SHIFT_PROBABILITIES["within_band_transition_049_to_051"] = 0.49
 FIELDS = (
     "boundary", "scenario", "horizon", "change_after", "p0", "stream_pre_p", "p1",
     "false_alarm_probability", "detection_probability", "mean_detection_delay",
@@ -94,6 +97,7 @@ EPROCESS_FAMILY_SCENARIOS = (
     "selection_bias_no_environment_shift",
     "stable_baseline_rate_045", "stable_baseline_rate_048", "stable_baseline_rate_049",
     "stable_baseline_rate_051", "stable_baseline_rate_052", "stable_baseline_rate_055",
+    "within_band_transition_049_to_051",
 )
 EPROCESS_FAMILY_FIELDS = (
     "family", "scenario", "horizon", "change_after", "p0", "stream_pre_p", "p1",
@@ -644,6 +648,13 @@ def eprocess_family_self_test():
             outside_band = indexed[(family, "stable_baseline_rate_045")]
             if float(outside_band["false_alarm_probability"]) <= 0.04:
                 raise ValueError("composite-null outside-band negative control did not expose baseline drift")
+            within_band_transition = indexed[(family, "within_band_transition_049_to_051")]
+            transition_alarm = (
+                float(within_band_transition["false_alarm_probability"])
+                + float(within_band_transition["detection_probability"])
+            )
+            if transition_alarm > PER_CELL_ALPHA + EPS:
+                raise ValueError("composite-null e-process exceeded alpha when conditional rates moved within its accepted band")
         elif float(misspecified["false_alarm_probability"]) <= PER_CELL_ALPHA:
             raise ValueError(f"{family} did not expose nominal-rate misspecification")
         for scenario in EPROCESS_FAMILY_SCENARIOS:
