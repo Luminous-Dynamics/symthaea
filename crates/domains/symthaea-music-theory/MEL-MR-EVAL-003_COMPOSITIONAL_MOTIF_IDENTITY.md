@@ -3,6 +3,14 @@
 **Date:** 2026-10-28  
 **Status:** research/design increment with synthetic smoke fixtures. This is not evidence that the Rust verifier passes the corpus.
 
+## Implementation status at prototype revision
+
+The PR now includes an isolated Rust reference implementation in `src/compositional_motif.rs`, exported by the crate root. It has versioned descriptors, independent per-axis evidence, monotonic edit alignment, coverage/gap gates, invalid-input rejection, and a 1,000,000-cell DP budget. Unit tests are authored for compound transformations, adversarial axis violations, bounded insertions, invalid/range claims, the computation budget, temporal-origin invariance, and the committed smoke corpus.
+
+**Execution boundary:** those Rust tests have not been compiled or executed in this environment. Exact-head GitHub CI records are skipped. An independent local Python simulation of the intended alignment/verdict rules produced zero mismatches on the 108-case smoke corpus; this is algorithm-level fixture checking, not Rust execution or scientific validation.
+
+Current API scope is deliberately monophonic: events must have strictly increasing onsets. Simultaneous notes, explicit rests, retrograde, ornament operators, audio realization, and historical restoration lineage are not supported by this contract and must not be inferred.
+
 ## Motivation: move beyond a single transformation label
 
 The v5 motif-return contract improves fail-closed identifiability but exposes a single ReturnTransformation label. Musical transformations are compositional: a return can be inverted, transposed, augmented, ornamented and presented as a fragment at once. A winner-takes-one label discards information and makes obligations brittle when they specify multiple simultaneous properties.
@@ -51,14 +59,14 @@ The 2026 music-generation survey notes that no single metric captures musical qu
 
 Do not claim “better than Suno/Udio” from this benchmark. The direct differentiator is verifiable compositional control and edit locality. A fair product comparison should use identical prompts, candidate budgets, rendering/normalization and blind listening, while separately reporting symbolic constraint correctness.
 
-## Implementation sequence
+## Remaining implementation and evaluation sequence
 
-1. Add a versioned descriptor type without silently changing legacy ReturnTransformation serialization.
-2. Implement deterministic alignment behind a feature/API boundary, retaining the strict index-aligned path as baseline.
-3. Make per-axis evidence first-class; all declared axes must pass and abstention must remain explicit.
-4. Port fixtures into Rust tests and generate factorial metamorphic cases and executable mutants.
-5. Test on held-out, family-disjoint annotated motifs; then add the edit-locality suite.
-6. Run blinded recognition and full-piece preference studies only after symbolic controls are stable.
+1. Execute the authored Rust suite on an exact commit SHA with `cargo test --locked -p symthaea-music-theory`, formatting and Clippy gates; never infer a pass from a skipped workflow.
+2. Generate a factorial suite across orientation, transposition, onset scale, duration scale, source-window selection, event insertions/deletions, and local perturbations. Run executable mutation tests against the Rust verifier and preserve matched valid positives.
+3. Add a score adapter only after the standalone contract is validated, keeping the legacy ReturnTransformation wire format unchanged.
+4. Grow to at least 50 independent motif families per split, validate annotation agreement, then calibrate tolerance and gap thresholds without test leakage.
+5. Add the edit-locality benchmark and measure preservation of non-targeted pitch, rhythm, harmony, voice-leading, and form.
+6. Run blinded motif-recognition and full-piece preference studies only after symbolic controls are stable. Compare these results separately from verifier correctness and report confidence intervals.
 
 ## References
 
