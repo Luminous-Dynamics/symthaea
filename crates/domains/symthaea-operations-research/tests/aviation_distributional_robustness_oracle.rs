@@ -121,7 +121,7 @@ fn greedy_tv_evaluator_matches_independent_exhaustive_oracle_at_multiple_radii()
         let oracle = brute_force_tv_max(&scenarios, radius)
             .expect("nominal distribution is always in the ambiguity set");
         assert_eq!(
-            production.worst_case_expected_delta_numerator_ppm, oracle,
+            production.worst_case_expected_delta_numerator_ppm(), oracle,
             "mismatch at TV radius {radius} ppm"
         );
     }
@@ -138,7 +138,7 @@ fn exhaustive_oracle_checks_zero_probability_stress_scenario() {
     for radius in [0, 100_000, 300_000, 1_000_000] {
         let production = evaluate_tv_robust_cost_delta(&scenarios, radius).unwrap();
         let oracle = brute_force_tv_max(&scenarios, radius).unwrap();
-        assert_eq!(production.worst_case_expected_delta_numerator_ppm, oracle);
+        assert_eq!(production.worst_case_expected_delta_numerator_ppm(), oracle);
     }
 }
 
@@ -150,7 +150,7 @@ fn oracle_is_insensitive_to_scenario_row_order() {
     for radius in [0, 200_000, 500_000, 1_000_000] {
         let a = evaluate_tv_robust_cost_delta(&scenarios, radius).unwrap();
         let b = evaluate_tv_robust_cost_delta(&reversed, radius).unwrap();
-        assert_eq!(a.worst_case_expected_delta_numerator_ppm, b.worst_case_expected_delta_numerator_ppm);
-        assert_eq!(a.nominal_expected_delta_numerator_ppm, b.nominal_expected_delta_numerator_ppm);
+        assert_eq!(a.worst_case_expected_delta_numerator_ppm(), b.worst_case_expected_delta_numerator_ppm);
+        assert_eq!(a.nominal_expected_delta_numerator_ppm(), b.nominal_expected_delta_numerator_ppm);
     }
 }
