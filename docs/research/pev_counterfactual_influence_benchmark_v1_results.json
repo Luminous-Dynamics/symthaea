@@ -9,7 +9,19 @@
       "expected_error_detected": true,
       "rejected": true
     },
+    "duplicate_evidence_id_across_batch": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "duplicate_invalid_payload_coverage": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
     "duplicate_positive_admission": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "duplicate_trial_id_across_batch": {
       "expected_error_detected": true,
       "rejected": true
     },
@@ -17,7 +29,19 @@
       "expected_error_detected": true,
       "rejected": true
     },
+    "invalid_branch_label_mismatch": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
     "invalid_payload_changes_protected_state": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "malformed_consumer_state_digest": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "missing_invalid_variant": {
       "expected_error_detected": true,
       "rejected": true
     },
@@ -29,6 +53,10 @@
       "expected_error_detected": true,
       "rejected": true
     },
+    "unclassified_consumer": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
     "valid_pe_collateral_state_change": {
       "expected_error_detected": true,
       "rejected": true
@@ -36,10 +64,14 @@
     "valid_pe_noop_learner": {
       "expected_error_detected": true,
       "rejected": true
+    },
+    "valid_scalar_evidence_mismatch": {
+      "expected_error_detected": true,
+      "rejected": true
     }
   },
-  "mutations_detected": 8,
-  "mutations_injected": 8,
+  "mutations_detected": 16,
+  "mutations_injected": 16,
   "production_symthaea_imported": false,
   "rust_compiled_or_executed": false,
   "scope_note": "Synthetic paired state-digest fixtures only; not production causal verification or task-utility/SOTA evidence.",
