@@ -798,6 +798,36 @@ mod tests {
     }
 
     #[test]
+    fn posthoc_serialization_preserves_invalid_typed_evidence() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+        let invalid = PredictionErrorEvidence::invalid(
+            crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable,
+            Some(8),
+            9,
+        )
+        .unwrap();
+
+        engine.record_posthoc_with_evidence(true, false, Some(invalid));
+        ctx.cycle_id = 10;
+        engine.reason(&ctx);
+
+        let outcome = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("outcome should remain available without a usable PE");
+        assert_eq!(outcome.prediction_error, None);
+        let encoded = serde_json::to_vec(outcome).expect("posthoc outcome serializes");
+        let restored: PosthocOutcome =
+            serde_json::from_slice(&encoded).expect("posthoc outcome deserializes");
+        assert_eq!(restored.prediction_error, None);
+        assert_eq!(
+            restored.prediction_evidence.unwrap().status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable
+        );
+    }
+
+    #[test]
     fn posthoc_without_valid_pe_preserves_gate_outcome_and_missingness() {
         let mut engine = ConsciousReasoningEngine::new();
         let mut ctx = make_context(0.8, 0.8, 25_000);
