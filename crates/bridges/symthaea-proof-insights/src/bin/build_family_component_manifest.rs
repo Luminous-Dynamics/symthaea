@@ -30,7 +30,7 @@ fn hard(s:&str)->bool{matches!(s,"exact_duplicate"|"shared_source_artifact"|"for
 fn deterministic(ids:&[String])->Result<BTreeMap<String,String>>{
  if ids.len()<3{bail!("at least three family IDs required")}let mut unique=BTreeSet::new();for id in ids{if id.trim().is_empty()||!unique.insert(id.clone()){bail!("family IDs must be unique and nonblank")}}
  let mut ranked:Vec<(String,String)>=ids.iter().map(|id|(sha(format!("{SEED}\0{id}").as_bytes()),id.clone())).collect();ranked.sort_unstable();let n=ranked.len();let tr=n*70/100;let va=n*85/100;
- Ok(ranked.into_iter().enumerate().map(|(i,(_,id))|(id,if i<tr{"train"}else if i<va{"validation"}else{"test"}.to_owned())).collect())
+ Ok(ranked.into_iter().enumerate().map(|(i,(_,id))|(id,(if i<tr{"train"}else if i<va{"validation"}else{"test"}).to_owned())).collect())
 }
 fn partition_digest(m:&BTreeMap<String,String>)->String{let mut s=String::new();for(id,split)in m{s.push_str(id);s.push('\t');s.push_str(split);s.push('\n')}sha(s.as_bytes())}
 fn validate_splits(doc:&Value)->Result<(String,BTreeMap<String,String>)>{

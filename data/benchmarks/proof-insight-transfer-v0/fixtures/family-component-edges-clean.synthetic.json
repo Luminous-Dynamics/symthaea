@@ -1,0 +1,7 @@
+{
+  "schema_version": "pitb.family-leakage-edges.v0",
+  "source_partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+  "coverage_status": "independently_reviewed_complete",
+  "coverage_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "edges": []
+}

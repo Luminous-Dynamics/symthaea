@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/family-component-manifest.schema.json",
+  "title": "PITB Complete Independent Component Manifest",
+  "description": "Complete mapping of every frozen PITB family to deterministic connected components over non-dismissed hard relations. Includes same-split groups and isolated families. A digest is not authentication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "upstream_commit",
+    "source_partition_digest_sha256",
+    "relationship_inventory_sha256",
+    "relationship_inventory_status",
+    "coverage_receipt_sha256",
+    "total_family_count",
+    "total_component_count",
+    "independent_component_count_by_split",
+    "cross_split_component_count",
+    "edge_counts",
+    "families",
+    "components",
+    "qualification_status",
+    "qualified_for_confirmatory_resampling",
+    "qualification_limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.independent-component-manifest.v0"
+    },
+    "upstream_commit": {
+      "const": "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+    },
+    "source_partition_digest_sha256": {
+      "const": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970"
+    },
+    "relationship_inventory_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relationship_inventory_status": {
+      "enum": [
+        "incomplete",
+        "independently_reviewed_complete"
+      ]
+    },
+    "coverage_receipt_sha256": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "total_family_count": {
+      "const": 372
+    },
+    "total_component_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 372
+    },
+    "independent_component_count_by_split": {
+      "$ref": "#/$defs/counts"
+    },
+    "cross_split_component_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 372
+    },
+    "edge_counts": {
+      "$ref": "#/$defs/edges"
+    },
+    "families": {
+      "type": "array",
+      "minItems": 372,
+      "maxItems": 372,
+      "items": {
+        "$ref": "#/$defs/family"
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 372,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "qualification_status": {
+      "enum": [
+        "not_qualified_incomplete_inventory",
+        "not_qualified_cross_split_hard_relationships",
+        "qualified_complete_same_split_components"
+      ]
+    },
+    "qualified_for_confirmatory_resampling": {
+      "type": "boolean"
+    },
+    "qualification_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "train",
+        "validation",
+        "test"
+      ],
+      "properties": {
+        "train": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "validation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "test": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "edges": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_edges",
+        "hard_edges_included",
+        "confirmed_hard_edges",
+        "unresolved_hard_edges",
+        "dismissed_hard_edges",
+        "soft_edges",
+        "cross_split_hard_edges",
+        "unresolved_cross_split_hard_edges"
+      ],
+      "properties": {
+        "total_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_edges_included": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dismissed_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "soft_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cross_split_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_cross_split_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_id",
+        "split",
+        "component_id"
+      ],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ]
+        },
+        "component_id": {
+          "type": "string",
+          "pattern": "^component-[0-9a-f]{64}$"
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "split_names",
+        "family_ids",
+        "hard_edge_ids",
+        "confirmed_edge_ids",
+        "unresolved_edge_ids"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "pattern": "^component-[0-9a-f]{64}$"
+        },
+        "split_names": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          }
+        },
+        "family_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "hard_edge_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confirmed_edge_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unresolved_edge_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

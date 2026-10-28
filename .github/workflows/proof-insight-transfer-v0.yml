@@ -756,6 +756,76 @@ jobs:
           print("PITB_FAMILY_LEAKAGE_SCHEMA_PASS: " + str(len(pairs)) + " title candidates, " + str(len(path_pairs)) + " artifact-path candidates; both deterministic; incomplete inventory fail-closed; synthetic quarantine controls verified")
           PY
 
+      - name: Validate complete PITB component manifest and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          root="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0"
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$root/family-component-manifest.schema.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          Draft202012Validator.check_schema(json.loads(Path(sys.argv[1]).read_text()))
+          PY
+          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-components-incomplete-a.json"
+          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-components-incomplete-b.json"
+          cmp "$RUNNER_TEMP/family-components-incomplete-a.json" "$RUNNER_TEMP/family-components-incomplete-b.json"
+          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-component-edges-clean.synthetic.json" "$RUNNER_TEMP/family-components-clean-synthetic.json"
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$root/family-component-manifest.schema.json" "$RUNNER_TEMP/family-components-incomplete-a.json" "$RUNNER_TEMP/family-components-clean-synthetic.json" <<'PY'
+          import copy, json, sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError
+          schema_path, incomplete_path, clean_path = map(Path, sys.argv[1:])
+          validator = Draft202012Validator(json.loads(schema_path.read_text()))
+          incomplete = json.loads(incomplete_path.read_text())
+          clean = json.loads(clean_path.read_text())
+          def check_manifest(manifest):
+              validator.validate(manifest)
+              ids = [row["family_id"] for row in manifest["families"]]
+              if len(ids) != 372 or len(set(ids)) != 372:
+                  raise ValueError("family mapping must cover 372 unique IDs")
+              mapping = {row["family_id"]: row["component_id"] for row in manifest["families"]}
+              comps = manifest["components"]
+              members = [family for comp in comps for family in comp["family_ids"]]
+              if len([c["component_id"] for c in comps]) != len(set(c["component_id"] for c in comps)):
+                  raise ValueError("component IDs must be unique")
+              if len(members) != 372 or len(set(members)) != 372 or set(members) != set(ids):
+                  raise ValueError("components must partition all families exactly once")
+              for comp in comps:
+                  if any(mapping[family] != comp["component_id"] for family in comp["family_ids"]):
+                      raise ValueError("family assignment/component row mismatch")
+                  if comp["family_ids"] != sorted(comp["family_ids"]):
+                      raise ValueError("component member IDs must be sorted")
+              if manifest["total_component_count"] != len(comps):
+                  raise ValueError("component count does not reconcile")
+              if sum(len(c["split_names"]) > 1 for c in comps) != manifest["cross_split_component_count"]:
+                  raise ValueError("cross-split component count does not reconcile")
+              return mapping
+          imap = check_manifest(incomplete); check_manifest(clean)
+          if incomplete["relationship_inventory_status"] != "incomplete" or incomplete["qualified_for_confirmatory_resampling"]:
+              raise SystemExit("incomplete inventory must never qualify")
+          cross = next((c for c in incomplete["components"] if set(c["family_ids"]) == {"001","005","012"}), None)
+          if cross is None or len(cross["split_names"]) != 3:
+              raise SystemExit("confirmed and unresolved hard edges must form the synthetic cross-split component")
+          if imap["001"] != imap["005"] or imap["001"] != imap["012"]:
+              raise SystemExit("cross-split families must share one component")
+          if imap["008"] == imap["001"]:
+              raise SystemExit("soft conceptual similarity must not join components")
+          if clean["relationship_inventory_status"] != "independently_reviewed_complete" or clean["qualification_status"] != "qualified_complete_same_split_components" or not clean["qualified_for_confirmatory_resampling"]:
+              raise SystemExit("clean synthetic inventory should exercise positive schema shape only")
+          if clean["total_component_count"] != 372 or clean["independent_component_count_by_split"] != {"train":260,"validation":56,"test":56}:
+              raise SystemExit("clean synthetic inventory must retain isolated families")
+          bad = copy.deepcopy(incomplete); bad["qualification_status"] = "qualified_complete_same_split_components"; bad["qualified_for_confirmatory_resampling"] = True
+          try: validator.validate(bad)
+          except ValidationError: pass
+          else: raise SystemExit("schema accepted incomplete inventory as qualified")
+          bad = copy.deepcopy(clean); bad["families"].pop()
+          try: validator.validate(bad)
+          except ValidationError: pass
+          else: raise SystemExit("schema accepted incomplete family mapping")
+          print("PITB_COMPONENT_MANIFEST_CONTRACT_PASS: 372-family mapping, isolated families, deterministic membership, hard/unresolved vs soft/dismissed relations, cross-split fail-closed status, negative controls; clean path synthetic only")
+          PY
       - name: Validate counterfactual mutation qualification schema and controls
         shell: bash
         run: |
