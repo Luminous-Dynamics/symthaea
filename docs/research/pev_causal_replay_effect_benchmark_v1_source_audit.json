@@ -24,11 +24,11 @@
   },
   "seed_sweep_source": {
     "path": "/mnt/data/pev_causal_replay_seed_sweep_v1.py",
-    "sha256": "a9621d6e2edf8bfe8ef8795955aea370c494a79d4ceed1249f2d0d01f4ebb881",
-    "local_git_blob_sha1": "a6f09aa2577ddb5460dbb0abf4640741a08b9c39",
-    "repository_git_blob_sha1": "bea1eea5b77a8cf26ea3d04c43a673dcea2c3fc7",
-    "repository_source_matches_local_git_blob": false,
-    "qualification": "The local seed sweep passed syntax compilation and produced the recorded aggregate result. The fetched repository source is semantically equivalent on inspected lines but the bytes were not identical; therefore, do not claim byte-identity for this script."
+    "sha256": "4f62434eb7a686f54798a5f4eddc0224137da2a4346b2280233b034e287b50e2",
+    "git_blob_sha1": "bea1eea5b77a8cf26ea3d04c43a673dcea2c3fc7",
+    "repository_source_matches_local_git_blob": true,
+    "python_syntax_compile": "PASS",
+    "reference_execution": "PASS_ESTIMATOR_SEED_SWEEP_ONLY"
   },
   "seed_sweep_results": {
     "path": "/mnt/data/pev_causal_replay_seed_sweep_v1_1000_results.json",
