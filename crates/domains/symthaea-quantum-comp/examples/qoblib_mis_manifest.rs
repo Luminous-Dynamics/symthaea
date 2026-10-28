@@ -111,13 +111,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         let source_sha256 = sha256_hex(&bytes);
         let canonical = canonicalize_dimacs_graph(&bytes)?;
         let canonical_sha256 = sha256_hex(&canonical);
-        let (vertices, edges) = canonical_graph_counts(&canonical)?;
-        if vertices != pinned.expected_vertices || edges != pinned.expected_edges {
-            return Err(format!(
-                "{} graph-count mismatch: pinned {} vertices / {} edges, parsed {} vertices / {} edges",
-                pinned.name, pinned.expected_vertices, pinned.expected_edges, vertices, edges
-            ).into());
-        }
+        let (vertices, edges) = validate_pinned_graph_counts(pinned, &canonical)?;
         output.push_str(&format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             pinned.name,
@@ -251,6 +245,20 @@ fn verify_instance_directory_inventory(
     Ok(())
 }
 
+fn validate_pinned_graph_counts(
+    pinned: &PinnedFile,
+    canonical_graph: &[u8],
+) -> Result<(usize, usize), Box<dyn Error>> {
+    let (vertices, edges) = canonical_graph_counts(canonical_graph)?;
+    if vertices != pinned.expected_vertices || edges != pinned.expected_edges {
+        return Err(format!(
+            "{} graph-count mismatch: pinned {} vertices / {} edges, parsed {} vertices / {} edges",
+            pinned.name, pinned.expected_vertices, pinned.expected_edges, vertices, edges
+        ).into());
+    }
+    Ok((vertices, edges))
+}
+
 fn canonical_graph_counts(bytes: &[u8]) -> Result<(usize, usize), Box<dyn Error>> {
     let text = std::str::from_utf8(bytes)?;
     let mut lines = text.lines();
@@ -330,6 +338,26 @@ mod tests {
         );
         let manifest = format!("# source_commit={COMMIT}\\n{row}{row}");
         assert!(parse_pinned_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn validates_graph_counts_against_pinned_metadata() {
+        let canonical = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n0 1\\n2 3\\n";
+        let pinned = PinnedFile {
+            name: "tiny".into(),
+            relative_path: "07-independentset/instances/tiny.gph".into(),
+            git_blob_sha1: BLOB.into(),
+            size_bytes: canonical.len() as u64,
+            expected_vertices: 4,
+            expected_edges: 2,
+        };
+        assert_eq!(validate_pinned_graph_counts(&pinned, canonical).unwrap(), (4, 2));
+
+        let wrong_vertices = PinnedFile { expected_vertices: 5, ..pinned };
+        assert!(validate_pinned_graph_counts(&wrong_vertices, canonical).is_err());
+
+        let wrong_edges = PinnedFile { expected_vertices: 4, expected_edges: 3, ..wrong_vertices };
+        assert!(validate_pinned_graph_counts(&wrong_edges, canonical).is_err());
     }
 
     #[test]
