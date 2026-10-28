@@ -14,15 +14,10 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-#[cfg(test)]
 #[path = "../src/mis_evidence.rs"]
 mod standalone_mis_evidence;
 
-#[cfg(test)]
 use standalone_mis_evidence::{canonicalize_dimacs_graph, sha256_hex};
-
-#[cfg(not(test))]
-use symthaea_quantum_comp::{canonicalize_dimacs_graph, sha256_hex};
 
 #[derive(Debug)]
 struct PinnedFile {
