@@ -1,7 +1,7 @@
 """Offline protocol tests for broca_rust_memory.py using a fake JSONL worker.
 
 Run with:
-  python3 -m unittest research/broca-lexical-evidence-baseline-v1/test_broca_rust_memory.py
+  python3 research/broca-lexical-evidence-baseline-v1/test_broca_rust_memory.py
 
 These tests do not validate the Rust worker or official benchmark integration.
 """
