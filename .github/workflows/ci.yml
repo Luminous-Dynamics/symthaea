@@ -56,6 +56,7 @@ jobs:
           python3 --version
           python3 tools/casting-benchmark/test_decision_robustness_eval.py
           python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
+          python3 tools/casting-benchmark/test_prepare_synthetic_robustness_manifests.py
           python3 tools/casting-benchmark/decision_robustness_eval.py \
             tools/casting-benchmark/fixtures/decision_robustness_toy.json \
             --output /tmp/casting-decision-robustness-receipt.json
