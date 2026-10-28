@@ -173,8 +173,8 @@ def attestation_output_issues(raw: bytes, manifest: dict[str, Any]) -> list[dict
         san_value = san.get("value") if isinstance(san, dict) else san
         immutable_checks = (
             ("sourceRepositoryIdentifier", str(repo["repository_id"]), "attestation_repository_id_mismatch"),
-            ("sourceRepositoryDigest", repo["workflow_sha"], "attestation_source_digest_mismatch"),
-            ("sourceRepositoryRef", repo["workflow_ref"], "attestation_source_ref_mismatch"),
+            ("sourceRepositoryDigest", repo["source_repository_digest"], "attestation_source_digest_mismatch"),
+            ("sourceRepositoryRef", repo["source_repository_ref"], "attestation_source_ref_mismatch"),
             ("githubWorkflowRepository", repo["full_name"], "attestation_workflow_repository_mismatch"),
             ("githubWorkflowRef", repo["workflow_ref"], "attestation_workflow_ref_mismatch"),
             ("githubWorkflowSHA", repo["workflow_sha"], "attestation_workflow_sha_mismatch"),
@@ -394,8 +394,8 @@ def validate_manifest(
                 "--repo", repo["full_name"],
                 "--signer-repo", provenance["signer_repository"],
                 "--signer-workflow", expected_signer_workflow,
-                "--source-digest", repo["workflow_sha"],
-                "--source-ref", repo["workflow_ref"],
+                "--source-digest", repo["source_repository_digest"],
+                "--source-ref", repo["source_repository_ref"],
                 "--predicate-type", provenance["predicate_type"],
                 "--format", "json",
             ]
