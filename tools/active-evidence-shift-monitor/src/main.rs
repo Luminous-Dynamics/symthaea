@@ -1768,10 +1768,23 @@ mod tests {
                         + metrics.survival_probability;
                     assert!((total - 1.0).abs() <= 1.0e-9);
                     if scenario.class == ScenarioClass::TargetShift {
-                        assert!(metrics.post_shift_detection_probability.is_some());
+                        let detection = metrics.post_shift_detection_probability.unwrap();
+                        if detection > 0.0 {
+                            let median = metrics.median_post_shift_detection_delay.unwrap();
+                            let p90 = metrics.p90_post_shift_detection_delay.unwrap();
+                            assert!(metrics.mean_post_shift_detection_delay.is_some());
+                            assert!(median >= 1.0 && median <= p90);
+                            assert!(p90 <= horizon.saturating_sub(scenario.change_after) as f64);
+                        } else {
+                            assert!(metrics.mean_post_shift_detection_delay.is_none());
+                            assert!(metrics.median_post_shift_detection_delay.is_none());
+                            assert!(metrics.p90_post_shift_detection_delay.is_none());
+                        }
                     } else {
                         assert!(metrics.post_shift_detection_probability.is_none());
                         assert!(metrics.mean_post_shift_detection_delay.is_none());
+                        assert!(metrics.median_post_shift_detection_delay.is_none());
+                        assert!(metrics.p90_post_shift_detection_delay.is_none());
                     }
                     let is_accepted_null_control =
                         scenario.class == ScenarioClass::StationaryNull
