@@ -18,7 +18,7 @@ use crate::score::{Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 /// Version of the transformation-aware motif-return measurement contract.
-pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v4";
+pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v5";
 
 /// Auditable evidence that one melodic region recalls another.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -53,6 +53,13 @@ pub struct MotifReturnEvidence {
     /// Defaults to zero when reading legacy evidence that did not record it.
     #[serde(default)]
     pub duration_scale_consistency: f32,
+    /// Geometric-mean target/source inter-onset interval scale.
+    /// Defaults to zero for legacy evidence, which cannot prove temporal augmentation.
+    #[serde(default)]
+    pub inter_onset_scale: f32,
+    /// Consistency of the nonzero inter-onset interval ratios in [0, 1].
+    #[serde(default)]
+    pub inter_onset_scale_consistency: f32,
     /// Best contiguous interval-window match for fragment recognition.
     pub fragment_similarity: f32,
     /// Rhythm-shape similarity measured against the same aligned source window.
@@ -83,17 +90,17 @@ impl MotifReturnEvidence {
             ReturnTransformation::Diminished => Some(0.5_f32),
             _ => None,
         };
-        // Duration-shape normalization alone cannot distinguish augmentation
-        // from an unchanged phrase. Require the absolute duration scale to be
-        // close to the declared transformation as well as internally uniform.
-        // A quarter-octave log2 tolerance permits modest quantization noise
-        // while rejecting identity, diminution-as-augmentation, and extreme
-        // scale changes. This is a provisional engineering bound to calibrate
-        // on held-out annotated returns, not a learned perceptual threshold.
+        // Augmentation/diminution must change the whole rhythmic timeline,
+        // not only note sustain durations. Require both duration ratios and
+        // inter-onset intervals to match the declared factor. Quarter-octave
+        // tolerance is provisional and must be calibrated on held-out examples.
         let expected_scale_compatible = expected_scale.is_none_or(|expected| {
             self.duration_scale.is_finite()
                 && self.duration_scale > f32::EPSILON
                 && (self.duration_scale / expected).log2().abs() <= 0.25
+                && self.inter_onset_scale.is_finite()
+                && self.inter_onset_scale > f32::EPSILON
+                && (self.inter_onset_scale / expected).log2().abs() <= 0.25
         });
         let uniform_scaling_required = expected_scale.is_some();
         // A zero-shift transposition is identity, not a transformation.
@@ -127,7 +134,9 @@ impl MotifReturnEvidence {
             && self.overall_similarity >= threshold.clamp(0.0, 1.0)
             && transformation_compatible
             && expected_scale_compatible
-            && (!uniform_scaling_required || self.duration_scale_consistency >= 0.85)
+            && (!uniform_scaling_required
+                || (self.duration_scale_consistency >= 0.85
+                    && self.inter_onset_scale_consistency >= 0.85))
     }
 }
 
@@ -195,6 +204,8 @@ pub fn compare_melodic_sequences(
     let rhythmic_shape_similarity = normalized_rhythm_similarity(&source, &target);
     let (duration_scale, duration_scale_consistency) =
         duration_scale_metrics(&source, &target);
+    let (inter_onset_scale, inter_onset_scale_consistency) =
+        inter_onset_scale_metrics(&source, &target);
 
     let score_for = |kind| {
         transformation_score(
@@ -207,6 +218,8 @@ pub fn compare_melodic_sequences(
             rhythmic_shape_similarity,
             duration_scale,
             duration_scale_consistency,
+            inter_onset_scale,
+            inter_onset_scale_consistency,
             fragment_similarity,
             fragment_rhythmic_shape_similarity,
             coverage,
@@ -250,6 +263,8 @@ pub fn compare_melodic_sequences(
         rhythmic_shape_similarity,
         duration_scale,
         duration_scale_consistency,
+        inter_onset_scale,
+        inter_onset_scale_consistency,
         fragment_similarity,
         fragment_rhythmic_shape_similarity,
         fragment_source_start_note,
@@ -285,6 +300,8 @@ fn transformation_score(
     rhythm: f32,
     duration_scale: f32,
     duration_scale_consistency: f32,
+    inter_onset_scale: f32,
+    inter_onset_scale_consistency: f32,
     fragment: f32,
     fragment_rhythm: f32,
     coverage: f32,
@@ -296,6 +313,17 @@ fn transformation_score(
             (1.0 - ((duration_scale / expected).ln().abs() / 2.0_f32.ln())).clamp(0.0, 1.0)
         }
     };
+    let inter_onset_ratio_similarity = |expected: f32| {
+        if inter_onset_scale <= f32::EPSILON {
+            0.0
+        } else {
+            (1.0
+                - ((inter_onset_scale / expected).ln().abs() / 2.0_f32.ln()))
+            .clamp(0.0, 1.0)
+        }
+    };
+    let temporal_scale_consistency =
+        duration_scale_consistency.min(inter_onset_scale_consistency);
     let value = match kind {
         ReturnTransformation::Literal => {
             // A literal return must preserve absolute note durations, not
@@ -314,20 +342,22 @@ fn transformation_score(
             0.65 * inverted + 0.10 * transposed + 0.15 * rhythm + 0.10 * coverage
         }
         ReturnTransformation::Augmented => {
-            (0.35 * transposed
-                + 0.20 * interval
-                + 0.20 * rhythm
-                + 0.15 * ratio_similarity(2.0)
+            (0.30 * transposed
+                + 0.15 * interval
+                + 0.15 * rhythm
+                + 0.10 * ratio_similarity(2.0)
+                + 0.10 * inter_onset_ratio_similarity(2.0)
                 + 0.10 * coverage)
-                * duration_scale_consistency
+                * temporal_scale_consistency
         }
         ReturnTransformation::Diminished => {
-            (0.35 * transposed
-                + 0.20 * interval
-                + 0.20 * rhythm
-                + 0.15 * ratio_similarity(0.5)
+            (0.30 * transposed
+                + 0.15 * interval
+                + 0.15 * rhythm
+                + 0.10 * ratio_similarity(0.5)
+                + 0.10 * inter_onset_ratio_similarity(0.5)
                 + 0.10 * coverage)
-                * duration_scale_consistency
+                * temporal_scale_consistency
         }
         ReturnTransformation::Fragmented => {
             // Use the rhythm of the same source window that produced the
@@ -427,6 +457,45 @@ fn duration_scale_metrics(source: &[ScoreNote], target: &[ScoreNote]) -> (f32, f
         / log_ratios.len() as f64;
     // 1.0 is exact uniform scaling; larger per-note scale disagreement
     // monotonically lowers this confidence channel toward zero.
+    let consistency = (-mean_absolute_log_deviation).exp();
+    (scale as f32, consistency as f32)
+}
+
+/// Estimate the geometric-mean ratio and consistency of positive inter-onset
+/// intervals. Absolute starting positions do not matter: only gaps between
+/// sorted events are compared. A zero gap is ignored only when both sides have
+/// a zero gap; a one-sided zero gap is a failed temporal-scaling claim.
+fn inter_onset_scale_metrics(source: &[ScoreNote], target: &[ScoreNote]) -> (f32, f32) {
+    let count = source.len().min(target.len());
+    if count < 2 {
+        return (0.0, 0.0);
+    }
+
+    let mut log_ratios = Vec::with_capacity(count - 1);
+    for index in 1..count {
+        let source_gap =
+            source[index].onset.beats() - source[index - 1].onset.beats();
+        let target_gap =
+            target[index].onset.beats() - target[index - 1].onset.beats();
+        if source_gap <= f64::EPSILON || target_gap <= f64::EPSILON {
+            if source_gap.abs() <= f64::EPSILON && target_gap.abs() <= f64::EPSILON {
+                continue;
+            }
+            return (0.0, 0.0);
+        }
+        log_ratios.push((target_gap / source_gap).ln());
+    }
+    if log_ratios.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    let mean_log_ratio = log_ratios.iter().sum::<f64>() / log_ratios.len() as f64;
+    let scale = mean_log_ratio.exp();
+    let mean_absolute_log_deviation = log_ratios
+        .iter()
+        .map(|ratio| (ratio - mean_log_ratio).abs())
+        .sum::<f64>()
+        / log_ratios.len() as f64;
     let consistency = (-mean_absolute_log_deviation).exp();
     (scale as f32, consistency as f32)
 }
@@ -537,6 +606,7 @@ mod tests {
             .copied()
             .map(|mut note| {
                 note.duration = note.duration.scale(2, 1);
+                note.onset = note.onset.scale(2, 1);
                 note
             })
             .collect();
@@ -599,6 +669,7 @@ mod tests {
             .copied()
             .map(|mut note| {
                 note.duration = note.duration.scale(2, 1);
+                note.onset = note.onset.scale(2, 1);
                 note
             })
             .collect();
@@ -773,6 +844,7 @@ mod tests {
             .copied()
             .map(|mut event| {
                 event.duration = event.duration.scale(2, 1);
+                event.onset = event.onset.scale(2, 1);
                 event
             })
             .collect();
@@ -789,6 +861,7 @@ mod tests {
             .copied()
             .map(|mut event| {
                 event.duration = event.duration.scale(1, 2);
+                event.onset = event.onset.scale(1, 2);
                 event
             })
             .collect();
@@ -821,6 +894,26 @@ mod tests {
             compare_melodic_sequences(&source, &source, ReturnTransformation::Diminished);
         assert!((unchanged_diminution.overall_similarity - 0.85).abs() < 1e-6);
         assert!(!unchanged_diminution.meets_threshold(0.85));
+
+        // Scaling note sustain only is not a complete temporal augmentation.
+        let duration_only: Vec<_> = source.iter().copied().map(|mut event| {
+            event.duration = event.duration.scale(2, 1);
+            event
+        }).collect();
+        let duration_only_evidence = compare_melodic_sequences(
+            &source, &duration_only, ReturnTransformation::Augmented,
+        );
+        assert!(!duration_only_evidence.meets_threshold(0.85));
+
+        // Scaling event spacing alone is not enough when note durations stay fixed.
+        let onset_only: Vec<_> = source.iter().copied().map(|mut event| {
+            event.onset = event.onset.scale(2, 1);
+            event
+        }).collect();
+        let onset_only_evidence = compare_melodic_sequences(
+            &source, &onset_only, ReturnTransformation::Augmented,
+        );
+        assert!(!onset_only_evidence.meets_threshold(0.85));
 
         // A uniform but wrong factor is also not the transformation requested.
         let quadrupled: Vec<_> = source
@@ -954,6 +1047,7 @@ mod tests {
                 .copied()
                 .map(|mut event| {
                     event.duration = event.duration.scale(2, 1);
+                    event.onset = event.onset.scale(2, 1);
                     event
                 })
                 .collect();
@@ -973,6 +1067,7 @@ mod tests {
                 .copied()
                 .map(|mut event| {
                     event.duration = event.duration.scale(1, 2);
+                    event.onset = event.onset.scale(1, 2);
                     event
                 })
                 .collect();
