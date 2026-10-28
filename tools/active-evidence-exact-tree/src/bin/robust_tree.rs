@@ -36,6 +36,8 @@ const SCENARIOS: [(&str, Matrix); 5] = [
     ("out_of_set_flip", OUT_OF_SET),
 ];
 const EPS: f64 = 1.0e-12;
+const COST_BUDGETS: [f64; 9] = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 2.632, 2.75, 3.0];
+const COST_BUDGET_LABELS: [&str; 9] = ["0", "0.5", "1", "1.5", "2", "2.5", "2.632", "2.75", "3"];
 
 #[derive(Clone, Debug)]
 enum Tree {
@@ -163,6 +165,24 @@ fn choose_plan(rounds: usize) -> Plan {
     }
     plans.swap_remove(best)
 }
+
+/// Minimize worst-case expected loss among trees whose expected query cost is within budget
+/// under every declared ambiguity model. This is an expected-cost constraint, not a hard
+/// realized-cost guarantee for every individual trajectory.
+fn choose_plan_cost_bounded(rounds: usize, budget: f64) -> Plan {
+    let plans = enumerate_plans(PRIOR, [PRIOR; 4], 0b1111, rounds.min(3));
+    let mut best: Option<usize> = None;
+    for (index, plan) in plans.iter().enumerate() {
+        if worst(plan.cost) > budget + EPS { continue; }
+        match best {
+            None => best = Some(index),
+            Some(previous) if is_better(plan, &plans[previous]) => best = Some(index),
+            _ => {}
+        }
+    }
+    let index = best.expect("the zero-query plan is feasible for a nonnegative budget");
+    plans[index].clone()
+}
 fn terminal(h: usize, belief: [f64; 3]) -> Metrics {
     let loss = LOSS[h][best_action(belief)];
     let best_possible = LOSS[h].iter().copied().fold(f64::INFINITY, f64::min);
@@ -202,19 +222,29 @@ fn print_csv(filter: Option<&str>) -> Result<(), String> {
             return Err(format!("unknown scenario: {name}"));
         }
     }
-    println!("scenario,query_cap,expected_loss,expected_decision_regret,expected_query_cost,expected_query_count,worst_case_ambiguity_regret,planned_first_query");
+    println!("mode,limit,scenario,expected_loss,expected_decision_regret,expected_query_cost,expected_query_count,worst_case_ambiguity_regret,worst_case_ambiguity_cost,planned_first_query");
+
     for cap in 0..=3 {
         let plan = choose_plan(cap);
-        let first = plan.tree.first_query().map(|q| QUERY_NAMES[q]).unwrap_or("none");
-        let worst_case = worst(plan.risk);
-        for (scenario, matrix) in SCENARIOS {
-            if filter.is_some_and(|f| f != scenario) { continue; }
-            let m = evaluate_plan(&plan.tree, matrix);
-            println!("{scenario},{cap},{:.12},{:.12},{:.12},{:.12},{:.12},{first}",
-                m.loss, m.regret, m.cost, m.queries, worst_case);
-        }
+        emit_plan_rows("query_cap", &cap.to_string(), &plan, filter);
+    }
+    for (index, budget) in COST_BUDGETS.iter().copied().enumerate() {
+        let plan = choose_plan_cost_bounded(3, budget);
+        emit_plan_rows("expected_cost_budget", COST_BUDGET_LABELS[index], &plan, filter);
     }
     Ok(())
+}
+
+fn emit_plan_rows(mode: &str, limit: &str, plan: &Plan, filter: Option<&str>) {
+    let first = plan.tree.first_query().map(|q| QUERY_NAMES[q]).unwrap_or("none");
+    let worst_regret = worst(plan.risk);
+    let worst_cost = worst(plan.cost);
+    for (scenario, matrix) in SCENARIOS {
+        if filter.is_some_and(|f| f != scenario) { continue; }
+        let m = evaluate_plan(&plan.tree, matrix);
+        println!("{mode},{limit},{scenario},{:.12},{:.12},{:.12},{:.12},{:.12},{:.12},{first}",
+            m.loss, m.regret, m.cost, m.queries, worst_regret, worst_cost);
+    }
 }
 fn main() -> ExitCode {
     let mut filter: Option<String> = None;
@@ -267,6 +297,28 @@ mod tests {
         let shifted = evaluate_plan(&plan.tree, OUT_OF_SET);
         assert!(shifted.regret > 2.3);
         assert!(near(shifted.regret, 3.513272));
+    }
+    #[test]
+    fn expected_cost_frontier_respects_every_ambiguity_budget() {
+        for budget in COST_BUDGETS {
+            let plan = choose_plan_cost_bounded(3, budget);
+            assert!(worst(plan.cost) <= budget + 1.0e-8);
+        }
+        let low = choose_plan_cost_bounded(3, 1.5);
+        assert!(near(worst(low.risk), 1.735898));
+        assert!(near(worst(low.cost), 1.48318));
+        let frontier = choose_plan_cost_bounded(3, 2.632);
+        assert!(near(worst(frontier.risk), 1.6090232));
+        assert!(near(worst(frontier.cost), 2.632));
+    }
+    #[test]
+    fn expected_cost_frontier_is_nonincreasing_in_worst_case_loss() {
+        let mut previous = f64::INFINITY;
+        for budget in COST_BUDGETS {
+            let current = worst(choose_plan_cost_bounded(3, budget).risk);
+            assert!(current <= previous + 1.0e-8);
+            previous = current;
+        }
     }
     #[test]
     fn all_reported_metrics_are_finite_and_query_cap_is_respected() {
