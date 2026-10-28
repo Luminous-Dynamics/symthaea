@@ -6,8 +6,9 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
+- `schema/task-set.schema.json`: strict schema for evaluator-held tasks with separate policy-visible and evaluator-only fields.
 - `fixtures/generation-manifest.example.json`: non-scoring placeholder fixture.
-- `src/lib.rs` and `src/main.rs`: standalone Rust validator, commitment calculator, and post-run reveal verifier.
+- `src/lib.rs` and `src/main.rs`: standalone Rust validator, commitment calculator, task-set contract checker, and post-run reveal verifier.
 
 ## Validate a manifest
 
@@ -28,7 +29,7 @@ The manifest carries three commitment digests:
 - `seed_commitment_sha256`: exact bytes of a high-entropy seed, bound to the protocol commitment.
 - `task_set_commitment_sha256`: exact bytes of the complete evaluator task-set artifact, also bound to that protocol commitment.
 
-The protocol context is a versioned Rust struct serialized with `serde_json`; it includes the generation ID, lane, purpose, generator repository/revision/config digest, evaluator version/source/boundary declaration, expected task count and family mixture, frozen policy/tool/prompt/config identities, budgets, analysis-plan digest, and reveal policy. It excludes the three commitment fields to prevent circularity. Any change to the frozen context changes its protocol commitment.
+The protocol context is a versioned Rust struct serialized with `serde_json`; it includes the generation ID, lane, purpose, generator repository/revision/config digest, evaluator version/source/boundary declaration, expected task count and family mixture, frozen policy/tool/prompt/config identities, budgets, analysis-plan digest, and reveal policy. It excludes the three commitment fields to prevent circularity. Any change to the frozen context changes its protocol commitment. The locked Rust/Serde serialization profile is part of this versioned contract.
 
 Commitment bytes use SHA-256 with the domain prefix `symthaea.science_bench_refresh.commitment.v1\0`, a kind-specific domain (`protocol.v1\0`, `seed.v1\0`, or `task-set.v1\0`), and unsigned 64-bit big-endian length framing. Artifact commitments also include the protocol digest as context. Seed files must contain at least 32 bytes. Task-set commitments bind the exact raw bytes, so whitespace/ordering changes intentionally change the digest.
 
@@ -47,7 +48,7 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
   artifact-commit draft-manifest.json task-set evaluator-task-set.json
 ```
 
-Copy the reported `protocol_commitment_sha256` into the manifest, and copy each artifact's reported `artifact_commitment_sha256` into its matching field. Because artifact commitments are computed from the non-commitment protocol context, computing them from the draft does not create a circular dependency. Before a real sealed run, the seed must be generated from a cryptographically secure source with at least 256 bits of entropy and kept outside the policy-visible environment.
+Copy the reported `protocol_commitment_sha256` into the manifest, and copy each artifact's reported `artifact_commitment_sha256` into its matching field. Because artifact commitments are computed from the non-commitment protocol context, computing them from the draft does not create a circular dependency. Before a real sealed run, the seed must be generated from a cryptographically secure source with at least 256 bits of entropy and kept outside the policy-visible environment. The committed task-set file must use `schema/task-set.schema.json`: every record has a unique `task_id`, a declared `family_id`, a `policy_input` object, and a separate `evaluator_only` object. A runner must pass only `policy_input` into the evaluated policy.
 
 After submissions close and the reveal is authorized, verify the exact original bytes:
 
@@ -56,7 +57,7 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
   verify-reveal final-manifest.json revealed-seed.bin revealed-task-set.json
 ```
 
-`verify-reveal` accepts only a structurally valid manifest declaring `purpose=qualified_run` and `lane=sealed_refresh`. It exits 0 when all three commitments match, exits 5 when artifact bytes do not match, and exits 2 for invalid inputs/manifest. Its report includes recomputed and declared commitments, byte counts, and mismatch reasons; it never outputs seed bytes.
+`verify-reveal` accepts only a structurally valid manifest declaring `purpose=qualified_run` and `lane=sealed_refresh`. It verifies the protocol, seed and exact task-set-byte commitments; it also checks task-set schema/version, matching generation ID, exact task count, unique task IDs, declared per-family counts, object-shaped inputs, and rejects known oracle-only field names recursively inside `policy_input`. It exits 0 only if commitments and task-set contract all pass, exits 5 if the revealed artifacts or task-set contract fail, and exits 2 for invalid inputs/manifest. Its report separates commitment-match flags from `task_set_contract_valid`; it never outputs seed bytes.
 
 ### Important limits
 
