@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "dataset_version": "MEL-EDIT-LOCALITY-ADVERSARIAL-1.1",
+  "case_count": 84,
+  "expected_verdicts": {
+    "accept": 24,
+    "reject": 60
+  },
+  "split_cases": {
+    "development": 42,
+    "calibration": 14,
+    "test": 28
+  },
+  "families": 12,
+  "unique_case_ids": 84,
+  "family_isolation": true,
+  "schema_json_parse": "PASS",
+  "json_schema_validation": "PASS",
+  "schema_errors": 0,
+  "independent_reference_oracle_mismatches": 0,
+  "categories": {
+    "compound_multi_axis_collateral": 12,
+    "onset_exact_tolerance": 12,
+    "onset_just_over_tolerance": 12,
+    "duration_just_under_tolerance": 12,
+    "duration_just_over_tolerance": 12,
+    "local_pitch_multi_axis_leak": 12,
+    "under_edit_plus_collateral": 12
+  },
+  "scope": "synthetic adversarial fixture validation and independent numerical oracle only; not Rust execution or human evaluation"
+}
