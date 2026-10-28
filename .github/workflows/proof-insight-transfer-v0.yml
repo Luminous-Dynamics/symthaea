@@ -177,6 +177,10 @@ jobs:
 
           if fixture["schema_version"] != "pitb.power-report.v2":
               raise SystemExit("primary power fixture must use schema v2")
+          if "012" not in fixture["known_exposed_validation_family_ids"]:
+              raise SystemExit("primary power fixture must quarantine exposed validation family 012")
+          if "089" not in fixture["known_exposed_test_family_ids"]:
+              raise SystemExit("primary power fixture must quarantine exposed test family 089")
           if len(fixture["scenarios"]) != 48 or len(fixture["weak_null_scenarios"]) != 36:
               raise SystemExit("primary power fixture must contain 48 strict/power rows and 36 weak-null rows")
           if sum(row["eligible_target_count"] for row in fixture["family_target_counts"]) != fixture["eligible_validation_target_count"]:
@@ -223,12 +227,39 @@ jobs:
           worst_power_rows = [row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2]
           expected_power = min(row["estimated_utility_gate_power"] for row in worst_power_rows)
           expected_power_lower = min(row["estimated_power_lower_95"] for row in worst_power_rows)
+
+          def wilson_lower(successes, trials, z):
+              if trials <= 0:
+                  return 0.0
+              rate = successes / trials
+              z2 = z * z
+              denominator = 1.0 + z2 / trials
+              center = (rate + z2 / (2.0 * trials)) / denominator
+              half = z * ((rate * (1.0 - rate) / trials + z2 / (4.0 * trials * trials)) ** 0.5) / denominator
+              return max(0.0, center - half)
+
+          def expected_simultaneous_power_lower(report):
+              rows = [row for row in report["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2]
+              if len(rows) != 3:
+                  return None
+              # Two-sided 95% Bonferroni-adjusted Wilson lower bound across three
+              # registered association settings; z=2.394 is conservative.
+              return min(wilson_lower(row["utility_gate_passes"], row["study_simulations"], 2.394) for row in rows)
+
           if len(worst_power_rows) != 3:
               raise SystemExit("headline power must summarize all three association levels at +20pp/ICC .20")
           if abs(fixture["estimated_power_at_20pp_and_icc_020"] - expected_power) > 1e-12:
               raise SystemExit("headline power estimate must equal the worst association cell at +20pp/ICC .20")
           if abs(fixture["estimated_power_at_20pp_and_icc_020_lower_95"] - expected_power_lower) > 1e-12:
-              raise SystemExit("headline power bound must equal the worst association cell at +20pp/ICC .20")
+              raise SystemExit("per-cell headline power bound must equal the worst association cell at +20pp/ICC .20")
+          simultaneous_power_lower = expected_simultaneous_power_lower(fixture)
+          if simultaneous_power_lower is None or abs(fixture["estimated_power_at_20pp_and_icc_020_lower_simultaneous_95"] - simultaneous_power_lower) > 1e-12:
+              raise SystemExit("simultaneous headline power bound must equal the adjusted worst-association lower bound")
+
+          malformed_power_bound = copy.deepcopy(fixture)
+          malformed_power_bound["estimated_power_at_20pp_and_icc_020_lower_simultaneous_95"] = fixture["estimated_power_at_20pp_and_icc_020_lower_95"]
+          if abs(malformed_power_bound["estimated_power_at_20pp_and_icc_020_lower_simultaneous_95"] - expected_simultaneous_power_lower(malformed_power_bound)) <= 1e-12:
+              raise SystemExit("power-bound negative control did not distinguish per-cell and simultaneous limits")
 
           bad = copy.deepcopy(fixture)
           bad["weak_null_scenarios"].pop()
@@ -254,7 +285,7 @@ jobs:
               pass
           else:
               raise SystemExit("schema must reject the incomplete v1 power report")
-          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v2 schema, 48-cell effect/ICC/association grid, 36-cell weak-null grid, 48-cell null multiplicity check, worst-association power summary, denominator reconciliation and negative controls; fixture is synthetic and not a power result")
+          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v2 schema, validation/test exposure quarantine, 48-cell effect/ICC/association grid, 36-cell weak-null grid, 48-cell null multiplicity check, simultaneous worst-association power bound, denominator reconciliation and negative controls; fixture is synthetic and not a power result")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
