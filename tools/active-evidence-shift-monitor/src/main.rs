@@ -618,6 +618,250 @@ where
     }
 }
 
+
+const CUSUM_SCALE: usize = 25;
+const CUSUM_UPPER_INCREMENT: usize = 12;
+const CUSUM_LOWER_INCREMENT: usize = 13;
+const CUSUM_SIDE_ALPHA: f64 = PER_CELL_ALPHA / 2.0;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CusumDirection {
+    Upper,
+    Lower,
+}
+
+impl CusumDirection {
+    const ALL: [Self; 2] = [Self::Upper, Self::Lower];
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Upper => "upper_cusum",
+            Self::Lower => "lower_cusum",
+        }
+    }
+
+    /// Probability that this directional statistic sees an evidence event.
+    /// For a lower shift, a Bernoulli failure is the event.
+    fn event_probability(self, observed_probability: f64) -> f64 {
+        match self {
+            Self::Upper => observed_probability,
+            Self::Lower => 1.0 - observed_probability,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct CusumMetrics {
+    scenario_or_pre_shift_alarm_probability: f64,
+    post_shift_detection_probability: Option<f64>,
+    mean_post_shift_detection_delay: Option<f64>,
+    survival_probability: f64,
+}
+
+/// Reflected one-sided Bernoulli CUSUM on an exact 1/25 score grid.
+/// An evidence event adds 12/25; a non-event subtracts 13/25. The event-rate
+/// boundary 0.52 is therefore exactly zero-drift for the calibration process.
+fn cusum_next_state(state: usize, event: bool) -> usize {
+    if event {
+        state + CUSUM_UPPER_INCREMENT
+    } else {
+        state.saturating_sub(CUSUM_LOWER_INCREMENT)
+    }
+}
+
+/// Exact finite-horizon alarm probability for a one-sided CUSUM and a constant
+/// event probability. This is a finite-horizon calibration, not an infinite-horizon
+/// or Ville-style guarantee.
+fn cusum_alarm_probability(horizon: usize, threshold: usize, event_probability: f64) -> f64 {
+    if threshold == 0 {
+        return 1.0;
+    }
+    let mut active = vec![0.0_f64; threshold];
+    active[0] = 1.0;
+    let mut alarm_probability = 0.0;
+
+    for n in 1..=horizon {
+        let mut next = vec![0.0_f64; threshold];
+        let reachable_states = threshold.min((n - 1) * CUSUM_UPPER_INCREMENT + 1);
+        for state in 0..reachable_states {
+            let mass = active[state];
+            if mass == 0.0 {
+                continue;
+            }
+
+            let event_mass = mass * event_probability;
+            let event_state = cusum_next_state(state, true);
+            if event_state >= threshold {
+                alarm_probability += event_mass;
+            } else {
+                next[event_state] += event_mass;
+            }
+
+            let non_event_mass = mass * (1.0 - event_probability);
+            let non_event_state = cusum_next_state(state, false);
+            if non_event_state >= threshold {
+                alarm_probability += non_event_mass;
+            } else {
+                next[non_event_state] += non_event_mass;
+            }
+        }
+        active = next;
+    }
+    alarm_probability
+}
+
+/// Find the smallest integer threshold that keeps the exact boundary alarm
+/// probability at or below the per-direction allocation.
+fn calibrate_cusum_threshold(horizon: usize, alpha: f64) -> usize {
+    let mut low = 1;
+    let mut high = horizon * CUSUM_UPPER_INCREMENT + 1;
+    while low < high {
+        let middle = low + (high - low) / 2;
+        let alarm = cusum_alarm_probability(horizon, middle, COMPOSITE_NULL_UPPER);
+        if alarm <= alpha {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+    low
+}
+
+fn probability_range_sum(values: &[f64], start: usize, end: usize) -> f64 {
+    if start > end || start >= values.len() {
+        return 0.0;
+    }
+    values[start..=end.min(values.len() - 1)].iter().sum()
+}
+
+/// Run the exact CUSUM dynamic program once to the largest requested horizon and
+/// return typed metrics at each checkpoint.
+fn evaluate_cusum_scenario(
+    direction: CusumDirection,
+    threshold: usize,
+    scenario: Scenario,
+) -> Vec<(usize, CusumMetrics)> {
+    let max_horizon = *HORIZONS.last().expect("horizons must be nonempty");
+    let mut active = vec![0.0_f64; threshold];
+    active[0] = 1.0;
+    let mut first_alarm = vec![0.0_f64; max_horizon + 1];
+    let mut snapshots = Vec::with_capacity(HORIZONS.len());
+    let mut checkpoint = 0;
+
+    for n in 1..=max_horizon {
+        let observed_probability = match scenario.post_shift_p {
+            Some(p1) if n > scenario.change_after => p1,
+            _ => scenario.pre_shift_p,
+        };
+        let event_probability = direction.event_probability(observed_probability);
+        let mut next = vec![0.0_f64; threshold];
+        let reachable_states = threshold.min((n - 1) * CUSUM_UPPER_INCREMENT + 1);
+        for state in 0..reachable_states {
+            let mass = active[state];
+            if mass == 0.0 {
+                continue;
+            }
+            for (event, branch_mass) in [
+                (true, mass * event_probability),
+                (false, mass * (1.0 - event_probability)),
+            ] {
+                let next_state = cusum_next_state(state, event);
+                if next_state >= threshold {
+                    first_alarm[n] += branch_mass;
+                } else {
+                    next[next_state] += branch_mass;
+                }
+            }
+        }
+        active = next;
+
+        if checkpoint < HORIZONS.len() && n == HORIZONS[checkpoint] {
+            let survival = active.iter().sum::<f64>();
+            snapshots.push((n, survival));
+            checkpoint += 1;
+        }
+    }
+
+    snapshots
+        .into_iter()
+        .map(|(horizon, survival)| {
+            let is_target_shift = scenario.class == ScenarioClass::TargetShift;
+            let alarm_probability = if is_target_shift {
+                probability_range_sum(
+                    &first_alarm,
+                    1,
+                    scenario.change_after.min(horizon),
+                )
+            } else {
+                probability_range_sum(&first_alarm, 1, horizon)
+            };
+            let detection_probability = if is_target_shift {
+                Some(probability_range_sum(
+                    &first_alarm,
+                    scenario.change_after.saturating_add(1),
+                    horizon,
+                ))
+            } else {
+                None
+            };
+            let delay = detection_probability.and_then(|detection| {
+                if detection <= 0.0 {
+                    None
+                } else {
+                    let delay_mass = (scenario.change_after.saturating_add(1)..=horizon)
+                        .map(|n| (n - scenario.change_after) as f64 * first_alarm[n])
+                        .sum::<f64>();
+                    Some(delay_mass / detection)
+                }
+            });
+            (
+                horizon,
+                CusumMetrics {
+                    scenario_or_pre_shift_alarm_probability: alarm_probability,
+                    post_shift_detection_probability: detection_probability,
+                    mean_post_shift_detection_delay: delay,
+                    survival_probability: survival,
+                },
+            )
+        })
+        .collect()
+}
+
+fn print_cusum_baseline_csv() {
+    let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
+    println!(
+        "direction,scenario,scenario_class,horizon,change_after,p0,null_lower,null_upper,threshold_scaled,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_side_alpha,survival_probability"
+    );
+    for direction in CusumDirection::ALL {
+        for scenario in SCENARIOS {
+            for (horizon, metrics) in evaluate_cusum_scenario(direction, threshold, scenario) {
+                let change_after = if scenario.post_shift_p.is_some() {
+                    scenario.change_after.to_string()
+                } else {
+                    "NA".to_owned()
+                };
+                println!(
+                    "{},{},{},{},{},{:.12},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12}",
+                    direction.name(),
+                    scenario.name,
+                    scenario.class.name(),
+                    horizon,
+                    change_after,
+                    NOMINAL_P,
+                    COMPOSITE_NULL_LOWER,
+                    COMPOSITE_NULL_UPPER,
+                    threshold,
+                    metrics.scenario_or_pre_shift_alarm_probability,
+                    csv_optional(metrics.post_shift_detection_probability),
+                    csv_optional(metrics.mean_post_shift_detection_delay),
+                    CUSUM_SIDE_ALPHA,
+                    metrics.survival_probability
+                );
+            }
+        }
+    }
+}
+
 fn print_eprocess_family_csv() {
     println!(
         "family,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
@@ -847,8 +1091,12 @@ fn main() -> ExitCode {
             print_eprocess_family_csv();
             ExitCode::SUCCESS
         }
+        Some(argument) if argument == "--cusum-baseline-csv" => {
+            print_cusum_baseline_csv();
+            ExitCode::SUCCESS
+        }
         Some(argument) if argument == "--help" || argument == "-h" => {
-            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv|--eprocess-family-csv]");
+            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv|--eprocess-family-csv|--cusum-baseline-csv]");
             ExitCode::SUCCESS
         }
         Some(argument) => {
@@ -1338,4 +1586,82 @@ mod tests {
         assert!((value - 0.5).abs() <= 1.0e-10);
         assert!((log_beta(0.5, 0.5) - std::f64::consts::PI.ln()).abs() <= 1.0e-10);
     }
+    #[test]
+    fn cusum_threshold_is_exactly_calibrated_at_the_composite_null_edge() {
+        let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
+        let upper_alarm = cusum_alarm_probability(
+            HORIZONS[HORIZONS.len() - 1],
+            threshold,
+            COMPOSITE_NULL_UPPER,
+        );
+        let lower_alarm = cusum_alarm_probability(
+            HORIZONS[HORIZONS.len() - 1],
+            threshold,
+            1.0 - COMPOSITE_NULL_LOWER,
+        );
+        assert!(upper_alarm <= CUSUM_SIDE_ALPHA + EPS);
+        assert!(lower_alarm <= CUSUM_SIDE_ALPHA + EPS);
+        assert!((upper_alarm - lower_alarm).abs() <= EPS);
+        if threshold > 1 {
+            let previous = cusum_alarm_probability(
+                HORIZONS[HORIZONS.len() - 1],
+                threshold - 1,
+                COMPOSITE_NULL_UPPER,
+            );
+            assert!(
+                previous > CUSUM_SIDE_ALPHA - EPS,
+                "calibration did not find the minimum threshold: previous={previous}, target={CUSUM_SIDE_ALPHA}"
+            );
+        }
+    }
+
+    #[test]
+    fn cusum_scenario_metrics_preserve_semantics_and_probability_mass() {
+        let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
+        for direction in CusumDirection::ALL {
+            for scenario in SCENARIOS {
+                for (horizon, metrics) in evaluate_cusum_scenario(direction, threshold, scenario) {
+                    let total = metrics.scenario_or_pre_shift_alarm_probability
+                        + metrics.post_shift_detection_probability.unwrap_or(0.0)
+                        + metrics.survival_probability;
+                    assert!((total - 1.0).abs() <= 1.0e-9);
+                    if scenario.class == ScenarioClass::TargetShift {
+                        assert!(metrics.post_shift_detection_probability.is_some());
+                    } else {
+                        assert!(metrics.post_shift_detection_probability.is_none());
+                        assert!(metrics.mean_post_shift_detection_delay.is_none());
+                    }
+                    if scenario.class == ScenarioClass::WithinBandTransitionControl {
+                        assert!(
+                            metrics.scenario_or_pre_shift_alarm_probability <= CUSUM_SIDE_ALPHA + EPS,
+                            "CUSUM violated finite-horizon side allocation on an in-band schedule: direction={}, horizon={}, alarm={}",
+                            direction.name(),
+                            horizon,
+                            metrics.scenario_or_pre_shift_alarm_probability
+                        );
+                    }
+                }
+            }
+        }
+        let large_up = evaluate_cusum_scenario(
+            CusumDirection::Upper,
+            threshold,
+            SCENARIOS.iter().copied().find(|s| s.name == "step_up_080").unwrap(),
+        );
+        let final_power = large_up.last().unwrap().1.post_shift_detection_probability.unwrap();
+        assert!(final_power > 0.99, "upper CUSUM missed large up-shift: {final_power}");
+        let large_down = evaluate_cusum_scenario(
+            CusumDirection::Lower,
+            threshold,
+            SCENARIOS.iter().copied().find(|s| s.name == "step_down_010").unwrap(),
+        );
+        let down_power = large_down.last().unwrap().1.post_shift_detection_probability.unwrap();
+        assert!(down_power > 0.99, "lower CUSUM missed large down-shift: {down_power}");
+        let selected = SCENARIOS.iter().copied()
+            .find(|s| s.name == "selection_bias_no_environment_shift").unwrap();
+        let selected_alarm = evaluate_cusum_scenario(CusumDirection::Upper, threshold, selected)
+            .last().unwrap().1.scenario_or_pre_shift_alarm_probability;
+        assert!(selected_alarm > 0.99, "selection-bias control did not alarm: {selected_alarm}");
+    }
+
 }
