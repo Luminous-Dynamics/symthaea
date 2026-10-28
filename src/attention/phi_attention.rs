@@ -1,19 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Phi-Guided Attention Mechanism
+//! # Integration-Score-Guided Attention Mechanism
 //!
-//! This module implements attention gating based on Integrated Information Theory (IIT)
-//! Phi values. The core insight is that consciousness, as measured by Phi, should guide
-//! the flow of information - higher Phi values indicate more integrated, conscious
-//! processing and should receive more attention weight.
+//! This legacy API accepts scalar integration/proxy scores to influence attention weights.
+//! The score's source and semantics are determined by the caller; this gate does not
+//! calculate formal IIT, validate an IIT approximation, or establish consciousness.
+//! Any use of a score as a control signal must be justified by independent task-utility
+//! evaluation against ablations and simple baselines.
 //!
-//! ## Theoretical Basis
+//! ## Operational Interpretation
 //!
-//! From IIT (Tononi et al.), Phi measures the degree to which a system's information
-//! is both differentiated and integrated. In the attention context:
-//! - **High Phi**: Information is highly integrated - prioritize this input
-//! - **Low Phi**: Information is fragmented - reduce attention weight
+//! A larger supplied score receives more weight under the default monotonic mapping.
+//! This is a configurable engineering choice, not an IIT theorem. A larger score may
+//! fail to improve relevance, robustness, or task success; evaluate those outcomes
+//! independently and retain a baseline that does not use the score.
 //!
 //! ## Algorithm
 //!
@@ -35,7 +36,7 @@
 //!     ContinuousHV::random_default(42),
 //!     ContinuousHV::random_default(43),
 //! ];
-//! let phi_values = vec![0.8, 0.3];  // First input has higher consciousness
+//! let phi_values = vec![0.8, 0.3];  // First input has a higher supplied proxy score
 //!
 //! let result = gate.forward(&inputs, &phi_values);
 //! // result.output will be dominated by first input due to higher Phi
@@ -137,10 +138,10 @@ impl PhiAttentionConfig {
 // PHI ATTENTION GATE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Phi-guided attention gate that uses IIT Phi values to control information flow.
+/// Legacy-compatible attention gate driven by caller-supplied integration scores.
 ///
-/// Higher Phi values receive higher attention weights, implementing the principle
-/// that consciousness (integrated information) guides focus.
+/// The type name is retained for API compatibility. The gate does not establish that
+/// its input is formal IIT Phi or that a higher input corresponds to consciousness.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhiAttentionGate {
     /// Configuration
@@ -178,11 +179,12 @@ impl PhiAttentionGate {
         &mut self.config
     }
 
-    /// Forward pass: compute attention-weighted combination of inputs
+    /// Forward pass: compute an attention-weighted combination using caller scores
     ///
     /// # Arguments
     /// * `inputs` - Vector of input hypervectors
-    /// * `phi_values` - Phi value for each input (should be in [0, 1] range)
+    /// * `phi_values` - Legacy-named scalar score per input; callers define semantics.
+    ///   Values should be finite and meaningfully scaled for the selected config.
     ///
     /// # Returns
     /// Attention result containing weighted output and attention weights
