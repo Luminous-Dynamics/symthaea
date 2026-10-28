@@ -1479,6 +1479,96 @@ mod tests {
         assert!(!witness_path.exists());
     }
 
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_concurrent_execute_with_permit_produces_one_effect_witness() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+            Mutex,
+        };
+        use std::time::Duration;
+
+        const WORKERS: usize = 32;
+        let temp = tempfile::tempdir().unwrap();
+        let witness_path = temp.path().join("concurrent-effect.witness");
+        let command = NixOSCommand::RebuildSwitch {
+            flake: Some(".#concurrent".to_owned()),
+            extra_args: Vec::new(),
+        };
+        let (executable, args) = command.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "effect-witness-concurrent-001",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = Arc::new(ledger.issue(request).unwrap());
+        let invocations = Arc::new(AtomicUsize::new(0));
+        let observed_calls = Arc::new(Mutex::new(Vec::new()));
+        let runner = Arc::new(EffectWitnessRunner {
+            invocations: Arc::clone(&invocations),
+            observed_calls: Arc::clone(&observed_calls),
+            expected_executable: "nixos-rebuild".to_owned(),
+            expected_args: vec![
+                "switch".to_owned(),
+                "--flake".to_owned(),
+                ".#concurrent".to_owned(),
+            ],
+            witness_path: witness_path.clone(),
+        });
+        let executor = NixOSExecutor::new().with_runner(runner);
+        let shared = Arc::new(tokio::sync::Mutex::new((executor, ledger)));
+
+        let mut workers = Vec::with_capacity(WORKERS);
+        for _ in 0..WORKERS {
+            let shared = Arc::clone(&shared);
+            let permit = Arc::clone(&permit);
+            let command = command.clone();
+            workers.push(tokio::spawn(async move {
+                let mut state = shared.lock().await;
+                let (executor, ledger) = &mut *state;
+                executor
+                    .execute_with_permit(
+                        command,
+                        0.0,
+                        ledger,
+                        permit.as_ref(),
+                        "operator:alice",
+                        AuthorizationAuthority::HumanOperator,
+                    )
+                    .await
+            }));
+        }
+
+        let mut successes = 0usize;
+        let mut denied = 0usize;
+        for worker in workers {
+            match worker.await.unwrap() {
+                ExecutionResult::Success { .. } => successes += 1,
+                ExecutionResult::Blocked { .. } => denied += 1,
+                other => panic!("unexpected authorization result in race: {other:?}"),
+            }
+        }
+
+        assert_eq!(successes, 1, "one-shot race must have one successful effect");
+        assert_eq!(denied, WORKERS - 1, "all competing replays must be blocked");
+        assert_eq!(invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(observed_calls.lock().unwrap().len(), 1);
+        assert_eq!(
+            std::fs::read(&witness_path).unwrap(),
+            b"authorized-effect-witness"
+        );
+    }
+
     #[tokio::test]
     async fn test_execute_confirmed_bypasses_phi_check() {
         // execute_confirmed must run a command that execute() would gate,
