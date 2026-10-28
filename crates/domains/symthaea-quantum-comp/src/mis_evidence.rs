@@ -212,6 +212,33 @@ pub fn canonicalize_dimacs_graph(raw_bytes: &[u8]) -> Result<Vec<u8>, MisEvidenc
     Ok(canonical.into_bytes())
 }
 
+/// Encode an ordered selection into the one canonical candidate byte format.
+///
+/// The vertex list must already be strictly increasing; this fails closed on duplicates
+/// or alternative orderings rather than silently changing candidate identity. The
+/// graph-specific edge-feasibility check is still performed by the verifier.
+pub fn encode_canonical_mis_candidate(
+    vertex_count: usize,
+    selected_vertices: &[usize],
+) -> Result<Vec<u8>, MisEvidenceError> {
+    let mut previous = None;
+    let mut text = format!(
+        "SYMTHEA-MIS-CANDIDATE-V1\\ncount {}\\n",
+        selected_vertices.len()
+    );
+    for &vertex in selected_vertices {
+        if vertex >= vertex_count {
+            return Err(MisEvidenceError::CandidateVertexOutOfRange(vertex));
+        }
+        if previous.is_some_and(|old| old >= vertex) {
+            return Err(MisEvidenceError::CandidateVerticesNotStrictlySorted);
+        }
+        previous = Some(vertex);
+        text.push_str(&format!("{vertex}\\n"));
+    }
+    Ok(text.into_bytes())
+}
+
 /// Parse, hash, and independently validate canonical graph and candidate bytes.
 ///
 /// Graph format (UTF-8, LF line endings, final newline, zero-based vertices):
@@ -676,6 +703,25 @@ mod tests {
             canonicalize_dimacs_graph(b"p edge 3 1\\ne 1 4\\n"),
             Err(MisEvidenceError::InvalidDimacsVertex)
         ));
+    }
+
+    #[test]
+    fn canonical_candidate_encoder_round_trips_and_rejects_ambiguous_selections() {
+        let bytes = encode_canonical_mis_candidate(4, &[0, 2]).unwrap();
+        assert_eq!(bytes, candidate(&[0, 2]));
+        assert!(matches!(
+            encode_canonical_mis_candidate(4, &[2, 0]),
+            Err(MisEvidenceError::CandidateVerticesNotStrictlySorted)
+        ));
+        assert!(matches!(
+            encode_canonical_mis_candidate(4, &[1, 1]),
+            Err(MisEvidenceError::CandidateVerticesNotStrictlySorted)
+        ));
+        assert!(matches!(
+            encode_canonical_mis_candidate(4, &[0, 4]),
+            Err(MisEvidenceError::CandidateVertexOutOfRange(4))
+        ));
+        assert_eq!(encode_canonical_mis_candidate(0, &[]).unwrap(), candidate(&[]));
     }
 
     #[test]
