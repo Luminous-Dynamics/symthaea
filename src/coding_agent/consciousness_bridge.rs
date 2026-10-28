@@ -305,6 +305,22 @@ mod tests {
         let without_provenance = PendingReasoningOutcome::capture_with_evidence(&reasoning, None);
         assert_eq!(without_provenance.prediction_error_at_decision, None);
         assert!(without_provenance.prediction_evidence_at_decision.is_none());
+
+        // A finite payload with an inconsistent source cycle is not usable PE.
+        let stale = PredictionErrorEvidence::from_comparison(
+            crate::cognitive_loop::PredictionEvidenceStatus::Valid,
+            Some(0.88),
+            Some(8),
+            11,
+        );
+        assert_eq!(
+            stale.status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(stale.value_for_observation(11), None);
+        let stale_pending =
+            PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(stale));
+        assert_eq!(stale_pending.prediction_error_at_decision, None);
     }
 
     #[test]
