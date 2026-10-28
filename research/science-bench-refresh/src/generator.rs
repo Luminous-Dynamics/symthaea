@@ -618,6 +618,49 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_generator_config_fixture_decodes_and_has_all_expected_families() {
+        let bytes = include_bytes!("../fixtures/generator-config.example.json");
+        let config = decode_config(bytes).expect("checked-in generator config must decode");
+        let families: BTreeSet<&str> =
+            config.recipes.iter().map(|recipe| recipe.family_id.as_str()).collect();
+        assert_eq!(config.recipes.len(), 4);
+        assert_eq!(
+            families,
+            BTreeSet::from([
+                "semantic_invariance",
+                "sampling_noise_shift",
+                "confounding_null",
+                "identifiability_abstention"
+            ])
+        );
+    }
+
+    #[test]
+    fn distinct_committed_seeds_produce_distinct_task_artifacts() {
+        let config = demo_config();
+        let seed_a = vec![0x6d; 32];
+        let seed_b = vec![0x6e; 32];
+        let manifest_a = manifest_for_test(&config, &seed_a);
+        let manifest_b = manifest_for_test(&config, &seed_b);
+        let tasks_a = generate_task_set_bytes(&manifest_a, &seed_a, &config).unwrap();
+        let tasks_b = generate_task_set_bytes(&manifest_b, &seed_b, &config).unwrap();
+        assert_ne!(tasks_a, tasks_b);
+    }
+
+    #[test]
+    fn changed_task_bytes_fail_exact_regeneration_even_when_json_parses() {
+        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let final_manifest = manifest_with_task_commitment(&manifest, &generated);
+        let mut changed = generated.clone();
+        changed.push(b' ');
+        let report = verify_regeneration(&final_manifest, &seed, &config, &changed).unwrap();
+        assert!(!report.verified);
+        assert!(!report.task_set_commitment_matches);
+        assert!(report.task_set_contract_valid);
+        assert!(!report.byte_exact_match);
+    }
+
+    #[test]
     fn generated_task_set_is_byte_deterministic() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let repeated = generate_task_set_bytes(&manifest, &seed, &config).unwrap();
