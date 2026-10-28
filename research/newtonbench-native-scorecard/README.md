@@ -42,4 +42,4 @@ cargo run --locked --manifest-path research/newtonbench-native-scorecard/Cargo.t
 
 The fixture intentionally includes one paired completed trial, one failed vanilla trial with a Python-style NaN RMSLE, and a missing code-assisted counterpart. These values exist only to test importer behavior; they are not empirical benchmark results.
 
-For actual imports, set `upstream_revision` to a pinned NewtonBench Git commit (not `main`) and hash the complete runner/model/judge/tool configuration in `runner_configuration_sha256`. The report can establish native artifact pairing and arithmetic, not independent scientific validity or authenticated execution.
+For actual imports, set `upstream_revision` to a pinned 40-character lowercase NewtonBench Git commit SHA (not `main`); the validator rejects other revision labels. The literal `fixture-only` is reserved for explicitly synthetic fixtures. Hash the complete runner/model/judge/tool configuration in `runner_configuration_sha256`. The report can establish native artifact pairing and arithmetic, not independent scientific validity or authenticated execution.
