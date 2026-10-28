@@ -1,0 +1,58 @@
+name: Science Benchmark Refresh Manifest Validator
+
+on:
+  pull_request:
+    paths:
+      - "research/science-bench-refresh/**"
+      - "docs/research/SCI-BENCH-REFRESH-001.md"
+      - ".github/workflows/science-bench-refresh-validator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: science-bench-refresh-validator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validator:
+    name: Manifest contract and hostile controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path research/science-bench-refresh/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/science-bench-refresh/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path research/science-bench-refresh/Cargo.toml --all-targets -- -D warnings
+
+      - name: Fixture is valid but never eligible for scoring
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json > /tmp/science-bench-refresh-report.json
+          grep -q '"valid": true' /tmp/science-bench-refresh-report.json
+          grep -q '"admissible_for_scoring": false' /tmp/science-bench-refresh-report.json
+          grep -q '"eligible_for_sealed_generalization_claim": false' /tmp/science-bench-refresh-report.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json --require-scoring > /tmp/science-bench-refresh-required.json
+          scoring_exit=$?
+          set -e
+          test "$scoring_exit" -eq 3
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json --require-sealed > /tmp/science-bench-refresh-sealed.json
+          sealed_exit=$?
+          set -e
+          test "$sealed_exit" -eq 4
