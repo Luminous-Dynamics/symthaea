@@ -227,7 +227,7 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<AdaptationPanelAuditReport> 
             "replay run_id is reused across distinct panel cells"
         );
         ensure!(
-            recomputed == *stored_score,
+            &recomputed == stored_score,
             "cells[{index}] independently recomputed score does not exactly match panel score"
         );
 
