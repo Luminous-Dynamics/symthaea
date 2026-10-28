@@ -153,6 +153,8 @@ fn main() {
         summarize("consume", &consume_latencies);
         println!("profile_contract_mismatches={profile_mismatches}");
         println!("cumulative_contract_mismatches={contract_mismatches}");
+        // Keep the permit handles observable through the end of this profile.
+        std::hint::black_box(&_base_permits);
         println!("profile_end");
 
         // `_base_permits` keeps the originally issued permits alive for the
