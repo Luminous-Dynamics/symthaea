@@ -675,11 +675,36 @@ pub fn generate_task_set_bytes(
     seed_bytes: &[u8],
     generator_config_bytes: &[u8],
 ) -> Result<Vec<u8>, String> {
-    let validation = validate_manifest_bytes(manifest_bytes)?;
-    if !validation.valid {
-        return Err(format!("manifest is invalid: {}", validation.issues.join("; ")));
-    }
     let manifest = decode_manifest(manifest_bytes)?;
+
+    // Generation precedes the task-set commitment by design. Permit exactly
+    // the all-zero placeholder for this one field during generation, but
+    // validate every other manifest field and the frozen protocol commitment.
+    // The final scoring path still requires verify_reveal() with the real task
+    // digest, so a generated artifact cannot be admitted from this draft alone.
+    let mut admission_view: Value = serde_json::from_slice(manifest_bytes)
+        .map_err(|error| format!("manifest JSON is invalid: {error}"))?;
+    let declared_task_commitment = required_text(
+        &admission_view["task_set_commitment_sha256"],
+        "manifest.task_set_commitment_sha256",
+    )?;
+    if declared_task_commitment == "0".repeat(64) {
+        admission_view["task_set_commitment_sha256"] =
+            json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    }
+    let admission_bytes = serde_json::to_vec(&admission_view)
+        .map_err(|error| format!("cannot serialize manifest admission view: {error}"))?;
+    let validation = validate_manifest_bytes(&admission_bytes)?;
+    if !validation.valid {
+        return Err(format!("manifest is invalid for generation: {}", validation.issues.join("; ")));
+    }
+    // Only commitment fields differ in the admission view, and all commitment
+    // fields are excluded from the protocol context. Recheck the protocol
+    // commitment against the exact original manifest's frozen context.
+    let computed_protocol = compute_protocol_commitment(manifest_bytes)?;
+    if computed_protocol != manifest.protocol_commitment_sha256 {
+        return Err("protocol commitment does not match the frozen manifest context".to_owned());
+    }
     if manifest.purpose != "qualified_run" || manifest.lane != "sealed_refresh" {
         return Err("task regeneration requires a qualified sealed_refresh manifest".to_owned());
     }
@@ -1233,6 +1258,27 @@ mod tests {
             .expect_err("a seed different from the committed seed must be rejected");
         assert!(error.contains("seed bytes do not match"));
         assert!(!generated.is_empty());
+    }
+
+    #[test]
+    fn generation_accepts_zero_task_set_commitment_placeholder_but_reveal_does_not() {
+        let config = demo_config();
+        let seed = vec![0x6d; 32];
+        let committed_seed_manifest = manifest_for_test(&config, &seed);
+        let mut manifest: Value =
+            serde_json::from_slice(&committed_seed_manifest).unwrap();
+        manifest["task_set_commitment_sha256"] = json!("0".repeat(64));
+        let draft_manifest = serde_json::to_vec_pretty(&manifest).unwrap();
+
+        let generated = generate_task_set_bytes(&draft_manifest, &seed, &config)
+            .expect("generation should allow an explicit not-yet-committed task set");
+        assert!(!generated.is_empty());
+        assert!(crate::verify_reveal(&draft_manifest, &seed, &generated).is_err());
+
+        let final_manifest = manifest_with_task_commitment(&draft_manifest, &generated);
+        let report = verify_regeneration(&final_manifest, &seed, &config, &generated)
+            .expect("final committed manifest should verify");
+        assert!(report.verified, "{:?}", report.issues);
     }
 
     #[test]
