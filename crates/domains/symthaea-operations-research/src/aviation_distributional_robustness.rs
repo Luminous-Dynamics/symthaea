@@ -57,23 +57,69 @@ pub struct ScenarioProbability {
 /// Distributionally robust paired cost report.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DistributionalRobustReport {
-    pub scenario_count: usize,
-    pub tv_radius_ppm: u32,
+    scenario_count: usize,
+    tv_radius_ppm: u32,
     /// Exact numerator: expected cost delta = numerator / PROBABILITY_SCALE_PPM.
-    pub nominal_expected_delta_numerator_ppm: i128,
+    nominal_expected_delta_numerator_ppm: i128,
     /// Exact numerator over the worst distribution in the declared TV ball.
-    pub worst_case_expected_delta_numerator_ppm: i128,
-    pub nominal_expected_delta_units: f64,
-    pub worst_case_expected_delta_units: f64,
-    pub worst_single_scenario_delta_units: i64,
+    worst_case_expected_delta_numerator_ppm: i128,
+    nominal_expected_delta_units: f64,
+    worst_case_expected_delta_units: f64,
+    worst_single_scenario_delta_units: i64,
     /// Deterministic tie-break: lexicographically smallest scenario ID among ties.
-    pub worst_single_scenario_id: String,
-    pub scenarios_improved: usize,
-    pub scenarios_regressed: usize,
-    pub scenarios_unchanged: usize,
+    worst_single_scenario_id: String,
+    scenarios_improved: usize,
+    scenarios_regressed: usize,
+    scenarios_unchanged: usize,
     /// Sorted by scenario ID, independent of input row order.
-    pub probabilities: Vec<ScenarioProbability>,
+    probabilities: Vec<ScenarioProbability>,
 }
+
+impl DistributionalRobustReport {
+    /// Number of scenarios in the evaluated finite support.
+    pub fn scenario_count(&self) -> usize { self.scenario_count }
+
+    /// Total-variation radius used by the evaluator, in ppm of moved mass.
+    pub fn tv_radius_ppm(&self) -> u32 { self.tv_radius_ppm }
+
+    /// Exact nominal expected-cost numerator, scaled by 1,000,000.
+    pub fn nominal_expected_delta_numerator_ppm(&self) -> i128 {
+        self.nominal_expected_delta_numerator_ppm
+    }
+
+    /// Exact worst-case expected-cost numerator, scaled by 1,000,000.
+    pub fn worst_case_expected_delta_numerator_ppm(&self) -> i128 {
+        self.worst_case_expected_delta_numerator_ppm
+    }
+
+    /// Nominal expected candidate-minus-baseline cost in modeled units.
+    pub fn nominal_expected_delta_units(&self) -> f64 {
+        self.nominal_expected_delta_units
+    }
+
+    /// Worst-case expected candidate-minus-baseline cost in modeled units.
+    pub fn worst_case_expected_delta_units(&self) -> f64 {
+        self.worst_case_expected_delta_units
+    }
+
+    /// Largest positive or least-negative single-scenario cost delta.
+    pub fn worst_single_scenario_delta_units(&self) -> i64 {
+        self.worst_single_scenario_delta_units
+    }
+
+    /// Stable ID associated with the worst single-scenario cost delta.
+    pub fn worst_single_scenario_id(&self) -> &str {
+        &self.worst_single_scenario_id
+    }
+
+    pub fn scenarios_improved(&self) -> usize { self.scenarios_improved }
+    pub fn scenarios_regressed(&self) -> usize { self.scenarios_regressed }
+    pub fn scenarios_unchanged(&self) -> usize { self.scenarios_unchanged }
+
+    /// Scenario probabilities and cost deltas, sorted by scenario ID.
+    pub fn probabilities(&self) -> &[ScenarioProbability] { &self.probabilities }
+}
+
 
 /// Predeclared acceptance thresholds. Expected cost is compared using exact
 /// ppm-numerator arithmetic; the single-scenario ceiling is also explicit.
