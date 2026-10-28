@@ -14,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use syn::{spanned::Spanned, visit::Visit, Expr, ExprCall};
+use syn::{spanned::Spanned, visit::Visit, Expr, ExprCall, ExprMethodCall};
 
 const SCAN_SCHEMA: &str = "symthaea.effect_primitive_scan.v1";
 
@@ -178,6 +178,33 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+impl CandidateVisitor<'_> {
+    fn push_candidate(
+        &mut self,
+        line: usize,
+        column: usize,
+        class: &'static str,
+        callee: String,
+        confidence: &'static str,
+    ) {
+        let identity = format!(
+            "{}:{}:{}:{}:{}",
+            self.source_path, line, column, class, callee
+        );
+        let site_id_sha256 = format!("{:x}", Sha256::digest(identity.as_bytes()));
+        self.candidates.push(CandidateSite {
+            site_id_sha256,
+            source_path: self.source_path.to_string(),
+            source_sha256: self.source_sha256.to_string(),
+            line,
+            column,
+            class,
+            callee,
+            confidence,
+        });
+    }
+}
+
 impl<'ast, 'source> Visit<'ast> for CandidateVisitor<'source> {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if let Expr::Path(function) = node.func.as_ref() {
@@ -190,26 +217,26 @@ impl<'ast, 'source> Visit<'ast> for CandidateVisitor<'source> {
                     .collect::<Vec<_>>()
                     .join("::");
                 let start = node.span().start();
-                let identity = format!(
-                    "{}:{}:{}:{}:{}",
-                    self.source_path, start.line, start.column, class, callee
-                );
-                let site_id_sha256 = format!("{:x}", Sha256::digest(identity.as_bytes()));
-                self.candidates.push(CandidateSite {
-                    site_id_sha256,
-                    source_path: self.source_path.to_string(),
-                    source_sha256: self.source_sha256.to_string(),
-                    line: start.line,
-                    column: start.column,
-                    class,
-                    callee,
-                    confidence,
-                });
+                self.push_candidate(start.line, start.column, class, callee, confidence);
             }
         }
         syn::visit::visit_expr_call(self, node);
     }
-}
+
+    fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+        let method = node.method.to_string();
+        if let Some((class, confidence)) = classify_method_call(&method, &node.receiver) {
+            let start = node.span().start();
+            self.push_candidate(
+                start.line,
+                start.column,
+                class,
+                format!("<method>::{method}"),
+                confidence,
+            );
+        }
+        syn::visit::visit_expr_method_call(self, node);
+    }
 
 fn classify_call(path: &syn::Path) -> Option<(&'static str, &'static str)> {
     let segments = path
@@ -261,6 +288,71 @@ fn classify_call(path: &syn::Path) -> Option<(&'static str, &'static str)> {
     }
 
     None
+}
+
+fn classify_method_call(method: &str, receiver: &Expr) -> Option<(&'static str, &'static str)> {
+    if is_command_receiver(receiver) && matches!(method, "spawn" | "output" | "status" | "kill" | "start_kill" | "wait") {
+        return Some(("process_dispatch_method", "receiver_chain_heuristic"));
+    }
+    if is_file_receiver(receiver)
+        && matches!(method, "read" | "read_to_end" | "read_to_string" | "write" | "write_all" | "flush" | "set_len" | "sync_all" | "sync_data")
+    {
+        return Some(("filesystem_handle_io_method", "receiver_chain_heuristic"));
+    }
+    if is_socket_receiver(receiver) && matches!(method, "connect" | "bind" | "listen" | "accept" | "send" | "send_to" | "recv" | "recv_from")
+    {
+        return Some(("network_socket_method", "receiver_chain_heuristic"));
+    }
+    None
+}
+
+fn is_command_receiver(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call(call) => matches!(call.func.as_ref(), Expr::Path(path)
+            if path.path.segments.iter().any(|segment| segment.ident == "Command")
+                && path.path.segments.last().is_some_and(|segment| segment.ident == "new")),
+        Expr::MethodCall(call) => is_command_receiver(&call.receiver),
+        Expr::Paren(expr) => is_command_receiver(&expr.expr),
+        Expr::Reference(expr) => is_command_receiver(&expr.expr),
+        Expr::Path(path) => path.path.segments.last().is_some_and(|segment| {
+            let name = segment.ident.to_string().to_ascii_lowercase();
+            name.contains("command") || name == "cmd" || name.contains("process")
+        }),
+        _ => false,
+    }
+}
+
+fn is_file_receiver(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call(call) => matches!(call.func.as_ref(), Expr::Path(path)
+            if path.path.segments.iter().any(|segment| matches!(segment.ident.to_string().as_str(), "File" | "OpenOptions"))
+                && path.path.segments.iter().any(|segment| matches!(segment.ident.to_string().as_str(), "open" | "create" | "new"))),
+        Expr::MethodCall(call) => is_file_receiver(&call.receiver),
+        Expr::Paren(expr) => is_file_receiver(&expr.expr),
+        Expr::Reference(expr) => is_file_receiver(&expr.expr),
+        Expr::Path(path) => path.path.segments.last().is_some_and(|segment| {
+            let name = segment.ident.to_string().to_ascii_lowercase();
+            name.contains("file") || name == "reader" || name == "writer" || name == "handle"
+        }),
+        _ => false,
+    }
+}
+
+fn is_socket_receiver(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call(call) => matches!(call.func.as_ref(), Expr::Path(path)
+            if path.path.segments.iter().any(|segment| {
+                matches!(segment.ident.to_string().as_str(), "TcpStream" | "TcpListener" | "UdpSocket" | "UnixStream" | "UnixListener")
+            })),
+        Expr::MethodCall(call) => is_socket_receiver(&call.receiver),
+        Expr::Paren(expr) => is_socket_receiver(&expr.expr),
+        Expr::Reference(expr) => is_socket_receiver(&expr.expr),
+        Expr::Path(path) => path.path.segments.last().is_some_and(|segment| {
+            let name = segment.ident.to_string().to_ascii_lowercase();
+            name.contains("socket") || name.contains("stream") || name.contains("listener")
+        }),
+        _ => false,
+    }
 }
 
 fn collect_rust_files(directory: &Path, output: &mut Vec<PathBuf>) -> Result<()> {
