@@ -24,12 +24,13 @@ The Rust module matched_evaluation.rs defines:
 - Exact pairing by pair ID, with seed identity required to match. No silent inner join discards unmatched attempts.
 - An explicit termination state and candidate-verification state for every trial, including failed, timed-out, aborted, unverified, conflicting, and verifier-failed candidates.
 - Target attainment derived only when the same declared independent verifier confirms a conflict-free independent set whose cardinality meets the target.
-- A fixed cost vector for acquisition, preprocessing, feature extraction, transfer, amortized compilation/initialization, solve, repair, verification, and receipt persistence.
-- Unknown costs represented as unknown. If any stage is unknown, all-in time and time-speedup for that trial are unavailable; a missing stage is never a zero-cost stage.
+- A fixed cost vector for queue wait, acquisition, preprocessing, feature extraction, transfer, amortized compilation/initialization, solve, repair, verification, and receipt persistence.
+- Two non-interchangeable timing conventions: deployment all-in latency includes queue delay and amortized compilation/initialization; standardized algorithm runtime excludes those two fields to match common benchmark submission rules. Both require every stage in the respective convention to be measured.
+- Unknown costs represented as unknown. If any all-in stage is unknown, deployment latency and all-in speedup are unavailable; if any algorithm-runtime stage is unknown, standardized runtime is unavailable. A missing stage is never a zero-cost stage.
 - Energy records with explicit NotMeasured, DeviceOnly, PartialSystem, or FullSystem boundaries. Energy comparisons are emitted only when both successful paired trials have comparable measured boundaries.
-- Per-pair details plus target-hit counts and rates (candidate, baseline, both, either-only, neither), candidate-minus-baseline hit-rate delta, costed pair count, uncosted target hits, energy-scope mismatches, and medians of paired ratios.
+- Per-pair details plus target-hit counts and rates (candidate, baseline, both, either-only, neither), candidate-minus-baseline hit-rate delta, all-in-costed and algorithm-runtime-costed pair counts, uncosted target hits, energy-scope mismatches, and separate medians for all-in latency, standardized runtime, and measured energy ratios.
 
-The ratio baseline/candidate is greater than 1 when the candidate uses less of the measured resource. Ratios are reported only for pairs where both methods attain the same verified target and both cost vectors are complete. These are conditional diagnostics and can be survivor-biased when hard pairs are missed, so they are always accompanied by both arms' hit rates and paired hit-rate delta. Missed targets remain in target-hit counts and do not receive an invented ratio.
+The ratio baseline/candidate is greater than 1 when the candidate uses less of the measured resource. Ratios are reported only for pairs where both methods attain the same verified target and the relevant cost vectors are complete. These are conditional diagnostics and can be survivor-biased when hard pairs are missed, so they are always accompanied by both arms' hit rates and paired hit-rate delta. Deployment latency and standardized algorithm runtime are reported separately; do not call either one the other. Missed targets remain in target-hit counts and do not receive an invented ratio.
 
 ## Standalone smoke runner
 
