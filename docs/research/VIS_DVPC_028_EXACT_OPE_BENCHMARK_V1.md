@@ -24,9 +24,9 @@ For this controlled experiment, the logging propensity and Bernoulli DGP are kno
 
 ## Frozen DGP
 
-`tests/fixtures/vision-dvpc-028-scenarios.tsv` defines six scenarios: healthy overlap with correct/misspecified reward models; logging propensity A of 0.9, 0.95, and 0.99; and exact-zero support. Each supported scenario enumerates all `4^6 = 4096` possible logged action/reward sequences, with exact probability mass. Rewards are independent Bernoulli conditional on the selected action; the benchmark does not model contexts, unobserved confounding, clustering or adaptive logging in v1.
+`tests/fixtures/vision-dvpc-028-scenarios.tsv` defines eight scenarios: healthy overlap with correct/misspecified reward models; logging propensity A of 0.9, 0.95, and 0.99; a misspecified estimated logging propensity with a correct reward model; simultaneous logging-propensity and reward-model misspecification; and exact-zero support. Each of the seven supported scenarios enumerates all `4^6 = 4096` possible logged action/reward sequences, with exact probability mass. Rewards are independent Bernoulli conditional on the selected action; the benchmark does not model contexts, unobserved confounding, clustering or adaptive logging in v1.
 
-The target policy chooses A with probability 0.5. Reward means are 0.2 for A and 0.8 for B, so the evaluator-known target value is 0.5. The logging policy is the scenario's A probability. The SWITCH/clipping cap is frozen at 2.5. The deliberately misspecified reward model differs from the true means.
+The target policy chooses A with probability 0.5. Reward means are 0.2 for A and 0.8 for B, so the evaluator-known target value is 0.5. The generator's logging policy is the scenario's true A probability. Estimator weights use the separately recorded estimated logging probability, which is deliberately wrong in two scenarios. The evaluator uses generator truth for the structural-support label, while the estimators receive only the stated propensity value. The SWITCH/clipping cap is frozen at 2.5. The deliberately misspecified reward model differs from the true means.
 
 ## Run
 
@@ -39,7 +39,7 @@ rustc --edition=2024 -O tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028
 
 ## Independent numerical known answers
 
-An independent exact-enumeration reference calculation for `weak_overlap_001_misspecified` gives IPS variance `3.300084175084`, SNIPS expected estimate `0.233448729630`, clipped-IPS expected estimate `0.120000000000`, and SWITCH expected estimate `0.350000000000` with variance `0.006743476431`. The Rust tests pin these values within a declared `1e-8` tolerance.
+An independent exact-enumeration reference calculation for `propensity_misspecified_correct_q` gives IPS expected estimate `0.738095238095` while DR remains `0.500000000000` in expectation because its reward model is correct. Under simultaneous misspecification in `both_misspecified`, DR expectation is `0.420833333333` (true value 0.5). For `weak_overlap_001_misspecified`, the same reference gives IPS variance `3.300084175084`, SNIPS expected estimate `0.233448729630`, clipped-IPS expected estimate `0.120000000000`, and SWITCH expected estimate `0.350000000000` with variance `0.006743476431`. The Rust tests pin these values within a declared `1e-8` tolerance.
 
 ## Interpretation boundaries
 
