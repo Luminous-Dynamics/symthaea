@@ -41,6 +41,64 @@ def worker_request(request_id: str, op: str, **fields: Any) -> dict[str, Any]:
     return {"request_id": request_id, "op": op, **fields}
 
 
+def resolve_pointer(root: Any, pointer: str) -> Any:
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise ValueError(f"invalid absolute JSON Pointer: {pointer!r}")
+    current = root
+    for raw_token in pointer.split("/")[1:]:
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit():
+            index = int(token)
+            if index >= len(current) or str(index) != token:
+                raise ValueError(f"invalid array index in JSON Pointer: {pointer}")
+            current = current[index]
+        else:
+            raise ValueError(f"JSON Pointer does not resolve: {pointer}")
+    return current
+
+
+def validate_fixtures(trajectories: list[dict[str, Any]], questions: list[dict[str, Any]]) -> None:
+    trajectory_by_id: dict[str, dict[str, Any]] = {}
+    for index, trajectory in enumerate(trajectories):
+        trajectory_id = trajectory.get("id")
+        if not isinstance(trajectory_id, str) or not trajectory_id:
+            raise ValueError(f"trajectory {index}: id must be a non-empty string")
+        if trajectory_id in trajectory_by_id:
+            raise ValueError(f"duplicate trajectory id: {trajectory_id}")
+        trajectory_by_id[trajectory_id] = trajectory
+
+    question_ids: set[str] = set()
+    for index, question in enumerate(questions):
+        question_id = question.get("question_id")
+        if not isinstance(question_id, str) or not question_id:
+            raise ValueError(f"question {index}: question_id must be a non-empty string")
+        if question_id in question_ids:
+            raise ValueError(f"duplicate question id: {question_id}")
+        question_ids.add(question_id)
+        if not isinstance(question.get("query"), str) or not question["query"].strip():
+            raise ValueError(f"{question_id}: query must be a non-empty string")
+        for field in ("required_support", "forbidden_support", "distractor_support"):
+            refs = question.get(field, [])
+            if not isinstance(refs, list):
+                raise ValueError(f"{question_id}: {field} must be an array")
+            seen_refs: set[tuple[str, str]] = set()
+            for index_ref, ref in enumerate(refs, 1):
+                if not isinstance(ref, dict):
+                    raise ValueError(f"{question_id}: {field}[{index_ref}] must be an object")
+                target_id = ref.get("trajectory_id")
+                pointer = ref.get("source_pointer")
+                if not isinstance(target_id, str) or target_id not in trajectory_by_id:
+                    raise ValueError(f"{question_id}: {field}[{index_ref}] references unknown trajectory")
+                key = (target_id, pointer) if isinstance(pointer, str) else (target_id, "")
+                if key in seen_refs:
+                    raise ValueError(f"{question_id}: duplicate pointer in {field}")
+                seen_refs.add(key)
+                if not isinstance(resolve_pointer(trajectory_by_id[target_id], pointer), str):
+                    raise ValueError(f"{question_id}: {field}[{index_ref}] must resolve to a string")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", required=True, type=Path, help="built broca-lme-worker executable")
@@ -68,6 +126,7 @@ def main() -> int:
         raise SystemExit("question IDs must be unique")
     if not trajectories or not questions:
         raise SystemExit("fixtures must contain trajectories and questions")
+    validate_fixtures(trajectories, questions)
 
     requests: list[dict[str, Any]] = [
         worker_request(
