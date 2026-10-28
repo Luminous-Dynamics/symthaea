@@ -82,11 +82,26 @@ class CompositionalBakeoffTests(unittest.TestCase):
             for r in document["paired_runs"]
         }
         self.assertEqual(len(by_key), document["run_count"])
-        receipt = score_document(document, ROOT)
+        receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
         self.assertTrue(receipt["valid"])
         self.assertEqual(receipt["run_count"], document["run_count"])
         self.assertEqual(receipt["cell_summary_count"], 2 * 2 * 1 * 2 * 5)
         self.assertEqual(receipt["paired_comparison_count"], 2 * 2 * 1 * 2 * 4)
+
+    def test_scorer_requires_default_matrix_or_explicit_subset_flag(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("high_only",),
+            design_count=75,
+        )
+        with self.assertRaisesRegex(ValueError, "full preregistered default matrix"):
+            score_document(document, ROOT)
+        receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
+        self.assertEqual(receipt["execution_scope"], "diagnostic_subset")
 
     def test_scorer_rejects_modified_objective_value(self) -> None:
         document = run_sweep(
@@ -100,7 +115,7 @@ class CompositionalBakeoffTests(unittest.TestCase):
         )
         document["paired_runs"][0]["evaluations"][0]["objectives"][0] += 0.01
         with self.assertRaisesRegex(ValueError, "replay rejected"):
-            score_document(document, ROOT)
+            score_document(document, ROOT, allow_diagnostic_subset=True)
 
     def test_scorer_rejects_unregistered_promotion_method(self) -> None:
         document = run_sweep(
@@ -116,7 +131,7 @@ class CompositionalBakeoffTests(unittest.TestCase):
         self.assertTrue(promotions)
         promotions[0]["method"] = "fabricated_method"
         with self.assertRaisesRegex(ValueError, "unregistered promotion fields"):
-            score_document(document, ROOT)
+            score_document(document, ROOT, allow_diagnostic_subset=True)
 
     def test_scorer_rejects_modified_budget_ledger(self) -> None:
         document = run_sweep(
@@ -130,7 +145,7 @@ class CompositionalBakeoffTests(unittest.TestCase):
         )
         document["paired_runs"][0]["cost_spent"] -= 1
         with self.assertRaisesRegex(ValueError, "replay rejected"):
-            score_document(document, ROOT)
+            score_document(document, ROOT, allow_diagnostic_subset=True)
 
     def test_duplicate_json_keys_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "duplicate JSON key"):
