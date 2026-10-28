@@ -610,6 +610,7 @@ mod tests {
                 id: "dryad_test".to_owned(),
                 title: "test".to_owned(),
                 source_url: "https://example.org/data".to_owned(),
+                source_version: None,
                 described_cohort_size: Some(2),
                 data_files_described: vec!["data.csv".to_owned()],
             }],
