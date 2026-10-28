@@ -189,5 +189,41 @@
       "status": "not_run",
       "reason": "No independently reviewed secure-legacy cohort has been evaluated."
     }
+  },
+  "metric_definitions": {
+    "assurance_adjusted_semantic_success_rate": {
+      "formula": "independently_verified_passes / all tasks assigned to the locked confirmatory cohort",
+      "pass_requirements": [
+        "semantic behavior contract satisfied",
+        "every required test passes",
+        "every declared observable has passing differential evidence",
+        "task-level mutation gate meets its preregistered criterion",
+        "evidence hashes, checkout, runtime and toolchain identities validate",
+        "trusted manifest, attestation and independent receipt audit pass"
+      ],
+      "denominator_rules": [
+        "freeze task admission before arm assignment and score inspection",
+        "failed, unresolved and abstained outcomes remain non-passes in the denominator",
+        "show unresolved, failure and abstention rates separately",
+        "allow exclusions only for predeclared reasons adjudicated blind to arm"
+      ],
+      "companion_metrics": [
+        "raw candidate-resolution rate before assurance checks",
+        "AASSR",
+        "raw candidate-resolution rate minus AASSR",
+        "false acceptance on negative controls",
+        "unresolved rate by reason",
+        "cost per independently verified pass"
+      ],
+      "composite_weighted_score": false
+    },
+    "cost_per_independently_verified_fix": {
+      "formula": "total model + tool + compute + retry + human-intervention cost / independently verified passes",
+      "zero_pass_rule": "report denominator as zero and metric as undefined; never report zero cost",
+      "comparability": "only compare matched task cohort, model/scaffold/tool budgets, tool permissions and infrastructure pricing"
+    },
+    "avg_at_3": {
+      "note": "Must use three attempts and the benchmark's exact aggregation rules; never relabel as pass@1."
+    }
   }
 }
