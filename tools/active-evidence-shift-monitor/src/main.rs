@@ -1719,7 +1719,12 @@ mod tests {
         let horizon = HORIZONS[HORIZONS.len() - 1];
         let matched_reference_alarm_probability =
             composite_boundary_reference_alarm_probability(horizon);
+        assert!(
+            (matched_reference_alarm_probability - 0.0008915879337992225).abs() <= 5.0e-10,
+            "composite reference edge FPR changed; update the preregistered calibration target"
+        );
         let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+        assert_eq!(threshold, 1374, "matched-edge CUSUM threshold changed; review benchmark protocol");
         let upper_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER);
         let lower_alarm =
             cusum_alarm_probability(horizon, threshold, 1.0 - COMPOSITE_NULL_LOWER);
