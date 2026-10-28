@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/generator-config.schema.json",
+  "title": "Symthaea Science Benchmark Refresh Generator Configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "config_version",
+    "recipes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_generator_config.v1"
+    },
+    "config_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recipes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "kind",
+          "instruction",
+          "samples_per_task",
+          "x_start",
+          "x_step",
+          "noise_amplitude"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "semantic_invariance",
+              "sampling_noise_shift",
+              "confounding_null",
+              "identifiability_abstention"
+            ]
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "samples_per_task": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 10000
+          },
+          "x_start": {
+            "type": "number"
+          },
+          "x_step": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "noise_amplitude": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "description": "Frozen generator recipe for a bounded synthetic benchmark. Exact file bytes are pinned by generator.configuration_sha256. Qualified runs still need the generator source commit, secure seed handling, external task regeneration verification, and independent execution-isolation evidence."
+}
