@@ -31,6 +31,7 @@ pub enum RobustSetError {
     ActorUniverseMismatch { scenario_id: String, missing: Vec<String>, extra: Vec<String> },
     ActorDomainChanged { actor_id: String, expected: ActorDomain, actual: ActorDomain },
     InvalidTailFraction,
+    TailFractionMismatch { reported: f64, requested: f64 },
     OutcomeComparison(NetworkComparisonError),
     ArithmeticOverflow { context: &'static str },
 }
@@ -56,6 +57,8 @@ pub struct ScenarioRisk {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RobustNetworkReport {
     pub scenario_count: usize,
+    /// Empirical upper-tail fraction used to compute the reported tail risk.
+    pub tail_fraction: f64,
     pub objective_id: String,
     pub mean_net_system_benefit_units: f64,
     pub worst_case_net_system_benefit_units: i128,
@@ -209,14 +212,24 @@ pub fn evaluate_robust_network_candidate(
     }
     let universe = actor_universe(baseline)?;
     let candidate_universe = actor_universe(candidate)?;
-    if universe != candidate_universe {
-        // Pairwise comparison below also checks each actor set. This whole-set check
-        // catches consistent-but-wrong actor-domain changes across all candidate cases.
+    let expected_ids: BTreeSet<String> = universe.keys().cloned().collect();
+    let candidate_ids: BTreeSet<String> = candidate_universe.keys().cloned().collect();
+    if expected_ids != candidate_ids {
         return Err(RobustSetError::ActorUniverseMismatch {
             scenario_id: String::new(),
-            missing: universe.keys().filter(|k| !candidate_universe.contains_key(*k)).cloned().collect(),
-            extra: candidate_universe.keys().filter(|k| !universe.contains_key(*k)).cloned().collect(),
+            missing: expected_ids.difference(&candidate_ids).cloned().collect(),
+            extra: candidate_ids.difference(&expected_ids).cloned().collect(),
         });
+    }
+    for (actor_id, expected_domain) in &universe {
+        let actual_domain = candidate_universe[actor_id];
+        if *expected_domain != actual_domain {
+            return Err(RobustSetError::ActorDomainChanged {
+                actor_id: actor_id.clone(),
+                expected: *expected_domain,
+                actual: actual_domain,
+            });
+        }
     }
 
     let mut total_benefit = 0_i128;
@@ -276,6 +289,7 @@ pub fn evaluate_robust_network_candidate(
 
     Ok(RobustNetworkReport {
         scenario_count: base_by_id.len(),
+        tail_fraction,
         objective_id: objective.id.clone(),
         mean_net_system_benefit_units: mean,
         worst_case_net_system_benefit_units: worst_benefit,
@@ -304,6 +318,12 @@ pub fn assess_robust_network_candidate(
         || !constraints.max_upper_tail_system_regression_units.is_finite()
     {
         return Err(RobustSetError::InvalidTailFraction);
+    }
+    if constraints.tail_fraction != report.tail_fraction {
+        return Err(RobustSetError::TailFractionMismatch {
+            reported: report.tail_fraction,
+            requested: constraints.tail_fraction,
+        });
     }
 
     let mut exclusions = Vec::new();
@@ -426,7 +446,9 @@ mod tests {
         let baseline = base();
         let candidate = vec![outcome("S3", 80, 110), outcome("S1", 80, 110), outcome("S2", 80, 110)];
         let a = evaluate_robust_network_candidate(&objective(), &baseline, &candidate, 0.5).unwrap();
-        let b = evaluate_robust_network_candidate(&objective(), &baseline, &candidate, 0.5).unwrap();
+        let mut reversed = candidate.clone();
+        reversed.reverse();
+        let b = evaluate_robust_network_candidate(&objective(), &baseline, &reversed, 0.5).unwrap();
         assert_eq!(a, b);
         assert_eq!(a.scenario_risks[0].scenario_id, "S1");
     }
@@ -493,6 +515,19 @@ mod tests {
             tail_fraction: 0.5,
         });
         assert!(matches!(result, Err(RobustSetError::InvalidTailFraction)));
+    }
+
+    #[test]
+    fn assessment_rejects_a_tail_fraction_different_from_the_report() {
+        let report = evaluate_robust_network_candidate(&objective(), &base(), &base(), 0.1).unwrap();
+        let result = assess_robust_network_candidate(report, RobustNetworkConstraints {
+            max_actor_regression_units: 10,
+            min_mean_system_benefit_units: 0.0,
+            min_worst_case_system_benefit_units: 0,
+            max_upper_tail_system_regression_units: 10.0,
+            tail_fraction: 0.5,
+        });
+        assert!(matches!(result, Err(RobustSetError::TailFractionMismatch { .. })));
     }
 
     #[test]
