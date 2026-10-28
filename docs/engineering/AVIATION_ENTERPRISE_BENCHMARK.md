@@ -300,3 +300,14 @@ The new [ACSP-001 calibration and split-integrity protocol](./AVIATION_CALIBRATI
 The key claim ceiling is explicit: these checks validate supplied metadata only. They cannot prove that cluster identifiers reflect real independent events or that analysts did not inspect test outcomes outside the declared provenance. Fourteen unit tests and five integration-oracle tests are defined but not executed due to the missing Rust toolchain.
 
 Follow-up: [AVIATION-ENTERPRISE-009 #8770](https://github.com/Luminous-Dynamics/symthaea/issues/8770).
+
+
+## Data-driven TV-radius calibration (28 October 2026)
+
+The exported `aviation_probability_calibration.rs` module turns held-out Calibration-partition frequencies into a conservative finite-support total-variation radius. It reports nominal-vs-empirical TV distance and a union-Hoeffding sampling allowance separately; the synthetic contract example evaluates the DRO objective at that radius and also reports the preregistered sensitivity curve.
+
+The concentration bound assumes independent event episodes from one fixed distribution. It is not valid as a blanket guarantee under arbitrary operational drift, temporal dependence or omitted scenario classes. A small calibration set can produce a 100% TV radius, exposing insufficient evidence rather than justifying a lower confidence level. The research spec recommends regime/time-block diagnostics and a predeclared envelope when pooling is not defensible.
+
+Fourteen unit tests and five public-API integration-oracle fixtures are defined for this module. No Rust tests or example execution are claimed.
+
+Follow-up: [AVIATION-ENTERPRISE-010 #8787](https://github.com/Luminous-Dynamics/symthaea/issues/8787).
