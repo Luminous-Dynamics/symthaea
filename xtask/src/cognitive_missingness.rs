@@ -104,7 +104,7 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<MissingnessScore> {
     let mut score = score(input, &bytes)?;
     score.result_sha256 = None;
     let canonical = serde_json::to_vec(&score)?;
-    score.result_sha256 = Some(hex::encode(Sha256::digest(canonical)));
+    score.result_sha256 = Some(sha256_hex(&canonical));
     Ok(score)
 }
 
@@ -186,7 +186,7 @@ pub fn score(input: MissingnessInput, source_bytes: &[u8]) -> anyhow::Result<Mis
 
     let mut result = MissingnessScore {
         metric_version: "informative-missingness-partial-identification-v1".to_string(),
-        source_input_sha256: hex::encode(Sha256::digest(source_bytes)),
+        source_input_sha256: sha256_hex(source_bytes),
         result_sha256: None,
         dataset_id: input.dataset_id,
         scenario_id: input.scenario_id,
@@ -204,8 +204,16 @@ pub fn score(input: MissingnessInput, source_bytes: &[u8]) -> anyhow::Result<Mis
     // Digest of the canonical score with result_sha256=null, so its own digest is not circular.
     result.result_sha256 = None;
     let canonical = serde_json::to_vec(&result)?;
-    result.result_sha256 = Some(hex::encode(Sha256::digest(canonical)));
+    result.result_sha256 = Some(sha256_hex(&canonical));
     Ok(result)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn validate_arm(arm: &MissingnessArmInput) -> anyhow::Result<()> {
@@ -301,8 +309,8 @@ mod tests {
             candidate,
             reference,
             sensitivity_grid: SensitivityGrid {
-                candidate_deltas: vec![-0.1, 0.0, 0.25, 0.9],
-                reference_deltas: vec![-0.3, 0.0, 0.2, 0.7],
+                candidate_deltas: vec![-0.1, 0.0, 0.25, 0.75],
+                reference_deltas: vec![-0.2, 0.0, 0.2, 0.6],
             },
         }
     }
