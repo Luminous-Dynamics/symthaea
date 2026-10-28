@@ -2964,6 +2964,92 @@ mod tests {
     }
 
     #[test]
+    fn weak_null_family_effects_have_zero_target_weighted_mean_and_valid_rates() {
+        let family_target_counts: Vec<FamilyTargetCount> = (0..24)
+            .map(|index| FamilyTargetCount {
+                family_id: format!("weak-null-{index:02}"),
+                eligible_target_count: 1 + index % 5,
+            })
+            .collect();
+        let baseline_rates: Vec<f64> = (0..24)
+            .map(|index| 0.10 + ((index * 7) % 8) as f64 * 0.10)
+            .collect();
+        let mut rng = SplitMix64 { state: 20261028 };
+        let effects = sample_centered_weak_null_family_effects(
+            &family_target_counts,
+            &baseline_rates,
+            0.20,
+            &mut rng,
+        )
+        .expect("aligned family rates should produce a weak-null effect vector");
+
+        let weighted_effect_sum: f64 = effects
+            .iter()
+            .zip(&family_target_counts)
+            .map(|(effect, family)| effect * family.eligible_target_count as f64)
+            .sum();
+        assert!(weighted_effect_sum.abs() < 1e-10);
+        assert!(effects
+            .iter()
+            .zip(&baseline_rates)
+            .all(|(effect, baseline)| (0.0..=1.0).contains(&(baseline + effect))));
+        let realized_sd = weighted_family_effect_sd(&effects, &family_target_counts);
+        assert!(realized_sd > 0.0);
+        assert!(realized_sd <= 0.20 + 1e-12);
+    }
+
+    #[test]
+    fn weak_null_calibration_replays_deterministically_and_counts_degenerate_intervals() {
+        let families: Vec<FamilyTargetCount> = (0..24)
+            .map(|index| FamilyTargetCount {
+                family_id: format!("weak-family-{index:02}"),
+                eligible_target_count: 1 + index % 4,
+            })
+            .collect();
+        let left = simulate_weak_null_scenario(
+            &families, 0.35, 0.10, 0.20, 64, 128, 20261028,
+        )
+        .expect("weak-null calibration should execute");
+        let right = simulate_weak_null_scenario(
+            &families, 0.35, 0.10, 0.20, 64, 128, 20261028,
+        )
+        .expect("same weak-null seed must replay identically");
+
+        assert_eq!(left.status, "estimated");
+        assert_eq!(left.false_claims, right.false_claims);
+        assert_eq!(left.degenerate_interval_trials, right.degenerate_interval_trials);
+        assert_eq!(
+            left.estimated_false_claim_probability,
+            right.estimated_false_claim_probability
+        );
+        assert_eq!(
+            left.false_claim_probability_lower_95,
+            right.false_claim_probability_lower_95
+        );
+        assert_eq!(
+            left.false_claim_probability_upper_95,
+            right.false_claim_probability_upper_95
+        );
+        assert_eq!(
+            left.mean_observed_effect_percentage_points,
+            right.mean_observed_effect_percentage_points
+        );
+        assert_eq!(
+            left.mean_realized_family_effect_heterogeneity_sd_percentage_points,
+            right.mean_realized_family_effect_heterogeneity_sd_percentage_points
+        );
+        assert!(left.false_claims <= 64 - left.degenerate_interval_trials);
+        assert!(left.mean_realized_family_effect_heterogeneity_sd_percentage_points
+            .is_some_and(|sd| sd > 0.0 && sd <= 10.0 + 1e-8));
+        assert!(left.estimated_false_claim_probability
+            .is_some_and(|rate| (0.0..=1.0).contains(&rate)));
+        assert!(left.false_claim_probability_lower_95
+            .zip(left.estimated_false_claim_probability)
+            .zip(left.false_claim_probability_upper_95)
+            .is_some_and(|((lower, rate), upper)| lower <= rate && rate <= upper));
+    }
+
+    #[test]
     fn power_simulation_is_reproducible_for_a_frozen_seed() {
         let families: Vec<FamilyTargetCount> = (0..24)
             .map(|index| FamilyTargetCount {
