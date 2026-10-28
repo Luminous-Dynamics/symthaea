@@ -1042,9 +1042,9 @@ def check_cusum_csv(path):
             or (class_name == "baseline_misspecification"
                 and COMPOSITE_NULL_LOWER <= stream_p <= COMPOSITE_NULL_UPPER)
         ) and alarm > matched_reference_alarm + EPS and not is_target_shift:
-            raise ValueError(f"CUSUM exceeded per-side alpha on an accepted-null scenario on line {line}")
+            raise ValueError(f"CUSUM exceeded the matched reference edge FPR on an accepted-null scenario on line {line}")
         if is_target_shift and alarm > matched_reference_alarm + EPS:
-            raise ValueError(f"CUSUM pre-shift alarm exceeded per-side alpha on line {line}")
+            raise ValueError(f"CUSUM pre-shift alarm exceeded the matched reference edge FPR on line {line}")
     print(f"PASS: independently recomputed and semantically checked all {len(expected)} exact-DP CUSUM rows")
 
 
@@ -1055,7 +1055,7 @@ def cusum_self_test():
     threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm)
     boundary_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER)
     previous_alarm = cusum_alarm_probability(horizon, threshold - 1, COMPOSITE_NULL_UPPER)
-    if boundary_alarm > matched_reference_alarm + EPS or previous_alarm <= matched_reference_alarm - EPS:
+    if boundary_alarm > matched_reference_alarm + EPS or previous_alarm <= matched_reference_alarm + EPS:
         raise ValueError("CUSUM threshold is not the minimum threshold at the matched reference FPR")
     if 2.0 * boundary_alarm > PER_CELL_ALPHA + EPS:
         raise ValueError("CUSUM two-direction union bound exceeds the per-cell alpha allocation")
