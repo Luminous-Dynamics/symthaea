@@ -42,6 +42,7 @@ struct Campaign {
     value_min_milli: i64,
     value_max_milli: i64,
     value_alpha_ppm: u64,
+    joint_alpha_ppm: u64,
     min_net_value_lcb_milli: i64,
     activation_count: u64,
     eligible_count: u64,
@@ -75,8 +76,8 @@ fn parse_flag(value: &str, field: &str, line: usize) -> Result<bool, String> {
 
 fn parse_campaign(line_text: &str, line: usize) -> Result<Campaign, String> {
     let f: Vec<&str> = line_text.split('\t').collect();
-    if f.len() != 25 {
-        return Err(format!("line {line}: expected 25 TSV fields, found {}", f.len()));
+    if f.len() != 26 {
+        return Err(format!("line {line}: expected 26 TSV fields, found {}", f.len()));
     }
     if f[0].is_empty() || f[0].chars().any(char::is_whitespace) {
         return Err(format!("line {line}: invalid campaign ID"));
@@ -92,21 +93,22 @@ fn parse_campaign(line_text: &str, line: usize) -> Result<Campaign, String> {
         value_min_milli: parse_num(f[7], "value_min_milli", line)?,
         value_max_milli: parse_num(f[8], "value_max_milli", line)?,
         value_alpha_ppm: parse_num(f[9], "value_alpha_ppm", line)?,
-        min_net_value_lcb_milli: parse_num(f[10], "min_net_value_lcb_milli", line)?,
-        activation_count: parse_num(f[11], "activation_count", line)?,
-        eligible_count: parse_num(f[12], "eligible_count", line)?,
-        min_activation_bps: parse_num(f[13], "min_activation_bps", line)?,
-        provenance_ok: parse_flag(f[14], "provenance_ok", line)?,
-        action_digest_ok: parse_flag(f[15], "action_digest_ok", line)?,
-        value_evidence_digest_ok: parse_flag(f[16], "value_evidence_digest_ok", line)?,
-        target_calibrated: parse_flag(f[17], "target_calibrated", line)?,
-        target_shift_detected: parse_flag(f[18], "target_shift_detected", line)?,
-        sealed_touched: parse_flag(f[19], "sealed_touched", line)?,
-        all_in_cost_units: parse_num(f[20], "all_in_cost_units", line)?,
-        cost_budget_units: parse_num(f[21], "cost_budget_units", line)?,
-        required_campaign_units: parse_num(f[22], "required_campaign_units", line)?,
-        available_campaign_units: parse_num(f[23], "available_campaign_units", line)?,
-        expected: Verdict::parse(f[24])?,
+        joint_alpha_ppm: parse_num(f[10], "joint_alpha_ppm", line)?,
+        min_net_value_lcb_milli: parse_num(f[11], "min_net_value_lcb_milli", line)?,
+        activation_count: parse_num(f[12], "activation_count", line)?,
+        eligible_count: parse_num(f[13], "eligible_count", line)?,
+        min_activation_bps: parse_num(f[14], "min_activation_bps", line)?,
+        provenance_ok: parse_flag(f[15], "provenance_ok", line)?,
+        action_digest_ok: parse_flag(f[16], "action_digest_ok", line)?,
+        value_evidence_digest_ok: parse_flag(f[17], "value_evidence_digest_ok", line)?,
+        target_calibrated: parse_flag(f[18], "target_calibrated", line)?,
+        target_shift_detected: parse_flag(f[19], "target_shift_detected", line)?,
+        sealed_touched: parse_flag(f[20], "sealed_touched", line)?,
+        all_in_cost_units: parse_num(f[21], "all_in_cost_units", line)?,
+        cost_budget_units: parse_num(f[22], "cost_budget_units", line)?,
+        required_campaign_units: parse_num(f[23], "required_campaign_units", line)?,
+        available_campaign_units: parse_num(f[24], "available_campaign_units", line)?,
+        expected: Verdict::parse(f[25])?,
     };
     validate_campaign(&campaign)?;
     Ok(campaign)
@@ -127,6 +129,12 @@ fn validate_campaign(c: &Campaign) -> Result<(), String> {
     }
     if c.value_alpha_ppm == 0 || c.value_alpha_ppm >= 1_000_000 {
         return Err(format!("{}: value alpha must be strictly between 0 and 1", c.id));
+    }
+    if c.joint_alpha_ppm == 0 || c.joint_alpha_ppm >= 1_000_000 {
+        return Err(format!("{}: joint alpha must be strictly between 0 and 1", c.id));
+    }
+    if c.alpha_ppm.checked_add(c.value_alpha_ppm).is_none_or(|sum| sum > c.joint_alpha_ppm) {
+        return Err(format!("{}: marginal alpha allocations exceed joint alpha budget", c.id));
     }
     let n = c.value_samples_n as i128;
     let minimum_sum = (c.value_min_milli as i128) * n;
@@ -343,17 +351,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn zero_failure_boundary_is_exact_at_58_and_59_trials() {
-        let alpha = 0.05;
-        assert!(exact_binomial_upper(58, 0, alpha).unwrap() > 0.05);
-        assert!(exact_binomial_upper(59, 0, alpha).unwrap() < 0.05);
-        assert_eq!(required_zero_failure_trials(alpha, 0.05).unwrap(), 59);
+    fn joint_error_budget_boundary_is_exact_at_71_and_72_trials() {
+        let alpha = 0.025;
+        assert!(exact_binomial_upper(71, 0, alpha).unwrap() > 0.05);
+        assert!(exact_binomial_upper(72, 0, alpha).unwrap() < 0.05);
+        assert_eq!(required_zero_failure_trials(alpha, 0.05).unwrap(), 72);
     }
 
     #[test]
-    fn one_failure_needs_more_than_59_trials_but_100_is_enough_here() {
-        assert!(exact_binomial_upper(59, 1, 0.05).unwrap() > 0.05);
-        assert!(exact_binomial_upper(100, 1, 0.05).unwrap() < 0.05);
+    fn one_failure_needs_120_trials_at_the_split_alpha() {
+        assert!(exact_binomial_upper(72, 1, 0.025).unwrap() > 0.05);
+        assert!(exact_binomial_upper(120, 1, 0.025).unwrap() < 0.05);
     }
 
     #[test]
@@ -374,13 +382,16 @@ mod tests {
     }
 
     #[test]
-    fn bounded_value_lcb_is_computed_not_supplied() {
+    fn bounded_value_lcb_is_computed_not_supplied_and_alpha_is_reserved() {
         let campaigns = parsed_fixture().unwrap();
-        let good = campaigns.iter().find(|x| x.id == "positive_59_zero").unwrap();
+        let good = campaigns.iter().find(|x| x.id == "positive_72_zero").unwrap();
         let good_lcb = bounded_mean_lcb(good).unwrap();
         assert!(good_lcb > good.min_net_value_lcb_milli as f64);
         let no_op = campaigns.iter().find(|x| x.id == "no_op").unwrap();
         assert!(bounded_mean_lcb(no_op).unwrap() < no_op.min_net_value_lcb_milli as f64);
+        let mut invalid = good.clone();
+        invalid.joint_alpha_ppm = 49_999;
+        assert!(validate_campaign(&invalid).unwrap_err().contains("exceed joint alpha budget"));
     }
 
     #[test]
@@ -405,8 +416,8 @@ mod tests {
 
     #[test]
     fn zero_failure_sample_requirement_tightens_with_risk_limit() {
-        assert_eq!(required_zero_failure_trials(0.05, 0.05).unwrap(), 59);
-        assert_eq!(required_zero_failure_trials(0.05, 0.01).unwrap(), 299);
+        assert_eq!(required_zero_failure_trials(0.025, 0.05).unwrap(), 72);
+        assert_eq!(required_zero_failure_trials(0.025, 0.01).unwrap(), 368);
         assert!(required_zero_failure_trials(0.05, 0.0).is_err());
     }
 }
