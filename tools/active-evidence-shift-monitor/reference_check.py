@@ -45,6 +45,15 @@ FIELDS = (
     "per_cell_alpha", "survival_probability",
 )
 EPS = 1e-10
+TOTAL_LABEL_BUDGET = 1000
+SHIFT_AFTER_TOTAL_LABELS = 100
+SENTINEL_FRACTIONS = (0.0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0)
+BUDGET_FIELDS = (
+    "sentinel_fraction", "total_label_budget", "sentinel_labels", "adaptive_labels",
+    "change_after_sentinel_labels", "no_target_shift_alarm_probability",
+    "pre_change_false_alarm_probability", "true_shift_detection_probability",
+    "mean_delay_sentinel_labels", "mean_delay_total_label_equivalent", "per_cell_alpha",
+)
 BETA_A = 0.5
 BETA_B = 0.5
 
@@ -86,9 +95,11 @@ def should_alarm(boundary, n, successes, horizon):
     return P0 < lower or P0 > upper
 
 
-def simulate(boundary, scenario, horizon):
+def simulate(boundary, scenario, horizon, change_after_override=None):
     post_shift_p = SHIFT_PROBABILITIES[scenario]
     change_after = CHANGE_AFTER if post_shift_p is not None else 0
+    if change_after_override is not None:
+        change_after = change_after_override
     active = [0.0] * (horizon + 1)
     active[0] = 1.0
     first_alarm = [0.0] * (horizon + 1)
@@ -198,6 +209,126 @@ def check_csv(path):
     print(f"PASS: independently recomputed all {len(expected)} exact-DP rows")
 
 
+
+def sentinel_budget_rows():
+    """Exact frontier at fixed total labels, using scheduled randomized target audits."""
+    rows = []
+    for fraction in SENTINEL_FRACTIONS:
+        sentinel_labels = int(round(fraction * TOTAL_LABEL_BUDGET))
+        adaptive_labels = TOTAL_LABEL_BUDGET - sentinel_labels
+        if sentinel_labels == 0:
+            no_shift = simulate(
+                "beta_mixture_e_process",
+                "selection_bias_no_environment_shift",
+                TOTAL_LABEL_BUDGET,
+            )[0]
+            rows.append({
+                "sentinel_fraction": f"{fraction:.4f}",
+                "total_label_budget": str(TOTAL_LABEL_BUDGET),
+                "sentinel_labels": "0",
+                "adaptive_labels": str(TOTAL_LABEL_BUDGET),
+                "change_after_sentinel_labels": "NA",
+                "no_target_shift_alarm_probability": f"{no_shift:.12f}",
+                "pre_change_false_alarm_probability": "NA",
+                "true_shift_detection_probability": "NA",
+                "mean_delay_sentinel_labels": "NA",
+                "mean_delay_total_label_equivalent": "NA",
+                "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
+            })
+            continue
+
+        change_after = int(round(fraction * SHIFT_AFTER_TOTAL_LABELS))
+        stable_alarm = simulate(
+            "beta_mixture_e_process", "stationary_null", sentinel_labels
+        )[0]
+        pre_change_false_alarm, detection, delay, _survival = simulate(
+            "beta_mixture_e_process",
+            "step_up_080",
+            sentinel_labels,
+            change_after_override=change_after,
+        )
+        delay_total = delay / fraction if delay is not None else None
+        rows.append({
+            "sentinel_fraction": f"{fraction:.4f}",
+            "total_label_budget": str(TOTAL_LABEL_BUDGET),
+            "sentinel_labels": str(sentinel_labels),
+            "adaptive_labels": str(adaptive_labels),
+            "change_after_sentinel_labels": str(change_after),
+            "no_target_shift_alarm_probability": f"{stable_alarm:.12f}",
+            "pre_change_false_alarm_probability": f"{pre_change_false_alarm:.12f}",
+            "true_shift_detection_probability": as_text(detection),
+            "mean_delay_sentinel_labels": as_text(delay),
+            "mean_delay_total_label_equivalent": as_text(delay_total),
+            "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
+        })
+    return rows
+
+
+def check_sentinel_budget_csv(path):
+    expected = sentinel_budget_rows()
+    try:
+        with open(path, newline="", encoding="utf-8") as source:
+            reader = csv.DictReader(source)
+            if tuple(reader.fieldnames or ()) != BUDGET_FIELDS:
+                raise ValueError(f"sentinel-budget header mismatch: {reader.fieldnames}")
+            actual = list(reader)
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise ValueError(f"cannot read sentinel-budget output: {exc}") from exc
+    if len(actual) != len(expected):
+        raise ValueError(f"sentinel-budget row count mismatch: expected {len(expected)}, got {len(actual)}")
+
+    text_fields = (
+        "sentinel_fraction", "total_label_budget", "sentinel_labels",
+        "adaptive_labels", "change_after_sentinel_labels",
+    )
+    numeric_fields = (
+        "no_target_shift_alarm_probability", "pre_change_false_alarm_probability",
+        "true_shift_detection_probability", "mean_delay_sentinel_labels",
+        "mean_delay_total_label_equivalent", "per_cell_alpha",
+    )
+    for line, (got, want) in enumerate(zip(actual, expected), 2):
+        for field in text_fields:
+            if got[field] != want[field]:
+                raise ValueError(f"{field} mismatch on line {line}: {got[field]} != {want[field]}")
+        if int(got["sentinel_labels"]) + int(got["adaptive_labels"]) != TOTAL_LABEL_BUDGET:
+            raise ValueError(f"label budget does not conserve on line {line}")
+        for field in numeric_fields:
+            if want[field] == "NA":
+                if got[field] != "NA":
+                    raise ValueError(f"{field} should be NA on line {line}")
+                continue
+            try:
+                value = float(got[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid numeric {field} on line {line}") from exc
+            target = float(want[field])
+            if not math.isfinite(value) or abs(value - target) > 5e-10:
+                raise ValueError(f"{field} mismatch on line {line}: {value} != {target}")
+    print(f"PASS: independently recomputed all {len(expected)} sentinel-budget rows")
+
+
+def sentinel_budget_self_test():
+    rows = sentinel_budget_rows()
+    if len(rows) != len(SENTINEL_FRACTIONS):
+        raise ValueError("sentinel-budget frontier row count mismatch")
+    no_audit = rows[0]
+    five_percent = rows[1]
+    ten_percent = rows[2]
+    twenty_percent = rows[3]
+    if float(no_audit["no_target_shift_alarm_probability"]) < 0.99:
+        raise ValueError("zero-sentinel negative control did not expose selection-induced alarms")
+    if float(five_percent["no_target_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+        raise ValueError("5% randomized-sentinel null alarm exceeded alpha")
+    if float(ten_percent["true_shift_detection_probability"]) < 0.95:
+        raise ValueError("10% sentinel budget missed target shift detection gate")
+    if float(twenty_percent["true_shift_detection_probability"]) < 0.99:
+        raise ValueError("20% sentinel budget missed target shift detection gate")
+    for row in rows:
+        if int(row["sentinel_labels"]) + int(row["adaptive_labels"]) != TOTAL_LABEL_BUDGET:
+            raise ValueError("sentinel budget frontier does not conserve labels")
+    print("PASS: audit-budget conservation, zero-sentinel negative control, sentinel null and shift-power gates")
+
+
 def self_test():
     fixed_final = simulate("fixed_time_final_only", "stationary_null", 1000)[0]
     fixed_reused = simulate("fixed_time_reused_each_look", "stationary_null", 1000)[0]
@@ -249,21 +380,25 @@ def self_test():
 
 
 def main(argv):
-    if len(argv) == 2 and argv[1] == "--self-test":
-        try:
+    try:
+        if len(argv) == 2 and argv[1] == "--self-test":
             self_test()
             return 0
-        except (AssertionError, ValueError) as exc:
-            print(f"FAIL: {exc}", file=sys.stderr)
-            return 1
-    if len(argv) != 2 or argv[1] in ("-h", "--help"):
+        if len(argv) == 2 and argv[1] == "--sentinel-budget-self-test":
+            sentinel_budget_self_test()
+            return 0
+        if len(argv) == 3 and argv[1] == "--sentinel-budget":
+            check_sentinel_budget_csv(argv[2])
+            return 0
+        if len(argv) == 2 and argv[1] not in ("-h", "--help"):
+            check_csv(argv[1])
+            return 0
         print("Usage: reference_check.py OUTPUT.csv")
         print("       reference_check.py --self-test")
+        print("       reference_check.py --sentinel-budget OUTPUT.csv")
+        print("       reference_check.py --sentinel-budget-self-test")
         return 2
-    try:
-        check_csv(argv[1])
-        return 0
-    except (OSError, UnicodeError, csv.Error, ValueError) as exc:
+    except (OSError, UnicodeError, csv.Error, ValueError, AssertionError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
 
