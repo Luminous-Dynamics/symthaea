@@ -448,6 +448,13 @@ pub fn generate_task_set_bytes(
             )?);
         }
     }
+    // Sort by seed-derived opaque task IDs so tasks are not grouped by
+    // constructor family in the policy-visible execution order.
+    tasks.sort_by(|left, right| {
+        left["task_id"]
+            .as_str()
+            .cmp(&right["task_id"].as_str())
+    });
     let task_set = json!({
         "schema": crate::TASK_SET_SCHEMA,
         "generation_id": manifest.generation_id.clone(),
@@ -697,6 +704,21 @@ mod tests {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let repeated = generate_task_set_bytes(&manifest, &seed, &config).unwrap();
         assert_eq!(generated, repeated);
+    }
+
+    #[test]
+    fn task_order_is_determined_by_opaque_id_not_family_grouping() {
+        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let tasks: Value = serde_json::from_slice(&generated).unwrap();
+        let rows = tasks["tasks"].as_array().unwrap();
+        let ids: Vec<&str> = rows
+            .iter()
+            .map(|row| row["task_id"].as_str().unwrap())
+            .collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        assert_eq!(ids, sorted);
+        assert!(manifest.len() > 0 && seed.len() >= 32 && !config.is_empty());
     }
 
     #[test]
