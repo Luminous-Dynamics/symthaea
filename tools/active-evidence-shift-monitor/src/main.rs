@@ -830,7 +830,7 @@ fn evaluate_cusum_scenario(
 fn print_cusum_baseline_csv() {
     let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
     println!(
-        "direction,scenario,scenario_class,horizon,change_after,p0,null_lower,null_upper,threshold_scaled,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_side_alpha,survival_probability"
+        "direction,scenario,scenario_class,horizon,change_after,p0,null_lower,null_upper,threshold_scaled,threshold_score,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_side_alpha,survival_probability"
     );
     for direction in CusumDirection::ALL {
         for scenario in SCENARIOS {
@@ -841,7 +841,7 @@ fn print_cusum_baseline_csv() {
                     "NA".to_owned()
                 };
                 println!(
-                    "{},{},{},{},{},{:.12},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12}",
+                    "{},{},{},{},{},{:.12},{:.12},{:.12},{},{:.12},{:.12},{},{},{:.12},{:.12}",
                     direction.name(),
                     scenario.name,
                     scenario.class.name(),
@@ -851,6 +851,7 @@ fn print_cusum_baseline_csv() {
                     COMPOSITE_NULL_LOWER,
                     COMPOSITE_NULL_UPPER,
                     threshold,
+                    threshold as f64 / CUSUM_SCALE as f64,
                     metrics.scenario_or_pre_shift_alarm_probability,
                     csv_optional(metrics.post_shift_detection_probability),
                     csv_optional(metrics.mean_post_shift_detection_delay),
