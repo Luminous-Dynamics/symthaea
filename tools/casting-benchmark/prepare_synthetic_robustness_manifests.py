@@ -263,6 +263,9 @@ def build_manifests(sweep: Any, sweep_raw: bytes, selector: dict[str, Any], gene
         "reference_point": list(REFERENCE_POINT),
         "selection_frozen_before_holdout": True,
         "nominal_prediction_source": "low_fidelity_compositional_reference_not_policy_internal_posterior",
+        "nominal_prediction_evaluations": design_count,
+        "nominal_prediction_fidelity": "low",
+        "nominal_prediction_cost_units": design_count * costs["low"],
         "selected_candidate_ids": sorted(high_ids),
         "candidate_predictions": predictions,
     }
@@ -293,6 +296,8 @@ def build_manifests(sweep: Any, sweep_raw: bytes, selector: dict[str, Any], gene
         "holdout_role": "synthetic_post_selection_diagnostic",
         "evidence_class": "synthetic",
         "shift_suite_id": GENERATOR_BENCHMARK_ID,
+        "shift_evaluation_count": design_count * len(shifts),
+        "shift_cost_accounting": "synthetic_analytic_not_priced",
         "shifts": shifts,
     }
     return selection, holdout
