@@ -1,20 +1,39 @@
-# Science Benchmark Refresh fixture
+# Science Benchmark Refresh
 
-This directory is a protocol-first starting point for SCI-BENCH-REFRESH-001 (Issue #8771).
+Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 
-`fixtures/generation-manifest.example.json` is a **format fixture only**. Its revision marker says `NOT_IMPLEMENTED_YET`; SHA-256 fields contain all-zero placeholders; the evaluator is explicitly not qualified. These values must never be interpreted as actual commitments or used to score a policy.
+## Current contents
 
-The companion JSON Schema defines the v1 field shape and basic value constraints. It does not by itself enforce cross-field invariants such as:
+- `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol.
+- `schema/generation-manifest.schema.json`: versioned JSON Schema for the declared v1 manifest shape.
+- `fixtures/generation-manifest.example.json`: non-scoring placeholder fixture.
+- `src/lib.rs` and `src/main.rs`: standalone Rust manifest validator and CLI.
 
-- task-family weights summing to 1;
-- sum of planned task counts equalling the expected denominator;
-- canonicalization and domain separation used when computing commitments;
-- correctness of the generator or evaluator;
-- proof that oracle-only fields were inaccessible to the evaluated policy;
-- task-level and family-level duplicate/leakage checks.
+## Validate a manifest
 
-Those require a separate Rust validator and hostile fixtures. Do not treat schema validation as benchmark qualification.
+```sh
+cargo fmt --manifest-path research/science-bench-refresh/Cargo.toml -- --check
+cargo test --locked --manifest-path research/science-bench-refresh/Cargo.toml
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  research/science-bench-refresh/fixtures/generation-manifest.example.json
+```
 
-Before any actual run, replace the placeholders with real immutable revisions and commitments; independently test the evaluator controls; and verify the runner can enforce the declared policy/oracle boundary. If secrecy cannot be maintained, change the lane to `reproducible_open` and the reveal policy to `open_from_start_not_sealed`.
+The example should report `valid: true` and `manifest_declares_scoring_eligible: false`. The fixture must fail when the CLI is invoked with `--require-scoring` or `--require-sealed`; the focused GitHub Actions workflow encodes this negative control.
 
-The current deliverable contains a protocol, schema, and placeholder fixture only. It does not yet generate tasks, hold a secret seed, run NewtonBench, or establish any Symthaea performance result.
+## What the validator checks
+
+- Strict versioned manifest shape, including rejection of unknown/oracle-only fields.
+- Syntax of SHA-256 and Git commit digests; qualified runs require non-placeholder digests and a pinned 40-character lowercase commit SHA.
+- Declared evaluator/oracle-separation status for a qualified run.
+- Compatibility between the lane and its reveal policy.
+- Unique task-family IDs, task-family weights summing to 1, positive per-family counts, and planned counts matching the declared expected denominator.
+- A deterministic SHA-256 receipt of the exact raw manifest bytes.
+- Separate flags for a valid manifest, manifest-declared scoring eligibility, and a manifest-declared sealed-refresh profile.
+
+## Limits (important)
+
+An all-zero digest is deliberately used by the example and does not identify any real artifact. The generator revision says `NOT_IMPLEMENTED_YET`. This fixture is never admissible for scoring.
+
+The validator does **not** recompute the hidden seed commitment or task-set commitment because the reveal artifact/task generator is not implemented yet. It does not establish that a policy could not access the oracle, that a runner executed the declared subject, that a generated task is scientifically identifiable, or that a score is correct. `manifest_declares_sealed_generalization_profile` means only that the *manifest's declared shape* passed; external execution-boundary evidence is still required.
+
+The current PR has 18 authored Rust tests. They must not be described as passing until exact-head CI actually runs them. This environment has no Rust toolchain available for a local compile/test run.
