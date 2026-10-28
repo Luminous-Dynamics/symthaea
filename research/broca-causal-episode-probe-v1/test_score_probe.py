@@ -35,7 +35,22 @@ class ScoreProbeTests(unittest.TestCase):
         self.assertEqual(report["overall"]["complete_chain_rate_at_k"], 1.0)
         self.assertEqual(report["overall"]["required_support_recall_at_k"], 1.0)
         self.assertEqual(report["overall"]["forbidden_support_hit_rate_at_k"], 1.0)
+        self.assertEqual(report["overall"]["safe_complete_chain_rate_at_k"], 0.0)
+        self.assertFalse(report["per_question"][0]["safe_complete_chain_at_k"])
         self.assertEqual(report["overall"]["distractor_retrieval_rate_at_k"], 0.0)
+
+    def test_complete_chain_without_forbidden_evidence_is_safe(self) -> None:
+        predictions = [{
+            "question_id": "Q1",
+            "audit": [
+                {"trajectory_id": "t1", "source_pointer": "/states/0/action"},
+                {"trajectory_id": "t1", "source_pointer": "/states/1/text"},
+            ],
+        }]
+        report = score_dataset(self.questions, predictions, 2)
+        self.assertEqual(report["overall"]["complete_chain_rate_at_k"], 1.0)
+        self.assertEqual(report["overall"]["safe_complete_chain_rate_at_k"], 1.0)
+        self.assertTrue(report["per_question"][0]["safe_complete_chain_at_k"])
 
     def test_incomplete_chain_is_not_hidden_by_one_hit(self) -> None:
         predictions = [{
