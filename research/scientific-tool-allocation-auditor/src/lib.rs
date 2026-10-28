@@ -102,6 +102,8 @@ pub struct TrialV1 {
     pub elapsed_ms: u64,
     /// Digest of the policy output/receipt, when one exists.
     pub policy_output_sha256: Option<String>,
+    /// Independently produced evaluator score artifact; required for completed trials.
+    pub evaluator_score_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -315,6 +317,11 @@ fn validate_trial(
             return Err(format!("invalid policy output digest for task {}", trial.task_id));
         }
     }
+    if let Some(digest) = &trial.evaluator_score_sha256 {
+        if !valid_digest(digest) {
+            return Err(format!("invalid independent evaluator score digest for task {}", trial.task_id));
+        }
+    }
     if trial.treatment == Treatment::NoTool && trial.tool_calls != 0 {
         return Err(format!("no_tool arm called a tool for task {}", trial.task_id));
     }
@@ -368,10 +375,17 @@ fn validate_trial(
                 trial.task_id
             ));
         }
+        if trial.evaluator_score_sha256.is_none() {
+            return Err(format!(
+                "completed trial lacks independent evaluator score digest for task {}",
+                trial.task_id
+            ));
+        }
     } else if trial.law_recovered.is_some()
         || trial.heldout_prediction_nrmse.is_some()
         || trial.false_confident_singleton.is_some()
         || trial.premature_commitment.is_some()
+        || trial.evaluator_score_sha256.is_some()
     {
         return Err(format!(
             "non-completed trial contains scored outcomes for task {}",
@@ -702,6 +716,9 @@ mod tests {
                     policy_output_sha256: completed.then(|| {
                         sha256_hex(format!("{}:{}", task.task_id, treatment.as_str()).as_bytes())
                     }),
+                    evaluator_score_sha256: completed.then(|| {
+                        sha256_hex(format!("score:{}:{}", task.task_id, treatment.as_str()).as_bytes())
+                    }),
                 });
             }
         }
@@ -900,6 +917,23 @@ mod tests {
     }
 
     #[test]
+    fn completed_trial_requires_independent_score_receipt() {
+        let (manifest_bytes, trial_bytes) = input_bytes(None);
+        let mut rows = String::from_utf8(trial_bytes)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<TrialV1>(line).unwrap())
+            .collect::<Vec<_>>();
+        let target = rows
+            .iter_mut()
+            .find(|row| row.task_id == "law-simple" && row.treatment == Treatment::CalibratedVoc)
+            .unwrap();
+        target.evaluator_score_sha256 = None;
+        let bytes = rows.iter().map(|row| serde_json::to_string(row).unwrap()).collect::<Vec<_>>().join("\n");
+        assert!(audit(&manifest_bytes, bytes.as_bytes()).unwrap_err().contains("lacks independent evaluator score digest"));
+    }
+
+    #[test]
     fn receipt_detects_report_tampering() {
         let (manifest_bytes, trial_bytes) = input_bytes(None);
         let mut report = audit(&manifest_bytes, &trial_bytes).unwrap();
@@ -949,6 +983,7 @@ mod tests {
         target.false_confident_singleton = None;
         target.premature_commitment = None;
         target.policy_output_sha256 = None;
+        target.evaluator_score_sha256 = None;
         let bytes = rows
             .iter()
             .map(|row| serde_json::to_string(row).unwrap())
