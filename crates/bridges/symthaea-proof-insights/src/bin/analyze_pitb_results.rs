@@ -286,6 +286,7 @@ struct PowerScenario {
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
     utility_gate_passes: usize,
+    degenerate_interval_trials: usize,
     estimated_utility_gate_power: Option<f64>,
     monte_carlo_standard_error: Option<f64>,
     estimated_power_lower_95: Option<f64>,
@@ -779,6 +780,7 @@ fn simulate_power_scenario(
             study_simulations: simulations,
             bootstrap_replicates_per_simulated_study: bootstrap_replicates,
             utility_gate_passes: 0,
+            degenerate_interval_trials: 0,
             estimated_utility_gate_power: None,
             monte_carlo_standard_error: None,
             estimated_power_lower_95: None,
@@ -796,6 +798,7 @@ fn simulate_power_scenario(
         .sum();
     let mut rng = SplitMix64 { state: seed };
     let mut passes = 0_usize;
+    let mut degenerate_interval_trials = 0_usize;
     let mut sum_effect = 0.0;
     let mut sum_lower = 0.0;
     for _ in 0..simulations {
@@ -811,11 +814,18 @@ fn simulate_power_scenario(
             .map(|family| family.paired_delta_sum)
             .sum();
         let observed_effect = total_delta as f64 / total_targets as f64;
-        let lower =
-            simulated_cluster_bootstrap_lower(&simulated_families, bootstrap_replicates, &mut rng);
+        let [lower, upper] = simulated_cluster_bootstrap_interval(
+            &simulated_families,
+            bootstrap_replicates,
+            &mut rng,
+        );
+        let interval_informative = upper - lower > f64::EPSILON;
+        if !interval_informative {
+            degenerate_interval_trials += 1;
+        }
         sum_effect += observed_effect;
         sum_lower += lower;
-        if clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS && observed_effect >= 0.10 && lower > 0.0 {
+        if confirmatory_utility_gate(observed_effect, lower, upper, clusters).2 {
             passes += 1;
         }
     }
@@ -827,6 +837,7 @@ fn simulate_power_scenario(
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
         utility_gate_passes: passes,
+        degenerate_interval_trials,
         estimated_utility_gate_power: Some(power),
         monte_carlo_standard_error: Some((power * (1.0 - power) / simulations as f64).sqrt()),
         estimated_power_lower_95: Some(wilson_interval(passes, simulations).0),
@@ -918,11 +929,11 @@ fn treatment_rate_given_baseline_family(
     }
 }
 
-fn simulated_cluster_bootstrap_lower(
+fn simulated_cluster_bootstrap_interval(
     families: &[SimulatedFamily],
     replicates: usize,
     rng: &mut SplitMix64,
-) -> f64 {
+) -> [f64; 2] {
     let mut values = Vec::with_capacity(replicates);
     for _ in 0..replicates {
         let mut delta_sum = 0_i64;
@@ -935,7 +946,7 @@ fn simulated_cluster_bootstrap_lower(
         values.push(delta_sum as f64 / target_count as f64);
     }
     values.sort_by(f64::total_cmp);
-    quantile(&values, 0.025)
+    [quantile(&values, 0.025), quantile(&values, 0.975)]
 }
 
 fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
@@ -1471,6 +1482,9 @@ fn validate_power_report(
                     || lower > power + 1e-12
                     || power > upper + 1e-12
                     || scenario.utility_gate_passes > report.study_simulations
+                    || scenario.degenerate_interval_trials > report.study_simulations
+                    || scenario.utility_gate_passes
+                        > report.study_simulations - scenario.degenerate_interval_trials
                 {
                     bail!("power scenario has inconsistent probability or confidence bounds");
                 }
@@ -1514,6 +1528,7 @@ fn validate_power_report(
             )?;
             if observed.status != expected.status
                 || observed.utility_gate_passes != expected.utility_gate_passes
+                || observed.degenerate_interval_trials != expected.degenerate_interval_trials
                 || !same_optional_probability(
                     observed.estimated_utility_gate_power,
                     expected.estimated_utility_gate_power,
@@ -2474,6 +2489,24 @@ mod tests {
     }
 
     #[test]
+    fn simulated_cluster_bootstrap_reports_both_endpoints_and_detects_degeneracy() {
+        let families: Vec<SimulatedFamily> = (0..MIN_CONFIRMATORY_FAMILY_CLUSTERS)
+            .map(|_| SimulatedFamily {
+                target_count: 1,
+                paired_delta_sum: 1,
+            })
+            .collect();
+        let mut rng = SplitMix64 { state: 20261028 };
+        let interval = simulated_cluster_bootstrap_interval(&families, 1_000, &mut rng);
+        assert_eq!(interval, [1.0, 1.0]);
+        let (informative, _, passed, reason) =
+            confirmatory_utility_gate(1.0, interval[0], interval[1], families.len());
+        assert!(!informative);
+        assert!(!passed);
+        assert_eq!(reason, "no_claim_degenerate_bootstrap_interval");
+    }
+
+    #[test]
     fn power_simulation_is_reproducible_for_a_frozen_seed() {
         let families: Vec<FamilyTargetCount> = (0..24)
             .map(|index| FamilyTargetCount {
@@ -2487,6 +2520,10 @@ mod tests {
             .expect("repeating a frozen seed must be deterministic");
         assert_eq!(left.status, "estimated");
         assert_eq!(left.utility_gate_passes, right.utility_gate_passes);
+        assert_eq!(
+            left.degenerate_interval_trials,
+            right.degenerate_interval_trials
+        );
         assert_eq!(
             left.estimated_utility_gate_power,
             right.estimated_utility_gate_power
