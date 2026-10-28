@@ -435,3 +435,11 @@ The previous amendment described a cluster-level t-interval approximation. That 
 The sensitivity note's numerical tables have been recalculated using a separate NumPy implementation of the paired component-bootstrap estimator (10,000 simulated studies, 1,000 bootstrap replicates per study). Those estimates are still exploratory, not Rust binary output, not CI evidence, and not an empirical PITB result. The underlying statistical model remains an unvalidated sensitivity model, and its parameters are not estimated from the held-out data.
 
 This alignment reduces estimator mismatch but does not make the power model exact: generative assumptions, cluster-size inputs, bootstrap Monte Carlo error, and the independent statistical review still matter. Use the actual frozen eligible component sizes and a preregistered sensitivity grid before a confirmatory experiment.
+
+### 2026-10-28 amendment — degenerate primary intervals cannot establish utility
+
+A code audit found that `analyze_pitb_results` computed `passed` from `lower > 0`, an observed effect of at least 0.10, and at least 20 family clusters, but did not require a nonzero bootstrap interval width. A synthetic case where every family has the same positive delta yields a degenerate interval `[a, a]`; the old predicate could therefore pass it despite the protocol's explicit prohibition on zero-width intervals counting as a win.
+
+The primary gate now records `confidence_interval_informative = (upper - lower > f64::EPSILON)` separately from the literal `confidence_interval_excludes_zero_positive = (lower > 0)`. The gate requires both facts, the +10-percentage-point effect threshold, and the minimum number of eligible family clusters. A degenerate interval returns `no_claim_degenerate_bootstrap_interval`; insufficient independent clusters retains the underpowered disposition. A regression test covers the positive-degenerate case and controls for an informative positive interval, an effect below threshold, and too few clusters.
+
+This is an unverified implementation change until Rust tests and exact-head CI execute. The new tests were statically inspected but not compiled in the authoring environment. It does not constitute a transfer result or SOTA claim.
