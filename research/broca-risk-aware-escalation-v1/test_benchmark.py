@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import math, random, unittest
+import math, random, tempfile, unittest
+from pathlib import Path
 import benchmark as b
 
 class RiskAwareTests(unittest.TestCase):
@@ -12,13 +13,13 @@ class RiskAwareTests(unittest.TestCase):
         c=b.make_case(random.Random(17),1,"iid","test")
         cfg={"similarity_threshold":.7,"evidence_threshold":.7,"risk_budget":.035,
              "direct_threshold":.6,"conflict_trigger":.7,"freshness_trigger":.3,"scope_trigger":.44,
-             "calibrated_risk_thresholds_by_budget":{f"risk_control_{int(budget*1000):02d}permille":{"answer":{"threshold":.02},"escalate":{"threshold":.02}} for budget in b.RISK_BUDGETS}}
+             "calibrated_risk_thresholds_by_budget":{f"risk_control_{int(b*1000):02d}permille":{"answer":{"threshold":.02},"escalate":{"threshold":.02}} for b in b.RISK_BUDGETS}}
         models=b.train_models([b.make_case(random.Random(i),i,"iid","dev") for i in range(200)])
         for p in b.POLICIES:
             action=b.choose_policy_action(p,c["x"],cfg,models)
             self.assertIn(action,{"answer","escalate","abstain"})
         with self.assertRaises((TypeError, AttributeError, KeyError)):
-            b.choose_policy_action("evidence_threshold",c,cfg)
+            b.choose_policy_action("evidence_threshold",c,cfg)  # Case object is not a feature map.
 
     def test_policy_has_no_latent_key(self):
         c=b.make_case(random.Random(19),3,"scope_shift","test")
@@ -41,7 +42,8 @@ class RiskAwareTests(unittest.TestCase):
 
     def test_ridge_reproducible(self):
         dev=[b.make_case(random.Random(i),i,"iid","dev") for i in range(80)]
-        self.assertEqual(b.train_models(dev),b.train_models(dev))
+        m1=b.train_models(dev); m2=b.train_models(dev)
+        self.assertEqual(m1,m2)
 
     def test_calibration_risk_upper_bound(self):
         rng=random.Random(712)
@@ -71,7 +73,7 @@ class RiskAwareTests(unittest.TestCase):
                 c=b.make_case(random.Random(i),i,regime,"test")
                 self.assertTrue(set(c["outcomes"])=={"answer","escalate","abstain"})
                 self.assertTrue(all(-3 <= o["utility"] <= 2 for o in c["outcomes"].values()))
-                self.assertIn(c["outcomes"]["escalate"]["harm"],(True,False))
+                self.assertEqual(c["outcomes"]["escalate"]["harm"] in (True,False),True)
 
     def test_singular_pivot_fallback_is_finite(self):
         result=b.solve_linear([[0.0,0.0],[0.0,1.0]],[0.0,1.0])
