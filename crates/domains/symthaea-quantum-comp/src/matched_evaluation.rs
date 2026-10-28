@@ -562,23 +562,22 @@ pub struct MatchedPairResult {
     pub baseline_target_hit: bool,
     /// Whether the candidate independently verified a target hit.
     pub candidate_target_hit: bool,
-    /// Baseline all-in deployment latency including queue and amortized compile.
-    /// Only available when all stages were measured.
+    /// Directly measured deployment elapsed time, including queue and amortized compile/init.
+    /// This is a monotonic-clock interval, not the sum of stage diagnostics.
     pub baseline_all_in_ms: Option<f64>,
-    /// Candidate all-in deployment latency including queue and amortized compile.
-    /// Only available when all stages were measured.
+    /// Directly measured deployment elapsed time for the candidate.
     pub candidate_all_in_ms: Option<f64>,
-    /// Baseline standardized algorithm runtime excluding queue and compile.
+    /// Directly measured standardized algorithm interval, excluding queue and compile/init.
     pub baseline_algorithm_runtime_ms: Option<f64>,
-    /// Candidate standardized algorithm runtime excluding queue and compile.
+    /// Directly measured standardized algorithm interval for the candidate.
     pub candidate_algorithm_runtime_ms: Option<f64>,
-    /// Baseline time divided by candidate time; only when both hit the target and
-    /// both complete all-in costs are available.
+    /// Baseline/candidate observed deployment elapsed ratio, only when both hit the target
+    /// and both directly measured deployment intervals are available.
     pub time_speedup_baseline_over_candidate: Option<f64>,
-    /// Time winner when both methods hit the target and have complete all-in costs.
+    /// Time winner when both methods hit the target and have both observed deployment intervals.
     pub time_winner: Option<TimeWinner>,
-    /// Baseline/candidate algorithm-runtime ratio, only for both-hit pairs where
-    /// all included algorithm stages are measured. This is distinct from all-in.
+    /// Baseline/candidate observed standardized algorithm interval ratio, only when both hit
+    /// and both algorithm intervals were directly measured.
     pub algorithm_runtime_speedup_baseline_over_candidate: Option<f64>,
     /// Baseline energy joules, if measured.
     pub baseline_energy_joules: Option<f64>,
@@ -616,26 +615,23 @@ pub struct MatchedComparisonSummary {
     pub baseline_only_target_hits: usize,
     /// Pairs where neither method reached the target.
     pub neither_target_hit: usize,
-    /// Both-hit pairs with complete all-in cost vectors for both methods.
-    pub both_hit_costed_pairs: usize,
-    /// Both-hit pairs with complete standardized algorithm-runtime vectors.
-    pub both_hit_algorithm_costed_pairs: usize,
-    /// Target-hit trials whose all-in cost cannot be computed because at least one
-    /// stage is unknown.
-    pub baseline_uncosted_target_hits: usize,
-    /// Target-hit trials whose all-in cost cannot be computed because at least one
-    /// stage is unknown.
-    pub candidate_uncosted_target_hits: usize,
+    /// Both-hit pairs with both direct deployment elapsed intervals observed.
+    pub both_hit_deployment_timed_pairs: usize,
+    /// Both-hit pairs with both direct standardized algorithm intervals observed.
+    pub both_hit_algorithm_timed_pairs: usize,
+    /// Verified target hits whose deployment elapsed interval is unknown.
+    pub baseline_untimed_target_hits: usize,
+    /// Verified target hits whose deployment elapsed interval is unknown.
+    pub candidate_untimed_target_hits: usize,
     /// Number of paired energy comparisons with matching measured boundaries.
     pub comparable_energy_pairs: usize,
     /// Both-hit pairs where measured energy boundaries differ.
     pub mismatched_energy_scope_pairs: usize,
-    /// Median paired baseline/candidate time ratio, restricted to both-hit costed
-    /// pairs. This is a conditional diagnostic, not the primary result; values > 1
-    /// favor the candidate on runtime. Target-hit rates and misses must be reported too.
+    /// Median paired baseline/candidate direct deployment-time ratio, restricted to both-hit
+    /// pairs with both wall-clock intervals observed. This is conditional and secondary.
     pub median_time_speedup_given_both_hit: Option<f64>,
-    /// Median paired baseline/candidate standardized algorithm-runtime ratio,
-    /// excluding compile/queue delay. Conditional on both-hit and measured stages.
+    /// Median paired baseline/candidate directly measured standardized algorithm interval ratio,
+    /// excluding compile/queue delay. Conditional on both-hit and both intervals observed.
     pub median_algorithm_runtime_speedup_given_both_hit: Option<f64>,
     /// Median paired baseline/candidate energy ratio, restricted to both-hit pairs
     /// with matching measured boundaries. This is conditional, not a system-wide
@@ -685,9 +681,9 @@ pub struct RestrictedMeanTtsSummary {
     /// Candidate within-horizon hit rate over every paired attempt.
     pub candidate_hit_rate_within_horizon: f64,
     /// Verified baseline target claims with incomplete all-in timing.
-    pub baseline_uncosted_target_hits: usize,
+    pub baseline_untimed_target_hits: usize,
     /// Verified candidate target claims with incomplete all-in timing.
-    pub candidate_uncosted_target_hits: usize,
+    pub candidate_untimed_target_hits: usize,
     /// Verified baseline target hits with measured all-in time after the horizon.
     pub baseline_hits_after_horizon: usize,
     /// Verified candidate target hits with measured all-in time after the horizon.
@@ -911,10 +907,10 @@ pub fn compare_matched_arms(
     let mut candidate_only_target_hits = 0;
     let mut baseline_only_target_hits = 0;
     let mut neither_target_hit = 0;
-    let mut both_hit_costed_pairs = 0;
-    let mut both_hit_algorithm_costed_pairs = 0;
-    let mut baseline_uncosted_target_hits = 0;
-    let mut candidate_uncosted_target_hits = 0;
+    let mut both_hit_deployment_timed_pairs = 0;
+    let mut both_hit_algorithm_timed_pairs = 0;
+    let mut baseline_untimed_target_hits = 0;
+    let mut candidate_untimed_target_hits = 0;
     let mut comparable_energy_pairs = 0;
     let mut mismatched_energy_scope_pairs = 0;
     let mut time_speedups = Vec::new();
@@ -957,16 +953,16 @@ pub fn compare_matched_arms(
         let candidate_algorithm_runtime_ms = candidate_trial.costs.algorithm_runtime_ms();
 
         if baseline_hit && baseline_all_in_ms.is_none() {
-            baseline_uncosted_target_hits += 1;
+            baseline_untimed_target_hits += 1;
         }
         if candidate_hit && candidate_all_in_ms.is_none() {
-            candidate_uncosted_target_hits += 1;
+            candidate_untimed_target_hits += 1;
         }
 
         let (time_speedup, time_winner) = if baseline_hit && candidate_hit {
             match (baseline_all_in_ms, candidate_all_in_ms) {
                 (Some(base_ms), Some(candidate_ms)) => {
-                    both_hit_costed_pairs += 1;
+                    both_hit_deployment_timed_pairs += 1;
                     let ratio = base_ms / candidate_ms;
                     if !ratio.is_finite() || ratio <= 0.0 {
                         return Err(MatchedEvaluationError::InvalidRatio {
@@ -992,7 +988,7 @@ pub fn compare_matched_arms(
         let algorithm_runtime_speedup = if baseline_hit && candidate_hit {
             match (baseline_algorithm_runtime_ms, candidate_algorithm_runtime_ms) {
                 (Some(base_ms), Some(candidate_ms)) => {
-                    both_hit_algorithm_costed_pairs += 1;
+                    both_hit_algorithm_timed_pairs += 1;
                     let ratio = base_ms / candidate_ms;
                     if !ratio.is_finite() || ratio <= 0.0 {
                         return Err(MatchedEvaluationError::InvalidRatio {
@@ -1067,10 +1063,10 @@ pub fn compare_matched_arms(
         candidate_only_target_hits,
         baseline_only_target_hits,
         neither_target_hit,
-        both_hit_costed_pairs,
-        both_hit_algorithm_costed_pairs,
-        baseline_uncosted_target_hits,
-        candidate_uncosted_target_hits,
+        both_hit_deployment_timed_pairs,
+        both_hit_algorithm_timed_pairs,
+        baseline_untimed_target_hits,
+        candidate_untimed_target_hits,
         comparable_energy_pairs,
         mismatched_energy_scope_pairs,
         median_time_speedup_given_both_hit: median(&mut time_speedups),
@@ -1107,8 +1103,8 @@ pub fn compare_restricted_mean_tts(
     let mut pairs = Vec::with_capacity(pair_count);
     let mut baseline_hits_within_horizon = 0usize;
     let mut candidate_hits_within_horizon = 0usize;
-    let mut baseline_uncosted_target_hits = 0usize;
-    let mut candidate_uncosted_target_hits = 0usize;
+    let mut baseline_untimed_target_hits = 0usize;
+    let mut candidate_untimed_target_hits = 0usize;
     let mut baseline_hits_after_horizon = 0usize;
     let mut candidate_hits_after_horizon = 0usize;
     let mut baseline_mean = 0.0f64;
@@ -1139,10 +1135,10 @@ pub fn compare_restricted_mean_tts(
             candidate_hits_within_horizon += 1;
         }
         if baseline_uncosted {
-            baseline_uncosted_target_hits += 1;
+            baseline_untimed_target_hits += 1;
         }
         if candidate_uncosted {
-            candidate_uncosted_target_hits += 1;
+            candidate_untimed_target_hits += 1;
         }
         if baseline_after {
             baseline_hits_after_horizon += 1;
@@ -1197,8 +1193,8 @@ pub fn compare_restricted_mean_tts(
         candidate_hits_within_horizon,
         baseline_hit_rate_within_horizon: baseline_hits_within_horizon as f64 / pair_count as f64,
         candidate_hit_rate_within_horizon: candidate_hits_within_horizon as f64 / pair_count as f64,
-        baseline_uncosted_target_hits,
-        candidate_uncosted_target_hits,
+        baseline_untimed_target_hits,
+        candidate_untimed_target_hits,
         baseline_hits_after_horizon,
         candidate_hits_after_horizon,
         baseline_restricted_mean_ms: baseline_mean,
@@ -1419,8 +1415,8 @@ mod tests {
         assert_eq!(result.candidate_only_target_hits, 1);
         assert_eq!(result.baseline_only_target_hits, 0);
         assert_eq!(result.neither_target_hit, 0);
-        assert_eq!(result.both_hit_costed_pairs, 1);
-        assert_eq!(result.both_hit_algorithm_costed_pairs, 1);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 1);
+        assert_eq!(result.both_hit_algorithm_timed_pairs, 1);
         assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_energy_speedup_given_both_hit, Some(2.0));
@@ -1447,8 +1443,8 @@ mod tests {
 
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.both_target_hits, 1);
-        assert_eq!(result.both_hit_costed_pairs, 0);
-        assert_eq!(result.candidate_uncosted_target_hits, 1);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 0);
+        assert_eq!(result.candidate_untimed_target_hits, 1);
         assert_eq!(result.median_time_speedup_given_both_hit, None);
         assert_eq!(result.pairs[0].candidate_all_in_ms, None);
     }
@@ -1470,8 +1466,8 @@ mod tests {
 
         let result = compare_matched_arms(&baseline, &candidate, 0.0).unwrap();
         assert_eq!(result.both_target_hits, 1);
-        assert_eq!(result.both_hit_costed_pairs, 0);
-        assert_eq!(result.both_hit_algorithm_costed_pairs, 1);
+        assert_eq!(result.both_hit_deployment_timed_pairs, 0);
+        assert_eq!(result.both_hit_algorithm_timed_pairs, 1);
         assert_eq!(result.median_time_speedup_given_both_hit, None);
         assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.pairs[0].candidate_all_in_ms, None);
@@ -1759,8 +1755,8 @@ mod tests {
         assert_eq!(result.candidate_hits_within_horizon, 2);
         assert_eq!(result.baseline_hits_after_horizon, 1);
         assert_eq!(result.candidate_hits_after_horizon, 0);
-        assert_eq!(result.baseline_uncosted_target_hits, 0);
-        assert_eq!(result.candidate_uncosted_target_hits, 0);
+        assert_eq!(result.baseline_untimed_target_hits, 0);
+        assert_eq!(result.candidate_untimed_target_hits, 0);
         assert!((result.baseline_restricted_mean_ms - 87.5).abs() < 1e-9);
         assert!((result.candidate_restricted_mean_ms - 75.0).abs() < 1e-9);
         assert!((result.paired_mean_difference_candidate_minus_baseline_ms + 12.5).abs() < 1e-9);
@@ -1790,7 +1786,7 @@ mod tests {
         let result = compare_restricted_mean_tts(&baseline, &candidate, 100.0).unwrap();
         assert_eq!(result.baseline_hits_within_horizon, 1);
         assert_eq!(result.candidate_hits_within_horizon, 0);
-        assert_eq!(result.candidate_uncosted_target_hits, 1);
+        assert_eq!(result.candidate_untimed_target_hits, 1);
         assert_eq!(result.pairs[0].candidate_restricted_time_ms, 100.0);
         assert_eq!(result.candidate_restricted_mean_ms, 100.0);
         assert!((result.baseline_over_candidate_restricted_mean_ratio.unwrap() - 0.5).abs() < 1e-9);
