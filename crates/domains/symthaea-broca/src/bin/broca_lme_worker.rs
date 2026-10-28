@@ -245,47 +245,6 @@ impl Worker {
         }
     }
 
-    fn transition_lifecycle(&mut self, operation: &str, request: &Value) -> Result<Value, String> {
-        self.require_initialized()?;
-        match operation {
-            "revoke" | "delete" => {
-                let evidence_id = request
-                    .get("evidence_id")
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.trim().is_empty())
-                    .ok_or_else(|| format!("{operation} requires non-empty evidence_id"))?;
-                match operation {
-                    "revoke" => self.index.revoke_evidence(evidence_id)?,
-                    "delete" => self.index.delete_evidence(evidence_id)?,
-                    _ => unreachable!(),
-                }
-                Ok(json!({
-                    "evidence_id": evidence_id,
-                    "lifecycle": if operation == "revoke" { "revoked" } else { "deleted" }
-                }))
-            }
-            "supersede" => {
-                let old_evidence_id = request
-                    .get("old_evidence_id")
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.trim().is_empty())
-                    .ok_or_else(|| "supersede requires non-empty old_evidence_id".to_string())?;
-                let new_evidence_id = request
-                    .get("new_evidence_id")
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.trim().is_empty())
-                    .ok_or_else(|| "supersede requires non-empty new_evidence_id".to_string())?;
-                self.index.supersede_evidence(old_evidence_id, new_evidence_id)?;
-                Ok(json!({
-                    "old_evidence_id": old_evidence_id,
-                    "new_evidence_id": new_evidence_id,
-                    "lifecycle": "superseded"
-                }))
-            }
-            _ => Err(format!("unsupported lifecycle operation: {operation}")),
-        }
-    }
-
     fn query(&self, request: &Value) -> Result<Value, String> {
         self.require_initialized()?;
         let query = request
