@@ -18,7 +18,7 @@ def fixture() -> dict:
         "run_id": "seed-17",
         "split": {
             "selection_frozen_before_holdout": True,
-            "holdout_role": "independent_post_selection",
+            "holdout_role": "synthetic_post_selection_diagnostic",
             "selection_freeze_sha256": "a" * 64,
             "holdout_manifest_sha256": "b" * 64,
         },
@@ -38,6 +38,13 @@ def fixture() -> dict:
             "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
             "cost_budget": 200,
             "cost_spent": 130,
+            "audit_accounting": {
+                "nominal_prediction_evaluations": 2,
+                "nominal_prediction_fidelity": "low",
+                "nominal_prediction_cost_units": 2,
+                "shift_evaluation_count": 4,
+                "shift_cost_accounting": "synthetic_analytic_not_priced",
+            },
         },
         "reference_point": [1.2, 1.2],
         "candidate_set": [
