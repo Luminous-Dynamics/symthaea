@@ -944,4 +944,27 @@ mod tests {
         tampered.content_sha256 = hash(b"different bytes");
         assert!(tampered.context_item(root.path()).is_err());
     }
+
+    #[test]
+    fn resolve_with_provenance_preserves_source_and_abi_projection() {
+        let mut index = EvidenceIndex::new();
+        index.insert(
+            text_record(7, "evidence-attributed", "web", "grounded answer"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+
+        let resolved = index.resolve_with_provenance(
+            &[7, 7], "web", 150, Path::new("."), 5,
+        ).unwrap();
+        assert_eq!(resolved.len(), 1, "duplicate candidate IDs must not duplicate context");
+        assert_eq!(resolved[0].hdc_id, 7);
+        assert_eq!(resolved[0].evidence_id, "evidence-attributed");
+        assert_eq!(resolved[0].source.trajectory_id, "trajectory-001");
+        assert_eq!(resolved[0].source.step_id.as_deref(), Some("step-4"));
+        assert_eq!(resolved[0].item.value, "grounded answer");
+
+        let abi = index.resolve(&[7, 7], "web", 150, Path::new("."), 5).unwrap();
+        assert_eq!(abi, resolved.into_iter().map(|entry| entry.item).collect::<Vec<_>>());
+    }
+
 }
