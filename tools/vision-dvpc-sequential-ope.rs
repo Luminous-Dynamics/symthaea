@@ -1,6 +1,7 @@
 //! VIS-DVPC-035: exact optional-stopping audit for sequential off-policy evaluation.
 //! Fixed-time Wald intervals are compared with an alpha-spending Hoeffding sequence.
-//! This is a transparent iid/stationary known-propensity baseline, not the published OFCS algorithm.
+//! Assumptions: independent rows, stationary reward means, known row-specific propensities and a bounded IPS contribution.
+//! This transparent baseline is not the published OFCS algorithm.
 #![deny(unsafe_code)]
 
 use std::collections::BTreeSet;
@@ -383,7 +384,7 @@ fn sweep(input: &str) -> Result<String, String> {
             result.sequence_ever_false_promotion.unwrap_or(0.0));
     }
     let _ = writeln!(out, "SUMMARY\tALL_SCENARIOS\t-\t-\tsupported_scenarios\t{supported_scenarios}");
-    out.push_str("LIMIT\tALL_SCENARIOS\t-\tiid_stationary_known_propensity_bounded_reward_assumptions\tREQUIRED\n");
+    out.push_str("LIMIT\tALL_SCENARIOS\t-\tindependent_rows_stationary_rewards_known_row_level_propensities_bounded_ips_assumptions\tREQUIRED\n");
     out.push_str("LIMIT\tALL_SCENARIOS\t-\tpublished_off_policy_confidence_sequence_algorithm\tNOT_IMPLEMENTED\n");
     out.push_str("LIMIT\tALL_SCENARIOS\t-\treal_trace_calibration\tNOT_CLAIMED\n");
     out.push_str("LIMIT\tALL_SCENARIOS\t-\tzero_support_intervals\tSUPPRESSED\n");
