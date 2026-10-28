@@ -119,10 +119,9 @@ impl EvidenceDiskStore {
     /// Recover only the CURRENT generation. No fallback is attempted on error.
     pub fn recover(&self) -> Result<Option<RecoveredEvidenceGeneration>, String> {
         let current_path = self.root.join(CURRENT_FILE);
-        let pointer_bytes = match read_regular_file(&current_path) {
-            Ok(bytes) => bytes,
-            Err(error) if !current_path.exists() && error.contains("not found") => return Ok(None),
-            Err(error) => return Err(format!("cannot trust committed CURRENT pointer: {error}")),
+        let pointer_bytes = match read_optional_regular_file(&current_path)? {
+            Some(bytes) => bytes,
+            None => return Ok(None),
         };
         let pointer: CurrentPointer = serde_json::from_slice(&pointer_bytes)
             .map_err(|error| format!("invalid CURRENT pointer: {error}"))?;
@@ -192,26 +191,33 @@ impl EvidenceDiskStore {
         let final_name = generation_directory_name(generation, &manifest_sha256);
         let final_dir = generations.join(final_name);
         let stage_path = stage.keep();
-        if final_dir.exists() {
-            // Idempotent retry after a crash between generation rename and CURRENT
-            // publication: reuse only byte-identical, internally valid artifacts.
-            let same = read_regular_file(&final_dir.join(INDEX_FILE)).ok().as_deref() == Some(hdc_index_bytes)
-                && read_regular_file(&final_dir.join(EVIDENCE_FILE)).ok().as_deref() == Some(snapshot_bytes.as_slice())
-                && read_regular_file(&final_dir.join(MANIFEST_FILE)).ok().as_deref() == Some(manifest_bytes.as_slice());
-            if !same {
-                return Err("generation directory collision with different artifact bytes".into());
+        match fs::symlink_metadata(&final_dir) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() || !metadata.is_dir() {
+                    return Err("generation path exists but is not a real directory".into());
+                }
+                // Idempotent retry after a crash between generation rename and CURRENT
+                // publication: reuse only byte-identical, internally valid artifacts.
+                let same = read_regular_file(&final_dir.join(INDEX_FILE)).ok().as_deref() == Some(hdc_index_bytes)
+                    && read_regular_file(&final_dir.join(EVIDENCE_FILE)).ok().as_deref() == Some(snapshot_bytes.as_slice())
+                    && read_regular_file(&final_dir.join(MANIFEST_FILE)).ok().as_deref() == Some(manifest_bytes.as_slice());
+                if !same {
+                    return Err("generation directory collision with different artifact bytes".into());
+                }
+                let existing_pointer = CurrentPointer {
+                    schema_version: CURRENT_SCHEMA_VERSION.to_string(),
+                    generation,
+                    manifest_sha256: manifest_sha256.clone(),
+                };
+                self.read_generation(&existing_pointer)?;
+                fs::remove_dir_all(&stage_path)
+                    .map_err(|error| format!("failed to remove redundant staging directory: {error}"))?;
             }
-            let existing_pointer = CurrentPointer {
-                schema_version: CURRENT_SCHEMA_VERSION.to_string(),
-                generation,
-                manifest_sha256: manifest_sha256.clone(),
-            };
-            self.read_generation(&existing_pointer)?;
-            fs::remove_dir_all(&stage_path)
-                .map_err(|error| format!("failed to remove redundant staging directory: {error}"))?;
-        } else {
-            fs::rename(&stage_path, &final_dir)
-                .map_err(|error| format!("failed to publish immutable generation directory: {error}"))?;
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                fs::rename(&stage_path, &final_dir)
+                    .map_err(|error| format!("failed to publish immutable generation directory: {error}"))?;
+            }
+            Err(error) => return Err(format!("failed to inspect final generation path: {error}")),
         }
         sync_directory(&generations)?;
         if fault == Some(CommitFaultPoint::AfterGenerationPublish) {
@@ -288,6 +294,20 @@ fn write_new_synced(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .map_err(|error| format!("failed to create generation artifact: {error}"))?;
     file.write_all(bytes).map_err(|error| format!("failed to write generation artifact: {error}"))?;
     file.sync_all().map_err(|error| format!("failed to sync generation artifact: {error}"))
+}
+
+fn read_optional_regular_file(path: &Path) -> Result<Option<Vec<u8>>, String> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("failed to inspect {}: {error}", path.display())),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!("expected a regular non-symlink file: {}", path.display()));
+    }
+    fs::read(path)
+        .map(Some)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))
 }
 
 fn read_regular_file(path: &Path) -> Result<Vec<u8>, String> {
@@ -476,6 +496,16 @@ mod tests {
         assert!(store.commit(b"index-v1", &sample_index("state"),).is_err());
         drop(lock);
         assert_eq!(store.commit(b"index-v1", &sample_index("state")).unwrap(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_current_symlink_is_corruption_not_empty_store() {
+        use std::os::unix::fs::symlink;
+        let root = tempdir().unwrap();
+        let store = EvidenceDiskStore::open(root.path()).unwrap();
+        symlink(root.path().join("missing-target"), root.path().join(CURRENT_FILE)).unwrap();
+        assert!(store.recover().is_err());
     }
 
     #[test]
