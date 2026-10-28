@@ -64,6 +64,7 @@ pub enum DriftMonitorError {
     InvalidProbability { owner_id: String, probability_ppm: u32 },
     ProbabilityMassMismatch { owner_id: String, actual_ppm: u64 },
     AlternativeSupportMismatch { alternative_id: String, scenario_id: String },
+    AlternativeMixtureHasZeroSupport { scenario_id: String },
     MixtureWeightMassMismatch { actual_ppm: u64 },
     InvalidAlpha { alpha_ppm: u32 },
     EmptyEventId,
@@ -233,21 +234,14 @@ impl OnlineDriftMonitor {
         }
 
         let nominal_probability = self.nominal.get(scenario_id).copied();
-        self.seen_event_ids.insert(event_id.into());
-        self.observations_seen = self
-            .observations_seen
-            .checked_add(1)
-            .ok_or(DriftMonitorError::NumericalFailure)?;
-        self.last_event_time_epoch_seconds = Some(event_time_epoch_seconds);
-        self.last_event_id = event_id.into();
-        self.last_scenario_id = scenario_id.into();
-
         let Some(p_ppm) = nominal_probability else {
+            self.commit_event(event_id, event_time_epoch_seconds, scenario_id);
             self.status = DriftMonitorStatus::SupportShiftAlarm;
             self.evidence = DriftEvidence::ScenarioOutsideNominalSupport;
             return Ok(self.report());
         };
         if p_ppm == 0 {
+            self.commit_event(event_id, event_time_epoch_seconds, scenario_id);
             self.status = DriftMonitorStatus::SupportShiftAlarm;
             self.evidence = DriftEvidence::ScenarioOutsideNominalSupport;
             return Ok(self.report());
@@ -271,16 +265,26 @@ impl OnlineDriftMonitor {
             }
         }
         let log_e_value = mixture_log_e_value(&self.alternatives, &next_log_ratios);
-        if !log_e_value.is_finite() {
+        if log_e_value.is_nan() || log_e_value == f64::INFINITY {
             return Err(DriftMonitorError::NumericalFailure);
         }
 
+        // Commit state only after the numeric update has passed validation.
+        self.commit_event(event_id, event_time_epoch_seconds, scenario_id);
         self.log_likelihood_ratios = next_log_ratios;
         if log_e_value >= self.log_alarm_threshold {
             self.status = DriftMonitorStatus::DriftAlarm;
             self.evidence = DriftEvidence::MixtureLikelihoodRatio;
         }
         Ok(self.report())
+    }
+
+    fn commit_event(&mut self, event_id: &str, time: i64, scenario_id: &str) {
+        self.seen_event_ids.insert(event_id.into());
+        self.observations_seen += 1;
+        self.last_event_time_epoch_seconds = Some(time);
+        self.last_event_id = event_id.into();
+        self.last_scenario_id = scenario_id.into();
     }
 
     /// Last report, useful for logs after an alarm.
@@ -609,4 +613,47 @@ mod tests {
         }
         assert!(monitor.report().log_e_value.is_finite());
     }
+ 
+    #[test]
+    fn positive_nominal_categories_must_have_alternative_mixture_coverage() {
+        assert!(matches!(
+            OnlineDriftMonitor::new(
+                vec![prob("routine", 900_000), prob("disruption", 100_000)],
+                vec![DriftAlternative {
+                    alternative_id: "routine-only".into(),
+                    mixture_weight_ppm: 1_000_000,
+                    probabilities: vec![prob("routine", 1_000_000), prob("disruption", 0)],
+                }],
+                50_000,
+            ),
+            Err(DriftMonitorError::AlternativeMixtureHasZeroSupport { scenario_id }) if scenario_id == "disruption"
+        ));
+    }
+
+    #[test]
+    fn zero_likelihood_event_is_rejected_before_mutating_monitor_state() {
+        let mut monitor = OnlineDriftMonitor::new(
+            vec![prob("a", 500_000), prob("b", 500_000)],
+            vec![
+                DriftAlternative {
+                    alternative_id: "not-a".into(),
+                    mixture_weight_ppm: 500_000,
+                    probabilities: vec![prob("a", 0), prob("b", 1_000_000)],
+                },
+                DriftAlternative {
+                    alternative_id: "not-b".into(),
+                    mixture_weight_ppm: 500_000,
+                    probabilities: vec![prob("a", 1_000_000), prob("b", 0)],
+                },
+            ],
+            50_000,
+        ).unwrap();
+        // Each observation leaves at least one alternative alive, so the mixture
+        // likelihood ratio remains well-defined rather than collapsing to zero.
+        let before = monitor.report();
+        let after = monitor.observe("e1", 10, "a").unwrap();
+        assert_eq!(after.observations_seen, before.observations_seen + 1);
+        assert!(after.log_e_value.is_finite());
+    }
+
 }
