@@ -250,8 +250,8 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
         raise ValueError("; ".join(errors))
     if document["benchmark_id"] != BENCHMARK_ID or document["synthetic_fixture_only"] is not True:
         errors.append("benchmark identity or synthetic-only declaration is invalid")
-    if document["design_count"] < 75 or isinstance(document["design_count"], bool):
-        errors.append("design_count must be at least 75")
+    if isinstance(document["design_count"], bool) or not isinstance(document["design_count"], int) or document["design_count"] < 75:
+        errors.append("design_count must be an integer at least 75")
     if not isinstance(document["cost_budget"], int) or isinstance(document["cost_budget"], bool) or document["cost_budget"] < 1:
         errors.append("cost_budget must be a positive integer")
     costs = document["fidelity_costs"]
@@ -263,29 +263,37 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
     if document["source_sha256"] != source_lock(root):
         errors.append("source SHA-256 lock differs from checked-out source/manifest bytes")
 
-    def valid_sequence(key: str, allowed: tuple | None = None, number: bool = False) -> list:
+    def valid_sequence(key: str, allowed: tuple | None = None, kind: str = "str") -> list:
         seq = document[key]
-        if not isinstance(seq, list) or not seq or len(set(seq)) != len(seq):
-            errors.append(f"{key} must be a non-empty unique list")
+        if not isinstance(seq, list) or not seq:
+            errors.append(f"{key} must be a non-empty list")
             return []
-        if allowed is not None and set(seq) - set(allowed):
+        if kind == "str":
+            well_typed = all(isinstance(v, str) for v in seq)
+        elif kind == "int":
+            well_typed = all(isinstance(v, int) and not isinstance(v, bool) for v in seq)
+        elif kind == "number":
+            well_typed = all(_finite(v) for v in seq)
+        else:
+            well_typed = False
+        if not well_typed:
+            errors.append(f"{key} contains values of an invalid type")
+            return []
+        if len(set(seq)) != len(seq):
+            errors.append(f"{key} must not contain duplicates")
+            return []
+        if allowed is not None and any(v not in allowed for v in seq):
             errors.append(f"{key} contains unsupported values")
-        if number and any(not _finite(v) for v in seq):
-            errors.append(f"{key} contains non-finite values")
         return seq
 
     objective_families = valid_sequence("objective_families", SUPPORTED_FAMILIES)
     constraint_families = valid_sequence("constraint_families", SUPPORTED_FAMILIES)
-    dimensions = valid_sequence("dimensions", SUPPORTED_DIMENSIONS)
-    severities = valid_sequence("severities", number=True)
-    seeds = valid_sequence("seeds")
+    dimensions = valid_sequence("dimensions", SUPPORTED_DIMENSIONS, "int")
+    severities = valid_sequence("severities", kind="number")
+    seeds = valid_sequence("seeds", kind="int")
     policies = valid_sequence("policies", POLICY_ORDER)
-    for d in dimensions:
-        if isinstance(d, bool) or not isinstance(d, int):
-            errors.append("dimensions must contain integers")
-    for seed in seeds:
-        if isinstance(seed, bool) or not isinstance(seed, int):
-            errors.append("seeds must contain integers")
+    if errors:
+        raise ValueError("compositional replay rejected: " + "; ".join(errors[:20]))
     if any(float(s) < 0.0 for s in severities if _finite(s)):
         errors.append("severities must be non-negative")
     if any(float(s) not in (0.0, 0.5, 1.0, 1.5, 2.0) for s in severities if _finite(s)):
@@ -327,8 +335,11 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
         cost_map = {"low": 0, "medium": 0, "high": 0}
         seen_eval_ids = []
         observed_high = {}
-        promotion_values = []
-        for ei, evaluation in enumerate(run["evaluations"] if isinstance(run["evaluations"], list) else []):
+        ledger = run["evaluations"]
+        if not isinstance(ledger, list):
+            errors.append(f"{label}.evaluations must be a list")
+            ledger = []
+        for ei, evaluation in enumerate(ledger):
             elabel = f"{label}.evaluations[{ei}]"
             if not _require_keys(evaluation, EVAL_KEYS, elabel, errors):
                 continue
@@ -358,6 +369,7 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
                 observed_high[cid] = (tuple(expected_obj), expected_margin)
 
         _near(run["evaluation_count"], len(seen_eval_ids), f"{label}.evaluation_count", errors)
+        _near(run["high_fidelity_call_count"], count_map["high"], f"{label}.high_fidelity_call_count", errors)
         if run["fidelity_evaluations"] != count_map:
             errors.append(f"{label} fidelity call counts disagree with ledger")
         if run["fidelity_cost_units_by_level"] != cost_map:
@@ -374,7 +386,7 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
         except ValueError as exc:
             errors.append(f"{label} invalid call template: {exc}")
 
-        if len(run["evaluations"]) != run["evaluation_count"]:
+        if len(ledger) != run["evaluation_count"]:
             errors.append(f"{label} ledger length disagrees with evaluation_count")
         payload = [
             [cid, list(design_point(cid, dim, seed))]
