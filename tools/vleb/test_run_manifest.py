@@ -55,6 +55,7 @@ def valid_manifest() -> dict[str, Any]:
             "immutable_image_id": "sha256:" + h("d"),
             "network_mode": "none",
             "network_mode_observed": True,
+            "runner_environment": "github_hosted",
         },
         "toolchains": [{"name": "rustc", "version": "1.96.0", "identity_sha256": h("e")}],
         "auditor": {
