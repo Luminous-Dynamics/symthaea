@@ -156,6 +156,60 @@ fn interval_radius(n: usize) -> f64 {
     ((2.0 * CELLS / ALPHA).ln() / (2.0 * n as f64)).sqrt()
 }
 
+const COVERAGE_GRID: [f64; 11] = [
+    0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0,
+];
+
+/// Stable normalized Binomial(n,p) probability masses, generated outward from a mode.
+/// This is used to enumerate exact finite-grid coverage without sampling Monte Carlo trials.
+fn binomial_pmf(n: usize, p: f64) -> Vec<f64> {
+    let mut mass = vec![0.0; n + 1];
+    if p <= 0.0 {
+        mass[0] = 1.0;
+        return mass;
+    }
+    if p >= 1.0 {
+        mass[n] = 1.0;
+        return mass;
+    }
+
+    let mode = (((n + 1) as f64) * p).floor() as usize;
+    let mode = mode.min(n);
+    mass[mode] = 1.0;
+
+    for k in (1..=mode).rev() {
+        mass[k - 1] = mass[k]
+            * (k as f64 / (n - k + 1) as f64)
+            * ((1.0 - p) / p);
+    }
+    for k in mode..n {
+        mass[k + 1] = mass[k]
+            * ((n - k) as f64 / (k + 1) as f64)
+            * (p / (1.0 - p));
+    }
+
+    let total = mass.iter().sum::<f64>();
+    for value in &mut mass {
+        *value /= total;
+    }
+    mass
+}
+
+fn cell_coverage(n: usize, true_probability: f64) -> f64 {
+    let radius = interval_radius(n);
+    binomial_pmf(n, true_probability)
+        .iter()
+        .enumerate()
+        .filter(|(successes, _)| {
+            let estimate = *successes as f64 / n as f64;
+            let lower = (estimate - radius).max(0.0);
+            let upper = (estimate + radius).min(1.0);
+            lower <= true_probability && true_probability <= upper
+        })
+        .map(|(_, probability_mass)| probability_mass)
+        .sum()
+}
+
 /// Expected loss/cost conditional on a fixed true hypothesis. Policy belief updates always use
 /// the nominal channel, while outcome probabilities use the supplied true/vertex matrix.
 fn evaluate_conditional(
@@ -346,6 +400,25 @@ mod tests {
                     assert!(high >= NOMINAL[query][hypothesis]);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn exact_binomial_coverage_grid_respects_the_bonferroni_budget() {
+        let per_cell_target = 1.0 - ALPHA / CELLS;
+        for n in SAMPLE_SIZES {
+            let mut minimum = f64::INFINITY;
+            for true_probability in COVERAGE_GRID {
+                let coverage = cell_coverage(n, true_probability);
+                assert!(coverage.is_finite() && (0.0..=1.0 + 1.0e-10).contains(&coverage));
+                minimum = minimum.min(coverage);
+            }
+            assert!(
+                minimum + 1.0e-10 >= per_cell_target,
+                "n={n}: minimum grid coverage {minimum} below {per_cell_target}"
+            );
+            let simultaneous_union_bound = 1.0 - CELLS * (1.0 - minimum);
+            assert!(simultaneous_union_bound + 1.0e-10 >= 1.0 - ALPHA);
         }
     }
 
