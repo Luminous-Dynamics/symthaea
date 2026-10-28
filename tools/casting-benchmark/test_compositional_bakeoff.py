@@ -190,6 +190,22 @@ class CompositionalBakeoffTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "replay rejected"):
             score_document(document, ROOT, allow_diagnostic_subset=True)
 
+    def test_zero_severity_trace_replay_rejects_any_mismatch(self) -> None:
+        document = run_sweep(
+            objective_families=("warped_coordinates",),
+            constraint_families=("heteroscedastic_noise",),
+            dimensions=(2,),
+            severities=(0.0,),
+            seeds=(17,),
+            policies=("low_screen",),
+            design_count=75,
+        )
+        self.assertEqual(document["run_count"], 1)
+        evaluation = document["paired_runs"][0]["evaluations"][0]
+        evaluation["objectives"][1] += 1e-5
+        with self.assertRaisesRegex(ValueError, "replay rejected"):
+            score_document(document, ROOT, allow_diagnostic_subset=True)
+
     def test_scorer_rejects_modified_objective_value(self) -> None:
         document = run_sweep(
             objective_families=("local_bias_island",),
