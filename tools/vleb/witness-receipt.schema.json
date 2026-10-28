@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vleb-evaluator-witness-receipt.schema.json",
+  "title": "VLEB evaluator-produced witness receipt",
+  "description": "Binds one legacy-engineering claim to a task, source snapshot, verifier, execution attempt, runtime and hashed input/output artifacts. A valid schema or matching hashes alone do not authenticate the producer or prove semantic truth; evaluator workflow attestation and trusted verifier policy remain mandatory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "producer", "task_id", "claim_id", "source", "verifier", "invocation", "execution", "runtime", "inputs", "outputs", "claim_result"],
+  "properties": {
+    "schema_version": {"const": "vleb-evaluator-witness-receipt-v1"},
+    "receipt_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,255}$"},
+    "producer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository_id", "repository_full_name", "workflow_path", "workflow_sha", "workflow_ref", "run_id", "run_attempt", "event"],
+      "properties": {
+        "repository_id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "repository_full_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "workflow_path": {"type": "string", "pattern": "^\\.github/workflows/[^\\s]+\\.ya?ml$"},
+        "workflow_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "workflow_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+        "run_id": {"type": "string", "pattern": "^[0-9]{1,32}$"},
+        "run_attempt": {"type": "integer", "minimum": 1},
+        "event": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "task_id": {"type": "string", "minLength": 3, "maxLength": 256},
+    "claim_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{1,127}$"},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "spans"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "spans": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceSpan"}}
+      }
+    },
+    "verifier": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "sha256"],
+      "properties": {
+        "kind": {"enum": ["source_index", "static_analysis", "compiler", "independent_execution", "independent_expert_review"]},
+        "id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "invocation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["argv", "cwd", "environment"],
+      "properties": {
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "maxLength": 8192}},
+        "cwd": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "environment": {"type": "array", "items": {"$ref": "#/$defs/environmentEntry"}, "uniqueItems": true}
+      }
+    },
+    "execution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "exit_code", "duration_ms", "stdout_sha256", "stderr_sha256"],
+      "properties": {
+        "status": {"enum": ["completed", "timed_out", "spawn_error", "cancelled"]},
+        "exit_code": {"type": ["integer", "null"], "minimum": 0, "maximum": 255},
+        "duration_ms": {"type": "integer", "minimum": 0, "maximum": 604800000},
+        "stdout_sha256": {"$ref": "#/$defs/sha256"},
+        "stderr_sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]}, "then": {"properties": {"exit_code": {"type": "integer"}}}},
+        {"if": {"properties": {"status": {"enum": ["timed_out", "spawn_error", "cancelled"]}}, "required": ["status"]}, "then": {"properties": {"exit_code": {"type": "null"}}}}
+      ]
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["image_digest", "toolchain_id", "toolchain_sha256", "os", "architecture", "network_mode"],
+      "properties": {
+        "image_digest": {"type": "string", "minLength": 3, "maxLength": 512},
+        "toolchain_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "toolchain_sha256": {"$ref": "#/$defs/sha256"},
+        "os": {"type": "string", "minLength": 1, "maxLength": 128},
+        "architecture": {"type": "string", "minLength": 1, "maxLength": 128},
+        "network_mode": {"enum": ["disabled", "model_endpoint_only", "restricted", "unrestricted"]}
+      }
+    },
+    "inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}},
+    "outputs": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "claim_result": {"enum": ["supports", "contradicts", "inconclusive"]}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "relativePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"},
+    "sourceSpan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["line_start", "line_end", "column_start", "column_end", "excerpt_sha256"],
+      "properties": {
+        "line_start": {"type": "integer", "minimum": 1},
+        "line_end": {"type": "integer", "minimum": 1},
+        "column_start": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "column_end": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "excerpt_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "environmentEntry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "value_sha256"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "value_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "path", "sha256"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "path": {"$ref": "#/$defs/relativePath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
