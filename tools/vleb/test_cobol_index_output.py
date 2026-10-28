@@ -97,6 +97,12 @@ class CobolIndexOutputTests(unittest.TestCase):
         errors = list(VALIDATOR.iter_errors(report))
         self.assertTrue(any("unsupported_semantics_claim" in str(error) for error in errors))
 
+    def test_schema_rejects_source_spans_in_identification_area(self) -> None:
+        report = validate_json(run_indexer(FIXTURE).stdout)
+        report["program_id"]["location"]["column_end"] = 73
+        errors = list(VALIDATOR.iter_errors(report))
+        self.assertTrue(any("column_end" in str(error) for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
