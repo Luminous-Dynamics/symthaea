@@ -138,6 +138,12 @@ def main() -> int:
         request("discover:query", "query", query="support office address 10 Old Mill Road"),
     ]
     discovery, discovery_input, discovery_output = invoke_worker(worker, discovery_requests, args.timeout_seconds)
+    discovery_insert = discovery[1]
+    if discovery_insert.get("trajectory_id") != trajectory["id"]:
+        raise ValueError("discovery insert returned the wrong trajectory ID")
+    source_sha256 = discovery_insert.get("source_sha256")
+    if not isinstance(source_sha256, str) or len(source_sha256) != 64:
+        raise ValueError("worker insert did not return a source SHA-256")
     discovery_audit = discovery[2].get("audit")
     if not isinstance(discovery_audit, list):
         raise ValueError("discovery query has no audit array")
@@ -166,12 +172,17 @@ def main() -> int:
         request("transition:query-new", "query", query="current support office address 42 New Harbour Road"),
     ]
     transitioned, transition_input, transition_output = invoke_worker(worker, transition_requests, args.timeout_seconds)
+    transition_insert = transitioned[1]
+    if transition_insert.get("trajectory_id") != trajectory["id"]:
+        raise ValueError("transition insert returned the wrong trajectory ID")
+    if transition_insert.get("source_sha256") != source_sha256:
+        raise ValueError("replayed trajectory source digest differs across worker runs")
     assert_transition_result(old_id, new_id, transitioned[2], transitioned[3], transitioned[4])
 
     output_record = {
         "schema": PROTOCOL,
         "trajectory_id": trajectory["id"],
-        "source_sha256": sha256_bytes(json.dumps(trajectory, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")),
+        "source_sha256": source_sha256,
         "old_source_pointer": "/states/0/text",
         "replacement_source_pointer": "/states/1/text",
         "old_evidence_id": old_id,
