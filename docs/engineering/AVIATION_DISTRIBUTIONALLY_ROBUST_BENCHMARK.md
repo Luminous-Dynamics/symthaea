@@ -80,9 +80,18 @@ Report nominal expected delta, worst-case expected delta across the declared TV 
 - On held-out disruption families, the robust gate reduces severe regressions without exceeding a preregistered mean-cost or utilization penalty.
 - Report robustness premiums and all rejected candidates. Do not select the radius after inspecting the final test set.
 
+
+## Robustness budget / sign-flip curve
+
+The exported `evaluate_tv_robustness_curve` evaluates a caller-predeclared, strictly increasing radius grid. For every radius it reports nominal and worst-case expected cost numerators plus the robustness premium (worst-case minus nominal). It also reports the first tested radius where the candidate crosses the chosen maximum expected-cost threshold. Setting the threshold to zero yields the first evaluated radius where non-positive robust expected cost is lost.
+
+For the hand-checkable fixture `routine = -100`, `capacity = 0`, `compound-weather = +20`, with nominal probabilities `[0.6, 0.3, 0.1]`, the nominal expected delta is -58 units. The worst-case delta is -34 at TV radius 20% and +2 at TV radius 50%; therefore the first non-beneficial radius on the grid `[0%, 20%, 40%, 50%, 100%]` is 50%. These are synthetic math fixtures, not operational estimates.
+
+Do not optimize or select the radius against final test outcomes. The curve is a sensitivity analysis; the calibration protocol must choose radius using training/validation periods and then freeze it.
+
 ## Test status and claim ceiling
 
-Twelve Rust unit tests are defined, covering exact hand calculations, TV radius zero/full, identical costs, probability-mass validation, stable row ordering, radius-mismatch rejection, and a scenario where nominal improvement turns into a positive worst-case expected cost delta. Three integration-oracle tests independently enumerate tiny probability grids and compare the resulting maximum expected cost against the production greedy transfer method, including zero-probability stress atoms. These are defined but not run: the current environment has no `cargo` or `rustc`.
+Fourteen Rust unit tests are defined, covering exact hand calculations, TV radius zero/full, identical costs, probability-mass validation, stable row ordering, radius-mismatch rejection, a scenario where nominal improvement turns into a positive worst-case expected cost delta, robustness-premium accounting and monotone sensitivity curves. Three integration-oracle tests independently enumerate tiny probability grids and compare the resulting maximum expected cost against the production greedy transfer method, including zero-probability stress atoms. These are defined but not run: the current environment has no `cargo` or `rustc`.
 
 Any passing result is bounded to the finite support and the declared TV ambiguity set. It does not prove distribution-free robustness, airline savings, causal intervention effects, operational authority, airworthiness or regulatory certification.
 
