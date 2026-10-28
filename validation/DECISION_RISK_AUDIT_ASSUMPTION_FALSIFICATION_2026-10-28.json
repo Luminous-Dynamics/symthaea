@@ -9,15 +9,33 @@
   ],
   "protocol": {
     "decision_radius_bits": 0.06664248830771191,
-    "declared_loss_range": [0.0, 4.0],
+    "declared_loss_range": [
+      0.0,
+      4.0
+    ],
     "maximum_admissible_epsilon_bits": 0.033357511692288094,
     "observations_per_cell": 4096,
-    "policies": ["p0", "p1"],
+    "policies": [
+      "p0",
+      "p1"
+    ],
     "regret_budget_bits": 0.2,
     "seed": 20261028,
     "systematic_bias_control": "planning model has +0.04 error at p0::w0; audit values share the same +0.04 offset at that cell and repeat identically for all observations",
-    "truth_risk_matrix": [[1.0, 1.2], [1.5, 2.0]],
-    "worlds": ["w0", "w1"]
+    "truth_risk_matrix": [
+      [
+        1.0,
+        1.2
+      ],
+      [
+        1.5,
+        2.0
+      ]
+    ],
+    "worlds": [
+      "w0",
+      "w1"
+    ]
   },
   "results": {
     "iid_low_noise_positive_control": {
@@ -29,14 +47,20 @@
       "max_cell_confidence_radius_bits": 0.014683175860617983,
       "max_cell_plugin_residual_bits": 0.0011429188048550643,
       "n_per_cell": 4096,
-      "preflight": {"admitted": true, "cell_count": 4, "reason": "PREFLIGHT_PASSED"},
+      "preflight": {
+        "admitted": true,
+        "cell_count": 4,
+        "reason": "PREFLIGHT_PASSED"
+      },
       "true_planning_error_bits": 0.0
     },
     "missing_support_control": {
       "expected_cell_count": 4,
       "fail_closed_preflight": {
         "admitted": false,
-        "missing_cells": ["p0::w0"],
+        "missing_cells": [
+          "p0::w0"
+        ],
         "reason": "AUDIT_SUPPORT_INCOMPLETE",
         "unexpected_cells": []
       },
@@ -51,7 +75,10 @@
       "certificate_regret_bound_bits": 0.15957931733699182,
       "epsilon_allowance_bits": 0.033357511692288094,
       "epsilon_upper_bits": 0.013147170360783994,
-      "fail_closed_preflight": {"admitted": false, "reason": "AUDIT_ASSUMPTIONS_UNVERIFIED"},
+      "fail_closed_preflight": {
+        "admitted": false,
+        "reason": "AUDIT_ASSUMPTIONS_UNVERIFIED"
+      },
       "familywise_delta": 0.05,
       "max_cell_confidence_radius_bits": 0.01314717036078355,
       "max_cell_plugin_residual_bits": 4.440892098500626e-16,
