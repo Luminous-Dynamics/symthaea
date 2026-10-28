@@ -121,6 +121,26 @@ class LegacyClaimAuditorTests(unittest.TestCase):
     def test_schema_bytes_must_match_external_pin(self) -> None:
         self.assert_issue(self.fx.validate(expected_schema_sha256="0" * 64), "schema_pin_mismatch")
 
+    def test_duplicate_claim_json_keys_are_rejected_even_after_rehash(self) -> None:
+        raw = self.fx.claim_path.read_bytes().rstrip()
+        self.assertTrue(raw.endswith(b"}"))
+        duplicate_raw = raw[:-1] + b', "claim_id":"OTHER.CLAIM"}\\n'
+        self.fx.claim_path.write_bytes(duplicate_raw)
+
+        result = audit.validate_claim(
+            self.fx.claim_path,
+            self.fx.schema_path,
+            self.fx.source_root,
+            self.fx.evidence_root,
+            expected_claim_sha256=sha(duplicate_raw),
+            expected_auditor_sha256=self.fx.trusted_auditor_sha,
+            expected_schema_sha256=self.fx.trusted_schema_sha,
+            expected_source_sha256=self.fx.source_sha,
+            trusted_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assert_issue(result, "invalid_json")
+
+
     def test_source_bytes_must_match_claim_and_external_pin(self) -> None:
         (self.fx.source_root / "legacy.cbl").write_bytes(b"       COPY OTHER-REC.\n")
         self.assert_issue(self.fx.validate(), "source_digest_mismatch")
