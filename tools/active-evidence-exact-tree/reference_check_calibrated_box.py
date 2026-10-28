@@ -27,6 +27,10 @@ FIELDS = (
     "worst_case_box_regret", "worst_case_box_expected_cost",
     "worst_case_box_expected_queries", "planned_first_query",
 )
+COVERAGE_FIELDS = (
+    "n_per_cell", "true_probability", "cell_coverage",
+    "minimum_grid_cell_coverage", "union_bound_lower_12_cells", "per_cell_target",
+)
 
 
 def p_obs(matrix, query, hypothesis, outcome):
@@ -115,6 +119,49 @@ def cell_coverage(n, true_probability):
         if max(0.0, successes / n - radius) <= true_probability
         <= min(1.0, successes / n + radius)
     )
+
+
+def coverage_rows():
+    rows = []
+    for n in SAMPLE_SIZES:
+        by_probability = [(p, cell_coverage(n, p)) for p in COVERAGE_GRID]
+        minimum = min(coverage for _, coverage in by_probability)
+        union_bound = 1.0 - CELLS * (1.0 - minimum)
+        target = 1.0 - ALPHA / CELLS
+        for true_probability, coverage in by_probability:
+            rows.append({
+                "n_per_cell": str(n),
+                "true_probability": f"{true_probability:.12f}",
+                "cell_coverage": f"{coverage:.12f}",
+                "minimum_grid_cell_coverage": f"{minimum:.12f}",
+                "union_bound_lower_12_cells": f"{union_bound:.12f}",
+                "per_cell_target": f"{target:.12f}",
+            })
+    return rows
+
+
+def check_coverage_grid(path):
+    expected = coverage_rows()
+    with open(path, newline="", encoding="utf-8") as source:
+        reader = csv.DictReader(source)
+        if tuple(reader.fieldnames or ()) != COVERAGE_FIELDS:
+            raise ValueError(f"coverage-grid header mismatch: {reader.fieldnames}")
+        actual = list(reader)
+    if len(actual) != len(expected):
+        raise ValueError(f"coverage-grid row count mismatch: expected {len(expected)}, got {len(actual)}")
+    numeric = COVERAGE_FIELDS[1:]
+    for line, (got, want) in enumerate(zip(actual, expected), 2):
+        if got.get("n_per_cell") != want["n_per_cell"]:
+            raise ValueError(f"coverage n mismatch on line {line}")
+        for field in numeric:
+            try:
+                value = float(got[field])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(f"invalid coverage field {field} on line {line}") from exc
+            target = float(want[field])
+            if not math.isfinite(value) or abs(value - target) > 5e-9:
+                raise ValueError(f"coverage {field} mismatch on line {line}: {value} != {target}")
+    print(f"PASS: independently recomputed {len(expected)} exact finite-grid binomial coverage rows")
 
 
 def evaluate_conditional(tree, truth, hypothesis, belief):
@@ -279,8 +326,16 @@ def main(argv):
         except (AssertionError, ValueError) as exc:
             print(f"FAIL: {exc}", file=sys.stderr)
             return 1
+    if len(argv) == 3 and argv[1] == "--check-coverage-grid":
+        try:
+            check_coverage_grid(argv[2])
+            return 0
+        except (OSError, UnicodeError, csv.Error, ValueError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
     if len(argv) != 2 or argv[1] in ("-h", "--help"):
         print("Usage: reference_check_calibrated_box.py RESULTS.csv")
+        print("       reference_check_calibrated_box.py --check-coverage-grid COVERAGE.csv")
         print("       reference_check_calibrated_box.py --self-test")
         return 2
     try:
