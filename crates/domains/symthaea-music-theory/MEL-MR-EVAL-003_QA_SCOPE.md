@@ -12,3 +12,8 @@ The corpus is smoke-scale. Do not use it as the sole evidence for a release or p
 ## Follow-on Rust prototype status
 
 The PR includes a Rust unit test that replays the committed corpus and asserts all 108 expected verdicts, plus adversarial and metamorphic unit tests. These tests are **authored but not executed**: local cargo/rustc/rustfmt are unavailable and the current exact-head GitHub workflow records are skipped. A separate local Python simulation of the intended alignment and verdict logic reported 0/108 expected-verdict mismatches. That result is not interchangeable with execution of the Rust implementation.
+
+
+## Evidence receipt contract
+
+Each verification result records the descriptor and threshold config, target offset, ordered match pairs with independent residuals, unmatched source/target indices, aggregate axis evidence and failure reasons. The receipt is JSON round-trip tested by the authored corpus replay test. This supports audit/replay but is not a cryptographic provenance receipt: callers still need to bind source/target content digests and the exact verifier build SHA when persisting evidence.
