@@ -433,7 +433,9 @@ fn parse_artifact(
         Some(metric) => match metric.as_f64() {
             Some(number) if number.is_finite() && (number == 0.0 || number == 1.0) => Some(number),
             Some(_) => {
-                issues.push("evaluation.exact_accuracy must be native trial-level 0.0 or 1.0".to_owned());
+                issues.push(
+                    "evaluation.exact_accuracy must be native trial-level 0.0 or 1.0".to_owned(),
+                );
                 None
             }
             None => {
@@ -505,7 +507,9 @@ fn summarize_arm(
         mean_rmsle_completed: mean(rmsle_values.into_iter()),
         exact_accuracy_available_completed: accuracy_values.len(),
         mean_exact_accuracy_completed: mean(accuracy_values.into_iter()),
-        total_experiments_completed: sum_optional(complete.iter().map(|trial| trial.num_experiments)),
+        total_experiments_completed: sum_optional(
+            complete.iter().map(|trial| trial.num_experiments),
+        ),
         total_rounds_completed: sum_optional(complete.iter().map(|trial| trial.rounds)),
         total_tokens_completed: sum_optional(complete.iter().map(|trial| trial.total_tokens)),
     }
@@ -587,7 +591,9 @@ pub fn audit(
         }
         let both_completed = matches!(
             (&vanilla_trial, &tool_trial),
-            (Some(v), Some(t)) if v.status == TrialStatus::Completed && t.status == TrialStatus::Completed
+            (Some(v), Some(t))
+                if v.status == TrialStatus::Completed
+                    && t.status == TrialStatus::Completed
         );
         if both_completed {
             both_completed_pairs += 1;
@@ -805,17 +811,50 @@ mod tests {
         let vanilla = vec![
             artifact(
                 "trial1.json",
-                raw_trial(1, 0.0, "easy", "vanilla_equation", "v0", "vanilla_agent", "completed", json!(0.5), 0.0, 3),
+                raw_trial(
+                    1,
+                    0.0,
+                    "easy",
+                    "vanilla_equation",
+                    "v0",
+                    "vanilla_agent",
+                    "completed",
+                    json!(0.5),
+                    0.0,
+                    3,
+                ),
             ),
             artifact(
                 "trial2_fail.json",
-                raw_trial(2, 0.1, "hard", "simple_system", "v1", "vanilla_agent", "failed", Value::Null, 0.0, 0),
+                raw_trial(
+                    2,
+                    0.1,
+                    "hard",
+                    "simple_system",
+                    "v1",
+                    "vanilla_agent",
+                    "failed",
+                    Value::Null,
+                    0.0,
+                    0,
+                ),
             ),
         ];
         let tool = vec![
             artifact(
                 "trial1.json",
-                raw_trial(1, 0.0, "easy", "vanilla_equation", "v0", "code_assisted_agent", "completed", json!(0.2), 1.0, 2),
+                raw_trial(
+                    1,
+                    0.0,
+                    "easy",
+                    "vanilla_equation",
+                    "v0",
+                    "code_assisted_agent",
+                    "completed",
+                    json!(0.2),
+                    1.0,
+                    2,
+                ),
             ),
         ];
         (bytes, vanilla, tool)
@@ -833,7 +872,10 @@ mod tests {
         assert_eq!(report.body.vanilla.failed_trials, 1);
         assert_eq!(report.body.comparison.both_observed_pairs, 1);
         assert_eq!(report.body.comparison.rmsle_pair_count, 1);
-        assert!((report.body.comparison.mean_rmsle_delta_tool_minus_vanilla.unwrap() + 0.3).abs() < 1.0e-12);
+        assert!(
+            (report.body.comparison.mean_rmsle_delta_tool_minus_vanilla.unwrap() + 0.3).abs()
+                < 1.0e-12
+        );
         assert_eq!(report.body.comparison.exact_accuracy_pair_count, 1);
         assert_eq!(report.body.comparison.mean_exact_accuracy_delta_tool_minus_vanilla, Some(1.0));
         assert_eq!(report.body.comparison.mean_experiments_delta_tool_minus_vanilla, Some(-1.0));
@@ -844,7 +886,23 @@ mod tests {
         let m = serde_json::to_vec(&manifest()).unwrap();
         let vanilla = vec![ArtifactInput {
             path: "trial2_fail.json".to_owned(),
-            raw_bytes: br#"{"trial_id":2,"module_name":"m0_gravity","noise_level":0.1,"model_name":"fixture-model","equation_difficulty":"hard","model_system":"simple_system","law_version":"v1","agent_backend":"vanilla_agent","LLM judge":"fixture-judge","status":"failed","rounds":0,"total_tokens":0,"num_experiments":0,"evaluation":{"rmsle":NaN,"exact_accuracy":0.0}}"#.to_vec(),
+            raw_bytes: br#"{
+                "trial_id": 2,
+                "module_name": "m0_gravity",
+                "noise_level": 0.1,
+                "model_name": "fixture-model",
+                "equation_difficulty": "hard",
+                "model_system": "simple_system",
+                "law_version": "v1",
+                "agent_backend": "vanilla_agent",
+                "LLM judge": "fixture-judge",
+                "status": "failed",
+                "rounds": 0,
+                "total_tokens": 0,
+                "num_experiments": 0,
+                "evaluation": {"rmsle": NaN, "exact_accuracy": 0.0}
+            }"#
+            .to_vec(),
         }];
         let report = audit(&m, vanilla, Vec::new()).unwrap();
         assert_eq!(report.body.vanilla.failed_trials, 1);
@@ -870,7 +928,11 @@ mod tests {
     fn rejects_duplicate_expected_pair_identity() {
         let mut manifest = manifest();
         manifest.expected_pairs.push(manifest.expected_pairs[0].clone());
-        assert!(validate_manifest(&manifest).unwrap_err().contains("duplicate expected trial identity"));
+        assert!(
+            validate_manifest(&manifest)
+                .unwrap_err()
+                .contains("duplicate expected trial identity")
+        );
     }
 
     #[test]
@@ -885,7 +947,18 @@ mod tests {
         let m = serde_json::to_vec(&manifest()).unwrap();
         let vanilla = vec![artifact(
             "trial1.json",
-            raw_trial(1, 0.0, "easy", "vanilla_equation", "v0", "code_assisted_agent", "completed", json!(0.2), 1.0, 2),
+            raw_trial(
+                1,
+                0.0,
+                "easy",
+                "vanilla_equation",
+                "v0",
+                "code_assisted_agent",
+                "completed",
+                json!(0.2),
+                1.0,
+                2,
+            ),
         )];
         let report = audit(&m, vanilla, Vec::new()).unwrap();
         assert_eq!(report.body.vanilla.observed_pairs, 0);
