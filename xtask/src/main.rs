@@ -72,9 +72,9 @@ enum Commands {
     EffectSurfaceRegistry {
         #[arg(long, default_value = "docs/security/effect-surface-registry.v1.json")]
         registry: PathBuf,
-        /// Refuse success while any entry lacks recorded qualification evidence.
+        /// Refuse success while any record lacks a complete recorded qualification-evidence entry.
         #[arg(long)]
-        require_qualified: bool,
+        require_evidence_records: bool,
     },
 }
 
@@ -158,7 +158,7 @@ fn main() -> anyhow::Result<()> {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
         }
-        Commands::EffectSurfaceRegistry { registry, require_qualified } => {
+        Commands::EffectSurfaceRegistry { registry, require_evidence_records } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .expect("xtask lives one level below the workspace root")
@@ -168,7 +168,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 root.join(registry)
             };
-            effect_surface_registry::check(&root, &registry_path, require_qualified)?;
+            effect_surface_registry::check(&root, &registry_path, require_evidence_records)?;
         }
     }
     Ok(())
