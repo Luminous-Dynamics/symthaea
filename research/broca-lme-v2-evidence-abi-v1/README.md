@@ -8,6 +8,17 @@ The official LongMemEval-V2 backend API calls `insert(trajectory)` and requires 
 
 The current `crates/domains/symthaea-broca/src/memory_bridge.rs` queries `HdcStore::scan_similar()` and returns blended `ContinuousHV` vectors. `crates/domains/symthaea-hdc-store/src/store.rs` describes vector entries containing metadata plus a `BinaryHV`. Neither API alone resolves a hit to answer-bearing text or an image path. Therefore a vector hit cannot be passed off as LongMemEval evidence.
 
+## The query encoder is also an explicit gap
+
+The `crates/domains/symthaea-broca/src/encoder.rs` module exposes `ThoughtLanguageEncoder::encode(&ThoughtChannels)`. `ThoughtChannels` is a structured scalar-channel representation, not arbitrary query or trajectory text. It must not be mistaken for a text embedding model.
+
+The next worker must select and pin a real retrieval representation before a full run:
+- a deterministic lexical retrieval baseline (e.g. BM25 or token/phrase postings) with no embedding-model dependency;
+- a pinned text embedding model, if allowed by the hardware/cost plan; or
+- a separately trained and validated text-to-HDC encoder with its own retrieval benchmark.
+
+Report these as distinct retrieval arms. Do not label a lexical feature hash as semantic HDC, and do not use answer/question labels or benchmark metadata to build the query representation.
+
 ## What this increment provides
 
 `memory_evidence.rs` defines a typed payload contract and a process-local ID resolver:
