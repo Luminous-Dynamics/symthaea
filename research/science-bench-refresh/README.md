@@ -84,10 +84,12 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
 
 `generate-task-set` refuses a config whose exact bytes do not match `generator.configuration_sha256`, refuses a seed that does not match its context-bound commitment, requires a valid pinned sealed-refresh manifest, and checks generated task-family counts against the expected denominator. `verify-regeneration` reproduces the exact task-set bytes and compares them with the revealed artifact in addition to checking reveal commitments and the task-set contract.
 
+Task IDs are full SHA-256 digests over domain-separated seed/generation/family/index inputs, and generated rows are sorted by that opaque ID rather than grouped by family. The family label remains only in the evaluator-held outer row; the runner must forward only `policy_input` to the policy.
+
 The task constructors are **synthetic protocol fixtures**, not a qualified physical/scientific benchmark. They test determinism, family-count closure, input/oracle field separation, and reproducible generation. They do not establish that the task distribution is scientifically representative, that the answer labels are correct for a physical domain, or that the evaluated policy cannot access evaluator-only data. The `generator-config.example.json` is a recipe example; real scored manifests must pin the exact config bytes and immutable generator source revision.
 
 ## Current implementation boundary
 
 The Rust validator checks strict manifest shape and unknown-field rejection, digest/revision syntax, protocol-context integrity, domain-separated seed/task commitments, exact-byte reveal verification, exact deterministic regeneration from seed/config bytes, task-set generation/denominator/family integrity, duplicate task IDs/families, oracle-key canaries in policy-visible inputs, denominator and family-weight closure, lane/reveal-policy consistency, and separate manifest-declared profile fields.
 
-At the current draft stage, 45 Rust unit tests are authored across manifest/reveal validation, task-set contract checks, deterministic generation/replay, and CLI argument handling. They must not be described as passing until current-head exact CI completes. This authoring environment does not include a Rust toolchain, so no local compile/test/Clippy result is claimed.
+At the current draft stage, 47 Rust unit tests are authored across manifest/reveal validation, task-set contract checks, deterministic generation/replay, and CLI argument handling. They must not be described as passing until current-head exact CI completes. This authoring environment does not include a Rust toolchain, so no local compile/test/Clippy result is claimed.
