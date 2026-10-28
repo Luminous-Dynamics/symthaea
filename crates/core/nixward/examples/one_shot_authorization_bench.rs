@@ -86,6 +86,7 @@ fn main() {
     let mut scenario_counts = [0usize; 9];
     let mut false_permits = 0usize;
     let mut false_blocks = 0usize;
+    let mut contract_mismatches = 0usize;
     let mut allowed = 0usize;
     let mut denied = 0usize;
 
@@ -240,10 +241,12 @@ fn main() {
         // Keep scenario labels and policy expectations separate from the
         // implementation's returned error message.
         if actual_allow != scenario.expected_allow() {
+            contract_mismatches += 1;
             eprintln!(
-                "CONTRACT MISMATCH: scenario={} index={} allowed={}",
+                "CONTRACT MISMATCH: scenario={} index={} measured={} allowed={}",
                 scenario.name(),
                 index,
+                measured,
                 actual_allow
             );
         }
@@ -267,6 +270,7 @@ fn main() {
     println!("denied_outcomes={denied}");
     println!("false_permits={false_permits}");
     println!("false_blocks={false_blocks}");
+    println!("contract_mismatches_including_warmup={contract_mismatches}");
     println!("p50_consume_ns={}", percentile(&latencies_ns, 50));
     println!("p95_consume_ns={}", percentile(&latencies_ns, 95));
     println!("p99_consume_ns={}", percentile(&latencies_ns, 99));
@@ -293,7 +297,7 @@ fn main() {
     }
     println!(
         "status={}",
-        if false_permits == 0 && false_blocks == 0 {
+        if false_permits == 0 && false_blocks == 0 && contract_mismatches == 0 {
             "CONTRACT_MATCHED"
         } else {
             "CONTRACT_MISMATCH"
@@ -302,7 +306,7 @@ fn main() {
     println!("measurement_scope=ledger.consume_only");
     println!("not_measured=process_launch,policy_latency,system_side_effects,global_bypass_paths");
 
-    if false_permits != 0 || false_blocks != 0 {
+    if false_permits != 0 || false_blocks != 0 || contract_mismatches != 0 {
         std::process::exit(1);
     }
 }
