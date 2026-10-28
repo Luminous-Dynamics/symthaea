@@ -58,15 +58,15 @@ class MutationCampaignGeneratorTests(unittest.TestCase):
         match_start = mutated.index("match side {")
         match_end = mutated.index("\n        }\n\n        account.unique_transactions", match_start)
         block = mutated[match_start:match_end]
-        credit_start = block.index("Side::Credit =>")
         debit_start = block.index("Side::Debit =>")
-        self.assertLess(credit_start, debit_start)
-        credit_branch = block[credit_start:debit_start]
-        debit_branch = block[debit_start:]
-        self.assertIn("account.debits_minor", credit_branch)
-        self.assertIn("totals.debits_minor", credit_branch)
-        self.assertIn("account.credits_minor", debit_branch)
-        self.assertIn("totals.credits_minor", debit_branch)
+        credit_start = block.index("Side::Credit =>")
+        self.assertLess(debit_start, credit_start, "mutant must swap branch discriminants")
+        debit_labeled_branch = block[debit_start:credit_start]
+        credit_labeled_branch = block[credit_start:]
+        self.assertIn("account.credits_minor", debit_labeled_branch)
+        self.assertIn("totals.credits_minor", debit_labeled_branch)
+        self.assertIn("account.debits_minor", credit_labeled_branch)
+        self.assertIn("totals.debits_minor", credit_labeled_branch)
 
     def test_duplicate_mutant_only_removes_exact_duplicate_short_circuit(self) -> None:
         _, transform, _ = self.mutants["VLEB-LDG-001"]
