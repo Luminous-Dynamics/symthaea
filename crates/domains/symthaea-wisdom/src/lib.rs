@@ -113,8 +113,9 @@ impl WisdomState {
 
     /// Update wisdom from signals when prediction-error evidence may be absent.
     ///
-    /// Missing/non-finite PE does not trigger surprise-driven Wisdom, autopoiesis,
-    /// or self-model updates. Uncertainty/coherence-driven updates remain active.
+    /// Missing/non-finite PE skips surprise-driven Wisdom and self-model updates.
+    /// Autopoiesis still records valid coherence and cycle accounting using a
+    /// neutral PE prior, without inventing an error observation.
     pub fn update_from_optional_experience(
         &mut self,
         prediction_error: Option<f32>,
@@ -123,15 +124,19 @@ impl WisdomState {
     ) {
         let prediction_error = prediction_error.filter(|value| value.is_finite());
 
-        if let Some(prediction_error) = prediction_error {
-            // High prediction error → boost Wisdom (what don't I know?)
-            if prediction_error > 0.5 {
-                self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
-            }
+        match prediction_error {
+            Some(prediction_error) => {
+                self.autopoiesis.record_cycle(prediction_error, coherence);
 
-            // PE-dependent monitors must receive measured evidence only.
-            self.autopoiesis.record_cycle(prediction_error, coherence);
-            self.meta_cognition.update_self_model(prediction_error);
+                // High prediction error → boost Wisdom (what don't I know?)
+                if prediction_error > 0.5 {
+                    self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
+                }
+
+                // The meta-self-model requires a measured PE outcome.
+                self.meta_cognition.update_self_model(prediction_error);
+            }
+            None => self.autopoiesis.record_cycle_without_prediction_error(coherence),
         }
 
         // High uncertainty → boost Play (what haven't I tried?)
@@ -183,6 +188,9 @@ mod tests {
         let initial_wisdom = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
         wisdom.update_from_optional_experience(None, 0.3, 0.7);
         assert_eq!(wisdom.harmonics.get(ActiveHarmonic::Wisdom), initial_wisdom);
+        assert_eq!(wisdom.autopoiesis.metrics().total_cycles, 1);
+        assert_eq!(wisdom.autopoiesis.prediction_error_observation_count(), 0);
+        assert!((wisdom.autopoiesis.metrics().average_coherence - 0.7).abs() < f32::EPSILON);
     }
 
     #[test]
