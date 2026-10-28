@@ -201,7 +201,7 @@ fn validate(inventory: &Inventory, sha256: String) -> Result<Summary> {
     let mut critical_count = 0;
     let mut high_count = 0;
     for mutation in &inventory.mutations {
-        if mutation.id.trim().is_empty() || !seen.insert(mutation.id.as_str()) {
+        if mutation.id.trim().is_empty() || !seen.insert(mutation.id.clone()) {
             bail!("mutation IDs must be non-empty and unique: {:?}", mutation.id);
         }
         let frozen = FROZEN_MUTATIONS
@@ -241,7 +241,7 @@ fn validate(inventory: &Inventory, sha256: String) -> Result<Summary> {
             other => bail!("mutation {} has unsupported severity {other:?}", mutation.id),
         }
     }
-    let expected_ids = FROZEN_MUTATIONS.iter().map(|m| m.id).collect::<BTreeSet<_>>();
+    let expected_ids = FROZEN_MUTATIONS.iter().map(|m| m.id.to_string()).collect::<BTreeSet<_>>();
     if seen != expected_ids {
         bail!("frozen mutation ID set changed; introduce a reviewed inventory version");
     }
