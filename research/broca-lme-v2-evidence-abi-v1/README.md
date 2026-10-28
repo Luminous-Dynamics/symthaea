@@ -31,7 +31,8 @@ Report these as distinct retrieval arms. Do not label a lexical feature hash as 
 - `EvidenceCommitManifest` binds exact HDC-index bytes and evidence-snapshot bytes to one nonzero generation, rejects a manifest/snapshot generation mismatch, and detects later artifact substitution; the coordinator must still ensure the index bytes were produced for that generation;
 - text payload digests are verified before emission; image paths are canonicalized under a trusted payload root and their file-byte digests are checked;
 - duplicate HDC/evidence IDs, malformed digests, invalid lifecycle shapes, path traversal, and corrupt payloads fail closed;
-- resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained.
+- resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained;
+- `EvidenceIndex::resolve_with_provenance` preserves the HDC ID, stable evidence ID, trajectory ID, and step coordinates beside each emitted item. `resolve` is a simple ABI projection that strips this audit envelope only when the caller explicitly needs the official `type/value` shape.
 
 ## Disk-generation persistence prototype
 
@@ -43,6 +44,24 @@ let generation = store.commit_hdc_store(&mut hdc_store, &evidence_index)?;
 let recovered = store.recover()?.ok_or("no committed generation")?;
 assert_eq!(recovered.generation, generation);
 ```
+
+The query-serving path accepts an already encoded query vector and returns candidate scores plus resolved source attribution:
+
+```rust
+let result = store.query_committed_context(
+    &query_hv,
+    32,
+    "web",
+    now_ms,
+    payload_root,
+    8,
+)?;
+let official_context = result
+    .map(|result| result.context_items())
+    .unwrap_or_default();
+```
+
+Integrity errors propagate through `?`; only an uninitialized store maps to no context. The resolved list retains each emitted item's HDC ID, evidence ID and source trajectory/step. The API uses exact search and is a correctness reference, not a measured latency claim.
 
 The exact API may evolve during review; the example communicates intended use, not a compiled integration result.
 
