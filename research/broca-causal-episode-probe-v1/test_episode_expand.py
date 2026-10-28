@@ -107,6 +107,7 @@ class EpisodeExpandTests(unittest.TestCase):
         prediction_path.write_bytes(prediction_bytes)
         manifest = {
             "schema": "broca-causal-episode-probe-v1",
+            "question_count": 1,
             "prediction_sha256": hashlib.sha256(prediction_bytes).hexdigest(),
             "trajectory_fixture_sha256": hashlib.sha256(trajectory_path.read_bytes()).hexdigest(),
             "scope_id": "web",
