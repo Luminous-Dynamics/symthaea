@@ -150,7 +150,7 @@ fn oracle_is_insensitive_to_scenario_row_order() {
     for radius in [0, 200_000, 500_000, 1_000_000] {
         let a = evaluate_tv_robust_cost_delta(&scenarios, radius).unwrap();
         let b = evaluate_tv_robust_cost_delta(&reversed, radius).unwrap();
-        assert_eq!(a.worst_case_expected_delta_numerator_ppm(), b.worst_case_expected_delta_numerator_ppm);
+        assert_eq!(a.worst_case_expected_delta_numerator_ppm(), b.worst_case_expected_delta_numerator_ppm());
         assert_eq!(a.nominal_expected_delta_numerator_ppm(), b.nominal_expected_delta_numerator_ppm);
     }
 }
