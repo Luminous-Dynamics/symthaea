@@ -112,7 +112,7 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
         if current.get("value") is not None or current.get("eligible") is not False:
             errors.append(metric_name + "_score_fabricated")
 
-        baseline_target = data.get("proposed_targets", {}).get("per_test_baseline_oracle_alignment_pct", {})
+    baseline_target = data.get("proposed_targets", {}).get("per_test_baseline_oracle_alignment_pct", {})
     if baseline_target.get("target") != 100 or baseline_target.get("status") != "target_not_measured":
         errors.append("per_test_baseline_oracle_target_drift")
     baseline_current = data.get("current_measurements", {}).get("per_test_baseline_oracle_alignment_pct", {})
