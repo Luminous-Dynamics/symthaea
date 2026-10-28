@@ -157,3 +157,16 @@ The checked reference run accepted 100,000 clean generated trace cases (69,740 v
 The newly available paper *Trial by Trace: Benchmarking AI Agent Harnesses for Reliability and Failure Attribution* (arXiv:2610.32285, posted 23 October 2026) proposes separating task success from harness reliability, using trajectory traces and mechanism-based failure attribution. It reports that some runs can succeed at the task while still failing a harness criterion. This supports a two-axis evaluation design for Symthaea: one score for task/learning utility, another for evidence and harness integrity. Its reported scores are not directly comparable to this PE-specific synthetic audit: [paper](https://arxiv.org/abs/2610.32285).
 
 The auditor contract must evolve alongside implementation. In particular, current reference traces do not yet cover a persisted event digest, reset epochs, tamper-evident hash chaining, or cross-process resume from a real Rust checkpoint. These remain explicit extensions rather than implied guarantees.
+
+
+## 11. Reset-aware canonical trace envelope (v2 reference implementation)
+
+The follow-on v2 files add stable trace-event IDs, gap-free sequence checking, a domain-separated canonical SHA-256 hash chain, explicit reset epochs, cycle-regression detection, cross-epoch evidence rejection, and exact decision-event/epoch retention for delayed posthoc outcomes. The v2 reference auditor imports the v1 semantic auditor as a sibling module; run it from the repository root:
+
+    python3 docs/research/pev_trace_audit_reference_v2.py --self-test --cases 100000 --seed 20261028
+
+The deterministic synthetic run accepted 100,000 single-epoch traces and six tests mutated the envelope/temporal contract; all six were rejected. A multi-epoch positive control confirms that a delayed outcome can arrive after reset without re-binding the old decision's evidence. It is not evidence that production Rust emits this trace shape or that Rust compiles.
+
+**Security qualification:** the hash chain is tamper-evident only if the trusted root is retained; it is not an authenticity proof because an editor who can rewrite the whole trace can recompute the chain. Signing or externally anchoring a root digest is a separate design decision. Keep hashed content to canonical metadata only; do not include raw user text or secrets.
+
+See pev_trace_audit_v2_contract.md for the complete v2 protocol, limits, and implementation gate. The missing next proof is still an exact-head Rust test that emits real decision/posthoc traces, including checkpoint/restore and reset boundaries, and passes those raw traces to the independent auditor.
