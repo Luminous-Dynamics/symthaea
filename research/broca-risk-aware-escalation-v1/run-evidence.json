@@ -40,7 +40,11 @@
     "report_sha256": "bf6c0fce12645780f1a98386dff7c6faed62bbda9e80e57b5ed0ad5048c1da46",
     "policy_frontier_csv_sha256": "0d0c8c351e58d02e012cbc454f221920f073bf52ed4840a1beb61eb92c2c7871",
     "primary_paired_contrasts_csv_sha256": "00ea8b00ba05b7b32f95121e3d4ef70914370f459e4b1f60b2c15204ad1d32d8",
-    "receipt_sha256": "473f99aabe5a7c568cad72fbceb0d2853876c4149c7a22eab697e4fd5635c3d1"
+    "receipt_sha256": "f5a9e36910289ffd1ff5bf4939e70db675ad0ee0102f1e8eef2f20d0de8b8b9f",
+    "raw_outcome_file": "run-20261028-final/per_case_policy_outcomes.jsonl",
+    "summary_file": "run-20261028-final/summary.json",
+    "report_file": "run-20261028-final/report.md",
+    "configuration_file": "run-20261028-final/config.json"
   },
   "validation": {
     "tests_passed": 16,
