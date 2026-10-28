@@ -683,8 +683,7 @@ fn cusum_alarm_probability(horizon: usize, threshold: usize, event_probability: 
     for n in 1..=horizon {
         let mut next = vec![0.0_f64; threshold];
         let reachable_states = threshold.min((n - 1) * CUSUM_UPPER_INCREMENT + 1);
-        for state in 0..reachable_states {
-            let mass = active[state];
+        for (state, &mass) in active.iter().take(reachable_states).enumerate() {
             if mass == 0.0 {
                 continue;
             }
@@ -756,8 +755,7 @@ fn evaluate_cusum_scenario(
         let event_probability = direction.event_probability(observed_probability);
         let mut next = vec![0.0_f64; threshold];
         let reachable_states = threshold.min((n - 1) * CUSUM_UPPER_INCREMENT + 1);
-        for state in 0..reachable_states {
-            let mass = active[state];
+        for (state, &mass) in active.iter().take(reachable_states).enumerate() {
             if mass == 0.0 {
                 continue;
             }
