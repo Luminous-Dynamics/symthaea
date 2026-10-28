@@ -27,9 +27,9 @@ The Rust module matched_evaluation.rs defines:
 - A fixed cost vector for acquisition, preprocessing, feature extraction, transfer, amortized compilation/initialization, solve, repair, verification, and receipt persistence.
 - Unknown costs represented as unknown. If any stage is unknown, all-in time and time-speedup for that trial are unavailable; a missing stage is never a zero-cost stage.
 - Energy records with explicit NotMeasured, DeviceOnly, PartialSystem, or FullSystem boundaries. Energy comparisons are emitted only when both successful paired trials have comparable measured boundaries.
-- Per-pair details plus target-hit counts (candidate, baseline, both, either-only, neither), costed pair count, uncosted target hits, energy-scope mismatches, and medians of paired ratios.
+- Per-pair details plus target-hit counts and rates (candidate, baseline, both, either-only, neither), candidate-minus-baseline hit-rate delta, costed pair count, uncosted target hits, energy-scope mismatches, and medians of paired ratios.
 
-The ratio baseline/candidate is greater than 1 when the candidate uses less of the measured resource. Ratios are reported only for pairs where both methods attain the same verified target and both cost vectors are complete. Missed targets remain in target-hit counts and do not receive an invented ratio.
+The ratio baseline/candidate is greater than 1 when the candidate uses less of the measured resource. Ratios are reported only for pairs where both methods attain the same verified target and both cost vectors are complete. These are conditional diagnostics and can be survivor-biased when hard pairs are missed, so they are always accompanied by both arms' hit rates and paired hit-rate delta. Missed targets remain in target-hit counts and do not receive an invented ratio.
 
 ## Standalone smoke runner
 
@@ -56,7 +56,7 @@ For each canonical graph digest, freeze the target cardinality and per-trial sol
 6. Adaptive acquisition gate.
 7. A hybrid portfolio including an eligible specialist solver such as KaMIS/ReduMIS.
 
-Use a development split for tuning and a confirmation split frozen by graph family. Pair stochastic repeats by explicit trial IDs and seeds, but treat graph instances—not repeated seeds on one graph—as the independent units for generalization claims.
+Use a development split for tuning and a confirmation split frozen by graph family. QOBLIB's contribution guidance calls for at least five runs for stochastic methods and recommends ten or more; follow the pinned benchmark revision's current rule. Pair stochastic repeats by explicit trial IDs and seeds, but treat graph instances—not repeated seeds on one graph—as the independent units for generalization claims.
 
 Report feasible objective, best known/proven bound, proof status, target-hit fraction, all-in verified time-to-target, failures/timeouts, stage breakdown, energy scope, and graph-level paired effects with uncertainty. Keep solution-quality comparisons separate from optimality certification.
 
