@@ -7,6 +7,7 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Research protocol and statistical plan](../../docs/research/VERIFIED_LEGACY_ENGINEERING_BENCHMARK_2026-10-24.md)
 - [Industry benchmark comparison and next frontier](../../docs/research/VLEB_INDUSTRY_COMPARISON_2026-10-28.md)
 - [Task contract schema](task-contract.schema.json)
+- [Requirement-to-oracle traceability protocol](../../docs/research/VLEB_REQUIREMENT_ORACLE_TRACEABILITY_2026-10-28.md)
 - [Evidence receipt schema](evidence-receipt.schema.json)
 - [Trusted run-manifest schema](run-manifest.schema.json)
 - [Run-manifest validator and confirmatory attestation verification](verify_run_manifest.py)

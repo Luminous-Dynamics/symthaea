@@ -109,10 +109,51 @@ class AuditBundle:
                 "network_mode": "none",
                 "toolchains": [{"name": "rustc", "version": "1.96.0", "identity_sha256": sha(b"rustc-1.96.0-binary")}],
             },
-            "behavior_contract": {"observable_effects": self.EFFECTS},
+            "behavior_contract": {
+                "task_statement": "The evaluator must account for every declared logical behavior.",
+                "invariants": ["Every declared observable is covered by a required executable test."],
+                "allowed_behavior_changes": [],
+                "observable_effects": self.EFFECTS,
+                "requirement_traceability": [
+                    {
+                        "requirement_id": "TRACE.STATEMENT",
+                        "source_kind": "task_statement",
+                        "source_text": "The evaluator must account for every declared logical behavior.",
+                        "required_test_ids": [self.LOGICAL[0][0]],
+                        "observable_effects": self.EFFECTS,
+                    },
+                    {
+                        "requirement_id": "TRACE.INVARIANT.001",
+                        "source_kind": "invariant",
+                        "source_text": "Every declared observable is covered by a required executable test.",
+                        "required_test_ids": [logical for logical, _ in self.LOGICAL],
+                        "observable_effects": self.EFFECTS,
+                    },
+                    *[
+                        {
+                            "requirement_id": "TRACE.EFFECT." + effect.upper(),
+                            "source_kind": "observable_effect",
+                            "source_text": effect,
+                            "required_test_ids": [logical],
+                            "observable_effects": [effect],
+                        }
+                        for effect, (logical, _) in zip(self.EFFECTS, self.LOGICAL)
+                    ],
+                ],
+            },
             "oracle_contract": {
                 "required_test_ids": [logical for logical, _ in self.LOGICAL],
-                "test_execution_map": [{"test_id": logical, "execution_ids": [execution]} for logical, execution in self.LOGICAL],
+                "test_execution_map": [
+                    {
+                        "test_id": logical,
+                        "execution_ids": [execution],
+                        "baseline_expectations": [{
+                            "execution_id": execution,
+                            "expected_status": "passed" if logical in ("logical.stdout", "logical.exit") else "failed",
+                        }],
+                    }
+                    for logical, execution in self.LOGICAL
+                ],
                 "baseline_empty_patch_must_fail": True,
                 "reference_patch_must_pass": True,
                 "reference_evidence_artifacts": ref_paths,
@@ -268,10 +309,41 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.assertIn(code, codes, result)
         self.assertFalse(result["eligible"])
 
+    def test_duplicate_json_object_keys_are_rejected(self) -> None:
+        raw = self.bundle.task_path.read_text(encoding="utf-8")
+        anchor = '"task_id": "vleb-private-auditor-001",'
+        self.assertIn(anchor, raw)
+        raw = raw.replace(anchor, anchor + '\n  "task_id": "attacker/relabelled-task",', 1)
+        self.bundle.task_path.write_text(raw, encoding="utf-8")
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "invalid_json")
+
+    def test_nonstandard_json_nan_is_rejected(self) -> None:
+        raw = self.bundle.task_path.read_text(encoding="utf-8")
+        raw = raw.replace('"task_id": "vleb-private-auditor-001",', '"task_id": "vleb-private-auditor-001",\n  "unexpected_numeric": NaN,', 1)
+        self.bundle.task_path.write_text(raw, encoding="utf-8")
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "invalid_json")
+
     def test_valid_synthetic_bundle_passes(self) -> None:
         result = self.bundle.run_audit()
         self.assertTrue(result["eligible"], result["issues"])
         self.assertEqual(result["verdict"], "pass")
+        self.assertEqual(result["task_contract_sha256"], sha(self.bundle.task_path.read_bytes()))
+        self.assertEqual(result["protocol_sha256"], sha(self.bundle.protocol_path.read_bytes()))
+        self.assertEqual(result["candidate_patch_sha256"], sha(self.bundle.patch_path.read_bytes()))
+        self.assertTrue(result["requirement_traceability"]["complete"])
+        self.assertEqual(result["requirement_traceability"]["declared_source_item_count"], 7)
+        self.assertEqual(result["requirement_traceability"]["traced_source_item_count"], 7)
+        self.assertEqual(result["requirement_traceability"]["required_test_count"], 5)
+        self.assertEqual(result["requirement_traceability"]["traced_required_test_count"], 5)
+        baseline = result["per_test_baseline_oracle_alignment"]
+        self.assertTrue(baseline["complete"])
+        self.assertEqual(baseline["concrete_execution_count"], 5)
+        self.assertEqual(baseline["expected_status_count"], 5)
+        self.assertEqual(baseline["observed_status_count"], 5)
+        self.assertEqual(baseline["matching_status_count"], 5)
+        self.assertEqual(baseline["alignment_pct"], 100.0)
 
     def test_task_digest_must_match_out_of_band_pin(self) -> None:
         self.bundle.inputs = replace(self.bundle.inputs, expected_task_sha256="0" * 64)
@@ -314,6 +386,73 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.bundle.write(self.bundle.task_path, jbytes(task))
         self.bundle.refresh_task_hash()
         self.assert_issue(self.bundle.run_audit(), "execution_map_incomplete")
+
+    def test_scored_task_requires_traceability_inventory(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        del task["behavior_contract"]["requirement_traceability"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_traceability_missing")
+
+    def test_scored_task_must_trace_every_declared_invariant(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"] = [
+            row for row in task["behavior_contract"]["requirement_traceability"]
+            if row["source_kind"] != "invariant"
+        ]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "requirement_source_coverage_incomplete")
+        self.assertFalse(result["requirement_traceability"]["complete"])
+        self.assertLess(result["requirement_traceability"]["traced_source_item_count"], result["requirement_traceability"]["declared_source_item_count"])
+
+    def test_traceability_cannot_reference_undeclared_test(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"][0]["required_test_ids"] = ["logical.not.declared"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_unknown_test_id")
+        self.assert_issue(self.bundle.run_audit(), "requirement_test_inventory_incomplete")
+
+    def test_traceability_rejects_duplicate_test_ids_within_a_requirement(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        row = task["behavior_contract"]["requirement_traceability"][0]
+        row["required_test_ids"] = [row["required_test_ids"][0], row["required_test_ids"][0]]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_test_map_duplicate_test_id")
+
+    def test_traceability_must_cover_every_required_test(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        target = self.bundle.LOGICAL[-1][0]
+        for row in task["behavior_contract"]["requirement_traceability"]:
+            row["required_test_ids"] = [value for value in row["required_test_ids"] if value != target]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_test_inventory_incomplete")
+
+    def test_traceability_source_text_must_match_frozen_contract(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"][0]["source_text"] = "a more convenient requirement"
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_source_unmatched")
+
+    def test_traceability_observables_must_be_declared(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"][0]["observable_effects"] = ["invented_effect"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_observable_mismatch")
+
+    def test_requirement_ids_must_be_unique(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        trace = task["behavior_contract"]["requirement_traceability"]
+        trace[1]["requirement_id"] = trace[0]["requirement_id"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_id_duplicate")
 
     def test_wrong_runtime_image_is_rejected(self) -> None:
         self.bundle.receipt["environment"]["runtime_identity"]["immutable_image_id"] = "sha256:" + ("0" * 64)
@@ -371,6 +510,46 @@ class ReceiptAuditorTests(unittest.TestCase):
         for row in self.bundle.receipt["differential_checks"]:
             row["status"] = "not_applicable"
         self.assert_issue(self.bundle.run_audit(), "differential_effect_coverage_incomplete")
+
+    def test_unknown_concrete_test_in_baseline_expectations_is_rejected(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        row = task["oracle_contract"]["test_execution_map"][0]
+        row["baseline_expectations"][0]["execution_id"] = "not_a_mapped_execution"
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "baseline_expectation_unknown_execution")
+
+    def test_duplicate_baseline_expectation_for_same_execution_is_rejected(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        row = task["oracle_contract"]["test_execution_map"][0]
+        row["baseline_expectations"].append(copy.deepcopy(row["baseline_expectations"][0]))
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "baseline_expectation_duplicate_execution")
+
+    def test_empty_baseline_expectation_list_is_rejected(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["oracle_contract"]["test_execution_map"][0]["baseline_expectations"] = []
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "baseline_expectation_map_invalid")
+
+    def test_baseline_must_match_each_frozen_test_expectation(self) -> None:
+        raw = self.bundle.baseline_log().decode()
+        raw = raw.replace("test control_totals_contract ... FAILED", "test control_totals_contract ... ok")
+        encoded = raw.encode()
+        self.bundle.write(self.bundle.evidence / "logs/baseline.log", encoded)
+        task = json.loads(self.bundle.task_path.read_text())
+        task["oracle_contract"]["reference_evidence_sha256"]["baseline_log"] = sha(encoded)
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "baseline_expectation_mismatch")
+        baseline = result["per_test_baseline_oracle_alignment"]
+        self.assertFalse(baseline["complete"])
+        self.assertEqual(baseline["concrete_execution_count"], 5)
+        self.assertEqual(baseline["matching_status_count"], 4)
+        self.assertEqual(baseline["alignment_pct"], 80.0)
 
     def test_baseline_must_fail_preregistered_behavior_test(self) -> None:
         raw = (

@@ -52,11 +52,32 @@ def digest(raw: bytes) -> str:
 def sha256_path(path: Path) -> str:
     return digest(path.read_bytes())
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_non_finite_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant {value!r} rejected")
+
+
+def strict_json_loads(source: str) -> Any:
+    """Parse strict JSON without duplicate keys, NaN, or Infinity."""
+    return json.loads(
+        source,
+        object_pairs_hook=_reject_duplicate_json_keys,
+        parse_constant=_reject_non_finite_json_constant,
+    )
+
 
 def json_object(path: Path, label: str, issues: list[dict[str, str]]) -> dict[str, Any] | None:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        value = strict_json_loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
         issues.append({"code": "invalid_json", "message": f"{label}: {exc}"})
         return None
     if not isinstance(value, dict):
@@ -79,6 +100,172 @@ def schema_check(value: dict[str, Any], path: Path, label: str, issues: list[dic
     for error in errors:
         place = ".".join(map(str, error.absolute_path)) or "$"
         issues.append({"code": "schema_invalid", "message": f"{label} at {place}: {error.message}"})
+
+
+def requirement_traceability_issues(task: dict[str, Any]) -> list[dict[str, str]]:
+    """Require scored contracts to trace every declared requirement/effect to executable tests."""
+    classification = task.get("classification", {})
+    if not isinstance(classification, dict) or classification.get("exposure") not in ("private_holdout", "private_confirmatory"):
+        return []
+
+    behavior = task.get("behavior_contract", {})
+    oracle = task.get("oracle_contract", {})
+    if not isinstance(behavior, dict) or not isinstance(oracle, dict):
+        return [{"code": "requirement_traceability_missing", "message": "scored task requires behavior and oracle contracts"}]
+
+    raw_trace = behavior.get("requirement_traceability")
+    if not isinstance(raw_trace, list) or not raw_trace:
+        return [{"code": "requirement_traceability_missing", "message": "scored task must trace each task statement, invariant, allowed behavior change, and observable effect to executable tests"}]
+
+    expected_sources: set[tuple[str, str]] = set()
+    statement = behavior.get("task_statement")
+    if isinstance(statement, str) and statement:
+        expected_sources.add(("task_statement", statement))
+    for source_kind, field in (
+        ("invariant", "invariants"),
+        ("allowed_behavior_change", "allowed_behavior_changes"),
+        ("observable_effect", "observable_effects"),
+    ):
+        values = behavior.get(field, [])
+        if isinstance(values, list):
+            for value in values:
+                if isinstance(value, str) and value:
+                    expected_sources.add((source_kind, value))
+
+    declared_tests_value = oracle.get("required_test_ids", [])
+    declared_tests = {value for value in declared_tests_value if isinstance(value, str) and value}
+    issues: list[dict[str, str]] = []
+    seen_requirement_ids: set[str] = set()
+    seen_sources: set[tuple[str, str]] = set()
+    traced_tests: set[str] = set()
+    declared_effects_value = behavior.get("observable_effects", [])
+    declared_effects = {value for value in declared_effects_value if isinstance(value, str)}
+
+    for index, row in enumerate(raw_trace):
+        label = f"behavior_contract.requirement_traceability[{index}]"
+        if not isinstance(row, dict):
+            issues.append({"code": "requirement_traceability_invalid", "message": f"{label} must be an object"})
+            continue
+        requirement_id = row.get("requirement_id")
+        if not isinstance(requirement_id, str) or not requirement_id:
+            issues.append({"code": "requirement_traceability_invalid", "message": f"{label} has no requirement_id"})
+        elif requirement_id in seen_requirement_ids:
+            issues.append({"code": "requirement_id_duplicate", "message": f"duplicate requirement ID {requirement_id!r}"})
+        else:
+            seen_requirement_ids.add(requirement_id)
+
+        source_kind = row.get("source_kind")
+        source_text = row.get("source_text")
+        source_key = (source_kind, source_text) if isinstance(source_kind, str) and isinstance(source_text, str) else None
+        if source_key is None or source_key not in expected_sources:
+            issues.append({"code": "requirement_source_unmatched", "message": f"{label} must match a declared task statement, invariant, allowed behavior change, or observable effect"})
+        else:
+            if source_key in seen_sources:
+                issues.append({"code": "requirement_source_duplicate", "message": f"declared source {source_kind!r} is mapped more than once"})
+            seen_sources.add(source_key)
+
+        test_ids = row.get("required_test_ids")
+        if not isinstance(test_ids, list) or not test_ids or any(not isinstance(value, str) or not value for value in test_ids):
+            issues.append({"code": "requirement_test_map_invalid", "message": f"{label} requires one or more concrete logical test IDs"})
+        else:
+            if len(test_ids) != len(set(test_ids)):
+                issues.append({"code": "requirement_test_map_duplicate_test_id", "message": f"{label} repeats a logical test ID"})
+            for test_id in test_ids:
+                if test_id not in declared_tests:
+                    issues.append({"code": "requirement_unknown_test_id", "message": f"{label} references undeclared test ID {test_id!r}"})
+                traced_tests.add(test_id)
+
+        effects = row.get("observable_effects")
+        if not isinstance(effects, list) or not effects or any(not isinstance(value, str) or not value for value in effects):
+            issues.append({"code": "requirement_observable_mismatch", "message": f"{label} must declare at least one observable effect"})
+        else:
+            undeclared = sorted(set(effects) - declared_effects)
+            if undeclared:
+                issues.append({"code": "requirement_observable_mismatch", "message": f"{label} references undeclared observable effects: {undeclared}"})
+            if source_kind == "observable_effect" and source_text not in effects:
+                issues.append({"code": "requirement_observable_mismatch", "message": f"{label} must measure its source observable effect"})
+
+    missing_sources = expected_sources - seen_sources
+    if missing_sources:
+        examples = sorted(f"{kind}:{value}" for kind, value in missing_sources)[:5]
+        issues.append({"code": "requirement_source_coverage_incomplete", "message": f"{len(missing_sources)} declared contract item(s) lack a requirement-to-test trace: {examples}"})
+    missing_tests = declared_tests - traced_tests
+    extra_tests = traced_tests - declared_tests
+    if missing_tests or extra_tests:
+        issues.append({"code": "requirement_test_inventory_incomplete", "message": f"traceability must cover every required test exactly within the declared inventory; missing={sorted(missing_tests)}, extra={sorted(extra_tests)}"})
+    return issues
+
+
+def requirement_traceability_summary(task: dict[str, Any], issues: list[dict[str, str]]) -> dict[str, Any]:
+    """Return coverage counts for reporting without granting eligibility."""
+    behavior = task.get("behavior_contract", {})
+    oracle = task.get("oracle_contract", {})
+    behavior = behavior if isinstance(behavior, dict) else {}
+    oracle = oracle if isinstance(oracle, dict) else {}
+    expected_sources: set[tuple[str, str]] = set()
+    statement = behavior.get("task_statement")
+    if isinstance(statement, str) and statement:
+        expected_sources.add(("task_statement", statement))
+    for source_kind, field in (
+        ("invariant", "invariants"),
+        ("allowed_behavior_change", "allowed_behavior_changes"),
+        ("observable_effect", "observable_effects"),
+    ):
+        values = behavior.get(field, [])
+        if isinstance(values, list):
+            expected_sources.update((source_kind, value) for value in values if isinstance(value, str) and value)
+
+    trace = behavior.get("requirement_traceability", [])
+    trace = trace if isinstance(trace, list) else []
+    seen_sources = {
+        (row.get("source_kind"), row.get("source_text"))
+        for row in trace
+        if isinstance(row, dict) and isinstance(row.get("source_kind"), str) and isinstance(row.get("source_text"), str)
+    }
+    required_value = oracle.get("required_test_ids", [])
+    required_tests = {value for value in required_value if isinstance(value, str) and value} if isinstance(required_value, list) else set()
+    traced_tests = {
+        test_id
+        for row in trace if isinstance(row, dict)
+        for test_id in (row.get("required_test_ids") if isinstance(row.get("required_test_ids"), list) else [])
+        if isinstance(test_id, str) and test_id
+    }
+    trace_failed = any(issue.get("code", "").startswith("requirement_") for issue in issues)
+    return {
+        "declared_source_item_count": len(expected_sources),
+        "traced_source_item_count": len(expected_sources & seen_sources),
+        "required_test_count": len(required_tests),
+        "traced_required_test_count": len(required_tests & traced_tests),
+        "complete": not trace_failed and expected_sources == seen_sources and required_tests == traced_tests,
+    }
+
+
+def baseline_alignment_summary(
+    mapping: dict[str, list[str]],
+    expected: dict[str, str],
+    observed: dict[str, str],
+) -> dict[str, Any]:
+    """Summarize per-test baseline-oracle alignment; never grants eligibility."""
+    concrete_ids = [execution_id for execution_ids in mapping.values() for execution_id in execution_ids]
+    expected_count = sum(1 for execution_id in concrete_ids if expected.get(execution_id) in ("passed", "failed"))
+    observed_count = sum(1 for execution_id in concrete_ids if observed.get(execution_id) in ("ok", "FAILED"))
+    matching_count = sum(
+        1 for execution_id in concrete_ids
+        if (
+            expected.get(execution_id) == "passed" and observed.get(execution_id) == "ok"
+        ) or (
+            expected.get(execution_id) == "failed" and observed.get(execution_id) == "FAILED"
+        )
+    )
+    denominator = len(concrete_ids)
+    return {
+        "concrete_execution_count": denominator,
+        "expected_status_count": expected_count,
+        "observed_status_count": observed_count,
+        "matching_status_count": matching_count,
+        "alignment_pct": (100.0 * matching_count / denominator) if denominator else None,
+        "complete": denominator > 0 and expected_count == denominator and observed_count == denominator and matching_count == denominator,
+    }
 
 
 def evidence_path(root: Path, relative: Any, label: str, issues: list[dict[str, str]]) -> Path | None:
@@ -166,6 +353,8 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
     schema_check(receipt, inputs.receipt_schema, "receipt", issues)
     if any(issue["code"].startswith("schema_") for issue in issues):
         return {"schema_version": "vleb-independent-audit-v1", "eligible": False, "verdict": "fail", "issues": issues}
+    issues.extend(requirement_traceability_issues(task))
+    traceability_summary = requirement_traceability_summary(task, issues)
 
     # The receipt cannot choose its own trust roots: the evaluator supplies these pins independently.
     for label, path, claimed, pin in (
@@ -220,6 +409,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
     required_ids = oracle.get("required_test_ids", [])
     mapping: dict[str, list[str]] = {}
     owner: dict[str, str] = {}
+    baseline_expectations: dict[str, str] = {}
     for row in execution_rows:
         tid = row.get("test_id")
         execution_ids = row.get("execution_ids", [])
@@ -230,6 +420,34 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
             issues.append({"code": "invalid_execution_map", "message": f"{tid!r} needs concrete test names"})
             continue
         mapping[tid] = execution_ids
+        expectation_rows = row.get("baseline_expectations")
+        if expectation_rows is not None:
+            if not isinstance(expectation_rows, list) or not expectation_rows:
+                issues.append({"code": "baseline_expectation_map_invalid", "message": f"{tid!r} needs non-empty baseline expectations"})
+            else:
+                expected_in_row: dict[str, str] = {}
+                for expectation in expectation_rows:
+                    if not isinstance(expectation, dict):
+                        issues.append({"code": "baseline_expectation_map_invalid", "message": f"{tid!r} contains a non-object baseline expectation"})
+                        continue
+                    execution_id = expectation.get("execution_id")
+                    expected_status = expectation.get("expected_status")
+                    if not isinstance(execution_id, str) or execution_id not in execution_ids:
+                        issues.append({"code": "baseline_expectation_unknown_execution", "message": f"{tid!r} has an expectation for an unmapped execution ID"})
+                        continue
+                    if expected_status not in ("passed", "failed"):
+                        issues.append({"code": "baseline_expectation_status_invalid", "message": f"{tid!r} must expect passed or failed for {execution_id!r}"})
+                        continue
+                    if execution_id in expected_in_row:
+                        issues.append({"code": "baseline_expectation_duplicate_execution", "message": f"{tid!r} repeats a baseline expectation for {execution_id!r}"})
+                        continue
+                    expected_in_row[execution_id] = expected_status
+                if set(expected_in_row) != set(execution_ids):
+                    issues.append({"code": "baseline_expectation_map_incomplete", "message": f"{tid!r} must declare baseline expectations for every concrete execution ID"})
+                for execution_id, expected_status in expected_in_row.items():
+                    if execution_id in baseline_expectations:
+                        issues.append({"code": "baseline_expectation_execution_reused", "message": f"baseline expectation for {execution_id!r} is declared more than once"})
+                    baseline_expectations[execution_id] = expected_status
         for name in execution_ids:
             if name in owner and owner[name] != tid:
                 issues.append({"code": "execution_mapping_reused", "message": f"concrete test {name!r} is mapped to more than one logical ID"})
@@ -239,6 +457,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
 
     ref_hashes = oracle.get("reference_evidence_sha256", {})
     ref_paths = oracle.get("reference_evidence_artifacts", {})
+    baseline_observed: dict[str, str] = {}
     for name in ("baseline_log", "reference_log", "reference_patch", "test_bundle"):
         if name not in ref_hashes or name not in ref_paths:
             issues.append({"code": "oracle_control_evidence_missing", "message": f"task lacks reference evidence path/hash for {name}"})
@@ -248,9 +467,24 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
             continue
         if name == "baseline_log":
             tests = parse_test_log(raw)
+            baseline_observed = tests
             mapped = {test for rows in mapping.values() for test in rows}
             if not any(tests.get(test) == "FAILED" for test in mapped) or b"test result: FAILED" not in raw:
                 issues.append({"code": "baseline_control_not_demonstrated", "message": "baseline must fail a preregistered behavior test"})
+            if classification.get("exposure") in ("private_holdout", "private_confirmatory"):
+                for logical_id, execution_ids in mapping.items():
+                    for execution_id in execution_ids:
+                        expected_status = baseline_expectations.get(execution_id)
+                        observed_status = tests.get(execution_id)
+                        if expected_status is None:
+                            issues.append({"code": "baseline_expectation_missing", "message": f"no frozen baseline expectation for {logical_id!r}/{execution_id!r}"})
+                            continue
+                        expected_observed = "ok" if expected_status == "passed" else "FAILED"
+                        if observed_status != expected_observed:
+                            issues.append({
+                                "code": "baseline_expectation_mismatch",
+                                "message": f"{logical_id!r}/{execution_id!r}: expected baseline {expected_status}, observed {observed_status!r}",
+                            })
         if name == "reference_log":
             tests = parse_test_log(raw)
             missing = sorted(test for rows in mapping.values() for test in rows if tests.get(test) != "ok")
@@ -418,11 +652,16 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
         "eligible": eligible,
         "verdict": "pass" if eligible else ("unresolved" if any(row["code"].startswith(unresolved_prefixes) for row in issues) else "fail"),
         "receipt_sha256": digest(inputs.receipt.read_bytes()),
+        "task_contract_sha256": inputs.expected_task_sha256,
+        "protocol_sha256": inputs.expected_protocol_sha256,
+        "candidate_patch_sha256": inputs.expected_candidate_patch_sha256,
         "auditor_sha256": digest(Path(__file__).read_bytes()),
         "task_id": task.get("task_id"),
         "expected_revision": inputs.expected_revision,
         "expected_image_id": inputs.expected_image_id,
         "required_test_count": len(required_ids),
+        "requirement_traceability": traceability_summary,
+        "per_test_baseline_oracle_alignment": baseline_alignment_summary(mapping, baseline_expectations, baseline_observed),
         "observed_test_result_count": len(results),
         "required_mutation_count": len(expected_active),
         "observed_mutation_result_count": len(mutation_rows),
