@@ -1246,6 +1246,6 @@ mod tests {
         let raw = serde_json::to_vec_pretty(&value).unwrap();
         let error = generate_task_set_bytes(&raw, &seed, &config)
             .expect_err("the manifest and config family sets differ");
-        assert!(error.contains("families must equal"));
+        assert!(error.contains("recipe kind semantic_invariance must use family_id semantic_invariance"));
     }
 }
