@@ -505,6 +505,24 @@ mod tests {
     }
 
     #[test]
+    fn every_single_bit_flip_in_v2_wire_frames_is_rejected() {
+        let frames = fragment_v2(0xBEEF, &sample(2133, 0xC0FFEE)).unwrap();
+        for (frame_index, frame) in frames.iter().enumerate() {
+            let wire = frame.to_bytes();
+            for byte_index in 0..wire.len() {
+                for bit_index in 0..8 {
+                    let mut corrupted = wire.clone();
+                    corrupted[byte_index] ^= 1u8 << bit_index;
+                    assert!(
+                        LoRaFragmentV2::from_bytes(&corrupted).is_none(),
+                        "single-bit corruption accepted: frame={frame_index}, byte={byte_index}, bit={bit_index}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn caller_buffer_serialization_matches_vec_and_rejects_short_output_atomically() {
         let frames = fragment_v2(0x5eed, &sample(2105, 42)).unwrap();
         for frame in frames {
