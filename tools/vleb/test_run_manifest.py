@@ -90,6 +90,10 @@ def valid_manifest() -> dict[str, Any]:
             "auditor_sha256": h("6"),
             "schema_path": "legacy-claim-evidence.schema.json",
             "schema_sha256": h("7"),
+            "witness_receipt_schema_path": "witness-execution-receipt.schema.json",
+            "witness_receipt_schema_sha256": h("a"),
+            "witness_receipt_producer_path": "record_witness_execution.py",
+            "witness_receipt_producer_sha256": h("b"),
             "claims": [{
                 "claim_id": "COPY.BANK.REC",
                 "claim_path": "claims/COPY.BANK.REC.json",
