@@ -20,6 +20,7 @@ on:
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
+      - "docs/research/INFORMATIVE_MISSINGNESS_PARTIAL_IDENTIFICATION.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
   push:
     branches: [main]
@@ -41,6 +42,7 @@ on:
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
+      - "docs/research/INFORMATIVE_MISSINGNESS_PARTIAL_IDENTIFICATION.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
   workflow_dispatch:
 
