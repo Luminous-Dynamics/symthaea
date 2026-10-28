@@ -61,6 +61,7 @@ pub mod motif;
 pub mod motif_family;
 pub mod motif_foundry;
 pub mod motif_return;
+pub mod edit_locality;
 pub mod obligation;
 pub mod opera;
 pub mod passacaglia;
@@ -108,6 +109,11 @@ pub use melodic_contour_identity::{
 };
 pub use meter::{MeterError, TimeSignature};
 pub use motif::{Contour, Motif, MotifNote};
+pub use edit_locality::{
+    EDIT_LOCALITY_CONTRACT_VERSION, EditLocalityConfig, EditLocalityError, EditLocalityEvidence,
+    EditOperation, EditRequest, LocalityEvent, PropertyCheck, MAX_EDIT_LOCALITY_EVENTS,
+    verify_edit_locality, verify_edit_locality_with_config,
+};
 pub use motif_foundry::{
     FoundryConfig, FoundryDiversityReport, canonical_fingerprint, config_for_dna,
     foundry_diversity_report, generate_candidate, generate_family, generate_with_foundry,
