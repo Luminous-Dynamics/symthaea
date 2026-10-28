@@ -133,7 +133,6 @@ fn assess(
         calibration_created_at_epoch_seconds: 100,
         decision_time_epoch_seconds: 200,
         max_calibration_age_seconds: 1_000,
-        latest_monitor_observation_epoch_seconds: Some(190),
         max_monitor_observation_age_seconds: 30,
     })
 }
