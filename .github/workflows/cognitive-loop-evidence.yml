@@ -380,6 +380,7 @@ jobs:
           jq -e '
             .run_kind == "synthetic-not-measured" and
             .scenario_id == "abrupt" and
+            .comparison_track == "observed-outcome" and
             .ticks == 64 and
             (.receipt_sha256 | length) == 64 and
             (.score_sha256 | length) == 64 and
