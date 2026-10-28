@@ -9,7 +9,9 @@
 //! Callers should calibrate separately by regime/time block when pooling would hide
 //! heterogeneity, and should take a documented envelope over regimes if required.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::aviation_calibration_protocol::EvaluationPartition;
 
 /// Probability scale, in parts per million.
 pub const PROBABILITY_SCALE_PPM: u32 = 1_000_000;
@@ -38,6 +40,17 @@ pub enum RadiusCalibrationError {
     EmptyRegimeId,
     DuplicateRegimeId { regime_id: String },
     FailureProbabilityTooSmallForRegimeCount { failure_probability_ppm: u32, regime_count: usize },
+    NonCalibrationPartition { record_id: String, partition: EvaluationPartition },
+    DuplicateRecordId { record_id: String },
+    DuplicateEventClusterId { event_cluster_id: String },
+    UnknownRegime { regime_id: String },
+    EmptyNominalDistribution { regime_id: String },
+    DuplicateNominalRegime { regime_id: String },
+    DuplicateNominalScenarioId { regime_id: String, scenario_id: String },
+    InvalidNominalScenarioProbability { regime_id: String, scenario_id: String, probability_ppm: u32 },
+    NominalRegimeProbabilityMassMismatch { regime_id: String, actual_ppm: u64 },
+    ObservedScenarioOutsideNominalSupport { regime_id: String, scenario_id: String },
+    RegimeHasNoCalibrationEpisodes { regime_id: String },
     ArithmeticOverflow,
 }
 
@@ -179,6 +192,186 @@ fn div_ceil_nonnegative(
     Ok(adjusted / denominator)
 }
 
+
+/// One independently counted event episode from a declared data partition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CalibrationEpisode {
+    pub record_id: String,
+    pub event_cluster_id: String,
+    pub regime_id: String,
+    pub observed_scenario_id: String,
+    pub partition: EvaluationPartition,
+}
+
+/// One category's frozen nominal probability within a regime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NominalScenarioProbability {
+    pub scenario_id: String,
+    pub probability_ppm: u32,
+}
+
+/// Frozen nominal scenario distribution for one regime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegimeNominalDistribution {
+    pub regime_id: String,
+    pub probabilities: Vec<NominalScenarioProbability>,
+}
+
+/// Build regime-specific frequency counts from event-level Calibration records,
+/// then calibrate the simultaneous maximum radius across regimes.
+///
+/// This is the preferred path over hand-entered aggregate counts when episode-level
+/// provenance is available. Each event cluster must appear exactly once and every
+/// row must belong to Calibration; train/validation/test rows cannot influence the
+/// estimated radius. The source/event labels themselves are not authenticated.
+pub fn calibrate_tv_radius_from_episodes(
+    episodes: &[CalibrationEpisode],
+    nominal_distributions: &[RegimeNominalDistribution],
+    family_failure_probability_ppm: u32,
+) -> Result<TvRadiusEnvelopeReport, RadiusCalibrationError> {
+    if episodes.is_empty() {
+        return Err(RadiusCalibrationError::ZeroCalibrationEpisodes);
+    }
+    if nominal_distributions.is_empty() {
+        return Err(RadiusCalibrationError::EmptyRegimeSet);
+    }
+
+    let mut seen_records = BTreeSet::new();
+    let mut seen_clusters = BTreeSet::new();
+    let mut regime_episode_counts: BTreeMap<String, u64> = BTreeMap::new();
+    let mut observed_counts: BTreeMap<(String, String), u64> = BTreeMap::new();
+
+    let mut nominal_by_regime: BTreeMap<String, &RegimeNominalDistribution> = BTreeMap::new();
+    for distribution in nominal_distributions {
+        if distribution.regime_id.trim().is_empty() {
+            return Err(RadiusCalibrationError::EmptyRegimeId);
+        }
+        if distribution.probabilities.is_empty() {
+            return Err(RadiusCalibrationError::EmptyNominalDistribution {
+                regime_id: distribution.regime_id.clone(),
+            });
+        }
+        if nominal_by_regime
+            .insert(distribution.regime_id.clone(), distribution)
+            .is_some()
+        {
+            return Err(RadiusCalibrationError::DuplicateNominalRegime {
+                regime_id: distribution.regime_id.clone(),
+            });
+        }
+
+        let mut category_ids = BTreeSet::new();
+        let mut sum = 0_u64;
+        for probability in &distribution.probabilities {
+            if probability.scenario_id.trim().is_empty() {
+                return Err(RadiusCalibrationError::EmptyScenarioId);
+            }
+            if !category_ids.insert(probability.scenario_id.as_str()) {
+                return Err(RadiusCalibrationError::DuplicateNominalScenarioId {
+                    regime_id: distribution.regime_id.clone(),
+                    scenario_id: probability.scenario_id.clone(),
+                });
+            }
+            if probability.probability_ppm > PROBABILITY_SCALE_PPM {
+                return Err(RadiusCalibrationError::InvalidNominalScenarioProbability {
+                    regime_id: distribution.regime_id.clone(),
+                    scenario_id: probability.scenario_id.clone(),
+                    probability_ppm: probability.probability_ppm,
+                });
+            }
+            sum += u64::from(probability.probability_ppm);
+        }
+        if sum != u64::from(PROBABILITY_SCALE_PPM) {
+            return Err(RadiusCalibrationError::NominalRegimeProbabilityMassMismatch {
+                regime_id: distribution.regime_id.clone(),
+                actual_ppm: sum,
+            });
+        }
+    }
+
+    for episode in episodes {
+        if episode.partition != EvaluationPartition::Calibration {
+            return Err(RadiusCalibrationError::NonCalibrationPartition {
+                record_id: episode.record_id.clone(),
+                partition: episode.partition,
+            });
+        }
+        if episode.record_id.trim().is_empty() {
+            return Err(RadiusCalibrationError::EmptyRecordId);
+        }
+        if !seen_records.insert(episode.record_id.as_str()) {
+            return Err(RadiusCalibrationError::DuplicateRecordId {
+                record_id: episode.record_id.clone(),
+            });
+        }
+        if episode.event_cluster_id.trim().is_empty() {
+            return Err(RadiusCalibrationError::EmptyEventClusterId);
+        }
+        if !seen_clusters.insert(episode.event_cluster_id.as_str()) {
+            return Err(RadiusCalibrationError::DuplicateEventClusterId {
+                event_cluster_id: episode.event_cluster_id.clone(),
+            });
+        }
+        if episode.regime_id.trim().is_empty() {
+            return Err(RadiusCalibrationError::EmptyRegimeId);
+        }
+        if episode.observed_scenario_id.trim().is_empty() {
+            return Err(RadiusCalibrationError::EmptyScenarioId);
+        }
+
+        let distribution = nominal_by_regime
+            .get(&episode.regime_id)
+            .ok_or_else(|| RadiusCalibrationError::UnknownRegime {
+                regime_id: episode.regime_id.clone(),
+            })?;
+        if !distribution
+            .probabilities
+            .iter()
+            .any(|p| p.scenario_id == episode.observed_scenario_id)
+        {
+            return Err(RadiusCalibrationError::ObservedScenarioOutsideNominalSupport {
+                regime_id: episode.regime_id.clone(),
+                scenario_id: episode.observed_scenario_id.clone(),
+            });
+        }
+
+        let regime_count = regime_episode_counts.entry(episode.regime_id.clone()).or_default();
+        *regime_count = regime_count
+            .checked_add(1)
+            .ok_or(RadiusCalibrationError::CountTotalOverflow)?;
+        let scenario_count = observed_counts
+            .entry((episode.regime_id.clone(), episode.observed_scenario_id.clone()))
+            .or_default();
+        *scenario_count = scenario_count
+            .checked_add(1)
+            .ok_or(RadiusCalibrationError::CountTotalOverflow)?;
+    }
+
+    let mut regimes = Vec::with_capacity(nominal_distributions.len());
+    for (regime_id, distribution) in nominal_by_regime {
+        if !regime_episode_counts.contains_key(&regime_id) {
+            return Err(RadiusCalibrationError::RegimeHasNoCalibrationEpisodes {
+                regime_id,
+            });
+        }
+
+        let frequencies = distribution
+            .probabilities
+            .iter()
+            .map(|probability| CalibrationFrequency {
+                scenario_id: probability.scenario_id.clone(),
+                nominal_probability_ppm: probability.probability_ppm,
+                observed_count: observed_counts
+                    .get(&(distribution.regime_id.clone(), probability.scenario_id.clone()))
+                    .copied()
+                    .unwrap_or(0),
+            })
+            .collect();
+        regimes.push(RegimeCalibration { regime_id, frequencies });
+    }
+
+    calibrate_tv_radius_envelope(&regimes, family_failure_probability_ppm)
+}
 
 /// A regime-specific calibration set, e.g. a weather/airport cohort or season.
 /// Frequencies must count complete event episodes, not duplicated flight rows.
@@ -521,5 +714,127 @@ mod tests {
         ));
     }
 
+
+
+    fn nominal_distribution(regime_id: &str) -> RegimeNominalDistribution {
+        RegimeNominalDistribution {
+            regime_id: regime_id.into(),
+            probabilities: vec![
+                NominalScenarioProbability { scenario_id: "routine".into(), probability_ppm: 600_000 },
+                NominalScenarioProbability { scenario_id: "capacity".into(), probability_ppm: 300_000 },
+                NominalScenarioProbability { scenario_id: "weather".into(), probability_ppm: 100_000 },
+            ],
+        }
+    }
+
+    fn episode(id: &str, regime: &str, scenario: &str) -> CalibrationEpisode {
+        CalibrationEpisode {
+            record_id: format!("record-{id}"),
+            event_cluster_id: format!("cluster-{id}"),
+            regime_id: regime.into(),
+            observed_scenario_id: scenario.into(),
+            partition: EvaluationPartition::Calibration,
+        }
+    }
+
+    #[test]
+    fn event_level_calibration_counts_observations_and_builds_regime_envelope() {
+        let mut events = Vec::new();
+        for (index, scenario) in ["routine", "routine", "capacity", "weather"].into_iter().enumerate() {
+            events.push(episode(&index.to_string(), "airport-a", scenario));
+        }
+        for (index, scenario) in ["routine", "capacity", "weather", "weather"].into_iter().enumerate() {
+            events.push(episode(&format!("b-{index}"), "airport-b", scenario));
+        }
+        let report = calibrate_tv_radius_from_episodes(
+            &events,
+            &[nominal_distribution("airport-a"), nominal_distribution("airport-b")],
+            50_000,
+        ).unwrap();
+        assert_eq!(report.regime_count, 2);
+        assert_eq!(report.per_regime_failure_probability_ppm, 25_000);
+        assert_eq!(report.regimes[0].report.calibration_episode_count, 4);
+        assert_eq!(report.regimes[1].report.calibration_episode_count, 4);
+        assert!(report.regimes[0].report.empirical_tv_distance_ppm > 0);
+    }
+
+    #[test]
+    fn event_level_calibration_rejects_test_or_validation_rows() {
+        for partition in [EvaluationPartition::Training, EvaluationPartition::Validation, EvaluationPartition::Test] {
+            let mut event = episode("x", "airport-a", "routine");
+            event.partition = partition;
+            assert!(matches!(
+                calibrate_tv_radius_from_episodes(&[event], &[nominal_distribution("airport-a")], 50_000),
+                Err(RadiusCalibrationError::NonCalibrationPartition { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn event_level_calibration_rejects_duplicate_record_and_cluster_ids() {
+        let a = episode("a", "airport-a", "routine");
+        let mut duplicate_record = episode("b", "airport-a", "capacity");
+        duplicate_record.record_id = a.record_id.clone();
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(&[a.clone(), duplicate_record], &[nominal_distribution("airport-a")], 50_000),
+            Err(RadiusCalibrationError::DuplicateRecordId { .. })
+        ));
+
+        let mut duplicate_cluster = episode("b", "airport-a", "capacity");
+        duplicate_cluster.event_cluster_id = a.event_cluster_id.clone();
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(&[a, duplicate_cluster], &[nominal_distribution("airport-a")], 50_000),
+            Err(RadiusCalibrationError::DuplicateEventClusterId { .. })
+        ));
+    }
+
+    #[test]
+    fn event_level_calibration_rejects_unknown_regime_or_scenario() {
+        let unknown_regime = episode("a", "not-declared", "routine");
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(&[unknown_regime], &[nominal_distribution("airport-a")], 50_000),
+            Err(RadiusCalibrationError::UnknownRegime { .. })
+        ));
+        let unknown_scenario = episode("b", "airport-a", "unexpected");
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(&[unknown_scenario], &[nominal_distribution("airport-a")], 50_000),
+            Err(RadiusCalibrationError::ObservedScenarioOutsideNominalSupport { .. })
+        ));
+    }
+
+    #[test]
+    fn every_declared_regime_requires_calibration_evidence() {
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(
+                &[episode("a", "airport-a", "routine")],
+                &[nominal_distribution("airport-a"), nominal_distribution("airport-b")],
+                50_000
+            ),
+            Err(RadiusCalibrationError::RegimeHasNoCalibrationEpisodes { .. })
+        ));
+    }
+
+    #[test]
+    fn nominal_regime_support_and_mass_are_validated() {
+        let duplicate = RegimeNominalDistribution {
+            regime_id: "airport-a".into(),
+            probabilities: vec![
+                NominalScenarioProbability { scenario_id: "x".into(), probability_ppm: 500_000 },
+                NominalScenarioProbability { scenario_id: "x".into(), probability_ppm: 500_000 },
+            ],
+        };
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(&[episode("a", "airport-a", "x")], &[duplicate], 50_000),
+            Err(RadiusCalibrationError::DuplicateNominalScenarioId { .. })
+        ));
+        let bad_mass = RegimeNominalDistribution {
+            regime_id: "airport-a".into(),
+            probabilities: vec![NominalScenarioProbability { scenario_id: "x".into(), probability_ppm: 900_000 }],
+        };
+        assert!(matches!(
+            calibrate_tv_radius_from_episodes(&[episode("b", "airport-a", "x")], &[bad_mass], 50_000),
+            Err(RadiusCalibrationError::NominalRegimeProbabilityMassMismatch { .. })
+        ));
+    }
 
 }
