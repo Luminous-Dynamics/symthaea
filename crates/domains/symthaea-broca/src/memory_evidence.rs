@@ -88,6 +88,55 @@ pub struct MemoryContextItem {
     pub value: String,
 }
 
+/// Deterministic BM25 retrieval settings for the lexical evidence baseline.
+/// This is a transparent baseline, not a semantic encoder.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bm25Config {
+    /// Term-frequency saturation parameter; must be finite and positive.
+    pub k1: f64,
+    /// Document-length normalization in [0, 1].
+    pub b: f64,
+    /// Maximum number of evidence items returned.
+    pub max_items: usize,
+}
+
+impl Default for Bm25Config {
+    fn default() -> Self {
+        Self {
+            k1: 1.2,
+            b: 0.75,
+            max_items: 5,
+        }
+    }
+}
+
+impl Bm25Config {
+    fn validate(&self) -> Result<(), String> {
+        if !self.k1.is_finite() || self.k1 <= 0.0 {
+            return Err("BM25 k1 must be finite and positive".into());
+        }
+        if !self.b.is_finite() || !(0.0..=1.0).contains(&self.b) {
+            return Err("BM25 b must be finite and in [0, 1]".into());
+        }
+        if self.max_items == 0 {
+            return Err("BM25 max_items must be positive".into());
+        }
+        Ok(())
+    }
+}
+
+/// A scored evidence candidate. Keep this metadata outside the reader context;
+/// the adapter should pass only `context` as a benchmark MemoryContextItem.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LexicalEvidenceHit {
+    pub hdc_id: u64,
+    pub evidence_id: String,
+    pub source: EvidenceSource,
+    pub content_sha256: String,
+    pub bm25_score: f64,
+    pub context: MemoryContextItem,
+}
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -282,6 +331,130 @@ impl EvidenceIndex {
         old.validate()
     }
 
+
+    /// Search active, in-scope text evidence using deterministic BM25 ranking.
+    ///
+    /// The candidate corpus is filtered by lifecycle, scope, validity window and
+    /// structural validation before document frequency statistics are computed.
+    /// Text digests are verified before they can affect ranking. Images are
+    /// intentionally excluded from this lexical arm. Unknown query terms return
+    /// no hit; ties use ascending HDC ID so repeated runs are reproducible.
+    ///
+    /// This establishes a simple non-semantic baseline before any HDC/text encoder
+    /// is evaluated. It does not use gold answers or benchmark question metadata.
+    pub fn search_bm25(
+        &self,
+        query: &str,
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: &Path,
+        config: Bm25Config,
+    ) -> Result<Vec<LexicalEvidenceHit>, String> {
+        config.validate()?;
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+
+        let query_terms: BTreeSet<String> = tokenize_lexical(query).into_iter().collect();
+        if query_terms.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        struct IndexedText {
+            hdc_id: u64,
+            evidence_id: String,
+            source: EvidenceSource,
+            content_sha256: String,
+            context: MemoryContextItem,
+            terms: BTreeMap<String, usize>,
+            length: usize,
+        }
+
+        let mut documents = Vec::new();
+        for (hdc_id, record) in &self.records {
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            if !matches!(record.payload, EvidencePayload::Text { .. }) {
+                continue;
+            }
+
+            // Verify stored bytes before they can influence either DF or score.
+            let context = record.context_item(payload_root)?;
+            let tokens = tokenize_lexical(&context.value);
+            if tokens.is_empty() {
+                continue;
+            }
+            let mut terms = BTreeMap::new();
+            for token in tokens.iter() {
+                *terms.entry(token.clone()).or_insert(0usize) += 1;
+            }
+            documents.push(IndexedText {
+                hdc_id: *hdc_id,
+                evidence_id: record.evidence_id.clone(),
+                source: record.source.clone(),
+                content_sha256: record.content_sha256.clone(),
+                context,
+                terms,
+                length: tokens.len(),
+            });
+        }
+
+        if documents.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let document_count = documents.len() as f64;
+        let average_length = documents.iter().map(|doc| doc.length as f64).sum::<f64>()
+            / document_count;
+        if !average_length.is_finite() || average_length <= 0.0 {
+            return Ok(Vec::new());
+        }
+
+        let mut document_frequency: BTreeMap<String, usize> = BTreeMap::new();
+        for document in &documents {
+            for term in document.terms.keys() {
+                *document_frequency.entry(term.clone()).or_insert(0) += 1;
+            }
+        }
+
+        let mut hits = Vec::new();
+        for document in documents {
+            let mut score = 0.0f64;
+            for term in &query_terms {
+                let Some(&term_frequency) = document.terms.get(term) else {
+                    continue;
+                };
+                let df = *document_frequency.get(term).unwrap_or(&0) as f64;
+                let idf = (1.0 + (document_count - df + 0.5) / (df + 0.5)).ln();
+                let tf = term_frequency as f64;
+                let length_norm = config.k1
+                    * (1.0 - config.b + config.b * document.length as f64 / average_length);
+                score += idf * (tf * (config.k1 + 1.0)) / (tf + length_norm);
+            }
+
+            if score > 0.0 && score.is_finite() {
+                hits.push(LexicalEvidenceHit {
+                    hdc_id: document.hdc_id,
+                    evidence_id: document.evidence_id,
+                    source: document.source,
+                    content_sha256: document.content_sha256,
+                    bm25_score: score,
+                    context: document.context,
+                });
+            }
+        }
+
+        hits.sort_by(|left, right| {
+            right
+                .bm25_score
+                .total_cmp(&left.bm25_score)
+                .then_with(|| left.hdc_id.cmp(&right.hdc_id))
+        });
+        hits.truncate(config.max_items);
+        Ok(hits)
+    }
+
     /// Resolve ranked HDC IDs to safe context items. Missing IDs, duplicates,
     /// inactive records, invalid times and cross-scope records are skipped.
     /// A present but corrupt payload is an error, not accepted evidence.
@@ -320,6 +493,25 @@ impl EvidenceIndex {
         }
         Ok(output)
     }
+}
+
+
+/// Lowercase Unicode alphanumeric tokens; punctuation and whitespace delimit terms.
+/// Kept intentionally small and deterministic so the baseline has no model dependency.
+fn tokenize_lexical(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for character in text.chars() {
+        if character.is_alphanumeric() {
+            current.extend(character.to_lowercase());
+        } else if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
 }
 
 fn resolve_image_path(payload_root: &Path, path: &str) -> Result<PathBuf, String> {
@@ -379,6 +571,108 @@ mod tests {
             valid_until_unix_ms: None,
             superseded_by: None,
         }
+    }
+
+
+    fn insert_text(index: &mut EvidenceIndex, id: u64, text: &str, scope: &str) {
+        index
+            .insert(
+                text_record(id, &format!("evidence-{id}"), scope, text),
+                b"canonical trajectory bytes",
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn bm25_ranks_matching_evidence_and_returns_auditable_hits() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 10, "The checkout payment configuration uses a billing panel", "web");
+        insert_text(&mut index, 11, "The account profile has a display name", "web");
+        insert_text(&mut index, 12, "Billing configuration for enterprise invoices", "web");
+
+        let hits = index
+            .search_bm25(
+                "billing configuration",
+                "web",
+                150,
+                Path::new("."),
+                Bm25Config::default(),
+            )
+            .unwrap();
+
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].hdc_id, 12);
+        assert_eq!(hits[1].hdc_id, 10);
+        assert!(hits[0].bm25_score > 0.0);
+        assert_eq!(hits[0].context.kind, MemoryContextType::Text);
+        assert_eq!(hits[0].source.trajectory_id, "trajectory-001");
+    }
+
+    #[test]
+    fn bm25_filters_scope_and_lifecycle_before_scoring() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "private billing billing", "enterprise");
+        insert_text(&mut index, 2, "public billing", "web");
+        insert_text(&mut index, 3, "obsolete billing", "web");
+        index.revoke(3).unwrap();
+
+        let hits = index
+            .search_bm25("billing", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].hdc_id, 2);
+    }
+
+    #[test]
+    fn bm25_is_deterministic_for_ties_and_empty_or_unknown_queries() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 9, "cart opens overlay", "web");
+        insert_text(&mut index, 4, "cart opens overlay", "web");
+
+        let first = index
+            .search_bm25("cart", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        let second = index
+            .search_bm25("cart", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.iter().map(|hit| hit.hdc_id).collect::<Vec<_>>(), vec![4, 9]);
+        assert!(index
+            .search_bm25("   !!! ", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap()
+            .is_empty());
+        assert!(index
+            .search_bm25("nonexistentterm", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn bm25_rejects_invalid_configuration_and_tampered_candidate_text() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "trusted invoice route", "web");
+        let invalid = Bm25Config { k1: 1.2, b: 1.1, max_items: 5 };
+        assert!(index
+            .search_bm25("invoice", "web", 150, Path::new("."), invalid)
+            .is_err());
+        assert!(index
+            .search_bm25(
+                "invoice",
+                "web",
+                150,
+                Path::new("."),
+                Bm25Config { max_items: 0, ..Bm25Config::default() },
+            )
+            .is_err());
+
+        let mut corrupt = text_record(2, "corrupt-evidence", "web", "invoice route");
+        corrupt.content_sha256 = hash(b"tampered text");
+        index.insert(corrupt, b"canonical trajectory bytes").unwrap();
+        assert!(index
+            .search_bm25("invoice", "web", 150, Path::new("."), Bm25Config::default())
+            .is_err());
     }
 
     #[test]
