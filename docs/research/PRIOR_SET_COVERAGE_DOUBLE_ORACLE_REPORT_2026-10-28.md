@@ -41,7 +41,7 @@ Local command: python -m unittest -v from the standalone package directory.
 
 Result: **11/11 tests passed** on Python 3.13.5 with NumPy 2.3.5 and SciPy 1.17.0. Tests include 300 seeded prior-linearity games, 100 convex-mixture checks, exact full-game/double-oracle agreement, vertex checks, objective coverage and invalid-input rejection.
 
-The standalone benchmark source SHA-256 is d7ceb9b79ee06869e7835cfaec14f67a0bd59a017fc0f85fec972572dc0b8bb3; regression-test SHA-256 is 1e94d7884c315b93520cff5b8daa67918e085039e3ae30dc289467c9c4bb19e8; result JSON SHA-256 is b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435. The exact standalone source/test/result artifacts and a repository patch are also provided in the conversation's research package. They are not being represented as source files committed by this report-only change.
+The standalone benchmark source SHA-256 is d7ceb9b79ee06869e7835cfaec14f67a0bd59a017fc0f85fec972572dc0b8bb3; regression-test SHA-256 is 1e94d7884c315b93520cff5b8daa67918e085039e3ae30dc289467c9c4bb19e8; result JSON SHA-256 is b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435. The standalone benchmark source, risk-linearity helper, and both regression-test modules are now committed on the research branch; their SHA-256 values and Git blob IDs are recorded in the companion summary. The exact 22,070-byte result JSON remains a local research-package artifact (SHA-256 `b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435`) and is not represented as a committed repository artifact. The benchmark still uses a synthetic likelihood rather than Symthaea's repository SCM implementation.
 
 ## Efficiency boundary
 
