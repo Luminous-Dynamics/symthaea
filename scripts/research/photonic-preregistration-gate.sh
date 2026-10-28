@@ -20,7 +20,7 @@ fi
 
 MODE="$1"
 MANIFEST="$2"
-RECEIPT="\${3:-}"
+RECEIPT="${3:-}"
 
 if [[ ! -f "$MANIFEST" ]]; then
   echo "ERROR: manifest file does not exist: $MANIFEST" >&2
@@ -77,16 +77,16 @@ require "cost boundary and energy scope explicit" '(.cost_boundary.standardized_
 require "execution environment/compiler/lockfile frozen" '(.environment.operating_system | type == "string" and length > 0) and (.environment.cpu_model | type == "string" and length > 0) and (.environment.ram_bytes | type == "number" and floor == . and . > 0) and (.environment.thread_count | type == "number" and floor == . and . > 0) and (.environment.container_or_nix_derivation_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and (.environment.dependency_lock_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and (.environment.compiler_versions | type == "object" and length > 0 and all(.[]; type == "string" and length > 0))'
 require "result record/event log/receipt schema and output locations" '(.result_artifacts.per_attempt_record_schema_version | type == "string" and length > 0) and (.result_artifacts.raw_event_log_location | type == "string" and length > 0) and (.result_artifacts.verifier_receipt_location | type == "string" and length > 0) and (.result_artifacts.result_manifest_sha256 | type == "string" and test("^[0-9a-f]{64}$"))'
 
-if (( \${#missing[@]} > 0 )); then
-  printf 'BLOCKED: preregistration is incomplete (%d requirement groups failed):\n' "\${#missing[@]}" >&2
-  for field in "\${missing[@]}"; do
+if (( ${#missing[@]} > 0 )); then
+  printf 'BLOCKED: preregistration is incomplete (%d requirement groups failed):\n' "${#missing[@]}" >&2
+  for field in "${missing[@]}"; do
     printf '  - %s\n' "$field" >&2
   done
   exit 1
 fi
 
 manifest_sha256="$(sha256sum "$MANIFEST" | awk '{print $1}')"
-checker_path="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/$(basename -- "\${BASH_SOURCE[0]}")"
+checker_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/$(basename -- "${BASH_SOURCE[0]}")"
 checker_sha256="$(sha256sum "$checker_path" | awk '{print $1}')"
 echo "PASS: preregistration manifest is complete under PHOT-CTRL-004."
 echo "Manifest SHA-256: $manifest_sha256"
