@@ -389,10 +389,176 @@ impl EvidenceCommitManifest {
 /// this is not a disk transaction and cannot atomically commit with the HDC
 /// vector index. Callers must coordinate both stores and durably pin/authenticate
 /// the returned snapshot bytes as required by their threat model.
+/// Versioned immutable inverted index derived from one evidence snapshot.
+///
+///// The manifest binds the exact serialized bytes; generation and structural
+/// validation prevent accidentally using an index from another commit.
+pub const LEXICAL_INDEX_SCHEMA_VERSION: &str = "BROCA-LEXICAL-INDEX-V1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LexicalIndex {
+    schema_version: String,
+    generation: u64,
+    /// Text payload ID -> token count. IDs include text records with no tokens.
+    documents: BTreeMap<u64, LexicalDocument>,
+    /// Token -> ascending HDC-ID postings.
+    postings: BTreeMap<String, Vec<LexicalPosting>>,
+    total_token_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LexicalDocument {
+    token_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LexicalPosting {
+    hdc_id: u64,
+    term_frequency: u32,
+}
+
 #[derive(Debug, Default)]
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
     evidence_ids: BTreeMap<String, u64>,
+}
+
+impl LexicalIndex {
+    /// Build an inverted index from verified text payloads in a specific
+    /// evidence generation. This is done during commit, never per query.
+    pub fn build(evidence: &EvidenceIndex, generation: u64) -> Result<Self, String> {
+        if generation == 0 {
+            return Err("lexical index generation must start at 1".into());
+        }
+        let mut documents = BTreeMap::new();
+        let mut postings: BTreeMap<String, Vec<LexicalPosting>> = BTreeMap::new();
+        let mut total_token_count = 0u64;
+
+        for (hdc_id, record) in &evidence.records {
+            let EvidencePayload::Text { value } = &record.payload else {
+                continue;
+            };
+            if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                return Err(format!("cannot index text with invalid content digest at HDC ID {hdc_id}"));
+            }
+            let tokens = lexical_tokens(value);
+            let mut frequencies = BTreeMap::<String, u32>::new();
+            for token in &tokens {
+                let count = frequencies.entry(token.clone()).or_default();
+                *count = count.checked_add(1)
+                    .ok_or_else(|| format!("lexical term frequency overflow at HDC ID {hdc_id}"))?;
+            }
+            let token_count = u64::try_from(tokens.len())
+                .map_err(|_| "lexical document token count overflow".to_string())?;
+            total_token_count = total_token_count.checked_add(token_count)
+                .ok_or_else(|| "lexical index token count overflow".to_string())?;
+            documents.insert(*hdc_id, LexicalDocument { token_count });
+            for (term, term_frequency) in frequencies {
+                postings.entry(term).or_default().push(LexicalPosting {
+                    hdc_id: *hdc_id,
+                    term_frequency,
+                });
+            }
+        }
+
+        let index = Self {
+            schema_version: LEXICAL_INDEX_SCHEMA_VERSION.to_string(),
+            generation,
+            documents,
+            postings,
+            total_token_count,
+        };
+        index.validate_structure()?;
+        Ok(index)
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, String> {
+        self.validate_structure()?;
+        serde_json::to_vec(self).map_err(|error| format!("failed to encode lexical index: {error}"))
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let index: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("invalid lexical index: {error}"))?;
+        index.validate_structure()?;
+        Ok(index)
+    }
+
+    /// Ensure the index is for this exact logical evidence generation and has
+    /// exactly one document entry for each text record (including zero-token text).
+    pub fn validate_for_evidence(&self, evidence: &EvidenceIndex, generation: u64) -> Result<(), String> {
+        self.validate_structure()?;
+        if self.generation != generation {
+            return Err("lexical index generation does not match evidence generation".into());
+        }
+        let expected: BTreeSet<u64> = evidence.records.iter()
+            .filter_map(|(id, record)| matches!(record.payload, EvidencePayload::Text { .. }).then_some(*id))
+            .collect();
+        let actual: BTreeSet<u64> = self.documents.keys().copied().collect();
+        if expected != actual {
+            return Err("lexical index text-document IDs do not match evidence snapshot".into());
+        }
+        Ok(())
+    }
+
+    fn validate_structure(&self) -> Result<(), String> {
+        if self.schema_version != LEXICAL_INDEX_SCHEMA_VERSION {
+            return Err("unsupported lexical index schema version".into());
+        }
+        if self.generation == 0 {
+            return Err("lexical index generation must start at 1".into());
+        }
+        let mut summed_lengths = 0u64;
+        let mut per_document_frequency = BTreeMap::<u64, u64>::new();
+        for (id, document) in &self.documents {
+            summed_lengths = summed_lengths.checked_add(document.token_count)
+                .ok_or_else(|| "lexical index token count overflow".to_string())?;
+            per_document_frequency.insert(*id, 0);
+        }
+        if summed_lengths != self.total_token_count {
+            return Err("lexical index total token count does not match document lengths".into());
+        }
+        for (term, list) in &self.postings {
+            if lexical_tokens(term) != [term.clone()] {
+                return Err("lexical index contains a non-canonical term".into());
+            }
+            if list.is_empty() {
+                return Err("lexical index contains an empty posting list".into());
+            }
+            let mut previous = None;
+            for posting in list {
+                if posting.term_frequency == 0 {
+                    return Err("lexical posting term frequency must be positive".into());
+                }
+                if previous.is_some_and(|id| posting.hdc_id <= id) {
+                    return Err("lexical postings must be strictly ordered by HDC ID".into());
+                }
+                previous = Some(posting.hdc_id);
+                let document = self.documents.get(&posting.hdc_id)
+                    .ok_or_else(|| "lexical posting references an unknown document".to_string())?;
+                if u64::from(posting.term_frequency) > document.token_count {
+                    return Err("lexical term frequency exceeds document token count".into());
+                }
+                let count = per_document_frequency.get_mut(&posting.hdc_id)
+                    .ok_or_else(|| "lexical posting references a non-text document".to_string())?;
+                *count = count.checked_add(u64::from(posting.term_frequency))
+                    .ok_or_else(|| "lexical document frequency sum overflow".to_string())?;
+            }
+        }
+        for (id, document) in &self.documents {
+            if per_document_frequency[id] != document.token_count {
+                return Err("lexical postings do not account for each document token".into());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl EvidenceIndex {
@@ -587,6 +753,118 @@ impl EvidenceIndex {
         old.lifecycle = EvidenceLifecycle::Superseded;
         old.superseded_by = Some(new_evidence_id);
         old.validate()
+    }
+
+    /// BM25 over a previously built inverted index. This avoids re-tokenizing
+    /// and re-hashing every evidence payload on each query. Eligibility and
+    /// corpus statistics are still evaluated against current evidence metadata,
+    /// because lifecycle and validity windows can change between queries.
+    pub fn rank_text_indexed(
+        &self,
+        index: &LexicalIndex,
+        expected_generation: u64,
+        query_text: &str,
+        scope_id: &str,
+        now_ms: u64,
+        max_candidates: usize,
+    ) -> Result<Vec<(u64, f32)>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if expected_generation == 0 || index.generation != expected_generation {
+            return Err("lexical index generation does not match committed evidence generation".into());
+        }
+        if max_candidates == 0 {
+            return Ok(Vec::new());
+        }
+        let query_terms: BTreeSet<String> = lexical_tokens(query_text).into_iter().collect();
+        if query_terms.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        const K1: f64 = 1.2;
+        const B: f64 = 0.75;
+        let mut eligible_documents = 0usize;
+        let mut total_length = 0u64;
+        for (hdc_id, record) in &self.records {
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            let EvidencePayload::Text { .. } = &record.payload else {
+                continue;
+            };
+            let document = index.documents.get(hdc_id)
+                .ok_or_else(|| format!("lexical index missing eligible text HDC ID {hdc_id}"))?;
+            if document.token_count == 0 {
+                continue;
+            }
+            eligible_documents += 1;
+            total_length = total_length.checked_add(document.token_count)
+                .ok_or_else(|| "eligible lexical token count overflow".to_string())?;
+        }
+        if eligible_documents == 0 {
+            return Ok(Vec::new());
+        }
+        let average_length = total_length as f64 / eligible_documents as f64;
+        if average_length <= 0.0 {
+            return Ok(Vec::new());
+        }
+
+        let eligible = |id: u64| -> bool {
+            self.records.get(&id).is_some_and(|record| record.is_eligible_for(scope_id, now_ms))
+                && index.documents.contains_key(&id)
+                && index.documents.get(&id).is_some_and(|document| document.token_count > 0)
+        };
+        let mut document_frequency = BTreeMap::<String, usize>::new();
+        let mut scores = BTreeMap::<u64, f64>::new();
+        for term in &query_terms {
+            let Some(postings) = index.postings.get(term) else {
+                continue;
+            };
+            let mut df = 0usize;
+            for posting in postings {
+                if !eligible(posting.hdc_id) {
+                    continue;
+                }
+                df += 1;
+                *scores.entry(posting.hdc_id).or_default();
+            }
+            document_frequency.insert(term.clone(), df);
+        }
+
+        // Iterate terms in lexical order so each document's floating-point
+        // accumulation is deterministic and matches the reference implementation.
+        for term in &query_terms {
+            let Some(postings) = index.postings.get(term) else {
+                continue;
+            };
+            let df = *document_frequency.get(term).unwrap_or(&0) as f64;
+            if df == 0.0 {
+                continue;
+            }
+            let n = eligible_documents as f64;
+            let inverse_document_frequency = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+            for posting in postings {
+                if !eligible(posting.hdc_id) {
+                    continue;
+                }
+                let document_length = index.documents[&posting.hdc_id].token_count as f64;
+                let term_frequency = f64::from(posting.term_frequency);
+                let length_norm = 1.0 - B + B * (document_length / average_length);
+                let contribution = inverse_document_frequency
+                    * (term_frequency * (K1 + 1.0))
+                    / (term_frequency + K1 * length_norm);
+                *scores.entry(posting.hdc_id).or_default() += contribution;
+            }
+        }
+        let mut ranked: Vec<(u64, f32)> = scores.into_iter()
+            .filter_map(|(id, score)| (score > 0.0).then_some((id, score as f32)))
+            .collect();
+        ranked.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+        ranked.truncate(max_candidates);
+        Ok(ranked)
     }
 
     /// Deterministic BM25 lexical retrieval over eligible text evidence.
