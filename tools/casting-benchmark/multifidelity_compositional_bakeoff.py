@@ -72,6 +72,8 @@ SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
     "docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json",
+    "docs/research/CASTING_BENCHMARK_PROTOCOL_V1.json",
+    "docs/research/CASTING_RESEARCH_FRONTIER_2026-10-28.md",
     "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json",
 )
 
