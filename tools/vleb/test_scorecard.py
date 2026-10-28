@@ -120,6 +120,15 @@ class ScorecardTests(unittest.TestCase):
         definition = self.scorecard["metric_definitions"]["cost_per_independently_verified_fix"]
         self.assertIn("undefined", definition["zero_pass_rule"])
 
+    def test_official_and_indexed_legacy_bench_views_remain_distinct(self) -> None:
+        indexed = self.scorecard["industry_comparators"]["legacy_bench"]
+        official = self.scorecard["industry_comparators"]["legacy_bench_official_factory"]
+        self.assertEqual(indexed["metric"], "avg@3")
+        self.assertEqual(indexed["entries"][0]["score_pct"], 62.0)
+        self.assertEqual(official["metric"], "overall pass rate")
+        self.assertEqual(official["top_listed_score_pct"], 42.5)
+        self.assertIn("not interchangeable", official["comparability_note"])
+
     def test_cost_frontier_target_is_lower_cost_than_listed_leader(self) -> None:
         target = self.scorecard["proposed_targets"]["legacy_bench_cost_frontier"]
         leader = self.scorecard["industry_comparators"]["legacy_bench"]["entries"][0]
