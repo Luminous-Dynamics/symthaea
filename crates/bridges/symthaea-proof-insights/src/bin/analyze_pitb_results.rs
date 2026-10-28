@@ -1631,18 +1631,29 @@ fn validate_exposure_quarantine(
     test_ids: &[String],
     frozen_families: &BTreeMap<String, String>,
 ) -> Result<()> {
-    if validation_ids.is_empty() || !validation_ids.iter().any(|id| id == REQUIRED_EXPOSED_VALIDATION_FAMILY) {
+    if validation_ids.is_empty()
+        || !validation_ids
+            .iter()
+            .any(|id| id == REQUIRED_EXPOSED_VALIDATION_FAMILY)
+    {
         bail!(
             "known-exposed validation family {REQUIRED_EXPOSED_VALIDATION_FAMILY} must remain excluded from validation baseline selection"
         );
     }
-    if test_ids.is_empty() || !test_ids.iter().any(|id| id == REQUIRED_EXPOSED_TEST_FAMILY) {
+    if test_ids.is_empty()
+        || !test_ids
+            .iter()
+            .any(|id| id == REQUIRED_EXPOSED_TEST_FAMILY)
+    {
         bail!(
             "known-exposed test family {REQUIRED_EXPOSED_TEST_FAMILY} must remain excluded from confirmatory scoring"
         );
     }
 
-    let validation_unique: BTreeSet<&str> = validation_ids.iter().map(String::as_str).collect();
+    let validation_unique: BTreeSet<&str> = validation_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
     if validation_unique.len() != validation_ids.len() {
         bail!("known_exposed_validation_family_ids contains duplicates");
     }
@@ -3284,15 +3295,24 @@ mod tests {
         ]);
         let validation_has_test_id = vec!["012".to_string(), "099".to_string()];
         let test = vec!["089".to_string()];
-        assert!(validate_exposure_quarantine(&validation_has_test_id, &test, &frozen)
-            .expect_err("test family 089 must not enter validation exposure list")
-            .to_string().contains("assigned to the frozen validation split"));
+        let validation_error =
+            validate_exposure_quarantine(&validation_has_test_id, &test, &frozen)
+                .expect_err("test family 099 must not enter validation exposure list");
+        assert!(
+            validation_error
+                .to_string()
+                .contains("assigned to the frozen validation split")
+        );
 
         let validation = vec!["012".to_string()];
         let test_has_validation_id = vec!["089".to_string(), "017".to_string()];
-        assert!(validate_exposure_quarantine(&validation, &test_has_validation_id, &frozen)
-            .expect_err("validation family 017 must not enter test exposure list")
-            .to_string().contains("assigned to the frozen test split"));
+        let test_error = validate_exposure_quarantine(&validation, &test_has_validation_id, &frozen)
+            .expect_err("validation family 017 must not enter test exposure list");
+        assert!(
+            test_error
+                .to_string()
+                .contains("assigned to the frozen test split")
+        );
     }
 
     #[test]
@@ -3303,18 +3323,24 @@ mod tests {
         ]);
         let missing_validation = Vec::<String>::new();
         let test = vec!["089".to_string()];
-        assert!(validate_exposure_quarantine(&missing_validation, &test, &frozen).is_err());
+        assert!(
+            validate_exposure_quarantine(&missing_validation, &test, &frozen).is_err()
+        );
 
         let validation = vec!["012".to_string(), "012".to_string()];
-        assert!(validate_exposure_quarantine(&validation, &test, &frozen)
-            .expect_err("duplicate validation IDs must fail")
-            .to_string().contains("duplicates"));
+        let duplicate_error = validate_exposure_quarantine(&validation, &test, &frozen)
+            .expect_err("duplicate validation IDs must fail");
+        assert!(duplicate_error.to_string().contains("duplicates"));
 
         let overlap_validation = vec!["012".to_string(), "089".to_string()];
         let overlap_test = vec!["089".to_string()];
-        assert!(validate_exposure_quarantine(&overlap_validation, &overlap_test, &frozen)
-            .expect_err("shared IDs must fail")
-            .to_string().contains("a family cannot be listed as exposed in both validation and test"));
+        let overlap_error = validate_exposure_quarantine(&overlap_validation, &overlap_test, &frozen)
+            .expect_err("shared IDs must fail");
+        assert!(
+            overlap_error
+                .to_string()
+                .contains("a family cannot be listed as exposed in both validation and test")
+        );
     }
 
     #[test]
