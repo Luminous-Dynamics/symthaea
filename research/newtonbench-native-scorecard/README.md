@@ -22,8 +22,10 @@ The CLI recursively reads raw `trial*.json` files from each supplied trial direc
 - Report how many completed trials supplied each cost field separately from sums of available values; a missing field is never silently presented as a complete total.
 - Retain failures and missing counterpart trials; paired deltas use only pairs with both trials completed and the corresponding metric available.
 - Report paired effects by module, noise, equation difficulty, system type and law version as well as the pooled scorecard, so pooled gains cannot hide a regression on a difficult stratum.
+- Include approximate paired Student-t 95% intervals and standard errors for mean deltas at pooled and stratum level; intervals are null when fewer than two complete pairs exist. They are descriptive intervals, not causal proof or a substitute for a preregistered hierarchical analysis.
 - The importer records source-file digests, native metric availability, and import problems. A malformed artifact does not silently disappear from the report.
 - Python's default JSON serialization may emit non-standard NaN/Infinity values. The importer normalizes standalone non-finite tokens outside strings to null, records the normalization, and does not convert an unavailable RMSLE into zero.
+On upstream `failed` or `invalid` rows, evaluation metrics are withheld even when the failure writer emitted placeholder `exact_accuracy = 0.0`; the terminal state and raw-file digest remain visible. Recorded cost fields remain visible with availability counts, and paired cost deltas require values in both completed arms.
 
 NewtonBench's upstream RMSLE implementation masks NaN points and uses absolute values before applying log1p. The importer preserves its result and records this semantic caveat rather than recomputing or overstating it. Upstream output also labels the backend; the importer does not authenticate that a tool actually executed. False-confidence and premature-commitment outcomes are not inferred because the native trial schema does not directly provide them.
 
