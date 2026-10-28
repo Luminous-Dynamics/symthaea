@@ -64,6 +64,10 @@ class ScoreProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "k must be"):
             score_dataset(self.questions, [{"question_id": "Q1", "audit": []}], 0)
 
+    def test_empty_question_set_fails_closed(self) -> None:
+        with self.assertRaisesRegex(ValueError, "questions must not be empty"):
+            score_dataset([], [], 5)
+
 
 if __name__ == "__main__":
     unittest.main()
