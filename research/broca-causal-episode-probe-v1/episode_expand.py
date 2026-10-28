@@ -37,6 +37,40 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def load_candidate_manifest(predictions_path: Path, trajectory_path: Path, evaluation_k: int) -> tuple[dict[str, Any], Path]:
+    """Require exact source-run provenance before deriving another retrieval arm."""
+    manifest_path = predictions_path.with_suffix(predictions_path.suffix + ".manifest.json")
+    if not manifest_path.is_file():
+        raise ValueError(f"candidate-run manifest is required: {manifest_path}")
+    manifest_bytes = manifest_path.read_bytes()
+    try:
+        manifest = json.loads(manifest_bytes)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"candidate-run manifest is invalid JSON: {error}") from error
+    if not isinstance(manifest, dict):
+        raise ValueError("candidate-run manifest must be an object")
+    if manifest.get("schema") != "broca-causal-episode-probe-v1":
+        raise ValueError("candidate-run manifest schema mismatch")
+    if manifest.get("prediction_sha256") != sha256_bytes(predictions_path.read_bytes()):
+        raise ValueError("candidate prediction digest does not match its manifest")
+    if manifest.get("trajectory_fixture_sha256") != sha256_bytes(trajectory_path.read_bytes()):
+        raise ValueError("candidate manifest trajectory fixture digest mismatch")
+    if manifest.get("scope_id") != "web":
+        raise ValueError("candidate manifest scope must be exactly 'web' for this fixture")
+    worker_sha256 = manifest.get("worker_sha256")
+    if not isinstance(worker_sha256, str) or len(worker_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in worker_sha256
+    ):
+        raise ValueError("candidate manifest must bind a lowercase worker SHA-256")
+    bm25 = manifest.get("bm25")
+    if not isinstance(bm25, dict):
+        raise ValueError("candidate manifest requires a BM25 configuration")
+    candidate_k = bm25.get("max_items")
+    if isinstance(candidate_k, bool) or not isinstance(candidate_k, int) or not evaluation_k <= candidate_k <= 100:
+        raise ValueError("candidate pool must be an integer in [evaluation_k, 100]")
+    return manifest, manifest_path
+
+
 def extract_indexed_refs(trajectories: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
     """Mirror the worker's public-state/content text allowlist for this probe."""
     result: dict[tuple[str, str], dict[str, Any]] = {}
@@ -271,6 +305,9 @@ def main() -> int:
         raise SystemExit("--window must be in [0, 10]")
 
     trajectory_path = FIXTURE_DIR / "trajectories.jsonl"
+    candidate_manifest, candidate_manifest_path = load_candidate_manifest(
+        args.predictions, trajectory_path, args.k
+    )
     trajectories = read_jsonl(trajectory_path)
     predictions = read_jsonl(args.predictions)
     expanded = expand_predictions(trajectories, predictions, args.k, args.window)
@@ -286,6 +323,11 @@ def main() -> int:
         "schema": POLICY_VERSION,
         "trajectory_fixture_sha256": sha256_bytes(trajectory_path.read_bytes()),
         "input_candidate_predictions_sha256": sha256_bytes(args.predictions.read_bytes()),
+        "input_candidate_manifest_sha256": sha256_bytes(candidate_manifest_path.read_bytes()),
+        "input_worker_sha256": candidate_manifest["worker_sha256"],
+        "input_bm25_config": candidate_manifest["bm25"],
+        "input_scope_id": candidate_manifest["scope_id"],
+        "input_candidate_k": candidate_manifest["bm25"]["max_items"],
         "output_predictions_sha256": sha256_bytes(output.read_bytes()),
         "output_path": str(output),
         "evaluation_k": args.k,
