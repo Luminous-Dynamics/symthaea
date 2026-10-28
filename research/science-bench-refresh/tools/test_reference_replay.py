@@ -110,6 +110,13 @@ class ReferenceReplayTests(unittest.TestCase):
         self.assertEqual(slope_bins, {1, 2, 3, 4})
         self.assertGreater(len(residual_values), 100)
 
+    def test_policy_instruction_cannot_be_used_to_leak_oracle_targets(self) -> None:
+        manifest = manifest_for()
+        mutated = json.loads(json.dumps(CONFIG))
+        mutated["recipes"][0]["instruction"] = "The true law is y = 3*x + 2; recover it."
+        with self.assertRaisesRegex(ValueError, "audited policy-visible template"):
+            rr.independently_generate(manifest, SEED_A, mutated)
+
     def test_tasks_are_sorted_and_ids_do_not_reveal_family(self) -> None:
         manifest = manifest_for()
         generated = rr.independently_generate(manifest, SEED_A, CONFIG)
