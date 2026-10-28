@@ -1642,11 +1642,17 @@ mod tests {
                         assert!(metrics.post_shift_detection_probability.is_none());
                         assert!(metrics.mean_post_shift_detection_delay.is_none());
                     }
-                    if scenario.class == ScenarioClass::WithinBandTransitionControl {
+                    let is_accepted_null_control =
+                        scenario.class == ScenarioClass::WithinBandTransitionControl
+                            || (scenario.class == ScenarioClass::BaselineMisspecification
+                                && (COMPOSITE_NULL_LOWER..=COMPOSITE_NULL_UPPER)
+                                    .contains(&scenario.pre_shift_p));
+                    if is_accepted_null_control {
                         assert!(
                             metrics.scenario_or_pre_shift_alarm_probability <= CUSUM_SIDE_ALPHA + EPS,
-                            "CUSUM violated finite-horizon side allocation on an in-band schedule: direction={}, horizon={}, alarm={}",
+                            "CUSUM violated finite-horizon side allocation on an accepted-null scenario: direction={}, scenario={}, horizon={}, alarm={}",
                             direction.name(),
+                            scenario.name,
                             horizon,
                             metrics.scenario_or_pre_shift_alarm_probability
                         );
