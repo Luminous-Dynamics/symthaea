@@ -654,6 +654,8 @@ struct CusumMetrics {
     scenario_or_pre_shift_alarm_probability: f64,
     post_shift_detection_probability: Option<f64>,
     mean_post_shift_detection_delay: Option<f64>,
+    median_post_shift_detection_delay: Option<f64>,
+    p90_post_shift_detection_delay: Option<f64>,
     survival_probability: f64,
 }
 
@@ -732,6 +734,27 @@ fn probability_range_sum(values: &[f64], start: usize, end: usize) -> f64 {
     values[start..=end.min(values.len() - 1)].iter().sum()
 }
 
+fn conditional_detection_delay_quantile(
+    first_alarm: &[f64],
+    change_after: usize,
+    horizon: usize,
+    detection_probability: f64,
+    quantile: f64,
+) -> Option<f64> {
+    if detection_probability <= 0.0 {
+        return None;
+    }
+    let target_mass = detection_probability * quantile;
+    let mut cumulative_mass = 0.0;
+    for n in change_after.saturating_add(1)..=horizon {
+        cumulative_mass += first_alarm[n];
+        if cumulative_mass >= target_mass {
+            return Some((n - change_after) as f64);
+        }
+    }
+    Some(horizon.saturating_sub(change_after) as f64)
+}
+
 #[cfg(test)]
 fn evaluate_cusum_null_schedule<P>(
     direction: CusumDirection,
@@ -778,6 +801,8 @@ where
         scenario_or_pre_shift_alarm_probability: alarm_probability,
         post_shift_detection_probability: None,
         mean_post_shift_detection_delay: None,
+        median_post_shift_detection_delay: None,
+        p90_post_shift_detection_delay: None,
         survival_probability: active.iter().sum(),
     }
 }
@@ -861,12 +886,32 @@ fn evaluate_cusum_scenario(
                     Some(delay_mass / detection)
                 }
             });
+            let median_delay = detection_probability.and_then(|detection| {
+                conditional_detection_delay_quantile(
+                    &first_alarm,
+                    scenario.change_after,
+                    horizon,
+                    detection,
+                    0.50,
+                )
+            });
+            let p90_delay = detection_probability.and_then(|detection| {
+                conditional_detection_delay_quantile(
+                    &first_alarm,
+                    scenario.change_after,
+                    horizon,
+                    detection,
+                    0.90,
+                )
+            });
             (
                 horizon,
                 CusumMetrics {
                     scenario_or_pre_shift_alarm_probability: alarm_probability,
                     post_shift_detection_probability: detection_probability,
                     mean_post_shift_detection_delay: delay,
+                    median_post_shift_detection_delay: median_delay,
+                    p90_post_shift_detection_delay: p90_delay,
                     survival_probability: survival,
                 },
             )
@@ -898,7 +943,7 @@ fn print_cusum_baseline_csv() {
         cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER);
     let family_worst_case_union_bound = 2.0 * calibration_boundary_alarm_probability;
     println!(
-        "direction,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_lower,null_upper,threshold_scaled,threshold_score,matched_reference_alarm_probability,calibration_boundary_alarm_probability,family_worst_case_union_bound,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability"
+        "direction,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_lower,null_upper,threshold_scaled,threshold_score,matched_reference_alarm_probability,calibration_boundary_alarm_probability,family_worst_case_union_bound,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,median_post_shift_detection_delay,p90_post_shift_detection_delay,per_cell_alpha,survival_probability"
     );
     for direction in CusumDirection::ALL {
         for scenario in SCENARIOS {
@@ -913,7 +958,7 @@ fn print_cusum_baseline_csv() {
                     .map(|p| format!("{p:.12}"))
                     .unwrap_or_else(|| "NA".to_owned());
                 println!(
-                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{:.12},{},{:.12},{:.12},{:.12},{:.12},{:.12},{},{},{:.12},{:.12}",
+                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{:.12},{},{:.12},{:.12},{:.12},{:.12},{:.12},{},{},{},{},{:.12},{:.12}",
                     direction.name(),
                     scenario.name,
                     scenario.class.name(),
@@ -932,6 +977,8 @@ fn print_cusum_baseline_csv() {
                     metrics.scenario_or_pre_shift_alarm_probability,
                     csv_optional_precise(metrics.post_shift_detection_probability),
                     csv_optional_precise(metrics.mean_post_shift_detection_delay),
+                    csv_optional_precise(metrics.median_post_shift_detection_delay),
+                    csv_optional_precise(metrics.p90_post_shift_detection_delay),
                     PER_CELL_ALPHA,
                     metrics.survival_probability
                 );
