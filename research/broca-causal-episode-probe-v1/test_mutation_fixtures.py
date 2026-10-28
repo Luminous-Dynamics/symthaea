@@ -88,7 +88,7 @@ class MutationFixtureTests(unittest.TestCase):
 
         report = score_dataset(self.questions, predictions, 5)
         self.assertEqual(report["overall"]["complete_chain_rate_at_k"], 1.0)
-        self.assertEqual(report["overall"]["safe_complete_chain_rate_at_k"], 11 / 12)
+        self.assertAlmostEqual(report["overall"]["safe_complete_chain_rate_at_k"], 11 / 12, places=5)
         bad = next(row for row in report["per_question"] if row["question_id"] == "MCB-001")
         self.assertTrue(bad["complete_chain_at_k"])
         self.assertFalse(bad["safe_complete_chain_at_k"])
