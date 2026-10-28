@@ -611,3 +611,48 @@ fn fixed_seed_cohort_reports_delivery_by_deadline_for_all_strategies() {
         airtime_totals[3] / TRIALS,
     );
 }
+
+fn pseudo_random_packet() -> [u8; super::WISDOM_PACKET_SIZE] {
+    let mut raw = [0u8; super::WISDOM_PACKET_SIZE];
+    let mut state = 0x4D45_5348_2026_1028u64;
+    for byte in &mut raw {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        *byte = (state >> 24) as u8;
+    }
+    raw
+}
+
+#[test]
+fn current_compression_path_keeps_random_like_packet_envelope_exact_size() {
+    let raw = pseudo_random_packet();
+    let envelope = super::compress_packet(&raw);
+    assert_eq!(
+        envelope.first().copied(),
+        Some(super::COMPRESS_NONE),
+        "random-like packet should take the non-expanding fallback"
+    );
+    assert_eq!(envelope.len(), BASELINE_ENVELOPE_BYTES);
+}
+
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn packet_aead_adds_nonce_and_tag_to_current_envelope() {
+    let raw = pseudo_random_packet();
+    let envelope = super::compress_packet(&raw);
+    let encrypted = super::encrypt_packet_typed(
+        &envelope,
+        &[0x42; 32],
+        &[1, 2, 3, 4, 5, 6, 7, 8],
+        0,
+        1,
+        1,
+    );
+    assert_eq!(
+        encrypted.len(),
+        envelope.len() + 12 + 16,
+        "packet AEAD prepends a 12-byte nonce and a 16-byte tag"
+    );
+    assert_eq!(encrypted.len(), PACKET_AEAD_ENVELOPE_BYTES);
+}
