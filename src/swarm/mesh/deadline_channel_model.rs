@@ -809,5 +809,5 @@ fn delta_gap_decoder_rejects_malformed_and_noncanonical_inputs() {
     assert!(decode_gap_varints(&[0x80, 0x80, 0x01], 1).is_none());
     assert!(decode_gap_varints(&[0x00], 0).is_none());
     assert!(decode_gap_varints(&[0xff, 0x7f], 1).is_some());
-    assert!(decode_gap_varints(&[0x80, 0x7f], 1).is_none(), "decoded index out of range");
+    assert!(decode_gap_varints(&[0xff, 0x7f, 0x01], 2).is_none(), "decoded index out of range");
 }
