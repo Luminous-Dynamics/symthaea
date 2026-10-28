@@ -11,8 +11,12 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
+import stat
 import subprocess
 import sys
+import tempfile
+import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -44,6 +48,81 @@ def safe_file(root: Path, relative: Any) -> Path:
     if not resolved.is_relative_to(root_resolved) or not resolved.is_file():
         raise ValueError("artifact must be a regular file inside the evidence root")
     return resolved
+
+
+def extract_evidence_bundle(bundle_path: Path, destination: Path) -> None:
+    """Extract only regular, canonical ZIP members with strict size/path limits."""
+    max_members = 100_000
+    max_member_bytes = 512 * 1024 * 1024
+    max_total_bytes = 2 * 1024 * 1024 * 1024
+    destination_root = destination.resolve(strict=True)
+
+    try:
+        archive = zipfile.ZipFile(bundle_path, "r")
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ValueError(f"evidence bundle is not a valid ZIP archive: {exc}") from exc
+
+    with archive:
+        infos = archive.infolist()
+        if not infos or len(infos) > max_members:
+            raise ValueError(f"evidence bundle member count outside allowed range: {len(infos)}")
+        seen: set[str] = set()
+        total_size = 0
+
+        for info in infos:
+            name = info.filename
+            if not name or "\\" in name or "\x00" in name:
+                raise ValueError("evidence bundle contains a non-canonical member path")
+            rel = PurePosixPath(name)
+            normalized = str(rel)
+            allowed_name = name[:-1] if info.is_dir() and name.endswith("/") else name
+            if (
+                rel.is_absolute()
+                or any(part in ("", ".", "..") for part in rel.parts)
+                or normalized != allowed_name
+            ):
+                raise ValueError(f"evidence bundle path traversal or ambiguity rejected: {name!r}")
+            if normalized in seen:
+                raise ValueError(f"duplicate evidence bundle member rejected: {normalized!r}")
+            seen.add(normalized)
+
+            mode = (info.external_attr >> 16) & 0xFFFF
+            if stat.S_ISLNK(mode):
+                raise ValueError(f"symlink evidence member rejected: {name!r}")
+            if mode and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                raise ValueError(f"special file evidence member rejected: {name!r}")
+            if info.flag_bits & 0x1:
+                raise ValueError(f"encrypted evidence member rejected: {name!r}")
+            if info.file_size < 0 or info.file_size > max_member_bytes:
+                raise ValueError(f"evidence member exceeds size limit: {name!r}")
+            total_size += info.file_size
+            if total_size > max_total_bytes:
+                raise ValueError("evidence bundle exceeds total uncompressed-size limit")
+            if info.file_size > 1024 * 1024 and info.compress_size > 0:
+                if info.file_size / info.compress_size > 1000:
+                    raise ValueError(f"suspicious compression ratio rejected: {name!r}")
+
+        for info in infos:
+            rel = PurePosixPath(info.filename.rstrip("/"))
+            target = destination_root.joinpath(*rel.parts)
+            if not target.resolve(strict=False).is_relative_to(destination_root):
+                raise ValueError(f"evidence member escapes extraction directory: {info.filename!r}")
+            if info.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            written = 0
+            with archive.open(info, "r") as source, target.open("xb") as output:
+                while True:
+                    chunk = source.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > info.file_size or written > max_member_bytes:
+                        raise ValueError(f"evidence member actual size exceeds declared size: {info.filename!r}")
+                    output.write(chunk)
+            if written != info.file_size:
+                raise ValueError(f"evidence member size mismatch: {info.filename!r}")
 
 
 def attestation_output_issues(raw: bytes, manifest: dict[str, Any]) -> list[dict[str, str]]:
@@ -227,6 +306,30 @@ def validate_manifest(
             "run_id": manifest["run_id"], "run_kind": manifest["run_kind"], "issues": issues,
         }
 
+    # The attested ZIP is the trust boundary. Verify it first, extract safely,
+    # and hash/audit only members actually contained inside that sealed bundle.
+    resolved: dict[str, Path] = {}
+    bundle_path: Path | None = None
+    try:
+        bundle_path = safe_file(artifact_root, bundle["path"])
+        observed_bundle_sha = digest(bundle_path.read_bytes())
+        resolved["evidence bundle"] = bundle_path
+        if observed_bundle_sha != bundle["sha256"]:
+            issues.append({
+                "code": "artifact_digest_mismatch",
+                "message": f"evidence bundle: expected {bundle['sha256']}, observed {observed_bundle_sha}",
+            })
+    except (OSError, ValueError) as exc:
+        issues.append({"code": "artifact_path_invalid", "message": f"evidence bundle: {exc}"})
+
+    temporary_evidence = tempfile.TemporaryDirectory(prefix="vleb-sealed-evidence-")
+    evidence_root = Path(temporary_evidence.name)
+    if bundle_path is not None:
+        try:
+            extract_evidence_bundle(bundle_path, evidence_root)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            issues.append({"code": "evidence_bundle_invalid", "message": str(exc)})
+
     hashed_fields = [
         ("task contract", task["contract_path"], task["contract_sha256"]),
         ("protocol", manifest["protocol"]["path"], manifest["protocol"]["sha256"]),
@@ -236,13 +339,11 @@ def validate_manifest(
         ("receipt schema", manifest["auditor"]["receipt_schema_path"], manifest["auditor"]["receipt_schema_sha256"]),
         ("mutation catalog", campaign["catalog_path"], campaign["catalog_sha256"]),
         ("mutation results", campaign["results_path"], campaign["results_sha256"]),
-        ("evidence bundle", bundle["path"], bundle["sha256"]),
         ("evidence receipt", bundle["receipt_path"], bundle["receipt_sha256"]),
     ]
-    resolved: dict[str, Path] = {}
     for label, relative, expected in hashed_fields:
         try:
-            path = safe_file(artifact_root, relative)
+            path = safe_file(evidence_root, relative)
             observed = digest(path.read_bytes())
             resolved[label] = path
             if observed != expected:
@@ -312,7 +413,7 @@ def validate_manifest(
                 "--protocol", str(resolved["protocol"]),
                 "--patch", str(resolved["candidate patch"]),
                 "--catalog", str(resolved["mutation catalog"]),
-                "--evidence-root", str(artifact_root.resolve()),
+                "--evidence-root", str(evidence_root.resolve()),
                 "--expected-revision", manifest["candidate"]["checkout_revision"],
                 "--expected-image", manifest["runtime"]["immutable_image_id"],
                 "--expected-task-sha256", task["contract_sha256"],
@@ -348,6 +449,7 @@ def validate_manifest(
         )
     )
     score_eligible = manifest_valid and manifest["run_kind"] == "confirmatory"
+    temporary_evidence.cleanup()
     return {
         "schema_version": "vleb-run-manifest-verification-v1",
         "eligible": manifest_valid,
