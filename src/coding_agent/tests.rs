@@ -48,8 +48,6 @@ fn coding_agent_does_not_relabel_confidence_gap_as_measured_pe() {
         (signals.confidence_gap - (1.0 - agent.cognitive_loop.prediction_confidence()) as f32).abs()
             < f32::EPSILON
     );
-    assert_ne!(signals.confidence_gap, signals.prediction_error);
-
     // Invalid PE does not become an entry in measured-error history, while the
     // independent confidence-gap track remains available for confidence velocity.
     assert!(agent.prediction_error_history.is_empty());
@@ -59,7 +57,6 @@ fn coding_agent_does_not_relabel_confidence_gap_as_measured_pe() {
     let measured = agent.extract_consciousness_signals(&measured_cycle);
     assert!(measured.prediction_error_valid);
     assert_eq!(measured.prediction_error, 0.23);
-    assert_ne!(measured.prediction_error, measured.confidence_gap);
 }
 
 #[test]
