@@ -108,3 +108,26 @@ Independent Python reference results at query cap 3:
 The result is a promising algorithmic hypothesis, not a superiority claim. The optimizer is exact only for this finite 3-hypothesis/4-query fixture and four-model ambiguity set. It minimizes worst-case loss first, then expected cost; it is not constrained to a fixed cumulative-cost budget. The comparison therefore reports both query cap and realized expected costs, and must not be described as a matched-cost SOTA comparison. The selected tree still uses nominal posterior updates and nominal terminal actions, so it is not a fully robust decision/inference system.
 
 The Rust binary and its Rust tests have not yet been compiled or run in this environment because Cargo/rustc/rustfmt are unavailable. The independent Python prototype exhaustively evaluated the same finite problem and reproduced the listed reference witnesses; the Rust-versus-Python CSV check remains pending exact-source execution.
+
+
+## Follow-up: cost-constrained minimax frontier
+
+The robust-tree binary now emits two views:
+1. a depth/query-cap view (the best worst-case tree for depth 0–3);
+2. an expected-cost-constrained view over budgets 0, 0.5, 1, 1.5, 2, 2.5, 2.632, 2.75, and 3 cost units.
+
+For the cost-constrained view, a candidate is feasible only if its **expected query cost is at or below the budget under every declared ambiguity model**. Among feasible plans, selection minimizes worst-case expected terminal loss; ties prefer lower worst-case expected cost. This is a bound on expectation under the finite model set, not a per-trajectory hard cap.
+
+Independent Python reference results for selected budgets:
+| Maximum expected cost across ambiguity models | Worst-case expected regret |
+|---:|---:|
+| 0.0 | 2.300000 |
+| 1.0 | 1.778000 |
+| 1.5 | 1.735898 |
+| 2.0 | 1.706826 |
+| 2.5 | 1.648986 |
+| 2.632 | 1.609023 |
+
+This provides a more informative frontier than the prior risk-first tie-break, but it still does not establish a win over entropy/diversity/SOTA at matched budgets. The next fair comparison is to take the best baseline result feasible under the same **worst-case expected-cost cap**, report the full risk-cost frontier and its dominated segments, then expand to task/source and shift-family replication.
+
+The robust_tree.rs output schema is now mode,limit,scenario,...; the independent checker also verifies the additional worst_case_ambiguity_cost field and rejects a mutated row.
