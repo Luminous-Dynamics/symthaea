@@ -285,14 +285,40 @@ impl SignalComputer {
         symthaea_core::math::ema_update(previous, current, self.ema_alpha)
     }
 
-    /// Compute prediction error from similarity scores
-    pub fn compute_prediction_error(similarities: &[f32]) -> f32 {
-        if similarities.is_empty() {
-            return 1.0; // No data = high surprise
+    /// Smooth an optional prediction-error estimate without inventing evidence.
+    ///
+    /// A missing or non-finite current estimate remains unavailable. A valid
+    /// current sample starts a new series when the previous estimate is absent
+    /// or non-finite; otherwise it is smoothed against the previous valid value.
+    pub fn smooth_prediction_error(
+        &self,
+        previous: Option<f32>,
+        current: Option<f32>,
+    ) -> Option<f32> {
+        let current = current.filter(|value| value.is_finite())?;
+        let smoothed = match previous.filter(|value| value.is_finite()) {
+            Some(previous) if self.ema_alpha.is_finite() => self.ema(previous, current),
+            _ => current,
+        };
+        smoothed.is_finite().then_some(smoothed)
+    }
+
+    /// Compute prediction error from similarity scores.
+    ///
+    /// Returns `None` when no comparison exists or any input is non-finite.
+    /// Missing data is not maximum surprise. Similarity range semantics are
+    /// unchanged: this computes one minus the arithmetic mean of the scores.
+    pub fn compute_prediction_error(similarities: &[f32]) -> Option<f32> {
+        if similarities.is_empty() || similarities.iter().any(|value| !value.is_finite()) {
+            return None;
         }
 
-        let avg: f32 = similarities.iter().sum::<f32>() / similarities.len() as f32;
-        1.0 - avg
+        // Accumulate in f64 so a long list of finite f32 scores does not overflow
+        // merely because the f32 intermediate sum is too small a numeric type.
+        let avg = similarities.iter().map(|&value| value as f64).sum::<f64>()
+            / similarities.len() as f64;
+        let error = (1.0_f64 - avg) as f32;
+        error.is_finite().then_some(error)
     }
 
     /// Compute uncertainty from outcome variance
@@ -381,12 +407,40 @@ mod tests {
     #[test]
     fn test_prediction_error_computation() {
         let high_sim = vec![0.9, 0.85, 0.95];
-        let pe = SignalComputer::compute_prediction_error(&high_sim);
+        let pe = SignalComputer::compute_prediction_error(&high_sim).expect("finite comparisons");
         assert!(pe < 0.2); // Low error when similar
 
         let low_sim = vec![0.1, 0.2, 0.15];
-        let pe = SignalComputer::compute_prediction_error(&low_sim);
+        let pe = SignalComputer::compute_prediction_error(&low_sim).expect("finite comparisons");
         assert!(pe > 0.8); // High error when dissimilar
+    }
+
+
+    #[test]
+    fn empty_or_non_finite_similarity_is_unavailable_not_maximum_surprise() {
+        assert_eq!(SignalComputer::compute_prediction_error(&[]), None);
+        assert_eq!(SignalComputer::compute_prediction_error(&[0.5, f32::NAN]), None);
+        assert_eq!(SignalComputer::compute_prediction_error(&[0.5, f32::INFINITY]), None);
+        assert_eq!(
+            SignalComputer::compute_prediction_error(&[0.0, 1.0]),
+            Some(0.5)
+        );
+    }
+
+    #[test]
+    fn optional_prediction_error_smoothing_preserves_missingness() {
+        let computer = SignalComputer::new(0.5);
+        assert_eq!(computer.smooth_prediction_error(Some(0.2), None), None);
+        assert_eq!(computer.smooth_prediction_error(Some(f32::NAN), Some(0.8)), Some(0.8));
+        assert_eq!(computer.smooth_prediction_error(None, Some(0.8)), Some(0.8));
+        assert_eq!(
+            computer.smooth_prediction_error(Some(0.2), Some(0.8)),
+            Some(0.5)
+        );
+        assert_eq!(
+            computer.smooth_prediction_error(Some(0.2), Some(f32::INFINITY)),
+            None
+        );
     }
 
     #[test]
