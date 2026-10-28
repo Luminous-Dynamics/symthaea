@@ -262,6 +262,7 @@ def audit_claim_evidence_bundle(
         "supported": 0,
         "contradicted": 0,
         "unresolved": 0,
+        "failed": 0,
         "claims": [],
         "issues": [],
     }
@@ -280,6 +281,9 @@ def audit_claim_evidence_bundle(
 
     def mark_unresolved_claims() -> None:
         result["unresolved"] = len(claim_inventory)
+        result["supported"] = 0
+        result["contradicted"] = 0
+        result["failed"] = 0
         result["claims"] = [
             {"claim_id": item.get("claim_id"), "status": "unresolved"}
             for item in claim_inventory
@@ -343,6 +347,7 @@ def audit_claim_evidence_bundle(
             "code": "claim_audit_tool_path_invalid",
             "message": str(exc),
         })
+        mark_unresolved_claims()
         return result
     if result["issues"]:
         mark_unresolved_claims()
@@ -357,6 +362,7 @@ def audit_claim_evidence_bundle(
             "code": "claim_inventory_duplicate",
             "message": "claim IDs and claim paths must be unique in the evaluator-pinned manifest",
         })
+        mark_unresolved_claims()
         return result
 
     all_valid = True
@@ -404,6 +410,7 @@ def audit_claim_evidence_bundle(
                 continue
         except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
             row["issues"] = [{"code": "claim_input_invalid", "message": str(exc)}]
+            result["failed"] += 1
             result["issues"].append({
                 "code": "claim_input_invalid",
                 "message": f"{item['claim_id']}: {exc}",
@@ -455,6 +462,7 @@ def audit_claim_evidence_bundle(
                 row["status"] = "passed"
             else:
                 row["status"] = "failed"
+                result["failed"] += 1
                 result["issues"].append({
                     "code": "claim_evidence_audit_failed",
                     "message": f"{item['claim_id']}: claim auditor did not validate the pinned evidence chain",
@@ -463,6 +471,7 @@ def audit_claim_evidence_bundle(
         except (OSError, subprocess.TimeoutExpired) as exc:
             row["status"] = "unresolved"
             row["error"] = str(exc)
+            result["unresolved"] += 1
             result["issues"].append({
                 "code": "claim_evidence_audit_unavailable",
                 "message": f"{item['claim_id']}: {exc}",
