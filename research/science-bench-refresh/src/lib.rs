@@ -1131,6 +1131,71 @@ mod tests {
     }
 
     #[test]
+    fn task_set_with_correct_digest_but_wrong_denominator_is_not_verified() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        let malformed = serde_json::to_vec(&json!({
+            "schema": TASK_SET_SCHEMA,
+            "generation_id": "test-generation-0001",
+            "tasks": [{
+                "task_id": "task-0001",
+                "family_id": "family-a",
+                "policy_input": {"observations": []},
+                "evaluator_only": {"expected_law": "y = 2*x"}
+            }]
+        }))
+        .unwrap();
+        let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let commitment =
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &malformed).unwrap();
+        manifest["task_set_commitment_sha256"] = json!(commitment);
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &malformed).unwrap();
+        assert!(report.task_set_commitment_matches);
+        assert!(!report.task_set_contract_valid);
+        assert!(!report.verified);
+        assert!(report.issues.iter().any(|issue| issue.contains("record count")));
+    }
+
+    #[test]
+    fn committed_task_set_with_nested_oracle_field_is_rejected() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
+        task_set["tasks"][0]["policy_input"]["nested"] =
+            json!({"hidden_law": "y = 2*x"});
+        let task_bytes = serde_json::to_vec(&task_set).unwrap();
+        let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let commitment =
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes).unwrap();
+        manifest["task_set_commitment_sha256"] = json!(commitment);
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+        assert!(report.task_set_commitment_matches);
+        assert!(!report.task_set_contract_valid);
+        assert!(!report.verified);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("forbidden oracle field")));
+    }
+
+    #[test]
+    fn duplicate_task_ids_are_rejected_even_when_bytes_are_committed() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
+        task_set["tasks"][1]["task_id"] = json!("task-0001");
+        let task_bytes = serde_json::to_vec(&task_set).unwrap();
+        let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        manifest["task_set_commitment_sha256"] = json!(
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes).unwrap()
+        );
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+        assert!(report.task_set_commitment_matches);
+        assert!(!report.task_set_contract_valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("duplicate task_id")));
+    }
+
+    #[test]
     fn malformed_json_is_rejected() {
         let error = validate_manifest_bytes(b"{not-json")
             .expect_err("malformed JSON must not produce a report");
