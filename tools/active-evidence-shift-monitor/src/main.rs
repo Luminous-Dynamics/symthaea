@@ -132,6 +132,7 @@ struct AlarmMetrics {
 #[derive(Clone, Copy)]
 struct Scenario {
     name: &'static str,
+    class: ScenarioClass,
     /// Bernoulli rate in the observed stream before any target-environment shift.
     /// This can differ from p0 when adaptive acquisition changes the sample mix.
     pre_shift_p: f64,
@@ -139,69 +140,101 @@ struct Scenario {
     change_after: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ScenarioClass {
+    StationaryNull,
+    TargetShift,
+    SelectionBiasControl,
+    BaselineMisspecification,
+    WithinBandTransitionControl,
+}
+
+impl ScenarioClass {
+    fn name(self) -> &'static str {
+        match self {
+            Self::StationaryNull => "stationary_null",
+            Self::TargetShift => "target_shift",
+            Self::SelectionBiasControl => "selection_bias_control",
+            Self::BaselineMisspecification => "baseline_misspecification",
+            Self::WithinBandTransitionControl => "within_band_transition_control",
+        }
+    }
+}
+
 const SCENARIOS: [Scenario; 19] = [
     Scenario {
         name: "stationary_null",
+        class: ScenarioClass::StationaryNull,
         pre_shift_p: NOMINAL_P,
         post_shift_p: None,
         change_after: 0,
     },
     Scenario {
         name: "step_down_010",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.10),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_down_020",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.20),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_down_030",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.30),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_down_040",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.40),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_down_045",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.45),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_up_055",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.55),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_up_060",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.60),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_up_070",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.70),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_up_080",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(SHIFTED_P),
         change_after: CHANGE_AFTER,
     },
     Scenario {
         name: "step_up_090",
+        class: ScenarioClass::TargetShift,
         pre_shift_p: NOMINAL_P,
         post_shift_p: Some(0.90),
         change_after: CHANGE_AFTER,
@@ -212,6 +245,7 @@ const SCENARIOS: [Scenario; 19] = [
     // a spurious environment-shift alarm for this scenario.
     Scenario {
         name: "selection_bias_no_environment_shift",
+        class: ScenarioClass::SelectionBiasControl,
         pre_shift_p: 0.74,
         post_shift_p: None,
         change_after: 0,
@@ -221,36 +255,42 @@ const SCENARIOS: [Scenario; 19] = [
     // rate is misspecified, and does not by itself establish a later environment change.
     Scenario {
         name: "stable_baseline_rate_045",
+        class: ScenarioClass::BaselineMisspecification,
         pre_shift_p: 0.45,
         post_shift_p: None,
         change_after: 0,
     },
     Scenario {
         name: "stable_baseline_rate_048",
+        class: ScenarioClass::BaselineMisspecification,
         pre_shift_p: 0.48,
         post_shift_p: None,
         change_after: 0,
     },
     Scenario {
         name: "stable_baseline_rate_049",
+        class: ScenarioClass::BaselineMisspecification,
         pre_shift_p: 0.49,
         post_shift_p: None,
         change_after: 0,
     },
     Scenario {
         name: "stable_baseline_rate_051",
+        class: ScenarioClass::BaselineMisspecification,
         pre_shift_p: 0.51,
         post_shift_p: None,
         change_after: 0,
     },
     Scenario {
         name: "stable_baseline_rate_052",
+        class: ScenarioClass::BaselineMisspecification,
         pre_shift_p: 0.52,
         post_shift_p: None,
         change_after: 0,
     },
     Scenario {
         name: "stable_baseline_rate_055",
+        class: ScenarioClass::BaselineMisspecification,
         pre_shift_p: 0.55,
         post_shift_p: None,
         change_after: 0,
@@ -260,6 +300,7 @@ const SCENARIOS: [Scenario; 19] = [
     // total alarm probability across this predictable transition.
     Scenario {
         name: "within_band_transition_049_to_051",
+        class: ScenarioClass::WithinBandTransitionControl,
         pre_shift_p: 0.49,
         post_shift_p: Some(0.51),
         change_after: CHANGE_AFTER,
@@ -579,7 +620,7 @@ where
 
 fn print_eprocess_family_csv() {
     println!(
-        "family,scenario,horizon,change_after,p0,stream_pre_p,p1,false_alarm_probability,detection_probability,mean_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
+        "family,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
     );
 
     for family in EProcessFamily::ALL {
@@ -626,18 +667,27 @@ fn print_eprocess_family_csv() {
             } else {
                 "NA".to_owned()
             };
+            let null_or_pre_shift_alarm = if scenario.class == ScenarioClass::WithinBandTransitionControl {
+                metrics.false_alarm_probability + metrics.detection_probability
+            } else {
+                metrics.false_alarm_probability
+            };
+            let target_shift = scenario.class == ScenarioClass::TargetShift;
+            let detection = target_shift.then_some(metrics.detection_probability);
+            let delay = if target_shift { metrics.mean_detection_delay } else { None };
             println!(
-                "{},{},{},{},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12},{:.12}",
+                "{},{},{},{},{},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12},{:.12}",
                 family.name(),
                 scenario.name,
+                scenario.class.name(),
                 FAMILY_HORIZON,
                 change_after,
                 NOMINAL_P,
                 scenario.pre_shift_p,
                 p1,
-                metrics.false_alarm_probability,
-                csv_optional(scenario.post_shift_p.map(|_| metrics.detection_probability)),
-                csv_optional(metrics.mean_detection_delay),
+                null_or_pre_shift_alarm,
+                csv_optional(detection),
+                csv_optional(delay),
                 PER_CELL_ALPHA,
                 metrics.survival_probability,
                 (1.0 / PER_CELL_ALPHA).ln()
@@ -655,7 +705,7 @@ fn csv_optional(value: Option<f64>) -> String {
 
 fn print_csv() {
     println!(
-        "boundary,scenario,horizon,change_after,p0,stream_pre_p,p1,false_alarm_probability,detection_probability,mean_detection_delay,per_cell_alpha,survival_probability"
+        "boundary,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability"
     );
     for boundary in Boundary::ALL {
         for horizon in HORIZONS {
@@ -677,18 +727,27 @@ fn print_csv() {
                 } else {
                     "NA".to_owned()
                 };
+                let null_or_pre_shift_alarm = if scenario.class == ScenarioClass::WithinBandTransitionControl {
+                    metrics.false_alarm_probability + metrics.detection_probability
+                } else {
+                    metrics.false_alarm_probability
+                };
+                let target_shift = scenario.class == ScenarioClass::TargetShift;
+                let detection = target_shift.then_some(metrics.detection_probability);
+                let delay = if target_shift { metrics.mean_detection_delay } else { None };
                 println!(
-                    "{},{},{},{},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12}",
+                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12}",
                     boundary.name(),
                     scenario.name,
+                    scenario.class.name(),
                     horizon,
                     change_after,
                     NOMINAL_P,
                     scenario.pre_shift_p,
                     p1,
-                    metrics.false_alarm_probability,
-                    csv_optional(scenario.post_shift_p.map(|_| metrics.detection_probability)),
-                    csv_optional(metrics.mean_detection_delay),
+                    null_or_pre_shift_alarm,
+                    csv_optional(detection),
+                    csv_optional(delay),
                     PER_CELL_ALPHA,
                     metrics.survival_probability
                 );
