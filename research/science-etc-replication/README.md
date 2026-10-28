@@ -5,6 +5,8 @@ Research protocol and machine-readable trial design for a budget-matched replica
 - Main protocol: `docs/research/SCI-ETC-REPLICATION-001.md`.
 - Run manifest schema: `research/science-etc-replication/schema/run-manifest.schema.json`.
 - Non-scoring example: `research/science-etc-replication/fixtures/run-manifest.example.json`.
+- Standalone strict Rust validator: `research/science-etc-replication/src/lib.rs` and `src/main.rs`.
+- Focused CI: `.github/workflows/science-etc-replication-validator.yml`.
 - Tracking issue: [#8804](https://github.com/Luminous-Dynamics/symthaea/issues/8804).
 
 ## Why replicate rather than copy the headline
@@ -29,3 +31,20 @@ The schema enforces strict object shapes and basic types. A later Rust validator
 6. Extend to noisy, embedded, operator-held-out and sealed refresh tasks only after the narrow replication is qualified.
 
 No model performance result is included in this protocol tranche.
+## Manifest preflight
+
+```sh
+cargo fmt --manifest-path research/science-etc-replication/Cargo.toml -- --check
+cargo test --locked --manifest-path research/science-etc-replication/Cargo.toml
+cargo clippy --locked --manifest-path research/science-etc-replication/Cargo.toml --all-targets -- -D warnings
+cargo run --locked --manifest-path research/science-etc-replication/Cargo.toml -- \
+  research/science-etc-replication/fixtures/run-manifest.example.json
+```
+
+The validator checks the expected eight-arm grid, native-metric preservation, exact task-slice identity and model coverage, pinned source/model/judge identities for qualified runs, sorted measurement caps, enforced over-budget rejection, and preregistered primary contrast references. It reports the expected attempt count separately for each budget profile.
+
+The example fixture should validate structurally but must fail if invoked with `--require-qualified`. The placeholder hashes and unresolved model/upstream identities prevent admission for scoring.
+
+## Validation boundary
+
+21 Rust unit tests are authored for the manifest contract, with two additional CLI argument tests. They must not be reported as passing until exact-head CI runs. No NewtonBench experiment is included in this PR tranche. The schema/validator does not authenticate a hosted model snapshot or prove that the NewtonBench runner executed a declared configuration.
