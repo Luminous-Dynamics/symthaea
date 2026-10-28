@@ -36,10 +36,20 @@ The ratio baseline/candidate is greater than 1 when the candidate uses less of t
 
 The helper script scripts/research/run-photonic-contract-tests.sh compiles the four dependency-free Rust contracts directly with rustc --test rather than invoking Cargo. This provides a fast, narrow test path while the repository's wider workspace-discovery issue is being resolved. It does not replace full crate compilation, cargo fmt, clippy, repository CI, exact MIS integration, or application-level comparison.
 
+## Candidate and verifier-receipt evidence boundary
+
+A target-hit record must include the SHA-256-shaped identity of the exact candidate bytes and a content-addressed verifier-receipt reference. The report validator binds the receipt metadata to the canonical graph digest, verifier digest, candidate digest, frozen target, candidate cardinality, conflict count, and verdict. A verified target hit is not counted when the receipt reference or any required matching metadata is absent or inconsistent.
+
+**Important limit:** `matched_evaluation.rs` validates receipt references and metadata; it does not fetch receipt bytes, recompute a receipt digest from those bytes, or authenticate a signature. The producer/ingestion boundary must independently run the verifier, validate the actual receipt artifact, and only then provide these parsed metadata fields. The current crate's existing `ResearchArtifactReceipt` uses a non-cryptographic FNV fingerprint and explicitly is not a signature, so it is not sufficient on its own as an independently authenticated verifier receipt. If the receipt-ingestion step cannot be demonstrated, the evidence must remain unverified and must not count as a target hit.
+
+This boundary prevents accidental “verified” dispositions from being represented without a receipt reference, but it is not an authenticity proof against a malicious report producer. A later integration should consume the project's concrete verifier output format and verify its cryptographic commitment/signature where the trust model requires one.
+
 ## Negative controls in unit tests
 
 - Unknown acquisition time suppresses all-in time and speedup rather than making the candidate look cheaper.
 - A large unverified candidate is not a target hit.
+- Missing verifier receipt, malformed receipt digest, and receipt metadata disagreement with graph/verifier/candidate/target are rejected.
+- A verifier failure without a receipt remains recordable but is never a target hit.
 - Supplying joules under NotMeasured is rejected.
 - Device-only energy cannot be compared directly with full-system energy.
 - Different graph digests, target size, solver budget, verifier digest, pair ID sets, or paired seed identity are rejected.
