@@ -38,7 +38,7 @@ The e-process gate's exact probability of crossing the risk boundary by n=120 un
 
 The fixture contains 40 scenarios: five horizons {20, 40, 80, 120, 200} crossed with four risk truths {0, 0.05, 0.10, 0.20} and four value means {0.40, 0.50, 0.60, 0.70}. The scorer reports the exact probability of crossing at any time up to each horizon.
 
-The workflow verifies the fixture digest, runs standalone Rust tests, builds the scorer, checks the scenario and output counts, and uploads the machine-readable output plus a receipt binding the commit SHA, Rust version, source hash, fixture hash and output hash.
+The output starts with a CONTRACT record that states alpha allocation, risk cap, value floor, the fixed risk alternatives, value lambdas and peeking look schedule. It then reports the exact scenario crossings, a PEЕKING_CONTROL comparison, fail-closed GATE_CONTROL cases, and a summary. The workflow verifies the fixture digest, runs standalone Rust tests, builds the scorer, checks scenario counts, and uploads the machine-readable output plus a receipt binding commit SHA, Rust version, source hash, fixture hash and output hash.
 
 ## Acceptance gates
 
@@ -57,6 +57,6 @@ The workflow verifies the fixture digest, runs standalone Rust tests, builds the
 
 ## Limitations
 
-This benchmark does not prove correctness under arbitrary adaptive data selection, clustered dependence, nonstationary targets, unmodeled target shift, multiple subgroups, or reuse across multiple campaigns. Real use needs a conditional null that remains true under the acquisition policy, appropriate cluster-level procedures, a preregistered alpha allocation across claims and slices, independently verified evidence receipts, and an untouched target confirmation set. The target-calibration and cost/provenance gates remain outside this mathematical scorer.
+This benchmark does not prove correctness under arbitrary adaptive data selection, clustered dependence, nonstationary targets, unmodeled target shift, multiple subgroups, or reuse across multiple campaigns. Real use needs a conditional null that remains true under the acquisition policy, appropriate cluster-level procedures, a preregistered alpha allocation across claims and slices, independently verified evidence receipts, and an untouched target confirmation set. A small deterministic authorization wrapper returns AUTHORIZED only when both e-processes cross and evidence, target-calibration, cost and provenance flags pass; its GATE_CONTROL rows exercise missing-evidence, shift/uncalibrated, over-budget, provenance-mismatch, and always-deny cases. Those booleans are simulated contract inputs, not actual production receipt verification or shift detection.
 
 No SOTA, real-world safety, calibration, transportability or production-authority claim follows from these synthetic cases.
