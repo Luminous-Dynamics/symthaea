@@ -18,7 +18,8 @@
     "outputs",
     "process",
     "observed_result",
-    "source_sha256"
+    "source_sha256",
+    "input_drift_paths"
   ],
   "properties": {
     "schema_version": {
@@ -202,6 +203,13 @@
     },
     "source_sha256": {
       "$ref": "#/$defs/sha256"
+    },
+    "input_drift_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/relativePath"
+      }
     }
   },
   "allOf": [
