@@ -26,6 +26,8 @@ def valid_manifest() -> dict[str, Any]:
             "workflow_path": ".github/workflows/vleb-confirmatory.yml",
             "workflow_ref": "refs/heads/main",
             "workflow_sha": git("1"),
+            "source_repository_digest": git("4"),
+            "source_repository_ref": "refs/heads/main",
             "repository_id": 123456789,
             "run_id": "90001",
             "run_attempt": 1,
