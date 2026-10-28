@@ -35,10 +35,13 @@ The output probabilities should sum to one. The null test checks that the single
     cargo test --locked --manifest-path tools/active-evidence-shift-monitor/Cargo.toml
     cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > /tmp/shift-monitor.csv
     cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --sentinel-budget-csv > /tmp/sentinel-budget.csv
+    cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --eprocess-family-csv > /tmp/eprocess-family.csv
     python3 tools/active-evidence-shift-monitor/reference_check.py --self-test
     python3 tools/active-evidence-shift-monitor/reference_check.py /tmp/shift-monitor.csv
     python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget-self-test
     python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget /tmp/sentinel-budget.csv
+    python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family-self-test
+    python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family /tmp/eprocess-family.csv
 
 ## Exploratory Python reference results
 
@@ -180,3 +183,32 @@ Detection is the probability of an alarm *after* the true shift and by the end o
 A subtlety: the “no-environment-shift alarm probability” for q>0 is the probability of an alarm on the randomized sentinel channel over its own number of observations; for q=0 it is the spurious alarm probability of the adaptively selected channel over the full budget. The genuine-shift column excludes alarms that occur before the change; that pre-change false-alarm probability is also emitted separately in the CSV. Delay is conditional on detection after the shift and converted to total-label equivalents by dividing sentinel-count delay by q.
 
 This benchmark now allows the next experiment to sweep not only sentinel share but also change magnitude, change onset, stratum prevalence, misspecified audit inclusion probabilities, and rare/unsupported target groups. A later version should compare a random sentinel channel against valid design-based reweighting and policy-conditioned nulls; this release does not claim any of those corrections is already qualified.
+
+
+## 20. A fixed portfolio of anytime-valid e-processes
+
+The new `--eprocess-family-csv` report compares five predeclared monitoring strategies under the same Ville threshold (1/\delta), with per-cell (delta=0.05/12), horizon 1,000, and a step change after observation 100:
+
+- Beta(1/2, 1/2), the existing Jeffreys mixture.
+- Beta(1, 1), a uniform alternative.
+- Beta(5, 5), a moderately concentrated alternative.
+- Beta(20, 20), a local alternative concentrated near the nominal rate p0=0.5.
+- Equal-weight portfolio of all four e-processes, with weights fixed at 1/4 before observations.
+
+A convex mixture of e-processes is again an e-process under the same null, so the portfolio retains the anytime-valid Ville guarantee. It does not choose the prior after seeing the observed shift. The CSV includes the stationary-null alarm probability, false alarms before a true shift, post-shift detection probability and conditional delay, as well as the selection-bias negative control.
+
+An independent exact-DP Python prototype gave the following horizon-1,000 results at the fixed anytime-valid threshold:
+
+| E-process alternative | Stable-null alarm probability | Detect p1=0.55 | Detect p1=0.60 | Detect p1=0.70 | Detect p1=0.80 |
+|---|---:|---:|---:|---:|---:|
+| Beta(1/2, 1/2) | 0.003059 | 11.84% | 94.28% | 99.75% | 99.75% |
+| Beta(1, 1) | 0.003108 | 14.17% | 95.43% | 99.78% | 99.78% |
+| Beta(5, 5) | 0.002667 | 19.39% | 97.13% | 99.90% | 99.90% |
+| Beta(20, 20) | 0.001884 | 22.83% | 97.92% | 99.99% | 99.99% |
+| Equal portfolio | 0.002778 | 17.93% | 96.75% | 99.84% | 99.84% |
+
+These are exact finite-Bernoulli probabilities for the predeclared model and horizon—not real-world results or evidence that Beta(20,20) is universally better. The single-prior policies have different realized null alarm probabilities below the common theoretical bound; the equal portfolio achieves a useful compromise and raises weak-shift power versus the original Jeffreys monitor in this fixture. We must also test p1 near 0 or 1, gradual ramps, transient bursts, serial dependence, misspecified p0, and different horizons before selecting a default. If comparing tuned thresholds, calibrate and evaluate on disjoint synthetic/validation regimes; do not choose the prior or threshold on the sealed test alternatives.
+
+**Important protocol distinction:** the family report uses the same Ville threshold for every policy, so each remains anytime-valid. It is not a matched-realized-false-alarm leaderboard; actual null alarm probabilities are emitted so the trade-offs stay visible. The next calibration experiment should compare power at matched empirical false-alarm budgets without calling finite-horizon-calibrated thresholds anytime-valid.
+
+The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls are now included in the branch. Their output still requires exact-head CI before being described as Rust-qualified.
