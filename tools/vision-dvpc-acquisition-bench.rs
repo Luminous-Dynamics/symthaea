@@ -548,11 +548,19 @@ mod tests {
         assert!(out.contains("missing_outcome_count\t1"));
     }
     #[test] fn selected_evaluation_can_reveal_harmful_decision_value(){
-        let a=sample_actions().replace(
-            "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.10",
-            "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.40"
+        let a=sample_actions()
+            .replace(
+                "ACTION\tunauthorized-source\td4\tAUTHORIZATION\t100\t0.99\t1\t1\tUNAUTHORIZED\tPUBLIC_SOURCE_AUDIT",
+                "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.10\t20\t30\tELIGIBLE\tNEW_INDEPENDENT_CLUSTER"
+            )
+            .replace(
+                "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.10\t20\t30",
+                "ACTION\tshift-replication\td4\tSHIFT_SIGN_REVERSAL\t5\t0.40\t20\t30"
+            );
+        let o=sample_oracle(&a).replace(
+            "ORACLE\tunauthorized-source\t0\t1\t1\tSUCCESS",
+            "ORACLE\tshift-replication\t-0.15\t20\t30\tSUCCESS"
         );
-        let o=sample_oracle(&a);
         let out=analyze(a.as_bytes(),&sha256_hex(a.as_bytes()),o.as_bytes(),&sha256_hex(o.as_bytes()),"decision-value-lcb").unwrap();
         assert!(out.contains("shift-replication\td4\ttrue\tSELECTED"));
         assert!(out.contains("shift-replication\td4\ttrue\tSELECTED\t5.00000000\t0.40000000\t20\t30\tSUCCESS\t-0.150000000000"));
