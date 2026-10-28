@@ -45,3 +45,19 @@ jobs:
           test "$(/tmp/vis-dvpc-023 --zero-failure-required 0.025 0.05 | cut -f2)" = "72"
           grep '^SHIFT_CONTROL[[:space:]]' /tmp/vis-dvpc-023-sweep.tsv
           grep '^SUMMARY[[:space:]]' /tmp/vis-dvpc-023-sweep.tsv
+      - name: Create exact-source reproducibility receipt
+        run: |
+          {
+            printf 'VIS_DVPC_023_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-coverage-sweep.rs tests/fixtures/vision-dvpc-023-grid.tsv /tmp/vis-dvpc-023-sweep.tsv
+          } > /tmp/vis-dvpc-023-receipt.tsv
+      - name: Publish machine-readable sweep and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-023-coverage-\${{ github.sha }}
+          path: |
+            /tmp/vis-dvpc-023-sweep.tsv
+            /tmp/vis-dvpc-023-receipt.tsv
+          retention-days: 90
