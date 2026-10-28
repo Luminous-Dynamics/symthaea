@@ -35,7 +35,7 @@ The matrix is normalized to a stable canonical binary representation, so C- vs F
 
 A typed implementation now lives at crates/domains/symthaea-subterranean/src/policy_risk_binding.rs and is exposed by the subterranean crate. The crate manifest and Cargo.lock were updated for the workspace's existing sha2 dependency. Its eight inline unit tests cover canonical manifest round-trip, row permutations, policy and hypothesis order, execution order, trusted-anchor/self-digest tampering, invalid matrix values/shape, and signed-zero normalization.
 
-This Rust module is **authored but not locally compiled or tested**: the current environment has no cargo or rustc executable, and the PR's latest CI run was skipped. Its committed file has Git blob 63c4e9aacfe5b7db5971e701c42ae38ac226c4c3; the crate manifest blob is 45de998db181d6459983e417942db27aee528e0e; lib.rs blob is 525647bb48110711bddecc813879b66be5e7e707; Cargo.lock blob is 5701d38370bb363508872871a15eb27537f8d645.
+This Rust module is **authored but not locally compiled or tested**: the current environment has no cargo or rustc executable, and the PR's latest CI run was skipped. Its committed file has Git blob e991c451ddce443849b9823f76836714eb4ba2ec; the crate manifest blob is 45de998db181d6459983e417942db27aee528e0e; lib.rs blob is 525647bb48110711bddecc813879b66be5e7e707; Cargo.lock blob is 5701d38370bb363508872871a15eb27537f8d645.
 
 ## Trust model caveat
 
