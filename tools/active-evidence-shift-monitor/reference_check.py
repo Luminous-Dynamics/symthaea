@@ -1,26 +1,3 @@
-def scenario_class(scenario):
-    if scenario == "stationary_null":
-        return "stationary_null"
-    if scenario.startswith("step_"):
-        return "target_shift"
-    if scenario == "selection_bias_no_environment_shift":
-        return "selection_bias_control"
-    if scenario.startswith("stable_baseline_rate_"):
-        return "baseline_misspecification"
-    if scenario == "within_band_transition_049_to_051":
-        return "within_band_transition_control"
-    raise ValueError(f"unclassified benchmark scenario: {scenario}")
-
-
-def reporting_metrics(scenario, metrics):
-    """Separate accepted-null alarm risk from real target-shift detection metrics."""
-    false_alarm, detection, delay, survival = metrics
-    kind = scenario_class(scenario)
-    null_alarm = false_alarm + (detection or 0.0) if kind == "within_band_transition_control" else false_alarm
-    is_target_shift = kind == "target_shift"
-    return kind, null_alarm, detection if is_target_shift else None, delay if is_target_shift else None, survival
-
-
 #!/usr/bin/env python3
 """Independent exact reference checker for the shift-monitor Rust DP."""
 import csv
@@ -81,7 +58,7 @@ PRE_SHIFT_PROBABILITIES["stable_baseline_rate_055"] = 0.55
 PRE_SHIFT_PROBABILITIES["within_band_transition_049_to_051"] = 0.49
 FIELDS = (
     "boundary", "scenario", "scenario_class", "horizon", "change_after", "p0", "stream_pre_p", "p1",
-    "null_or_pre_shift_alarm_probability", "post_shift_detection_probability",
+    "scenario_or_pre_shift_alarm_probability", "post_shift_detection_probability",
     "mean_post_shift_detection_delay", "per_cell_alpha", "survival_probability",
 )
 EPS = 1e-10
@@ -124,12 +101,34 @@ EPROCESS_FAMILY_SCENARIOS = (
 )
 EPROCESS_FAMILY_FIELDS = (
     "family", "scenario", "scenario_class", "horizon", "change_after", "p0", "stream_pre_p", "p1",
-    "null_or_pre_shift_alarm_probability", "post_shift_detection_probability",
+    "scenario_or_pre_shift_alarm_probability", "post_shift_detection_probability",
     "mean_post_shift_detection_delay", "per_cell_alpha", "survival_probability", "log_e_threshold",
 )
 BETA_A = 0.5
 BETA_B = 0.5
 
+
+def scenario_class(scenario):
+    if scenario == "stationary_null":
+        return "stationary_null"
+    if scenario.startswith("step_"):
+        return "target_shift"
+    if scenario == "selection_bias_no_environment_shift":
+        return "selection_bias_control"
+    if scenario.startswith("stable_baseline_rate_"):
+        return "baseline_misspecification"
+    if scenario == "within_band_transition_049_to_051":
+        return "within_band_transition_control"
+    raise ValueError(f"unclassified benchmark scenario: {scenario}")
+
+
+def reporting_metrics(scenario, metrics):
+    """Separate accepted-null alarm risk from real target-shift detection metrics."""
+    false_alarm, detection, delay, survival = metrics
+    kind = scenario_class(scenario)
+    null_alarm = false_alarm + (detection or 0.0) if kind == "within_band_transition_control" else false_alarm
+    is_target_shift = kind == "target_shift"
+    return kind, null_alarm, detection if is_target_shift else None, delay if is_target_shift else None, survival
 
 def radius(boundary, n):
     if boundary == "time_uniform_alpha_spending":
@@ -238,7 +237,7 @@ def reference_rows():
                     "p0": f"{P0:.12f}",
                     "stream_pre_p": f"{PRE_SHIFT_PROBABILITIES[scenario]:.12f}",
                     "p1": f"{SHIFT_PROBABILITIES[scenario]:.12f}" if SHIFT_PROBABILITIES[scenario] is not None else "NA",
-                    "null_or_pre_shift_alarm_probability": f"{null_alarm:.12f}",
+                    "scenario_or_pre_shift_alarm_probability": f"{null_alarm:.12f}",
                     "post_shift_detection_probability": as_text(detection),
                     "mean_post_shift_detection_delay": as_text(delay),
                     "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
@@ -266,7 +265,7 @@ def check_csv(path):
     key_fields = ("boundary", "scenario", "horizon")
     text_fields = ("boundary", "scenario", "scenario_class", "horizon", "change_after", "p1",
                    "post_shift_detection_probability", "mean_post_shift_detection_delay")
-    numeric_fields = ("p0", "stream_pre_p", "null_or_pre_shift_alarm_probability", "per_cell_alpha", "survival_probability")
+    numeric_fields = ("p0", "stream_pre_p", "scenario_or_pre_shift_alarm_probability", "per_cell_alpha", "survival_probability")
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
             raise ValueError(f"row key mismatch on line {line}")
@@ -632,7 +631,7 @@ def eprocess_family_rows(tables=None):
                 "p0": f"{P0:.12f}",
                 "stream_pre_p": f"{PRE_SHIFT_PROBABILITIES[scenario]:.12f}",
                 "p1": f"{post_shift_p:.12f}" if post_shift_p is not None else "NA",
-                "null_or_pre_shift_alarm_probability": f"{null_alarm:.12f}",
+                "scenario_or_pre_shift_alarm_probability": f"{null_alarm:.12f}",
                 "post_shift_detection_probability": as_text(detection),
                 "mean_post_shift_detection_delay": as_text(delay),
                 "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
@@ -660,7 +659,7 @@ def check_eprocess_family_csv(path):
         "post_shift_detection_probability", "mean_post_shift_detection_delay",
     )
     numeric_fields = (
-        "null_or_pre_shift_alarm_probability", "per_cell_alpha", "survival_probability", "log_e_threshold",
+        "scenario_or_pre_shift_alarm_probability", "per_cell_alpha", "survival_probability", "log_e_threshold",
     )
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
@@ -693,31 +692,31 @@ def eprocess_family_self_test():
     for family in EPROCESS_FAMILY_ORDER:
         null = indexed[(family, "stationary_null")]
         selected = indexed[(family, "selection_bias_no_environment_shift")]
-        if float(null["null_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+        if float(null["scenario_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
             raise ValueError(f"{family} exceeds the anytime null alarm budget")
-        if float(selected["null_or_pre_shift_alarm_probability"]) < 0.99:
+        if float(selected["scenario_or_pre_shift_alarm_probability"]) < 0.99:
             raise ValueError(f"{family} failed the selection-bias negative control")
         misspecified = indexed[(family, "stable_baseline_rate_048")]
         if family == COMPOSITE_FAMILY:
-            if float(misspecified["null_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+            if float(misspecified["scenario_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
                 raise ValueError("composite-null e-process exceeded alpha at p=0.48 within its null interval")
             upper_edge = indexed[(family, "stable_baseline_rate_052")]
-            if float(upper_edge["null_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+            if float(upper_edge["scenario_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
                 raise ValueError("composite-null e-process exceeded alpha at p=0.52 within its null interval")
             outside_band = indexed[(family, "stable_baseline_rate_045")]
-            if float(outside_band["null_or_pre_shift_alarm_probability"]) <= 0.04:
+            if float(outside_band["scenario_or_pre_shift_alarm_probability"]) <= 0.04:
                 raise ValueError("composite-null outside-band negative control did not expose baseline drift")
             within_band_transition = indexed[(family, "within_band_transition_049_to_051")]
-            transition_alarm = float(within_band_transition["null_or_pre_shift_alarm_probability"])
+            transition_alarm = float(within_band_transition["scenario_or_pre_shift_alarm_probability"])
             if transition_alarm > PER_CELL_ALPHA + EPS:
                 raise ValueError("composite-null e-process exceeded alpha when conditional rates moved within its accepted band")
-        elif float(misspecified["null_or_pre_shift_alarm_probability"]) <= PER_CELL_ALPHA:
+        elif float(misspecified["scenario_or_pre_shift_alarm_probability"]) <= PER_CELL_ALPHA:
             raise ValueError(f"{family} did not expose nominal-rate misspecification")
         for scenario in EPROCESS_FAMILY_SCENARIOS:
             row = indexed[(family, scenario)]
             if scenario.startswith("step_"):
                 total = (
-                    float(row["null_or_pre_shift_alarm_probability"])
+                    float(row["scenario_or_pre_shift_alarm_probability"])
                     + float(row["post_shift_detection_probability"])
                     + float(row["survival_probability"])
                 )
@@ -725,7 +724,7 @@ def eprocess_family_self_test():
                     raise ValueError(f"{family} probability mass does not conserve for {scenario}")
         if family == COMPOSITE_FAMILY:
             within_band = indexed[(family, "within_band_transition_049_to_051")]
-            if float(within_band["null_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+            if float(within_band["scenario_or_pre_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
                 raise ValueError("composite-null process exceeded alpha on a predictable within-band schedule")
 
     alternating_alarm, alternating_survival = simulate_null_schedule(
