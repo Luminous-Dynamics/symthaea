@@ -33,5 +33,13 @@ class DecisionSufficientAmbiguityTests(unittest.TestCase):
             for v in s['methods'].values():
                 self.assertTrue(np.isfinite(v['mean_regret_bits']))
                 self.assertLess(v['max_certificate_gap_bits'],1e-5)
+            for method in ('risk_pooled','risk_group_max'):
+                evidence=s['methods'][method]['covered_case_regret_bound_2r']
+                self.assertEqual(evidence['violations'],0)
+                self.assertLessEqual(evidence['max_regret_over_2r'],1.0+1e-7)
+                for row in s['rows']:
+                    prediction=row['methods'][method]
+                    if prediction['covered']:
+                        self.assertLessEqual(prediction['regret_bits'],2.0*prediction['radius']+1e-7)
 
 if __name__=='__main__': unittest.main()
