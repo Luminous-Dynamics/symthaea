@@ -461,7 +461,71 @@
               },
               "source_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "execution_witness": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "receipt_path",
+                  "receipt_sha256",
+                  "plan_path",
+                  "plan_sha256"
+                ],
+                "properties": {
+                  "receipt_path": {
+                    "$ref": "#/$defs/relativePath"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "plan_path": {
+                    "$ref": "#/$defs/relativePath"
+                  },
+                  "plan_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
               }
+            }
+          }
+        },
+        "execution_witness_toolchain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runner_path",
+            "runner_sha256",
+            "auditor_path",
+            "auditor_sha256",
+            "receipt_schema_path",
+            "receipt_schema_sha256",
+            "plan_schema_path",
+            "plan_schema_sha256"
+          ],
+          "properties": {
+            "runner_path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "runner_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "auditor_path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "auditor_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "receipt_schema_path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "receipt_schema_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "plan_schema_path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "plan_schema_sha256": {
+              "$ref": "#/$defs/sha256"
             }
           }
         }
