@@ -384,28 +384,29 @@ mod tests {
     }
 
     #[test]
-    fn source_digest_is_deterministic_across_whitespace_and_serialization() {
-        let first = sample_line();
-        let second_value: Value = serde_json::from_str(&first).unwrap();
-        let second = serde_json::to_string_pretty(&second_value).unwrap();
+    fn source_digest_and_ids_ignore_json_whitespace_and_object_key_order() {
+        let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":null,"states":[{"state_index":0,"step":1,"url":"https://example.test","action":{"type":"click","target":"x"},"thought":"t","accessibility_tree":"tree","screenshot":null}]}"#;
+        let second = r#"{
+            "states":[{"screenshot":null,"accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0}],
+            "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":null,"id":"traj-order"
+        }"#;
         let resolver = |_: &str, _: &str| Some("scope".to_string());
 
         let first_records = ingest_longmemeval_v2_jsonl([first.as_bytes()], resolver).unwrap();
         let second_records = ingest_longmemeval_v2_jsonl([second.as_bytes()], resolver).unwrap();
-        assert_eq!(first_records.len(), second_records.len());
+        assert_eq!(first_records.len(), 1);
+        assert_eq!(second_records.len(), 1);
+        let left = &first_records[0];
+        let right = &second_records[0];
+        assert_eq!(left.evidence_id, right.evidence_id);
+        assert_eq!(left.hdc_id, right.hdc_id);
+        assert_eq!(left.source.source_sha256, right.source.source_sha256);
+        assert_eq!(left.content_sha256, right.content_sha256);
 
-        for (left, right) in first_records.iter().zip(second_records.iter()) {
-            assert_eq!(left.evidence_id, right.evidence_id);
-            assert_eq!(left.hdc_id, right.hdc_id);
-            assert_eq!(left.source.source_sha256, right.source.source_sha256);
-            let value: Value = serde_json::from_slice(first.as_bytes()).unwrap();
-            let trajectory: LongMemEvalTrajectory = serde_json::from_value(value).unwrap();
-            let state = trajectory.states.iter().find(|state| {
-                state.state_index == left.source.step_index.unwrap()
-            }).unwrap();
-            let canonical = canonical_source_bytes(&trajectory, state).unwrap();
-            assert!(left.verify_source_bytes(&canonical).is_ok());
-        }
+        let value: Value = serde_json::from_slice(first.as_bytes()).unwrap();
+        let trajectory: LongMemEvalTrajectory = serde_json::from_value(value).unwrap();
+        let canonical = canonical_source_bytes(&trajectory, &trajectory.states[0]).unwrap();
+        assert!(left.verify_source_bytes(&canonical).is_ok());
     }
 
     #[test]
