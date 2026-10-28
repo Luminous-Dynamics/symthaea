@@ -109,3 +109,19 @@ Do not describe any earlier evidence class as a later one. A win over plug-in EV
 ## 12. Current blocker
 
 The local v1.9 report states that the evaluator checks both the v1.9 contract and parent v1.8 digest, but the reproducible-package audit found two referenced frozen contract files missing. Recover the original exact bytes or mark the v1.9 package incomplete. Do not fabricate replacements from aggregate metrics. The v2.0 confirmatory run is blocked until the v1.9 provenance issue is resolved or the work is explicitly forked into a new version with new frozen inputs.
+
+## 13. New exploratory algorithmic pilot: exact policy trees and a cost frontier
+
+Tracking implementation: [PR #8723](https://github.com/Luminous-Dynamics/symthaea/pull/8723).
+
+A dependency-free finite synthetic model now enumerates all 3,137 observation-contingent query trees up to depth three for a fixed three-hypothesis/four-query task. Unlike one-step greedy robust EVSI, the optimizer chooses a complete fixed query tree against a four-model ambiguity set and can additionally constrain worst-case expected acquisition cost. It does not switch the adversarial model independently at every branch.
+
+Independent Python reference findings on this hand-defined model:
+- Worst-case regret over the four ambiguity models at depth three: 1.7780 for one-step robust greedy versus 1.6090 for the selected full tree.
+- At maximum expected-cost budget 2.632, best of the implemented greedy arms (random, entropy, plug-in EVSI, one-step robust EVSI) has worst-case regret 1.7780; the full tree has 1.6090.
+- At expected-cost budget 3.0, entropy has worst-case regret 1.7359 while the full tree has 1.6090 at expected cost 2.632.
+- The deliberately out-of-ambiguity-set measurement flip still raises full-tree regret to 3.5133 versus 2.3000 for no query.
+
+This is an algorithmic pilot, **not confirmatory evidence**. The best greedy baseline is selected on the same four scenarios; only four hand-defined ambiguity models are used; the cost limit is on expected cost rather than each trajectory; and no Uncertainty Herding or R-IDeA implementation is included. The Rust binaries and independent CSV parity gate are committed, but Rust compilation/tests and exact-head workflow qualification have not yet been confirmed.
+
+This pilot suggests the next research question should be: **can a sequentially calibrated, fixed-horizon decision-tree policy maintain its regret advantage when the ambiguity set is estimated from calibration data rather than hand-coded, and when the test shift family is held out?** The main confirmatory protocol above remains unchanged: this pilot may be used for development, not as the held-out test.
