@@ -186,3 +186,24 @@ The locally executed synthetic run accepted 100,000 paired trials (900,000 branc
 The reference checker now requires the exact seven distinct invalid-payload variants; valid compatibility scalar and typed PE value must agree; state and trial metadata digests must be lowercase SHA-256 hex; every declared consumer must be classified; and batch trial/evidence IDs must be unique. Importantly, expected branch role is derived from the paired-trial structure, NOT from a branch's self-reported pe_status; this closes a status-promotion path where an invalid branch might try to masquerade as the positive control. A dedicated invalid_status_promotion mutation covers it.
 
 The updated local run accepted 100,000 generated paired trials, audited 900,000 branch summaries, and rejected 17/17 deliberate mutations. The result JSON is byte-identical to the local deterministic output. The repository source is separately source-scanned; the fetched repo bytes were not executed byte-for-byte locally. All results remain reference-only until real Rust consumer traces are emitted and tested.
+
+
+## 13. Causal replay: estimate effects under stochastic continuation
+
+The strict counterfactual benchmark tests channel integrity, but it does not quantify downstream outcome effects for a stochastic learner. A separate reference estimator now pairs no-PE controls with valid-PE interventions and invalid-PE placebo runs, requiring a shared pre-intervention state, scenario digest, randomness-tape identity, and outcome-calibration digest. It replays downstream behavior after intervention and estimates paired outcome differences with bootstrap confidence intervals.
+
+This layer is informed by *Causal Agent Replay: Counterfactual Attribution for LLM-Agent Failures* (arXiv:2606.08275), which frames causal attribution as intervention followed by forward re-execution, reports outcome distributions and uncertainty, and emphasizes validation against planted causal ground truth. This benchmark is a related protocol adaptation, not an independent replication or comparable score.
+
+### Deterministic reference result
+
+- 512 pairs for valid PE and 512 invalid-PE placebo pairs; 2,048 run summaries total.
+- 3,000 percentile-bootstrap resamples per arm.
+- Planted valid-PE effect +0.08; estimated mean +0.07981, 95% interval [+0.07632, +0.08311].
+- Planted invalid-PE effect 0; estimated mean +0.00249, 95% interval [-0.00083, +0.00585], inside the preregistered equivalence margin ±0.02.
+- 13/13 injected malformed-pair mutations rejected.
+
+The committed source and result JSON Git blob IDs match the local tested artifacts. These figures validate the reference estimator against planted synthetic effects only. They are not measurements of Symthaea's real PE influence, production behavior, or task utility.
+
+### Production acceptance gate
+
+Emit real Rust run summaries from the PE decision boundary, replay the same pre-intervention state and exogenous randomness across matched branches, and use a versioned independent outcome evaluator. Keep integrity/invalid-PE equivalence gates separate from the valid-PE utility effect. If stochastic paths diverge, do not demand identical whole trajectories; estimate effects across independent scenario pairs and disclose replay fidelity. Then compare held-out task utility against matched baselines under equal data and compute/memory budgets.
