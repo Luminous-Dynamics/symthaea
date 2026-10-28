@@ -801,7 +801,7 @@ impl EvidenceIndex {
     /// and re-hashing every evidence payload on each query. Eligibility and
     /// corpus statistics are still evaluated against current evidence metadata,
     /// because lifecycle and validity windows can change between queries.
-    pub fn rank_text_indexed(
+    pub(crate) fn rank_text_indexed(
         &self,
         index: &LexicalIndex,
         expected_generation: u64,
