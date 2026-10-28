@@ -436,6 +436,8 @@ mod tests {
     use crate::memory_evidence::{
         EvidenceLifecycle, EvidencePayload, EvidenceRecord, EvidenceSource, EVIDENCE_SCHEMA_VERSION,
     };
+    use symthaea_core::hdc::BinaryHV;
+    use symthaea_hdc_store::StoreConfig;
     use tempfile::tempdir;
 
     fn sha(bytes: &[u8]) -> String {
@@ -467,10 +469,113 @@ mod tests {
         index
     }
 
+    fn active_evidence(id: u64, text: &str) -> EvidenceRecord {
+        let source = b"canonical trajectory bytes";
+        EvidenceRecord {
+            schema_version: EVIDENCE_SCHEMA_VERSION.to_string(),
+            evidence_id: format!("evidence-{id}"),
+            hdc_id: id,
+            scope_id: "web".into(),
+            source: EvidenceSource {
+                trajectory_id: "trajectory-typed-hdc".into(),
+                step_id: Some(format!("step-{id}")),
+                step_index: Some(id),
+                source_sha256: sha(source),
+            },
+            payload: EvidencePayload::Text { value: text.into() },
+            content_sha256: sha(text.as_bytes()),
+            lifecycle: EvidenceLifecycle::Active,
+            occurred_at_unix_ms: Some(100),
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            superseded_by: None,
+        }
+    }
+
     fn generation_path(root: &Path, generation: u64) -> PathBuf {
         let pointer: CurrentPointer = serde_json::from_slice(&fs::read(root.join(CURRENT_FILE)).unwrap()).unwrap();
         assert_eq!(pointer.generation, generation);
         root.join("generations").join(generation_directory_name(generation, &pointer.manifest_sha256))
+    }
+
+    #[test]
+    fn typed_hdc_commit_binds_real_generation_checksum_and_live_ids() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "correct route"), b"canonical trajectory bytes").unwrap();
+
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        assert_eq!(disk.commit_hdc_store(&mut hdc, &evidence).unwrap(), 1);
+        let recovered = disk.recover().unwrap().unwrap();
+        assert_eq!(recovered.generation, 1);
+        assert_eq!(recovered.evidence_index.active_hdc_ids(), [7_u64].into_iter().collect());
+        let identity = recovered.manifest.hdc_store_identity().expect("typed commit must persist HDC identity");
+        assert_eq!(identity.live_count, 1);
+        assert_eq!(identity.checksum_hex.len(), 16);
+    }
+
+    #[test]
+    fn typed_hdc_commit_rejects_missing_or_extra_active_evidence() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+
+        let empty = EvidenceIndex::new();
+        assert!(disk.commit_hdc_store(&mut hdc, &empty).is_err());
+        assert!(disk.recover().unwrap().is_none());
+
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "bound route"), b"canonical trajectory bytes").unwrap();
+        evidence.insert(active_evidence(8, "extra route"), b"canonical trajectory bytes").unwrap();
+        assert!(disk.commit_hdc_store(&mut hdc, &evidence).is_err());
+        assert!(disk.recover().unwrap().is_none());
+    }
+
+    #[test]
+    fn typed_hdc_commit_requires_vector_deletion_before_evidence_tombstone_commit() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "to be deleted"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        evidence.mark_deleted(7).unwrap();
+        // A tombstone cannot be committed while the actual vector remains live.
+        assert!(disk.commit_hdc_store(&mut hdc, &evidence).is_err());
+        assert_eq!(disk.recover().unwrap().unwrap().generation, 1);
+
+        assert!(hdc.delete(7).unwrap());
+        assert_eq!(disk.commit_hdc_store(&mut hdc, &evidence).unwrap(), 2);
+        let recovered = disk.recover().unwrap().unwrap();
+        assert!(recovered.evidence_index.resolve(&[7], "web", 150, Path::new("."), 5).unwrap().is_empty());
+        assert!(recovered.evidence_index.insert(
+            active_evidence(7, "resurrected"),
+            b"canonical trajectory bytes",
+        ).is_err());
+    }
+
+    #[test]
+    fn typed_hdc_recovery_rejects_replaced_index_even_if_file_is_present() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "bound route"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        let dir = generation_path(&root.path().join("evidence-generations"), 1);
+        fs::write(dir.join(INDEX_FILE), b"replacement bytes").unwrap();
+        assert!(disk.recover().is_err());
     }
 
     #[test]
