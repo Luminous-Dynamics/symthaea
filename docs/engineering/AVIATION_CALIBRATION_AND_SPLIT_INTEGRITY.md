@@ -76,6 +76,10 @@ Report:
 - Demonstrated reduction in held-out tail cost compared with the best matched baseline, while satisfying a predeclared average-cost and utilization non-inferiority bound.
 - For predictive uncertainty, report empirical coverage and width by time block and regime; do not claim formal coverage under arbitrary distribution shift.
 
+## Runnable contract-composition example
+
+The example `crates/domains/symthaea-operations-research/examples/aviation_calibration_protocol_benchmark.rs` combines split integrity, declared tuning provenance, and the TV-radius robustness curve in one small synthetic program. It exits nonzero if the declared split/tuning contract fails and emits a JSON-formatted manifest of partition stats and curve points. It is only a smoke-test fixture; real data wiring, manifest digests, data lineage, model fitting and final evaluation remain outside this example.
+
 ## Test status and claim ceiling
 
 Fourteen Rust unit tests and five separate integration-oracle tests are defined in `aviation_calibration_protocol.rs`, but they have not been compiled or run here because the environment lacks `cargo` and `rustc`. Test definitions are not test results. A successful metadata audit is necessary but not sufficient for credible calibration, independent validation, airline savings or operational approval.
