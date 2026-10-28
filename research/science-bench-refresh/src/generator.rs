@@ -350,50 +350,54 @@ fn generate_one_task(
                     let x = recipe.x_start
                         + f64::from(u32::try_from(sample).unwrap_or(0)) * narrow_step;
                     let err = noise(
-                        seed, generation_id, &recipe.family_id, index,
-                        u64::try_from(sample).unwrap_or(0), recipe.noise_amplitude,
+                        seed,
+                        generation_id,
+                        &recipe.family_id,
+                        index,
+                        u64::try_from(sample).unwrap_or(0),
+                        recipe.noise_amplitude,
                     );
                     json!({"x": x, "y": slope * x + intercept + err})
                 })
                 .collect();
-            (
-                json!({
-                    "instruction": instruction,
-                    "observations": observations,
-                    "observed_x_span": (count.saturating_sub(1) as f64) * narrow_step,
-                    "declared_measurement_noise_amplitude": recipe.noise_amplitude,
-                    "required_response_mode": "report_identifiability_or_abstain"
-                }),
-                let roots: Vec<f64> = observations
-                    .iter()
-                    .map(|row| row["x"].as_f64().unwrap_or(f64::NAN))
-                    .collect();
-                let challenge_x = x_start + (recipe.samples_per_task as f64 + 1.0) * narrow_step;
-                json!({
-                    "target_kind": "not_identifiable_from_declared_sample",
-                    "one_compatible_law": {
-                        "kind": "linear",
-                        "slope": slope,
-                        "intercept": intercept
-                    },
-                    "alternative_compatible_law": {
-                        "kind": "linear_plus_vanishing_polynomial",
-                        "base_slope": slope,
-                        "base_intercept": intercept,
-                        "coefficient": 1.0,
-                        "roots": roots,
-                        "formula": "f_alt(x) = slope*x + intercept + coefficient*product_i(x - observed_x_i)"
-                    },
-                    "identifiability_witness": {
-                        "equal_on_observed_x": true,
-                        "challenge_x_outside_observed_range": challenge_x,
-                        "challenge_x_is_observed": false,
-                        "claim": "both candidate mean functions agree at every observed x; the alternative is not constrained to extrapolate like the linear law"
-                    },
-                    "noise_amplitude": recipe.noise_amplitude,
-                    "claim_limit": "the observations do not uniquely establish a global law"
-                }),
-            )
+            let roots: Vec<f64> = observations
+                .iter()
+                .map(|row| row["x"].as_f64().unwrap_or(f64::NAN))
+                .collect();
+            let challenge_index = f64::from(u32::try_from(count).unwrap_or(0)) + 1.0;
+            let challenge_x = recipe.x_start + challenge_index * narrow_step;
+            let policy_input = json!({
+                "instruction": instruction,
+                "observations": observations,
+                "observed_x_span": (count.saturating_sub(1) as f64) * narrow_step,
+                "declared_measurement_noise_amplitude": recipe.noise_amplitude,
+                "required_response_mode": "report_identifiability_or_abstain"
+            });
+            let evaluator_only = json!({
+                "target_kind": "not_identifiable_from_declared_sample",
+                "one_compatible_law": {
+                    "kind": "linear",
+                    "slope": slope,
+                    "intercept": intercept
+                },
+                "alternative_compatible_law": {
+                    "kind": "linear_plus_vanishing_polynomial",
+                    "base_slope": slope,
+                    "base_intercept": intercept,
+                    "coefficient": 1.0,
+                    "roots": roots,
+                    "formula": "f_alt(x) = slope*x + intercept + coefficient*product_i(x - observed_x_i)"
+                },
+                "identifiability_witness": {
+                    "equal_on_observed_x": true,
+                    "challenge_x_outside_observed_range": challenge_x,
+                    "challenge_x_is_observed": false,
+                    "claim": "both candidate mean functions agree at every observed x; the alternative is not constrained to extrapolate like the linear law"
+                },
+                "noise_amplitude": recipe.noise_amplitude,
+                "claim_limit": "the observations do not uniquely establish a global law"
+            });
+            (policy_input, evaluator_only)
         }
         other => return Err(format!("unsupported recipe kind: {other}")),
     };
