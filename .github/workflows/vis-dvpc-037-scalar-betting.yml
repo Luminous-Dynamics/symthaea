@@ -1,0 +1,73 @@
+name: VIS-DVPC-037 exact scalar betting e-process audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-037-scalar-betting.rs"
+      - "tests/fixtures/vision-dvpc-037-scalar.tsv"
+      - "tests/fixtures/vision-dvpc-037.SHA256SUMS"
+      - "docs/research/VIS_DVPC_037_SCALAR_BETTING_V1.md"
+      - ".github/workflows/vis-dvpc-037-scalar-betting.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-037-scalar-betting.rs"
+      - "tests/fixtures/vision-dvpc-037-scalar.tsv"
+      - "tests/fixtures/vision-dvpc-037.SHA256SUMS"
+      - "docs/research/VIS_DVPC_037_SCALAR_BETTING_V1.md"
+      - ".github/workflows/vis-dvpc-037-scalar-betting.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source and frozen DGPs
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Verify frozen fixture digest
+        run: sha256sum -c tests/fixtures/vision-dvpc-037.SHA256SUMS
+      - name: Run exact path-enumeration tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-037-scalar-betting.rs -o /tmp/vis-dvpc-037-tests
+          /tmp/vis-dvpc-037-tests
+      - name: Enumerate every path and check known answers
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-037-scalar-betting.rs -o /tmp/vis-dvpc-037
+          /tmp/vis-dvpc-037 --sweep > /tmp/vis-dvpc-037-results.tsv
+          test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-037-results.tsv)" = "870"
+          test "$(grep -c '^DP_LOOK' /tmp/vis-dvpc-037-results.tsv)" = "96"
+          test "$(grep -c '^SCENARIO.*enumerated_paths' /tmp/vis-dvpc-037-results.tsv)" = "6"
+          grep -Fq $'SCENARIO\thealthy_null\t8\tWALD_FIXED_TIME\tFALSE_PROMOTION_NULL\tsequence_coverage\t0.437500000000' /tmp/vis-dvpc-037-results.tsv
+          grep -Fq $'SCENARIO\thealthy_null\t8\tWALD_FIXED_TIME\tFALSE_PROMOTION_NULL\tever_threshold_crossing_probability\t0.281250000000' /tmp/vis-dvpc-037-results.tsv
+          grep -Fq $'SCENARIO\thealthy_null\t8\tALPHA_SPENDING_HOEFFDING_CS\tFALSE_PROMOTION_NULL\tsequence_coverage\t1.000000000000' /tmp/vis-dvpc-037-results.tsv
+          grep -Fq $'SCENARIO\tweak_null_p099\t8\tSCALAR_BETTING_ONE_SIDED\tFALSE_PROMOTION_NULL\tever_rejection_probability\t0.001975038788' /tmp/vis-dvpc-037-results.tsv
+          grep -Fq $'SCENARIO\tweak_small_alt_p099\t8\tSCALAR_BETTING_ONE_SIDED\tDECISION_POWER_ALTERNATIVE\tever_rejection_probability\t0.003379111912' /tmp/vis-dvpc-037-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null" && $4=="SCALAR_BETTING_ONE_SIDED" && $6=="ever_rejection_probability" { if ($7 < 0 || $7 > 0.05000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-037-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="weak_null_p099" && $4=="SCALAR_BETTING_ONE_SIDED" && $6=="ever_rejection_probability" { if ($7 < 0 || $7 > 0.05000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-037-results.tsv
+          awk -F '\t' '$1=="DP_LOOK" && $6=="probability_mass" { if ($7 < 0.99999999 || $7 > 1.00000001) exit 1; n++ } END { if (n != 48) exit 1 }' /tmp/vis-dvpc-037-results.tsv
+          grep -Fq 'ONE_SIDED_E_PROCESS_NOT_FULL_MOPE_CI' /tmp/vis-dvpc-037-results.tsv
+          grep '^SCENARIO' /tmp/vis-dvpc-037-results.tsv > /tmp/vis-dvpc-037-summaries.tsv
+      - name: Create exact-source result receipt
+        run: |
+          {
+            printf 'VIS_DVPC_037_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-037-scalar-betting.rs tests/fixtures/vision-dvpc-037.SHA256SUMS tests/fixtures/vision-dvpc-037-scalar.tsv /tmp/vis-dvpc-037-results.tsv /tmp/vis-dvpc-037-summaries.tsv
+          } > /tmp/vis-dvpc-037-receipt.tsv
+          cat /tmp/vis-dvpc-037-receipt.tsv
+      - name: Publish exact enumeration output and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-037-scalar-betting
+          path: |
+            /tmp/vis-dvpc-037-results.tsv
+            /tmp/vis-dvpc-037-summaries.tsv
+            /tmp/vis-dvpc-037-receipt.tsv
+          retention-days: 90
