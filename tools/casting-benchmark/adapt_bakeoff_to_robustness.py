@@ -313,7 +313,11 @@ def adapt_documents(
         seen_eval_keys.add(key)
         if fidelity == "high":
             high_candidate_ids.add(cid)
-        _objective_pair(observation.get("objectives"), f"selected run evaluation {i}.objectives", reference)
+        raw_objectives = observation.get("objectives")
+        if not isinstance(raw_objectives, list) or len(raw_objectives) != 2:
+            raise ValueError(f"selected run evaluation {i}.objectives must contain two values")
+        for j, value in enumerate(raw_objectives):
+            _number(value, f"selected run evaluation {i}.objectives[{j}]")
         _number(observation.get("constraint_margin"), f"selected run evaluation {i}.constraint_margin")
         cost_units = observation.get("cost_units")
         if isinstance(cost_units, bool) or not isinstance(cost_units, int) or cost_units != run_costs[fidelity]:
