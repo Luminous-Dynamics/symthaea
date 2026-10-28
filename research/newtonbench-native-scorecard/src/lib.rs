@@ -80,9 +80,13 @@ pub struct ArmSummaryV1 {
     pub mean_rmsle_completed: Option<f64>,
     pub exact_accuracy_available_completed: usize,
     pub mean_exact_accuracy_completed: Option<f64>,
-    pub total_experiments_completed: u64,
-    pub total_rounds_completed: u64,
-    pub total_tokens_completed: u64,
+    pub experiments_available_completed: usize,
+    pub rounds_available_completed: usize,
+    pub tokens_available_completed: usize,
+    /// Sum of available values only; use the availability count to detect partial totals.
+    pub sum_reported_experiments_completed: u64,
+    pub sum_reported_rounds_completed: u64,
+    pub sum_reported_tokens_completed: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -507,11 +511,23 @@ fn summarize_arm(
         mean_rmsle_completed: mean(rmsle_values.into_iter()),
         exact_accuracy_available_completed: accuracy_values.len(),
         mean_exact_accuracy_completed: mean(accuracy_values.into_iter()),
-        total_experiments_completed: sum_optional(
+        experiments_available_completed: complete
+            .iter()
+            .filter(|trial| trial.num_experiments.is_some())
+            .count(),
+        rounds_available_completed: complete
+            .iter()
+            .filter(|trial| trial.rounds.is_some())
+            .count(),
+        tokens_available_completed: complete
+            .iter()
+            .filter(|trial| trial.total_tokens.is_some())
+            .count(),
+        sum_reported_experiments_completed: sum_optional(
             complete.iter().map(|trial| trial.num_experiments),
         ),
-        total_rounds_completed: sum_optional(complete.iter().map(|trial| trial.rounds)),
-        total_tokens_completed: sum_optional(complete.iter().map(|trial| trial.total_tokens)),
+        sum_reported_rounds_completed: sum_optional(complete.iter().map(|trial| trial.rounds)),
+        sum_reported_tokens_completed: sum_optional(complete.iter().map(|trial| trial.total_tokens)),
     }
 }
 
@@ -879,6 +895,22 @@ mod tests {
         assert_eq!(report.body.comparison.exact_accuracy_pair_count, 1);
         assert_eq!(report.body.comparison.mean_exact_accuracy_delta_tool_minus_vanilla, Some(1.0));
         assert_eq!(report.body.comparison.mean_experiments_delta_tool_minus_vanilla, Some(-1.0));
+    }
+
+    #[test]
+    fn missing_cost_fields_are_counted_not_silently_treated_as_complete_totals() {
+        let (m, mut vanilla, tool) = sample_inputs();
+        let mut value: Value = serde_json::from_slice(&vanilla[0].raw_bytes).unwrap();
+        value.as_object_mut().unwrap().remove("total_tokens");
+        vanilla[0].raw_bytes = serde_json::to_vec(&value).unwrap();
+
+        let report = audit(&m, vanilla, tool).unwrap();
+        let summary = &report.body.vanilla;
+        assert_eq!(summary.completed_trials, 1);
+        assert_eq!(summary.tokens_available_completed, 0);
+        assert_eq!(summary.sum_reported_tokens_completed, 0);
+        assert_eq!(report.body.comparison.tokens_pair_count, 0);
+        assert_eq!(report.body.comparison.mean_tokens_delta_tool_minus_vanilla, None);
     }
 
     #[test]
