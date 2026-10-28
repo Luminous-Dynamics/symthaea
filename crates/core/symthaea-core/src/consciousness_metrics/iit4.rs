@@ -1,25 +1,34 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! IIT 4.0 Measures
+//! IIT-4.0-inspired HDC estimators (formal compliance not established by this module).
 //!
-//! Reference: Albantakis et al. (2023) "Integrated Information Theory (IIT) 4.0"
+//! Reference theory: Albantakis et al. (2023), "Integrated Information Theory (IIT) 4.0".
+//! This implementation uses HDC histogram and mutual-information proxies; the API
+//! shown here does not provide a complete explicit causal transition model and the
+//! formal cause/effect repertoire calculations needed to claim a full IIT 4.0 result.
+//! See `docs/research/PHI_QUALIFICATION_V0_1.md` for the qualification contract.
 
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 use super::{ContinuousEntropyEstimator, TruePhiCalculator};
 
-/// IIT 4.0 result containing intrinsic difference measures
+/// Legacy-compatible aggregate of IIT-inspired HDC proxy measurements.
+///
+/// The type name and serialized field names are retained for compatibility; these
+/// fields are not a qualification claim that the full IIT 4.0 formalism is computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IIT4Result {
     /// Intrinsic difference (id) - fundamental measure
     pub intrinsic_difference: f64,
-    /// Small phi (φ) - irreducibility of a mechanism
+    /// HDC proxy for a mechanism-level irreducibility-like quantity; not formal φ without qualification.
     pub small_phi: f64,
-    /// Big Phi (Φ) - integrated information of the system
+    /// Legacy system-score field populated by `TruePhiCalculator`.
+    /// Do not interpret as PyPhi `Analysis.big_phi` (structure integrated information)
+    /// or formal IIT system φ_s without a separate qualified mapping.
     pub big_phi: f64,
-    /// Intrinsic information (ii) - how much the state specifies itself
+    /// Entropy-derived intrinsic-information proxy, not a formal IIT ii value unless qualified.
     pub intrinsic_information: f64,
     /// Number of concepts (mechanisms with φ > 0)
     pub concept_count: usize,
@@ -29,14 +38,12 @@ pub struct IIT4Result {
     pub concepts: Vec<ConceptStructure>,
 }
 
-/// A concept in IIT 4.0: an irreducible cause-effect mechanism.
+/// A proxy record for one HDC component.
 ///
-/// Each mechanism in the system has a cause repertoire (constraints on past)
-/// and an effect repertoire (constraints on future). The mechanism's phi (φ)
-/// is the irreducibility of this cause-effect structure under all partitions.
-///
-/// Science: Albantakis et al. (2023) — concepts are the "atoms of experience".
-/// A concept with φ > 0 specifies an irreducible cause-effect distinction.
+/// The current fields use estimated statistics as cause/effect-like features; they
+/// are not guaranteed to be formal IIT 4.0 repertoires, distinctions, or atoms of
+/// experience. Keep their use scoped to the estimator profile until reference tests
+/// validate stronger correspondence.
 #[cfg(feature = "iit4")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConceptStructure {
@@ -55,10 +62,12 @@ pub struct ConceptStructure {
 
 /// IIT 4.0 Calculator
 ///
-/// Implements the updated IIT 4.0 formalism with:
-/// - Intrinsic difference as the fundamental measure
-/// - Improved irreducibility computation
-/// - Intrinsic information quantification
+/// Computes IIT-inspired statistics over continuous HDC representations.
+///
+/// The implementation uses histogram-based Jensen–Shannon-style distribution
+/// differences, mutual-information-like partition proxies, and an entropy-derived
+/// intrinsic-information proxy. These operations do not by themselves establish the
+/// complete IIT 4.0 formalism. The module name is retained for API compatibility.
 ///
 /// ## Entropy estimation
 ///
@@ -90,7 +99,7 @@ impl Default for IIT4Calculator {
 }
 
 impl IIT4Calculator {
-    /// Create a new IIT 4.0 calculator with default 16 bins
+    /// Create the HDC proxy calculator with default 16-bin histogram estimation.
     pub fn new() -> Self {
         Self {
             estimator: ContinuousEntropyEstimator::fast(),
