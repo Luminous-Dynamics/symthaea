@@ -153,6 +153,42 @@ pub fn evaluate_file(
 
     let panel_input: AdaptationPanelInput = serde_json::from_slice(&panel_bytes)
         .context("parsing adaptation panel input")?;
+    let protocol_datasets = grid
+        .get("registered_dataset_ids")
+        .and_then(serde_json::Value::as_array)
+        .context("protocol complete_grid must declare registered_dataset_ids")?
+        .iter()
+        .map(|value| {
+            value.as_str()
+                .context("registered_dataset_ids must contain only strings")
+                .map(str::to_owned)
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let protocol_dataset_set: BTreeSet<String> = protocol_datasets.iter().cloned().collect();
+    ensure!(
+        protocol_datasets.len() == 7 && protocol_dataset_set.len() == 7,
+        "protocol must declare exactly seven unique dataset IDs"
+    );
+    ensure!(
+        protocol_dataset_set == panel_input.expected_dataset_ids.iter().cloned().collect(),
+        "panel dataset IDs differ from the preregistered protocol"
+    );
+    let protocol_seeds = grid
+        .get("registered_seed_ids")
+        .and_then(serde_json::Value::as_array)
+        .context("protocol complete_grid must declare registered_seed_ids")?
+        .iter()
+        .map(|value| value.as_u64().context("registered_seed_ids must contain only non-negative integers"))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let protocol_seed_set: BTreeSet<u64> = protocol_seeds.iter().copied().collect();
+    ensure!(
+        protocol_seeds.len() == 50 && protocol_seed_set.len() == 50,
+        "protocol must declare exactly fifty unique seed IDs"
+    );
+    ensure!(
+        protocol_seed_set == panel_input.expected_seed_ids.iter().copied().collect(),
+        "panel seed IDs differ from the preregistered protocol"
+    );
     let protocol_scenarios = grid
         .get("registered_scenario_ids")
         .and_then(serde_json::Value::as_array)
