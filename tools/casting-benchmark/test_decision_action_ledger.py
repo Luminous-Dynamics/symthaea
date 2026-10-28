@@ -35,6 +35,9 @@ def event(**overrides):
         "candidate_id": "candidate-1",
         "fidelity": "high",
         "estimated_cost_units": 5.0,
+        "decision_loss_reduction": 0.8,
+        "normalized_constraint_risk_reduction": 0.25,
+        "value_per_cost": 0.16,
     }
     fields.update(overrides)
     return decision_event(**fields)
@@ -192,6 +195,7 @@ class DecisionActionLedgerTests(unittest.TestCase):
                 reason_code="done",
             )
             altered["estimated_cost_units"] = 4.0
+            altered["value_per_cost"] = 0.2
             # The helper's output is later checked in a full chained ledger.
             altered["record_type"] = "outcome"
             first = {
