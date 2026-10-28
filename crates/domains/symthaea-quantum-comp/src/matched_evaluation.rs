@@ -92,7 +92,7 @@ pub struct StageCostsMs {
 }
 
 impl StageCostsMs {
-    fn values(&self) -> [Option<f64>; 9] {
+    fn values(&self) -> [Option<f64>; 10] {
         [
             self.queue_wait_ms,
             self.acquisition_ms,
