@@ -27,6 +27,28 @@ HEX40 = re.compile(r"^[a-f0-9]{40}$")
 def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
+def canonical_digest(value: Any) -> str:
+    """Digest a JSON value using a stable, whitespace-free UTF-8 encoding."""
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return digest(encoded)
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_non_finite(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant {value!r} rejected")
+
+
+def strict_json_loads(source: str) -> Any:
+    """Parse strict JSON: no duplicate object keys and no NaN/Infinity constants."""
+    return json.loads(source, object_pairs_hook=_reject_duplicate_keys, parse_constant=_reject_non_finite)
+
 
 def safe_file(root: Path, relative: Any) -> Path:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
@@ -65,13 +87,19 @@ def validate_receipt(
     expected_receipt_sha256: str,
     expected_schema_sha256: str,
     expected_repository_id: str,
+    expected_repository_full_name: str,
     expected_workflow_path: str,
     expected_workflow_sha: str,
+    expected_workflow_ref: str,
+    expected_event: str,
     expected_run_id: str,
     expected_run_attempt: int,
     expected_task_id: str,
     expected_claim_id: str,
     expected_source_sha256: str,
+    expected_source_spans_sha256: str,
+    expected_invocation_sha256: str,
+    expected_inputs_sha256: str,
     expected_verifier_kind: str,
     expected_verifier_id: str,
     expected_verifier_sha256: str,
@@ -80,8 +108,9 @@ def validate_receipt(
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
     for label, value in (("receipt", expected_receipt_sha256), ("schema", expected_schema_sha256),
-                         ("source", expected_source_sha256), ("verifier", expected_verifier_sha256),
-                         ("toolchain", expected_toolchain_sha256)):
+                         ("source", expected_source_sha256), ("source_spans", expected_source_spans_sha256),
+                         ("invocation", expected_invocation_sha256), ("inputs", expected_inputs_sha256),
+                         ("verifier", expected_verifier_sha256), ("toolchain", expected_toolchain_sha256)):
         if not isinstance(value, str) or not HEX.fullmatch(value):
             issues.append({"code": f"invalid_external_{label}_pin", "message": f"external {label} pin must be a lowercase SHA-256"})
     if not isinstance(expected_workflow_sha, str) or not HEX40.fullmatch(expected_workflow_sha):
@@ -106,9 +135,9 @@ def validate_receipt(
         observed_schema_sha = digest(schema_bytes)
         if observed_schema_sha != expected_schema_sha256:
             issues.append({"code": "schema_digest_mismatch", "message": "schema bytes differ from the evaluator-pinned schema digest"})
-        schema = json.loads(schema_bytes.decode("utf-8"))
+        schema = strict_json_loads(schema_bytes.decode("utf-8"))
         Draft202012Validator.check_schema(schema)
-        receipt = json.loads(receipt_bytes.decode("utf-8"))
+        receipt = strict_json_loads(receipt_bytes.decode("utf-8"))
         if not isinstance(receipt, dict):
             raise ValueError("receipt JSON root must be an object")
     except Exception as exc:
@@ -123,8 +152,11 @@ def validate_receipt(
     if not errors:
         pins = [
             (("producer", "repository_id"), expected_repository_id, "repository_id_mismatch"),
+            (("producer", "repository_full_name"), expected_repository_full_name, "repository_full_name_mismatch"),
             (("producer", "workflow_path"), expected_workflow_path, "workflow_path_mismatch"),
             (("producer", "workflow_sha"), expected_workflow_sha, "workflow_sha_mismatch"),
+            (("producer", "workflow_ref"), expected_workflow_ref, "workflow_ref_mismatch"),
+            (("producer", "event"), expected_event, "event_mismatch"),
             (("producer", "run_id"), expected_run_id, "run_id_mismatch"),
             (("producer", "run_attempt"), expected_run_attempt, "run_attempt_mismatch"),
             (("task_id",), expected_task_id, "task_id_mismatch"),
@@ -138,6 +170,17 @@ def validate_receipt(
         ]
         for path, expected, code in pins:
             _add_pin_issue(issues, receipt, path, expected, code)
+
+        observed_source_spans_sha256 = canonical_digest(receipt["source"]["spans"])
+        observed_invocation_sha256 = canonical_digest(receipt["invocation"])
+        observed_inputs_sha256 = canonical_digest(receipt["inputs"])
+        for label, observed, expected, code in (
+            ("source_spans", observed_source_spans_sha256, expected_source_spans_sha256, "source_spans_pin_mismatch"),
+            ("invocation", observed_invocation_sha256, expected_invocation_sha256, "invocation_pin_mismatch"),
+            ("inputs", observed_inputs_sha256, expected_inputs_sha256, "input_inventory_pin_mismatch"),
+        ):
+            if observed != expected:
+                issues.append({"code": code, "message": f"{label} differ from the evaluator-pinned canonical digest"})
 
         if receipt["execution"]["status"] != "completed" and receipt["claim_result"] != "inconclusive":
             issues.append({"code": "incomplete_execution_claimed_as_decisive", "message": "timed-out, cancelled or failed-to-spawn execution must be inconclusive"})
@@ -218,6 +261,9 @@ def validate_receipt(
         "claim_id": receipt.get("claim_id") if isinstance(receipt, dict) else None,
         "observed_receipt_sha256": observed_receipt_sha,
         "observed_schema_sha256": observed_schema_sha,
+        "observed_source_spans_sha256": canonical_digest(receipt["source"]["spans"]) if isinstance(receipt, dict) and isinstance(receipt.get("source"), dict) and isinstance(receipt["source"].get("spans"), list) else None,
+        "observed_invocation_sha256": canonical_digest(receipt["invocation"]) if isinstance(receipt, dict) and isinstance(receipt.get("invocation"), dict) else None,
+        "observed_inputs_sha256": canonical_digest(receipt["inputs"]) if isinstance(receipt, dict) and isinstance(receipt.get("inputs"), list) else None,
         "issues": issues,
         "assurance_boundary": "Receipt audit checks pinned identity, replay bindings and artifact integrity; producer authentication and semantic truth require the outer attestation gate and trusted verifier execution policy.",
     }
@@ -231,13 +277,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-receipt-sha256", required=True)
     parser.add_argument("--expected-schema-sha256", required=True)
     parser.add_argument("--expected-repository-id", required=True)
+    parser.add_argument("--expected-repository-full-name", required=True)
     parser.add_argument("--expected-workflow-path", required=True)
     parser.add_argument("--expected-workflow-sha", required=True)
+    parser.add_argument("--expected-workflow-ref", required=True)
+    parser.add_argument("--expected-event", required=True)
     parser.add_argument("--expected-run-id", required=True)
     parser.add_argument("--expected-run-attempt", type=int, required=True)
     parser.add_argument("--expected-task-id", required=True)
     parser.add_argument("--expected-claim-id", required=True)
     parser.add_argument("--expected-source-sha256", required=True)
+    parser.add_argument("--expected-source-spans-sha256", required=True)
+    parser.add_argument("--expected-invocation-sha256", required=True)
+    parser.add_argument("--expected-inputs-sha256", required=True)
     parser.add_argument("--expected-verifier-kind", required=True)
     parser.add_argument("--expected-verifier-id", required=True)
     parser.add_argument("--expected-verifier-sha256", required=True)
@@ -250,13 +302,19 @@ def main(argv: list[str] | None = None) -> int:
         expected_receipt_sha256=args.expected_receipt_sha256,
         expected_schema_sha256=args.expected_schema_sha256,
         expected_repository_id=args.expected_repository_id,
+        expected_repository_full_name=args.expected_repository_full_name,
         expected_workflow_path=args.expected_workflow_path,
         expected_workflow_sha=args.expected_workflow_sha,
+        expected_workflow_ref=args.expected_workflow_ref,
+        expected_event=args.expected_event,
         expected_run_id=args.expected_run_id,
         expected_run_attempt=args.expected_run_attempt,
         expected_task_id=args.expected_task_id,
         expected_claim_id=args.expected_claim_id,
         expected_source_sha256=args.expected_source_sha256,
+        expected_source_spans_sha256=args.expected_source_spans_sha256,
+        expected_invocation_sha256=args.expected_invocation_sha256,
+        expected_inputs_sha256=args.expected_inputs_sha256,
         expected_verifier_kind=args.expected_verifier_kind,
         expected_verifier_id=args.expected_verifier_id,
         expected_verifier_sha256=args.expected_verifier_sha256,
