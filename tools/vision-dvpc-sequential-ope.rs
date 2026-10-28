@@ -183,8 +183,8 @@ fn evaluate(s: &Scenario) -> Result<ScenarioResult, String> {
     }
     let max_weight = s.estimated_logging_schedule.iter()
         .map(|p| {
-            (if s.target_a > 0.0 { s.target_a / p } else { 0.0 })
-                .max(if target_b > 0.0 { target_b / (1.0 - p) } else { 0.0 })
+            (if s.target_a > 0.0 { s.target_a / *p } else { 0.0 })
+                .max(if target_b > 0.0 { target_b / (1.0 - *p) } else { 0.0 })
         })
         .fold(0.0_f64, f64::max);
     if !max_weight.is_finite() || max_weight <= 0.0 {
