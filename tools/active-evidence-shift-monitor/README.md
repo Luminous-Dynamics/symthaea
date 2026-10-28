@@ -149,7 +149,7 @@ The Rust DP, independent Python reference checker, and negative control now incl
 
 ## 19. Sentinel budget versus drift detection
 
-The second executable report makes audit cost an explicit dimension. It fixes a total budget of 1,000 labels and a target-population change from p=0.5 to p=0.8 after 100 total labels. For sentinel fractions q in {0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0}, labels assigned to sentinels are sampled from the target population on a deterministic, regularly spaced audit cadence; the rest can be assigned to the adaptive policy. The drift detector consumes only the randomized sentinel stream. This keeps the null interpretable instead of quietly treating policy-selected labels as representative.
+The second executable report makes audit cost an explicit dimension. It fixes a total budget of 1,000 labels and a target-population change from p=0.5 to p=0.8 after 100 total labels. For sentinel fractions q in {0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0} and post-shift event rates p1 in {0.55, 0.60, 0.70, 0.80, 0.90}, labels assigned to sentinels are sampled from the target population on a deterministic, regularly spaced audit cadence; the rest can be assigned to the adaptive policy. The zero-sentinel row is emitted once, because a representative audit stream does not exist at q=0. The drift detector consumes only the randomized sentinel stream. This keeps the null interpretable instead of quietly treating policy-selected labels as representative.
 
 The following values come from a separate exact-DP Python prototype of the same finite Bernoulli model. The Rust implementation and independent CSV reference checker now encode the same frontier, but exact-head workflow parity has not yet been established.
 
@@ -162,6 +162,18 @@ The following values come from a separate exact-DP Python prototype of the same 
 | 25% | 250 | 0.002774 | 99.84% | 241 |
 | 50% | 500 | 0.002938 | 99.79% | 148 |
 | 100% | 1,000 | 0.003059 | 99.75% | 95 |
+
+This table is the p1=0.80 slice of the full CSV grid. The important caveat appears when the shift magnitude changes:
+
+| Post-shift event rate p1 | 10% sentinel: detection | 20% sentinel: detection | 100% sentinel: detection |
+|---:|---:|---:|---:|
+| 0.55 | 0.56% | 0.82% | 11.84% |
+| 0.60 | 3.07% | 10.01% | 94.28% |
+| 0.70 | 43.60% | 89.73% | 99.75% |
+| 0.80 | 96.96% | 99.85% | 99.75% |
+| 0.90 | 100.00% | 99.85% | 99.75% |
+
+Detection is the probability of an alarm *after* the true shift and by the end of the label budget. The monitor can alarm before the shift; that is reported separately as a false alarm and removed from post-shift detection. This explains why post-shift detection is not strictly monotone in sentinel fraction: longer pre-shift exposure creates more opportunities for a pre-shift false alarm.
 
 **Read this as a cost–power frontier, not a universal recommendation.** In this fixture, a 10% randomized audit budget is enough to achieve about 97% detection by the 1,000-label horizon for the specified abrupt shift, while a 5% audit budget detects only about 58%. More sentinel labels improve detection delay, but spend less budget on exploitation/acquisition. The 0% row has almost-certain apparent drift because the policy-selected stream has event rate 0.74 even when the target is stable. This example does not demonstrate that 10% is optimal for other tasks or weak/gradual shifts.
 
