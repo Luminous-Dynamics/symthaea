@@ -75,6 +75,24 @@ def main() -> int:
         "memory registry",
     )
 
+    # The worker is process-isolated per Memory instance and serializes IPC per
+    # instance, so it can use the upstream harness's non-shared parallel prompt
+    # builder without sharing mutable retrieval state across questions.
+    nonshared_anchor = (
+        'NONSHARED_PARALLEL_MEMORY_TYPES = {\n'
+        '    "codex",\n'
+        '    "agentrunbook_c",\n'
+        '    "agentrunbook_c_v2",\n'
+    )
+    memory_text_harness_path = upstream / "evaluation" / "harness.py"
+    harness_text = memory_text_harness_path.read_text(encoding="utf-8")
+    harness_text_new = replace_once(
+        harness_text,
+        nonshared_anchor,
+        nonshared_anchor + '    "broca_rust",\n',
+        "non-shared parallel memory allowlist",
+    )
+
     method_anchor = '    "agentrunbook_c_v2",\n'
     run_eval_text_new = replace_once(
         run_eval_text,
@@ -127,6 +145,7 @@ def main() -> int:
     paths = [
         memory_path,
         run_eval_path,
+        memory_text_harness_path,
         destination_adapter,
     ]
     print(f"Upstream commit pinned: {head}")
@@ -134,13 +153,14 @@ def main() -> int:
     for item in paths:
         print(f"  - {item.relative_to(upstream)}")
     print("  - adds --broca-worker and --broca-worker-timeout to evaluation/run_eval.py")
-    print("  - adds broca_rust to METHODS and build_memory_config")
+    print("  - adds broca_rust to METHODS, build_memory_config and the non-shared parallel allowlist")
     if not args.apply:
         print("Dry run only. Re-run with --apply to write the changes.")
         return 0
 
     memory_path.write_text(memory_text_new, encoding="utf-8")
     run_eval_path.write_text(run_eval_text_new, encoding="utf-8")
+    memory_text_harness_path.write_text(harness_text_new, encoding="utf-8")
     if not destination_adapter.exists():
         destination_adapter.write_bytes(adapter_source.read_bytes())
 
