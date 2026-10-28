@@ -178,6 +178,14 @@ mod tests {
     }
 
     #[test]
+    fn missing_prediction_error_skips_pe_dependent_wisdom_updates() {
+        let mut wisdom = init_wisdom();
+        let initial_wisdom = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
+        wisdom.update_from_optional_experience(None, 0.3, 0.7);
+        assert_eq!(wisdom.harmonics.get(ActiveHarmonic::Wisdom), initial_wisdom);
+    }
+
+    #[test]
     fn test_low_coherence_boosts_coherence_harmony() {
         let mut wisdom = init_wisdom();
         let initial = wisdom.harmonics.get(ActiveHarmonic::Coherence);
