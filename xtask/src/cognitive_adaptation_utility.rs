@@ -752,7 +752,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_empty_overlapping_or_out_of-range_evaluation_windows() {
+    fn invalid_window_cases_fail_closed() {
         let mut empty = fixture();
         empty.evaluation_windows.post_shift_start_cycle = 4;
         assert!(score_counterfactual_utility(empty).unwrap_err().to_string().contains("post-shift window must be non-empty"));
