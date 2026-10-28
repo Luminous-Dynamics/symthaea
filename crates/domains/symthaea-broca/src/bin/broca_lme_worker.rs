@@ -337,16 +337,57 @@ fn collect_trajectory_evidence(
     source_sha256: &str,
 ) -> Result<Vec<EvidenceRecord>, String> {
     let mut fields: Vec<(String, String, Option<usize>)> = Vec::new();
+    let public_states = trajectory
+        .get("states")
+        .and_then(Value::as_array)
+        .filter(|states| !states.is_empty());
 
-    for key in ["goal", "start_url"] {
-        if let Some(value) = trajectory.get(key).and_then(Value::as_str) {
-            if !value.trim().is_empty() {
-                fields.push((format!("/{key}"), value.to_string(), None));
+    // Only allowlisted trajectory fields become retrieval evidence. In
+    // particular, root outcome, benchmark question metadata, and arbitrary
+    // metadata fields are never copied into the evidence corpus.
+    if let Some(value) = trajectory
+        .get("goal")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+    {
+        fields.push(("/goal".to_string(), value.to_string(), None));
+    } else if let Some(raw_goal) = trajectory
+        .get("metadata")
+        .and_then(Value::as_object)
+        .and_then(|metadata| metadata.get("original_goal"))
+    {
+        match raw_goal {
+            Value::String(value) if !value.trim().is_empty() => {
+                fields.push((
+                    "/metadata/original_goal".to_string(),
+                    value.to_string(),
+                    None,
+                ));
             }
+            Value::Array(parts) => {
+                for (part_index, part) in parts.iter().enumerate() {
+                    if let Some(value) = part.as_str().filter(|value| !value.trim().is_empty()) {
+                        fields.push((
+                            format!("/metadata/original_goal/{part_index}"),
+                            value.to_string(),
+                            None,
+                        ));
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
-    if let Some(states) = trajectory.get("states").and_then(Value::as_array) {
+    if let Some(value) = trajectory
+        .get("start_url")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+    {
+        fields.push(("/start_url".to_string(), value.to_string(), None));
+    }
+
+    if let Some(states) = public_states {
         for (state_index, state) in states.iter().enumerate() {
             if !state.is_object() {
                 return Err(format!("trajectory state {state_index} must be an object"));
@@ -360,6 +401,8 @@ fn collect_trajectory_evidence(
                             Some(state_index),
                         ));
                     }
+                } else if state.get(key).is_some_and(|value| !value.is_null()) {
+                    return Err(format!("trajectory state {state_index} field {key} must be a string or null"));
                 }
             }
             let thought_key = if state.get("thoughts").and_then(Value::as_str).is_some() {
@@ -375,7 +418,10 @@ fn collect_trajectory_evidence(
                         Some(state_index),
                     ));
                 }
+            } else if state.get(thought_key).is_some_and(|value| !value.is_null()) {
+                return Err(format!("trajectory state {state_index} field {thought_key} must be a string or null"));
             }
+
             let text_key = if state.get("accessibility_tree").and_then(Value::as_str).is_some() {
                 "accessibility_tree"
             } else {
@@ -389,8 +435,63 @@ fn collect_trajectory_evidence(
                         Some(state_index),
                     ));
                 }
+            } else if state.get(text_key).is_some_and(|value| !value.is_null()) {
+                return Err(format!("trajectory state {state_index} field {text_key} must be a string"));
             }
         }
+    } else if let Some(content) = trajectory.get("content").and_then(Value::as_array) {
+        if content.is_empty() {
+            return Err("trajectory content must be a non-empty array when states are absent".into());
+        }
+        for (state_index, state) in content.iter().enumerate() {
+            if !state.is_object() {
+                return Err(format!("trajectory content state {state_index} must be an object"));
+            }
+            let url = state
+                .get("url")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("trajectory content state {state_index} requires a non-empty url"))?;
+            fields.push((
+                format!("/content/{state_index}/url"),
+                url.to_string(),
+                Some(state_index),
+            ));
+
+            for key in ["action", "thoughts"] {
+                if let Some(value) = state.get(key).and_then(Value::as_str) {
+                    if !value.trim().is_empty() {
+                        fields.push((
+                            format!("/content/{state_index}/{key}"),
+                            value.to_string(),
+                            Some(state_index),
+                        ));
+                    }
+                } else if state.get(key).is_some_and(|value| !value.is_null()) {
+                    return Err(format!("trajectory content state {state_index} field {key} must be a string or null"));
+                }
+            }
+
+            let observation = state
+                .get("observation")
+                .and_then(Value::as_object)
+                .ok_or_else(|| format!("trajectory content state {state_index} requires an observation object"))?;
+            let text = observation
+                .get("text")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("trajectory content state {state_index} requires observation.text"))?;
+            if !text.trim().is_empty() {
+                fields.push((
+                    format!("/content/{state_index}/observation/text"),
+                    text.to_string(),
+                    Some(state_index),
+                ));
+            }
+            // Screenshot paths remain out of the lexical corpus; the worker
+            // explicitly does not claim image retrieval or visual grounding.
+        }
+    } else {
+        return Err("trajectory requires a non-empty states array or content array".into());
     }
 
     if fields.iter().any(|(_, text, _)| text.len() > MAX_TEXT_FIELD_BYTES) {
@@ -596,6 +697,52 @@ mod tests {
         }
         assert!(!records.iter().any(|record| record.source.source_pointer.contains("outcome")));
         assert!(!records.iter().any(|record| record.source.source_pointer.contains("question")));
+    }
+
+
+    #[test]
+    fn legacy_content_trajectory_schema_is_ingested_with_exact_pointers() {
+        let trajectory = json!({
+            "id": "trajectory-content-21",
+            "metadata": {
+                "original_goal": ["Find account settings", "Update display name"],
+                "secret_evaluator_metadata": "must not be copied"
+            },
+            "outcome": "GOLD ANSWER MUST NOT ENTER MEMORY",
+            "question_id": "evaluator-only-id",
+            "content": [{
+                "url": "https://example.invalid/account",
+                "action": "open Account",
+                "thoughts": "look for profile control",
+                "observation": {
+                    "text": "Account heading Display Name textbox",
+                    "screenshot": "screenshots/state-0.png"
+                }
+            }]
+        });
+        let source = stable_json_bytes(&trajectory).unwrap();
+        let source_hash = sha256_hex(&source);
+        let records = collect_trajectory_evidence(
+            &trajectory,
+            "trajectory-content-21",
+            "enterprise",
+            &source_hash,
+        ).unwrap();
+
+        assert_eq!(records.len(), 5);
+        for record in &records {
+            record.verify_source_bytes(&source).unwrap();
+            assert!(!record.source.source_pointer.contains("outcome"));
+            assert!(!record.source.source_pointer.contains("question"));
+            assert!(!record.source.source_pointer.contains("screenshot"));
+            assert!(!record.source.source_pointer.contains("secret_evaluator_metadata"));
+        }
+        assert!(records.iter().any(|record| record.source.source_pointer == "/metadata/original_goal/0"));
+        assert!(records.iter().any(|record| record.source.source_pointer == "/content/0/observation/text"));
+        assert!(!records.iter().any(|record| match &record.payload {
+            EvidencePayload::Text { value } => value.contains("GOLD ANSWER") || value.contains("must not be copied"),
+            EvidencePayload::Image { .. } => false,
+        }));
     }
 
     #[test]
