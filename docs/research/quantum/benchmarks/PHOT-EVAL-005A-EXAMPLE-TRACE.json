@@ -23,7 +23,7 @@
       "elapsed_deployment_ms": 20,
       "candidate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "candidate_artifact_path": "candidates/unverified-candidate.bin",
-      "verifier_disposition": "missing_receipt",
+      "verifier_disposition": "unverified",
       "reported_cardinality": 8
     },
     {
