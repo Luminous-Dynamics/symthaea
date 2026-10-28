@@ -23,7 +23,7 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tempfile::{Builder, NamedTempFile};
 
 const CURRENT_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-CURRENT-V1";
@@ -62,6 +62,16 @@ pub struct RecoveredEvidenceGeneration {
 pub struct EvidenceDiskStore {
     root: PathBuf,
     local_writer: Mutex<()>,
+    /// Most recently verified immutable generation, keyed by the exact CURRENT pointer.
+    query_cache: Mutex<Option<Arc<CachedQueryGeneration>>>,
+}
+
+struct CachedQueryGeneration {
+    pointer: CurrentPointer,
+    evidence_index: EvidenceIndex,
+    lexical_index: Option<LexicalIndex>,
+    manifest: EvidenceCommitManifest,
+    hdc_reader: Option<HdcStoreReader>,
 }
 
 struct WriterLock {
@@ -132,7 +142,7 @@ impl EvidenceDiskStore {
         }
         sync_directory(&generations_canonical)?;
         sync_directory(&root)?;
-        Ok(Self { root, local_writer: Mutex::new(()) })
+        Ok(Self { root, local_writer: Mutex::new(()), query_cache: Mutex::new(None) })
     }
 
     /// Low-level opaque-byte fixture used only by module tests. Production
@@ -205,6 +215,49 @@ impl EvidenceDiskStore {
         self.read_generation(&pointer).map(Some)
     }
 
+    /// Clear the process-local verified-generation cache and release its mapped files.
+    /// A later query reloads the current generation and revalidates every artifact.
+    pub fn clear_query_cache(&self) -> Result<(), String> {
+        let mut cache = self.query_cache.lock()
+            .map_err(|_| "evidence query-cache mutex is poisoned".to_string())?;
+        *cache = None;
+        Ok(())
+    }
+
+    /// Reuse a previously verified immutable generation when CURRENT is unchanged.
+    /// A different manifest digest forces a complete reload and integrity check.
+    fn cached_query_generation(
+        &self,
+        pointer: &CurrentPointer,
+    ) -> Result<Arc<CachedQueryGeneration>, String> {
+        {
+            let cache = self.query_cache.lock()
+                .map_err(|_| "evidence query-cache mutex is poisoned".to_string())?;
+            if let Some(cached) = cache.as_ref().filter(|cached| &cached.pointer == pointer) {
+                return Ok(Arc::clone(cached));
+            }
+        }
+
+        // read_generation verifies the pointer, manifest, all artifact digests,
+        // lexical-index structure/document parity, HDC identity and ID parity.
+        let (recovered, hdc_reader) = self.read_generation_with_reader(pointer)?;
+        let loaded = Arc::new(CachedQueryGeneration {
+            pointer: pointer.clone(),
+            evidence_index: recovered.evidence_index,
+            lexical_index: recovered.lexical_index,
+            manifest: recovered.manifest,
+            hdc_reader,
+        });
+
+        let mut cache = self.query_cache.lock()
+            .map_err(|_| "evidence query-cache mutex is poisoned".to_string())?;
+        if let Some(cached) = cache.as_ref().filter(|cached| &cached.pointer == pointer) {
+            return Ok(Arc::clone(cached));
+        }
+        *cache = Some(Arc::clone(&loaded));
+        Ok(loaded)
+    }
+
     /// Query the exact HDC index and evidence snapshot named by one CURRENT pointer.
     ///
     /// This is the first query-serving boundary for the disk store: it reads one
@@ -254,17 +307,17 @@ impl EvidenceDiskStore {
             return Err("CURRENT pointer has invalid generation or manifest digest".into());
         }
 
-        let recovered = self.read_generation(&pointer)?;
-        if recovered.manifest.hdc_store_identity().is_none() {
+        let cached = self.cached_query_generation(&pointer)?;
+        if cached.manifest.hdc_store_identity().is_none() {
             return Err("committed text query requires a typed HDC identity; opaque-byte fixtures cannot serve context".into());
         }
-        let lexical_index = recovered.lexical_index.as_ref()
+        let lexical_index = cached.lexical_index.as_ref()
             .ok_or_else(|| "typed committed generation has no manifest-bound lexical index".to_string())?;
-        let candidates = recovered.evidence_index.rank_text_indexed(
-            lexical_index, recovered.generation, query_text, scope_id, now_ms, candidate_k,
+        let candidates = cached.evidence_index.rank_text_indexed(
+            lexical_index, cached.pointer.generation, query_text, scope_id, now_ms, candidate_k,
         )?;
         let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
-        let resolved_context = recovered.evidence_index.resolve_with_provenance(
+        let resolved_context = cached.evidence_index.resolve_with_provenance(
             &candidate_ids,
             scope_id,
             now_ms,
@@ -273,7 +326,7 @@ impl EvidenceDiskStore {
         )?;
 
         Ok(Some(CommittedEvidenceQuery {
-            generation: recovered.generation,
+            generation: cached.pointer.generation,
             candidates,
             resolved_context,
         }))
@@ -307,41 +360,19 @@ impl EvidenceDiskStore {
             return Err("CURRENT pointer has invalid generation or manifest digest".into());
         }
 
-        let recovered = self.read_generation(&pointer)?;
-        let identity = recovered.manifest.hdc_store_identity()
-            .ok_or_else(|| "committed query requires a typed HDC identity; opaque-byte fixtures cannot serve context".to_string())?;
-        identity.validate_for_recovery()?;
-
-        let index_path = self.root
-            .join("generations")
-            .join(generation_directory_name(pointer.generation, &pointer.manifest_sha256))
-            .join(INDEX_FILE);
-        let reader = HdcStoreReader::open(&index_path)
-            .map_err(|error| format!("committed query could not open its HDC generation: {error}"))?;
-
-        // Revalidate the reader that will actually answer the query. The earlier
-        // recovery pass validates the manifest's exact file bytes; this second
-        // check ensures the opened mapping still matches that committed identity.
-        let checksum = reader.content_checksum();
-        if reader.generation() != identity.store_generation
-            || reader.live_count() != identity.live_count
-            || checksum.version != identity.checksum_version
-            || checksum.live_count != identity.live_count
-            || checksum.hex() != identity.checksum_hex
-        {
-            return Err("opened query HDC generation no longer matches committed identity".into());
+        let cached = self.cached_query_generation(&pointer)?;
+        if cached.manifest.hdc_store_identity().is_none() {
+            return Err("committed query requires a typed HDC identity; opaque-byte fixtures cannot serve context".into());
         }
-        if reader.ids().collect::<BTreeSet<_>>() != recovered.evidence_index.active_hdc_ids() {
-            return Err("opened query HDC live IDs do not match committed active evidence IDs".into());
-        }
-
+        let reader = cached.hdc_reader.as_ref()
+            .ok_or_else(|| "typed committed generation has no cached HDC reader".to_string())?;
         let candidates = if candidate_k == 0 {
             Vec::new()
         } else {
             reader.scan_similar(query, candidate_k)
         };
         let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
-        let resolved_context = recovered.evidence_index.resolve_with_provenance(
+        let resolved_context = cached.evidence_index.resolve_with_provenance(
             &candidate_ids,
             scope_id,
             now_ms,
@@ -350,7 +381,7 @@ impl EvidenceDiskStore {
         )?;
 
         Ok(Some(CommittedEvidenceQuery {
-            generation: recovered.generation,
+            generation: cached.pointer.generation,
             candidates,
             resolved_context,
         }))
@@ -624,6 +655,13 @@ impl EvidenceDiskStore {
     }
 
     fn read_generation(&self, pointer: &CurrentPointer) -> Result<RecoveredEvidenceGeneration, String> {
+        self.read_generation_with_reader(pointer).map(|(generation, _reader)| generation)
+    }
+
+    fn read_generation_with_reader(
+        &self,
+        pointer: &CurrentPointer,
+    ) -> Result<(RecoveredEvidenceGeneration, Option<HdcStoreReader>), String> {
         let generations = self.root.join("generations");
         let dir = generations.join(generation_directory_name(pointer.generation, &pointer.manifest_sha256));
         let metadata = fs::symlink_metadata(&dir)
@@ -661,11 +699,11 @@ impl EvidenceDiskStore {
             }
             None => None,
         };
-        if let Some(identity) = manifest.hdc_store_identity() {
+        let hdc_reader = if let Some(identity) = manifest.hdc_store_identity() {
             identity.validate_for_recovery()?;
             // Integrity validation needs the canonical data reader, not an ANN
-            // sidecar rebuild. ANN materialization is a separate query policy;
-            // rebuilding it here would add cost to every exact/lexical query.
+            // sidecar rebuild. The same validated reader is returned to the query
+            // cache so the initial cache load does not scan the HDC set twice.
             let reader = HdcStoreReader::open(&dir.join(INDEX_FILE))
                 .map_err(|error| format!("committed HDC store failed independent reopen: {error}"))?;
             if reader.generation() != identity.store_generation {
@@ -683,14 +721,20 @@ impl EvidenceDiskStore {
             if hdc_live_ids != evidence_index.active_hdc_ids() {
                 return Err("committed HDC live IDs do not match active evidence IDs".into());
             }
-        }
-        Ok(RecoveredEvidenceGeneration {
-            generation: pointer.generation,
-            hdc_index_bytes: index_bytes,
-            evidence_index,
-            lexical_index,
-            manifest,
-        })
+            Some(reader)
+        } else {
+            None
+        };
+        Ok((
+            RecoveredEvidenceGeneration {
+                generation: pointer.generation,
+                hdc_index_bytes: index_bytes,
+                evidence_index,
+                lexical_index,
+                manifest,
+            },
+            hdc_reader,
+        ))
     }
 }
 
@@ -1151,6 +1195,83 @@ mod tests {
         assert_eq!(recovered.generation, 1, "unpublished lexical artifact must not advance CURRENT");
         assert_eq!(recovered.evidence_index.active_hdc_ids(), [7_u64].into_iter().collect());
         assert!(recovered.lexical_index.is_some());
+    }
+
+    #[test]
+    fn verified_query_cache_reuses_exact_generation_and_invalidates_on_pointer_change() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "cart checkout button"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        let first = disk.query_committed_text_context(
+            "cart checkout", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().unwrap();
+        assert_eq!(first.generation, 1);
+        let first_cache = disk.query_cache.lock().unwrap().as_ref().unwrap().clone();
+
+        let second = disk.query_committed_text_context(
+            "checkout button", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().unwrap();
+        assert_eq!(second.generation, 1);
+        let second_cache = disk.query_cache.lock().unwrap().as_ref().unwrap().clone();
+        assert!(Arc::ptr_eq(&first_cache, &second_cache), "same CURRENT pointer should reuse the verified generation");
+
+        hdc.append(8, &BinaryHV::random(8)).unwrap();
+        evidence.insert(active_evidence(8, "cart checkout details"), b"canonical trajectory bytes").unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+
+        let third = disk.query_committed_text_context(
+            "checkout details", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().unwrap();
+        assert_eq!(third.generation, 2);
+        let third_cache = disk.query_cache.lock().unwrap().as_ref().unwrap().clone();
+        assert!(!Arc::ptr_eq(&second_cache, &third_cache), "new CURRENT pointer must replace old cached generation");
+
+        disk.clear_query_cache().unwrap();
+        assert!(disk.query_cache.lock().unwrap().is_none());
+        let fourth = disk.query_committed_text_context(
+            "checkout details", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().unwrap();
+        assert_eq!(fourth.generation, 2);
+        let fourth_cache = disk.query_cache.lock().unwrap().as_ref().unwrap().clone();
+        assert!(!Arc::ptr_eq(&third_cache, &fourth_cache), "explicit cache clear must force a revalidated reload");
+    }
+
+    #[test]
+    fn explicit_recovery_bypasses_cache_and_detects_artifact_corruption() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "cart checkout evidence"), b"canonical trajectory bytes").unwrap();
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+        assert!(disk.query_committed_text_context(
+            "cart checkout", 4, "web", 150, Path::new("."), 2,
+        ).unwrap().is_some(), "first query must populate cache");
+
+        let generation_dir = generation_path(&root.path().join("evidence-generations"), 1);
+        let lexical_path = generation_dir.join(LEXICAL_FILE);
+        let original = fs::read(&lexical_path).unwrap();
+        fs::write(&lexical_path, b"out-of-protocol corruption").unwrap();
+        assert!(disk.recover().is_err(), "explicit recovery must verify disk even with a warm cache");
+
+        disk.clear_query_cache().unwrap();
+        assert!(disk.query_committed_text_context(
+            "cart checkout", 4, "web", 150, Path::new("."), 2,
+        ).is_err(), "cache clear must force the next query to reject corrupt disk bytes");
+
+        fs::write(&lexical_path, &original).unwrap();
+        let reloaded = disk.query_committed_text_context(
+            "cart checkout", 4, "web", 150, Path::new("."), 2,
+        ).unwrap().unwrap();
+        assert_eq!(reloaded.generation, 1);
     }
 
     #[test]
