@@ -149,7 +149,8 @@
           "maxLength": 2000
         },
         "target_symbolic_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256",
+          "description": "Must equal assets.expected_target_symbolic.sha256; this cross-field invariant is enforced by the ingest validator."
         },
         "parameters": {
           "type": "object"
@@ -373,7 +374,7 @@
         },
         "relative_path": {
           "type": "string",
-          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -423,7 +424,7 @@
         },
         "relative_path": {
           "type": "string",
-          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -486,7 +487,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "Ingest-time semantic validation must enforce start_seconds < end_seconds, end_seconds <= source audio duration, and correct separation of target/protected masks."
     },
     "property_oracle": {
       "type": "object",
