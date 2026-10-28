@@ -1,0 +1,44 @@
+{
+  "generated_case_mix": {
+    "invalid": 20268,
+    "missing": 9992,
+    "valid": 69740
+  },
+  "generated_single_epoch_cases_accepted": 100000,
+  "generated_single_epoch_trace_cases": 100000,
+  "integrity_note": "Hash chains detect unsynchronized changes but are not authenticity proofs unless the root is signed or externally anchored.",
+  "multi_epoch_positive_control_accepted": true,
+  "mutation_results": {
+    "dropped_event_sequence_gap": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "duplicate_trace_event_replay": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "post_reset_old_pe_admission": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "reset_epoch_jump": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "tampered_event_digest": {
+      "expected_error_detected": true,
+      "rejected": true
+    },
+    "wrong_epoch_evidence_reference": {
+      "expected_error_detected": true,
+      "rejected": true
+    }
+  },
+  "mutations_detected": 6,
+  "mutations_injected": 6,
+  "production_symthaea_imported": false,
+  "rust_compiled_or_executed": false,
+  "scope_note": "Python reference auditor only; not production Rust verification, signed trace authenticity, or task-utility/SOTA evidence.",
+  "seed": 20261028,
+  "status": "PASS_REFERENCE_TRACE_ENVELOPE_AND_SEMANTICS_ONLY"
+}
