@@ -68,8 +68,12 @@ def build_sweep() -> tuple[dict, bytes]:
         "cost_budget": 200,
         "fidelity_costs": costs,
         "source_sha256": {
-            "tools/casting-benchmark/multifidelity_compositional_bakeoff.py": "a" * 64,
-            "tools/casting-benchmark/multifidelity_scenario_suite.py": "b" * 64,
+            "tools/casting-benchmark/multifidelity_compositional_bakeoff.py": hashlib.sha256(
+                (Path(__file__).resolve().parents[2] / "tools/casting-benchmark/multifidelity_compositional_bakeoff.py").read_bytes()
+            ).hexdigest(),
+            "tools/casting-benchmark/multifidelity_scenario_suite.py": hashlib.sha256(
+                (Path(__file__).resolve().parents[2] / "tools/casting-benchmark/multifidelity_scenario_suite.py").read_bytes()
+            ).hexdigest(),
         },
         "run_count": 1,
         "paired_runs": [run],
