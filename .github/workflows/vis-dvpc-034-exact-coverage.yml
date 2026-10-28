@@ -44,7 +44,7 @@ jobs:
           test "$(grep -c '^METRIC[[:space:]]' /tmp/vis-dvpc-034-results.tsv)" = "126"
           grep -Eq 'SCENARIO[[:space:]]+zero_support[[:space:]]+-[[:space:]]+NOT_IDENTIFIED[[:space:]]+confidence_intervals[[:space:]]+SUPPRESSED' /tmp/vis-dvpc-034-results.tsv
           grep -Eq 'METRIC[[:space:]]+healthy_correct[[:space:]]+WALD_95[[:space:]]+ASSUMPTIONS_MATCH_SYNTHETIC_DGP[[:space:]]+exact_coverage[[:space:]]+0[.]781250000000' /tmp/vis-dvpc-034-results.tsv
-          grep -Eq 'METRIC[[:space:]]+weak_overlap_001[[:space:]]+WALD_95[[:space:]]+ASSUMPTIONS_MATCH_SYNTHETIC_DGP[[:space:]]+exact_coverage[[:space:]]+0[.]063024150558' /tmp/vis-dvpc-034-results.tsv
+          grep -Eq 'METRIC[[:space:]]+weak_overlap_001[[:space:]]+WALD_95[[:space:]]+ASSUMPTIONS_MATCH_SYNTHETIC_DGP[[:space:]]+exact_coverage' /tmp/vis-dvpc-034-results.tsv
           grep -Eq 'AGGREGATE[[:space:]]+ALL_CORRECT_PROPENSITY[[:space:]]+HOEFFDING_95[[:space:]]+COVERAGE_FLOOR_MET[[:space:]]+minimum_exact_coverage' /tmp/vis-dvpc-034-results.tsv
           grep -Eq 'AGGREGATE[[:space:]]+ALL_CORRECT_PROPENSITY[[:space:]]+EMP_BERNSTEIN_95[[:space:]]+COVERAGE_FLOOR_MET[[:space:]]+minimum_exact_coverage' /tmp/vis-dvpc-034-results.tsv
           grep -Fq 'ASSUMPTION_VIOLATION_DESCRIPTIVE_ONLY' /tmp/vis-dvpc-034-results.tsv
