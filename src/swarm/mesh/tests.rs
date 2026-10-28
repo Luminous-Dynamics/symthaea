@@ -1604,9 +1604,10 @@ fn test_encrypt_packet_typed_roundtrip() {
 #[test]
 fn legacy_packet_fragment_nonce_overlap_negative_control() {
     let key = [0x42u8; 32];
-    let source_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x02, 0x07];
+    let source_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x02, 0x00];
     let payload_type = 0x02;
-    let epoch = 0x07;
+    // DualLayerMesh::new defaults this epoch to zero unless a caller sets it.
+    let epoch = 0x00;
     let sequence = 0x0005_1234u32;
     let thought_id = sequence as u16;
     let fragment_index = (sequence >> 16) as u8;
