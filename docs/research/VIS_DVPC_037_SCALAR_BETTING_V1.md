@@ -65,7 +65,7 @@ The exact scalar-test false-promotion probabilities are below 0.05 in the listed
 
 ## Output and qualification
 
-The machine-readable TSV includes per-look pointwise interval coverage and width for Wald/Hoeffding, threshold-crossing probabilities and first-crossing probabilities for all three gates, scalar e-process log wealth, sequence coverage for interval methods, conditional first crossing time, path counts, and probability mass checks. The artifact receipt binds the exact source, frozen fixture and output hashes, commit SHA and Rust version.
+The machine-readable TSV includes per-look pointwise interval coverage and width for Wald/Hoeffding, threshold-crossing probabilities and first-crossing probabilities for all three gates, scalar e-process mean wealth and mean log wealth, sequence coverage for interval methods, conditional first crossing time, path counts, and probability mass checks. Under each frozen null, expected e-process wealth is checked against 1 at every look; this is a martingale invariant in addition to the final false-promotion probability. The artifact receipt binds the exact source, frozen fixture and output hashes, commit SHA and Rust version.
 
 Limitations:
 - two actions, fixed target policy, fixed logger, stationary Bernoulli rewards, known propensities;
