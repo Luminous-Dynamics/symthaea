@@ -1715,4 +1715,64 @@ mod tests {
         assert!(selected_alarm > 0.99, "selection-bias control did not alarm: {selected_alarm}");
     }
 
+    #[test]
+    fn cusum_improves_weak_and_moderate_step_power_at_matched_edge_fpr() {
+        let horizon = HORIZONS[HORIZONS.len() - 1];
+        let matched_reference_alarm_probability =
+            composite_boundary_reference_alarm_probability(horizon);
+        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+        let composite_table = family_alarm_table(
+            EProcessFamily::CompositeBandBetting,
+            NOMINAL_P,
+            horizon,
+        );
+
+        let cusum_055 = evaluate_cusum_scenario(
+            CusumDirection::Upper,
+            threshold,
+            SCENARIOS.iter().copied().find(|s| s.name == "step_up_055").unwrap(),
+        )
+        .last()
+        .unwrap()
+        .1
+        .post_shift_detection_probability
+        .unwrap();
+        let composite_055 = evaluate_with_alarm(
+            NOMINAL_P,
+            Some(0.55),
+            CHANGE_AFTER,
+            horizon,
+            |n, successes| composite_table[n][successes],
+        )
+        .detection_probability;
+
+        let cusum_060 = evaluate_cusum_scenario(
+            CusumDirection::Upper,
+            threshold,
+            SCENARIOS.iter().copied().find(|s| s.name == "step_up_060").unwrap(),
+        )
+        .last()
+        .unwrap()
+        .1
+        .post_shift_detection_probability
+        .unwrap();
+        let composite_060 = evaluate_with_alarm(
+            NOMINAL_P,
+            Some(0.60),
+            CHANGE_AFTER,
+            horizon,
+            |n, successes| composite_table[n][successes],
+        )
+        .detection_probability;
+
+        assert!(
+            cusum_055 > composite_055 + 0.04,
+            "matched-edge CUSUM did not improve weak-shift power: CUSUM={cusum_055}, composite={composite_055}"
+        );
+        assert!(
+            cusum_060 > composite_060 + 0.15,
+            "matched-edge CUSUM did not improve moderate-shift power: CUSUM={cusum_060}, composite={composite_060}"
+        );
+    }
+
 }
