@@ -58,7 +58,7 @@ From the Symthaea repository root, after the worker compiles:
     python3 research/broca-causal-episode-probe-v1/test_score_probe.py
     python3 research/broca-causal-episode-probe-v1/test_episode_expand.py
 
-The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixture hashes, scope, candidate pool, evaluation budget, protocol, and question count. The candidate pool (`--candidate-k`) must be at least as large as the final budget (`--k`). The baseline is scored using the first k BM25 results. The episode-expansion arm uses the same BM25 ranking as seeds, then adds indexed evidence from the same or adjacent trajectory steps until the identical k-item budget is reached. Its manifest binds the input candidate artifact and output ranking. Preserve all manifests with every metric.
+The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixture hashes, scope, candidate pool, evaluation budget, protocol, and question count. The candidate pool (`--candidate-k`) must be at least as large as the final budget (`--k`). The baseline is scored using the first k BM25 results. The episode-expansion arm requires that sibling manifest, verifies the candidate prediction digest and fixture digest, and carries forward the worker SHA-256 and BM25 settings into its own receipt. It then adds indexed evidence from the same or adjacent trajectory steps until the identical k-item budget is reached. Preserve all manifests with every metric.
 
 ## Metrics and interpretation
 
