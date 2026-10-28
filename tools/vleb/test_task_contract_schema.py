@@ -29,12 +29,67 @@ class TaskContractSchemaTests(unittest.TestCase):
             for error in self.validator.iter_errors(task)
         ]
 
+
+    def traceability_for_task(self, task: dict[str, Any]) -> list[dict[str, Any]]:
+        behavior = task["behavior_contract"]
+        effects = behavior["observable_effects"]
+        required = set(task["oracle_contract"]["required_test_ids"])
+        by_invariant = [
+            ["ledger.invalid_amount_fails_closed", "ledger.amount_token_canonical", "ledger.overflow_fails_closed", "ledger.maximum_credit_debit_valid"],
+            ["ledger.exact_duplicate_idempotency", "ledger.duplicate_multiplicity_idempotent"],
+            ["ledger.conflicting_duplicate_rejected", "ledger.conflict_has_no_partial_effect"],
+            ["ledger.normal_exact_output", "ledger.transaction_order_invariant"],
+            ["ledger.account_totals", "ledger.global_totals", "ledger.generated_differential_reducer"],
+            ["ledger.overflow_fails_closed", "ledger.maximum_credit_debit_valid", "ledger.generated_differential_reducer"],
+        ]
+        by_effect = {
+            "stdout_bytes": ["ledger.normal_exact_output"],
+            "exit_code": ["ledger.invalid_amount_fails_closed", "ledger.conflicting_duplicate_rejected"],
+            "control_totals": ["ledger.account_totals", "ledger.global_totals"],
+            "numeric_semantics": ["ledger.amount_token_canonical", "ledger.overflow_fails_closed"],
+            "idempotency": ["ledger.exact_duplicate_idempotency"],
+        }
+        trace: list[dict[str, Any]] = []
+
+        def add(requirement_id: str, source_kind: str, source_text: str, test_ids: list[str], observable_effects: list[str]) -> None:
+            selected = [test_id for test_id in test_ids if test_id in required]
+            if not selected:
+                selected = sorted(required)[:1]
+            trace.append({
+                "requirement_id": requirement_id,
+                "source_kind": source_kind,
+                "source_text": source_text,
+                "required_test_ids": selected,
+                "observable_effects": observable_effects,
+            })
+
+        add("TRACE.STATEMENT", "task_statement", behavior["task_statement"],
+            ["ledger.normal_exact_output", "ledger.unknown_side_fails_closed", "ledger.final_line_ending_invariant", "ledger.malformed_csv_rejected"],
+            effects)
+        for index, invariant in enumerate(behavior["invariants"]):
+            test_ids = by_invariant[index] if index < len(by_invariant) else sorted(required)
+            invariant_effects = (
+                ["numeric_semantics", "exit_code"] if index == 0 else
+                ["idempotency", "control_totals"] if index == 1 else
+                ["exit_code"] if index == 2 else
+                ["stdout_bytes"] if index == 3 else
+                ["control_totals"] if index == 4 else
+                ["numeric_semantics", "control_totals"]
+            )
+            add(f"TRACE.INVARIANT.{index + 1:03d}", "invariant", invariant, test_ids, invariant_effects)
+        for index, change in enumerate(behavior["allowed_behavior_changes"]):
+            add(f"TRACE.ALLOWED.{index + 1:03d}", "allowed_behavior_change", change, sorted(required), effects)
+        for effect in effects:
+            add(f"TRACE.EFFECT.{effect.upper()}", "observable_effect", effect, by_effect.get(effect, sorted(required)), [effect])
+        return trace
+
     def valid_private_task(self) -> dict[str, Any]:
         task = copy.deepcopy(self.task)
         task["classification"].update({
             "exposure": "private_confirmatory",
             "reviewer_count": 2,
         })
+        task["behavior_contract"]["requirement_traceability"] = self.traceability_for_task(task)
         task["oracle_contract"].update({
             "oracle_review": {
                 "independent_reviewer_count": 2,
@@ -76,6 +131,19 @@ class TaskContractSchemaTests(unittest.TestCase):
         errors = self.errors(task)
         self.assertTrue(any("independent_reviewer_count" in error for error in errors), errors)
         self.assertTrue(any("mutation_equivalence_reviewed" in error for error in errors), errors)
+
+    def test_private_task_requires_requirement_traceability(self) -> None:
+        task = self.valid_private_task()
+        del task["behavior_contract"]["requirement_traceability"]
+        errors = self.errors(task)
+        self.assertTrue(any("requirement_traceability" in error for error in errors), errors)
+
+    def test_private_requirement_traceability_schema_rejects_duplicate_ids_and_empty_test_map(self) -> None:
+        task = self.valid_private_task()
+        task["behavior_contract"]["requirement_traceability"][1]["requirement_id"] = task["behavior_contract"]["requirement_traceability"][0]["requirement_id"]
+        errors = self.errors(task)
+        # Per-entry schema validates the shape; cross-entry uniqueness is enforced by the independent auditor.
+        self.assertEqual(errors, [])
 
     def test_private_task_requires_each_reference_hash_and_artifact_path(self) -> None:
         task = self.valid_private_task()

@@ -293,6 +293,70 @@
               "minimum": 0
             }
           }
+        },
+        "requirement_traceability": {
+          "type": "array",
+          "minItems": 1,
+          "description": "For scored tasks, every stated task requirement and observable must map to concrete executable test IDs.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "source_kind",
+              "source_text",
+              "required_test_ids",
+              "observable_effects"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "pattern": "^[A-Z0-9][A-Z0-9._-]{1,127}$"
+              },
+              "source_kind": {
+                "enum": [
+                  "task_statement",
+                  "invariant",
+                  "allowed_behavior_change",
+                  "observable_effect"
+                ]
+              },
+              "source_text": {
+                "type": "string",
+                "minLength": 5
+              },
+              "required_test_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "observable_effects": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "stdout_bytes",
+                    "stderr_bytes",
+                    "exit_code",
+                    "record_layout",
+                    "database_state",
+                    "control_totals",
+                    "transaction_boundary",
+                    "restart_behavior",
+                    "idempotency",
+                    "ordering",
+                    "numeric_semantics",
+                    "external_side_effect"
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -573,6 +637,11 @@
                 ]
               }
             }
+          },
+          "behavior_contract": {
+            "required": [
+              "requirement_traceability"
+            ]
           }
         }
       }
