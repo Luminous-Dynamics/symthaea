@@ -62,6 +62,7 @@ jq empty \
   "$ROOT/tools/vleb/task-contract.schema.json" \
   "$ROOT/tools/vleb/evidence-receipt.schema.json" \
   "$ROOT/tools/vleb/cobol-index/index-output.schema.json" \
+  "$ROOT/tools/vleb/legacy-claim-evidence.schema.json" \
   "$ROOT/tools/vleb/examples/ledger-reconciliation/expected.json"
 
 printf '%s\n' "VLEB fixture integrity checks passed."
