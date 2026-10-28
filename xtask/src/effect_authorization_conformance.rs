@@ -529,6 +529,7 @@ fn ensure_nonempty_list<T>(field: &str, values: &[T]) -> Result<()> {
 mod tests {
     use super::{Case, Expected, Mutation, Setup, validate_case};
     use serde_json::json;
+    use sha2::Digest;
 
     fn sample_case(id: &str, category: &str, decision: &str, calls: u64, witness: &str, terminal: &str) -> Case {
         Case {
