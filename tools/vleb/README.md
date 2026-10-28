@@ -20,6 +20,8 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [COBOL index output integration tests](test_cobol_index_output.py)
 - [Atomic legacy claim evidence schema](legacy-claim-evidence.schema.json)
 - [Atomic legacy claim evidence negative controls](test_legacy_claim_evidence.py)
+- [Legacy claim source/witness auditor](audit_legacy_claim.py)
+- [Legacy claim auditor adversarial tests](test_audit_legacy_claim.py)
 - [Synthetic ledger task contract](examples/ledger-reconciliation/task.json)
 - [Rust reference implementation and test instructions](ledger-reconcile/README.md)
 - [Fixture integrity gate](check-fixture-integrity.sh)
@@ -43,4 +45,4 @@ When follow-on commits change files under `tools/vleb/`, check the VLEB workflow
 
 ## Legacy claim evidence
 
-The atomic legacy claim contract separates textual anchors, static structure, and runtime behavior. A static index witness cannot certify a transaction or numeric-behavior claim; those require an independent execution witness. Witness hashes are integrity fields and must still be checked against trusted external pins by a future claim auditor.
+The atomic legacy claim contract separates textual anchors, static structure, and runtime behavior. The claim auditor recomputes source-file and source-span hashes, verifies witness-artifact bytes, and compares witness verifier digests to out-of-band pins. A static index witness cannot certify a transaction or numeric-behavior claim; those require an independent execution witness. A successful evidence-chain audit validates pins and artifacts, but does not by itself re-run the compiler or transaction scenario.
