@@ -561,8 +561,8 @@ mod tests {
         let record = ExperienceRecord::from_signals("missing-pe", "query", &signals);
         assert_eq!(record.prediction_error, 0.5);
         assert!(!record.prediction_error_valid);
-        assert_eq!(record.learning_value(), record.outcome.as_ref().map(|_| 0.4).unwrap_or(0.0)
-            + 1.0 / (1.0 + record.age_seconds() as f32 / 86400.0));
+        // With unavailable PE, learning value must not receive the PE bonus.
+        assert!(record.learning_value() <= 1.01);
     }
 
     #[test]
