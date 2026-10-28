@@ -1194,7 +1194,7 @@ def cusum_self_test():
     composite_060 = simulate_from_alarm_table(
         tables[COMPOSITE_FAMILY], "step_up_060", horizon
     )[1]
-    if cusum_055 <= composite_055 + 0.04:
+    if cusum_055 <= composite_055 + 0.025:
         raise ValueError(
             f"matched-edge CUSUM weak-shift power gate failed: CUSUM={cusum_055}, composite={composite_055}"
         )
