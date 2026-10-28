@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v2.schema.json",
   "title": "PITB Primary Analyzer Power Report v2",
-  "description": "Strict JSON contract for analyze_pitb_results --mode power. Includes a 48-cell strict effect/ICC/paired-outcome-association grid and a 36-cell zero-average-effect weak-null grid. The headline +20pp/ICC 0.20 power estimate is the minimum across the registered association levels. The simultaneous null-risk upper bound uses a conservative one-sided Wilson score z=3.08 for Bonferroni control over 48 null cells (12 strict-null plus 36 weak-null). This is validation-only design analysis, not an observed proof-transfer result.",
+  "description": "Strict JSON contract for analyze_pitb_results --mode power. Includes a 48-cell strict effect/ICC/paired-outcome-association grid and a 36-cell zero-average-effect weak-null grid. The +20pp/ICC 0.20 power gate uses the minimum two-sided 95% Bonferroni-adjusted Wilson lower bound across the three association levels (z=2.394). The simultaneous null-risk upper bound uses a conservative one-sided Wilson score z=3.08 for Bonferroni control over 48 null cells (12 strict-null plus 36 weak-null). The report records validation- and test-exposure quarantine explicitly. This is validation-only design analysis, not an observed proof-transfer result.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,6 +17,8 @@
     "analyzer_source_sha256",
     "upstream_commit",
     "selected_baseline_arm",
+    "known_exposed_test_family_ids",
+    "known_exposed_validation_family_ids",
     "eligible_validation_target_count",
     "eligible_validation_family_count",
     "validation_baseline_semantic_success_rate",
@@ -39,6 +41,7 @@
     "weak_null_false_claim_probability_upper_simultaneous_95_max",
     "estimated_power_at_20pp_and_icc_020",
     "estimated_power_at_20pp_and_icc_020_lower_95",
+    "estimated_power_at_20pp_and_icc_020_lower_simultaneous_95",
     "power_gate_passed",
     "scenarios",
     "model_assumptions",
@@ -94,6 +97,34 @@
         "E",
         "I"
       ]
+    },
+    "known_exposed_validation_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "012"
+      },
+      "minContains": 1,
+      "description": "Known-exposed validation families excluded from baseline selection and threshold tuning; must include family 012."
+    },
+    "known_exposed_test_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "089"
+      },
+      "minContains": 1,
+      "description": "Known-exposed test families excluded from confirmatory denominators; must include family 089."
     },
     "eligible_validation_target_count": {
       "type": "integer",
@@ -334,6 +365,19 @@
         }
       ],
       "description": "Minimum per-scenario 95% Wilson lower bound across pair-association fractions 0, 0.5 and 0.9 at +20pp true effect and ICC 0.20; null if any registered scenario is infeasible/unestimated."
+    },
+    "estimated_power_at_20pp_and_icc_020_lower_simultaneous_95": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Minimum two-sided 95% Bonferroni-adjusted Wilson lower bound (z=2.394) across the three registered paired-outcome association fractions at +20pp true effect and ICC 0.20; null if any registered scenario is infeasible/unestimated."
     },
     "power_gate_passed": {
       "type": "boolean"
