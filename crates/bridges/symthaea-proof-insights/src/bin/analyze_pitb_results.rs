@@ -3278,6 +3278,7 @@ mod tests {
     fn exposure_quarantine_rejects_each_required_id_in_the_wrong_split() {
         let frozen = BTreeMap::from([
             ("012".to_string(), "validation".to_string()),
+            ("017".to_string(), "validation".to_string()),
             ("089".to_string(), "test".to_string()),
         ]);
         let validation_has_test_id = vec!["012".to_string(), "089".to_string()];
@@ -3287,12 +3288,10 @@ mod tests {
             .to_string().contains("assigned to the frozen validation split"));
 
         let validation = vec!["012".to_string()];
-        let test_has_validation_id = vec!["089".to_string(), "012".to_string()];
+        let test_has_validation_id = vec!["089".to_string(), "017".to_string()];
         assert!(validate_exposure_quarantine(&validation, &test_has_validation_id, &frozen)
-            .expect_err("validation family 012 must not enter test exposure list")
-            .to_string().contains("a family cannot be listed as exposed in both validation and test")
-            == false
-            || true);
+            .expect_err("validation family 017 must not enter test exposure list")
+            .to_string().contains("assigned to the frozen test split"));
     }
 
     #[test]
