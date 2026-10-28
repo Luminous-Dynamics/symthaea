@@ -102,6 +102,22 @@ class CompositionalBakeoffTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "replay rejected"):
             score_document(document, ROOT)
 
+    def test_scorer_rejects_unregistered_promotion_method(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("low_screen",),
+            design_count=75,
+        )
+        promotions = document["paired_runs"][0]["promotion_records"]
+        self.assertTrue(promotions)
+        promotions[0]["method"] = "fabricated_method"
+        with self.assertRaisesRegex(ValueError, "unregistered promotion fields"):
+            score_document(document, ROOT)
+
     def test_scorer_rejects_modified_budget_ledger(self) -> None:
         document = run_sweep(
             objective_families=("smooth_stationary",),
