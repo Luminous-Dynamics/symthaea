@@ -757,6 +757,34 @@ mod tests {
     }
 
     #[test]
+    fn alignment_accepts_one_bounded_deletion_and_reports_original_index() {
+        let mut source = simple_source();
+        for i in 5..10 {
+            source.push(SymbolicEvent {
+                pitch_midi: 60 + (i % 5) * 2,
+                onset_beats: i as f64,
+                duration_beats: 0.5,
+            });
+        }
+        let claim = descriptor(
+            PitchOrientation::Preserve,
+            0,
+            1.0,
+            1.0,
+            SelectionMode::Full,
+            0,
+            source.len(),
+        );
+        let mut target = transform_sequence(&source, claim, 4.0);
+        target.remove(3);
+        let evidence = verify_compositional_transform(&source, &target, 4.0, &claim).unwrap();
+        assert!(evidence.passed, "{evidence:?}");
+        assert_eq!(evidence.deleted_source_events, 1);
+        assert_eq!(evidence.deleted_source_indices, vec![3]);
+        assert!(evidence.inserted_target_indices.is_empty());
+    }
+
+    #[test]
     fn fragment_receipt_uses_original_source_indices() {
         let source = simple_source();
         let claim = descriptor(
