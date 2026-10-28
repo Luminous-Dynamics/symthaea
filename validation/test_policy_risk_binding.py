@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 from policy_risk_binding import PolicyRiskBindingError, build_manifest, verify_binding
+from prior_set_coverage_double_oracle_benchmark import build_risk_tensor
 
 class PolicyRiskBindingTests(unittest.TestCase):
     def setUp(self):
@@ -49,6 +50,22 @@ class PolicyRiskBindingTests(unittest.TestCase):
         broken = replace(self.manifest, risk_matrix_sha256="0" * 64)
         with self.assertRaisesRegex(PolicyRiskBindingError, "manifest_self_digest_mismatch"):
             verify_binding(broken, self.manifest.manifest_sha256, self.policy_ids, self.hypothesis_ids, self.matrix, self.policy_ids)
+
+    def test_actual_finite_game_risk_rows_are_bound_to_ordered_policy_ids(self):
+        tensor, _, _ = build_risk_tensor()
+        matrix = np.asarray(tensor["joint"]["risk_by_policy_and_world"], dtype=np.float64)
+        policies = tuple(f"toy-policy:{i}" for i in range(matrix.shape[0]))
+        hypotheses = tuple(f"toy-world:{i}" for i in range(matrix.shape[1]))
+        manifest = build_manifest(policies, hypotheses, matrix)
+        self.assertEqual(
+            verify_binding(manifest, manifest.manifest_sha256, policies, hypotheses, matrix, policies),
+            manifest.manifest_sha256,
+        )
+        permutation = [3, 1, 7, 0, 6, 2, 5, 4]
+        with self.assertRaisesRegex(PolicyRiskBindingError, "risk_matrix_digest_mismatch"):
+            verify_binding(manifest, manifest.manifest_sha256, policies, hypotheses, matrix[permutation, :], policies)
+        with self.assertRaisesRegex(PolicyRiskBindingError, "runtime_policy_order_mismatch"):
+            verify_binding(manifest, manifest.manifest_sha256, tuple(policies[i] for i in permutation), hypotheses, matrix, policies)
 
     def test_duplicate_ids_nonfinite_and_negative_costs_fail_closed(self):
         with self.assertRaisesRegex(PolicyRiskBindingError, "policy_ids_duplicate"):
