@@ -60,3 +60,6 @@ The alpha-spending method is extremely conservative here; that is a measurable e
 - This monitor only indicates a mismatch with the nominal Bernoulli rate. It does not identify the cause, repair the predictive model, or prove that every shift is harmful.
 - The fixed-time-reused arm is intentionally invalid when inspected repeatedly; it is included only to show why optional-stopping control matters.
 - Current reported numbers are independent Python reference calculations. Rust compilation and Rust-versus-Python output parity remain subject to the exact-head workflow.
+
+
+Metric interpretation: in the step-shift rows, false-alarm probability counts alarms at or before the change point; detection probability counts first alarms strictly after the change point. The reported mean delay is conditional on detecting after the change. In stationary-null rows, false-alarm probability is the probability of any alarm by the horizon, while detection probability and detection delay are NA. The three probabilities (pre-change false alarm, post-change detection, and survival) sum to one.
