@@ -342,7 +342,12 @@ def sentinel_budget_self_test():
     for row in rows:
         if int(row["sentinel_labels"]) + int(row["adaptive_labels"]) != TOTAL_LABEL_BUDGET:
             raise ValueError("sentinel budget frontier does not conserve labels")
-    print("PASS: audit-budget conservation, zero-sentinel negative control, sentinel null and shift-magnitude power gates")
+        if row["sentinel_labels"] != "0":
+            if float(row["no_target_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+                raise ValueError("stable sentinel alarm exceeded the allocated per-cell alpha")
+            if float(row["pre_change_false_alarm_probability"]) > PER_CELL_ALPHA + EPS:
+                raise ValueError("pre-change alarm exceeded the allocated per-cell alpha")
+    print("PASS: audit-budget conservation, zero-sentinel negative control, all sentinel null and pre-change alpha checks, and shift-magnitude power gates")
 
 
 def self_test():
