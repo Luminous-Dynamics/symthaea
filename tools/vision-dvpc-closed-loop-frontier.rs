@@ -34,7 +34,7 @@ const ORACLE_HEADER: &[&str] = &[
     "outcome_complete", "risk_trials", "risk_failures", "value_n",
     "value_sum_milli", "value_min_milli", "value_max_milli",
     "evidence_unit_kind", "target_calibrated", "provenance_ok", "sealed_touched",
-    "risk_sequence", "value_sequence",
+    "target_truth_risk_ppm", "target_truth_value_mean_milli", "risk_sequence", "value_sequence",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,6 +90,8 @@ struct Outcome {
     target_calibrated: bool,
     provenance_ok: bool,
     sealed_touched: bool,
+    target_truth_risk_ppm: u64,
+    target_truth_value_mean_milli: i64,
     risk_sequence: Vec<bool>,
     value_sequence: Vec<i64>,
 }
@@ -133,10 +135,11 @@ enum Policy {
     RiskAwareValue,
     DecisionValueAnytime,
     RiskAwareValueAnytime,
+    NaivePeeking,
 }
 
 impl Policy {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 9] = [
         Self::FixedFallback,
         Self::ForcedAdapt,
         Self::HighestUncertainty,
@@ -145,6 +148,7 @@ impl Policy {
         Self::RiskAwareValue,
         Self::DecisionValueAnytime,
         Self::RiskAwareValueAnytime,
+        Self::NaivePeeking,
     ];
 
     fn label(self) -> &'static str {
@@ -157,6 +161,7 @@ impl Policy {
             Self::RiskAwareValue => "risk_aware_value_fixed",
             Self::DecisionValueAnytime => "decision_value_anytime",
             Self::RiskAwareValueAnytime => "risk_aware_value_anytime",
+            Self::NaivePeeking => "naive_fixed_peeking_unsafe",
         }
     }
 }
@@ -169,6 +174,7 @@ struct RunResult {
     selected_ids: Vec<String>,
     activated: bool,
     false_authorization: bool,
+    false_safe_authorization: bool,
     budget_overrun: bool,
     actual_cost_units: u64,
     gross_value_milli: i64,
@@ -181,6 +187,7 @@ struct Summary {
     campaigns: usize,
     activations: usize,
     false_authorizations: usize,
+    false_safe_authorizations: usize,
     budget_overruns: usize,
     harmful_activations: usize,
     actual_cost_units: u64,
@@ -313,15 +320,17 @@ fn parse_oracle(text: &str, actions: &[Action]) -> Result<BTreeMap<(String, Stri
         if f.len() != ORACLE_HEADER.len() {
             return Err(format!("oracle line {line_no}: expected {} columns", ORACLE_HEADER.len()));
         }
-        let risk_sequence: Vec<bool> = f[15].chars().map(|c| match c {
+        let target_truth_risk_ppm = parse_u64(f[15], "target_truth_risk_ppm", line_no)?;
+        let target_truth_value_mean_milli = parse_i64(f[16], "target_truth_value_mean_milli", line_no)?;
+        let risk_sequence: Vec<bool> = f[17].chars().map(|c| match c {
             '0' => Ok(false),
             '1' => Ok(true),
             _ => Err(format!("oracle line {line_no}: risk sequence must contain only 0/1")),
         }).collect::<Result<_, _>>()?;
-        let value_sequence: Vec<i64> = if f[16].is_empty() {
+        let value_sequence: Vec<i64> = if f[18].is_empty() {
             Vec::new()
         } else {
-            f[16].split(',').map(|value| parse_i64(value, "value_sequence", line_no))
+            f[18].split(',').map(|value| parse_i64(value, "value_sequence", line_no))
                 .collect::<Result<_, _>>()?
         };
         let o = Outcome {
@@ -338,11 +347,16 @@ fn parse_oracle(text: &str, actions: &[Action]) -> Result<BTreeMap<(String, Stri
             target_calibrated: parse_bool(f[12], "target_calibrated", line_no)?,
             provenance_ok: parse_bool(f[13], "provenance_ok", line_no)?,
             sealed_touched: parse_bool(f[14], "sealed_touched", line_no)?,
+            target_truth_risk_ppm,
+            target_truth_value_mean_milli,
             risk_sequence,
             value_sequence,
         };
         if o.actual_cost_units == 0 {
             return Err(format!("oracle line {line_no}: actual cost must be positive"));
+        }
+        if o.target_truth_risk_ppm > 1_000_000 || !(0..=1_000).contains(&o.target_truth_value_mean_milli) {
+            return Err(format!("oracle line {line_no}: hidden target truth is outside declared bounds"));
         }
         if o.risk_failures > o.risk_trials {
             return Err(format!("oracle line {line_no}: failures exceed risk trials"));
@@ -398,10 +412,19 @@ fn parse_oracle(text: &str, actions: &[Action]) -> Result<BTreeMap<(String, Stri
             actual.difference(&expected).count()
         ));
     }
+    let mut truth_by_campaign = BTreeMap::<String, (u64, i64)>::new();
     for a in actions {
         let o = &result[&(a.campaign_id.clone(), a.action_id.clone())];
         if o.evidence_unit_kind != a.evidence_unit_kind {
             return Err(format!("{}:{} evidence-unit contract differs from outcome", a.campaign_id, a.action_id));
+        }
+        let truth = (o.target_truth_risk_ppm, o.target_truth_value_mean_milli);
+        if let Some(prior) = truth_by_campaign.get(&a.campaign_id) {
+            if *prior != truth {
+                return Err(format!("{}: hidden target truth differs across campaign outcomes", a.campaign_id));
+            }
+        } else {
+            truth_by_campaign.insert(a.campaign_id.clone(), truth);
         }
         if a.kind == ActionKind::Activate && (o.risk_trials != 0 || o.value_n != 0) {
             return Err(format!("{}: activation outcome must not be reused as calibration evidence", a.campaign_id));
@@ -472,6 +495,20 @@ fn bounded_mean_lcb(n: usize, sum_milli: i64, min_milli: i64, max_milli: i64, al
 }
 
 fn evaluate_gate(selected: &[Action], oracle: &BTreeMap<(String, String), Outcome>) -> GateReport {
+    evaluate_gate_internal(selected, oracle, false)
+}
+
+fn evaluate_naive_peeking_gate(selected: &[Action], oracle: &BTreeMap<(String, String), Outcome>) -> GateReport {
+    // Explicitly invalid comparator: permits repeated fixed-sample looks and
+    // treats a stream declared FIXED_PEEKED as if it were an IID sample.
+    evaluate_gate_internal(selected, oracle, true)
+}
+
+fn evaluate_gate_internal(
+    selected: &[Action],
+    oracle: &BTreeMap<(String, String), Outcome>,
+    allow_fixed_peeking: bool,
+) -> GateReport {
     let mut risk_n = 0usize;
     let mut risk_failures = 0usize;
     let mut value_n = 0usize;
@@ -499,8 +536,10 @@ fn evaluate_gate(selected: &[Action], oracle: &BTreeMap<(String, String), Outcom
                 risk_upper: None, value_lcb_milli: None, risk_n, risk_failures, value_n, unit_kind,
             };
         }
-        if !matches!(outcome.evidence_unit_kind.as_str(), "IID" | "INDEPENDENT_CLUSTER") {
-            // Do not treat dependent rows or repeatedly peeked fixed-sample streams as independent.
+        let admissible_unit = matches!(outcome.evidence_unit_kind.as_str(), "IID" | "INDEPENDENT_CLUSTER")
+            || (allow_fixed_peeking && outcome.evidence_unit_kind == "FIXED_PEEKED");
+        if !admissible_unit {
+            // Only the deliberately invalid naive baseline bypasses this unit control.
             continue;
         }
         if let Some(prior) = &unit_kind {
@@ -693,6 +732,7 @@ fn evaluate_policy_gate(
 ) -> GateReport {
     match policy {
         Policy::DecisionValueAnytime | Policy::RiskAwareValueAnytime => evaluate_anytime_gate(selected, oracle),
+        Policy::NaivePeeking => evaluate_naive_peeking_gate(selected, oracle),
         _ => evaluate_gate(selected, oracle),
     }
 }
@@ -710,7 +750,7 @@ fn selection_score(action: &Action, risk_aware: bool) -> i64 {
 fn choose_action<'a>(policy: Policy, pool: Vec<&'a Action>) -> Option<&'a Action> {
     match policy {
         Policy::FixedFallback | Policy::ForcedAdapt => None,
-        Policy::HighestUncertainty => pool.into_iter().max_by(|a, b| {
+        Policy::HighestUncertainty | Policy::NaivePeeking => pool.into_iter().max_by(|a, b| {
             a.uncertainty_ppm.cmp(&b.uncertainty_ppm).then_with(|| b.action_id.cmp(&a.action_id))
         }),
         Policy::CostFirst => pool.into_iter().min_by(|a, b| {
@@ -742,6 +782,7 @@ fn simulate(
     let mut gross_value_milli = 0i64;
     let mut activated = false;
     let mut false_authorization = false;
+    let mut false_safe_authorization = false;
     let mut budget_overrun = false;
 
     if policy == Policy::ForcedAdapt {
@@ -756,6 +797,9 @@ fn simulate(
                 activated = true;
                 let gate = evaluate_policy_gate(policy, &selected, oracle);
                 false_authorization = gate.status != GateStatus::Authorized;
+                false_safe_authorization = gate.status == GateStatus::Authorized
+                    && (outcome.target_truth_risk_ppm as f64 / PPM >= RISK_CAP
+                        || outcome.target_truth_value_mean_milli as f64 <= VALUE_FLOOR_MILLI);
                 budget_overrun = actual_cost_units > budget;
             }
         }
@@ -798,6 +842,9 @@ fn simulate(
                 gross_value_milli = outcome.gross_value_milli;
                 let gate_after = evaluate_policy_gate(policy, &selected, oracle);
                 false_authorization = gate_after.status != GateStatus::Authorized;
+                false_safe_authorization = gate_after.status == GateStatus::Authorized
+                    && (outcome.target_truth_risk_ppm as f64 / PPM >= RISK_CAP
+                        || outcome.target_truth_value_mean_milli as f64 <= VALUE_FLOOR_MILLI);
                 budget_overrun = actual_cost_units > budget;
                 break;
             }
@@ -817,6 +864,7 @@ fn simulate(
         selected_ids: selected_labels,
         activated,
         false_authorization,
+        false_safe_authorization,
         budget_overrun,
         actual_cost_units,
         gross_value_milli,
@@ -841,7 +889,7 @@ fn score_fixture() -> Result<String, String> {
     }
     let mut summaries: BTreeMap<Policy, Summary> = Policy::ALL.into_iter().map(|p| (p, Summary::default())).collect();
     let mut output = String::from(
-        "RESULT\tcampaign_id\tfamily\tpolicy\tselected_actions\tactivation\tgate_status\tfalse_authorization\tbudget_overrun\tactual_cost_units\tgross_value_milli\tnet_value_milli\trisk_upper_bound\tvalue_lcb_milli\trisk_trials\trisk_failures\tvalue_n\tgate_reason\n"
+        "RESULT\tcampaign_id\tfamily\tpolicy\tselected_actions\tactivation\tgate_status\tuncertified_activation\tfalse_safe_authorization\tbudget_overrun\tactual_cost_units\tgross_value_milli\tnet_value_milli\trisk_upper_bound\tvalue_lcb_milli\trisk_trials\trisk_failures\tvalue_n\tgate_reason\n"
     );
     for (campaign_id, candidates) in &by_campaign {
         for policy in Policy::ALL {
@@ -850,7 +898,7 @@ fn score_fixture() -> Result<String, String> {
                 output,
                 "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 r.campaign_id, r.family, r.policy.label(), r.selected_ids.join(","),
-                r.activated, r.gate.status.as_str(), r.false_authorization, r.budget_overrun,
+                r.activated, r.gate.status.as_str(), r.false_authorization, r.false_safe_authorization, r.budget_overrun,
                 r.actual_cost_units, r.gross_value_milli, r.net_value_milli,
                 fmt_opt(r.gate.risk_upper), fmt_opt(r.gate.value_lcb_milli),
                 r.gate.risk_n, r.gate.risk_failures, r.gate.value_n, r.gate.reason
@@ -859,6 +907,7 @@ fn score_fixture() -> Result<String, String> {
             s.campaigns += 1;
             s.activations += if r.activated { 1 } else { 0 };
             s.false_authorizations += if r.false_authorization { 1 } else { 0 };
+            s.false_safe_authorizations += if r.false_safe_authorization { 1 } else { 0 };
             s.budget_overruns += if r.budget_overrun { 1 } else { 0 };
             s.harmful_activations += if r.activated && r.gross_value_milli < 0 { 1 } else { 0 };
             s.actual_cost_units = s.actual_cost_units.saturating_add(r.actual_cost_units);
@@ -869,8 +918,8 @@ fn score_fixture() -> Result<String, String> {
         let s = summaries.get(&policy).expect("summary exists");
         let _ = writeln!(
             output,
-            "SUMMARY\t{}\tcampaigns={}\tactivations={}\tfalse_authorizations={}\tbudget_overruns={}\tharmful_activations={}\tactual_cost_units={}\tnet_value_milli={}",
-            policy.label(), s.campaigns, s.activations, s.false_authorizations, s.budget_overruns,
+            "SUMMARY\t{}\tcampaigns={}\tactivations={}\tuncertified_activations={}\tfalse_safe_authorizations={}\tbudget_overruns={}\tharmful_activations={}\tactual_cost_units={}\tnet_value_milli={}",
+            policy.label(), s.campaigns, s.activations, s.false_authorizations, s.false_safe_authorizations, s.budget_overruns,
             s.harmful_activations, s.actual_cost_units, s.net_value_milli
         );
     }
@@ -916,6 +965,19 @@ mod tests {
         assert_eq!(oracle.len(), 52);
         let campaigns: BTreeSet<&str> = actions.iter().map(|a| a.campaign_id.as_str()).collect();
         assert_eq!(campaigns.len(), 13);
+    }
+
+    #[test]
+    fn naive_peeking_witness_false_certifies_the_null_boundary() {
+        let (actions, oracle) = fixture();
+        let candidates: Vec<Action> = actions.iter().filter(|a| a.campaign_id == "C13-repeated-look").cloned().collect();
+        let safe_control = simulate("C13-repeated-look", Policy::HighestUncertainty, &candidates, &oracle);
+        let naive = simulate("C13-repeated-look", Policy::NaivePeeking, &candidates, &oracle);
+        assert!(!safe_control.activated);
+        assert!(naive.activated, "{naive:?}");
+        assert_eq!(naive.gate.status, GateStatus::Authorized);
+        assert!(!naive.false_authorization);
+        assert!(naive.false_safe_authorization, "{naive:?}");
     }
 
     #[test]
@@ -1031,8 +1093,8 @@ mod tests {
         let a = score_fixture().unwrap();
         let b = score_fixture().unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.matches("RESULT\t").count(), 13 * 8);
-        assert_eq!(a.matches("SUMMARY\t").count(), 8);
+        assert_eq!(a.matches("RESULT\t").count(), 13 * 9);
+        assert_eq!(a.matches("SUMMARY\t").count(), 9);
         assert!(a.contains("\tfalse_authorizations="));
         assert!(a.contains("\tbudget_overruns="));
         assert!(a.contains("\tnet_value_milli="));
