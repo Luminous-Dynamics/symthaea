@@ -54,6 +54,7 @@ def _candidate_output(payload, **overrides):
         "metric_id": MODULE.RUST_CANDIDATE_METRIC_ID,
         "formalism_profile": payload["formalism_profile"],
         "model_sha256": payload["model_sha256"],
+        "request_blake3": "c" * 64,
         "n_nodes": payload["n_nodes"],
         "state": payload["state"],
         "value": 0.125,
@@ -73,10 +74,11 @@ class CandidateInvocationTests(unittest.TestCase):
             stdout=json.dumps(_candidate_output(payload)), stderr=""
         )
         with patch.object(MODULE.subprocess, "run", return_value=completed):
-            value, elapsed, metric_id = validator.compute_candidate_phi(payload)
+            value, elapsed, metric_id, request_digest = validator.compute_candidate_phi(payload)
         self.assertEqual(value, 0.125)
         self.assertGreaterEqual(elapsed, 0.0)
         self.assertEqual(metric_id, MODULE.RUST_CANDIDATE_METRIC_ID)
+        self.assertEqual(request_digest, "c" * 64)
 
     def test_nonzero_exit_fails_without_estimated_score(self):
         validator = _validator()
@@ -124,6 +126,17 @@ class CandidateInvocationTests(unittest.TestCase):
         )
         with patch.object(MODULE.subprocess, "run", return_value=completed):
             with self.assertRaisesRegex(RuntimeError, "metric identity"):
+                validator.compute_candidate_phi(payload)
+
+    def test_invalid_rust_request_digest_fails_closed(self):
+        validator = _validator()
+        payload = _payload()
+        output = _candidate_output(payload, request_blake3="not-a-digest")
+        completed = subprocess.CompletedProcess(
+            args=["cargo"], returncode=0, stdout=json.dumps(output), stderr=""
+        )
+        with patch.object(MODULE.subprocess, "run", return_value=completed):
+            with self.assertRaisesRegex(RuntimeError, "request_blake3"):
                 validator.compute_candidate_phi(payload)
 
     def test_nonfinite_candidate_value_fails_closed(self):
