@@ -411,7 +411,7 @@ mod tests {
             let original = sample(len, len as u64 + 0x1234);
             let frames = fragment_v2(0xBEEF, &original).unwrap();
             assert!(frames.iter().all(|frame| frame.to_bytes().len() <= V2_MTU));
-            assert_eq!(frames.last().unwrap().is_fec(), true);
+            assert!(frames.last().unwrap().is_fec());
 
             for lost_index in 0..(frames.len() - 1) {
                 let mut assembler = FragmentAssemblerV2::new(&frames[0]).unwrap();
@@ -450,18 +450,20 @@ mod tests {
 
         // Change count to an inconsistent value and recompute CRC to ensure the
         // semantic check, not just checksum validation, rejects the frame.
-        let mut malformed = frames[0].clone();
-        malformed.total_fragments -= 1;
-        malformed.checksum = LoRaFragmentV2::checksum_for(
-            malformed.thought_id,
-            malformed.fragment_index,
-            malformed.total_fragments,
-            malformed.payload_len,
-            malformed.flags,
-            malformed.encoded_len,
-            &malformed.payload[..usize::from(malformed.payload_len)],
+        let mut malformed_wire = frames[0].to_bytes();
+        let malformed_total = malformed_wire[3] - 1;
+        malformed_wire[3] = malformed_total;
+        let malformed_checksum = LoRaFragmentV2::checksum_for(
+            frames[0].thought_id,
+            frames[0].fragment_index,
+            malformed_total,
+            frames[0].payload_len,
+            frames[0].flags,
+            frames[0].encoded_len,
+            &frames[0].payload[..usize::from(frames[0].payload_len)],
         );
-        assert!(LoRaFragmentV2::from_bytes(&malformed.to_bytes()).is_none());
+        malformed_wire[6..8].copy_from_slice(&malformed_checksum.to_le_bytes());
+        assert!(LoRaFragmentV2::from_bytes(&malformed_wire).is_none());
 
         assert!(fragment_v2(1, &[]).is_err());
         assert!(fragment_v2(1, &vec![0u8; V2_MAX_ENCODED_LEN + 1]).is_err());
