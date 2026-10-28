@@ -33,6 +33,7 @@ on:
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
+      - "xtask/src/cognitive_adaptation_audit.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
