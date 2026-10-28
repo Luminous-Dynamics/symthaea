@@ -178,11 +178,6 @@ impl EvidenceRecord {
                 if value.trim().is_empty() {
                     return Err("text evidence must be non-empty".into());
                 }
-                // Text is immutable after insertion, so reject a mismatched digest
-                // before it can populate cached lexical postings or reach a reader.
-                if sha256_hex(value.as_bytes()) != self.content_sha256 {
-                    return Err("text content_sha256 mismatch".into());
-                }
             }
             EvidencePayload::Image { path } => {
                 if path.trim().is_empty() {
@@ -208,6 +203,18 @@ impl EvidenceRecord {
                 return Err("superseded_by is only valid for superseded evidence".into());
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    /// Verify the content digest once before immutable text is added to the
+    /// cached lexical index. This is intentionally separate from structural
+    /// validation so ordinary BM25 queries do not re-hash the full corpus.
+    fn verify_text_content_digest(&self) -> Result<(), String> {
+        if let EvidencePayload::Text { value } = &self.payload {
+            if sha256_hex(value.as_bytes()) != self.content_sha256 {
+                return Err("text content_sha256 mismatch".into());
+            }
         }
         Ok(())
     }
@@ -331,6 +338,9 @@ impl EvidenceIndex {
                 return Err("new evidence must enter with active lifecycle".into());
             }
             record.validate()?;
+            // Cache postings only after content integrity is checked. Text payloads
+            // are immutable afterward; image bytes are re-verified on materialization.
+            record.verify_text_content_digest()?;
             if record.source.source_sha256 != source_sha256 {
                 return Err("source_sha256 mismatch".into());
             }
