@@ -46,6 +46,109 @@ def safe_file(root: Path, relative: Any) -> Path:
     return resolved
 
 
+def attestation_output_issues(raw: bytes, manifest: dict[str, Any]) -> list[dict[str, str]]:
+    """Check verified attestation metadata against trusted manifest values.
+
+    GitHub CLI verifies cryptographic validity and signer policy. These extra
+    checks bind the verified certificate and subject to this specific run,
+    repository ID, source revision/ref, workflow identity and evidence bundle.
+    """
+    try:
+        rows = json.loads(raw.decode("utf-8", errors="strict"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        return [{"code": "attestation_json_invalid", "message": str(exc)}]
+    if not isinstance(rows, list) or not rows:
+        return [{"code": "attestation_json_empty", "message": "verified attestation output must be a non-empty JSON array"}]
+
+    repo = manifest["repository"]
+    candidate = manifest["candidate"]
+    bundle = manifest["evidence_bundle"]
+    provenance = manifest["provenance"]
+    expected_uri = f"https://github.com/{repo['full_name']}/{repo['workflow_path']}@{repo['workflow_ref']}"
+    expected_run_uri = (
+        f"https://github.com/{repo['full_name']}/actions/runs/"
+        f"{repo['run_id']}/attempts/{repo['run_attempt']}"
+    )
+    errors: list[dict[str, str]] = []
+    verified_subject_seen = False
+
+    for index, row in enumerate(rows):
+        location = f"attestation[{index}]"
+        if not isinstance(row, dict):
+            errors.append({"code": "attestation_entry_invalid", "message": f"{location} is not an object"})
+            continue
+        result = row.get("verificationResult")
+        if not isinstance(result, dict):
+            errors.append({"code": "attestation_result_missing", "message": f"{location} has no verificationResult"})
+            continue
+        signature = result.get("signature")
+        certificate = signature.get("certificate") if isinstance(signature, dict) else None
+        if not isinstance(certificate, dict):
+            errors.append({"code": "attestation_certificate_missing", "message": f"{location} has no verified certificate"})
+            continue
+
+        san = certificate.get("subjectAlternativeName")
+        san_value = san.get("value") if isinstance(san, dict) else san
+        immutable_checks = (
+            ("sourceRepositoryIdentifier", str(repo["repository_id"]), "attestation_repository_id_mismatch"),
+            ("sourceRepositoryDigest", candidate["checkout_revision"], "attestation_source_digest_mismatch"),
+            ("sourceRepositoryRef", repo["workflow_ref"], "attestation_source_ref_mismatch"),
+            ("githubWorkflowRepository", repo["full_name"], "attestation_workflow_repository_mismatch"),
+            ("githubWorkflowRef", repo["workflow_ref"], "attestation_workflow_ref_mismatch"),
+            ("githubWorkflowSHA", repo["workflow_sha"], "attestation_workflow_sha_mismatch"),
+            ("buildSignerURI", expected_uri, "attestation_signer_uri_mismatch"),
+            ("runInvocationURI", expected_run_uri, "attestation_run_id_mismatch"),
+        )
+        for key, expected, code in immutable_checks:
+            observed = certificate.get(key)
+            if observed != expected:
+                errors.append({
+                    "code": code,
+                    "message": f"{location}.{key} expected {expected!r}, observed {observed!r}",
+                })
+        if san_value != expected_uri:
+            errors.append({
+                "code": "attestation_certificate_identity_mismatch",
+                "message": f"{location} certificate SAN expected {expected_uri!r}, observed {san_value!r}",
+            })
+        if certificate.get("issuer") != "https://token.actions.githubusercontent.com":
+            errors.append({
+                "code": "attestation_issuer_mismatch",
+                "message": f"{location} certificate issuer is not GitHub Actions OIDC",
+            })
+
+        statement = result.get("statement")
+        if not isinstance(statement, dict):
+            errors.append({"code": "attestation_statement_missing", "message": f"{location} has no statement"})
+            continue
+        if statement.get("predicateType") != provenance["predicate_type"]:
+            errors.append({
+                "code": "attestation_predicate_type_mismatch",
+                "message": f"{location} predicate type differs from manifest",
+            })
+        subjects = statement.get("subject")
+        matched_subject = False
+        if isinstance(subjects, list):
+            for subject in subjects:
+                digest_obj = subject.get("digest") if isinstance(subject, dict) else None
+                if isinstance(digest_obj, dict) and digest_obj.get("sha256") == bundle["sha256"]:
+                    matched_subject = True
+                    verified_subject_seen = True
+                    break
+        if not matched_subject:
+            errors.append({
+                "code": "attestation_subject_digest_mismatch",
+                "message": f"{location} statement does not bind the declared evidence-bundle SHA-256",
+            })
+
+    if not verified_subject_seen and not any(row["code"] == "attestation_subject_digest_mismatch" for row in errors):
+        errors.append({
+            "code": "attestation_subject_digest_mismatch",
+            "message": "no verified attestation binds the declared evidence bundle",
+        })
+    return errors
+
+
 def validate_manifest(
     manifest_path: Path,
     schema_path: Path,
@@ -95,6 +198,8 @@ def validate_manifest(
     provenance = manifest["provenance"]
     if manifest["run_id"] != repo["run_id"]:
         issues.append({"code": "run_id_mismatch", "message": "manifest and repository run IDs differ"})
+    if manifest["candidate"]["checkout_revision"] != repo["expected_head_sha"]:
+        issues.append({"code": "candidate_head_mismatch", "message": "candidate checkout revision differs from evaluator-pinned expected head"})
     if provenance["subject_path"] != bundle["path"]:
         issues.append({"code": "attested_subject_mismatch", "message": "attestation subject must be the evidence bundle"})
     active_ids = campaign["active_mutation_ids"]
@@ -154,19 +259,31 @@ def validate_manifest(
         elif not verify_attestation:
             issues.append({"code": "attestation_verification_disabled", "message": "confirmatory mode cannot skip attestation verification"})
         else:
+            expected_signer_workflow = (
+                f"{repo['full_name']}/{provenance['signer_workflow']}"
+            )
             argv = [
                 gh_executable, "attestation", "verify", str(subject),
-                "--repo", provenance["signer_repository"],
-                "--signer-workflow", provenance["signer_workflow"],
+                "--repo", repo["full_name"],
+                "--signer-repo", provenance["signer_repository"],
+                "--signer-workflow", expected_signer_workflow,
+                "--source-digest", manifest["candidate"]["checkout_revision"],
+                "--source-ref", repo["workflow_ref"],
                 "--predicate-type", provenance["predicate_type"],
+                "--format", "json",
             ]
             try:
                 completed = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, timeout=120)
                 attestation_result["command_sha256"] = digest("\0".join(argv).encode())
                 attestation_result["output_sha256"] = digest(completed.stdout)
                 if completed.returncode == 0:
-                    attestation_result["verified"] = True
-                    attestation_result["status"] = "verified"
+                    claim_issues = attestation_output_issues(completed.stdout, manifest)
+                    if claim_issues:
+                        attestation_result["status"] = "claims_mismatch"
+                        issues.extend(claim_issues)
+                    else:
+                        attestation_result["verified"] = True
+                        attestation_result["status"] = "verified"
                 else:
                     issues.append({"code": "attestation_verification_failed", "message": completed.stdout.decode("utf-8", errors="replace")[-4000:]})
             except (OSError, subprocess.TimeoutExpired) as exc:
