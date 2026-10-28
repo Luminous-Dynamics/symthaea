@@ -49,6 +49,12 @@ H4. Any improvement transfers across at least one held-out graph family, rather 
 
 Each hypothesis can fail independently. Feature importance or predictive accuracy alone is not an optimization advantage; the downstream decision metric is paired all-in verified performance.
 
+## Related trajectory-diagnostics literature (checked 2026-10-28)
+
+Hellstern, Schacht, and Zaefferer, arXiv:2610.35126 (posted 26 October 2026), compare branch-and-cut, simulated annealing, parallel tempering, DMRG-based tensor networks, and fixed-schedule LR-QAOA. They report that some trajectory/structure diagnostics explain aspects of tensor-network behavior but do not yield a validated solver-selection rule; their tested LR-QAOA runs do not improve solution quality over the classical comparators. Their controlled optimum-placement and Wishart experiments also show that solver ranking depends on instance construction and the target metric. This is a preprint and not a result on our MIS trajectory features, but it is a direct caution against presenting an explanatory time-series feature as a useful controller before downstream validation: https://arxiv.org/abs/2610.35126
+
+QOBLIB's June 2026 paper distinguishes application, algorithm, and system benchmarking and explicitly states that the released baseline runs are not claimed to be the best results achievable by classical computers. Therefore PHOT-CTRL-001B must use QOBLIB for public reproducibility while separately comparing against strong specialized MIS methods and a matched classical algorithm-selection baseline: https://doi.org/10.1038/s43588-026-00991-1
+
 ## Feature identifiability positive control
 
 The unit-test corpus includes two synthetic trajectory cohorts with identical terminal selection frequency (the only vertex is selected in every completed run) but different dynamics:
