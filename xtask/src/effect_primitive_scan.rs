@@ -341,6 +341,20 @@ mod tests {
     }
 
     #[test]
+    fn classifies_socket_and_ffi_execution_candidates() {
+        let socket: syn::Path = parse_quote!(std::net::TcpStream::connect);
+        let ffi: syn::Path = parse_quote!(libc::system);
+        assert_eq!(
+            classify_call(&socket).map(|result| result.0),
+            Some("network_socket_connect_or_bind")
+        );
+        assert_eq!(
+            classify_call(&ffi).map(|result| result.0),
+            Some("ffi_process_execution")
+        );
+    }
+
+    #[test]
     fn scans_source_location_and_hashes_finding_identity() {
         let source = "fn main() { std::fs::write(\"sentinel\", b\"x\").unwrap(); }";
         let file = syn::parse_file(source).unwrap();
