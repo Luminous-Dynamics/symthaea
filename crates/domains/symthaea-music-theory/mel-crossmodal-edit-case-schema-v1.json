@@ -1,0 +1,553 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-music-theory/mel-crossmodal-edit-case-schema-v1.json",
+  "title": "MEL-MR-EVAL-005 Cross-modal Edit Case v1",
+  "description": "Task manifest for evaluating how symbolic music edits survive rendering to audio. Asset files and human labels must be independently licensed and verified before a case is benchmark-eligible.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "split",
+    "source_family_id",
+    "provenance",
+    "assets",
+    "edit",
+    "regions",
+    "expected_properties",
+    "renderer_reference",
+    "annotation_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "MEL-CROSSMODAL-EDIT-FIDELITY-1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$"
+    },
+    "split": {
+      "enum": [
+        "development",
+        "calibration",
+        "test"
+      ]
+    },
+    "source_family_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_type",
+        "source_record_id",
+        "license",
+        "rights_review",
+        "attribution"
+      ],
+      "properties": {
+        "source_type": {
+          "enum": [
+            "procedural",
+            "licensed_recording",
+            "public_domain",
+            "research_dataset"
+          ]
+        },
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_review": {
+          "enum": [
+            "approved",
+            "pending",
+            "rejected"
+          ]
+        },
+        "attribution": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_audio",
+        "source_symbolic",
+        "expected_target_symbolic"
+      ],
+      "properties": {
+        "source_audio": {
+          "$ref": "#/$defs/audio_asset"
+        },
+        "source_symbolic": {
+          "$ref": "#/$defs/symbolic_asset"
+        },
+        "expected_target_symbolic": {
+          "$ref": "#/$defs/symbolic_asset"
+        },
+        "reference_target_audio": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/audio_asset"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_stems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/audio_asset"
+          },
+          "maxItems": 64
+        }
+      }
+    },
+    "edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_family",
+        "operation",
+        "instruction_text",
+        "target_symbolic_sha256"
+      ],
+      "properties": {
+        "operation_family": {
+          "enum": [
+            "transpose_register",
+            "pitch_local",
+            "onset_duration",
+            "rhythmic_pattern",
+            "instrument_source",
+            "arrangement_texture",
+            "compound"
+          ]
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "instruction_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "target_symbolic_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Must equal assets.expected_target_symbolic.sha256; this cross-field invariant is enforced by the ingest validator."
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "operation_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorized_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "pitch",
+              "register",
+              "onset",
+              "duration",
+              "rhythm",
+              "instrument_identity",
+              "instrument_level",
+              "arrangement",
+              "texture",
+              "stereo_position",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "regions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_regions",
+        "protected_regions",
+        "timebase"
+      ],
+      "properties": {
+        "timebase": {
+          "const": "seconds_from_untrimmed_source_start"
+        },
+        "target_regions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/region"
+          }
+        },
+        "protected_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/region"
+          }
+        },
+        "transition_guard_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "expected_detector_floor_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "expected_properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested",
+        "protected",
+        "critical_failure_modes"
+      ],
+      "properties": {
+        "requested": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/property_oracle"
+          }
+        },
+        "protected": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/property_oracle"
+          }
+        },
+        "critical_failure_modes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "no_op",
+              "wrong_region",
+              "pitch_leakage",
+              "timing_leakage",
+              "duration_leakage",
+              "instrument_leakage",
+              "non_target_source_change",
+              "boundary_click_or_discontinuity",
+              "content_drop",
+              "unsupported_case_scored_as_pass"
+            ]
+          }
+        }
+      }
+    },
+    "renderer_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderer_name",
+        "renderer_version",
+        "config_sha256",
+        "sample_rate_hz",
+        "channels"
+      ],
+      "properties": {
+        "renderer_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "renderer_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 384000
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "gain_policy": {
+          "enum": [
+            "fixed",
+            "loudness_normalized",
+            "not_comparable"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "annotation_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbolic_oracle",
+        "audio_regions",
+        "human_audio_review"
+      ],
+      "properties": {
+        "symbolic_oracle": {
+          "enum": [
+            "verified_exact_target",
+            "verified_property_constraints",
+            "pending",
+            "not_applicable"
+          ]
+        },
+        "audio_regions": {
+          "enum": [
+            "human_verified",
+            "detector_proposed_human_verified",
+            "detector_only",
+            "pending"
+          ]
+        },
+        "human_audio_review": {
+          "enum": [
+            "double_blind_complete",
+            "pilot_complete",
+            "not_started",
+            "not_applicable"
+          ]
+        },
+        "annotator_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjudication_protocol": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "audio_asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "relative_path",
+        "sha256",
+        "sample_rate_hz",
+        "channels",
+        "duration_seconds",
+        "format"
+      ],
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 384000
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "duration_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3600
+        },
+        "format": {
+          "enum": [
+            "wav",
+            "flac",
+            "ogg",
+            "mp3",
+            "other"
+          ]
+        },
+        "license_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "symbolic_asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "relative_path",
+        "sha256",
+        "format"
+      ],
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "format": {
+          "enum": [
+            "midi",
+            "musicxml",
+            "musescore",
+            "jsonl",
+            "other"
+          ]
+        },
+        "license_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_seconds",
+        "end_seconds",
+        "label"
+      ],
+      "properties": {
+        "start_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "track_or_stem_id": {
+          "type": "string"
+        },
+        "human_verified": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "start_seconds",
+              "end_seconds"
+            ]
+          },
+          "then": {
+            "properties": {
+              "end_seconds": {
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      ],
+      "description": "Ingest-time semantic validation must enforce start_seconds < end_seconds, end_seconds <= source audio duration, and correct separation of target/protected masks."
+    },
+    "property_oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "property",
+        "measurement",
+        "tolerance",
+        "direction",
+        "critical"
+      ],
+      "properties": {
+        "property": {
+          "enum": [
+            "pitch",
+            "register",
+            "onset",
+            "duration",
+            "rhythm",
+            "harmony",
+            "instrument_identity",
+            "instrument_level",
+            "arrangement",
+            "texture",
+            "stereo_position",
+            "source_identity",
+            "perceptual_quality",
+            "other"
+          ]
+        },
+        "measurement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tolerance": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "direction": {
+          "enum": [
+            "must_change",
+            "must_preserve",
+            "range",
+            "human_judgement"
+          ]
+        },
+        "critical": {
+          "type": "boolean"
+        },
+        "detector_version": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
