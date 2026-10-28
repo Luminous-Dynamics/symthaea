@@ -264,3 +264,14 @@ A public-data implementation that lacks actual crew legality, pairings, and reco
 A 2026 systematic review covering flight-delay prediction research reports that uncertainty modeling, consistent task definitions, and deployment feasibility remain underdeveloped, with results difficult to compare across inconsistent datasets and metrics: https://doi.org/10.1016/j.asoc.2026.115761. That supports treating dataset/split/objective manifests, leakage tests, tail-risk accounting, runtime and auditability as first-class benchmark outputs—not supplementary documentation.
 
 A separate public resilience dataset (Mendeley Data v1, CC BY 4.0, published 12 September 2026) covers 134 airline-year observations for 22 Indian passenger airlines across FY2015–16 to FY2024–25. It can support strategic post-shock resilience analyses but is not event-level operations-control evidence and must not be used to infer flight-level dispatch or intervention effects: https://doi.org/10.17632/tms24w69w6.1.
+
+
+## Network externality and distributional guard (28 October 2026)
+
+The benchmark now has a companion specification, [AVIATION_NETWORK_EXTERNALITY_BENCHMARK.md](./AVIATION_NETWORK_EXTERNALITY_BENCHMARK.md), and a Rust module, `crates/domains/symthaea-operations-research/src/aviation_network_externalities.rs`.
+
+The module compares paired outcomes only when scenario/objective versions match, actor IDs/domains are stable and complete, and both outcomes are marked verified feasible by a separate checker. It reports system-level benefit separately from per-actor benefit/burden and keeps kg CO2e separate from the cost objective. Cost accounting explicitly distinguishes non-cancelled delay from cancellations to prevent double counting.
+
+The new `select_network_candidate` helper adds a predeclared per-actor harm ceiling and minimum system-benefit requirement to candidate selection. It is a constrained policy choice—not a universal definition of fairness—and does not provide compensation or independently verify physical feasibility. Nine Rust tests are defined; they have not been compiled or executed in this environment.
+
+The current industry comparator is EUROCONTROL's network-level Capacity and Weather-Based Operations programme, which uses weather/capacity/instability triggers and cross-stakeholder coordination. Its reported 2026 results—3.1 million delay minutes saved, €400 million in estimated operational savings and 14% higher network stability on challenging days—are program-level reported outcomes, not a transferable performance target for this prototype. Further comparators include integrated recovery, flight/passenger fairness in ATFM delay assignment and air-rail recovery. Sources and benchmark constraints are in the companion specification.
