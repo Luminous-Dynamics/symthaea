@@ -88,6 +88,18 @@ class TaskContractSchemaTests(unittest.TestCase):
             "reviewer_count": 2,
         })
         task["behavior_contract"]["requirement_traceability"] = self.traceability_for_task(task)
+        expected_baseline_fail_ids = {
+            "ledger.exact_duplicate_idempotency",
+            "ledger.conflicting_duplicate_rejected",
+            "ledger.conflict_has_no_partial_effect",
+            "ledger.duplicate_multiplicity_idempotent",
+        }
+        for row in task["oracle_contract"]["test_execution_map"]:
+            status = "failed" if row["test_id"] in expected_baseline_fail_ids else "passed"
+            row["baseline_expectations"] = [
+                {"execution_id": execution_id, "expected_status": status}
+                for execution_id in row["execution_ids"]
+            ]
         task["oracle_contract"].update({
             "oracle_review": {
                 "independent_reviewer_count": 2,
@@ -152,6 +164,12 @@ class TaskContractSchemaTests(unittest.TestCase):
         del task["behavior_contract"]["requirement_traceability"][0]["required_test_ids"]
         errors = self.errors(task)
         self.assertTrue(any("required_test_ids" in error for error in errors), errors)
+
+    def test_scored_task_requires_baseline_expectation_for_every_concrete_test(self) -> None:
+        task = self.valid_private_task()
+        del task["oracle_contract"]["test_execution_map"][0]["baseline_expectations"]
+        errors = self.errors(task)
+        self.assertTrue(any("baseline_expectations" in error for error in errors), errors)
 
     def test_private_task_requires_each_reference_hash_and_artifact_path(self) -> None:
         task = self.valid_private_task()

@@ -360,6 +360,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
     required_ids = oracle.get("required_test_ids", [])
     mapping: dict[str, list[str]] = {}
     owner: dict[str, str] = {}
+    baseline_expectations: dict[str, str] = {}
     for row in execution_rows:
         tid = row.get("test_id")
         execution_ids = row.get("execution_ids", [])
@@ -370,6 +371,34 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
             issues.append({"code": "invalid_execution_map", "message": f"{tid!r} needs concrete test names"})
             continue
         mapping[tid] = execution_ids
+        expectation_rows = row.get("baseline_expectations")
+        if expectation_rows is not None:
+            if not isinstance(expectation_rows, list) or not expectation_rows:
+                issues.append({"code": "baseline_expectation_map_invalid", "message": f"{tid!r} needs non-empty baseline expectations"})
+            else:
+                expected_in_row: dict[str, str] = {}
+                for expectation in expectation_rows:
+                    if not isinstance(expectation, dict):
+                        issues.append({"code": "baseline_expectation_map_invalid", "message": f"{tid!r} contains a non-object baseline expectation"})
+                        continue
+                    execution_id = expectation.get("execution_id")
+                    expected_status = expectation.get("expected_status")
+                    if not isinstance(execution_id, str) or execution_id not in execution_ids:
+                        issues.append({"code": "baseline_expectation_unknown_execution", "message": f"{tid!r} has an expectation for an unmapped execution ID"})
+                        continue
+                    if expected_status not in ("passed", "failed"):
+                        issues.append({"code": "baseline_expectation_status_invalid", "message": f"{tid!r} must expect passed or failed for {execution_id!r}"})
+                        continue
+                    if execution_id in expected_in_row:
+                        issues.append({"code": "baseline_expectation_duplicate_execution", "message": f"{tid!r} repeats a baseline expectation for {execution_id!r}"})
+                        continue
+                    expected_in_row[execution_id] = expected_status
+                if set(expected_in_row) != set(execution_ids):
+                    issues.append({"code": "baseline_expectation_map_incomplete", "message": f"{tid!r} must declare baseline expectations for every concrete execution ID"})
+                for execution_id, expected_status in expected_in_row.items():
+                    if execution_id in baseline_expectations:
+                        issues.append({"code": "baseline_expectation_execution_reused", "message": f"baseline expectation for {execution_id!r} is declared more than once"})
+                    baseline_expectations[execution_id] = expected_status
         for name in execution_ids:
             if name in owner and owner[name] != tid:
                 issues.append({"code": "execution_mapping_reused", "message": f"concrete test {name!r} is mapped to more than one logical ID"})
@@ -391,6 +420,20 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
             mapped = {test for rows in mapping.values() for test in rows}
             if not any(tests.get(test) == "FAILED" for test in mapped) or b"test result: FAILED" not in raw:
                 issues.append({"code": "baseline_control_not_demonstrated", "message": "baseline must fail a preregistered behavior test"})
+            if classification.get("exposure") in ("private_holdout", "private_confirmatory"):
+                for logical_id, execution_ids in mapping.items():
+                    for execution_id in execution_ids:
+                        expected_status = baseline_expectations.get(execution_id)
+                        observed_status = tests.get(execution_id)
+                        if expected_status is None:
+                            issues.append({"code": "baseline_expectation_missing", "message": f"no frozen baseline expectation for {logical_id!r}/{execution_id!r}"})
+                            continue
+                        expected_observed = "ok" if expected_status == "passed" else "FAILED"
+                        if observed_status != expected_observed:
+                            issues.append({
+                                "code": "baseline_expectation_mismatch",
+                                "message": f"{logical_id!r}/{execution_id!r}: expected baseline {expected_status}, observed {observed_status!r}",
+                            })
         if name == "reference_log":
             tests = parse_test_log(raw)
             missing = sorted(test for rows in mapping.values() for test in rows if tests.get(test) != "ok")

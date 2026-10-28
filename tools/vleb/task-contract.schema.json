@@ -497,6 +497,30 @@
                   "type": "string",
                   "minLength": 1
                 }
+              },
+              "baseline_expectations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "execution_id",
+                    "expected_status"
+                  ],
+                  "properties": {
+                    "execution_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "expected_status": {
+                      "enum": [
+                        "passed",
+                        "failed"
+                      ]
+                    }
+                  }
+                }
               }
             }
           }
@@ -638,6 +662,13 @@
                   "reference_patch",
                   "test_bundle"
                 ]
+              },
+              "test_execution_map": {
+                "items": {
+                  "required": [
+                    "baseline_expectations"
+                  ]
+                }
               }
             }
           },

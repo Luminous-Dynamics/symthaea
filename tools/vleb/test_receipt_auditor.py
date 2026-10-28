@@ -143,7 +143,17 @@ class AuditBundle:
             },
             "oracle_contract": {
                 "required_test_ids": [logical for logical, _ in self.LOGICAL],
-                "test_execution_map": [{"test_id": logical, "execution_ids": [execution]} for logical, execution in self.LOGICAL],
+                "test_execution_map": [
+                    {
+                        "test_id": logical,
+                        "execution_ids": [execution],
+                        "baseline_expectations": [{
+                            "execution_id": execution,
+                            "expected_status": "passed" if logical in ("logical.stdout", "logical.exit") else "failed",
+                        }],
+                    }
+                    for logical, execution in self.LOGICAL
+                ],
                 "baseline_empty_patch_must_fail": True,
                 "reference_patch_must_pass": True,
                 "reference_evidence_artifacts": ref_paths,
@@ -474,6 +484,18 @@ class ReceiptAuditorTests(unittest.TestCase):
         for row in self.bundle.receipt["differential_checks"]:
             row["status"] = "not_applicable"
         self.assert_issue(self.bundle.run_audit(), "differential_effect_coverage_incomplete")
+
+    def test_baseline_must_match_each_frozen_test_expectation(self) -> None:
+        raw = self.bundle.baseline_log().decode()
+        raw = raw.replace("test control_totals_contract ... FAILED", "test control_totals_contract ... ok")
+        encoded = raw.encode()
+        self.bundle.write(self.bundle.evidence / "logs/baseline.log", encoded)
+        task = json.loads(self.bundle.task_path.read_text())
+        task["oracle_contract"]["reference_evidence_sha256"]["baseline_log"] = sha(encoded)
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "baseline_expectation_mismatch")
 
     def test_baseline_must_fail_preregistered_behavior_test(self) -> None:
         raw = (
