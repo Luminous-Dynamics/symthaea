@@ -177,7 +177,7 @@ def synthetic_attestation(manifest: dict[str, Any]) -> bytes:
                     "subjectAlternativeName": {"type": "URI", "value": signer_uri},
                     "issuer": "https://token.actions.githubusercontent.com",
                     "sourceRepositoryIdentifier": str(repo["repository_id"]),
-                    "sourceRepositoryDigest": candidate["checkout_revision"],
+                    "sourceRepositoryDigest": repo["workflow_sha"],
                     "sourceRepositoryRef": repo["workflow_ref"],
                     "githubWorkflowRepository": repo["full_name"],
                     "githubWorkflowRef": repo["workflow_ref"],
