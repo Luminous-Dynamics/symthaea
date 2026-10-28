@@ -135,7 +135,9 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         nonempty_string_field(detector, "name", &context)?;
         nonempty_string_field(detector, "family", &context)?;
         nonempty_string_field(detector, "input_contract", &context)?;
-        nonempty_string_field(detector, "implementation_status", &context)?;
+        let implementation_status =
+            nonempty_string_field(detector, "implementation_status", &context)?;
+        validate_detector_implementation_status(detector, &context, implementation_status)?;
         let source = nonempty_string_field(detector, "source", &context)?;
         ensure!(
             source.starts_with("https://"),
@@ -568,6 +570,110 @@ fn nonempty_string_array(value: &Value, field: &str, context: &str) -> anyhow::R
     Ok(items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
 }
 
+/// Enforce a comparator evidence lifecycle so a name registered in the manifest cannot
+/// silently become an executable, validated, or measured result without artifact provenance.
+/// Legacy status strings remain accepted, but new validation/measurement claims require proof.
+fn validate_detector_implementation_status(
+    detector: &Value,
+    context: &str,
+    status: &str,
+) -> anyhow::Result<()> {
+    const SUPPORTED: [&str; 7] = [
+        "implemented-rust-reference-baseline",
+        "implemented-rust-reference-baseline-pending-validation",
+        "planned-baseline",
+        "external-adapter-required",
+        "validated-reference-implementation",
+        "measured-reference-implementation",
+        "excluded-with-reason",
+    ];
+    ensure!(
+        SUPPORTED.contains(&status),
+        "{context}.implementation_status has unsupported lifecycle value {status}"
+    );
+
+    match status {
+        "implemented-rust-reference-baseline"
+        | "implemented-rust-reference-baseline-pending-validation" => {
+            nonempty_string_field(detector, "implementation_path", context)?;
+            nonempty_string_field(detector, "implementation_scope", context)?;
+        }
+        "planned-baseline" | "external-adapter-required" => {
+            ensure!(
+                detector.get("implementation_path").is_none(),
+                "{context} cannot claim an implementation_path while status is {status}"
+            );
+        }
+        "validated-reference-implementation" => {
+            nonempty_string_field(detector, "implementation_path", context)?;
+            nonempty_string_field(detector, "implementation_scope", context)?;
+            validate_detector_validation_evidence(detector, context)?;
+        }
+        "measured-reference-implementation" => {
+            nonempty_string_field(detector, "implementation_path", context)?;
+            nonempty_string_field(detector, "implementation_scope", context)?;
+            validate_detector_validation_evidence(detector, context)?;
+            let evidence = detector
+                .get("measurement_evidence")
+                .context("measurement_evidence is required for measured comparators")?;
+            ensure!(
+                evidence.is_object(),
+                "{context}.measurement_evidence must be a JSON object"
+            );
+            validate_sha256_field(evidence, "dataset_manifest_sha256", "measurement_evidence")?;
+            validate_sha256_field(evidence, "raw_result_manifest_sha256", "measurement_evidence")?;
+            nonempty_string_field(evidence, "run_command", "measurement_evidence")?;
+            nonempty_string_field(evidence, "measured_at_utc", "measurement_evidence")?;
+            let run_ids = nonempty_string_array(evidence, "run_ids", "measurement_evidence")?;
+            ensure!(
+                run_ids.iter().collect::<BTreeSet<_>>().len() == run_ids.len(),
+                "{context}.measurement_evidence.run_ids must be unique"
+            );
+        }
+        "excluded-with-reason" => {
+            nonempty_string_field(detector, "exclusion_reason", context)?;
+            ensure!(
+                detector.get("measurement_evidence").is_none(),
+                "{context} cannot carry measurement_evidence while excluded"
+            );
+        }
+        _ => unreachable!("supported status is exhaustively matched"),
+    }
+    Ok(())
+}
+
+fn validate_detector_validation_evidence(
+    detector: &Value,
+    context: &str,
+) -> anyhow::Result<()> {
+    let evidence = detector
+        .get("validation_evidence")
+        .context("validation_evidence is required for validated/measured comparators")?;
+    ensure!(
+        evidence.is_object(),
+        "{context}.validation_evidence must be a JSON object"
+    );
+    let revision = nonempty_string_field(evidence, "implementation_revision", "validation_evidence")?;
+    ensure!(
+        revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "{context}.validation_evidence.implementation_revision must be a full 40-character Git SHA"
+    );
+    validate_sha256_field(evidence, "implementation_sha256", "validation_evidence")?;
+    validate_sha256_field(evidence, "environment_lock_sha256", "validation_evidence")?;
+    validate_sha256_field(evidence, "parity_fixture_sha256", "validation_evidence")?;
+    validate_sha256_field(evidence, "validation_report_sha256", "validation_evidence")?;
+    Ok(())
+}
+
+fn validate_sha256_field(value: &Value, field: &str, context: &str) -> anyhow::Result<()> {
+    let digest = nonempty_string_field(value, field, context)?;
+    ensure!(
+        digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "{context}.{field} must be a 64-character hexadecimal SHA-256 digest"
+    );
+    Ok(())
+}
+
 fn validate_nonempty_string_array(value: &Value, context: &str) -> anyhow::Result<()> {
     let items = value
         .as_array()
@@ -873,6 +979,67 @@ mod tests {
         manifest["drift_protocol"]["kdd26_reference_protocol"]["datasets_count"] = json!(3);
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("14 method families and seven datasets"));
+    }
+
+    #[test]
+    fn rejects_unknown_comparator_lifecycle_status() {
+        let mut manifest = valid_manifest();
+        manifest["external_drift_detectors"][0]["implementation_status"] = json!("measured-ish");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("unsupported lifecycle value"));
+    }
+
+    #[test]
+    fn rejects_measured_comparator_without_raw_execution_evidence() {
+        let mut manifest = valid_manifest();
+        let detector = &mut manifest["external_drift_detectors"][0];
+        detector["implementation_status"] = json!("measured-reference-implementation");
+        detector["implementation_path"] = json!("xtask/src/cognitive_drift_baselines.rs");
+        detector["implementation_scope"] = json!("Fixture implementation for the validator unit test.");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("validation_evidence is required"));
+    }
+
+    #[test]
+    fn rejects_measured_comparator_with_malformed_artifact_digest() {
+        let mut manifest = valid_manifest();
+        let detector = &mut manifest["external_drift_detectors"][0];
+        detector["implementation_status"] = json!("measured-reference-implementation");
+        detector["implementation_path"] = json!("xtask/src/cognitive_drift_baselines.rs");
+        detector["implementation_scope"] = json!("Fixture implementation for the validator unit test.");
+        detector["validation_evidence"] = json!({
+            "implementation_revision": "0123456789abcdef0123456789abcdef01234567",
+            "implementation_sha256": "a".repeat(64),
+            "environment_lock_sha256": "b".repeat(64),
+            "parity_fixture_sha256": "c".repeat(64),
+            "validation_report_sha256": "not-a-digest"
+        });
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("validation_report_sha256 must be a 64-character hexadecimal SHA-256 digest"));
+    }
+
+    #[test]
+    fn accepts_measured_comparator_only_with_pinned_validation_and_run_artifacts() {
+        let mut manifest = valid_manifest();
+        let detector = &mut manifest["external_drift_detectors"][0];
+        detector["implementation_status"] = json!("measured-reference-implementation");
+        detector["implementation_path"] = json!("xtask/src/cognitive_drift_baselines.rs");
+        detector["implementation_scope"] = json!("Fixture implementation for the validator unit test.");
+        detector["validation_evidence"] = json!({
+            "implementation_revision": "0123456789abcdef0123456789abcdef01234567",
+            "implementation_sha256": "a".repeat(64),
+            "environment_lock_sha256": "b".repeat(64),
+            "parity_fixture_sha256": "c".repeat(64),
+            "validation_report_sha256": "d".repeat(64)
+        });
+        detector["measurement_evidence"] = json!({
+            "dataset_manifest_sha256": "e".repeat(64),
+            "raw_result_manifest_sha256": "f".repeat(64),
+            "run_command": "cargo run --locked -p xtask -- benchmark --seed 7",
+            "measured_at_utc": "2026-10-28T00:00:00Z",
+            "run_ids": ["run-7", "run-8"]
+        });
+        validate_value(&manifest).expect("complete pinned measurement evidence should be accepted");
     }
 
     #[test]
