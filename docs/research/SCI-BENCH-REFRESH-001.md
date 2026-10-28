@@ -1,0 +1,186 @@
+# SCI-BENCH-REFRESH-001 — Adaptive Scientific-Law Benchmark Refresh
+
+**Status:** protocol proposal; not a qualified implementation or empirical result.
+
+**Parent tracking:** [Issue #8771](https://github.com/Luminous-Dynamics/symthaea/issues/8771).
+
+## 1. Objective
+
+Maintain a fixed reference point for longitudinal comparison while continuously testing whether scientific-discovery policies generalize beyond familiar task templates. A benchmark refresh must change the challenge set without silently changing what an existing score means.
+
+This work is lifecycle/evaluation protocol only. It composes with:
+
+- [#8143 — OPEN-WORLD-PHYSICS-001](https://github.com/Luminous-Dynamics/symthaea/issues/8143) for hidden-law evaluation and observational-equivalence semantics;
+- [#8588 — SCI-REGIME-001](https://github.com/Luminous-Dynamics/symthaea/issues/8588) for regime-transition discovery;
+- [#6283 — TRANSPORT-BENCH-CAL-003](https://github.com/Luminous-Dynamics/symthaea/issues/6283) for measurement validity and benchmark exposure history;
+- [#8756 / PR #8757](https://github.com/Luminous-Dynamics/symthaea/pull/8757) for importing and pairing native NewtonBench trial artifacts.
+
+It does not replace any of those evaluators or create another law-discovery solver.
+
+## 2. Evaluation lanes
+
+| Lane | Task exposure | Intended inference | Longitudinal rule |
+|---|---|---|---|
+| Public development | Tasks, answers and evaluator are visible by design | Debugging, smoke tests, hypothesis generation | Never counts as sealed confirmation |
+| Immutable anchors | Frozen task bytes, evaluator version and scoring semantics | Within-anchor comparison across policies and revisions | New versions are append-only; never rewrite old score meaning |
+| Sealed refresh | Public construction recipe; evaluator-held seed/target unavailable to policy until submission | Generalization to a fresh task draw from the declared task-family mixture | Report separately by generation; reveal task/seed after scoring for audit |
+| External scientific tasks | Independent published data, experiment or domain-specific reference | Transfer beyond synthetic task construction | Separate from all synthetic results and judged symbolic accuracy |
+
+A benchmark can be reproducible without being sealed. If a runner cannot keep the seed and oracle fields inaccessible to the policy, label the result `reproducible_open`, not `sealed_refresh`.
+
+Never average these lanes into a single trendline. Report anchor and refresh results side-by-side because they answer different questions.
+
+## 3. Threat model
+
+Assume the system being evaluated can exploit:
+
+- familiar templates, constants, task names, and evaluator quirks;
+- contamination from public examples, prior refresh generations or model/tool pretraining;
+- direct or indirect access to target labels or evaluation-only observations;
+- near-duplicate task leakage across development, anchor and refresh sets;
+- repeated benchmark feedback used to tune prompts, tools, policy thresholds or task generation;
+- evaluator failure on invalid, non-finite, not-identifiable or deliberately adversarial cases;
+- missing or failed trials that disappear from denominators;
+- selective reporting of easy task families or favorable budgets.
+
+The protocol does not claim to defeat all pretraining contamination. It makes exposure explicit, tests for observable leakage, and limits claims to the declared source and task-generation process.
+
+## 4. Refresh task construction
+
+Publish the constructor recipe and version its source code. Freeze the family mixture and task acceptance rules before scoring any candidate policy. Keep task-generation logic independent from both the evaluated policy and the evaluator that holds ground truth.
+
+Initial constructor families:
+
+1. **Semantic invariance:** symbol renaming, variable reparameterization, dimensionally valid unit and scale changes. Outputs should remain equivalent after the declared inverse mapping.
+2. **Structural generalization:** held-out operator combinations or expression structures; explicit unit/dimensional checks prevent malformed expressions from becoming easy false positives.
+3. **Sampling and noise shifts:** smaller/larger observation budgets, heteroscedastic or correlated noise when specified, and shifted sampling distributions.
+4. **Domain extrapolation:** held-out input regions and joint shifts not used for candidate selection or fitting.
+5. **Confounding and null worlds:** nuisance variables, spurious correlations, and no-effect controls to measure false discovery.
+6. **Identifiability limits:** worlds where several laws are observationally equivalent under available measurements, or where the target is not identifiable. The correct response is a bounded equivalence class, calibrated uncertainty, or abstention—not forced exact recovery.
+7. **Regime controls:** smooth laws that resemble a threshold over a narrow range, alongside real transitions. Compose with #8588 rather than duplicating its specialist evaluator.
+8. **Evaluator canaries:** frozen known-answer positive, negative, malformed, ambiguous and not-evaluable cases. The canary suite is a gate on the evaluator and generator, not a model leaderboard.
+
+Each generated task records its family and provenance without exposing the hidden target to the policy. Use family-level splits, not row-level random splits, where generated tasks share a parent law, generator lineage, or transformation seed.
+
+## 5. Commitment and reveal protocol
+
+Before executing a refresh generation, create and preserve a commitment to:
+
+- exact generator source revision and binary/build identity;
+- canonical generator configuration and task-family mixture;
+- evaluator source/version and hidden-target artifact;
+- seed bytes, task bytes, and expected ordered task IDs;
+- policy/model/tool/prompt/configuration identity and resource limits;
+- analysis plan, metrics, exclusions, pairing keys and stopping rules.
+
+Use domain-separated SHA-256 commitments over canonical byte encodings. Publish the commitment before a run, but keep the seed and evaluator-only bytes in a separate trusted evaluation boundary. The evaluated policy must receive only the declared observation interface. Bind the final result receipt to the pre-run commitment and every raw task/trial digest.
+
+After submissions are locked, reveal the seed and generated task/evaluator bytes when licensing, privacy and security constraints permit. An independent process should regenerate the task set from the revealed inputs and compare exact task digests. Retain failed, missing and invalid attempts as outcomes rather than deleting them.
+
+A hash proves byte identity, not secrecy, correct execution, scientific validity or freedom from common-mode bugs. Execution provenance and score correctness remain separate gates.
+
+## 6. Frozen policy and fair comparison
+
+Freeze before opening the refresh seed:
+
+- model ID/revision, system prompt, policy source SHA and relevant build artifact;
+- tool availability, tool versions, external data access and network policy;
+- task budget, observation/experiment caps, token/compute caps, wall-clock limit and stopping criteria;
+- evaluator revision, symbolic checker or judge identity, judge prompt and metric implementation;
+- paired seeds/tasks, exclusions, analysis plan and uncertainty method.
+
+Compare at least:
+
+- random or fixed feasible query policy;
+- the benchmark's native/reference baseline, where available;
+- the strongest eligible symbolic-regression baseline for tasks it can represent;
+- the current frozen Symthaea policy;
+- preregistered ablations for mechanisms actually claimed to help.
+
+All arms use the same initial task information and declared resource caps. Record tuning exposure and revision history. Do not tune on the sealed results and then describe the same generation as confirmatory; a result used to adapt a policy moves into development history.
+
+## 7. Metrics — keep the dimensions separate
+
+### Discovery quality
+
+- Exact symbolic recovery only when a formal or independently checkable equivalence procedure supports it.
+- Judge-derived exactness as a separate metric with judge identity and limitations.
+- Prediction error on held-out observations and held-out domains, including extrapolation error.
+- Validated discovery rate by total observation, experiment, reference-call, token and wall-clock budgets.
+- Cost to first independently validated law, counting failed experiments and invalid candidates.
+
+### Epistemic behavior
+
+- False-discovery rate on null/confounded worlds.
+- Confidently-wrong rate when the policy makes a high-confidence unsupported claim.
+- Calibration and interval coverage where probabilities/intervals are emitted and an appropriate target is defined.
+- Correct abstention, unsupported abstention, unresolved, and not-evaluable rates as distinct outcomes.
+
+### Robustness and generalization
+
+- Paired anchor deltas and refresh-only scores, separately by task family, noise, sample budget and shift.
+- Public-development to sealed-refresh degradation with uncertainty, without assuming that every difference is contamination.
+- Sensitivity to equivalent reparameterizations, scale/unit transformations, seed changes and generator-family holdouts.
+- Near-duplicate and family leakage rate across all splits.
+
+### Cost and auditability
+
+- Total and available-field counts for tokens, experiments, observations, tool calls, reference evaluations, runtime and compute cost.
+- Expected, observed, completed, failed, invalid, missing and not-evaluable denominators.
+- Source/task/config/evaluator digests, runner execution receipts, and exact policy identity.
+- Generator defect rate, evaluator control pass rate, and proportion of generated cases judged identifiable by a separate eligibility rule.
+
+Do not create a single benchmark-quality or science-capability scalar that allows high symbolic accuracy to compensate for false discoveries, leakage, or missing provenance.
+
+## 8. Task admission and evaluator gates
+
+Before comparing policies:
+
+1. Rebuild the generated task set from its committed recipe/seed in an independent process and compare task digests.
+2. Validate dimensional/semantic invariants and ensure transformation pairs preserve the intended target.
+3. Run positive and negative evaluator controls, including failures, malformed values, non-finite observations, no-effect controls and ambiguous cases.
+4. Check generated-family solvability by eligible reference baselines; report floor/ceiling saturation and retain hard-but-solvable cases.
+5. Audit family-level and near-duplicate leakage across development, anchor and refresh sets.
+6. Compute identifiability eligibility independently of the tested policy and report both the eligible fraction and conditional performance.
+7. Confirm no oracle-only field is accepted by the policy input schema and no post-outcome data are used to select, fit, stop or tune a policy.
+8. Freeze the denominator and analysis before scoring the tested policies.
+
+If a gate fails, the generation is a generator/evaluator diagnostic, not a valid model comparison.
+
+## 9. Proposed go/no-go targets
+
+These are prospective targets, not established results:
+
+- 100% agreement with frozen known-answer evaluator controls before policy metrics are admitted.
+- Zero accepted oracle-only fields in the policy input contract; adversarial field insertion and task/seed/config mutation must be rejected or change the commitment.
+- 100% expected-task accounting in the report, including failed, missing, invalid, and not-evaluable states.
+- No anchor/refresh score conflation; task and scoring revisions create new generation IDs.
+- Independent audits find no known family or near-duplicate leakage across the declared splits, or the affected cases are explicitly quarantined before unblinding.
+- Report generation quality and baseline-only performance before claiming any Symthaea improvement.
+- A superiority claim requires a preregistered paired comparison, matched resource caps, held-out families, multiplicity-aware analysis where multiple confirmatory comparisons are made, and uncertainty that supports the stated effect.
+- Synthetic results remain labelled synthetic. A claim of real scientific discovery requires independent real-data or experimental validation appropriate to the specific domain.
+
+Do not use a universal fixed percentage gain as the only success criterion. First establish valid task generation and eligible baselines; then power the prospective comparison around a domain-relevant minimum effect.
+
+## 10. External benchmark context
+
+- **AutoSciBench** (arXiv:2610.05140, 4 Oct 2026) explores iterative generation and refinement of scientific-agent tasks to reduce benchmark saturation. Its reported effects are specific to its tested settings and are not presumed to transfer to Symthaea: https://arxiv.org/abs/2610.05140
+- **NewtonBench** evaluates interactive scientific-law discovery across 324 tasks and 12 physics domains, with metaphysical shifts and increasing difficulty/noise: https://arxiv.org/abs/2510.07172
+- **SRBench** demonstrates the value of standardized reproducible symbolic-regression comparisons and emphasizes that no single method dominates every dataset; its updated benchmark discussion includes accuracy/complexity/resource trade-offs: https://doi.org/10.1145/3712255.3734309
+- **ScienceAgentBench** provides a complementary set of real scientific tasks sourced from peer-reviewed publications, with expert validation; synthetic law recovery is not a substitute for it: https://hal.cs.princeton.edu/scienceagentbench
+- **GravityBench** is a complementary interactive physics-discovery environment and demonstrates the need to evaluate observation planning as well as equation output: https://gravitybench.github.io/
+
+These benchmarks are complementary, not directly commensurate. Do not compare scores across them without matching task definitions, scoring semantics, budgets and evaluation units.
+
+## 11. Initial delivery sequence
+
+1. **Protocol (this document):** freeze lanes, threat model, generation and scoring rules.
+2. **Manifest/schema + synthetic fixture:** canonical example with pre-run commitments, hidden-field boundaries and expected denominator.
+3. **Standalone Rust validator:** validate manifests/commitments, denominator closure, task-family split integrity, post-run reveal consistency and hostile mutations. Keep it independent from candidate-policy code.
+4. **Generator qualification:** positive/negative controls, duplicate/family leakage, identifiability, baseline solvability and seed replay.
+5. **Baseline-only pilot:** use pinned NewtonBench or a separately declared small synthetic profile; no candidate-policy superiority claim.
+6. **Confirmatory study:** paired frozen policies, predeclared effect and sample size, complete cost accounting, held-out generation(s), and independent review.
+
+## 12. Claim ceiling
+
+This document is a protocol proposal. It does not show that a benchmark has been generated, that an evaluator-held secret can be safely maintained by the current runner, that task constructors are qualified, or that Symthaea exceeds any state-of-the-art baseline. The first valid result is successful generator/evaluator qualification; a model win is a later and separate claim.
