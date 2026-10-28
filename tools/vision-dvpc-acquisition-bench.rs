@@ -325,7 +325,8 @@ fn select_actions(candidates:&[Candidate],meta:&Meta,policy:Policy)->Result<Sele
                 .then_with(||a.action_id.cmp(&b.action_id)));
         }
         Policy::SeededRandom=>{
-            order.sort_by_key(|c|seeded_key(meta.seed,&c.action_id));
+            order.sort_by(|a,b|seeded_key(meta.seed,&a.action_id).cmp(&seeded_key(meta.seed,&b.action_id))
+                .then_with(||a.action_id.cmp(&b.action_id)));
         }
         Policy::Abstain=>{}
     }
@@ -539,6 +540,56 @@ mod tests {
     #[test] fn seeded_random_is_deterministic(){
         let c=sample_candidates();let m=meta();
         assert_eq!(select_actions(&c,&m,Policy::SeededRandom).unwrap().selected,select_actions(&c,&m,Policy::SeededRandom).unwrap().selected);
+    }
+    #[test]
+    fn selection_is_invariant_to_candidate_row_order() {
+        let candidates = sample_candidates();
+        let mut reversed = candidates.clone();
+        reversed.reverse();
+        let mut rotated = candidates.clone();
+        rotated.rotate_left(2);
+        let m = meta();
+        for policy in [
+            Policy::DecisionValueLcb,
+            Policy::HighestUncertainty,
+            Policy::CostFirst,
+            Policy::SeededRandom,
+            Policy::Abstain,
+        ] {
+            let expected = select_actions(&candidates, &m, policy).unwrap().selected;
+            assert_eq!(expected, select_actions(&reversed, &m, policy).unwrap().selected, "reverse: {policy:?}");
+            assert_eq!(expected, select_actions(&rotated, &m, policy).unwrap().selected, "rotate: {policy:?}");
+        }
+    }
+    #[test]
+    fn adding_an_ineligible_high_value_action_does_not_change_selection() {
+        let candidates = sample_candidates();
+        let mut expanded = candidates.clone();
+        expanded.push(Candidate {
+            action_id: "ineligible-dominating-control".into(),
+            decision_id: "d99".into(),
+            challenge_family: "INELIGIBLE_CONTROL".into(),
+            uncertainty_priority: 1_000.0,
+            regret_reduction_lcb: 1_000.0,
+            latency_cost_ucb: 1,
+            energy_cost_ucb: 1,
+            eligibility: "UNAUTHORIZED".into(),
+            evidence_type: "UNTRUSTED_SOURCE".into(),
+        });
+        let m = meta();
+        for policy in [
+            Policy::DecisionValueLcb,
+            Policy::HighestUncertainty,
+            Policy::CostFirst,
+            Policy::SeededRandom,
+            Policy::Abstain,
+        ] {
+            assert_eq!(
+                select_actions(&candidates, &m, policy).unwrap().selected,
+                select_actions(&expanded, &m, policy).unwrap().selected,
+                "policy: {policy:?}",
+            );
+        }
     }
     #[test] fn missing_measurement_cost_is_charged_at_reserved_upper_bound(){
         let a=sample_actions();let mut o=sample_oracle(&a);
