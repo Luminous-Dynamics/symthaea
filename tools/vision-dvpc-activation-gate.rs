@@ -207,7 +207,8 @@ fn exact_binomial_upper(n: usize, failures: usize, alpha: f64) -> Result<f64, St
 }
 
 /// Hoeffding lower confidence bound for independent bounded observations.
-/// The sample sum/count are bound to the frozen evidence receipt; the range is preregistered.
+/// Deployment must bind sample count/sum to an immutable receipt; this synthetic fixture
+/// does not hash or validate the raw outcome records themselves.
 fn bounded_mean_lcb(c: &Campaign) -> Result<f64, String> {
     if c.value_samples_n == 0 || c.value_min_milli > c.value_max_milli {
         return Err("require positive value sample count and ordered bounds".to_string());
