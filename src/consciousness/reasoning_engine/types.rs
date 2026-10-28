@@ -518,6 +518,9 @@ pub struct PosthocOutcome {
     pub gate_passed: bool,
     /// Whether the outcome was good.
     pub outcome_good: bool,
+    /// Cognitive cycle at which the associated decision was made, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_cycle: Option<u64>,
     /// Measured PE scalar retained for compatibility and existing reports.
     /// Derived from typed evidence on the live provenance-aware path.
     #[serde(default)]
