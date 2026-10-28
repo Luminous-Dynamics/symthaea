@@ -929,6 +929,71 @@ impl EvidenceIndex {
         Ok(ranked)
     }
 
+    /// Diversify a previously ranked lexical candidate pool by trajectory.
+    ///
+    /// The caller should oversample the BM25 ranking before applying this policy.
+    /// The selector preserves score order (score descending, HDC ID ascending),
+    /// emits at most `per_trajectory_limit` text records per source trajectory,
+    /// and rechecks scope, lifecycle and time eligibility at selection time.
+    ///
+    /// This is an opt-in retrieval policy, not part of the BM25 score or an
+    /// accuracy claim. It can reduce duplicate sibling-state context, but it may
+    /// also hurt questions that need several states from one trajectory; evaluate
+    /// by memory ability and equal context budget before selecting a default.
+    pub(crate) fn diversify_text_candidates_by_trajectory(
+        &self,
+        ranked_candidates: &[(u64, f32)],
+        scope_id: &str,
+        now_ms: u64,
+        max_candidates: usize,
+        per_trajectory_limit: usize,
+    ) -> Result<Vec<(u64, f32)>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if per_trajectory_limit == 0 {
+            return Err("per_trajectory_limit must be positive".into());
+        }
+        if max_candidates == 0 || ranked_candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut ordered = ranked_candidates.to_vec();
+        if ordered.iter().any(|(_, score)| !score.is_finite() || *score < 0.0) {
+            return Err("candidate scores must be finite and non-negative".into());
+        }
+        ordered.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+
+        let mut seen_ids = BTreeSet::new();
+        let mut trajectory_counts = BTreeMap::<String, usize>::new();
+        let mut selected = Vec::with_capacity(max_candidates.min(ordered.len()));
+        for (hdc_id, score) in ordered {
+            if !seen_ids.insert(hdc_id) {
+                continue;
+            }
+            let record = self.records.get(&hdc_id)
+                .ok_or_else(|| format!("ranked lexical candidate references unknown HDC ID {hdc_id}"))?;
+            if !record.is_eligible_for(scope_id, now_ms)
+                || !matches!(&record.payload, EvidencePayload::Text { .. })
+            {
+                continue;
+            }
+            let trajectory_id = record.source.trajectory_id.clone();
+            let count = trajectory_counts.entry(trajectory_id).or_default();
+            if *count >= per_trajectory_limit {
+                continue;
+            }
+            *count += 1;
+            selected.push((hdc_id, score));
+            if selected.len() == max_candidates {
+                break;
+            }
+        }
+        Ok(selected)
+    }
+
     /// Deterministic BM25 lexical retrieval over eligible text evidence.
     ///
     /// This is a transparent lexical baseline, not a semantic encoder. It reads
