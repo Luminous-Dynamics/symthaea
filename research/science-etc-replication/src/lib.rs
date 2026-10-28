@@ -937,6 +937,35 @@ mod tests {
     }
 
     #[test]
+    fn schema_document_matches_strict_top_level_manifest_contract() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/run-manifest.schema.json"
+        ))
+        .expect("manifest schema JSON");
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(MANIFEST_SCHEMA)
+        );
+        assert_eq!(schema["additionalProperties"].as_bool(), Some(false));
+        let property_names: BTreeSet<String> = schema["properties"]
+            .as_object()
+            .expect("schema properties object")
+            .keys()
+            .cloned()
+            .collect();
+        let required_names: BTreeSet<String> = schema["required"]
+            .as_array()
+            .expect("schema required array")
+            .iter()
+            .map(|item| item.as_str().expect("required name").to_owned())
+            .collect();
+        assert_eq!(property_names, required_names);
+        assert!(schema["properties"]["primary_contrasts"]["items"]["properties"]
+            ["multiplicity_family"]
+            .is_object());
+    }
+
+    #[test]
     fn sha256_known_answer_matches() {
         assert_eq!(
             sha256_hex(b"abc"),
