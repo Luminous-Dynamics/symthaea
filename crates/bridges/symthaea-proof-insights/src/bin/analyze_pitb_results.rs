@@ -3159,6 +3159,15 @@ mod tests {
     }
 
     #[test]
+    fn null_grid_uses_conservative_simultaneous_wilson_upper_bound() {
+        let per_cell_upper = wilson_interval(2, 1_000).1;
+        let simultaneous_upper = simultaneous_null_upper_bound(2, 1_000);
+        assert!(simultaneous_upper >= per_cell_upper);
+        assert!((0.0..=1.0).contains(&simultaneous_upper));
+        assert!(simultaneous_null_upper_bound(0, 1_000) <= 0.05);
+    }
+
+    #[test]
     fn wilson_interval_brackets_observed_bernoulli_rate() {
         let (lower, upper) = wilson_interval(80, 100);
         assert!(lower < 0.80);
