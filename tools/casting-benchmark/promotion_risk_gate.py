@@ -83,8 +83,14 @@ def assess_promotion_risk(
     predicted_feasible_count: int,
     risk_target: float = DEFAULT_RISK_TARGET,
     confidence: float = DEFAULT_CONFIDENCE,
+    independent_held_out: bool = False,
 ) -> dict[str, Any]:
-    """Return a fail-closed allow/abstain decision from observed promotion outcomes."""
+    """Return a fail-closed decision from predeclared independent validation outcomes.
+
+    Set independent_held_out only when outcomes came from a frozen policy evaluated
+    on an independent, representative validation sample. An optimizer's adaptively
+    selected promotions must not be used to certify its own risk.
+    """
     if (
         isinstance(predicted_feasible_count, bool)
         or not isinstance(predicted_feasible_count, int)
@@ -113,6 +119,7 @@ def assess_promotion_risk(
             "one_sided_confidence": float(confidence),
             "upper_confidence_bound": None,
             "risk_target": float(risk_target),
+            "validation_source": "independent_held_out" if independent_held_out else "optimization_trace",
             "certified": False,
             "decision": "abstain",
             "reason": "no_validated_predicted_feasible_promotions",
@@ -121,7 +128,13 @@ def assess_promotion_risk(
         false_feasible_count, predicted_feasible_count, confidence
     )
     observed = false_feasible_count / predicted_feasible_count
-    certified = upper <= float(risk_target)
+    certified = bool(independent_held_out) and upper <= float(risk_target)
+    reason = (
+        "upper_bound_within_target" if certified else
+        "validation_not_independent_or_exchangeable" if not independent_held_out else
+        "observed_rate_exceeds_target" if observed > float(risk_target) else
+        "insufficient_evidence_for_target"
+    )
     return {
         "validated_predicted_feasible_count": predicted_feasible_count,
         "false_feasible_count": false_feasible_count,
@@ -129,13 +142,10 @@ def assess_promotion_risk(
         "one_sided_confidence": float(confidence),
         "upper_confidence_bound": upper,
         "risk_target": float(risk_target),
+        "validation_source": "independent_held_out" if independent_held_out else "optimization_trace",
         "certified": certified,
         "decision": "allow" if certified else "abstain",
-        "reason": "upper_bound_within_target" if certified else (
-            "observed_rate_exceeds_target"
-            if observed > float(risk_target)
-            else "insufficient_evidence_for_target"
-        ),
+        "reason": reason,
     }
 
 
@@ -148,11 +158,15 @@ def main() -> int:
     parser.add_argument("--validated-predicted-feasible", type=int, required=True)
     parser.add_argument("--risk-target", type=float, default=DEFAULT_RISK_TARGET)
     parser.add_argument("--confidence", type=float, default=DEFAULT_CONFIDENCE)
+    parser.add_argument(
+        "--independent-held-out", action="store_true",
+        help="assert that outcomes are from a frozen policy on a predeclared independent, representative validation sample",
+    )
     args = parser.parse_args()
     try:
         result = assess_promotion_risk(
             args.false_feasible, args.validated_predicted_feasible,
-            args.risk_target, args.confidence,
+            args.risk_target, args.confidence, args.independent_held_out,
         )
     except ValueError as exc:
         parser.error(str(exc))
