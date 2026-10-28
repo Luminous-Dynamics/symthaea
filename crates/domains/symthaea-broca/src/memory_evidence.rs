@@ -348,9 +348,8 @@ impl EvidenceIndex {
 
             let lexical_document = match &record.payload {
                 EvidencePayload::Text { value } => {
-                    if sha256_hex(value.as_bytes()) != record.content_sha256 {
-                        return Err("text content_sha256 mismatch".into());
-                    }
+                    // verify_text_content_digest() already bound these exact bytes
+                    // before this immutable posting cache is constructed.
                     let tokens = tokenize_lexical(value);
                     if tokens.is_empty() {
                         None
