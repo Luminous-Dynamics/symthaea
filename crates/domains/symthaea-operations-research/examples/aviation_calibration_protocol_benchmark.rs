@@ -314,6 +314,11 @@ fn main() {
         network_assessment: &network_assessment,
         candidate_calibration_receipt_id: "synthetic-calibration-envelope-v1",
         active_calibration_receipt_id: "synthetic-calibration-envelope-v1",
+        calibration_created_at_epoch_seconds: 1_700_010_199,
+        decision_time_epoch_seconds: 1_700_040_002,
+        max_calibration_age_seconds: 86_400,
+        latest_monitor_observation_epoch_seconds: Some(1_700_040_002),
+        max_monitor_observation_age_seconds: 60,
     });
     let readiness_blockers_json = readiness_report.blockers.iter()
         .map(|blocker| format!("\"{:?}\"", blocker))
