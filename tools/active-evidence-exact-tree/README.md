@@ -195,3 +195,21 @@ The calibrated-box policy also remains vulnerable outside its confidence set. In
     python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py /tmp/calibrated-box.csv
 
 The dedicated workflow now includes this binary, deterministic output comparison, independent row-by-row reference verification, a mutated-row negative control, and the generated CSV in the exact-head artifact/receipt. The Rust binary and checker have not been compiled/executed together in this environment; these reference values are from a separate local Python prototype pending exact-head CI.
+
+
+### Finite-grid coverage qualification (new)
+
+The calibration binary now also has a Rust unit test that enumerates exact binomial mass for 11 true probabilities p in {0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1} at each of the six calibration sizes. It checks that the minimum per-cell coverage meets the Bonferroni target 1 - 0.05/12, then calculates the conservative 12-cell union-bound lower bound. The independent Python reference checker's self-test does the same independently. These are exact finite-grid coverage calculations (up to floating-point arithmetic), not Monte Carlo intervals, and do not establish uniform coverage empirically for every p.
+
+A local independent Python calculation gave the following minimum per-cell coverage and 12-cell union-bound lower bound over that probability grid:
+
+| Observations per cell | Minimum per-cell coverage | Union-bound lower bound for 12 cells |
+|---:|---:|---:|
+| 20 | 0.999598 | 0.995171 |
+| 50 | 0.999694 | 0.996330 |
+| 100 | 0.999591 | 0.995095 |
+| 200 | 0.999501 | 0.994007 |
+| 500 | 0.999600 | 0.995195 |
+| 1,000 | 0.999558 | 0.994692 |
+
+This strengthens finite-grid qualification, but the uniform guarantee still comes from the Hoeffding/Bonferroni argument under independent fixed-sample Bernoulli observations—not from this probability grid. The synthetic calibration counts used to choose the policy are rounded around nominal probabilities and are not the random samples used in the coverage calculation.
