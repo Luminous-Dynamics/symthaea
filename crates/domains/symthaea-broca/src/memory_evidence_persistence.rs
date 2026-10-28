@@ -103,14 +103,11 @@ impl EvidenceDiskStore {
         Ok(Self { root, local_writer: Mutex::new(()) })
     }
 
-    /// Commit one logical generation. The caller must supply the exact serialized
-    /// HDC index bytes corresponding to the supplied EvidenceIndex state.
-    ///
-    /// Generation is assigned from the fully verified current commit. If CURRENT
-    /// is corrupt, commit fails rather than guessing a generation or restoring an
-    /// older state. An error after CURRENT publication has an indeterminate
-    /// durability outcome; call recover() and inspect the committed generation.
-    pub fn commit(
+    /// Low-level opaque-byte fixture used only by module tests. Production
+    /// callers must use commit_hdc_store so the actual HDC generation, checksum
+    /// and live-ID set are independently bound and revalidated.
+    #[cfg(test)]
+    fn commit(
         &self,
         hdc_index_bytes: &[u8],
         evidence_index: &EvidenceIndex,
