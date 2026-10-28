@@ -43,6 +43,11 @@ pub struct PrincipledSignals {
     /// - Updating beliefs
     pub prediction_error: f32,
 
+    /// Whether prediction_error represents a measured, usable comparison.
+    /// Missing or legacy-serialized status defaults to false (fail closed).
+    #[serde(default)]
+    pub prediction_error_valid: bool,
+
     /// **Uncertainty** (Entropy)
     ///
     /// "What don't I know?"
@@ -122,6 +127,7 @@ impl PrincipledSignals {
     pub fn new() -> Self {
         Self {
             prediction_error: 0.5,
+            prediction_error_valid: false,
             uncertainty: 0.5,
             coherence: 0.5,
             confidence: 0.5,
@@ -134,6 +140,7 @@ impl PrincipledSignals {
     pub fn novel() -> Self {
         Self {
             prediction_error: 0.9,
+            prediction_error_valid: true,
             uncertainty: 0.7,
             coherence: 0.5,
             confidence: 0.3,
@@ -146,6 +153,7 @@ impl PrincipledSignals {
     pub fn familiar() -> Self {
         Self {
             prediction_error: 0.1,
+            prediction_error_valid: true,
             uncertainty: 0.2,
             coherence: 0.8,
             confidence: 0.8,
@@ -158,6 +166,7 @@ impl PrincipledSignals {
     pub fn confused() -> Self {
         Self {
             prediction_error: 0.6,
+            prediction_error_valid: true,
             uncertainty: 0.9,
             coherence: 0.3,
             confidence: 0.2,
@@ -166,9 +175,18 @@ impl PrincipledSignals {
         }
     }
 
-    /// Check if we should ask a clarifying question
+    /// Return the PE only when it is explicitly marked valid and finite.
+    pub fn prediction_error_value(&self) -> Option<f32> {
+        (self.prediction_error_valid && self.prediction_error.is_finite())
+            .then_some(self.prediction_error)
+    }
+
+    /// Check if we should ask a clarifying question.
+    /// Unavailable PE cannot independently trigger a clarification.
     pub fn should_clarify(&self) -> bool {
-        self.uncertainty > 0.6 || (self.prediction_error > 0.5 && self.confidence < 0.4)
+        self.uncertainty > 0.6
+            || (self.prediction_error_value().is_some_and(|pe| pe > 0.5)
+                && self.confidence < 0.4)
     }
 
     /// Check if we should consult values
@@ -186,48 +204,59 @@ impl PrincipledSignals {
     /// Higher = more ready to act
     /// Lower = more need for reflection/clarification
     pub fn action_readiness(&self) -> f32 {
-        // Weighted combination favoring confidence and coherence
-        let readiness = (self.confidence * 0.3)
+        // Renormalize when PE is unavailable; never interpret its numeric placeholder.
+        let base = (self.confidence * 0.3)
             + (self.coherence * 0.3)
-            + ((1.0 - self.uncertainty) * 0.2)
-            + ((1.0 - self.prediction_error) * 0.2);
-
-        readiness.clamp(0.0, 1.0)
+            + ((1.0 - self.uncertainty) * 0.2);
+        let (score, weight) = match self.prediction_error_value() {
+            Some(pe) => (base + (1.0 - pe) * 0.2, 1.0),
+            None => (base, 0.8),
+        };
+        (score / weight).clamp(0.0, 1.0)
     }
 
     /// Compute a weighted learning signal
     ///
     /// Higher = more to learn from this interaction
     pub fn learning_potential(&self) -> f32 {
-        // High prediction error + high salience = valuable learning
-        let potential =
-            (self.prediction_error * 0.4) + (self.salience * 0.3) + (self.uncertainty * 0.3);
-
-        potential.clamp(0.0, 1.0)
+        // Renormalize the valid channels when prediction error is unavailable.
+        let base = (self.salience * 0.3) + (self.uncertainty * 0.3);
+        let (potential, weight) = match self.prediction_error_value() {
+            Some(pe) => (base + pe * 0.4, 1.0),
+            None => (base, 0.6),
+        };
+        (potential / weight).clamp(0.0, 1.0)
     }
 
     /// Get dominant signal name
     pub fn dominant_signal(&self) -> &'static str {
-        let signals = [
-            (self.prediction_error, "prediction_error"),
+        let mut dominant = [
             (self.uncertainty, "uncertainty"),
             (self.coherence, "coherence"),
             (self.confidence, "confidence"),
             (self.salience, "salience"),
-        ];
+        ]
+        .into_iter()
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+        .unwrap_or((f32::NEG_INFINITY, "unknown"));
 
-        signals
-            .iter()
-            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(_, name)| *name)
-            .unwrap_or("unknown")
+        if let Some(pe) = self.prediction_error_value() {
+            if pe > dominant.0 {
+                dominant = (pe, "prediction_error");
+            }
+        }
+        dominant.1
     }
 
     /// Format as human-readable summary
     pub fn summary(&self) -> String {
+        let pe = self
+            .prediction_error_value()
+            .map(|value| format!("{value:.2}"))
+            .unwrap_or_else(|| "NA".to_string());
         format!(
-            "PE:{:.2} U:{:.2} C:{:.2} Cf:{:.2} S:{:.2} [Φ:{:.2}]",
-            self.prediction_error,
+            "PE:{} U:{:.2} C:{:.2} Cf:{:.2} S:{:.2} [Φ:{:.2}]",
+            pe,
             self.uncertainty,
             self.coherence,
             self.confidence,
@@ -263,12 +292,30 @@ impl SignalComputer {
         }
     }
 
-    /// Smooth signals using exponential moving average
+    /// Smooth signals using exponential moving average.
+    ///
+    /// PE missingness is propagated independently from the held numeric value:
+    /// invalid current PE stays invalid, and a later valid sample starts a fresh
+    /// PE series rather than smoothing against a stale or fabricated placeholder.
     pub fn smooth(&mut self, current: PrincipledSignals) -> PrincipledSignals {
+        let previous_pe = self
+            .previous
+            .as_ref()
+            .and_then(PrincipledSignals::prediction_error_value);
+        let current_pe = current.prediction_error_value();
+        let smoothed_pe = self.smooth_prediction_error(previous_pe, current_pe);
+        let prediction_error_valid = current_pe.is_some() && smoothed_pe.is_some();
+        let prediction_error = smoothed_pe.or(previous_pe).unwrap_or(0.5);
+
         let smoothed = match &self.previous {
-            None => current.clone(),
+            None => PrincipledSignals {
+                prediction_error,
+                prediction_error_valid,
+                ..current
+            },
             Some(prev) => PrincipledSignals {
-                prediction_error: self.ema(prev.prediction_error, current.prediction_error),
+                prediction_error,
+                prediction_error_valid,
                 uncertainty: self.ema(prev.uncertainty, current.uncertainty),
                 coherence: self.ema(prev.coherence, current.coherence),
                 confidence: self.ema(prev.confidence, current.confidence),
@@ -296,9 +343,12 @@ impl SignalComputer {
         current: Option<f32>,
     ) -> Option<f32> {
         let current = current.filter(|value| value.is_finite())?;
+        if !self.ema_alpha.is_finite() || !(0.0..=1.0).contains(&self.ema_alpha) {
+            return None;
+        }
         let smoothed = match previous.filter(|value| value.is_finite()) {
-            Some(previous) if self.ema_alpha.is_finite() => self.ema(previous, current),
-            _ => current,
+            Some(previous) => self.ema(previous, current),
+            None => current,
         };
         smoothed.is_finite().then_some(smoothed)
     }
@@ -389,10 +439,12 @@ mod tests {
 
         let s1 = PrincipledSignals {
             prediction_error: 0.2,
+            prediction_error_valid: true,
             ..Default::default()
         };
         let s2 = PrincipledSignals {
             prediction_error: 0.8,
+            prediction_error_valid: true,
             ..Default::default()
         };
 
@@ -415,6 +467,58 @@ mod tests {
         assert!(pe > 0.8); // High error when dissimilar
     }
 
+
+
+    #[test]
+    fn unavailable_prediction_error_cannot_drive_decisions() {
+        let mut absent = PrincipledSignals {
+            prediction_error: 0.99,
+            prediction_error_valid: false,
+            uncertainty: 0.1,
+            confidence: 0.9,
+            coherence: 0.9,
+            salience: 0.2,
+            ..Default::default()
+        };
+        let readiness_a = absent.action_readiness();
+        let learning_a = absent.learning_potential();
+        assert!(!absent.should_clarify());
+        assert_ne!(absent.dominant_signal(), "prediction_error");
+        assert!(absent.summary().starts_with("PE:NA"));
+
+        absent.prediction_error = 0.01;
+        assert!((absent.action_readiness() - readiness_a).abs() < f32::EPSILON);
+        assert!((absent.learning_potential() - learning_a).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn smoothing_holds_numeric_diagnostic_but_clears_validity() {
+        let mut computer = SignalComputer::new(0.5);
+        let valid = PrincipledSignals {
+            prediction_error: 0.4,
+            prediction_error_valid: true,
+            ..Default::default()
+        };
+        assert!(computer.smooth(valid).prediction_error_valid);
+
+        let invalid = PrincipledSignals {
+            prediction_error: f32::NAN,
+            prediction_error_valid: true,
+            ..Default::default()
+        };
+        let held = computer.smooth(invalid);
+        assert!(!held.prediction_error_valid);
+        assert_eq!(held.prediction_error, 0.4);
+
+        let recovered = PrincipledSignals {
+            prediction_error: 0.8,
+            prediction_error_valid: true,
+            ..Default::default()
+        };
+        let recovered = computer.smooth(recovered);
+        assert!(recovered.prediction_error_valid);
+        assert_eq!(recovered.prediction_error, 0.8);
+    }
 
     #[test]
     fn empty_or_non_finite_similarity_is_unavailable_not_maximum_surprise() {
