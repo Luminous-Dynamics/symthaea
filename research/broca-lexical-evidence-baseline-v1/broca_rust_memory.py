@@ -10,6 +10,7 @@ from __future__ import annotations
 import weakref
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import queue
@@ -171,12 +172,23 @@ class BrocaRustMemory(Memory):
         )
 
         try:
-            self._rpc({
+            init_result = self._rpc({
                 "op": "init",
                 "scope_id": self.scope_id,
                 "now_unix_ms": 0,
                 "bm25": self.bm25_params,
             })
+            require(init_result.get("scope_id") == self.scope_id,
+                    "worker initialized with a different scope")
+            capabilities = init_result.get("capabilities")
+            require(isinstance(capabilities, dict),
+                    "worker init response must declare capabilities")
+            require(capabilities.get("retrieval_type") == "lexical_bm25",
+                    "worker is not the required lexical BM25 baseline")
+            require(capabilities.get("semantic_encoder") is False,
+                    "worker must explicitly declare no semantic encoder")
+            require(capabilities.get("visual_query") is False,
+                    "worker must explicitly declare no visual query capability")
         except BaseException:
             self._abort_worker()
             raise
@@ -258,12 +270,25 @@ class BrocaRustMemory(Memory):
                     f"audit item {index} trajectory_id must be non-empty")
             require(isinstance(audit_item.get("source_pointer"), str) and audit_item["source_pointer"].startswith("/"),
                     f"audit item {index} source_pointer must be a JSON Pointer")
+            source_digest = audit_item.get("source_sha256")
+            require(
+                isinstance(source_digest, str)
+                and len(source_digest) == 64
+                and all(character in "0123456789abcdef" for character in source_digest),
+                f"audit item {index} source_sha256 is invalid",
+            )
             content_digest = audit_item.get("content_sha256")
             require(
                 isinstance(content_digest, str)
                 and len(content_digest) == 64
                 and all(character in "0123456789abcdef" for character in content_digest),
                 f"audit item {index} content_sha256 is invalid",
+            )
+            score = audit_item.get("bm25_score")
+            require(
+                isinstance(score, (int, float)) and not isinstance(score, bool)
+                and math.isfinite(float(score)) and float(score) > 0,
+                f"audit item {index} bm25_score must be finite and positive",
             )
             actual_digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
             require(actual_digest == content_digest,
