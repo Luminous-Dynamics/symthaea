@@ -67,6 +67,10 @@ jobs:
           cmp "$artifact_dir/calibrated-box-results.csv" "$temp_dir/calibrated-box-second.csv"
           python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py --self-test
           python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py "$artifact_dir/calibrated-box-results.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box -- --coverage-grid > "$artifact_dir/calibrated-box-coverage-grid.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box -- --coverage-grid > "$temp_dir/calibrated-box-coverage-second.csv"
+          cmp "$artifact_dir/calibrated-box-coverage-grid.csv" "$temp_dir/calibrated-box-coverage-second.csv"
+          python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py --check-coverage-grid "$artifact_dir/calibrated-box-coverage-grid.csv"
 
           {
             echo "source_commit=$(git rev-parse HEAD)"
@@ -76,7 +80,7 @@ jobs:
             echo "rustc_version=$(rustc --version)"
             echo "cargo_version=$(cargo --version)"
             echo "runner_os=$(uname -a)"
-            (cd "$artifact_dir" && sha256sum greedy-policy-results.csv robust-tree-results.csv matched-cost-frontier.csv calibrated-box-results.csv)
+            (cd "$artifact_dir" && sha256sum greedy-policy-results.csv robust-tree-results.csv matched-cost-frontier.csv calibrated-box-results.csv calibrated-box-coverage-grid.csv)
           } > "$artifact_dir/provenance-receipt.txt"
 
       - name: Reject mutated aggregate outputs
@@ -139,6 +143,25 @@ jobs:
           PY
           if python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py "$temp_dir/calibrated-box-mutated.csv"; then
             echo "calibrated-box checker accepted a mutated row" >&2
+            exit 1
+          fi
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box -- --coverage-grid > "$temp_dir/coverage-original.csv"
+          python3 - "$temp_dir/coverage-original.csv" "$temp_dir/coverage-mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[0]["cell_coverage"] = "0"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py --check-coverage-grid "$temp_dir/coverage-mutated.csv"; then
+            echo "coverage-grid checker accepted a mutated row" >&2
             exit 1
           fi
 
