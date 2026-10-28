@@ -10,6 +10,7 @@ mod cognitive_adaptation_panel;
 mod cognitive_drift_baselines;
 mod cognitive_replay_receipt;
 mod cognitive_adaptation_audit;
+mod cognitive_adaptation_replay;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -136,6 +137,18 @@ enum Commands {
         expected_bundle_sha256: String,
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Generate a deterministic synthetic replay to smoke-test receipt and score plumbing.
+    /// Output is always synthetic-not-measured and cannot count as benchmark evidence.
+    RunCognitiveAdaptationSyntheticReplay {
+        #[arg(long, default_value = "abrupt")]
+        scenario: String,
+        #[arg(long, default_value = "64")]
+        ticks: usize,
+        #[arg(long, default_value = "7")]
+        seed: u64,
+        #[arg(long, default_value = "reports/cognitive-adaptation-synthetic-replay")]
+        out_dir: PathBuf,
     },
 }
 
@@ -310,6 +323,10 @@ fn main() -> anyhow::Result<()> {
             } else {
                 println!("{rendered}");
             }
+        }
+        Commands::RunCognitiveAdaptationSyntheticReplay { scenario, ticks, seed, out_dir } => {
+            let summary = cognitive_adaptation_replay::run_synthetic(&scenario, ticks, seed, &out_dir)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
         }
     }
     Ok(())
