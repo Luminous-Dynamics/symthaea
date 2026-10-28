@@ -1996,6 +1996,7 @@ fn validate_power_report(
     }
 
     let expected_weak_null_sds_pp = [5.0_f64, 10.0, 20.0];
+    let expected_pair_associations = [0.0_f64, 0.5, 0.9];
     if report.weak_null_family_effect_heterogeneity_sd_grid_percentage_points.len()
         != expected_weak_null_sds_pp.len()
         || report
@@ -2003,10 +2004,17 @@ fn validate_power_report(
             .iter()
             .zip(expected_weak_null_sds_pp)
             .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
+        || report.weak_null_pair_association_fraction_grid.len()
+            != expected_pair_associations.len()
+        || report
+            .weak_null_pair_association_fraction_grid
+            .iter()
+            .zip(expected_pair_associations)
+            .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
         || report.weak_null_scenarios.len()
-            != expected_weak_null_sds_pp.len() * expected_iccs.len()
+            != expected_weak_null_sds_pp.len() * expected_iccs.len() * expected_pair_associations.len()
     {
-        bail!("weak-null report does not contain the preregistered 3x4 heterogeneity/ICC grid");
+        bail!("weak-null report does not contain the preregistered 3x4x3 heterogeneity/ICC/association grid");
     }
 
     let mut observed_weak_null_scenarios = BTreeSet::new();
@@ -2044,10 +2052,14 @@ fn validate_power_report(
             || !expected_iccs
                 .iter()
                 .any(|icc| (scenario.assumed_family_icc - icc).abs() <= 1e-12)
+            || !expected_pair_associations.iter().any(|association| {
+                (scenario.pair_association_fraction - association).abs() <= 1e-12
+            })
             || !observed_weak_null_scenarios.insert((
                 (scenario.requested_family_effect_heterogeneity_sd_percentage_points * 1000.0)
                     .round() as i32,
                 (scenario.assumed_family_icc * 1000.0).round() as i32,
+                (scenario.pair_association_fraction * 1000.0).round() as i32,
             ))
             || scenario.false_claims > report.study_simulations
             || scenario.degenerate_interval_trials > report.study_simulations
@@ -2077,32 +2089,40 @@ fn validate_power_report(
     // from the same validation-derived family sizes, configuration and seed.
     for (sd_index, requested_sd_pp) in expected_weak_null_sds_pp.iter().copied().enumerate() {
         for (icc_index, icc) in expected_iccs.iter().copied().enumerate() {
-            let scenario_index = sd_index * expected_iccs.len() + icc_index;
-            let scenario_seed = config
-                .bootstrap_seed
-                .wrapping_add(0xD1B5_4A32_D192_ED03)
-                .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
-            let observed = report
-                .weak_null_scenarios
-                .iter()
-                .find(|scenario| {
-                    (scenario.requested_family_effect_heterogeneity_sd_percentage_points
-                        - requested_sd_pp)
-                        .abs()
-                        <= 1e-12
-                        && (scenario.assumed_family_icc - icc).abs() <= 1e-12
-                })
-                .context("power report lacks a required weak-null scenario")?;
-            let expected = simulate_weak_null_scenario(
-                &expected_family_rows,
-                *selected_rate,
-                requested_sd_pp / 100.0,
-                icc,
-                report.study_simulations,
-                report.bootstrap_replicates_per_simulated_study,
-                scenario_seed,
-            )?;
-            if observed.false_claims != expected.false_claims
+            for (association_index, pair_association_fraction) in
+                expected_pair_associations.iter().copied().enumerate()
+            {
+                let scenario_index = sd_index * expected_iccs.len() * expected_pair_associations.len()
+                    + icc_index * expected_pair_associations.len()
+                    + association_index;
+                let scenario_seed = config
+                    .bootstrap_seed
+                    .wrapping_add(0xD1B5_4A32_D192_ED03)
+                    .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
+                let observed = report
+                    .weak_null_scenarios
+                    .iter()
+                    .find(|scenario| {
+                        (scenario.requested_family_effect_heterogeneity_sd_percentage_points
+                            - requested_sd_pp)
+                            .abs()
+                            <= 1e-12
+                            && (scenario.assumed_family_icc - icc).abs() <= 1e-12
+                            && (scenario.pair_association_fraction - pair_association_fraction).abs()
+                                <= 1e-12
+                    })
+                    .context("power report lacks a required weak-null scenario")?;
+                let expected = simulate_weak_null_scenario(
+                    &expected_family_rows,
+                    *selected_rate,
+                    requested_sd_pp / 100.0,
+                    icc,
+                    pair_association_fraction,
+                    report.study_simulations,
+                    report.bootstrap_replicates_per_simulated_study,
+                    scenario_seed,
+                )?;
+                if observed.false_claims != expected.false_claims
                 || observed.degenerate_interval_trials != expected.degenerate_interval_trials
                 || !same_optional_probability(
                     observed.estimated_false_claim_probability,
@@ -2134,8 +2154,9 @@ fn validate_power_report(
                 )
             {
                 bail!(
-                    "weak-null scenario +{requested_sd_pp}pp SD/ICC {icc} cannot be reproduced from the frozen validation rows and seed"
+                    "weak-null scenario +{requested_sd_pp}pp SD/ICC {icc}/pair-association {pair_association_fraction} cannot be reproduced from the frozen validation rows and seed"
                 );
+            }
             }
         }
     }
@@ -3152,11 +3173,11 @@ mod tests {
             })
             .collect();
         let left = simulate_weak_null_scenario(
-            &families, 0.35, 0.10, 0.20, 64, 128, 20261028,
+            &families, 0.35, 0.10, 0.20, 0.5, 64, 128, 20261028,
         )
         .expect("weak-null calibration should execute");
         let right = simulate_weak_null_scenario(
-            &families, 0.35, 0.10, 0.20, 64, 128, 20261028,
+            &families, 0.35, 0.10, 0.20, 0.5, 64, 128, 20261028,
         )
         .expect("same weak-null seed must replay identically");
 
