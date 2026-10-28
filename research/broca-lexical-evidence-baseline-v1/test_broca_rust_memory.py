@@ -118,9 +118,17 @@ FAKE_WORKER = textwrap.dedent(
             op = request.get("op")
             if op == "init":
                 scope = request.get("scope_id")
+                capabilities = {
+                    "text_query": True,
+                    "visual_query": False,
+                    "retrieval_type": "lexical_bm25",
+                    "semantic_encoder": False,
+                }
+                if mode == "wrong_capability":
+                    capabilities["semantic_encoder"] = True
                 emit(request_id, True, {
                     "scope_id": scope,
-                    "capabilities": {"text_query": True, "visual_query": False}
+                    "capabilities": capabilities
                 })
             elif op == "insert":
                 trajectory = request.get("trajectory", {})
@@ -231,6 +239,12 @@ class BrocaRustMemoryAdapterTests(unittest.TestCase):
     def test_scope_is_required_and_restricted(self):
         with self.assertRaises(RuntimeError):
             self.make_adapter(scope="question-derived")
+
+
+    def test_worker_must_declare_lexical_only_capabilities(self):
+        with patch.dict(os.environ, {"BROCA_FAKE_WORKER_MODE": "wrong_capability"}):
+            with self.assertRaises(RuntimeError):
+                self.make_adapter()
 
     def test_response_id_mismatch_fails_closed(self):
         with patch.dict(os.environ, {"BROCA_FAKE_WORKER_MODE": "wrong_id"}):
