@@ -620,7 +620,7 @@ where
 
 fn print_eprocess_family_csv() {
     println!(
-        "family,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
+        "family,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
     );
 
     for family in EProcessFamily::ALL {
@@ -667,7 +667,7 @@ fn print_eprocess_family_csv() {
             } else {
                 "NA".to_owned()
             };
-            let null_or_pre_shift_alarm = if scenario.class == ScenarioClass::WithinBandTransitionControl {
+            let scenario_or_pre_shift_alarm = if scenario.class == ScenarioClass::WithinBandTransitionControl {
                 metrics.false_alarm_probability + metrics.detection_probability
             } else {
                 metrics.false_alarm_probability
@@ -685,7 +685,7 @@ fn print_eprocess_family_csv() {
                 NOMINAL_P,
                 scenario.pre_shift_p,
                 p1,
-                null_or_pre_shift_alarm,
+                scenario_or_pre_shift_alarm,
                 csv_optional(detection),
                 csv_optional(delay),
                 PER_CELL_ALPHA,
@@ -705,7 +705,7 @@ fn csv_optional(value: Option<f64>) -> String {
 
 fn print_csv() {
     println!(
-        "boundary,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability"
+        "boundary,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability"
     );
     for boundary in Boundary::ALL {
         for horizon in HORIZONS {
@@ -727,7 +727,7 @@ fn print_csv() {
                 } else {
                     "NA".to_owned()
                 };
-                let null_or_pre_shift_alarm = if scenario.class == ScenarioClass::WithinBandTransitionControl {
+                let scenario_or_pre_shift_alarm = if scenario.class == ScenarioClass::WithinBandTransitionControl {
                     metrics.false_alarm_probability + metrics.detection_probability
                 } else {
                     metrics.false_alarm_probability
@@ -745,7 +745,7 @@ fn print_csv() {
                     NOMINAL_P,
                     scenario.pre_shift_p,
                     p1,
-                    null_or_pre_shift_alarm,
+                    scenario_or_pre_shift_alarm,
                     csv_optional(detection),
                     csv_optional(delay),
                     PER_CELL_ALPHA,
