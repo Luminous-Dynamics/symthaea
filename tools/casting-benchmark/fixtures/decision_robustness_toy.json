@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "benchmark_id": "CASTING-DECISION-ROBUSTNESS-001",
   "task_id": "known-answer-1",
   "run_id": "seed-17",
@@ -8,6 +8,19 @@
     "holdout_role": "independent_post_selection",
     "selection_freeze_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "holdout_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "source_run": {
+    "sweep_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "candidate_pool_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "objective_family": "local_bias_island",
+    "constraint_family": "constraint_boundary",
+    "dimension": 2,
+    "severity": 0.5,
+    "seed": 17,
+    "policy": "low_screen",
+    "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
+    "cost_budget": 200,
+    "cost_spent": 130
   },
   "reference_point": [1.2, 1.2],
   "candidate_set": [
