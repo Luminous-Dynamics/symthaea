@@ -1,9 +1,11 @@
 //! Rust AST discovery of likely external-effect call sites.
 //!
 //! This is a candidate-discovery tool, not a sound effect analysis. It reports
-//! selected direct call expressions with source locations and digests. It does
-//! not resolve aliases/types/control flow or analyze macro token bodies, FFI,
-//! generated code, scripts, dynamic loading, method dispatch, or indirect calls.
+//! selected direct calls and receiver-chain method candidates with source
+//! locations and digests. Receiver checks are syntactic heuristics, not type
+//! resolution. The scanner does not resolve aliases/types/control flow, analyze
+//! macro token bodies, FFI, generated code, scripts, dynamic loading, trait-object
+//! dispatch, or arbitrary indirect calls. It may over- and under-report.
 //! A scan cannot prove reachability, effect occurrence, or authorization.
 
 use anyhow::{bail, Context, Result};
