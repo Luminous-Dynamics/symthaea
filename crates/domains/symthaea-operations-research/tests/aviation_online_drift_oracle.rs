@@ -56,7 +56,7 @@ fn alternative_mixture_weights_change_the_e_value_by_exact_weighting() {
 
 #[test]
 fn sequential_evidence_crosses_only_after_predeclared_boundary() {
-    let mut monitor = fresh_monitor(50_000);
+    let mut monitor = fresh_monitor(100_000);
     assert_eq!(monitor.observe("e1", 1, "disruption").unwrap().status, DriftMonitorStatus::InControl);
     let report = monitor.observe("e2", 2, "disruption").unwrap();
     assert_eq!(report.status, DriftMonitorStatus::DriftAlarm);
