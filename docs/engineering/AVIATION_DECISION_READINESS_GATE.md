@@ -21,7 +21,7 @@ The composition takes:
 - Finite-scenario network/harm assessment: must be eligible.
 - Candidate calibration receipt ID and active calibration receipt ID: both must be non-empty and equal.
 
-Every blocker is returned in deterministic order. Rejected and Indeterminate states remain distinct; neither becomes acceptance by default. Calibration-receipt equality is only a string-binding check at this layer: a future run-manifest layer must bind the receipt cryptographically to frozen input/config/code digests. The gate also requires a positive, predeclared maximum calibration age and monitoring-observation age; missing, negative, future or expired timestamps block promotion even when receipt IDs match.
+Every blocker is returned in deterministic order. Rejected and Indeterminate states remain distinct; neither becomes acceptance by default. Calibration-receipt equality is only a string-binding check at this layer: a future run-manifest layer must bind the receipt cryptographically to frozen input/config/code digests. The gate also requires a positive, predeclared maximum calibration age and monitoring-observation age; missing, negative, future or expired timestamps block promotion even when receipt IDs match. The result manifest reports decision time, measured calibration/observation age when available, and the configured TTLs, so a freshness block is auditable.
 
 ## Decision-state interpretation
 
@@ -45,6 +45,6 @@ This is an integration/evidence architecture, not a new flight optimizer. Robust
 
 ## Test status and claim ceiling
 
-Thirteen unit tests are defined for the composition function. They have not been compiled or run in this environment due to missing `cargo` and `rustc`. Passing the synthetic composition tests does not establish runtime integration, data authenticity, airline cost savings, safety certification or regulatory compliance.
+Fourteen unit tests are defined for the composition function. They have not been compiled or run in this environment due to missing `cargo` and `rustc`. Passing the synthetic composition tests does not establish runtime integration, data authenticity, airline cost savings, safety certification or regulatory compliance.
 
 Follow-up: [AVIATION-ENTERPRISE-012 #8798](https://github.com/Luminous-Dynamics/symthaea/issues/8798).
