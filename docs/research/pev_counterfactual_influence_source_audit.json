@@ -1,22 +1,39 @@
 {
-  "checks": [
-    {"check":"dependency-free standard library imports only","passed":true},
-    {"check":"audits paired no-PE baseline","passed":true},
-    {"check":"checks same input and initial state","passed":true},
-    {"check":"checks exact-once positive control","passed":true},
-    {"check":"checks protected-channel invariance","passed":true},
-    {"check":"checks independent outcome calibration","passed":true},
-    {"check":"declares production Rust unexecuted","passed":true},
-    {"check":"100000 generated paired trials recorded","passed":true},
-    {"check":"900000 branch summaries recorded","passed":true},
-    {"check":"all seven mutations detected","passed":true}
-  ],
-  "checks_passed":10,
-  "checks_total":10,
-  "counterfactual_harness_self_test_status":"PASS_COUNTERFACTUAL_REFERENCE_AUDITOR_ONLY",
-  "python_syntax_compile":"PASS",
-  "results_sha256":"c064735a95734e22479cedc6e53dbe5d7a8f1c0392dedab0367416a0cbd77446",
+  "checks_on_fetched_repository_source": {
+    "checks": [
+      {"check":"has audit_trial implementation","passed":true},
+      {"check":"checks invalid-PE counterfactual invariance","passed":true},
+      {"check":"checks target evidence exact-once admission","passed":true},
+      {"check":"checks protected-channel invariance","passed":true},
+      {"check":"checks independent outcome calibration","passed":true},
+      {"check":"contains deterministic 100000-trial self-test","passed":true},
+      {"check":"results record 900000 branch summaries","passed":true},
+      {"check":"results state Rust was not executed","passed":true}
+    ],
+    "checks_passed":8,
+    "checks_total":8,
+    "status":"PASS_SOURCE_CONTRACT_SCAN_NOT_PRODUCTION_TEST"
+  },
+  "local_execution": {
+    "source_path":"/mnt/data/pev_counterfactual_influence_benchmark_v1.py",
+    "source_sha256":"a62dd6c2ac9f5abb6739bc9c1f2f9c90d5afcc16a5e4e7cdd38f1f06c464f02b",
+    "results_path":"/mnt/data/pev_counterfactual_influence_benchmark_v1_results.json",
+    "results_sha256":"c064735a95734e22479cedc6e53dbe5d7a8f1c0392dedab0367416a0cbd77446",
+    "python_syntax_compile":"PASS",
+    "self_test":"PASS_COUNTERFACTUAL_REFERENCE_AUDITOR_ONLY",
+    "trials":100000,
+    "branch_summaries":900000,
+    "mutations_detected":7,
+    "mutations_injected":7
+  },
+  "repository_snapshot": {
+    "source_path":"docs/research/pev_counterfactual_influence_benchmark_v1.py",
+    "source_git_blob_sha1":"3d476175ac82aca3c82a0f0e41a37f82956a0f04",
+    "results_path":"docs/research/pev_counterfactual_influence_benchmark_v1_results.json",
+    "results_git_blob_sha1":"1db9978a557b3a77715b8fde4bd36bce495d4419",
+    "byte_identity_to_local_execution_verified":false,
+    "qualification":"The repository source was checked for required contract markers, but the exact fetched repository blob was not executed locally. The 100000-trial result is from the local reference source snapshot."
+  },
   "rust_compiled_or_executed":false,
-  "source_sha256":"a62dd6c2ac9f5abb6739bc9c1f2f9c90d5afcc16a5e4e7cdd38f1f06c464f02b",
-  "status":"PASS_SOURCE_AND_RESULT_CONTRACT_SCAN_NOT_PRODUCTION_TEST"
+  "status":"PASS_LOCAL_REFERENCE_RUN_AND_REPOSITORY_SOURCE_SCAN_ONLY"
 }
