@@ -299,6 +299,7 @@ struct PowerScenario {
 #[derive(Debug, Deserialize, Serialize)]
 struct WeakNullScenario {
     status: String,
+    true_target_weighted_mean_effect_percentage_points: f64,
     assumed_family_icc: f64,
     requested_family_effect_heterogeneity_sd_percentage_points: f64,
     study_simulations: usize,
@@ -994,6 +995,7 @@ fn simulate_weak_null_scenario(
     let (false_claim_lower, false_claim_upper) = wilson_interval(false_claims, simulations);
     Ok(WeakNullScenario {
         status: "estimated".to_string(),
+        true_target_weighted_mean_effect_percentage_points: 0.0,
         assumed_family_icc: icc,
         requested_family_effect_heterogeneity_sd_percentage_points: requested_effect_sd * 100.0,
         study_simulations: simulations,
@@ -1902,6 +1904,7 @@ fn validate_power_report(
             .mean_realized_family_effect_heterogeneity_sd_percentage_points
             .context("weak-null scenario lacks its realized heterogeneity diagnostic")?;
         if scenario.status != "estimated"
+            || scenario.true_target_weighted_mean_effect_percentage_points.abs() > 1e-12
             || scenario.study_simulations != report.study_simulations
             || scenario.bootstrap_replicates_per_simulated_study
                 != report.bootstrap_replicates_per_simulated_study
@@ -3020,6 +3023,7 @@ mod tests {
         .expect("same weak-null seed must replay identically");
 
         assert_eq!(left.status, "estimated");
+        assert_eq!(left.true_target_weighted_mean_effect_percentage_points, 0.0);
         assert_eq!(left.false_claims, right.false_claims);
         assert_eq!(left.degenerate_interval_trials, right.degenerate_interval_trials);
         assert_eq!(
