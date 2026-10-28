@@ -17,16 +17,16 @@ The current source has two 96-bit nonce encodings used with ChaCha20-Poly1305:
 
 | Field | Value |
 |---|---|
-| `source_id` | `01 02 03 04 05 06 02 07` |
+| `source_id` | `01 02 03 04 05 06 02 00` |
 | `payload_type` | `0x02` |
-| `epoch` | `0x07` |
+| `epoch` | `0x00` |
 | `sequence` | `0x00051234` |
 | `thought_id` | `sequence as u16 = 0x1234` |
 | `fragment_index` | `0x05` |
 
 Both nonce layouts yield:
 
-`01 02 03 04 05 06 02 07 34 12 05 00`
+`01 02 03 04 05 06 02 00 34 12 05 00`
 
 This is an exact arithmetic overlap, not just a birthday-bound possibility. Whether a specific deployed identity/epoch configuration reaches this tuple is configuration-dependent; the source proves these nonce namespaces are not disjoint by construction. If both invocations occur with the same effective key and tuple, the pair (key, nonce) repeats.
 
