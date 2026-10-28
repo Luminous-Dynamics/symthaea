@@ -1,7 +1,7 @@
 {
   "schema": "symthaea-prior-set-coverage-double-oracle-summary-v1",
   "date": "2026-10-28",
-  "status": "STANDALONE_SYNTHETIC_FINITE_GAME_NOT_REPOSITORY_INTEGRATION",
+  "status": "STANDALONE_SYNTHETIC_FINITE_GAME_SOURCE_AND_TESTS_COMMITTED_NOT_REPOSITORY_SCM_INTEGRATION",
   "model": {
     "latent_hypotheses": 16,
     "graph_classes": 4,
@@ -12,7 +12,11 @@
     "deterministic_policy_trees": 8,
     "candidate_prior_scenarios": 6,
     "full_simplex_vertices": 16,
-    "objectives": ["graph", "kernel", "joint"]
+    "objectives": [
+      "graph",
+      "kernel",
+      "joint"
+    ]
   },
   "results": [
     {
@@ -20,40 +24,75 @@
       "six_prior_value_bits": 1.474374,
       "full_simplex_value_bits": 1.815263,
       "value_understatement_bits": 0.340889,
-      "six_prior_solution_full_simplex_regret_bits": 0.0,
+      "six_prior_solution_full_simplex_regret_bits": 0,
       "double_oracle_iterations": 2,
-      "certificate_interval_width_bits": 2.0e-9
+      "certificate_interval_width_bits": 2e-9
     },
     {
       "objective": "kernel",
       "six_prior_value_bits": 1.528545,
       "full_simplex_value_bits": 1.853951,
       "value_understatement_bits": 0.325406,
-      "six_prior_solution_full_simplex_regret_bits": 0.0,
+      "six_prior_solution_full_simplex_regret_bits": 0,
       "double_oracle_iterations": 5,
       "certificate_interval_width_bits": 2.0003e-9
     },
     {
       "objective": "joint",
       "six_prior_value_bits": 3.389536,
-      "full_simplex_value_bits": 3.794190,
+      "full_simplex_value_bits": 3.79419,
       "value_understatement_bits": 0.404654,
       "six_prior_solution_full_simplex_regret_bits": 0.081206,
       "double_oracle_iterations": 4,
-      "certificate_interval_width_bits": 2.0e-9
+      "certificate_interval_width_bits": 2e-9
     }
   ],
   "verification": {
-    "local_tests": "11/11_PASS",
-    "python": "3.13.5",
-    "numpy": "2.3.5",
-    "scipy": "1.17.0",
-    "max_raw_double_oracle_vs_full_game_difference_bits": 3.2085445411667024e-13,
-    "outward_numerical_margin_each_side_bits": 1.0e-9,
+    "local_tests": "11/11_PASS_REPRODUCED_2026-10-28",
+    "environment": {
+      "python": "3.13.5",
+      "numpy": "2.3.5",
+      "scipy": "1.17.0"
+    },
+    "repository_bindings": [
+      {
+        "path": "validation/prior_set_coverage_double_oracle_benchmark.py",
+        "git_blob": "2e33954bf72ecd828d5137f0d7c491146edd6e8a",
+        "sha256": "d7ceb9b79ee06869e7835cfaec14f67a0bd59a017fc0f85fec972572dc0b8bb3",
+        "exact_local_source_match": true
+      },
+      {
+        "path": "validation/verify_prior_risk_linearity.py",
+        "git_blob": "5cbddc6190c440ecd18341804035ba7adfd5eb6a",
+        "sha256": "9150c173dbaf318676b26ddc04efa7664f491af4ff68fbbb1b42be23d2177db5",
+        "exact_local_source_match": true
+      },
+      {
+        "path": "validation/test_prior_set_coverage_double_oracle_benchmark.py",
+        "git_blob": "29207281ce19fbc8435de796a16d507eb1c34de1",
+        "sha256": "1e94d7884c315b93520cff5b8daa67918e085039e3ae30dc289467c9c4bb19e8",
+        "exact_local_source_match": true
+      },
+      {
+        "path": "validation/test_verify_prior_risk_linearity.py",
+        "git_blob": "c3f1bdfe068b791185382a1167722f35b4194acf",
+        "sha256": "2d5b5dcfa7eb1cec1b983d5b96c76a5289651b868d7fe0349156c84fa8f38bd7",
+        "exact_local_source_match": true
+      }
+    ],
+    "local_result_artifact": {
+      "filename": "PRIOR_SET_COVERAGE_DOUBLE_ORACLE_RESULTS_2026-10-28.json",
+      "bytes": 22070,
+      "sha256": "b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435",
+      "committed_to_repository": false
+    },
+    "maximum_raw_double_oracle_vs_full_game_difference_bits": 3.2085445411667024e-13,
+    "outward_numerical_margin_each_side_bits": 1e-9,
     "margin_is_formal_interval_arithmetic_proof": false,
-    "standalone_benchmark_source_sha256": "d7ceb9b79ee06869e7835cfaec14f67a0bd59a017fc0f85fec972572dc0b8bb3",
-    "standalone_tests_sha256": "1e94d7884c315b93520cff5b8daa67918e085039e3ae30dc289467c9c4bb19e8",
-    "standalone_results_sha256": "b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435"
+    "repository_scm_integration": false,
+    "external_benchmark_run": false,
+    "remote_ci_claimed_pass": false,
+    "latest_observed_ci_conclusion": "skipped"
   },
   "limitations": [
     "synthetic likelihood; not the Symthaea repository SCM evaluator",
