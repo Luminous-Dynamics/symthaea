@@ -74,6 +74,10 @@ pub struct CompositionalVerificationConfig {
     pub duration_log_ratio_tolerance: f64,
     pub minimum_coverage: f64,
     pub maximum_gap_fraction: f64,
+    /// Permit additional target events only when the caller explicitly declares
+    /// that this transformation may contain insertions/ornaments. Source events
+    /// in the claimed selection are never silently deletable.
+    pub allow_target_insertions: bool,
 }
 
 impl Default for CompositionalVerificationConfig {
@@ -84,6 +88,7 @@ impl Default for CompositionalVerificationConfig {
             duration_log_ratio_tolerance: 0.05,
             minimum_coverage: 0.90,
             maximum_gap_fraction: 0.10,
+            allow_target_insertions: false,
         }
     }
 }
@@ -328,6 +333,18 @@ pub fn verify_compositional_transform_with_config(
     }
     if coverage < config.minimum_coverage {
         failure_reasons.push("matched-event coverage is below the required floor".to_owned());
+    }
+    if deleted_source_events > 0 {
+        failure_reasons.push(
+            "one or more selected source events were left unmatched; deletion is not declared by this contract"
+                .to_owned(),
+        );
+    }
+    if inserted_target_events > 0 && !config.allow_target_insertions {
+        failure_reasons.push(
+            "target insertions are unsupported unless explicitly enabled in the verification configuration"
+                .to_owned(),
+        );
     }
     if gap_fraction > config.maximum_gap_fraction {
         failure_reasons.push("insertions/deletions exceed the explicit edit budget".to_owned());
@@ -682,7 +699,7 @@ mod tests {
     }
 
     #[test]
-    fn alignment_accepts_one_bounded_insert_but_reports_it() {
+    fn target_insertions_require_explicit_opt_in_and_are_reported() {
         let mut source = simple_source();
         for i in 5..10 {
             source.push(SymbolicEvent {
@@ -705,9 +722,20 @@ mod tests {
             2,
             SymbolicEvent { pitch_midi: 66, onset_beats: 5.5, duration_beats: 0.25 },
         );
-        let evidence = verify_compositional_transform(&source, &target, 4.0, &claim).unwrap();
-        assert!(evidence.passed, "{evidence:?}");
-        assert_eq!(evidence.inserted_target_events, 1);
+        let strict = verify_compositional_transform(&source, &target, 4.0, &claim).unwrap();
+        assert!(!strict.passed, "insertions are not implicit in the default contract");
+        assert_eq!(strict.inserted_target_events, 1);
+
+        let config = CompositionalVerificationConfig {
+            allow_target_insertions: true,
+            ..CompositionalVerificationConfig::default()
+        };
+        let opted_in =
+            verify_compositional_transform_with_config(&source, &target, 4.0, &claim, &config)
+                .unwrap();
+        assert!(opted_in.passed, "{opted_in:?}");
+        assert_eq!(opted_in.inserted_target_events, 1);
+        assert_eq!(opted_in.inserted_target_indices, vec![2]);
     }
 
     #[test]
@@ -757,7 +785,7 @@ mod tests {
     }
 
     #[test]
-    fn alignment_accepts_one_bounded_deletion_and_reports_original_index() {
+    fn rejects_deleted_source_events_even_when_the_gap_budget_allows_them() {
         let mut source = simple_source();
         for i in 5..10 {
             source.push(SymbolicEvent {
@@ -778,10 +806,44 @@ mod tests {
         let mut target = transform_sequence(&source, claim, 4.0);
         target.remove(3);
         let evidence = verify_compositional_transform(&source, &target, 4.0, &claim).unwrap();
-        assert!(evidence.passed, "{evidence:?}");
+        assert!(!evidence.passed, "missing selected events cannot be excused as alignment gaps");
         assert_eq!(evidence.deleted_source_events, 1);
         assert_eq!(evidence.deleted_source_indices, vec![3]);
         assert!(evidence.inserted_target_indices.is_empty());
+        assert!(evidence.failure_reasons.iter().any(|reason| reason.contains("source events")));
+    }
+
+    #[test]
+    fn cannot_hide_a_corrupted_note_as_a_delete_plus_insert_on_a_long_motif() {
+        let source: Vec<_> = (0..20)
+            .map(|index| SymbolicEvent {
+                pitch_midi: 60 + (index % 7) as i32,
+                onset_beats: index as f64,
+                duration_beats: if index % 3 == 0 { 0.5 } else { 1.0 },
+            })
+            .collect();
+        let claim = descriptor(
+            PitchOrientation::Preserve,
+            0,
+            1.0,
+            1.0,
+            SelectionMode::Full,
+            0,
+            source.len(),
+        );
+        let mut target = transform_sequence(&source, claim, 10.0);
+        target[10].pitch_midi += 2;
+
+        let evidence = verify_compositional_transform(&source, &target, 10.0, &claim).unwrap();
+        assert!(
+            !evidence.passed,
+            "a substitution must not be hidden by paying one deletion and one insertion: {evidence:?}"
+        );
+        assert!(
+            evidence.deleted_source_events > 0
+                || !evidence.pitch.passed
+                || evidence.coverage < 0.90
+        );
     }
 
     #[test]
