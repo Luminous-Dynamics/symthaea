@@ -54,6 +54,7 @@ impl EProcessFamily {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Boundary {
     FixedFinalOnly,
     FixedTimeRepeated,
@@ -342,6 +343,27 @@ fn evaluate(
     change_after: usize,
     horizon: usize,
 ) -> AlarmMetrics {
+    evaluate_with_alarm(
+        p0,
+        pre_shift_p,
+        post_shift_p,
+        change_after,
+        horizon,
+        |n, successes| boundary.should_alarm(n, successes, horizon, p0),
+    )
+}
+
+fn evaluate_with_alarm<F>(
+    p0: f64,
+    pre_shift_p: f64,
+    post_shift_p: Option<f64>,
+    change_after: usize,
+    horizon: usize,
+    should_alarm: F,
+) -> AlarmMetrics
+where
+    F: Fn(usize, usize) -> bool,
+{
     let mut active = vec![0.0; horizon + 1];
     active[0] = 1.0;
     let mut first_alarm = vec![0.0; horizon + 1];
@@ -362,9 +384,7 @@ fn evaluate(
                 (successes, mass * (1.0 - probability)),
                 (successes + 1, mass * probability),
             ] {
-                let should_alarm = boundary.should_alarm(n, next_successes, horizon, p0);
-
-                if should_alarm {
+                if should_alarm(n, next_successes) {
                     first_alarm[n] += branch_mass;
                 } else {
                     next[next_successes] += branch_mass;
@@ -402,6 +422,64 @@ fn evaluate(
         detection_probability,
         mean_detection_delay,
         survival_probability: active.iter().sum(),
+    }
+}
+
+fn print_eprocess_family_csv() {
+    println!(
+        "family,scenario,horizon,change_after,p0,stream_pre_p,p1,false_alarm_probability,detection_probability,mean_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
+    );
+
+    for family in EProcessFamily::ALL {
+        let alarm_table = family_alarm_table(family, NOMINAL_P, FAMILY_HORIZON);
+        for scenario in SCENARIOS {
+            if !matches!(
+                scenario.name,
+                "stationary_null"
+                    | "step_up_055"
+                    | "step_up_060"
+                    | "step_up_070"
+                    | "step_up_080"
+                    | "step_up_090"
+                    | "selection_bias_no_environment_shift"
+            ) {
+                continue;
+            }
+
+            let metrics = evaluate_with_alarm(
+                NOMINAL_P,
+                scenario.pre_shift_p,
+                scenario.post_shift_p,
+                scenario.change_after,
+                FAMILY_HORIZON,
+                |n, successes| alarm_table[n][successes],
+            );
+            let p1 = scenario
+                .post_shift_p
+                .map(|p| format!("{p:.12}"))
+                .unwrap_or_else(|| "NA".to_owned());
+            let change_after = if scenario.post_shift_p.is_some() {
+                scenario.change_after.to_string()
+            } else {
+                "NA".to_owned()
+            };
+            println!(
+                "{},{},{},{},{:.12},{:.12},{},{:.12},{},{},{:.12},{:.12},{:.12}",
+                family.name(),
+                scenario.name,
+                FAMILY_HORIZON,
+                change_after,
+                NOMINAL_P,
+                scenario.pre_shift_p,
+                p1,
+                metrics.false_alarm_probability,
+                csv_optional(scenario.post_shift_p.map(|_| metrics.detection_probability)),
+                csv_optional(metrics.mean_detection_delay),
+                PER_CELL_ALPHA,
+                metrics.survival_probability,
+                (1.0 / PER_CELL_ALPHA).ln()
+            );
+        }
     }
 }
 
