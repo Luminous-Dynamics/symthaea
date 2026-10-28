@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/vleb-run-manifest.schema.json",
   "title": "VLEB trusted evaluator run manifest",
-  "description": "A manifest contract for binding a benchmark episode to pre-registered task/protocol inputs, candidate revision, runtime/toolchain identities and a complete evidence bundle. Schema validation alone does not establish signature validity or prove that logs originated from the claimed runner.",
+  "description": "A manifest contract for binding a benchmark episode to pre-registered task/protocol inputs, candidate revision, runtime/toolchain identities and a complete evidence bundle. Schema validation alone does not establish signature validity or prove that logs originated from the claimed runner. Confirmatory runs must include evaluator-pinned atomic legacy-claim evidence. Claim auditing is only an evidence-integrity gate; it does not itself reproduce the semantics of an underlying program.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -412,6 +412,60 @@
           "minLength": 1
         }
       }
+    },
+    "claim_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "auditor_path",
+        "auditor_sha256",
+        "schema_path",
+        "schema_sha256",
+        "claims"
+      ],
+      "properties": {
+        "auditor_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "auditor_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "claim_id",
+              "claim_path",
+              "claim_sha256",
+              "source_sha256"
+            ],
+            "properties": {
+              "claim_id": {
+                "type": "string",
+                "pattern": "^[A-Z0-9][A-Z0-9._-]{1,127}$"
+              },
+              "claim_path": {
+                "$ref": "#/$defs/relativePath"
+              },
+              "claim_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "source_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -473,8 +527,18 @@
                 "const": "github_hosted"
               }
             }
+          },
+          "claim_audit": {
+            "properties": {
+              "claims": {
+                "minItems": 1
+              }
+            }
           }
-        }
+        },
+        "required": [
+          "claim_audit"
+        ]
       }
     },
     {
