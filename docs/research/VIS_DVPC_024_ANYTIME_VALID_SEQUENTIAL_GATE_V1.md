@@ -49,6 +49,12 @@ The output starts with a CONTRACT record that states alpha allocation, risk cap,
 - Inputs, alternatives, betting fractions, look schedule, alpha allocation and output are frozen and reproducible.
 - Every result is scoped to the declared iid Bernoulli streams; value stream validity extends to bounded observations only under the corresponding conditional-mean assumption.
 
+## Cluster-dependence negative control
+
+The benchmark additionally models independent clusters with a latent per-cluster failure probability: each cluster has p=0 with probability 0.5 and p=0.10 with probability 0.5, so the marginal row failure probability is 0.05, but rows within one cluster are correlated. Exact dynamic programming gives a 0.063416077728 probability that the row-wise e-process crosses by five clusters of 20 rows, violating its 0.025 budget because the row-wise conditional null does not hold.
+
+A separate cluster-level bounded betting process consumes one failure fraction per independent cluster. With five all-zero clusters its e-value is only about 1.203845, far below the threshold 40, so the small cluster count cannot authorize. With 100 all-zero independent clusters the e-value is about 71.66, demonstrating that the cluster gate is not an always-deny control. This only validates the declared cluster-mean contract on this synthetic construction; production still needs a justified independent-cluster sampling frame, correct event definition, and target transportability.
+
 ## Research context
 
 - [Anytime-Valid Inference for Online Ranking of LLMs (ICML/PMLR 2026)](https://proceedings.mlr.press/v306/gu26l.html) gives an e-process framework for sequential ranking with family-wise error control under adaptive monitoring.
