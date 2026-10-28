@@ -5,9 +5,11 @@
 //! Expected empirical distances below are hand-derived independently of the module.
 
 use symthaea_operations_research::aviation_probability_calibration::{
-    calibrate_tv_radius, calibrate_tv_radius_envelope, CalibrationFrequency, RadiusCalibrationError,
-    RegimeCalibration, PROBABILITY_SCALE_PPM,
+    calibrate_tv_radius, calibrate_tv_radius_envelope, calibrate_tv_radius_from_episodes,
+    CalibrationEpisode, CalibrationFrequency, NominalScenarioProbability, RadiusCalibrationError,
+    RegimeCalibration, RegimeNominalDistribution, PROBABILITY_SCALE_PPM,
 };
+use symthaea_operations_research::aviation_calibration_protocol::EvaluationPartition;
 
 #[test]
 fn hand_calculated_ten_percent_tv_shift_is_reported_exactly() {
@@ -138,5 +140,71 @@ fn regime_envelope_rejects_unallocatable_family_confidence_budget() {
     assert!(matches!(
         calibrate_tv_radius_envelope(&regimes, 1),
         Err(RadiusCalibrationError::FailureProbabilityTooSmallForRegimeCount { .. })
+    ));
+}
+
+
+fn event(id: &str, scenario: &str, partition: EvaluationPartition) -> CalibrationEpisode {
+    CalibrationEpisode {
+        record_id: format!("row-{id}"),
+        event_cluster_id: format!("episode-{id}"),
+        regime_id: "airport-a".into(),
+        observed_scenario_id: scenario.into(),
+        partition,
+    }
+}
+
+fn nominal() -> RegimeNominalDistribution {
+    RegimeNominalDistribution {
+        regime_id: "airport-a".into(),
+        probabilities: vec![
+            NominalScenarioProbability { scenario_id: "routine".into(), probability_ppm: 666_667 },
+            NominalScenarioProbability { scenario_id: "disruption".into(), probability_ppm: 333_333 },
+        ],
+    }
+}
+
+#[test]
+fn event_ledger_builds_counts_from_calibration_rows() {
+    let events = vec![
+        event("1", "routine", EvaluationPartition::Calibration),
+        event("2", "routine", EvaluationPartition::Calibration),
+        event("3", "disruption", EvaluationPartition::Calibration),
+    ];
+    let report = calibrate_tv_radius_from_episodes(&events, &[nominal()], 50_000).unwrap();
+    assert_eq!(report.regime_count, 1);
+    assert_eq!(report.regimes[0].report.calibration_episode_count, 3);
+    assert_eq!(report.regimes[0].report.empirical_tv_distance_ppm, 1);
+}
+
+#[test]
+fn event_ledger_rejects_test_rows_before_calibration() {
+    let events = vec![
+        event("1", "routine", EvaluationPartition::Calibration),
+        event("2", "disruption", EvaluationPartition::Test),
+    ];
+    assert!(matches!(
+        calibrate_tv_radius_from_episodes(&events, &[nominal()], 50_000),
+        Err(RadiusCalibrationError::NonCalibrationPartition { .. })
+    ));
+}
+
+#[test]
+fn event_ledger_rejects_duplicate_event_clusters() {
+    let first = event("1", "routine", EvaluationPartition::Calibration);
+    let mut second = event("2", "disruption", EvaluationPartition::Calibration);
+    second.event_cluster_id = first.event_cluster_id.clone();
+    assert!(matches!(
+        calibrate_tv_radius_from_episodes(&[first, second], &[nominal()], 50_000),
+        Err(RadiusCalibrationError::DuplicateEventClusterId { .. })
+    ));
+}
+
+#[test]
+fn event_ledger_rejects_categories_missing_from_frozen_support() {
+    let events = vec![event("1", "unmodeled-compound-event", EvaluationPartition::Calibration)];
+    assert!(matches!(
+        calibrate_tv_radius_from_episodes(&events, &[nominal()], 50_000),
+        Err(RadiusCalibrationError::ObservedScenarioOutsideNominalSupport { .. })
     ));
 }
