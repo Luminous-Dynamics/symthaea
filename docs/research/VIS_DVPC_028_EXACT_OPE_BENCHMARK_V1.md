@@ -9,7 +9,7 @@ Structural-support preflight: https://github.com/Luminous-Dynamics/symthaea/pull
 
 An off-policy evaluator should prove which claims are identified before assigning a numeric winner. With selective feedback, only the action chosen by the logger reveals a reward. If a target policy assigns positive probability to an action with zero logging probability, that target value cannot be identified from these logs alone. The benchmark emits `NOT_IDENTIFIED` and suppresses estimates for that scenario.
 
-For supported scenarios, this tool exactly enumerates every length-6 logged sample under a two-action Bernoulli contextual-bandit model. It computes expected estimator value, bias, variance, RMSE and maximum absolute estimation error over the exact sampling distribution. It is enumeration—not Monte Carlo—so these finite-sample summaries have no simulation noise under the declared DGP. The output is TSV with one metric per row and explicit record-type, scenario, estimator, verdict, metric, and value fields.
+For supported scenarios, this tool exactly enumerates every length-6 logged sample under a stationary two-action Bernoulli bandit model. It computes expected estimator value, bias, variance, RMSE and maximum absolute estimation error over the exact sampling distribution. It is enumeration—not Monte Carlo—so these finite-sample summaries have no simulation noise under the declared DGP. The output is TSV with one metric per row and explicit record-type, scenario, estimator, verdict, metric, and value fields.
 
 ## Estimators
 
@@ -36,6 +36,10 @@ rustc --edition=2024 --test tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028-
 rustc --edition=2024 -O tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028
 /tmp/vis-dvpc-028 --sweep
 ```
+
+## Independent numerical known answers
+
+An independent exact-enumeration reference calculation for `weak_overlap_001_misspecified` gives IPS variance `3.300084175084`, SNIPS expected estimate `0.233448729630`, clipped-IPS expected estimate `0.120000000000`, and SWITCH expected estimate `0.350000000000` with variance `0.006743476431`. The Rust tests pin these values within a declared `1e-8` tolerance.
 
 ## Interpretation boundaries
 
