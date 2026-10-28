@@ -419,6 +419,10 @@ jobs:
             .candidate_minus_reference_loss_lower_bound < 0 and
             .candidate_minus_reference_loss_upper_bound > 0 and
             .identification_interval_excludes_zero_in_candidate_favor == false and
+            .sensitivity_grid_summary.ranking_reverses_within_registered_grid == true and
+            .sensitivity_grid_summary.candidate_favoring_at_every_registered_point == false and
+            .sensitivity_grid_summary.candidate_favoring_point_count > 0 and
+            .sensitivity_grid_summary.reference_favoring_point_count > 0 and
             (.sensitivity_surface | length) == 16 and
             (.source_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64 and
