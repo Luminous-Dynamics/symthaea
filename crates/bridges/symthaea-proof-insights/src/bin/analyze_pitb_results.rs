@@ -2121,40 +2121,40 @@ fn validate_power_report(
                     scenario_seed,
                 )?;
                 if observed.false_claims != expected.false_claims
-                || observed.degenerate_interval_trials != expected.degenerate_interval_trials
-                || !same_optional_probability(
-                    observed.estimated_false_claim_probability,
-                    expected.estimated_false_claim_probability,
-                )
-                || !same_optional_probability(
-                    observed.monte_carlo_standard_error,
-                    expected.monte_carlo_standard_error,
-                )
-                || !same_optional_probability(
-                    observed.false_claim_probability_lower_95,
-                    expected.false_claim_probability_lower_95,
-                )
-                || !same_optional_probability(
-                    observed.false_claim_probability_upper_95,
-                    expected.false_claim_probability_upper_95,
-                )
-                || !same_optional_probability(
-                    observed.false_claim_probability_upper_simultaneous_95,
-                    expected.false_claim_probability_upper_simultaneous_95,
-                )
-                || !same_optional_probability(
-                    observed.mean_observed_effect_percentage_points,
-                    expected.mean_observed_effect_percentage_points,
-                )
-                || !same_optional_probability(
-                    observed.mean_realized_family_effect_heterogeneity_sd_percentage_points,
-                    expected.mean_realized_family_effect_heterogeneity_sd_percentage_points,
-                )
-            {
-                bail!(
-                    "weak-null scenario +{requested_sd_pp}pp SD/ICC {icc}/pair-association {pair_association_fraction} cannot be reproduced from the frozen validation rows and seed"
-                );
-            }
+                    || observed.degenerate_interval_trials != expected.degenerate_interval_trials
+                    || !same_optional_probability(
+                        observed.estimated_false_claim_probability,
+                        expected.estimated_false_claim_probability,
+                    )
+                    || !same_optional_probability(
+                        observed.monte_carlo_standard_error,
+                        expected.monte_carlo_standard_error,
+                    )
+                    || !same_optional_probability(
+                        observed.false_claim_probability_lower_95,
+                        expected.false_claim_probability_lower_95,
+                    )
+                    || !same_optional_probability(
+                        observed.false_claim_probability_upper_95,
+                        expected.false_claim_probability_upper_95,
+                    )
+                    || !same_optional_probability(
+                        observed.false_claim_probability_upper_simultaneous_95,
+                        expected.false_claim_probability_upper_simultaneous_95,
+                    )
+                    || !same_optional_probability(
+                        observed.mean_observed_effect_percentage_points,
+                        expected.mean_observed_effect_percentage_points,
+                    )
+                    || !same_optional_probability(
+                        observed.mean_realized_family_effect_heterogeneity_sd_percentage_points,
+                        expected.mean_realized_family_effect_heterogeneity_sd_percentage_points,
+                    )
+                {
+                    bail!(
+                        "weak-null scenario +{requested_sd_pp}pp SD/ICC {icc}/pair-association {pair_association_fraction} cannot be reproduced from the frozen validation rows and seed"
+                    );
+                }
             }
         }
     }
