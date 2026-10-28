@@ -583,6 +583,7 @@ mod tests {
         assert!(first.valid && second.valid);
         assert_ne!(first.manifest_sha256, second.manifest_sha256);
     }
+
     #[test]
     fn schema_document_is_valid_json_and_matches_manifest_version() {
         let schema: Value = serde_json::from_str(include_str!(
