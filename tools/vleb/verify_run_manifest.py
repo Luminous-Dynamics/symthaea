@@ -59,6 +59,24 @@ def canonical_invocation_digest(argv: list[str], working_directory: str, timeout
     return digest(canonical)
 
 
+def safe_directory(root: Path, relative: Any) -> Path:
+    if not isinstance(relative, str) or not relative or "\\" in relative or "\\x00" in relative:
+        raise ValueError("working directory must be a non-empty canonical POSIX relative path")
+    rel = PurePosixPath(relative)
+    if rel.is_absolute() or ".." in rel.parts or str(rel) != relative:
+        raise ValueError("absolute, traversal or ambiguous working directory rejected")
+    root_resolved = root.resolve(strict=True)
+    current = root_resolved
+    for component in rel.parts:
+        current = current / component
+        if current.is_symlink():
+            raise ValueError("symlink working directory rejected")
+    resolved = current.resolve(strict=True)
+    if not resolved.is_relative_to(root_resolved) or not resolved.is_dir():
+        raise ValueError("working directory must be a real directory within evidence root")
+    return resolved
+
+
 def safe_file(root: Path, relative: Any) -> Path:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         raise ValueError("artifact path must be a non-empty POSIX relative path")
@@ -384,17 +402,22 @@ def audit_witness_execution_receipt(
                 "code": "witness_verifier_file_digest_mismatch",
                 "message": "verifier file bytes do not match the out-of-band verifier digest",
             })
-        if (
-            not isinstance(argv_index, int)
-            or isinstance(argv_index, bool)
-            or argv_index < 0
-            or argv_index >= len(receipt["invocation"]["argv"])
-            or receipt["invocation"]["argv"][argv_index] != verifier_path_value
-        ):
+        argv = receipt["invocation"]["argv"]
+        if not isinstance(argv_index, int) or isinstance(argv_index, bool) or argv_index < 0 or argv_index >= len(argv):
             issues.append({
                 "code": "witness_verifier_invocation_binding_mismatch",
-                "message": "the pinned verifier file is not the exact argv entry at the evaluator-pinned index",
+                "message": "the evaluator-pinned verifier argv index is invalid",
             })
+        else:
+            invocation_cwd = safe_directory(
+                evidence_root, receipt["invocation"]["working_directory"]
+            )
+            invoked_verifier_path = safe_file(invocation_cwd, argv[argv_index])
+            if invoked_verifier_path != verifier_file:
+                issues.append({
+                    "code": "witness_verifier_invocation_binding_mismatch",
+                    "message": "the pinned verifier argv entry does not resolve to the hashed verifier file from the recorded working directory",
+                })
         if not any(row.get("path") == verifier_path_value and row.get("sha256") == actual_verifier_sha256 for row in receipt["inputs"]):
             issues.append({
                 "code": "witness_verifier_input_missing",
