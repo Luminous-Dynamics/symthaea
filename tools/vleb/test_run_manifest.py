@@ -58,6 +58,10 @@ def valid_manifest() -> dict[str, Any]:
             "source_path": "tools/vleb/audit_receipt.py",
             "source_sha256": h("f"),
             "verifier_binary_sha256": h("1"),
+            "task_schema_path": "tools/vleb/task-contract.schema.json",
+            "task_schema_sha256": h("a"),
+            "receipt_schema_path": "tools/vleb/evidence-receipt.schema.json",
+            "receipt_schema_sha256": h("b"),
         },
         "mutation_campaign": {
             "catalog_path": "mutations.json",
