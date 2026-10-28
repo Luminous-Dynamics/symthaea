@@ -254,26 +254,35 @@ fn canonicalize_value(value: Value) -> Value {
 }
 
 fn reject_question_metadata(value: &Value) -> Result<(), String> {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                reject_question_metadata(item)?;
+    let Some(trajectory) = value.as_object() else {
+        // The strict typed parser below will report a non-object trajectory.
+        return Ok(());
+    };
+    reject_reserved_keys(trajectory.keys())?;
+
+    // State objects have a fixed schema too. Do not recursively inspect the
+    // arbitrary JSON value inside an action: a real form field can legitimately
+    // be named "answer" without being benchmark gold-answer metadata.
+    if let Some(Value::Array(states)) = trajectory.get("states") {
+        for state in states {
+            if let Some(fields) = state.as_object() {
+                reject_reserved_keys(fields.keys())?;
             }
         }
-        Value::Object(object) => {
-            for (key, nested) in object {
-                let normalized: String = key
-                    .chars()
-                    .filter(|character| character.is_ascii_alphanumeric())
-                    .flat_map(char::to_lowercase)
-                    .collect();
-                if FORBIDDEN_METADATA_KEYS.contains(&normalized.as_str()) {
-                    return Err(format!("question/evaluation metadata key {key:?} is forbidden"));
-                }
-                reject_question_metadata(nested)?;
-            }
+    }
+    Ok(())
+}
+
+fn reject_reserved_keys<'a>(keys: impl IntoIterator<Item = &'a String>) -> Result<(), String> {
+    for key in keys {
+        let normalized: String = key
+            .chars()
+            .filter(|character| character.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect();
+        if FORBIDDEN_METADATA_KEYS.contains(&normalized.as_str()) {
+            return Err(format!("question/evaluation metadata key {key:?} is forbidden"));
         }
-        _ => {}
     }
     Ok(())
 }
