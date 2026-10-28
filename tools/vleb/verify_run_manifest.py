@@ -285,9 +285,11 @@ def audit_claim_evidence_bundle(
         result["contradicted"] = 0
         result["failed"] = 0
         result["claims"] = [
-            {"claim_id": item.get("claim_id"), "status": "unresolved"}
+            {
+                "claim_id": item.get("claim_id") if isinstance(item, dict) else None,
+                "status": "unresolved",
+            }
             for item in claim_inventory
-            if isinstance(item, dict)
         ]
 
     if (
@@ -479,8 +481,25 @@ def audit_claim_evidence_bundle(
             all_valid = False
         result["claims"].append(row)
 
+    accounted = (
+        result["supported"]
+        + result["contradicted"]
+        + result["unresolved"]
+        + result["failed"]
+    )
+    if accounted != result["claim_count"]:
+        result["issues"].append({
+            "code": "claim_outcome_accounting_inconsistent",
+            "message": (
+                f"claim outcomes account for {accounted} of "
+                f"{result['claim_count']} evaluator-pinned claims"
+            ),
+        })
+        all_valid = False
+
     result["status"] = "passed" if all_valid and not result["issues"] else "failed"
     return result
+
 
 def validate_manifest(
     manifest_path: Path,
