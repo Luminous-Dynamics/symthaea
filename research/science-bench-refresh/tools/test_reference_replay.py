@@ -65,6 +65,51 @@ class ReferenceReplayTests(unittest.TestCase):
         second_ids = {task["task_id"] for task in second["tasks"]}
         self.assertTrue(first_ids.isdisjoint(second_ids))
 
+    def test_fixed_seed_sweep_covers_recipe_variation_and_unique_ids(self) -> None:
+        manifest = manifest_for()
+        all_ids: set[str] = set()
+        set_digests: set[str] = set()
+        scale_values: set[float] = set()
+        slope_bins: set[int] = set()
+        residual_values: set[str] = set()
+
+        for index in range(64):
+            seed = hashlib.sha256(
+                f"science-bench-seed-sweep-v1/{index}".encode("utf-8")
+            ).digest()
+            generated = rr.independently_generate(manifest, seed, CONFIG)
+            encoded = json.dumps(
+                generated, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode("utf-8")
+            set_digests.add(hashlib.sha256(encoded).hexdigest())
+
+            tasks = generated["tasks"]
+            self.assertEqual(len(tasks), manifest["expected_task_count"])
+            ids = [task["task_id"] for task in tasks]
+            self.assertEqual(len(ids), len(set(ids)))
+            self.assertTrue(all_ids.isdisjoint(ids))
+            all_ids.update(ids)
+
+            semantic = next(t for t in tasks if t["family_id"] == "semantic_invariance")
+            scale_values.add(
+                semantic["evaluator_only"]["inverse_coordinate_transform"]["scale"]
+            )
+            slope_bins.add(
+                int(semantic["evaluator_only"]["latent_law"]["slope"] // 1)
+            )
+
+            noisy = next(t for t in tasks if t["family_id"] == "sampling_noise_shift")
+            law = noisy["evaluator_only"]["law"]
+            for row in noisy["policy_input"]["observations"]:
+                residual = row["y"] - (law["slope"] * row["x"] + law["intercept"])
+                residual_values.add(residual.hex())
+
+        self.assertEqual(len(set_digests), 64)
+        self.assertEqual(len(all_ids), 64 * manifest["expected_task_count"])
+        self.assertEqual(scale_values, {0.25, 0.5, 2.0, 4.0})
+        self.assertEqual(slope_bins, {1, 2, 3, 4})
+        self.assertGreater(len(residual_values), 100)
+
     def test_tasks_are_sorted_and_ids_do_not_reveal_family(self) -> None:
         manifest = manifest_for()
         generated = rr.independently_generate(manifest, SEED_A, CONFIG)
