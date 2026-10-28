@@ -10,7 +10,7 @@
 
 use crate::edit_locality::{
     EditLocalityConfig, EditLocalityError, EditLocalityEvidence,
-    EditRequest, LocalityEvent, MAX_EDIT_LOCALITY_EVENTS, verify_edit_locality,
+    EditRequest, LocalityEvent, verify_edit_locality,
     verify_edit_locality_with_config,
 };
 use serde::{Deserialize, Serialize};
