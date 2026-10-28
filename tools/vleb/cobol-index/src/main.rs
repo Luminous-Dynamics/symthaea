@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use vleb_cobol_index::{index_fixed_format, IndexOptions};
+use vleb_cobol_index::{IndexOptions, index_fixed_format};
 
 fn usage() -> &'static str {
     "Usage: vleb-cobol-index --format fixed [--include-debug] <source.cbl>"
