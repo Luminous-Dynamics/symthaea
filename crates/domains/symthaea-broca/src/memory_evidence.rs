@@ -174,8 +174,15 @@ impl EvidenceRecord {
             }
         }
         match &self.payload {
-            EvidencePayload::Text { value } if value.trim().is_empty() => {
-                return Err("text evidence must be non-empty".into());
+            EvidencePayload::Text { value } => {
+                if value.trim().is_empty() {
+                    return Err("text evidence must be non-empty".into());
+                }
+                // Text is immutable after insertion, so reject a mismatched digest
+                // before it can populate cached lexical postings or reach a reader.
+                if sha256_hex(value.as_bytes()) != self.content_sha256 {
+                    return Err("text content_sha256 mismatch".into());
+                }
             }
             EvidencePayload::Image { path } => {
                 if path.trim().is_empty() {
@@ -185,7 +192,6 @@ impl EvidenceRecord {
                     return Err("image path must not contain parent-directory traversal".into());
                 }
             }
-            _ => {}
         }
         match &self.lifecycle {
             EvidenceLifecycle::Superseded => {
