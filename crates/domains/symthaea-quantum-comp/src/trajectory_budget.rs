@@ -488,7 +488,7 @@ mod tests {
         let order = vec![0, 1, 2, 3];
         gate.observe(batch("b1", 2, 2, Some(order.clone()))).unwrap();
         gate.observe(batch("b2", 2, 1, Some(order.clone()))).unwrap();
-        let decision = gate.observe(batch("b3", 2, 1, Some(order)).unwrap();
+        let decision = gate.observe(batch("b3", 2, 1, Some(order))).unwrap();
         match decision {
             AcquisitionDecision::Continue(snapshot) => {
                 assert_eq!(snapshot.attempted_total, 6);
