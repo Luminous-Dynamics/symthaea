@@ -47,10 +47,10 @@ The realized subgroup fractions are noisy because per-group test counts are only
 ## Reproducibility
 
 - Local combined regression suite: **24/24 passed** (Python 3.13.5, NumPy 2.3.5, SciPy 1.17.0).
-- Local script SHA-256: `f509f056270b670d6ab0f00e03a1c7102f2c624169912079258bc344a183219c`.
-- Local test SHA-256: `39bb8e67f7aff18a2b7b13e09334fb4a6a3576bad988a41fd743f80f9fae2f4c`.
-- Exact local result JSON: 73,433 bytes, SHA-256 `3cfb6350f12db29e6cb871409f2c3e79cfe390fce00e73ea456062de22033085`.
-- Lossless gzip result: 6,100 bytes, SHA-256 `be8953084b09c72e49d1296cc141adfe15920deb5acbedea7462f201f27fb9da`.
+- Local script SHA-256: `f509f056270b670d6ab0f00e03a1c7102f2c624169912079258bc344a183219c`; local Git blob `8621fd0bb4b4e6d4fe3a218f2d4c4804f94f84e0`; committed branch blob `d2f11ec5114cb07307e4c85fe1228a7749b8948c` (same byte length, not byte-identical).
+- Local test SHA-256: `39bb8e67f7aff18a2b7b13e09334fb4a6a3576bad988a41fd743f80f9fae2f4c`; test is byte-identical to branch blob `2ca8d6ca2be60af6bebdf2660353fcd903bb7836`.
+- Exact local result JSON: 73,433 bytes, SHA-256 `3cfb6350f12db29e6cb871409f2c3e79cfe390fce00e73ea456062de22033085` (local-only, not committed).
+- Lossless gzip result: 6,100 bytes, SHA-256 `be8953084b09c72e49d1296cc141adfe15920deb5acbedea7462f201f27fb9da` (local-only, not committed).
 
 The local executed script and test should be compared byte-for-byte with their committed branch copies before using this result as exact-head evidence. The synthetic risk model is inherited from the previous standalone pilot; the code is not yet integrated with Symthaea's actual SCM likelihood/observation semantics.
 
