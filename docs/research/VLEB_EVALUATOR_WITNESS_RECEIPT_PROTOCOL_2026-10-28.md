@@ -62,3 +62,8 @@ Canonical pins use UTF-8 JSON serialized with sorted keys, no insignificant whit
 The receipt auditor now rejects duplicate JSON object keys and non-standard numeric constants such as NaN and Infinity before schema validation. Some parsers silently accept duplicate keys by retaining only the last value; rejecting them prevents different tools from assigning different meanings to the same attested bytes. An end-to-end negative control verifies duplicate-key receipts fail closed.
 
 The source path itself is also compared to an evaluator-supplied pin; matching bytes and spans at an alternate path are not silently treated as the same claim anchor.
+
+
+## Complete runtime identity pin (follow-up)
+
+The runtime object now has its own evaluator-supplied canonical SHA-256 pin in addition to the explicit image and toolchain pins. This binds every declared runtime field—including toolchain identifier, OS, architecture, and network mode—in one comparison, so a receipt cannot change its claimed network isolation or execution architecture while leaving the image digest unchanged. Negative controls mutate network mode, architecture, and the external runtime pin.

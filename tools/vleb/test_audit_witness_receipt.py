@@ -114,6 +114,7 @@ class WitnessReceiptAuditTests(unittest.TestCase):
             "expected_verifier_sha256": "b" * 64,
             "expected_runtime_image_digest": "sha256:" + "c" * 64,
             "expected_toolchain_sha256": "d" * 64,
+            "expected_runtime_sha256": canonical_sha(self.receipt["runtime"]),
         }
         values.update(overrides)
         return validate_receipt(self.receipt_path, self.schema_path, self.root, **values)
@@ -178,6 +179,20 @@ class WitnessReceiptAuditTests(unittest.TestCase):
         self.assertIn("verifier_id_mismatch", {issue["code"] for issue in result["issues"]})
         result = self.audit(expected_verifier_sha256="e" * 64)
         self.assertIn("verifier_digest_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_complete_runtime_object_is_pinned(self) -> None:
+        self.receipt["runtime"]["network_mode"] = "unrestricted"
+        result = self.audit()
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+        self.receipt["runtime"]["network_mode"] = "disabled"
+        self.receipt["runtime"]["architecture"] = "aarch64"
+        result = self.audit()
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
+
+    def test_runtime_object_pin_must_be_valid_and_match(self) -> None:
+        result = self.audit(expected_runtime_sha256="e" * 64)
+        self.assertIn("runtime_object_pin_mismatch", {issue["code"] for issue in result["issues"]})
 
     def test_runtime_and_toolchain_are_pinned(self) -> None:
         result = self.audit(expected_runtime_image_digest="sha256:" + "e" * 64)
