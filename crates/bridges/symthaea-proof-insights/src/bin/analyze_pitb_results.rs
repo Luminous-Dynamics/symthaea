@@ -2067,9 +2067,12 @@ fn confirmatory_utility_gate(
     // replicates collapse to one value: such an interval has no empirical
     // resolution and must never pass the confirmatory utility gate.
     let interval_informative = upper - lower > f64::EPSILON;
-    let interval_positive = interval_informative && lower > 0.0;
+    // Keep the literal interval fact separate from whether it is informative:
+    // [a, a] with a > 0 excludes zero mathematically but cannot qualify a claim.
+    let interval_positive = lower > 0.0;
     let effect_gate = effect >= 0.10;
-    let passed = interval_positive
+    let passed = interval_informative
+        && interval_positive
         && effect_gate
         && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
     let decision = if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
@@ -2358,7 +2361,7 @@ mod tests {
         let (informative, excludes_zero, passed, decision) =
             confirmatory_utility_gate(0.25, 0.25, 0.25, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
         assert!(!informative);
-        assert!(!excludes_zero);
+        assert!(excludes_zero, "the interval is numerically positive even though it is uninformative");
         assert!(!passed);
         assert_eq!(decision, "no_claim_degenerate_bootstrap_interval");
     }
