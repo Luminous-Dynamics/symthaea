@@ -811,6 +811,16 @@ fn frozen_case(id: &str) -> Option<FrozenCase> {
 }
 
 fn validate_case(case: &Case) -> Result<()> {
+    let mut mutation_paths = BTreeSet::new();
+    for mutation in &case.mutations {
+        if !is_field_path(&mutation.path) {
+            bail!("case {} has invalid mutation path {:?}", case.id, mutation.path);
+        }
+        if !mutation_paths.insert(mutation.path.as_str()) {
+            bail!("case {} mutates the same field more than once: {}", case.id, mutation.path);
+        }
+    }
+
     let frozen = frozen_case(&case.id)
         .with_context(|| format!("unknown v1 conformance case {}; update the versioned contract deliberately", case.id))?;
     if case.category != frozen.category {
@@ -839,16 +849,6 @@ fn validate_case(case: &Case) -> Result<()> {
             .with_context(|| format!("invalid embedded frozen JSON scalar for {}", path))?;
         if actual.value != expected_value {
             bail!("case {} mutation {} value differs from frozen v1 contract", case.id, path);
-        }
-    }
-
-    let mut mutation_paths = BTreeSet::new();
-    for mutation in &case.mutations {
-        if !is_field_path(&mutation.path) {
-            bail!("case {} has invalid mutation path {:?}", case.id, mutation.path);
-        }
-        if !mutation_paths.insert(mutation.path.as_str()) {
-            bail!("case {} mutates the same field more than once: {}", case.id, mutation.path);
         }
     }
 
