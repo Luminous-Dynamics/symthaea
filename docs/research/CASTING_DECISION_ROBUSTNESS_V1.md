@@ -1,7 +1,7 @@
 # CASTING Decision Robustness Audit v1
 
 **Benchmark ID:** CASTING-DECISION-ROBUSTNESS-001  
-**Status:** research harness and strict bake-off adapter implemented; no production shift manifest / physical evidence supplied  
+**Status:** strict adapter and deterministic synthetic shift-suite generator implemented; real simulator / physical evidence not supplied  
 **Scope:** two-objective constrained optimization with a fixed reference point  
 **Evidence labels:** synthetic / simulator / physical must remain distinct
 
@@ -21,7 +21,7 @@ It complements, rather than replaces, the compositional multi-fidelity bake-off 
 6. Keep one row per task, selection, candidate, and shift in the raw archive. Preserve failed, timed-out, invalid, and refused evaluations as outcomes in the acquisition layer; do not omit failures from the accounting.
 7. Report synthetic stress fixtures, public optimization benchmarks, engineering simulator results, and physical foundry observations as separate evidence classes.
 
-The source selection manifest (adapter schema 1.1.0) must contain `schema_version`, `benchmark_id`, `source_sweep_sha256`, `selector`, `candidate_pool_sha256`, the fixed `[1.2, 1.2]` reference point, `selected_candidate_ids`, one frozen nominal prediction for every candidate in the pool, and the explicit `selection_frozen_before_holdout: true` declaration. The holdout manifest must contain the same selector and source/candidate-pool digests, `holdout_role: independent_post_selection`, and complete observations for every candidate in every named shift. Neither predictions nor shifted observations are inferred or invented by the adapter. The split fields in the input document are declarations, not cryptographic attestations of how data were collected. Reviewers must verify the hashes against controlled artifacts and independently check that the holdout really remained sealed.
+The source selection manifest (adapter schema 1.2.0) must contain schema_version, benchmark_id, source_sweep_sha256, manifest_generator_sha256, selector, candidate_pool_sha256, the fixed [1.2, 1.2] reference point, selected_candidate_ids, one nominal prediction for every candidate, the explicit selection_frozen_before_holdout=true declaration, and nominal-prediction count/fidelity/cost accounting. The holdout manifest must bind the exact selection manifest bytes and the same generator, sweep, selector and candidate-pool digests. It must declare its evidence class and holdout role and include complete observations for every candidate in every named shift. Neither predictions nor shifted observations are inferred or invented by the adapter. The split fields in the input document are declarations, not cryptographic attestations of how data were collected. Reviewers must verify the hashes against controlled artifacts and independently check that the holdout really remained sealed.
 
 ## Required shift families
 
@@ -117,3 +117,36 @@ For every algorithm, archive source URL, immutable commit or release, license, d
 ### A falsifiable research hypothesis
 
 At equal *total cost* (fidelity-weighted simulator cost plus policy/solver wall time), adaptive joint action selection plus post-selection shift auditing should improve the lower-tail feasible hypervolume retained under model shifts, while maintaining nominal performance within a predeclared non-inferiority margin. Falsify the hypothesis if it improves only average nominal hypervolume, if its worst-shift results regress beyond the declared margin, or if the overhead erases its evaluation-cost advantage.
+
+## End-to-end synthetic diagnostic
+
+This command sequence builds a small, fully synthetic path from the existing runner output through manifest generation, adapter conversion and scoring. It uses a single policy/task only to validate integration; it is not a competitive benchmark.
+
+\`\`\`sh
+python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \\
+  --objective-families local_bias_island \\
+  --constraint-families constraint_boundary \\
+  --dimensions 2 --severities 0.5 --seeds 17 \\
+  --policies low_screen --design-count 75 > /tmp/casting-sweep.json
+
+python3 tools/casting-benchmark/prepare_synthetic_robustness_manifests.py \\
+  /tmp/casting-sweep.json \\
+  --objective-family local_bias_island \\
+  --constraint-family constraint_boundary \\
+  --dimension 2 --severity 0.5 --seed 17 --policy low_screen \\
+  --selection-output /tmp/casting-selection.json \\
+  --holdout-output /tmp/casting-holdout.json
+
+python3 tools/casting-benchmark/adapt_bakeoff_to_robustness.py \\
+  /tmp/casting-sweep.json /tmp/casting-selection.json /tmp/casting-holdout.json \\
+  --output /tmp/casting-robustness-input.json
+
+python3 tools/casting-benchmark/decision_robustness_eval.py \\
+  /tmp/casting-robustness-input.json --output /tmp/casting-robustness-receipt.json
+
+python3 tools/casting-benchmark/test_decision_robustness_eval.py
+python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
+python3 tools/casting-benchmark/test_prepare_synthetic_robustness_manifests.py
+\`\`\`
+
+The generator normalizes raw synthetic objectives using the frozen affine transformation (objective + 1) / 3 and fixes the reference point at [1.2, 1.2]. Out-of-range values fail closed instead of being clipped. A future real simulator adapter must define and preregister units, uncertainty, objective normalization, shift parameter ranges, solver revisions, wall time and true compute costs before mixing its evidence with this synthetic track.
