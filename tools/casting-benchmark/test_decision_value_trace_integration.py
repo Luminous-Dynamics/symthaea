@@ -14,6 +14,7 @@ from decision_action_ledger import (
     verify_ledger_bytes,
 )
 from decision_value_gate import DecisionAction, choose_next_step
+from discrete_decision_voi import ObservationAction, evaluate_action
 
 
 def sha(data: bytes) -> str:
@@ -95,6 +96,75 @@ class DecisionGateLedgerIntegrationTests(unittest.TestCase):
             summary["records"][0]["normalized_constraint_risk_reduction"], 0.5
         )
         self.assertAlmostEqual(summary["records"][0]["value_per_cost"], 0.75)
+
+    def test_exact_discrete_voi_selects_cost_effective_query_and_records_it(self):
+        prior = (0.5, 0.5)
+        losses = (
+            (0.0, 10.0),
+            (10.0, 0.0),
+        )
+        noisy = evaluate_action(
+            prior,
+            losses,
+            ObservationAction("noisy", 2.0, ((0.9, 0.1), (0.1, 0.9))),
+        )
+        perfect = evaluate_action(
+            prior,
+            losses,
+            ObservationAction("perfect", 5.0, ((1.0, 0.0), (0.0, 1.0))),
+        )
+        decision = choose_next_step(
+            [
+                DecisionAction(
+                    noisy.action_id, "casting-design", "evaluate", "medium",
+                    noisy.estimated_cost_units, noisy.expected_value_of_information, 0.0
+                ),
+                DecisionAction(
+                    perfect.action_id, "casting-design", "escalate", "high",
+                    perfect.estimated_cost_units, perfect.expected_value_of_information, 0.0
+                ),
+            ],
+            remaining_cost_units=5.0,
+            quality_target_met=False,
+            risk_gate_satisfied=True,
+            minimum_value_per_cost=0.5,
+        )
+        self.assertEqual(decision.action_id, "noisy")
+        self.assertAlmostEqual(decision.value_per_cost, 2.0)
+
+        decision_record = decision_event(
+            task_id="analytic-voi-known-answer",
+            run_id="seed-0",
+            state_sha256=sha(b"visible-prior-and-loss-table"),
+            policy_sha256=sha(b"discrete-voi-v1"),
+            disposition=decision.disposition,
+            reason_code=decision.reason_code,
+            action_id=decision.action_id,
+            candidate_id=decision.candidate_id,
+            fidelity=decision.fidelity,
+            estimated_cost_units=decision.reserved_cost_units,
+            decision_loss_reduction=decision.decision_loss_reduction,
+            normalized_constraint_risk_reduction=decision.normalized_constraint_risk_reduction,
+            value_per_cost=decision.value_per_cost,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "decision-trace.jsonl"
+            stored = append_record(path, decision_record)
+            append_record(
+                path,
+                outcome_event(
+                    stored,
+                    actual_cost_units=2.25,
+                    outcome_status="succeeded",
+                    outcome_sha256=sha(b"synthetic-observation-y0"),
+                    resulting_state_sha256=sha(b"updated-visible-belief"),
+                    reason_code="query_completed",
+                ),
+            )
+            summary = verify_ledger_bytes(path.read_bytes())
+        self.assertEqual(summary["unresolved_action_count"], 0)
+        self.assertAlmostEqual(summary["records"][0]["decision_loss_reduction"], 4.0)
+        self.assertAlmostEqual(summary["actual_minus_estimated_cost_units"], 0.25)
 
     def test_abstention_is_audited_without_inventing_an_evaluation(self):
         decision = choose_next_step(
