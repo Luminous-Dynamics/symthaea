@@ -1863,6 +1863,158 @@ fn validate_power_report(
         }
     }
 
+    let expected_weak_null_sds_pp = [5.0_f64, 10.0, 20.0];
+    if report.weak_null_family_effect_heterogeneity_sd_grid_percentage_points.len()
+        != expected_weak_null_sds_pp.len()
+        || report
+            .weak_null_family_effect_heterogeneity_sd_grid_percentage_points
+            .iter()
+            .zip(expected_weak_null_sds_pp)
+            .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
+        || report.weak_null_scenarios.len()
+            != expected_weak_null_sds_pp.len() * expected_iccs.len()
+    {
+        bail!("weak-null report does not contain the preregistered 3x4 heterogeneity/ICC grid");
+    }
+
+    let mut observed_weak_null_scenarios = BTreeSet::new();
+    for scenario in &report.weak_null_scenarios {
+        let probability = scenario
+            .estimated_false_claim_probability
+            .context("weak-null scenario lacks a false-claim estimate")?;
+        let lower = scenario
+            .false_claim_probability_lower_95
+            .context("weak-null scenario lacks a lower Wilson bound")?;
+        let upper = scenario
+            .false_claim_probability_upper_95
+            .context("weak-null scenario lacks an upper Wilson bound")?;
+        let standard_error = scenario
+            .monte_carlo_standard_error
+            .context("weak-null scenario lacks its Monte Carlo standard error")?;
+        let mean_effect = scenario
+            .mean_observed_effect_percentage_points
+            .context("weak-null scenario lacks its mean observed effect")?;
+        let realized_sd = scenario
+            .mean_realized_family_effect_heterogeneity_sd_percentage_points
+            .context("weak-null scenario lacks its realized heterogeneity diagnostic")?;
+        if scenario.status != "estimated"
+            || scenario.study_simulations != report.study_simulations
+            || scenario.bootstrap_replicates_per_simulated_study
+                != report.bootstrap_replicates_per_simulated_study
+            || !expected_weak_null_sds_pp.iter().any(|sd| {
+                (scenario.requested_family_effect_heterogeneity_sd_percentage_points - sd).abs()
+                    <= 1e-12
+            })
+            || !expected_iccs
+                .iter()
+                .any(|icc| (scenario.assumed_family_icc - icc).abs() <= 1e-12)
+            || !observed_weak_null_scenarios.insert((
+                (scenario.requested_family_effect_heterogeneity_sd_percentage_points * 1000.0)
+                    .round() as i32,
+                (scenario.assumed_family_icc * 1000.0).round() as i32,
+            ))
+            || scenario.false_claims > report.study_simulations
+            || scenario.degenerate_interval_trials > report.study_simulations
+            || scenario.false_claims
+                > report.study_simulations - scenario.degenerate_interval_trials
+            || [probability, lower, upper, standard_error]
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+            || lower > probability + 1e-12
+            || probability > upper + 1e-12
+            || !mean_effect.is_finite()
+            || !realized_sd.is_finite()
+            || realized_sd < 0.0
+            || realized_sd
+                > scenario.requested_family_effect_heterogeneity_sd_percentage_points + 1e-8
+        {
+            bail!("weak-null scenario has an invalid grid key, count, or probability bound");
+        }
+    }
+
+    // Reproduce all family-heterogeneous, zero-average-effect stress scenarios
+    // from the same validation-derived family sizes, configuration and seed.
+    for (sd_index, requested_sd_pp) in expected_weak_null_sds_pp.iter().copied().enumerate() {
+        for (icc_index, icc) in expected_iccs.iter().copied().enumerate() {
+            let scenario_index = sd_index * expected_iccs.len() + icc_index;
+            let scenario_seed = config
+                .bootstrap_seed
+                .wrapping_add(0xD1B5_4A32_D192_ED03)
+                .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
+            let observed = report
+                .weak_null_scenarios
+                .iter()
+                .find(|scenario| {
+                    (scenario.requested_family_effect_heterogeneity_sd_percentage_points
+                        - requested_sd_pp)
+                        .abs()
+                        <= 1e-12
+                        && (scenario.assumed_family_icc - icc).abs() <= 1e-12
+                })
+                .context("power report lacks a required weak-null scenario")?;
+            let expected = simulate_weak_null_scenario(
+                &expected_family_rows,
+                *selected_rate,
+                requested_sd_pp / 100.0,
+                icc,
+                report.study_simulations,
+                report.bootstrap_replicates_per_simulated_study,
+                scenario_seed,
+            )?;
+            if observed.false_claims != expected.false_claims
+                || observed.degenerate_interval_trials != expected.degenerate_interval_trials
+                || !same_optional_probability(
+                    observed.estimated_false_claim_probability,
+                    expected.estimated_false_claim_probability,
+                )
+                || !same_optional_probability(
+                    observed.monte_carlo_standard_error,
+                    expected.monte_carlo_standard_error,
+                )
+                || !same_optional_probability(
+                    observed.false_claim_probability_lower_95,
+                    expected.false_claim_probability_lower_95,
+                )
+                || !same_optional_probability(
+                    observed.false_claim_probability_upper_95,
+                    expected.false_claim_probability_upper_95,
+                )
+                || !same_optional_probability(
+                    observed.mean_observed_effect_percentage_points,
+                    expected.mean_observed_effect_percentage_points,
+                )
+                || !same_optional_probability(
+                    observed.mean_realized_family_effect_heterogeneity_sd_percentage_points,
+                    expected.mean_realized_family_effect_heterogeneity_sd_percentage_points,
+                )
+            {
+                bail!(
+                    "weak-null scenario +{requested_sd_pp}pp SD/ICC {icc} cannot be reproduced from the frozen validation rows and seed"
+                );
+            }
+        }
+    }
+
+    let max_weak_null_false_claim_probability = report
+        .weak_null_scenarios
+        .iter()
+        .filter_map(|scenario| scenario.estimated_false_claim_probability)
+        .reduce(f64::max);
+    let max_weak_null_false_claim_upper_95 = report
+        .weak_null_scenarios
+        .iter()
+        .filter_map(|scenario| scenario.false_claim_probability_upper_95)
+        .reduce(f64::max);
+    if !same_optional_probability(
+        report.weak_null_false_claim_probability_max,
+        max_weak_null_false_claim_probability,
+    ) || !same_optional_probability(
+        report.weak_null_false_claim_probability_upper_95_max,
+        max_weak_null_false_claim_upper_95,
+    ) {
+        bail!("weak-null false-claim maxima do not match scenario rows");
+    }
+
     let max_null_power = report
         .scenarios
         .iter()
