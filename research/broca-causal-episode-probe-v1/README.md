@@ -57,6 +57,12 @@ From the Symthaea repository root, after the worker compiles:
 
     python3 research/broca-causal-episode-probe-v1/test_score_probe.py
     python3 research/broca-causal-episode-probe-v1/test_episode_expand.py
+    python3 research/broca-causal-episode-probe-v1/test_lifecycle_probe.py
+
+    # Verify the explicit supersede operation through two clean worker processes:
+    python3 research/broca-causal-episode-probe-v1/run_lifecycle_probe.py \
+      --worker target/debug/broca-lme-worker \
+      --output /tmp/broca-supersession-probe.json
 
 The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixture hashes, scope, candidate pool, evaluation budget, protocol, and question count. The candidate pool (`--candidate-k`) must be at least as large as the final budget (`--k`). The baseline is scored using the first k BM25 results. The episode-expansion arm requires that sibling manifest, verifies the candidate prediction digest and fixture digest, and carries forward the worker SHA-256 and BM25 settings into its own receipt. It then adds indexed evidence from the same or adjacent trajectory steps until the identical k-item budget is reached. Preserve all manifests with every metric.
 
@@ -77,6 +83,19 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 3. Add an explicit typed transition graph only after the episode-expansion ablation is measured.
 4. Compare the arms on official LongMemEval-V2 and one independent action-oriented benchmark (e.g. AMA-Bench or Mem2ActBench); do not average their scores together.
 5. Run the mutation lane separately: supersede a fact, save/load memory, rebuild the index, and prove the old pointer is no longer eligible. That is a governance test, not a causal-chain score.
+
+## Explicit currentness transition probe
+
+`run_lifecycle_probe.py` drives the compiled JSONL worker twice with the exact same trajectory and BM25 configuration. The first process discovers stable evidence IDs for the old and replacement address spans. The second process inserts the same trajectory, sends the worker's explicit `supersede` operation, then queries both the old and current address.
+
+The runner fails closed unless:
+- both clean processes report the same canonical source digest;
+- the supersede acknowledgement names the exact old and replacement IDs;
+- the old evidence ID disappears from post-transition search;
+- the replacement remains retrievable;
+- returned context and audit arrays have matching cardinality.
+
+This tests a recorded explicit update event, not automatic extraction of facts from natural language. The benchmark's naive episode expansion can still retrieve a retired span because it does not consult lifecycle state. Do not claim the system autonomously inferred the update. The runner writes a JSON receipt containing the worker/fixture digests and hashes of both protocol transcripts.
 
 ## Claim ceiling
 
