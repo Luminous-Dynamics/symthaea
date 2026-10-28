@@ -4,47 +4,59 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
-PyPhi Cross-Validation Framework
-================================
+Fail-closed paired-model comparison for Symthaea's IIT 3.0 candidate score.
 
-Validates Symthaea's HDC-based Φ approximation against PyPhi's exact IIT 3.0 calculation.
+This script sends one explicit state-by-node TPM and state to both:
+- Symthaea's Rust candidate MIP score adapter; and
+- the pinned PyPhi 2.0.0rc4 IIT_3_0 reference profile.
 
-This framework:
-1. Generates small topologies (n ≤ 8) where exact Φ is tractable
-2. Calculates Φ using both methods
-3. Computes correlation and agreement metrics
-4. Produces validation report for publication
+The Rust value is deliberately named a candidate score, not assumed to be
+formal IIT Phi. The report may qualify the candidate only for a declared
+comparison profile and acceptance gates. It never establishes that IIT is
+correct or that Symthaea is conscious.
 
-Target: r > 0.90 correlation between HDC-Φ and exact Φ
+Failure policy:
+- no hard-coded score fallbacks;
+- nonzero exits, timeouts, malformed output, wrong model identity, missing
+  PyPhi, unexpected PyPhi versions, and non-finite values are failures;
+- unpaired / insufficient / constant-score data cannot yield a correlation;
+- acceptance thresholds must be supplied explicitly before a run can qualify.
 
-Requirements:
-    pip install pyphi numpy scipy matplotlib seaborn
-
-Author: Tristan Stoltz & Claude
-Date: 2026-01-04
-Version: 1.0.0
+PyPhi is an offline research dependency; it is not a production dependency.
+Expected reference artifact: PyPhi 2.0.0rc4, formalism IIT_3_0.
 """
 
-import subprocess
+
+import hashlib
 import json
-import numpy as np
-from typing import List, Tuple, Dict, Optional
+import logging
+import math
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-import logging
+from typing import List, Optional, Tuple
 
-# Configure logging
+import numpy as np
+
+EXPECTED_PYPHI_VERSION = "2.0.0rc4"
+FORMALISM_PROFILE = "IIT_3_0"
+RUST_CANDIDATE_METRIC_ID = "symthaea_iit3_full_system_mechanism_mip_candidate_v1"
+MODEL_SCHEMA_VERSION = "symthaea-iit3-tpm-input-v1"
+NOISE_LEVEL = 0.02
+MAX_EXACT_NODES = 8
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Try to import PyPhi (optional for systems without it)
 try:
     import pyphi
     PYPHI_AVAILABLE = True
+    PYPHI_VERSION = getattr(pyphi, "__version__", None)
 except ImportError:
+    pyphi = None
     PYPHI_AVAILABLE = False
-    logger.warning("PyPhi not installed. Exact Φ validation unavailable.")
-    logger.warning("Install with: pip install pyphi")
+    PYPHI_VERSION = None
+    logger.warning("PyPhi is not installed; comparison will remain NOT_QUALIFIED.")
 
 
 @dataclass
@@ -58,27 +70,34 @@ class TopologySpec:
 
 @dataclass
 class ValidationResult:
-    """Result of cross-validation for a single topology."""
+    """Paired measurement result for one explicit TPM and current state."""
     topology_name: str
     n_nodes: int
-    hdc_phi: float
-    pyphi_phi: Optional[float]
-    hdc_std: float = 0.0
+    model_sha256: str
+    candidate_phi: Optional[float] = None
+    pyphi_phi_s: Optional[float] = None
     pyphi_computation_time: float = 0.0
-    hdc_computation_time: float = 0.0
+    candidate_computation_time: float = 0.0
+    candidate_metric_id: Optional[str] = None
     error_message: Optional[str] = None
 
 
 @dataclass
 class ValidationReport:
-    """Complete cross-validation report."""
+    """Fail-closed comparison report; status is NOT_QUALIFIED by default."""
     results: List[ValidationResult] = field(default_factory=list)
-    correlation: float = 0.0
-    mean_absolute_error: float = 0.0
-    max_absolute_error: float = 0.0
-    agreement_within_10_percent: float = 0.0
+    correlation: Optional[float] = None
+    mean_absolute_error: Optional[float] = None
+    max_absolute_error: Optional[float] = None
+    agreement_within_10_percent: Optional[float] = None
     n_validated: int = 0
     n_failed: int = 0
+    qualification_status: str = "NOT_QUALIFIED"
+    qualification_reasons: List[str] = field(default_factory=list)
+    pyphi_version: Optional[str] = None
+    formalism_profile: str = FORMALISM_PROFILE
+    min_valid_pairs: Optional[int] = None
+    min_pearson: Optional[float] = None
 
 
 class PyPhiValidator:
