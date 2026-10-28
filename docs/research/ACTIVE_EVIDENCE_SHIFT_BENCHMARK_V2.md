@@ -315,3 +315,18 @@ Required protocol:
 6. **Rank on a frontier, not one scalar.** Publish (a) formal guarantee class, (b) false alarms per 1,000/10,000 observations and ARL0, (c) detection probability at fixed budgets, (d) median and worst-case delay conditional on detection, (e) calibration uncertainty, and (f) compute/memory cost. Keep downstream regret and target-population performance as separate outcomes.
 
 **Acceptance criteria proposed for the next lane:** zero violations of the composite-null guarantee in the exact finite-state schedule tests; all baselines compared at preregistered matched empirical false-alarm operating points; no scenario-level detection claim where the target did not shift; repeatable paired evaluation on at least three source-distinct streams plus synthetic adversarial controls; and no “beats SOTA” claim until data, code, thresholds, and exact result receipts are independently reproduced. These are proposed gates, not results already achieved.
+
+
+## 27. Matched-edge CUSUM reference pilot (synthetic, provisional)
+
+The stacked implementation PR [#8822](https://github.com/Luminous-Dynamics/symthaea/pull/8822) adds upper/lower reflected Bernoulli CUSUM arms. Rather than giving CUSUM only a formal alpha allocation and then comparing it to the composite process at a different realized false-alarm rate, its threshold is selected by exact DP to match the existing composite-band betting e-process's *realized alarm probability at p=0.52* over 1,000 observations.
+
+An independent local DP prototype obtained:
+- reference composite edge alarm probability: 0.000891588;
+- smallest CUSUM integer threshold: 1,374, score 54.96;
+- CUSUM alarm probability at the boundary: 0.000885901; the previous threshold 1,373 gives 0.000894015 and is too liberal for this matched target;
+- two-sided CUSUM union-bound receipt: 0.001771803, below the per-cell allocation 0.004166667.
+
+At a change after observation 100 and horizon 1,000, the matched-edge prototype gives CUSUM upper-arm power of 7.226% at p1=.55 and 93.336% at p1=.60, compared with 1.769% and 73.527% for the composite-band e-process in the current exact-DP pilot. At p1=.70 and .80 both are near 100% by the horizon. CUSUM mean detection delay conditional on detection remains long (about 774 observations at p1=.55 and 623 at p1=.60), so the power gain is not a free win.
+
+**Claim ceiling:** these values are from independent local exact-DP calculations, not from the stacked Rust PR's artifact or CI. The matched point is a stable constant edge rate, not an empirical matched-FPR evaluation over every predictable in-band schedule. The CUSUM family false-alarm bound is the directional union bound; this is distinct from pointwise realized FPR and from the composite process's formal alpha guarantee. The next qualification step is exact-head Rust/reference parity plus broader predictable schedules and source-held-out real streams. Do not call this state of the art or general superiority.
