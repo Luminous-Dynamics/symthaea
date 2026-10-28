@@ -1,0 +1,66 @@
+{
+  "limitations": [
+    "four-cell synthetic demonstration only; not an empirical estimate of real-world failure prevalence",
+    "iid confidence bound is valid only when its bounded independent sampling assumptions and fixed support are justified",
+    "sample values alone cannot prove independence or rule out common-mode audit bias; preflight depends on an independently trusted assumption receipt",
+    "latent-world cells may not be directly observable; missing support must remain uncertified",
+    "no external method baselines or real-world dataset executed; no SOTA claim",
+    "contract helper is not integrated into the production Rust optimizer/dispatch path"
+  ],
+  "protocol": {
+    "decision_radius_bits": 0.06664248830771191,
+    "declared_loss_range": [0.0, 4.0],
+    "maximum_admissible_epsilon_bits": 0.033357511692288094,
+    "observations_per_cell": 4096,
+    "policies": ["p0", "p1"],
+    "regret_budget_bits": 0.2,
+    "seed": 20261028,
+    "systematic_bias_control": "planning model has +0.04 error at p0::w0; audit values share the same +0.04 offset at that cell and repeat identically for all observations",
+    "truth_risk_matrix": [[1.0, 1.2], [1.5, 2.0]],
+    "worlds": ["w0", "w1"]
+  },
+  "results": {
+    "iid_low_noise_positive_control": {
+      "admitted_by_numeric_bound": true,
+      "cells": 4,
+      "certificate_regret_bound_bits": 0.16490079984112033,
+      "epsilon_upper_bits": 0.01580791161284826,
+      "familywise_delta": 0.05,
+      "max_cell_confidence_radius_bits": 0.014683175860617983,
+      "max_cell_plugin_residual_bits": 0.0011429188048550643,
+      "n_per_cell": 4096,
+      "preflight": {"admitted": true, "cell_count": 4, "reason": "PREFLIGHT_PASSED"},
+      "true_planning_error_bits": 0.0
+    },
+    "missing_support_control": {
+      "expected_cell_count": 4,
+      "fail_closed_preflight": {
+        "admitted": false,
+        "missing_cells": ["p0::w0"],
+        "reason": "AUDIT_SUPPORT_INCOMPLETE",
+        "unexpected_cells": []
+      },
+      "naive_incomplete_support_admitted": true,
+      "naive_incomplete_support_epsilon_bound_bits": 0.15826794606655586,
+      "observed_cell_count": 3,
+      "true_planning_error_bits_scoring_only": 0.040000000000000036
+    },
+    "systematic_bias_adversarial_control": {
+      "admitted_by_numeric_bound": true,
+      "cells": 4,
+      "certificate_regret_bound_bits": 0.15957931733699182,
+      "epsilon_allowance_bits": 0.033357511692288094,
+      "epsilon_upper_bits": 0.013147170360783994,
+      "fail_closed_preflight": {"admitted": false, "reason": "AUDIT_ASSUMPTIONS_UNVERIFIED"},
+      "familywise_delta": 0.05,
+      "max_cell_confidence_radius_bits": 0.01314717036078355,
+      "max_cell_plugin_residual_bits": 4.440892098500626e-16,
+      "n_per_cell": 4096,
+      "true_planning_error_bits_scoring_only": 0.040000000000000036,
+      "unsafe_admission": true
+    }
+  },
+  "schema": "symthaea-decision-risk-audit-assumption-falsification-v1",
+  "source_sha256": "35986bf06755f3c00d628f1c78eda30e05f1d158c31c42fdc75a8cdbb3945641",
+  "status": "SYNTHETIC_ASSUMPTION_FALSIFICATION_NOT_DEPLOYMENT_CERTIFICATION"
+}
