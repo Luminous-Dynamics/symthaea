@@ -158,8 +158,6 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("verifier SHA-256 must be 64 lowercase hexadecimal characters")
         if args.verifier_argv_index < 0 or args.verifier_argv_index >= len(args.command):
             raise ValueError("verifier argv index is outside the exact invocation")
-        if args.command[args.verifier_argv_index] != args.verifier_path:
-            raise ValueError("verifier path must equal the evaluator-pinned argv entry at verifier argv index")
         if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{1,127}", args.claim_id):
             raise ValueError("claim ID is invalid")
         if len(args.expected_invocation_sha256) != 64 or any(
@@ -185,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
         cwd = safe_path(root, args.working_directory, must_exist=True)
         if not cwd.is_dir():
             raise ValueError("working directory must be a directory within artifact root")
+        invocation_verifier_path = safe_path(
+            cwd, args.command[args.verifier_argv_index], must_exist=True
+        )
+        if invocation_verifier_path != verifier_path:
+            raise ValueError("verifier argv entry does not resolve to the hashed verifier file from the working directory")
 
         receipt_path = safe_path(root, args.receipt_path, must_exist=False)
         stdout_path = safe_path(root, args.stdout_path, must_exist=False)
