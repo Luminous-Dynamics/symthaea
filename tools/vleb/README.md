@@ -15,6 +15,8 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Language capability matrix](language-capability-matrix.json)
 - [Language capability claim-boundary tests](test_language_capability_matrix.py)
 - [Read-only fixed-format COBOL indexer](cobol-index/README.md)
+- [COBOL index output schema](cobol-index/index-output.schema.json)
+- [COBOL index output integration tests](test_cobol_index_output.py)
 - [Synthetic ledger task contract](examples/ledger-reconciliation/task.json)
 - [Rust reference implementation and test instructions](ledger-reconcile/README.md)
 - [Fixture integrity gate](check-fixture-integrity.sh)
