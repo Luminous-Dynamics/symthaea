@@ -4,7 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 import unittest
+from pathlib import Path
 
+import adapt_bakeoff_to_robustness as adapter
 from adapt_bakeoff_to_robustness import (
     ADAPTER_BENCHMARK_ID,
     ADAPTER_SCHEMA_VERSION,
@@ -129,6 +131,8 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         converted = adapt_documents(sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw)
         self.assertEqual(converted["source_run"]["sweep_sha256"], hashlib.sha256(sweep_raw).hexdigest())
+        adapter_bytes = Path(adapter.__file__).resolve().read_bytes()
+        self.assertEqual(converted["source_run"]["adapter_sha256"], hashlib.sha256(adapter_bytes).hexdigest())
         self.assertEqual(converted["split"]["selection_freeze_sha256"], hashlib.sha256(selection_raw).hexdigest())
         self.assertEqual(converted["split"]["holdout_manifest_sha256"], hashlib.sha256(holdout_raw).hexdigest())
 
@@ -177,6 +181,15 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
         holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
         with self.assertRaisesRegex(ValueError, "synthetic_fixture_only"):
+            adapt_documents(sweep, updated_raw, selection, _canonical(selection), holdout, _canonical(holdout))
+
+    def test_rejects_evaluation_cost_ledger_mismatch(self) -> None:
+        sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
+        sweep["paired_runs"][0]["cost_spent"] = 99
+        updated_raw = _canonical(sweep)
+        selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
+        holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
+        with self.assertRaisesRegex(ValueError, "cost_spent disagrees"):
             adapt_documents(sweep, updated_raw, selection, _canonical(selection), holdout, _canonical(holdout))
 
     def test_rejects_selection_id_outside_candidate_pool(self) -> None:
