@@ -718,7 +718,8 @@ mod tests {
     #[test]
     fn duplicate_arm_id_is_rejected() {
         let mut value = qualified_manifest();
-        value["arms"][1]["arm_id"] = value["arms"][0]["arm_id"].clone();
+        let first_arm_id = value["arms"][0]["arm_id"].clone();
+        value["arms"][1]["arm_id"] = first_arm_id;
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
         assert!(report.issues.iter().any(|issue| issue.contains("duplicate arm_id")));
@@ -755,7 +756,8 @@ mod tests {
     #[test]
     fn duplicate_module_in_slice_is_rejected() {
         let mut value = qualified_manifest();
-        value["task_slices"][0]["modules"][1] = value["task_slices"][0]["modules"][0].clone();
+        let first_module = value["task_slices"][0]["modules"][0].clone();
+        value["task_slices"][0]["modules"][1] = first_module;
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
         assert!(report.issues.iter().any(|issue| issue.contains("duplicate")));
@@ -822,6 +824,85 @@ mod tests {
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
         assert!(report.issues.iter().any(|issue| issue.contains("40-character lowercase Git commit SHA")));
+    }
+
+    #[test]
+    fn duplicate_task_slice_identity_is_rejected() {
+        let mut value = qualified_manifest();
+        let duplicate = value["task_slices"][0].clone();
+        value["task_slices"].as_array_mut().unwrap().push(duplicate);
+        let report = validate_value(&value).unwrap();
+        assert!(!report.valid);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("duplicates an existing model/task-slice identity")));
+    }
+
+    #[test]
+    fn every_model_requires_at_least_one_task_slice() {
+        let mut value = qualified_manifest();
+        value["task_slices"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|slice| slice["model_id"] != "GPT-4.1");
+        let report = validate_value(&value).unwrap();
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("has no task slice")));
+    }
+
+    #[test]
+    fn duplicate_native_metric_is_rejected() {
+        let mut value = qualified_manifest();
+        value["upstream"]["native_metrics"] =
+            json!(["native_rmsle", "native_rmsle", "symbolic_accuracy"]);
+        let report = validate_value(&value).unwrap();
+        assert!(!report.valid);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("only unique native_rmsle")));
+    }
+
+    #[test]
+    fn schema_document_is_json_and_declares_strict_manifest_fields() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/run-manifest.schema.json"
+        ))
+        .expect("schema JSON");
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(MANIFEST_SCHEMA)
+        );
+        assert_eq!(schema["additionalProperties"].as_bool(), Some(false));
+        let required = schema["required"].as_array().expect("required array");
+        for name in [
+            "schema",
+            "purpose",
+            "upstream",
+            "task_slices",
+            "arms",
+            "budget_profiles",
+            "primary_contrasts",
+        ] {
+            assert!(required.iter().any(|field| field.as_str() == Some(name)));
+        }
+    }
+
+    #[test]
+    fn confirmatory_run_requires_multiplicity_family_on_each_primary_contrast() {
+        let mut value = qualified_manifest();
+        value["stage"] = json!("confirmatory");
+        value["claim_ceiling"] = json!("confirmatory_comparison_pending");
+        value["primary_contrasts"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("multiplicity_family");
+        let report = validate_value(&value).unwrap();
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| {
+            issue.contains("confirmatory contrasts must declare a multiplicity_family")
+        }));
     }
 
     #[test]
