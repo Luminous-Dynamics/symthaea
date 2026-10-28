@@ -58,6 +58,7 @@ From the Symthaea repository root, after the worker compiles:
     python3 research/broca-causal-episode-probe-v1/test_score_probe.py
     python3 research/broca-causal-episode-probe-v1/test_episode_expand.py
     python3 research/broca-causal-episode-probe-v1/test_lifecycle_probe.py
+    python3 research/broca-causal-episode-probe-v1/test_analyze_paired_runs.py
 
     # Verify the explicit supersede operation through two clean worker processes:
     python3 research/broca-causal-episode-probe-v1/run_lifecycle_probe.py \
@@ -83,6 +84,26 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 3. Add an explicit typed transition graph only after the episode-expansion ablation is measured.
 4. Compare the arms on official LongMemEval-V2 and one independent action-oriented benchmark (e.g. AMA-Bench or Mem2ActBench); do not average their scores together.
 5. Run the mutation lane separately: supersede a fact, save/load memory, rebuild the index, and prove the old pointer is no longer eligible. That is a governance test, not a causal-chain score.
+
+## Paired official-run decision analysis
+
+`analyze_paired_runs.py` makes the preregistered quality/efficiency gates executable once a baseline and candidate produce per-question JSONL. Both files must contain exactly one row for every matching `(domain, question_id)` pair, with the same `group_id` in both arms and these fields:
+
+```json
+{"domain":"web","question_id":"q-001","group_id":"session-07","status":"success","correct":true,"query_latency_ms":210.5,"context_tokens":816,"lifecycle_cost_units":0.42}
+```
+
+`status` must be `success`; failed or missing rows are not silently discarded. `lifecycle_cost_units` must use the same declared units for both arms and should include the agreed allocation of write/index/background cost, not query latency alone. The script groups and pairs question outcomes, runs a deterministic 95% cluster bootstrap by `group_id`, computes per-domain and aggregate accuracy deltas, latency p50/p95/p99, context size, lifecycle-cost reduction, and machine-readable gate results.
+
+Example:
+
+    python3 research/broca-causal-episode-probe-v1/analyze_paired_runs.py \
+      --baseline runs/baseline/per_question.jsonl \
+      --candidate runs/broca/per_question.jsonl \
+      --bootstrap-replicates 20000 --seed 20261028 \
+      --output runs/paired-analysis.json
+
+The default quality gate requires at least +3 percentage points and a 95% clustered-bootstrap interval whose lower bound is above zero. The alternative efficiency gate requires the accuracy interval's lower bound to be above -1 percentage point and observed lifecycle-cost reduction of at least 25%. These are internal preregistered project gates. A numerical pass alone is not an official SOTA claim; the upstream harness, reader/evaluator identity, exact split and run receipts still must be verified. The analysis tool is authored but not executed in the current environment.
 
 ## Explicit currentness transition probe
 
