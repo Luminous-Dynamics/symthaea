@@ -168,15 +168,15 @@ class DecisionActionLedgerTests(unittest.TestCase):
 
     def test_rejects_second_outcome_for_same_action(self):
         raw = completed_ledger()
-        first = json.loads(raw.splitlines()[0])
         second = json.loads(raw.splitlines()[1])
-        second["sequence"] = 2
-        second["previous_record_sha256"] = first["record_sha256"]
-        second["record_sha256"] = hashlib.sha256(
+        third = dict(second)
+        third["sequence"] = 2
+        third["previous_record_sha256"] = second["record_sha256"]
+        third["record_sha256"] = hashlib.sha256(
             b"CASTING-DECISION-ACTION-LEDGER-V1\0"
-            + canonical_json({k: v for k, v in second.items() if k != "record_sha256"})
+            + canonical_json({k: v for k, v in third.items() if k != "record_sha256"})
         ).hexdigest()
-        duplicated = raw + canonical_json(second) + b"\n"
+        duplicated = raw + canonical_json(third) + b"\n"
         with self.assertRaisesRegex(ValueError, "duplicate outcome"):
             verify_ledger_bytes(duplicated)
 
