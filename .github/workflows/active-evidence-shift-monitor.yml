@@ -52,8 +52,13 @@ jobs:
           cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > "$artifact_dir/shift-monitor-results.csv"
           cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > "$temp_dir/second.csv"
           cmp "$artifact_dir/shift-monitor-results.csv" "$temp_dir/second.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --sentinel-budget-csv > "$artifact_dir/sentinel-budget-results.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --sentinel-budget-csv > "$temp_dir/sentinel-budget-second.csv"
+          cmp "$artifact_dir/sentinel-budget-results.csv" "$temp_dir/sentinel-budget-second.csv"
           python3 tools/active-evidence-shift-monitor/reference_check.py --self-test
           python3 tools/active-evidence-shift-monitor/reference_check.py "$artifact_dir/shift-monitor-results.csv"
+          python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget-self-test
+          python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget "$artifact_dir/sentinel-budget-results.csv"
 
           {
             echo "source_commit=$(git rev-parse HEAD)"
@@ -63,7 +68,7 @@ jobs:
             echo "rustc_version=$(rustc --version)"
             echo "cargo_version=$(cargo --version)"
             echo "runner_os=$(uname -a)"
-            (cd "$artifact_dir" && sha256sum shift-monitor-results.csv)
+            (cd "$artifact_dir" && sha256sum shift-monitor-results.csv sentinel-budget-results.csv)
           } > "$artifact_dir/provenance-receipt.txt"
 
       - name: Reject mutated outputs
