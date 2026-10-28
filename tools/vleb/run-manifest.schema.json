@@ -191,7 +191,8 @@
         "platform",
         "immutable_image_id",
         "network_mode",
-        "network_mode_observed"
+        "network_mode_observed",
+        "runner_environment"
       ],
       "properties": {
         "platform": {
@@ -217,6 +218,13 @@
         },
         "network_mode_observed": {
           "const": true
+        },
+        "runner_environment": {
+          "enum": [
+            "github_hosted",
+            "self_hosted",
+            "unknown"
+          ]
         }
       }
     },
@@ -453,6 +461,16 @@
               },
               "provider": {
                 "const": "github_actions_sigstore"
+              }
+            }
+          },
+          "runtime": {
+            "required": [
+              "runner_environment"
+            ],
+            "properties": {
+              "runner_environment": {
+                "const": "github_hosted"
               }
             }
           }
