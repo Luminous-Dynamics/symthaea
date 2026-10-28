@@ -12,6 +12,7 @@ on:
       - "xtask/src/cognitive_drift_compare.rs"
       - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_replay_receipt.rs"
+      - "xtask/src/cognitive_replay_driver.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -32,6 +33,7 @@ on:
       - "xtask/src/cognitive_drift_compare.rs"
       - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_replay_receipt.rs"
+      - "xtask/src/cognitive_replay_driver.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -110,6 +112,8 @@ jobs:
         run: cargo test --locked -p xtask cognitive_drift_baselines
       - name: Test replay receipt validation failure modes
         run: cargo test --locked -p xtask cognitive_replay_receipt
+      - name: Test driver-owned replay timing and evidence boundary
+        run: cargo test --locked -p xtask cognitive_replay_driver
 
       - name: Run the drift scorer CLI against the synthetic fixture
         run: |
