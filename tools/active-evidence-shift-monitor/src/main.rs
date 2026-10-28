@@ -1035,11 +1035,40 @@ mod tests {
                 FAMILY_HORIZON,
                 |n, successes| table[n][successes],
             );
-            assert!(
-                misspecified_baseline.false_alarm_probability > PER_CELL_ALPHA,
-                "family {} hid the declared-p0 misspecification control",
-                family.name()
-            );
+            if family == EProcessFamily::CompositeBandBetting {
+                assert!(
+                    misspecified_baseline.false_alarm_probability <= PER_CELL_ALPHA + EPS,
+                    "composite-null family exceeded alpha inside lower null boundary"
+                );
+                let upper_boundary = evaluate_with_alarm(
+                    0.52,
+                    None,
+                    0,
+                    FAMILY_HORIZON,
+                    |n, successes| table[n][successes],
+                );
+                assert!(
+                    upper_boundary.false_alarm_probability <= PER_CELL_ALPHA + EPS,
+                    "composite-null family exceeded alpha inside upper null boundary"
+                );
+                let outside_band = evaluate_with_alarm(
+                    0.45,
+                    None,
+                    0,
+                    FAMILY_HORIZON,
+                    |n, successes| table[n][successes],
+                );
+                assert!(
+                    outside_band.false_alarm_probability > 0.04,
+                    "composite-null family failed the outside-band control"
+                );
+            } else {
+                assert!(
+                    misspecified_baseline.false_alarm_probability > PER_CELL_ALPHA,
+                    "family {} hid the declared-p0 misspecification control",
+                    family.name()
+                );
+            }
 
             let weak_shift = evaluate_with_alarm(
                 NOMINAL_P,
@@ -1070,6 +1099,28 @@ mod tests {
             portfolio > jeffreys + 0.04,
             "fixed portfolio did not improve weak-shift power in fixture: portfolio={portfolio}, Jeffreys={jeffreys}"
         );
+
+        let boundary_table = family_alarm_table(
+            EProcessFamily::CompositeBandBetting,
+            NOMINAL_P,
+            FAMILY_HORIZON,
+        );
+        let composite_shift_060 = evaluate_with_alarm(
+            NOMINAL_P,
+            Some(0.60),
+            CHANGE_AFTER,
+            FAMILY_HORIZON,
+            |n, successes| boundary_table[n][successes],
+        );
+        let composite_shift_080 = evaluate_with_alarm(
+            NOMINAL_P,
+            Some(0.80),
+            CHANGE_AFTER,
+            FAMILY_HORIZON,
+            |n, successes| boundary_table[n][successes],
+        );
+        assert!(composite_shift_060.detection_probability > 0.70);
+        assert!(composite_shift_080.detection_probability > 0.99);
 
         let individual_log_values = [
             beta_mixture_log_e_value_with_prior(2, 1, NOMINAL_P, 0.5, 0.5),
