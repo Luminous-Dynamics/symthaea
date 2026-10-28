@@ -356,6 +356,7 @@ struct PowerReport {
     weak_null_false_claim_probability_upper_simultaneous_95_max: Option<f64>,
     estimated_power_at_20pp_and_icc_020: Option<f64>,
     estimated_power_at_20pp_and_icc_020_lower_95: Option<f64>,
+    estimated_power_at_20pp_and_icc_020_lower_simultaneous_95: Option<f64>,
     power_gate_passed: bool,
     scenarios: Vec<PowerScenario>,
     model_assumptions: Vec<String>,
