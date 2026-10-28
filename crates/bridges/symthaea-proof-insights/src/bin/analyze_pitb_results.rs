@@ -698,11 +698,11 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         && weak_null_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
-        "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20 and the zero-effect false-claim scenario. This is a design-planning result, not evidence that insight transfer succeeds."
+        "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20, the strict-null scenarios, and the family-heterogeneous weak-null grid. This is a design-planning result, not evidence that insight transfer succeeds."
     } else if family_target_counts.len() < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
         "The validation-derived eligible sample has fewer than 20 independent families. The design is underpowered by the frozen project floor and cannot support a confirmatory claim."
     } else {
-        "The simulated design did not meet all preregistered power-planning gates, or the +20pp scenario was infeasible at the observed baseline. Expand the separately sourced eligible set or report the eventual experiment as a pilot; do not lower the gates."
+        "The simulated design did not meet the power gate, strict-null calibration, or family-heterogeneous weak-null false-claim gate, or the +20pp scenario was infeasible at the observed baseline. Expand the separately sourced eligible set or report the eventual experiment as a pilot; do not lower the gates."
     }
     .to_string();
 
@@ -758,7 +758,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     serialized.push(b'\n');
     fs::write(out_path, serialized).with_context(|| format!("write power report to {out_path}"))?;
     println!(
-        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} lower95={} null_false_claim_upper95={} gate={}",
+        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} lower95={} strict_null_false_claim_upper95={} weak_null_false_claim_upper95={} gate={}",
         report.selected_baseline_arm,
         report.eligible_validation_target_count,
         report.eligible_validation_family_count,
@@ -775,6 +775,10 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             .unwrap_or_else(|| "unestimated".to_string()),
         report
             .null_effect_false_claim_probability_upper_95_max
+            .map(|value| format!("{value:.3}"))
+            .unwrap_or_else(|| "unestimated".to_string()),
+        report
+            .weak_null_false_claim_probability_upper_95_max
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
         if report.power_gate_passed {
@@ -2992,7 +2996,7 @@ mod tests {
         assert!(effects
             .iter()
             .zip(&baseline_rates)
-            .all(|(effect, baseline)| (0.0..=1.0).contains(&(baseline + effect))));
+            .all(|(effect, baseline)| (0.0..=1.0).contains(&(*baseline + *effect))));
         let realized_sd = weighted_family_effect_sd(&effects, &family_target_counts);
         assert!(realized_sd > 0.0);
         assert!(realized_sd <= 0.20 + 1e-12);
