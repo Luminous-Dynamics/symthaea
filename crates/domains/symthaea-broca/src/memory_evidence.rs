@@ -45,6 +45,8 @@ pub struct EvidenceSource {
     pub step_index: Option<u64>,
     /// SHA-256 of the exact canonical source bytes emitted by the ingestion adapter.
     pub source_sha256: String,
+    /// RFC 6901 JSON Pointer to the exact string payload inside the source trajectory.
+    pub source_pointer: String,
 }
 
 /// Evidence linked to the numeric ID used by an HDC candidate index.
@@ -158,6 +160,11 @@ impl EvidenceRecord {
         if !is_sha256(&self.source.source_sha256) {
             return Err("source_sha256 must be 64 lowercase hexadecimal characters".into());
         }
+        if !self.source.source_pointer.starts_with('/')
+            || self.source.source_pointer.trim() == "/"
+        {
+            return Err("source_pointer must identify a non-root JSON value".into());
+        }
         if !is_sha256(&self.content_sha256) {
             return Err("content_sha256 must be 64 lowercase hexadecimal characters".into());
         }
@@ -206,6 +213,19 @@ impl EvidenceRecord {
         self.validate()?;
         if sha256_hex(source_bytes) != self.source.source_sha256 {
             return Err("source_sha256 mismatch".into());
+        }
+        let source_json: serde_json::Value = serde_json::from_slice(source_bytes)
+            .map_err(|error| format!("source bytes are not valid JSON: {error}"))?;
+        let source_value = source_json
+            .pointer(&self.source.source_pointer)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "source_pointer must resolve to a string value".to_string())?;
+        let expected_value = match &self.payload {
+            EvidencePayload::Text { value } => value.as_str(),
+            EvidencePayload::Image { path } => path.as_str(),
+        };
+        if source_value != expected_value {
+            return Err("payload does not match the source string at source_pointer".into());
         }
         Ok(())
     }
@@ -271,7 +291,13 @@ impl EvidenceIndex {
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
-        // Verify provenance before the record enters the candidate resolver.
+        // New ingestion must begin active. Restore of durable tombstones should use
+        // a separately validated persistence-recovery path, not ordinary insert.
+        if record.lifecycle != EvidenceLifecycle::Active {
+            return Err("new evidence must enter with active lifecycle".into());
+        }
+        // Verify source bytes and the exact string selected by source_pointer
+        // before the record enters the candidate resolver.
         record.verify_source_bytes(source_bytes)?;
         if self.records.contains_key(&record.hdc_id) {
             return Err("duplicate hdc_id; use an explicit lifecycle transition".into());
@@ -551,7 +577,12 @@ mod tests {
         sha256_hex(bytes)
     }
 
+    fn source_bytes_for_text(text: &str) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({"evidence": text})).unwrap()
+    }
+
     fn text_record(id: u64, evidence_id: &str, scope: &str, text: &str) -> EvidenceRecord {
+        let source_bytes = source_bytes_for_text(text);
         EvidenceRecord {
             schema_version: EVIDENCE_SCHEMA_VERSION.to_string(),
             evidence_id: evidence_id.to_string(),
@@ -561,7 +592,8 @@ mod tests {
                 trajectory_id: "trajectory-001".to_string(),
                 step_id: Some("step-4".to_string()),
                 step_index: Some(4),
-                source_sha256: hash(b"canonical trajectory bytes"),
+                source_sha256: hash(&source_bytes),
+                source_pointer: "/evidence".to_string(),
             },
             payload: EvidencePayload::Text { value: text.to_string() },
             content_sha256: hash(text.as_bytes()),
@@ -578,7 +610,7 @@ mod tests {
         index
             .insert(
                 text_record(id, &format!("evidence-{id}"), scope, text),
-                b"canonical trajectory bytes",
+                &source_bytes_for_text(text),
             )
             .unwrap();
     }
@@ -669,12 +701,35 @@ mod tests {
 
         let mut corrupt = text_record(2, "corrupt-evidence", "web", "invoice route");
         corrupt.content_sha256 = hash(b"tampered text");
-        index.insert(corrupt, b"canonical trajectory bytes").unwrap();
+        index.insert(corrupt, &source_bytes_for_text("invoice route")).unwrap();
         assert!(index
             .search_bm25("invoice", "web", 150, Path::new("."), Bm25Config::default())
             .is_err());
     }
 
+
+    #[test]
+    fn rejects_payload_not_present_at_its_source_pointer() {
+        let mut index = EvidenceIndex::new();
+        let record = text_record(21, "evidence-source-pointer", "web", "trusted source string");
+        let mismatched_source = serde_json::to_vec(&serde_json::json!({
+            "evidence": "different string"
+        })).unwrap();
+        assert!(index.insert(record.clone(), &mismatched_source).is_err());
+        assert!(index
+            .insert(record, &source_bytes_for_text("trusted source string"))
+            .is_ok());
+    }
+
+    #[test]
+    fn ordinary_insert_rejects_pre_revoked_or_deleted_records() {
+        let mut index = EvidenceIndex::new();
+        let mut record = text_record(22, "evidence-revoked", "web", "blocked evidence");
+        record.lifecycle = EvidenceLifecycle::Revoked;
+        assert!(index
+            .insert(record, &source_bytes_for_text("blocked evidence"))
+            .is_err());
+    }
     #[test]
     fn serializes_context_items_to_official_type_value_shape() {
         let item = MemoryContextItem {
@@ -690,8 +745,8 @@ mod tests {
     #[test]
     fn resolves_text_with_digest_and_preserves_hit_order() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-a", "web", "cart icon opens cart"), b"canonical trajectory bytes").unwrap();
-        index.insert(text_record(8, "evidence-b", "web", "checkout uses address panel"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(7, "evidence-a", "web", "cart icon opens cart"), &source_bytes_for_text("cart icon opens cart")).unwrap();
+        index.insert(text_record(8, "evidence-b", "web", "checkout uses address panel"), &source_bytes_for_text("checkout uses address panel")).unwrap();
         let items = index.resolve(&[8, 7, 8, 404], "web", 150, Path::new("."), 3).unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].value, "checkout uses address panel");
@@ -705,7 +760,7 @@ mod tests {
         let mut record = text_record(7, "evidence-a", "enterprise", "admin panel uses roles");
         record.valid_from_unix_ms = Some(200);
         record.valid_until_unix_ms = Some(300);
-        index.insert(record, b"canonical trajectory bytes").unwrap();
+        index.insert(record, &source_bytes_for_text("admin panel uses roles")).unwrap();
         assert!(index.resolve(&[7], "web", 250, Path::new("."), 10).unwrap().is_empty());
         assert!(index.resolve(&[7], "enterprise", 199, Path::new("."), 10).unwrap().is_empty());
         assert!(index.resolve(&[7], "enterprise", 300, Path::new("."), 10).unwrap().is_empty());
@@ -715,28 +770,28 @@ mod tests {
     #[test]
     fn revoked_and_deleted_records_never_resolve_or_reinsert() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-a", "web", "old route"), b"canonical trajectory bytes").unwrap();
-        index.insert(text_record(8, "evidence-b", "web", "new route"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(7, "evidence-a", "web", "old route"), &source_bytes_for_text("old route")).unwrap();
+        index.insert(text_record(8, "evidence-b", "web", "new route"), &source_bytes_for_text("new route")).unwrap();
         index.revoke(7).unwrap();
         index.mark_deleted(8).unwrap();
         assert!(index.resolve(&[7, 8], "web", 150, Path::new("."), 10).unwrap().is_empty());
-        assert!(index.insert(text_record(7, "evidence-c", "web", "resurrected route"), b"canonical trajectory bytes").is_err());
+        assert!(index.insert(text_record(7, "evidence-c", "web", "resurrected route"), &source_bytes_for_text("resurrected route")).is_err());
         assert!(index.revoke(8).is_err());
     }
 
     #[test]
     fn supersession_hides_old_record_and_requires_same_scope() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-old", "web", "old selector"), b"canonical trajectory bytes").unwrap();
-        index.insert(text_record(8, "evidence-new", "web", "new selector"), b"canonical trajectory bytes").unwrap();
+        index.insert(text_record(7, "evidence-old", "web", "old selector"), &source_bytes_for_text("old selector")).unwrap();
+        index.insert(text_record(8, "evidence-new", "web", "new selector"), &source_bytes_for_text("new selector")).unwrap();
         index.supersede(7, 8).unwrap();
         let items = index.resolve(&[7, 8], "web", 150, Path::new("."), 10).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].value, "new selector");
 
         let mut other = EvidenceIndex::new();
-        other.insert(text_record(1, "web-record", "web", "web payload"), b"canonical trajectory bytes").unwrap();
-        other.insert(text_record(2, "enterprise-record", "enterprise", "enterprise payload"), b"canonical trajectory bytes").unwrap();
+        other.insert(text_record(1, "web-record", "web", "web payload"), &source_bytes_for_text("web payload")).unwrap();
+        other.insert(text_record(2, "enterprise-record", "enterprise", "enterprise payload"), &source_bytes_for_text("enterprise payload")).unwrap();
         assert!(other.supersede(1, 2).is_err());
     }
 
@@ -746,15 +801,15 @@ mod tests {
         let record = text_record(9, "evidence-provenance", "web", "source-bound evidence");
         assert!(index.insert(record.clone(), b"tampered source bytes").is_err());
         // A failed insert must not reserve either ID.
-        assert!(index.insert(record, b"canonical trajectory bytes").is_ok());
+        assert!(index.insert(record, &source_bytes_for_text("source-bound evidence")).is_ok());
     }
 
     #[test]
     fn refuses_duplicate_vector_and_evidence_ids() {
         let mut index = EvidenceIndex::new();
-        index.insert(text_record(7, "evidence-a", "web", "payload"), b"canonical trajectory bytes").unwrap();
-        assert!(index.insert(text_record(7, "evidence-b", "web", "other payload"), b"canonical trajectory bytes").is_err());
-        assert!(index.insert(text_record(8, "evidence-a", "web", "other payload"), b"canonical trajectory bytes").is_err());
+        index.insert(text_record(7, "evidence-a", "web", "payload"), &source_bytes_for_text("payload")).unwrap();
+        assert!(index.insert(text_record(7, "evidence-b", "web", "other payload"), &source_bytes_for_text("other payload")).is_err());
+        assert!(index.insert(text_record(8, "evidence-a", "web", "other payload"), &source_bytes_for_text("other payload")).is_err());
     }
 
     #[test]
@@ -762,7 +817,7 @@ mod tests {
         let mut index = EvidenceIndex::new();
         let mut record = text_record(7, "evidence-a", "web", "trusted text");
         record.content_sha256 = hash(b"different text");
-        index.insert(record, b"canonical trajectory bytes").unwrap();
+        index.insert(record, &source_bytes_for_text("trusted text")).unwrap();
         assert!(index.resolve(&[7], "web", 150, Path::new("."), 10).is_err());
     }
 
