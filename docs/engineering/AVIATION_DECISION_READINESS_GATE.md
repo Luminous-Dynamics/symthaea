@@ -47,4 +47,4 @@ This is an integration/evidence architecture, not a new flight optimizer. Robust
 
 Ten unit tests are defined for the composition function. They have not been compiled or run in this environment due to missing `cargo` and `rustc`. Passing the synthetic composition tests does not establish runtime integration, data authenticity, airline cost savings, safety certification or regulatory compliance.
 
-Follow-up: [AVIATION-ENTERPRISE-012 #8804](https://github.com/Luminous-Dynamics/symthaea/issues/8804).
+Follow-up: [AVIATION-ENTERPRISE-012 #8798](https://github.com/Luminous-Dynamics/symthaea/issues/8804).
