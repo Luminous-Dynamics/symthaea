@@ -9,6 +9,12 @@
 //! This is an evidence-accounting contract, not a solver and not a statistical
 //! significance procedure. Trial pairs on one graph are repeated measurements;
 //! graph-level generalization must be assessed across independent instances.
+//!
+//! A verified disposition must carry content-addressed candidate and verifier
+//! receipt references whose parsed metadata matches the report. This module does
+//! not fetch receipt bytes or authenticate a receipt signature; the ingestion
+//! boundary must independently validate the receipt artifact before constructing
+//! the reference.
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -234,6 +240,31 @@ pub enum CandidateVerification {
     VerificationFailed,
 }
 
+/// Metadata extracted from an independently validated verifier-receipt artifact.
+///
+/// The digest identifies the immutable receipt bytes. This evaluator checks that
+/// the receipt metadata agrees with the candidate/report but does not fetch those
+/// bytes or authenticate their signature; receipt ingestion must do that first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifierReceiptEvidence {
+    /// SHA-256 of the canonical verifier receipt bytes.
+    pub receipt_sha256: String,
+    /// SHA-256 of the canonical original graph bytes covered by the receipt.
+    pub instance_sha256: String,
+    /// SHA-256 of the verifier build/source that produced the receipt.
+    pub verifier_sha256: String,
+    /// SHA-256 of the exact candidate bytes covered by the receipt.
+    pub candidate_sha256: String,
+    /// Frozen MIS target cardinality covered by the receipt.
+    pub target_size: usize,
+    /// Candidate cardinality covered by the receipt.
+    pub candidate_size: usize,
+    /// Conflict count produced by the verifier; None when no count was returned.
+    pub conflict_count: Option<usize>,
+    /// Verification disposition recorded by the verifier.
+    pub verdict: CandidateVerification,
+}
+
 /// One attempted solver run, including failed and unverified outcomes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchedTrialRecord {
@@ -247,6 +278,10 @@ pub struct MatchedTrialRecord {
     pub termination: TrialTermination,
     /// Candidate size / objective value when available. For MIS this is cardinality.
     pub candidate_size: Option<usize>,
+    /// SHA-256 of the exact candidate bytes, if a candidate was returned.
+    pub candidate_sha256: Option<String>,
+    /// Content-addressed evidence from the independent verifier, when available.
+    pub verifier_receipt: Option<VerifierReceiptEvidence>,
     /// Independent verification outcome.
     pub verification: CandidateVerification,
     /// Number of graph-edge conflicts reported by the verifier, if available.
@@ -258,14 +293,44 @@ pub struct MatchedTrialRecord {
 }
 
 impl MatchedTrialRecord {
-    /// True only when independent feasibility was confirmed and the target is met.
+    /// True only when candidate and receipt references consistently attest a target hit.
+    ///
+    /// The report-level validator additionally binds the receipt to the report's
+    /// graph and verifier digests before a comparison is accepted.
     pub fn verified_target_hit(&self, target_size: usize) -> bool {
-        self.verification == CandidateVerification::VerifiedIndependentSet
-            && self.conflict_count == Some(0)
-            && self.candidate_size.is_some_and(|size| size >= target_size)
+        if self.verification != CandidateVerification::VerifiedIndependentSet
+            || self.conflict_count != Some(0)
+        {
+            return false;
+        }
+        let Some(size) = self.candidate_size else {
+            return false;
+        };
+        let Some(candidate_sha256) = self.candidate_sha256.as_deref() else {
+            return false;
+        };
+        let Some(receipt) = self.verifier_receipt.as_ref() else {
+            return false;
+        };
+        size >= target_size
+            && validate_sha256("candidate_sha256", candidate_sha256).is_ok()
+            && validate_sha256("verifier_receipt_sha256", &receipt.receipt_sha256).is_ok()
+            && validate_sha256("receipt_instance_sha256", &receipt.instance_sha256).is_ok()
+            && validate_sha256("receipt_verifier_sha256", &receipt.verifier_sha256).is_ok()
+            && validate_sha256("receipt_candidate_sha256", &receipt.candidate_sha256).is_ok()
+            && receipt.verdict == CandidateVerification::VerifiedIndependentSet
+            && receipt.target_size == target_size
+            && receipt.candidate_size == size
+            && receipt.conflict_count == Some(0)
+            && receipt.candidate_sha256 == candidate_sha256
     }
 
-    fn validate(&self) -> Result<(), MatchedEvaluationError> {
+    fn validate(
+        &self,
+        instance_sha256: &str,
+        target_size: usize,
+        verifier_sha256: &str,
+    ) -> Result<(), MatchedEvaluationError> {
         if self.trial_id.trim().is_empty() {
             return Err(MatchedEvaluationError::EmptyTrialId);
         }
@@ -275,15 +340,44 @@ impl MatchedTrialRecord {
 
         match self.verification {
             CandidateVerification::NotReturned => {
-                if self.candidate_size.is_some() || self.conflict_count.is_some() {
+                if self.candidate_size.is_some()
+                    || self.candidate_sha256.is_some()
+                    || self.verifier_receipt.is_some()
+                    || self.conflict_count.is_some()
+                {
                     return Err(MatchedEvaluationError::InconsistentCandidateRecord(
                         self.trial_id.clone(),
                     ));
                 }
             }
-            CandidateVerification::Unverified | CandidateVerification::VerificationFailed => {
+            CandidateVerification::Unverified => {
+                if self.candidate_size.is_none()
+                    || self.conflict_count.is_some()
+                    || self.verifier_receipt.is_some()
+                {
+                    return Err(MatchedEvaluationError::InconsistentCandidateRecord(
+                        self.trial_id.clone(),
+                    ));
+                }
+                if self.candidate_sha256.is_none() {
+                    return Err(MatchedEvaluationError::MissingCandidateDigest(
+                        self.trial_id.clone(),
+                    ));
+                }
+            }
+            CandidateVerification::VerificationFailed => {
                 if self.candidate_size.is_none() || self.conflict_count.is_some() {
                     return Err(MatchedEvaluationError::InconsistentCandidateRecord(
+                        self.trial_id.clone(),
+                    ));
+                }
+                if self.candidate_sha256.is_none() {
+                    return Err(MatchedEvaluationError::MissingCandidateDigest(
+                        self.trial_id.clone(),
+                    ));
+                }
+                if self.verifier_receipt.is_none() {
+                    return Err(MatchedEvaluationError::MissingVerifierReceipt(
                         self.trial_id.clone(),
                     ));
                 }
@@ -291,6 +385,16 @@ impl MatchedTrialRecord {
             CandidateVerification::VerifiedIndependentSet => {
                 if self.candidate_size.is_none() || self.conflict_count != Some(0) {
                     return Err(MatchedEvaluationError::InconsistentCandidateRecord(
+                        self.trial_id.clone(),
+                    ));
+                }
+                if self.candidate_sha256.is_none() {
+                    return Err(MatchedEvaluationError::MissingCandidateDigest(
+                        self.trial_id.clone(),
+                    ));
+                }
+                if self.verifier_receipt.is_none() {
+                    return Err(MatchedEvaluationError::MissingVerifierReceipt(
                         self.trial_id.clone(),
                     ));
                 }
@@ -302,6 +406,49 @@ impl MatchedTrialRecord {
                     return Err(MatchedEvaluationError::InconsistentCandidateRecord(
                         self.trial_id.clone(),
                     ));
+                }
+                if self.candidate_sha256.is_none() {
+                    return Err(MatchedEvaluationError::MissingCandidateDigest(
+                        self.trial_id.clone(),
+                    ));
+                }
+                if self.verifier_receipt.is_none() {
+                    return Err(MatchedEvaluationError::MissingVerifierReceipt(
+                        self.trial_id.clone(),
+                    ));
+                }
+            }
+        }
+
+        if let Some(candidate_sha256) = self.candidate_sha256.as_deref() {
+            validate_sha256("candidate_sha256", candidate_sha256)?;
+        }
+        if let Some(receipt) = self.verifier_receipt.as_ref() {
+            validate_sha256("verifier_receipt_sha256", &receipt.receipt_sha256)?;
+            validate_sha256("receipt_instance_sha256", &receipt.instance_sha256)?;
+            validate_sha256("receipt_verifier_sha256", &receipt.verifier_sha256)?;
+            validate_sha256("receipt_candidate_sha256", &receipt.candidate_sha256)?;
+
+            let candidate_sha256 = self.candidate_sha256.as_deref().ok_or_else(|| {
+                MatchedEvaluationError::MissingCandidateDigest(self.trial_id.clone())
+            })?;
+            let candidate_size = self.candidate_size.ok_or_else(|| {
+                MatchedEvaluationError::InconsistentCandidateRecord(self.trial_id.clone())
+            })?;
+            for (field, matches) in [
+                ("instance_sha256", receipt.instance_sha256 == instance_sha256),
+                ("verifier_sha256", receipt.verifier_sha256 == verifier_sha256),
+                ("candidate_sha256", receipt.candidate_sha256 == candidate_sha256),
+                ("target_size", receipt.target_size == target_size),
+                ("candidate_size", receipt.candidate_size == candidate_size),
+                ("conflict_count", receipt.conflict_count == self.conflict_count),
+                ("verdict", receipt.verdict == self.verification),
+            ] {
+                if !matches {
+                    return Err(MatchedEvaluationError::VerifierReceiptMismatch {
+                        trial_id: self.trial_id.clone(),
+                        field,
+                    });
                 }
             }
         }
@@ -374,7 +521,7 @@ impl MatchedArmReport {
         let mut trial_ids = HashSet::with_capacity(self.trials.len());
         let mut pair_ids = HashSet::with_capacity(self.trials.len());
         for trial in &self.trials {
-            trial.validate()?;
+            trial.validate(&self.instance_sha256, self.target_size, &self.verifier_sha256)?;
             if !trial_ids.insert(trial.trial_id.clone()) {
                 return Err(MatchedEvaluationError::DuplicateTrialId(
                     trial.trial_id.clone(),
@@ -521,6 +668,12 @@ pub enum MatchedEvaluationError {
     DuplicatePairId { arm_id: String, pair_id: String },
     /// Candidate size and verification fields are inconsistent.
     InconsistentCandidateRecord(String),
+    /// Candidate bytes were returned without a content digest.
+    MissingCandidateDigest(String),
+    /// A verifier-derived disposition lacks its content-addressed receipt.
+    MissingVerifierReceipt(String),
+    /// Receipt metadata does not match the graph, verifier, candidate, target, or verdict.
+    VerifierReceiptMismatch { trial_id: String, field: &'static str },
     /// A stage cost is negative or non-finite.
     InvalidStageCost { trial_id: String, stage: &'static str, value: f64 },
     /// Complete all-in measured cost is non-finite or non-positive.
@@ -573,6 +726,15 @@ impl fmt::Display for MatchedEvaluationError {
             }
             Self::InconsistentCandidateRecord(id) => {
                 write!(f, "trial {id} has inconsistent candidate-verification fields")
+            }
+            Self::MissingCandidateDigest(id) => {
+                write!(f, "trial {id} lacks the candidate SHA-256 digest")
+            }
+            Self::MissingVerifierReceipt(id) => {
+                write!(f, "trial {id} lacks the independent verifier receipt")
+            }
+            Self::VerifierReceiptMismatch { trial_id, field } => {
+                write!(f, "trial {trial_id} verifier receipt mismatches {field}")
             }
             Self::InvalidStageCost { trial_id, stage, value } => {
                 write!(f, "trial {trial_id} has invalid {stage} value {value}")
@@ -899,12 +1061,25 @@ mod tests {
         stage_costs: StageCostsMs,
         energy: EnergyRecord,
     ) -> MatchedTrialRecord {
+        let candidate_sha256 = "1".repeat(64);
+        let verifier_receipt = VerifierReceiptEvidence {
+            receipt_sha256: "2".repeat(64),
+            instance_sha256: "a".repeat(64),
+            verifier_sha256: "c".repeat(64),
+            candidate_sha256: candidate_sha256.clone(),
+            target_size: 5,
+            candidate_size: size,
+            conflict_count: Some(0),
+            verdict: CandidateVerification::VerifiedIndependentSet,
+        };
         MatchedTrialRecord {
             trial_id: id.to_owned(),
             pair_id: pair.to_owned(),
             seed,
             termination: TrialTermination::Completed,
             candidate_size: Some(size),
+            candidate_sha256: Some(candidate_sha256),
+            verifier_receipt: Some(verifier_receipt),
             verification: CandidateVerification::VerifiedIndependentSet,
             conflict_count: Some(0),
             costs: stage_costs,
@@ -953,6 +1128,8 @@ mod tests {
                     seed: 2,
                     termination: TrialTermination::TimedOut,
                     candidate_size: None,
+                    candidate_sha256: None,
+                    verifier_receipt: None,
                     verification: CandidateVerification::NotReturned,
                     conflict_count: None,
                     costs: costs(1_000.0),
@@ -1055,6 +1232,8 @@ mod tests {
                 seed: 1,
                 termination: TrialTermination::Completed,
                 candidate_size: Some(99),
+                candidate_sha256: Some("9".repeat(64)),
+                verifier_receipt: None,
                 verification: CandidateVerification::Unverified,
                 conflict_count: None,
                 costs: costs(1.0),
@@ -1121,21 +1300,31 @@ mod tests {
             vec![verified_trial("c", "pair-1", 1, 5, costs(50.0), EnergyRecord::not_measured())],
         );
         candidate.instance_sha256 = "9".repeat(64);
+        candidate.trials[0].verifier_receipt.as_mut().unwrap().instance_sha256 =
+            candidate.instance_sha256.clone();
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::InstanceMismatch)));
 
         candidate.instance_sha256 = baseline.instance_sha256.clone();
+        candidate.trials[0].verifier_receipt.as_mut().unwrap().instance_sha256 =
+            candidate.instance_sha256.clone();
         candidate.target_size = 6;
+        candidate.trials[0].verifier_receipt.as_mut().unwrap().target_size = 6;
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::TargetMismatch)));
 
         candidate.target_size = 5;
+        candidate.trials[0].verifier_receipt.as_mut().unwrap().target_size = 5;
         candidate.per_trial_solver_budget_ms = 999.0;
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::SolverBudgetMismatch)));
 
         candidate.per_trial_solver_budget_ms = baseline.per_trial_solver_budget_ms;
         candidate.verifier_sha256 = "8".repeat(64);
+        candidate.trials[0].verifier_receipt.as_mut().unwrap().verifier_sha256 =
+            candidate.verifier_sha256.clone();
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::VerifierMismatch)));
 
         candidate.verifier_sha256 = baseline.verifier_sha256.clone();
+        candidate.trials[0].verifier_receipt.as_mut().unwrap().verifier_sha256 =
+            candidate.verifier_sha256.clone();
         candidate.trials[0].pair_id = "other-pair".into();
         assert!(matches!(compare_matched_arms(&baseline, &candidate, 0.0), Err(MatchedEvaluationError::PairSetMismatch)));
     }
@@ -1170,6 +1359,52 @@ mod tests {
         assert!(matches!(
             bad_zero.validate(),
             Err(MatchedEvaluationError::InvalidAllInCost { .. })
+        ));
+    }
+
+
+    #[test]
+    fn verified_target_requires_content_addressed_receipt_bound_to_report_and_candidate() {
+        let good = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "pair", 1, 5, costs(100.0), EnergyRecord::not_measured())],
+        );
+        assert!(good.trials[0].verified_target_hit(5));
+
+        let mut missing_receipt = good.clone();
+        missing_receipt.trials[0].verifier_receipt = None;
+        assert!(matches!(
+            missing_receipt.validate(),
+            Err(MatchedEvaluationError::MissingVerifierReceipt(_))
+        ));
+
+        let mut invalid_digest = good.clone();
+        invalid_digest.trials[0].verifier_receipt.as_mut().unwrap().receipt_sha256 = "not-a-sha".into();
+        assert!(matches!(
+            invalid_digest.validate(),
+            Err(MatchedEvaluationError::InvalidSha256 { field: "verifier_receipt_sha256" })
+        ));
+
+        let mut wrong_candidate = good.clone();
+        wrong_candidate.trials[0].verifier_receipt.as_mut().unwrap().candidate_sha256 = "3".repeat(64);
+        assert!(matches!(
+            wrong_candidate.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "candidate_sha256", .. })
+        ));
+
+        let mut wrong_verifier = good.clone();
+        wrong_verifier.trials[0].verifier_receipt.as_mut().unwrap().verifier_sha256 = "4".repeat(64);
+        assert!(matches!(
+            wrong_verifier.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "verifier_sha256", .. })
+        ));
+
+        let mut wrong_instance = good.clone();
+        wrong_instance.trials[0].verifier_receipt.as_mut().unwrap().instance_sha256 = "5".repeat(64);
+        assert!(matches!(
+            wrong_instance.validate(),
+            Err(MatchedEvaluationError::VerifierReceiptMismatch { field: "instance_sha256", .. })
         ));
     }
 
