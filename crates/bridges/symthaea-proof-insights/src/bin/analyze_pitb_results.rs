@@ -3165,6 +3165,52 @@ mod tests {
     }
 
     #[test]
+    fn joint_success_probability_interpolates_independence_to_frechet_upper_bound() {
+        let baseline = 0.25;
+        let treatment = 0.45;
+        let independent = joint_success_probability_at_association(baseline, treatment, 0.0)
+            .expect("independent coupling should be valid");
+        let middle = joint_success_probability_at_association(baseline, treatment, 0.5)
+            .expect("intermediate coupling should be valid");
+        let maximal = joint_success_probability_at_association(baseline, treatment, 1.0)
+            .expect("upper Frechet coupling should be valid");
+        assert!((independent - baseline * treatment).abs() < 1e-12);
+        assert!((middle - (baseline * treatment + 0.5 * (baseline.min(treatment) - baseline * treatment))).abs() < 1e-12);
+        assert!((maximal - baseline.min(treatment)).abs() < 1e-12);
+        assert!(joint_success_probability_at_association(baseline, treatment, -0.1).is_err());
+        assert!(joint_success_probability_at_association(baseline, treatment, 1.1).is_err());
+    }
+
+    #[test]
+    fn paired_bernoulli_sampler_preserves_both_marginals_and_joint_success_probability() {
+        let baseline = 0.25;
+        let treatment = 0.45;
+        for (index, association) in [0.0_f64, 0.5, 0.9].into_iter().enumerate() {
+            let joint = joint_success_probability_at_association(baseline, treatment, association)
+                .expect("registered association fraction should be valid");
+            let mut rng = SplitMix64 { state: 20261028 + index as u64 };
+            let trials = 60_000usize;
+            let mut baseline_successes = 0usize;
+            let mut treatment_successes = 0usize;
+            let mut joint_successes = 0usize;
+            for _ in 0..trials {
+                let (base, treated) = sample_paired_bernoulli_from_joint_probability(
+                    baseline, treatment, joint, &mut rng,
+                );
+                baseline_successes += usize::from(base);
+                treatment_successes += usize::from(treated);
+                joint_successes += usize::from(base && treated);
+            }
+            let empirical_base = baseline_successes as f64 / trials as f64;
+            let empirical_treatment = treatment_successes as f64 / trials as f64;
+            let empirical_joint = joint_successes as f64 / trials as f64;
+            assert!((empirical_base - baseline).abs() < 0.01);
+            assert!((empirical_treatment - treatment).abs() < 0.01);
+            assert!((empirical_joint - joint).abs() < 0.01);
+        }
+    }
+
+    #[test]
     fn weak_null_calibration_replays_deterministically_and_counts_degenerate_intervals() {
         let families: Vec<FamilyTargetCount> = (0..24)
             .map(|index| FamilyTargetCount {
