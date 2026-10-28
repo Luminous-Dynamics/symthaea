@@ -68,6 +68,9 @@ impl EnergyRecord {
 /// unknown. Zero must never be used as a placeholder for missing data.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StageCostsMs {
+    /// External queue wait before a solver or sampler becomes available.
+    /// Some(0.0) means measured or known not to apply; None means unknown.
+    pub queue_wait_ms: Option<f64>,
     /// Trajectory acquisition / device execution.
     pub acquisition_ms: Option<f64>,
     /// Graph reading, canonicalization, and preprocessing.
@@ -91,6 +94,7 @@ pub struct StageCostsMs {
 impl StageCostsMs {
     fn values(&self) -> [Option<f64>; 9] {
         [
+            self.queue_wait_ms,
             self.acquisition_ms,
             self.preprocessing_ms,
             self.feature_extraction_ms,
@@ -120,8 +124,45 @@ impl StageCostsMs {
         Some(values.into_iter().flatten().sum())
     }
 
+    /// Runtime used for normalized algorithm comparisons. Excludes queue wait and
+    /// amortized compilation/initialization, following common benchmark reporting
+    /// conventions. Returns None if any included algorithm stage is unknown.
+    pub fn algorithm_runtime_ms(&self) -> Option<f64> {
+        let values = [
+            self.acquisition_ms,
+            self.preprocessing_ms,
+            self.feature_extraction_ms,
+            self.transfer_ms,
+            self.solve_ms,
+            self.repair_ms,
+            self.verification_ms,
+            self.receipt_ms,
+        ];
+        if values.iter().any(Option::is_none) {
+            return None;
+        }
+        Some(values.into_iter().flatten().sum())
+    }
+
+    /// True when every stage used by algorithm_runtime_ms is measured.
+    pub fn is_algorithm_runtime_complete(&self) -> bool {
+        [
+            self.acquisition_ms,
+            self.preprocessing_ms,
+            self.feature_extraction_ms,
+            self.transfer_ms,
+            self.solve_ms,
+            self.repair_ms,
+            self.verification_ms,
+            self.receipt_ms,
+        ]
+        .iter()
+        .all(Option::is_some)
+    }
+
     fn validate(&self, trial_id: &str) -> Result<(), MatchedEvaluationError> {
         for (stage, value) in [
+            ("queue_wait_ms", self.queue_wait_ms),
             ("acquisition_ms", self.acquisition_ms),
             ("preprocessing_ms", self.preprocessing_ms),
             ("feature_extraction_ms", self.feature_extraction_ms),
@@ -149,6 +190,15 @@ impl StageCostsMs {
                 return Err(MatchedEvaluationError::InvalidAllInCost {
                     trial_id: trial_id.to_owned(),
                     value: total,
+                });
+            }
+        }
+        if self.is_algorithm_runtime_complete() {
+            let runtime = self.algorithm_runtime_ms().unwrap_or(f64::NAN);
+            if !runtime.is_finite() || runtime <= 0.0 {
+                return Err(MatchedEvaluationError::InvalidAlgorithmRuntime {
+                    trial_id: trial_id.to_owned(),
+                    value: runtime,
                 });
             }
         }
@@ -361,15 +411,24 @@ pub struct MatchedPairResult {
     pub baseline_target_hit: bool,
     /// Whether the candidate independently verified a target hit.
     pub candidate_target_hit: bool,
-    /// Baseline all-in wall time, only when all stages were measured.
+    /// Baseline all-in deployment latency including queue and amortized compile.
+    /// Only available when all stages were measured.
     pub baseline_all_in_ms: Option<f64>,
-    /// Candidate all-in wall time, only when all stages were measured.
+    /// Candidate all-in deployment latency including queue and amortized compile.
+    /// Only available when all stages were measured.
     pub candidate_all_in_ms: Option<f64>,
+    /// Baseline standardized algorithm runtime excluding queue and compile.
+    pub baseline_algorithm_runtime_ms: Option<f64>,
+    /// Candidate standardized algorithm runtime excluding queue and compile.
+    pub candidate_algorithm_runtime_ms: Option<f64>,
     /// Baseline time divided by candidate time; only when both hit the target and
     /// both complete all-in costs are available.
     pub time_speedup_baseline_over_candidate: Option<f64>,
-    /// Time winner when both methods hit the target and have complete costs.
+    /// Time winner when both methods hit the target and have complete all-in costs.
     pub time_winner: Option<TimeWinner>,
+    /// Baseline/candidate algorithm-runtime ratio, only for both-hit pairs where
+    /// all included algorithm stages are measured. This is distinct from all-in.
+    pub algorithm_runtime_speedup_baseline_over_candidate: Option<f64>,
     /// Baseline energy joules, if measured.
     pub baseline_energy_joules: Option<f64>,
     /// Candidate energy joules, if measured.
@@ -406,8 +465,10 @@ pub struct MatchedComparisonSummary {
     pub baseline_only_target_hits: usize,
     /// Pairs where neither method reached the target.
     pub neither_target_hit: usize,
-    /// Both-hit pairs with complete cost vectors for both methods.
+    /// Both-hit pairs with complete all-in cost vectors for both methods.
     pub both_hit_costed_pairs: usize,
+    /// Both-hit pairs with complete standardized algorithm-runtime vectors.
+    pub both_hit_algorithm_costed_pairs: usize,
     /// Target-hit trials whose all-in cost cannot be computed because at least one
     /// stage is unknown.
     pub baseline_uncosted_target_hits: usize,
@@ -422,6 +483,9 @@ pub struct MatchedComparisonSummary {
     /// pairs. This is a conditional diagnostic, not the primary result; values > 1
     /// favor the candidate on runtime. Target-hit rates and misses must be reported too.
     pub median_time_speedup_given_both_hit: Option<f64>,
+    /// Median paired baseline/candidate standardized algorithm-runtime ratio,
+    /// excluding compile/queue delay. Conditional on both-hit and measured stages.
+    pub median_algorithm_runtime_speedup_given_both_hit: Option<f64>,
     /// Median paired baseline/candidate energy ratio, restricted to both-hit pairs
     /// with matching measured boundaries. This is conditional, not a system-wide
     /// energy claim; values > 1 favor the candidate.
@@ -463,6 +527,8 @@ pub enum MatchedEvaluationError {
     InvalidAllInCost { trial_id: String, value: f64 },
     /// A derived speed ratio overflowed or was non-finite.
     InvalidRatio { quantity: &'static str },
+    /// Complete measured algorithm runtime is non-finite or non-positive.
+    InvalidAlgorithmRuntime { trial_id: String, value: f64 },
     /// Energy is present despite the scope being NotMeasured.
     EnergyValueWithNotMeasuredScope,
     /// A measured energy scope has no joule value.
@@ -518,6 +584,10 @@ impl fmt::Display for MatchedEvaluationError {
             Self::InvalidRatio { quantity } => write!(
                 f,
                 "derived {quantity} ratio was not finite and positive"
+            ),
+            Self::InvalidAlgorithmRuntime { trial_id, value } => write!(
+                f,
+                "trial {trial_id} has invalid algorithm runtime {value}; it must be finite and positive"
             ),
             Self::EnergyValueWithNotMeasuredScope => {
                 write!(f, "energy value supplied with NotMeasured scope")
@@ -604,11 +674,13 @@ pub fn compare_matched_arms(
     let mut baseline_only_target_hits = 0;
     let mut neither_target_hit = 0;
     let mut both_hit_costed_pairs = 0;
+    let mut both_hit_algorithm_costed_pairs = 0;
     let mut baseline_uncosted_target_hits = 0;
     let mut candidate_uncosted_target_hits = 0;
     let mut comparable_energy_pairs = 0;
     let mut mismatched_energy_scope_pairs = 0;
     let mut time_speedups = Vec::new();
+    let mut algorithm_runtime_speedups = Vec::new();
     let mut energy_speedups = Vec::new();
 
     for baseline_trial in &baseline.trials {
@@ -643,6 +715,8 @@ pub fn compare_matched_arms(
 
         let baseline_all_in_ms = baseline_trial.costs.all_in_total_ms();
         let candidate_all_in_ms = candidate_trial.costs.all_in_total_ms();
+        let baseline_algorithm_runtime_ms = baseline_trial.costs.algorithm_runtime_ms();
+        let candidate_algorithm_runtime_ms = candidate_trial.costs.algorithm_runtime_ms();
 
         if baseline_hit && baseline_all_in_ms.is_none() {
             baseline_uncosted_target_hits += 1;
@@ -675,6 +749,25 @@ pub fn compare_matched_arms(
             }
         } else {
             (None, None)
+        };
+
+        let algorithm_runtime_speedup = if baseline_hit && candidate_hit {
+            match (baseline_algorithm_runtime_ms, candidate_algorithm_runtime_ms) {
+                (Some(base_ms), Some(candidate_ms)) => {
+                    both_hit_algorithm_costed_pairs += 1;
+                    let ratio = base_ms / candidate_ms;
+                    if !ratio.is_finite() || ratio <= 0.0 {
+                        return Err(MatchedEvaluationError::InvalidRatio {
+                            quantity: "algorithm-runtime-speedup",
+                        });
+                    }
+                    algorithm_runtime_speedups.push(ratio);
+                    Some(ratio)
+                }
+                _ => None,
+            }
+        } else {
+            None
         };
 
         let baseline_energy = baseline_trial.energy.joules;
@@ -711,8 +804,11 @@ pub fn compare_matched_arms(
             candidate_target_hit: candidate_hit,
             baseline_all_in_ms,
             candidate_all_in_ms,
+            baseline_algorithm_runtime_ms,
+            candidate_algorithm_runtime_ms,
             time_speedup_baseline_over_candidate: time_speedup,
             time_winner,
+            algorithm_runtime_speedup_baseline_over_candidate: algorithm_runtime_speedup,
             baseline_energy_joules: baseline_energy,
             candidate_energy_joules: candidate_energy,
             energy_speedup_baseline_over_candidate: energy_speedup,
@@ -734,11 +830,13 @@ pub fn compare_matched_arms(
         baseline_only_target_hits,
         neither_target_hit,
         both_hit_costed_pairs,
+        both_hit_algorithm_costed_pairs,
         baseline_uncosted_target_hits,
         candidate_uncosted_target_hits,
         comparable_energy_pairs,
         mismatched_energy_scope_pairs,
         median_time_speedup_given_both_hit: median(&mut time_speedups),
+        median_algorithm_runtime_speedup_given_both_hit: median(&mut algorithm_runtime_speedups),
         median_energy_speedup_given_both_hit: median(&mut energy_speedups),
         pairs,
     })
@@ -780,6 +878,7 @@ mod tests {
 
     fn costs(total_ms: f64) -> StageCostsMs {
         StageCostsMs {
+            queue_wait_ms: Some(0.0),
             acquisition_ms: Some(total_ms * 0.1),
             preprocessing_ms: Some(total_ms * 0.1),
             feature_extraction_ms: Some(total_ms * 0.1),
@@ -882,7 +981,9 @@ mod tests {
         assert_eq!(result.baseline_only_target_hits, 0);
         assert_eq!(result.neither_target_hit, 0);
         assert_eq!(result.both_hit_costed_pairs, 1);
+        assert_eq!(result.both_hit_algorithm_costed_pairs, 1);
         assert_eq!(result.median_time_speedup_given_both_hit, Some(2.0));
+        assert_eq!(result.median_algorithm_runtime_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.median_energy_speedup_given_both_hit, Some(2.0));
         assert_eq!(result.pairs[1].time_speedup_baseline_over_candidate, None);
     }
@@ -1025,6 +1126,7 @@ mod tests {
         ));
 
         let zero = StageCostsMs {
+            queue_wait_ms: Some(0.0),
             acquisition_ms: Some(0.0),
             preprocessing_ms: Some(0.0),
             feature_extraction_ms: Some(0.0),
