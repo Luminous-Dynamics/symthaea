@@ -122,6 +122,7 @@ pub struct EventAlignment {
 pub struct CompositionalMotifEvidence {
     pub contract_version: String,
     pub claim: CompositionalTransform,
+    pub config: CompositionalVerificationConfig,
     pub target_start_offset_beats: f64,
     pub aligned_pairs: Vec<EventAlignment>,
     pub deleted_source_indices: Vec<usize>,
@@ -299,7 +300,7 @@ pub fn verify_compositional_transform_with_config(
     let duration = make_axis_evidence(&duration_errors, config.duration_log_ratio_tolerance);
     let deleted_source_indices: Vec<usize> = deleted_source_indices_local
         .iter()
-        .map(|index| selection.source_start_index + index)
+        .map(|index| selection.source_start_index + *index)
         .collect();
     let deleted_source_events = deleted_source_indices.len();
     let inserted_target_events = inserted_target_indices.len();
@@ -326,6 +327,7 @@ pub fn verify_compositional_transform_with_config(
     Ok(CompositionalMotifEvidence {
         contract_version: COMPOSITIONAL_MOTIF_CONTRACT_VERSION.to_owned(),
         claim: *claim,
+        config: *config,
         target_start_offset_beats,
         aligned_pairs,
         deleted_source_indices,
