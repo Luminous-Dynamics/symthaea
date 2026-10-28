@@ -41,6 +41,7 @@ pub enum TerminalStatus {
     InfrastructureFailure,
     Invalid,
     NotEvaluable,
+    BudgetViolation,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,6 +56,14 @@ pub struct TaskSeedV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResourceBudgetV1 {
+    pub max_tool_calls: u64,
+    pub max_experiment_queries: u64,
+    pub max_tokens: u64,
+    pub max_elapsed_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ManifestV1 {
     pub schema: String,
     pub protocol_id: String,
@@ -64,6 +73,8 @@ pub struct ManifestV1 {
     pub task_manifest_sha256: String,
     pub tool_registry_sha256: String,
     pub treatments: Vec<Treatment>,
+    /// The same per-trial caps apply to every treatment arm.
+    pub resource_budget: ResourceBudgetV1,
     pub task_seeds: Vec<TaskSeedV1>,
 }
 
@@ -108,6 +119,7 @@ pub struct TreatmentSummaryV1 {
     pub missing_runs: usize,
     pub completed_runs: usize,
     pub infrastructure_failures: usize,
+    pub budget_violations: usize,
     pub invalid_runs: usize,
     pub not_evaluable_runs: usize,
     pub successful_recoveries: usize,
@@ -229,6 +241,13 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<(), String> {
             return Err(format!("manifest {name} must be lowercase SHA-256"));
         }
     }
+    if manifest.resource_budget.max_tool_calls == 0
+        || manifest.resource_budget.max_experiment_queries == 0
+        || manifest.resource_budget.max_tokens == 0
+        || manifest.resource_budget.max_elapsed_ms == 0
+    {
+        return Err("all resource budget caps must be positive".to_owned());
+    }
     if manifest.treatments.len() < 2 {
         return Err("manifest must declare no_tool and at least one comparison treatment".to_owned());
     }
@@ -302,6 +321,23 @@ fn validate_trial(
     if !task.tool_available && trial.tool_calls != 0 {
         return Err(format!(
             "tool call recorded where tools were unavailable for task {}",
+            trial.task_id
+        ));
+    }
+    let budget = &manifest.resource_budget;
+    let budget_exceeded = trial.tool_calls > budget.max_tool_calls
+        || trial.experiment_queries > budget.max_experiment_queries
+        || trial.tokens > budget.max_tokens
+        || trial.elapsed_ms > budget.max_elapsed_ms;
+    if budget_exceeded && trial.terminal_status != TerminalStatus::BudgetViolation {
+        return Err(format!(
+            "trial exceeded its manifest resource budget but was not marked budget_violation: {}",
+            trial.task_id
+        ));
+    }
+    if !budget_exceeded && trial.terminal_status == TerminalStatus::BudgetViolation {
+        return Err(format!(
+            "trial marked budget_violation without an evidenced cap breach: {}",
             trial.task_id
         ));
     }
@@ -454,6 +490,10 @@ pub fn audit(manifest_bytes: &[u8], trial_bytes: &[u8]) -> Result<AuditReportV1,
                 .iter()
                 .filter(|trial| trial.terminal_status == TerminalStatus::InfrastructureFailure)
                 .count(),
+            budget_violations: selected
+                .iter()
+                .filter(|trial| trial.terminal_status == TerminalStatus::BudgetViolation)
+                .count(),
             invalid_runs: selected
                 .iter()
                 .filter(|trial| trial.terminal_status == TerminalStatus::Invalid)
@@ -566,7 +606,7 @@ mod tests {
     use super::*;
 
     fn digest(ch: char) -> String {
-        std::iter::repeat(ch).take(64).collect()
+        std::iter::repeat_n(ch, 64).collect()
     }
 
     fn manifest() -> ManifestV1 {
@@ -578,6 +618,12 @@ mod tests {
             prompt_sha256: digest('a'),
             task_manifest_sha256: digest('b'),
             tool_registry_sha256: digest('c'),
+            resource_budget: ResourceBudgetV1 {
+                max_tool_calls: 3,
+                max_experiment_queries: 20,
+                max_tokens: 6_000,
+                max_elapsed_ms: 1_000,
+            },
             treatments: vec![
                 Treatment::NoTool,
                 Treatment::AlwaysTool,
@@ -697,6 +743,7 @@ mod tests {
             .unwrap();
         assert_eq!(calibrated.completed_runs, 1);
         assert_eq!(calibrated.infrastructure_failures, 1);
+        assert_eq!(calibrated.budget_violations, 0);
         assert_eq!(calibrated.assigned_runs, 2);
         assert_eq!(calibrated.recovery_rate_all_assigned, 0.5);
 
@@ -858,6 +905,65 @@ mod tests {
         let mut report = audit(&manifest_bytes, &trial_bytes).unwrap();
         report.body.missing_cell_count += 1;
         assert!(!report.verify_receipt());
+    }
+
+    #[test]
+    fn enforces_resource_caps_and_preserves_budget_violations() {
+        let (manifest_bytes, trial_bytes) = input_bytes(None);
+        let manifest: ManifestV1 = serde_json::from_slice(&manifest_bytes).unwrap();
+        let mut rows = String::from_utf8(trial_bytes)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<TrialV1>(line).unwrap())
+            .collect::<Vec<_>>();
+        let target = rows
+            .iter_mut()
+            .find(|row| row.task_id == "law-simple" && row.treatment == Treatment::CalibratedVoc)
+            .unwrap();
+        target.tokens = manifest.resource_budget.max_tokens + 1;
+        let bytes = rows
+            .iter()
+            .map(|row| serde_json::to_string(row).unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            audit(&manifest_bytes, bytes.as_bytes())
+                .unwrap_err()
+                .contains("not marked budget_violation")
+        );
+
+        let (manifest_bytes, trial_bytes) = input_bytes(None);
+        let mut rows = String::from_utf8(trial_bytes)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<TrialV1>(line).unwrap())
+            .collect::<Vec<_>>();
+        let target = rows
+            .iter_mut()
+            .find(|row| row.task_id == "law-simple" && row.treatment == Treatment::CalibratedVoc)
+            .unwrap();
+        target.tokens = 6_001;
+        target.terminal_status = TerminalStatus::BudgetViolation;
+        target.law_recovered = None;
+        target.heldout_prediction_nrmse = None;
+        target.false_confident_singleton = None;
+        target.premature_commitment = None;
+        target.policy_output_sha256 = None;
+        let bytes = rows
+            .iter()
+            .map(|row| serde_json::to_string(row).unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let report = audit(&manifest_bytes, bytes.as_bytes()).unwrap();
+        let summary = report
+            .body
+            .treatment_summaries
+            .iter()
+            .find(|summary| summary.treatment == Treatment::CalibratedVoc)
+            .unwrap();
+        assert_eq!(summary.budget_violations, 1);
+        assert_eq!(summary.assigned_runs, 2);
+        assert_eq!(summary.recovery_rate_all_assigned, 0.0);
     }
 
     #[test]
