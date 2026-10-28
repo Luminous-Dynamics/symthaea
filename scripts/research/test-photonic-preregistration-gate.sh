@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 GATE="$ROOT/scripts/research/photonic-preregistration-gate.sh"
 TEMPLATE="$ROOT/docs/research/quantum/benchmarks/PHOT-CTRL-003A-PREREGISTRATION-TEMPLATE.json"
 TMP="$(mktemp -d)"
