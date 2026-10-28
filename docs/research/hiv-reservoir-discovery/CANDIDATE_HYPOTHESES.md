@@ -35,7 +35,7 @@ The purpose of this register is to start specific, falsifiable work while avoidi
 
 **What this cannot prove:** That the same manipulation is safe or clinically beneficial, or that transcript reactivation alone eliminates a reservoir.
 
-**Evidence:** https://doi.org/10.1016/j.ebiom.2024.105471 ; https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE260588
+**Evidence:** https://doi.org/10.1371/journal.ppat.1012822 ; https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE260588
 
 ## H3 — Memory-cell differentiation and reservoir seeding are temporally distinct from reservoir maintenance
 
