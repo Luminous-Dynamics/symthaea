@@ -6,6 +6,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -47,6 +48,11 @@ class WitnessFixture:
         self.root = Path(self.tmp.name)
         self.source_path = self.root / "source.cbl"
         self.source_raw = b"       COPY ACCOUNT-REC.\n"
+        self.schema_rel = "tools/vleb/execution-witness-receipt.schema.json"
+        self.plan_schema_rel = "tools/vleb/execution-witness-plan.schema.json"
+        (self.root / "tools/vleb").mkdir(parents=True)
+        shutil.copyfile(SCHEMA_PATH, self.root / self.schema_rel)
+        shutil.copyfile(PLAN_SCHEMA_PATH, self.root / self.plan_schema_rel)
         self.source_path.write_bytes(self.source_raw)
         self.source_sha = sha(self.source_raw)
         self.executable_sha = sha(Path(sys.executable).resolve(strict=True).read_bytes())
@@ -92,7 +98,8 @@ class WitnessFixture:
         self.receipt_path = "receipts/execution.json"
         self.runner_sha = sha(Path(runner.__file__).read_bytes())
         self.auditor_sha = sha(Path(auditor.__file__).read_bytes())
-        self.schema_sha = sha(SCHEMA_PATH.read_bytes())
+        self.schema_sha = sha((self.root / self.schema_rel).read_bytes())
+        self.plan_schema_sha = sha((self.root / self.plan_schema_rel).read_bytes())
         self.identity = runner.expected_identity_from_plan(self.plan)
         self.result = runner.record_execution(
             plan_path=Path("plan.json"),
@@ -108,11 +115,13 @@ class WitnessFixture:
         args = {
             "receipt_path": Path(self.receipt_path),
             "plan_path": Path("plan.json"),
-            "schema_path": SCHEMA_PATH,
+            "schema_path": Path(self.schema_rel),
+            "plan_schema_path": Path(self.plan_schema_rel),
             "evidence_root": self.root,
             "expected_receipt_sha256": self.result["receipt_sha256"],
             "expected_auditor_sha256": self.auditor_sha,
             "expected_schema_sha256": self.schema_sha,
+            "expected_plan_schema_sha256": self.plan_schema_sha,
             "expected_runner_sha256": self.runner_sha,
             "expected_plan_sha256": self.plan_sha,
             "expected_verifier_sha256": self.executable_sha,
