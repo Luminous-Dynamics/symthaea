@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vleb-cobol-index-output.schema.json",
+  "title": "VLEB fixed-format COBOL index output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_format",
+    "physical_line_count",
+    "program_id",
+    "divisions",
+    "copy_references",
+    "file_descriptions",
+    "data_items",
+    "embedded_blocks",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vleb-cobol-index-v1"
+    },
+    "source_format": {
+      "const": "fixed"
+    },
+    "physical_line_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "program_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "location"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
+          }
+        }
+      ]
+    },
+    "divisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/namedSpan"
+      }
+    },
+    "copy_references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "location",
+          "has_replacing_clause"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "location": {
+            "$ref": "#/$defs/location"
+          },
+          "has_replacing_clause": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "file_descriptions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/namedSpan"
+      }
+    },
+    "data_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "level",
+          "name",
+          "picture",
+          "usage",
+          "redefines",
+          "location"
+        ],
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 88
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "picture": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "usage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "redefines": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "$ref": "#/$defs/location"
+          }
+        }
+      }
+    },
+    "embedded_blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "location",
+          "has_end_exec"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "SQL",
+              "CICS"
+            ]
+          },
+          "location": {
+            "$ref": "#/$defs/location"
+          },
+          "has_end_exec": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "location"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "location": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/location"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line",
+        "column_start",
+        "column_end"
+      ],
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column_end": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "namedSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "location"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
+      }
+    }
+  }
+}
