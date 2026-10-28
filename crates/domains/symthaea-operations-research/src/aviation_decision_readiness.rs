@@ -33,6 +33,14 @@ pub enum DecisionReadinessBlock {
     PlanVerificationIndeterminate,
     MissingCalibrationReceipt,
     StaleCalibrationReceipt,
+    InvalidFreshnessPolicy,
+    InvalidCalibrationTimestamp,
+    FutureCalibrationReceipt,
+    CalibrationExpired,
+    MonitoringObservationMissing,
+    InvalidMonitoringObservationTimestamp,
+    FutureMonitoringObservation,
+    MonitoringObservationStale,
     DriftAlarm,
     SupportShiftAlarm,
     DistributionalRiskIneligible,
@@ -51,6 +59,16 @@ pub struct DecisionReadinessInput<'a> {
     pub candidate_calibration_receipt_id: &'a str,
     /// Identifier of the active, most recently accepted calibration receipt.
     pub active_calibration_receipt_id: &'a str,
+    /// Timestamp of the calibration run bound to this candidate (not merely its ID).
+    pub calibration_created_at_epoch_seconds: i64,
+    /// Time at which this decision is being assessed.
+    pub decision_time_epoch_seconds: i64,
+    /// Preregistered maximum age for the calibration receipt, in seconds.
+    pub max_calibration_age_seconds: u64,
+    /// Timestamp of the latest observation successfully ingested by the monitor.
+    pub latest_monitor_observation_epoch_seconds: Option<i64>,
+    /// Preregistered maximum age for online monitoring evidence, in seconds.
+    pub max_monitor_observation_age_seconds: u64,
 }
 
 /// Auditable decision-readiness result. This is not operational authorization.
@@ -90,6 +108,38 @@ pub fn assess_decision_readiness(input: DecisionReadinessInput<'_>) -> DecisionR
         blockers.push(DecisionReadinessBlock::MissingCalibrationReceipt);
     } else if input.candidate_calibration_receipt_id != input.active_calibration_receipt_id {
         blockers.push(DecisionReadinessBlock::StaleCalibrationReceipt);
+    }
+
+    if input.max_calibration_age_seconds == 0
+        || input.max_monitor_observation_age_seconds == 0
+    {
+        blockers.push(DecisionReadinessBlock::InvalidFreshnessPolicy);
+    }
+    if input.decision_time_epoch_seconds < 0 || input.calibration_created_at_epoch_seconds < 0 {
+        blockers.push(DecisionReadinessBlock::InvalidCalibrationTimestamp);
+    } else if input.calibration_created_at_epoch_seconds > input.decision_time_epoch_seconds {
+        blockers.push(DecisionReadinessBlock::FutureCalibrationReceipt);
+    } else if (input.decision_time_epoch_seconds - input.calibration_created_at_epoch_seconds) as u64
+        > input.max_calibration_age_seconds
+    {
+        blockers.push(DecisionReadinessBlock::CalibrationExpired);
+    }
+
+    match input.latest_monitor_observation_epoch_seconds {
+        None => blockers.push(DecisionReadinessBlock::MonitoringObservationMissing),
+        Some(timestamp) if timestamp < 0 || input.decision_time_epoch_seconds < 0 => {
+            blockers.push(DecisionReadinessBlock::InvalidMonitoringObservationTimestamp);
+        }
+        Some(timestamp) if timestamp > input.decision_time_epoch_seconds => {
+            blockers.push(DecisionReadinessBlock::FutureMonitoringObservation);
+        }
+        Some(timestamp)
+            if (input.decision_time_epoch_seconds - timestamp) as u64
+                > input.max_monitor_observation_age_seconds =>
+        {
+            blockers.push(DecisionReadinessBlock::MonitoringObservationStale);
+        }
+        Some(_) => {}
     }
 
     match input.drift_monitor.status {
@@ -252,6 +302,11 @@ mod tests {
             network_assessment: &network,
             candidate_calibration_receipt_id: candidate_receipt,
             active_calibration_receipt_id: active_receipt,
+            calibration_created_at_epoch_seconds: 100,
+            decision_time_epoch_seconds: 200,
+            max_calibration_age_seconds: 1_000,
+            latest_monitor_observation_epoch_seconds: Some(190),
+            max_monitor_observation_age_seconds: 30,
         })
     }
 
@@ -369,4 +424,92 @@ mod tests {
             DecisionReadinessStatus::EligibleForHumanReview
         );
     }
+
+    #[test]
+    fn old_calibration_is_blocked_even_when_receipt_ids_match() {
+        let feature = feature(AuditStatus::Accept);
+        let split = split(SplitAuditStatus::Accept);
+        let plan = verification(VerificationStatus::Verified);
+        let drift = drift(DriftMonitorStatus::InControl);
+        let distributional = distributional(true);
+        let network = network(true);
+        let report = assess_decision_readiness(DecisionReadinessInput {
+            feature_audit: &feature,
+            split_audit: &split,
+            plan_verification: &plan,
+            drift_monitor: &drift,
+            distributional_assessment: &distributional,
+            network_assessment: &network,
+            candidate_calibration_receipt_id: "same",
+            active_calibration_receipt_id: "same",
+            calibration_created_at_epoch_seconds: 100,
+            decision_time_epoch_seconds: 1_000,
+            max_calibration_age_seconds: 100,
+            latest_monitor_observation_epoch_seconds: Some(990),
+            max_monitor_observation_age_seconds: 20,
+        });
+        assert_eq!(report.blockers, vec![DecisionReadinessBlock::CalibrationExpired]);
+    }
+
+    #[test]
+    fn missing_or_stale_monitor_feed_blocks_readiness() {
+        let missing = assess_with_feed_time(None);
+        assert_eq!(missing.blockers, vec![DecisionReadinessBlock::MonitoringObservationMissing]);
+
+        let stale = assess_with_feed_time(Some(100));
+        assert_eq!(stale.blockers, vec![DecisionReadinessBlock::MonitoringObservationStale]);
+    }
+
+    fn assess_with_feed_time(latest: Option<i64>) -> DecisionReadinessReport {
+        let feature = feature(AuditStatus::Accept);
+        let split = split(SplitAuditStatus::Accept);
+        let plan = verification(VerificationStatus::Verified);
+        let drift = drift(DriftMonitorStatus::InControl);
+        let distributional = distributional(true);
+        let network = network(true);
+        assess_decision_readiness(DecisionReadinessInput {
+            feature_audit: &feature,
+            split_audit: &split,
+            plan_verification: &plan,
+            drift_monitor: &drift,
+            distributional_assessment: &distributional,
+            network_assessment: &network,
+            candidate_calibration_receipt_id: "same",
+            active_calibration_receipt_id: "same",
+            calibration_created_at_epoch_seconds: 100,
+            decision_time_epoch_seconds: 200,
+            max_calibration_age_seconds: 1_000,
+            latest_monitor_observation_epoch_seconds: latest,
+            max_monitor_observation_age_seconds: 10,
+        })
+    }
+
+    #[test]
+    fn future_timestamps_and_zero_age_limits_fail_closed() {
+        let feature = feature(AuditStatus::Accept);
+        let split = split(SplitAuditStatus::Accept);
+        let plan = verification(VerificationStatus::Verified);
+        let drift = drift(DriftMonitorStatus::InControl);
+        let distributional = distributional(true);
+        let network = network(true);
+        let report = assess_decision_readiness(DecisionReadinessInput {
+            feature_audit: &feature,
+            split_audit: &split,
+            plan_verification: &plan,
+            drift_monitor: &drift,
+            distributional_assessment: &distributional,
+            network_assessment: &network,
+            candidate_calibration_receipt_id: "same",
+            active_calibration_receipt_id: "same",
+            calibration_created_at_epoch_seconds: 300,
+            decision_time_epoch_seconds: 200,
+            max_calibration_age_seconds: 0,
+            latest_monitor_observation_epoch_seconds: Some(250),
+            max_monitor_observation_age_seconds: 0,
+        });
+        assert!(report.blockers.contains(&DecisionReadinessBlock::InvalidFreshnessPolicy));
+        assert!(report.blockers.contains(&DecisionReadinessBlock::FutureCalibrationReceipt));
+        assert!(report.blockers.contains(&DecisionReadinessBlock::FutureMonitoringObservation));
+    }
+
 }
