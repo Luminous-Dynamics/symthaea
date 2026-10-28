@@ -88,8 +88,10 @@ pub use lora_fragment::{
     fragment,
 };
 pub use lora_fragment_v2::{
-    FragmentAssemblerV2, LoRaFragmentV2, V2FragmentError, fragment_v2, V2_HEADER_SIZE,
-    V2_MTU, V2_PAYLOAD_SIZE, V2_MAX_DATA_FRAGMENTS, V2_MAX_ENCODED_LEN,
+    FragmentAssemblerV2, LoRaFragmentV2, V2FragmentError, fragment_v2,
+    fragment_v2_with_aead_overhead, V2_HEADER_SIZE, V2_MTU, V2_PAYLOAD_SIZE,
+    V2_AEAD_PAYLOAD_SIZE, V2_FRAGMENT_AEAD_OVERHEAD, V2_FLAG_AEAD_BUDGET,
+    V2_MAX_DATA_FRAGMENTS, V2_MAX_ENCODED_LEN, V2_MAX_AEAD_ENCODED_LEN,
 };
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
 pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
