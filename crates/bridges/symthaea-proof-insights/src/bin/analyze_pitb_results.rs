@@ -768,7 +768,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             "Weak-null paired outcomes use a bivariate Bernoulli coupling with the prescribed marginal success rates; the association fraction interpolates joint-success probability from independence to the Frechet upper bound and is not a Pearson correlation. The 36-cell weak-null grid tests false-claim probability when positive and negative family effects cancel on average, under those explicit pair-association and ICC values.".to_string(),
             "This finite family-size stress model does not cover selective missingness, alternative family-size mechanisms, or every dependence structure and is not proof of nominal coverage universally.".to_string(),
             "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
-            "Power estimates and their Monte Carlo standard errors are design simulations only. The report retains per-cell 95% Wilson bounds for diagnostics and uses a conservative one-sided Wilson upper bound with z=2.74 across the 16 registered strict/weak null cells for the simultaneous false-claim gate. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
+            "Power estimates and their Monte Carlo standard errors are design simulations only. The report retains per-cell 95% Wilson bounds for diagnostics and uses a conservative one-sided Wilson upper bound with z=3.03 across the 40 registered strict/weak null cells for the simultaneous false-claim gate. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
         interpretation,
     };
@@ -829,13 +829,11 @@ fn wilson_interval_with_z(successes: usize, trials: usize, z: f64) -> (f64, f64)
     )
 }
 
-// The registered null grid has 16 cells: four strict-null ICC cells plus
-// twelve family-heterogeneous weak-null cells. z=2.74 is slightly more
-// conservative than the one-sided Bonferroni critical value for alpha=.05/16.
+// The registered null grid has 40 cells: four strict-null ICC cells plus
+// 3 family-effect SDs × 4 ICCs × 3 paired-outcome association fractions.
+// z=3.03 conservatively exceeds the one-sided Bonferroni critical value
+// for alpha=.05/40.
 fn simultaneous_null_upper_bound(successes: usize, trials: usize) -> f64 {
-    // Four strict-null ICC cells plus 3 SD × 4 ICC × 3 pair-association
-    // weak-null cells: 40 registered null cells. z=3.03 exceeds the one-sided
-    // Bonferroni critical value for alpha=.05/40.
     wilson_interval_with_z(successes, trials, 3.03).1
 }
 
@@ -1061,7 +1059,7 @@ fn simulate_weak_null_scenario(
         mean_realized_family_effect_heterogeneity_sd_percentage_points: Some(
             sum_realized_effect_sd / simulations as f64 * 100.0,
         ),
-        interpretation: "Weak-null calibration: treatment effects vary by family but are recentered to exactly zero target-weighted mean within each simulated study. The gate false-claim rate is estimated under the declared ICC and family-size design; it does not cover every possible outcome-dependence or missingness mechanism.".to_string(),
+        interpretation: "Weak-null calibration: treatment effects vary by family but are recentered to exactly zero target-weighted mean within each simulated study. The paired Bernoulli coupling varies from independent potential outcomes to the Frechet upper bound per the registered association fraction. This does not cover every dependence, selective-missingness, or family-size-generating mechanism.".to_string(),
     })
 }
 
