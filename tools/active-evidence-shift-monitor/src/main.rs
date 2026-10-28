@@ -99,22 +99,82 @@ struct Scenario {
 }
 
 const SCENARIOS: [Scenario; 12] = [
-    Scenario { name: "stationary_null", pre_shift_p: NOMINAL_P, post_shift_p: None, change_after: 0 },
-    Scenario { name: "step_down_010", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.10), change_after: CHANGE_AFTER },
-    Scenario { name: "step_down_020", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.20), change_after: CHANGE_AFTER },
-    Scenario { name: "step_down_030", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.30), change_after: CHANGE_AFTER },
-    Scenario { name: "step_down_040", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.40), change_after: CHANGE_AFTER },
-    Scenario { name: "step_down_045", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.45), change_after: CHANGE_AFTER },
-    Scenario { name: "step_up_055", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.55), change_after: CHANGE_AFTER },
-    Scenario { name: "step_up_060", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.60), change_after: CHANGE_AFTER },
-    Scenario { name: "step_up_070", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.70), change_after: CHANGE_AFTER },
-    Scenario { name: "step_up_080", pre_shift_p: NOMINAL_P, post_shift_p: Some(SHIFTED_P), change_after: CHANGE_AFTER },
-    Scenario { name: "step_up_090", pre_shift_p: NOMINAL_P, post_shift_p: Some(0.90), change_after: CHANGE_AFTER },
+    Scenario {
+        name: "stationary_null",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    Scenario {
+        name: "step_down_010",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.10),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_down_020",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.20),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_down_030",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.30),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_down_040",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.40),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_down_045",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.45),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_up_055",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.55),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_up_060",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.60),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_up_070",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.70),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_up_080",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(SHIFTED_P),
+        change_after: CHANGE_AFTER,
+    },
+    Scenario {
+        name: "step_up_090",
+        pre_shift_p: NOMINAL_P,
+        post_shift_p: Some(0.90),
+        change_after: CHANGE_AFTER,
+    },
     // Target population remains at p0=0.5, but the adaptive selector samples a stratum
     // with event rate 0.8 nine times as often as a stratum with rate 0.2: p_obs=0.74.
     // This is selection bias, not an environmental change; alarm probability is therefore
     // a spurious environment-shift alarm for this scenario.
-    Scenario { name: "selection_bias_no_environment_shift", pre_shift_p: 0.74, post_shift_p: None, change_after: 0 },
+    Scenario {
+        name: "selection_bias_no_environment_shift",
+        pre_shift_p: 0.74,
+        post_shift_p: None,
+        change_after: 0,
+    },
 ];
 
 /// Lanczos approximation for log-gamma on positive values.
