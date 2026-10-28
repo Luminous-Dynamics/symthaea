@@ -1117,12 +1117,24 @@ pub fn compare_restricted_mean_tts(
                 horizon_ms,
             );
 
-        baseline_hits_within_horizon += usize::from(baseline_hit);
-        candidate_hits_within_horizon += usize::from(candidate_hit);
-        baseline_uncosted_target_hits += usize::from(baseline_uncosted);
-        candidate_uncosted_target_hits += usize::from(candidate_uncosted);
-        baseline_hits_after_horizon += usize::from(baseline_after);
-        candidate_hits_after_horizon += usize::from(candidate_after);
+        if baseline_hit {
+            baseline_hits_within_horizon += 1;
+        }
+        if candidate_hit {
+            candidate_hits_within_horizon += 1;
+        }
+        if baseline_uncosted {
+            baseline_uncosted_target_hits += 1;
+        }
+        if candidate_uncosted {
+            candidate_uncosted_target_hits += 1;
+        }
+        if baseline_after {
+            baseline_hits_after_horizon += 1;
+        }
+        if candidate_after {
+            candidate_hits_after_horizon += 1;
+        }
 
         let n = (index + 1) as f64;
         baseline_mean += (baseline_time - baseline_mean) / n;
