@@ -586,6 +586,9 @@ def eprocess_family_self_test():
             raise ValueError(f"{family} exceeds the anytime null alarm budget")
         if float(selected["false_alarm_probability"]) < 0.99:
             raise ValueError(f"{family} failed the selection-bias negative control")
+        misspecified = indexed[(family, "stable_baseline_rate_048")]
+        if float(misspecified["false_alarm_probability"]) <= PER_CELL_ALPHA:
+            raise ValueError(f"{family} did not expose nominal-rate misspecification")
         for scenario in EPROCESS_FAMILY_SCENARIOS:
             row = indexed[(family, scenario)]
             if scenario.startswith("step_"):
@@ -600,9 +603,6 @@ def eprocess_family_self_test():
     portfolio = float(indexed[("equal_portfolio_4_priors", "step_up_055")]["detection_probability"])
     if portfolio <= jeffreys + 0.04:
         raise ValueError("fixed prior portfolio did not improve weak-shift power in this fixture")
-    nominal_misspec = indexed[("beta_0.5_0.5", "stable_baseline_rate_048")]
-    if float(nominal_misspec["false_alarm_probability"]) <= PER_CELL_ALPHA:
-        raise ValueError("p0-misspecification negative control did not expose the assumption boundary")
     print("PASS: family row count, anytime null budget, selection-bias and nominal-rate controls, mass conservation and weak-shift portfolio gate")
 
 
