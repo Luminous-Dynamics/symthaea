@@ -351,9 +351,9 @@ impl MatchedTrialRecord {
                 }
             }
             CandidateVerification::VerificationFailed => {
-                // A verifier failure may produce no receipt at all. If a failure
-                // receipt exists it is checked below; absence is a recorded failure,
-                // never a successful target hit.
+                // A failed verifier execution is recordable without a success receipt.
+                // The opaque VerifiedMisCandidate type is minted only for a completed
+                // verifier result, so a failure cannot carry this evidence type.
                 if self.candidate_size.is_none() || self.conflict_count.is_some() {
                     return Err(MatchedEvaluationError::InconsistentCandidateRecord(
                         self.trial_id.clone(),
