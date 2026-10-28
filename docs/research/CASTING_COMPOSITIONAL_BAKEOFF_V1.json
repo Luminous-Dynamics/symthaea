@@ -102,6 +102,37 @@
         "high": 4
       },
       "method_class": "interpretable heuristic; not exact posterior expected value of information"
+    },
+    {
+      "id": "joint_action_cost_aware",
+      "role": "adaptive joint candidate/fidelity acquisition with local discrepancy correction, feasibility risk, and deferred high-fidelity validation cost",
+      "method_class": "interpretable research heuristic; not Bayesian posterior VOI and not an implementation of a cited paper",
+      "adaptive_rule": {
+        "bootstrap_low_calls": 6,
+        "information_fraction": {
+          "low": 0.25,
+          "medium": 0.6,
+          "high": 1
+        },
+        "score_weights": {
+          "feasible_hypervolume_gain": 0.7,
+          "constraint_boundary_information": 0.2,
+          "frontier_objective_information": 0.1
+        },
+        "effective_cost": "immediate fidelity cost + proxy probability of later high-fidelity validation × high-fidelity cost (for low/medium only)",
+        "paired_discrepancy": "nearest-four inverse-distance-weighted paired residuals, separately low→medium and medium→high; robust local scale includes MAD, residual variance, and extrapolation distance",
+        "action_rule": "At each step rank every affordable unseen (candidate, fidelity) action; select the maximum acquisition score; after the six low-fidelity space-filling bootstrap calls, do not pre-schedule the fidelity allocation",
+        "validation_proxy": "clamp(candidate decision-impact score / maximum current candidate impact, 0.05, 0.95)",
+        "calibration_bias": "While no high-fidelity anchor exists, prioritize medium probes and favor high calls on candidates already observed at medium fidelity",
+        "tie_break": "descending score, then lowest candidate ID, then low→medium→high",
+        "trace": "Each oracle call emits budget-before, selected candidate/fidelity, selected score, effective cost, deferred-validation proxy cost, candidate count, decision impact, and selection mode; independent scorer recomputes the winning action from the prior ledger"
+      },
+      "limitations": [
+        "Decision-impact score is a transparent heuristic, not a calibrated probability or exact expected value of information.",
+        "Expected deferred validation cost is a proxy; benchmark separately under alternative validation-probability calibration.",
+        "The six-call bootstrap is fixed; later candidate and fidelity allocation is adaptive.",
+        "Synthetic success does not establish casting-process validity or industry superiority."
+      ]
     }
   ],
   "default_sweep": {
@@ -124,8 +155,8 @@
       23,
       29
     ],
-    "policies": 6,
-    "run_count": 7776,
+    "policies": 7,
+    "run_count": 9072,
     "raw_runs_preserved": true
   },
   "outputs": [
@@ -137,7 +168,8 @@
     "Paired-seed contrasts versus high_only on each cell",
     "Independent response replay and source-byte digests",
     "Decision-impact acquisition score and uncertainty components for the new candidate policy",
-    "Full candidate-level acquisition-score trace for both sequential confirmation decisions"
+    "Full candidate-level acquisition-score trace for both sequential confirmation decisions",
+    "Joint candidate/fidelity action trace with per-step budget and independent action replay"
   ],
   "acceptance_gates": {
     "execution": "Authored tests must pass locally before any empirical statement; runner artifacts must be retained.",
@@ -147,13 +179,15 @@
     "external": "No SOTA claim until pinned BoTorch MF-HVKG/MOMF and suitable single-fidelity baselines are executed under matched budgets; retain COCO-native scoring on COCO tasks.",
     "physical": "No casting-validity claim without validated multiphysics models, documented solver uncertainty, and held-out physical measurements.",
     "decision_value_policy": "The sixth policy uses the frozen 60/8/4 fidelity-call template and preregistered score weights; all acquisition inputs must be derived only from observations available before each high-fidelity call.",
-    "zero_mismatch_control": "Severity 0 is included in the formal default matrix and must satisfy exact equality to analytic truth for every family/fidelity, every objective/constraint composition, and a deterministic candidate sample; any discrepancy is a correctness failure."
+    "zero_mismatch_control": "Severity 0 is included in the formal default matrix and must satisfy exact equality to analytic truth for every family/fidelity, every objective/constraint composition, and a deterministic candidate sample; any discrepancy is a correctness failure.",
+    "joint_action_policy": "The policy must choose one affordable candidate/fidelity action per step, include deferred high-fidelity validation cost in low/medium action ranking, preserve all raw action records, and pass independent replay that rejects altered action choice, score, effective cost, or budget-before. Report as a heuristic until paired multi-seed comparison against locked BoTorch MF-HVKG/MOMF and single-fidelity controls."
   },
   "evidence_label": "COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
   "provenance": {
     "source_digest_paths": [
       "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
       "tools/casting-benchmark/multifidelity_decision_value_policy.py",
+      "tools/casting-benchmark/multifidelity_joint_action_policy.py",
       "tools/casting-benchmark/score_compositional_bakeoff.py",
       "tools/casting-benchmark/multifidelity_scenario_suite.py",
       "tools/casting-benchmark/multifidelity_stress.py",
@@ -236,5 +270,36 @@
       "code_availability": "Article states code/data are available on reasonable request; implementation and immutable dependency lock have not yet been acquired.",
       "required_followup": "Add an auxiliary fixed-scalarization comparison only after the acquisition and constraint-handling code, dependency environment, and evaluation protocol are pinned. Do not label an approximation as the authors' implementation."
     }
+  },
+  "joint_action_policy": {
+    "id": "joint_action_cost_aware",
+    "role": "adaptive joint candidate/fidelity acquisition with local discrepancy correction, feasibility risk, and deferred high-fidelity validation cost",
+    "method_class": "interpretable research heuristic; not Bayesian posterior VOI and not an implementation of a cited paper",
+    "adaptive_rule": {
+      "bootstrap_low_calls": 6,
+      "information_fraction": {
+        "low": 0.25,
+        "medium": 0.6,
+        "high": 1
+      },
+      "score_weights": {
+        "feasible_hypervolume_gain": 0.7,
+        "constraint_boundary_information": 0.2,
+        "frontier_objective_information": 0.1
+      },
+      "effective_cost": "immediate fidelity cost + proxy probability of later high-fidelity validation × high-fidelity cost (for low/medium only)",
+      "paired_discrepancy": "nearest-four inverse-distance-weighted paired residuals, separately low→medium and medium→high; robust local scale includes MAD, residual variance, and extrapolation distance",
+      "action_rule": "At each step rank every affordable unseen (candidate, fidelity) action; select the maximum acquisition score; after the six low-fidelity space-filling bootstrap calls, do not pre-schedule the fidelity allocation",
+      "validation_proxy": "clamp(candidate decision-impact score / maximum current candidate impact, 0.05, 0.95)",
+      "calibration_bias": "While no high-fidelity anchor exists, prioritize medium probes and favor high calls on candidates already observed at medium fidelity",
+      "tie_break": "descending score, then lowest candidate ID, then low→medium→high",
+      "trace": "Each oracle call emits budget-before, selected candidate/fidelity, selected score, effective cost, deferred-validation proxy cost, candidate count, decision impact, and selection mode; independent scorer recomputes the winning action from the prior ledger"
+    },
+    "limitations": [
+      "Decision-impact score is a transparent heuristic, not a calibrated probability or exact expected value of information.",
+      "Expected deferred validation cost is a proxy; benchmark separately under alternative validation-probability calibration.",
+      "The six-call bootstrap is fixed; later candidate and fidelity allocation is adaptive.",
+      "Synthetic success does not establish casting-process validity or industry superiority."
+    ]
   }
 }
