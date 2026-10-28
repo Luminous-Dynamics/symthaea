@@ -219,6 +219,9 @@ def make_task(
                 seed, generation_id, family_id, index, sample, noise_amplitude
             )
             observations.append({"x": x, "y": slope * x + intercept + err})
+        roots = [row["x"] for row in observations]
+        challenge_index = float(samples) + 1.0
+        challenge_x = x_start + challenge_index * narrow_step
         policy_input = {
             "instruction": instruction,
             "observations": observations,
@@ -233,6 +236,24 @@ def make_task(
                 "slope": slope,
                 "intercept": intercept,
             },
+            "alternative_compatible_law": {
+                "kind": "linear_plus_vanishing_polynomial",
+                "base_slope": slope,
+                "base_intercept": intercept,
+                "coefficient": 1.0,
+                "roots": roots,
+                "formula": "f_alt(x) = slope*x + intercept + coefficient*product_i(x - observed_x_i)",
+            },
+            "identifiability_witness": {
+                "equal_on_observed_x": True,
+                "challenge_x_outside_observed_range": challenge_x,
+                "challenge_x_is_observed": False,
+                "claim": (
+                    "both candidate mean functions agree at every observed x; "
+                    "the alternative is not constrained to extrapolate like the linear law"
+                ),
+            },
+            "noise_amplitude": noise_amplitude,
             "claim_limit": "the observations do not uniquely establish a global law",
         }
     else:
