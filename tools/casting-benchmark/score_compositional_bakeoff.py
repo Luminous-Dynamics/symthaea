@@ -643,8 +643,10 @@ def score_document(
     diwa_contract = manifest.get("decision_value_policy", {})
     if diwa_contract.get("id") != DIWA_POLICY:
         errors.append("decision-impact policy identifier differs from scorer contract")
-    if diwa_contract.get("fixed_calls") != {"low": 60, "medium": 8, "high": 4}:
+    if diwa_contract.get("fidelity_call_template") != {"low": 60, "medium": 8, "high": 4}:
         errors.append("decision-impact policy call template differs from scorer contract")
+    if diwa_contract.get("cost_units") != {"low": 1, "medium": 5, "high": 25}:
+        errors.append("decision-impact fidelity costs differ from scorer contract")
     if diwa_contract.get("frozen_score_weights") != DIWA_WEIGHTS:
         errors.append("decision-impact policy weights differ from scorer contract")
     if diwa_contract.get("fixed_parameters") != DIWA_FIXED_PARAMETERS:
