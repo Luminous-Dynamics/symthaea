@@ -234,13 +234,15 @@
           "items": {
             "type": "string",
             "minLength": 5
-          }
+          },
+          "uniqueItems": true
         },
         "allowed_behavior_changes": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "uniqueItems": true
         },
         "observable_effects": {
           "type": "array",
@@ -260,7 +262,8 @@
               "numeric_semantics",
               "external_side_effect"
             ]
-          }
+          },
+          "uniqueItems": true
         },
         "numeric_semantics": {
           "type": [

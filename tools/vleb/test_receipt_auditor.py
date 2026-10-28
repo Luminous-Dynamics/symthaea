@@ -371,6 +371,14 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.assert_issue(self.bundle.run_audit(), "requirement_unknown_test_id")
         self.assert_issue(self.bundle.run_audit(), "requirement_test_inventory_incomplete")
 
+    def test_traceability_rejects_duplicate_test_ids_within_a_requirement(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        row = task["behavior_contract"]["requirement_traceability"][0]
+        row["required_test_ids"] = [row["required_test_ids"][0], row["required_test_ids"][0]]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_test_map_duplicate_test_id")
+
     def test_traceability_must_cover_every_required_test(self) -> None:
         task = json.loads(self.bundle.task_path.read_text())
         target = self.bundle.LOGICAL[-1][0]

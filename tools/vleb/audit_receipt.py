@@ -147,6 +147,8 @@ def requirement_traceability_issues(task: dict[str, Any]) -> list[dict[str, str]
         if not isinstance(test_ids, list) or not test_ids or any(not isinstance(value, str) or not value for value in test_ids):
             issues.append({"code": "requirement_test_map_invalid", "message": f"{label} requires one or more concrete logical test IDs"})
         else:
+            if len(test_ids) != len(set(test_ids)):
+                issues.append({"code": "requirement_test_map_duplicate_test_id", "message": f"{label} repeats a logical test ID"})
             for test_id in test_ids:
                 if test_id not in declared_tests:
                     issues.append({"code": "requirement_unknown_test_id", "message": f"{label} references undeclared test ID {test_id!r}"})

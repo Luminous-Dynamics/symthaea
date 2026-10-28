@@ -130,6 +130,17 @@ class TaskContractSchemaTests(unittest.TestCase):
         self.assertTrue(any("independent_reviewer_count" in error for error in errors), errors)
         self.assertTrue(any("mutation_equivalence_reviewed" in error for error in errors), errors)
 
+    def test_scored_contract_rejects_duplicate_invariants_and_observable_effects(self) -> None:
+        task = self.valid_private_task()
+        task["behavior_contract"]["invariants"].append(task["behavior_contract"]["invariants"][0])
+        errors = self.errors(task)
+        self.assertTrue(any("unique" in error.lower() for error in errors), errors)
+
+        task = self.valid_private_task()
+        task["behavior_contract"]["observable_effects"].append(task["behavior_contract"]["observable_effects"][0])
+        errors = self.errors(task)
+        self.assertTrue(any("unique" in error.lower() for error in errors), errors)
+
     def test_private_task_requires_requirement_traceability(self) -> None:
         task = self.valid_private_task()
         del task["behavior_contract"]["requirement_traceability"]
