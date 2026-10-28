@@ -1883,4 +1883,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn validates_direct_elapsed_measurements_and_nested_interval_order() {
+        let good = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "p", 1, 5, costs(50.0), EnergyRecord::not_measured())],
+        );
+
+        let mut zero_deployment = good.clone();
+        zero_deployment.trials[0].deployment_elapsed_ms = Some(0.0);
+        assert!(matches!(
+            zero_deployment.validate(),
+            Err(MatchedEvaluationError::InvalidObservedElapsed {
+                field: "deployment_elapsed_ms",
+                ..
+            })
+        ));
+
+        let mut nonfinite_algorithm = good.clone();
+        nonfinite_algorithm.trials[0].standardized_algorithm_elapsed_ms = Some(f64::NAN);
+        assert!(matches!(
+            nonfinite_algorithm.validate(),
+            Err(MatchedEvaluationError::InvalidObservedElapsed {
+                field: "standardized_algorithm_elapsed_ms",
+                ..
+            })
+        ));
+
+        let mut inverted_intervals = good;
+        inverted_intervals.trials[0].deployment_elapsed_ms = Some(40.0);
+        inverted_intervals.trials[0].standardized_algorithm_elapsed_ms = Some(45.0);
+        assert!(matches!(
+            inverted_intervals.validate(),
+            Err(MatchedEvaluationError::AlgorithmElapsedExceedsDeployment { .. })
+        ));
+    }
+
 }
