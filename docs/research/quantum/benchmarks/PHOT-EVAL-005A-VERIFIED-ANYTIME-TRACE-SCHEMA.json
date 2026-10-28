@@ -143,10 +143,8 @@
           "enum": [
             "verified_feasible",
             "verified_infeasible",
-            "verifier_error",
-            "missing_receipt",
-            "context_mismatch",
-            "untrusted_artifact"
+            "unverified",
+            "verification_failed"
           ]
         },
         "receipt_sha256": {
