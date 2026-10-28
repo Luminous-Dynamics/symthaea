@@ -24,6 +24,10 @@ The KDD 2026 benchmark addresses detector comparability with controlled drifts i
 
 A hypothesis is supported only by its registered estimand, held-out data, paired uncertainty, and negative controls. The protocol itself is not evidence for any hypothesis.
 
+## Recent evidence that changes the benchmark design
+
+The October 2026 TPAMI work on latency-aware adaptation treats delayed supervision and concept drift as a coupled problem, not two independent implementation details. That reinforces a required design choice here: outcomes have both a value and a reveal time, and a policy may only consume them after that reveal time. The synthetic harness records a one-tick delay and uses the `observed-outcome` track; it must not be compared directly with a valid-prediction-error-only detector. The paper's reported results apply to its own evaluated settings and are motivation for a matched delayed-label ablation, not evidence that Symthaea outperforms it. [Paper record](https://pubmed.ncbi.nlm.nih.gov/42862614/).
+
 ## Conceptual shift: drift as a hypothesis, adaptation as a transaction
 
 Model an adaptation attempt as a reversible transaction:
@@ -189,6 +193,7 @@ A full coverage panel is necessary for the registered comparison, but it is not 
 - Lu et al., *Autonomous Concept Drift Threshold Determination*, AAAI 2026. https://doi.org/10.1609/aaai.v40i29.39586
 - Kuang & Xia, *Anytime-Valid Distribution Shift Detection via Predictive Rank Martingales*, arXiv:2609.00536 (September 2026). https://arxiv.org/abs/2609.00536
 - Shaer et al., *Testing for Distribution Shifts with Conditional Conformal Test Martingales*, ICML 2026. https://proceedings.mlr.press/v306/shaer26a.html
+- Liu et al., *Latency-Aware Adaptive Learning for Nonstationary Data Streams: Coordinating Concept Drift and Delayed Supervision*, IEEE Transactions on Pattern Analysis and Machine Intelligence, ahead of print (12 October 2026). https://doi.org/10.1109/TPAMI.2026.3742576
 - *Concept drift detection in district heating: A characterization framework and detector-centric benchmark*, Energy and AI 25 (September 2026), 100788. https://doi.org/10.1016/j.egyai.2026.100788
 
 ## Industry baseline and competitive thesis
