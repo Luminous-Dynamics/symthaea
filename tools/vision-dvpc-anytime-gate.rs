@@ -497,9 +497,9 @@ fn exact_sweep() -> Result<String, String> {
     let five_zero_clusters = cluster_risk_e_value(&[0.0; 5])?;
     let _ = writeln!(
         output,
-        "CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross={:.12}\tcluster_gate_cross_by_5={:.12}\tcluster_gate_all_zero_e_value={:.12}\talpha={:.6}",
+        "CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross={:.12}\tcluster_gate_all_zero_crossed_5={}\tcluster_gate_all_zero_e_value={:.12}\talpha={:.6}",
         clustered,
-        if five_zero_clusters < 1.0 / RISK_ALPHA { 0.0 } else { f64::NAN },
+        if five_zero_clusters >= 1.0 / RISK_ALPHA { "YES" } else { "NO" },
         five_zero_clusters,
         RISK_ALPHA
     );
@@ -673,7 +673,7 @@ mod tests {
         assert_eq!(first.lines().filter(|line| line.starts_with("VALUE\t")).count(), 20);
         assert!(first.contains("CONTRACT\talpha_risk=0.025000\talpha_value=0.025000\talpha_joint=0.050000\trisk_cap=0.050000\tvalue_floor=0.500000\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tcluster_risk_lambdas=0.5,1.0\tpeeking_looks=72,120"));
         assert!(first.contains("PEEKING_CONTROL\t120\t50000\t72,120\t0.032937159528\t0.008924249150\t0.025000"));
-        assert!(first.contains("CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000"));
+        assert!(first.contains("CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross=0.063416077728\tcluster_gate_all_zero_crossed_5=NO"));
         assert!(first.contains("GATE_CONTROL\tall_clear\tAUTHORIZED"));
         assert!(first.contains("GATE_CONTROL\tmissing_evidence\tDENIED"));
         assert!(first.contains("GATE_CONTROL\ttarget_shift_or_uncalibrated\tDENIED"));
