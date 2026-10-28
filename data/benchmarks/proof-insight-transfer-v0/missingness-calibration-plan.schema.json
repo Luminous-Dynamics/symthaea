@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/missingness-calibration-plan.schema.json",
+  "title": "PITB Selective Missingness and Informative Component Size Plan",
+  "description": "A preregistered design contract, not simulation output or a proof-transfer result. It fixes the finite target-weighted estimand, complete-ledger policy, explicit non-solve semantics, family-to-independent-component rule, and adversarial missingness scenarios.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "status",
+    "protocol_id",
+    "primary_estimand",
+    "primary_weighting",
+    "secondary_estimand",
+    "denominator_policy",
+    "missing_target_row_policy",
+    "missing_arm_outcome_policy",
+    "not_attempted_policy",
+    "tool_unavailable_policy",
+    "timeout_policy",
+    "missing_required_receipt_policy",
+    "post_outcome_exclusion_policy",
+    "cluster_key_policy",
+    "component_manifest_required",
+    "confirmatory_cluster_floor",
+    "cluster_floor_count_source",
+    "family_count_grid",
+    "family_size_profiles",
+    "missingness_rate_grid",
+    "simulation_results_included",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.missingness-calibration-plan.v0"
+    },
+    "plan_id": {
+      "const": "pitb-selective-missingness-and-informative-size-v0"
+    },
+    "status": {
+      "const": "design_only_not_results"
+    },
+    "protocol_id": {
+      "const": "proof-insight-transfer-v0"
+    },
+    "primary_estimand": {
+      "const": "finite_frozen_test_target_average"
+    },
+    "primary_weighting": {
+      "const": "target_weighted"
+    },
+    "secondary_estimand": {
+      "const": "equal_component_weighted_diagnostic_only"
+    },
+    "denominator_policy": {
+      "const": "all_frozen_eligible_target_assignments"
+    },
+    "missing_target_row_policy": {
+      "const": "reject_confirmatory_run"
+    },
+    "missing_arm_outcome_policy": {
+      "const": "reject_confirmatory_run"
+    },
+    "not_attempted_policy": {
+      "const": "retain_as_non_solve"
+    },
+    "tool_unavailable_policy": {
+      "const": "retain_as_non_solve"
+    },
+    "timeout_policy": {
+      "const": "retain_as_non_solve"
+    },
+    "missing_required_receipt_policy": {
+      "const": "no_claim_evidence_incomplete"
+    },
+    "post_outcome_exclusion_policy": {
+      "const": "forbidden"
+    },
+    "cluster_key_policy": {
+      "const": "audited_cross_family_connected_component"
+    },
+    "component_manifest_required": {
+      "const": true
+    },
+    "confirmatory_cluster_floor": {
+      "const": 20
+    },
+    "cluster_floor_count_source": {
+      "const": "independent_connected_components"
+    },
+    "family_count_grid": {
+      "const": [
+        20,
+        30,
+        40,
+        60
+      ]
+    },
+    "family_size_profiles": {
+      "const": [
+        "balanced",
+        "validation_empirical",
+        "heavy_tailed"
+      ]
+    },
+    "missingness_rate_grid": {
+      "const": [
+        0,
+        0.05,
+        0.15,
+        0.3
+      ]
+    },
+    "simulation_results_included": {
+      "const": false
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "scope",
+          "mechanism",
+          "missingness_class",
+          "nominal_rate",
+          "selection_driver",
+          "outcome_encoding",
+          "expected_primary_action",
+          "confirmatory_claim_allowed",
+          "diagnostic_purpose"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "enum": [
+              "target",
+              "component",
+              "arm_target"
+            ]
+          },
+          "mechanism": {
+            "type": "string",
+            "minLength": 1
+          },
+          "missingness_class": {
+            "enum": [
+              "none",
+              "MCAR",
+              "MAR",
+              "MNAR",
+              "design_stress",
+              "evidence_loss",
+              "selection_bias",
+              "dependence_stress"
+            ]
+          },
+          "nominal_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.3
+          },
+          "selection_driver": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome_encoding": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_primary_action": {
+            "enum": [
+              "primary_reference",
+              "reject_confirmatory_run",
+              "retain_as_non_solve",
+              "no_claim_evidence_incomplete",
+              "forbid_post_outcome_exclusion",
+              "report_primary_and_secondary_estimands",
+              "no_go_if_independent_components_below_floor"
+            ]
+          },
+          "confirmatory_claim_allowed": {
+            "type": "boolean"
+          },
+          "diagnostic_purpose": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

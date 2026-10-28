@@ -338,6 +338,105 @@ jobs:
               raise SystemExit("schema must reject a stale v2 power report under the v3 contract")
           print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v3 schema; informative/degenerate denominators; conditional and unconditional power/false-claim rates; 48-cell strict/power grid; 36-cell weak-null grid; simultaneous bounds and negative controls; fixture is synthetic, not a power result")
           PY
+      - name: Validate PITB selective-missingness and component-size calibration plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/missingness-calibration-plan.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/missingness-calibration-plan-2026-10-28.json" <<'PY'
+          import copy
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError
+
+          schema_path, plan_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          plan = json.loads(plan_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+
+          REQUIRED_IDS = {
+              "complete_data_reference",
+              "mcar_target_row_omission_05",
+              "mcar_target_row_omission_15",
+              "mcar_component_row_omission_15",
+              "mar_difficulty_nonattempt_15",
+              "arm_differential_tool_unavailable_15",
+              "size_informative_component_outage_15",
+              "mnar_outcome_dependent_row_omission_15",
+              "missing_checker_receipt_05",
+              "post_outcome_exclusion_05",
+              "informative_component_size_effect",
+              "cross_family_links_20_to_14_components",
+              "missing_receipt_misclassified_verified_success",
+          }
+
+          def check(candidate):
+              validator.validate(candidate)
+              ids = [row["scenario_id"] for row in candidate["scenarios"]]
+              if len(ids) != len(set(ids)) or set(ids) != REQUIRED_IDS:
+                  raise ValueError("scenario IDs must be unique and match the registered scenario inventory")
+              if candidate["status"] != "design_only_not_results" or candidate["simulation_results_included"]:
+                  raise ValueError("plan must remain explicitly design-only, not a results artifact")
+              if candidate["primary_estimand"] != "finite_frozen_test_target_average" or candidate["primary_weighting"] != "target_weighted":
+                  raise ValueError("primary estimand/weighting drifted")
+              if candidate["denominator_policy"] != "all_frozen_eligible_target_assignments":
+                  raise ValueError("frozen eligible target denominator cannot be changed")
+              if candidate["missing_target_row_policy"] != "reject_confirmatory_run" or candidate["missing_arm_outcome_policy"] != "reject_confirmatory_run":
+                  raise ValueError("missing target/arm rows must fail closed")
+              if any(candidate[k] != "retain_as_non_solve" for k in ("not_attempted_policy","tool_unavailable_policy","timeout_policy")):
+                  raise ValueError("explicit recorded runtime failures must remain non-solves")
+              if candidate["missing_required_receipt_policy"] != "no_claim_evidence_incomplete":
+                  raise ValueError("missing verifier evidence cannot be promoted to success")
+              if candidate["post_outcome_exclusion_policy"] != "forbidden":
+                  raise ValueError("post-outcome exclusion is forbidden")
+              if candidate["cluster_key_policy"] != "audited_cross_family_connected_component" or not candidate["component_manifest_required"]:
+                  raise ValueError("component manifest and connected-component resampling are required")
+              if candidate["cluster_floor_count_source"] != "independent_connected_components" or candidate["confirmatory_cluster_floor"] != 20:
+                  raise ValueError("the confirmatory cluster floor must count independent connected components")
+              rows = {row["scenario_id"]: row for row in candidate["scenarios"]}
+              required = {
+                  "complete_data_reference": ("primary_reference", True),
+                  "mcar_target_row_omission_05": ("reject_confirmatory_run", False),
+                  "mcar_target_row_omission_15": ("reject_confirmatory_run", False),
+                  "mcar_component_row_omission_15": ("reject_confirmatory_run", False),
+                  "mar_difficulty_nonattempt_15": ("retain_as_non_solve", True),
+                  "arm_differential_tool_unavailable_15": ("retain_as_non_solve", True),
+                  "size_informative_component_outage_15": ("retain_as_non_solve", True),
+                  "mnar_outcome_dependent_row_omission_15": ("reject_confirmatory_run", False),
+                  "missing_checker_receipt_05": ("no_claim_evidence_incomplete", False),
+                  "post_outcome_exclusion_05": ("forbid_post_outcome_exclusion", False),
+                  "informative_component_size_effect": ("report_primary_and_secondary_estimands", True),
+                  "cross_family_links_20_to_14_components": ("no_go_if_independent_components_below_floor", False),
+                  "missing_receipt_misclassified_verified_success": ("no_claim_evidence_incomplete", False),
+              }
+              for scenario_id, (action, allowed) in required.items():
+                  row = rows[scenario_id]
+                  if row["expected_primary_action"] != action or row["confirmatory_claim_allowed"] is not allowed:
+                      raise ValueError(f"wrong fail-closed behavior for scenario: {scenario_id}")
+              return True
+
+          check(plan)
+          mutants = []
+          bad = copy.deepcopy(plan); bad["scenarios"].pop(); mutants.append(("missing scenario", bad))
+          bad = copy.deepcopy(plan); bad["primary_weighting"] = "equal_component_weighted"; mutants.append(("estimand changed", bad))
+          bad = copy.deepcopy(plan); bad["missing_target_row_policy"] = "complete_case_delete"; mutants.append(("complete-case deletion", bad))
+          bad = copy.deepcopy(plan); bad["tool_unavailable_policy"] = "omit_from_denominator"; mutants.append(("runtime failure omitted", bad))
+          bad = copy.deepcopy(plan); bad["component_manifest_required"] = False; mutants.append(("component audit bypass", bad))
+          bad = copy.deepcopy(plan); bad["post_outcome_exclusion_policy"] = "allowed"; mutants.append(("post-outcome exclusion", bad))
+          bad = copy.deepcopy(plan); bad["simulation_results_included"] = True; mutants.append(("design mislabeled as result", bad))
+          bad = copy.deepcopy(plan)
+          row = next(r for r in bad["scenarios"] if r["scenario_id"] == "mnar_outcome_dependent_row_omission_15")
+          row["expected_primary_action"] = "primary_reference"; row["confirmatory_claim_allowed"] = True
+          mutants.append(("MNAR promoted to confirmatory", bad))
+          for label, mutant in mutants:
+              try:
+                  check(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"negative control unexpectedly accepted: {label}")
+          print("PITB_MISSINGNESS_PLAN_CONTRACT_PASS: frozen target estimand, all-row denominator, explicit non-solve semantics, connected-component floor, 13 scenario IDs, and 8 negative controls; design only, not a simulation result")
+          PY
       - name: Validate run-config v1 schema and split-aware exposure quarantine
         shell: bash
         run: |
