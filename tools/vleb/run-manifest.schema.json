@@ -1,0 +1,478 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vleb-run-manifest.schema.json",
+  "title": "VLEB trusted evaluator run manifest",
+  "description": "A manifest contract for binding a benchmark episode to pre-registered task/protocol inputs, candidate revision, runtime/toolchain identities and a complete evidence bundle. Schema validation alone does not establish signature validity or prove that logs originated from the claimed runner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_kind",
+    "repository",
+    "task",
+    "protocol",
+    "candidate",
+    "runtime",
+    "toolchains",
+    "auditor",
+    "mutation_campaign",
+    "evidence_bundle",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vleb-run-manifest-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "run_kind": {
+      "enum": [
+        "development_smoke",
+        "confirmatory"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "full_name",
+        "workflow_path",
+        "workflow_ref",
+        "workflow_sha",
+        "run_id",
+        "run_attempt",
+        "event",
+        "expected_head_sha"
+      ],
+      "properties": {
+        "full_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "workflow_path": {
+          "type": "string",
+          "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"
+        },
+        "workflow_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow_sha": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "enum": [
+            "pull_request",
+            "push",
+            "workflow_dispatch",
+            "schedule",
+            "workflow_call",
+            "other"
+          ]
+        },
+        "expected_head_sha": {
+          "$ref": "#/$defs/gitSha"
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "exposure",
+        "contract_path",
+        "contract_sha256",
+        "independent_reviewer_count",
+        "baseline_empty_patch_failed",
+        "reference_solution_passed"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128
+        },
+        "exposure": {
+          "enum": [
+            "public_development",
+            "private_holdout",
+            "private_confirmatory"
+          ]
+        },
+        "contract_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "independent_reviewer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baseline_empty_patch_failed": {
+          "type": "boolean"
+        },
+        "reference_solution_passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patch_path",
+        "patch_sha256",
+        "checkout_revision",
+        "clean_worktree"
+      ],
+      "properties": {
+        "patch_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "checkout_revision": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "clean_worktree": {
+          "const": true
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "immutable_image_id",
+        "network_mode",
+        "network_mode_observed"
+      ],
+      "properties": {
+        "platform": {
+          "enum": [
+            "linux",
+            "windows",
+            "macos",
+            "z_os",
+            "other"
+          ]
+        },
+        "immutable_image_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "network_mode": {
+          "enum": [
+            "none",
+            "allowlisted",
+            "enabled",
+            "not_applicable"
+          ]
+        },
+        "network_mode_observed": {
+          "const": true
+        }
+      }
+    },
+    "toolchains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "identity_sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "identity_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "auditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_path",
+        "source_sha256",
+        "verifier_binary_sha256"
+      ],
+      "properties": {
+        "source_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "mutation_campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_path",
+        "catalog_sha256",
+        "active_mutation_ids",
+        "results_path",
+        "results_sha256",
+        "compilable",
+        "killed",
+        "survived",
+        "unresolved"
+      ],
+      "properties": {
+        "catalog_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "catalog_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "active_mutation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "results_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "results_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "compilable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "killed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "survived": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "evidence_bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "receipt_path",
+        "receipt_sha256",
+        "artifact_count"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attestation_required",
+        "provider",
+        "subject_path",
+        "signer_repository",
+        "signer_workflow",
+        "predicate_type"
+      ],
+      "properties": {
+        "attestation_required": {
+          "type": "boolean"
+        },
+        "provider": {
+          "enum": [
+            "github_actions_sigstore",
+            "other",
+            "none"
+          ]
+        },
+        "subject_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "signer_repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "signer_workflow": {
+          "type": "string",
+          "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"
+        },
+        "predicate_type": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "run_kind": {
+            "const": "confirmatory"
+          }
+        },
+        "required": [
+          "run_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task": {
+            "properties": {
+              "exposure": {
+                "enum": [
+                  "private_holdout",
+                  "private_confirmatory"
+                ]
+              },
+              "independent_reviewer_count": {
+                "minimum": 1
+              },
+              "baseline_empty_patch_failed": {
+                "const": true
+              },
+              "reference_solution_passed": {
+                "const": true
+              }
+            }
+          },
+          "candidate": {
+            "properties": {
+              "clean_worktree": {
+                "const": true
+              }
+            }
+          },
+          "provenance": {
+            "properties": {
+              "attestation_required": {
+                "const": true
+              },
+              "provider": {
+                "const": "github_actions_sigstore"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_kind": {
+            "const": "development_smoke"
+          }
+        },
+        "required": [
+          "run_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task": {
+            "properties": {
+              "exposure": {
+                "enum": [
+                  "public_development",
+                  "private_holdout",
+                  "private_confirmatory"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "^(?:/|[A-Za-z]:[/\\\\])"
+      },
+      "pattern": "^(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"
+    }
+  }
+}
