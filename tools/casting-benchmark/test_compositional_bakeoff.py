@@ -31,6 +31,39 @@ class CompositionalBakeoffTests(unittest.TestCase):
                     self.assertEqual(actual.constraint_margin, expected.constraint_margin, (family, candidate_id, fidelity))
                     self.assertEqual(actual.cost_units, expected.cost_units)
 
+    def test_zero_severity_is_exact_truth_negative_control(self) -> None:
+        costs = {"low": 1, "medium": 5, "high": 25}
+        for objective_family in SUPPORTED_SCENARIOS:
+            for constraint_family in SUPPORTED_SCENARIOS:
+                for dimension in (2, 5, 10):
+                    world = CompositionalScenarioWorld(
+                        objective_family, constraint_family, dimension, 0.0, 29,
+                        costs, 128,
+                    )
+                    for candidate_id in (0, 1, 17, 31, 74, 127):
+                        truth = world.truth_for_audit_only(candidate_id)
+                        for fidelity in ("low", "medium", "high"):
+                            observed = world._response(candidate_id, fidelity)
+                            self.assertEqual(
+                                observed.objectives, truth.objectives,
+                                (objective_family, constraint_family, dimension, candidate_id, fidelity),
+                            )
+                            self.assertEqual(
+                                observed.constraint_margin, truth.constraint_margin,
+                                (objective_family, constraint_family, dimension, candidate_id, fidelity),
+                            )
+
+    def test_manifest_freezes_zero_severity_null_control(self) -> None:
+        manifest = json.loads(
+            (ROOT / "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["default_sweep"]["severities"], [0, 0.5, 1, 2])
+        self.assertEqual(
+            manifest["default_sweep"]["run_count"],
+            6 * 6 * 3 * 4 * 3 * 6,
+        )
+        self.assertIn("zero_mismatch", manifest["negative_controls"])
+
     def test_independent_equation_replay_matches_every_family(self) -> None:
         for family in SUPPORTED_SCENARIOS:
             for dimension in (2, 5):
