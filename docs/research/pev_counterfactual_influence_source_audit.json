@@ -2,83 +2,92 @@
   "checks_on_fetched_repository_source": {
     "checks": [
       {
-        "check": "strict SHA-256 format for branch metadata",
+        "check": "SHA-256 validation for paired metadata",
         "passed": true
       },
       {
-        "check": "strict SHA-256 format for consumer state digests",
+        "check": "SHA-256 validation for before/after consumer states",
         "passed": true
       },
       {
-        "check": "exact seven invalid variants",
+        "check": "exact invalid variant count",
         "passed": true
       },
       {
-        "check": "all seven payload classes required",
+        "check": "exact seven-payload coverage",
         "passed": true
       },
       {
-        "check": "valid scalar and typed value equality",
+        "check": "valid typed PE matches compatibility scalar",
         "passed": true
       },
       {
-        "check": "all consumers classified",
+        "check": "all consumers must be classified",
         "passed": true
       },
       {
-        "check": "target consumer missing fails closed",
+        "check": "missing target/protected consumers fail closed",
         "passed": true
       },
       {
-        "check": "invalid branch labels enforced",
+        "check": "invalid branch role labels enforced",
         "passed": true
       },
       {
-        "check": "batch-level trial identity audited",
+        "check": "branch role—not self-reported status—controls path",
         "passed": true
       },
       {
-        "check": "batch-level evidence identity audited",
+        "check": "invalid status promotion mutation exists",
         "passed": true
       },
       {
-        "check": "deterministic self-test contains 16 mutations",
+        "check": "trial IDs unique across batch",
         "passed": true
       },
       {
-        "check": "CLI applies batch identity checks",
+        "check": "evidence IDs unique across batch",
         "passed": true
       },
       {
-        "check": "production Rust limitation explicit",
+        "check": "CLI applies batch validation",
+        "passed": true
+      },
+      {
+        "check": "result JSON records 17/17 mutations",
+        "passed": true
+      },
+      {
+        "check": "result JSON states Rust not executed",
         "passed": true
       }
     ],
-    "checks_passed": 13,
-    "checks_total": 13,
+    "checks_passed": 15,
+    "checks_total": 15,
     "status": "PASS_SOURCE_CONTRACT_SCAN_NOT_PRODUCTION_TEST"
   },
   "local_execution": {
     "source_path": "/mnt/data/pev_counterfactual_influence_benchmark_v1.py",
-    "source_sha256": "f8f8b61d582c0a3ee9fc9e03243dbd76476345e4624086c3182cf8c4ee9aa9ab",
-    "git_blob_sha1": "2e21a7c802f4be7d671df1392639462b083356bf",
+    "source_sha256": "5f7c7db12829c3ff591dba8dfcc01560894f1a126d330864d37f01db60795548",
+    "source_git_blob_sha1": "4eba8c3a54c304a0431c7aa2179028f4843135b6",
     "results_path": "/mnt/data/pev_counterfactual_influence_benchmark_v1_results.json",
-    "results_sha256": "289929cbbe5293d76337f4319d9f324e2266c8c853c92cae124a03522566cced",
+    "results_sha256": "9c1e2e3a0be511f399f9baf342b87a41a361f3805f5677b5462bf2a7c1f3958b",
+    "results_git_blob_sha1": "ddcd4e650b3c5ccd1ebbee3e71c6e7a935d9af64",
     "python_syntax_compile": "PASS",
     "self_test": "PASS_COUNTERFACTUAL_REFERENCE_AUDITOR_ONLY",
     "trials": 100000,
     "branch_summaries": 900000,
-    "mutations_detected": 16,
-    "mutations_injected": 16
+    "mutations_detected": 17,
+    "mutations_injected": 17
   },
   "repository_snapshot": {
     "source_path": "docs/research/pev_counterfactual_influence_benchmark_v1.py",
-    "source_git_blob_sha1": "57d75796ae837a053feee9ae0ac778c1e5457965",
+    "source_git_blob_sha1": "d1017729e075d76da14dda89edaa850a3246c15d",
     "source_byte_identity_to_local_execution_verified": false,
     "results_path": "docs/research/pev_counterfactual_influence_benchmark_v1_results.json",
-    "results_git_blob_sha1": "2c2a1586eb7b2e6cfcaf9c919e7d2ee77b05d474",
+    "results_git_blob_sha1": "ddcd4e650b3c5ccd1ebbee3e71c6e7a935d9af64",
     "result_bytes_match_local_execution": true,
-    "qualification": "The result JSON's Git blob ID matches the local Git blob ID. The repository source passed the listed 13-check contract scan but was not executed byte-for-byte locally; local run and repository source are recorded separately."
+    "qualification": "The repository results JSON is byte-identical to the local deterministic output. The fetched repository source passes the listed contract scan but was not executed byte-for-byte locally; local-run and repository source identities are recorded separately."
   },
   "rust_compiled_or_executed": false,
   "status": "PASS_LOCAL_REFERENCE_RUN_AND_REPOSITORY_SOURCE_SCAN_ONLY"
