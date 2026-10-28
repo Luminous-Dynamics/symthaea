@@ -12,7 +12,7 @@ from decision_robustness_eval import BENCHMARK_ID, score_document, validate_docu
 
 def fixture() -> dict:
     return {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "benchmark_id": BENCHMARK_ID,
         "task_id": "known-answer-1",
         "run_id": "seed-17",
@@ -21,6 +21,19 @@ def fixture() -> dict:
             "holdout_role": "independent_post_selection",
             "selection_freeze_sha256": "a" * 64,
             "holdout_manifest_sha256": "b" * 64,
+        },
+        "source_run": {
+            "sweep_sha256": "c" * 64,
+            "candidate_pool_sha256": "d" * 64,
+            "objective_family": "local_bias_island",
+            "constraint_family": "constraint_boundary",
+            "dimension": 2,
+            "severity": 0.5,
+            "seed": 17,
+            "policy": "low_screen",
+            "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
+            "cost_budget": 200,
+            "cost_spent": 130,
         },
         "reference_point": [1.2, 1.2],
         "candidate_set": [
@@ -108,6 +121,12 @@ class DecisionRobustnessTests(unittest.TestCase):
         doc["holdout_shifts"][0]["evaluations"][0]["objectives"] = [1.2, 0.5]
         with self.assertRaisesRegex(ValueError, "reference_point"):
             validate_document(doc)
+
+    def test_receipt_preserves_bakeoff_source_identity(self) -> None:
+        source_run = self.score()["source_run"]
+        self.assertEqual(source_run["candidate_pool_sha256"], "d" * 64)
+        self.assertEqual(source_run["policy"], "low_screen")
+        self.assertEqual(source_run["seed"], 17)
 
     def test_receipt_binds_evaluator_source_bytes(self) -> None:
         receipt = self.score()
