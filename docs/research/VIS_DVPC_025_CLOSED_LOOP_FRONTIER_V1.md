@@ -13,7 +13,7 @@ This deliberately joins a selection loop and an activation gate in one scorer. E
 ## Frozen fixture
 
 - 13 hand-authored campaigns cover positive opportunity, high uncertainty with low value, ranking reversal, cost inversion, source-to-target shift, row dependence, missing/censored evidence, safe-but-useless evidence, actual cost overrun, negative realized value, independent cluster units, no information, and repeated fixed-sample peeking.
-- Each campaign has three measurement candidates and one activation candidate; the public action table and evaluator-only outcome table are separate hashed files. Oracle rows freeze per-observation risk bits and bounded-value samples, validate them against the aggregate summaries, and never place those samples in the visible table.
+- Each campaign has three measurement candidates and one activation candidate; the public action table and evaluator-only outcome table are separate hashed files. Oracle rows freeze per-observation risk bits, bounded-value samples, and hidden target risk/value truth; raw observations are cross-checked against aggregate summaries and never placed in the visible table.
 - The public table contains estimates, uncertainty, estimated cost, budget, target and the declared type of evidence unit. Realized value, actual cost, sample counts, failures, value summaries, target calibration, provenance and sealed-access controls are evaluator-only.
 - Thirteen campaigns are a known-answer adversarial fixture, not thirteen independent empirical replications. The seeds identify frozen cases; they do not support confidence intervals or population claims.
 
@@ -35,26 +35,28 @@ Only declared IID trials or independent-cluster units may contribute. Row-depend
 - **risk_aware_value_fixed:** decision value with a simple predicted-risk penalty/risk-cap filter, then fixed gate.
 - **decision_value_anytime:** same acquisition score but activation requires both anytime-valid e-processes to cross.
 - **risk_aware_value_anytime:** risk-penalized acquisition with the anytime-valid gate.
+- **naive_fixed_peeking_unsafe:** intentionally treats an oracle stream marked `FIXED_PEEKED` as independent and ignores repeated-look provenance; it exists only as a falsification baseline.
 
 All baselines get the same visible candidate set, budgets and evaluator outcomes. The scorer does not expose oracle outcomes to the policy before a selected action. The hindsight oracle is deliberately omitted from deployable baseline ranks.
 
 ## Accounting and output
 
-For each campaign-policy pair, output includes selected actions, gate status/reason, activation, false authorization, budget overrun, actual cost, gross realized value, net value, risk upper bound, value lower bound, and the counts used by the gate.
+For each campaign-policy pair, output includes selected actions, gate status/reason, activation, uncertified activation, false-safe authorization against hidden target truth, budget overrun, actual cost, gross realized value, net value, risk upper bound, value lower bound, and the counts used by the gate.
 
 Net value is realized activation value minus (all actual measurement and activation costs multiplied by 100 milli-value units). An abstaining policy that spends money but never activates can therefore have negative net value; a policy that never spends gets zero rather than being credited as a discovery success. Actual costs, not only planning estimates, control budget-overrun reporting.
 
-The output is a metric vector, not a single weighted leaderboard score. Keep risk, realized value, cost, activation coverage, harmful activations, budget overruns and false authorizations separately visible.
+The output is a metric vector, not a single weighted leaderboard score. Keep risk, realized value, cost, activation coverage, uncertified activations, false-safe authorizations, harmful activations and budget overruns separately visible. An uncertified activation is a policy action without a successful gate; a false-safe authorization is a gate pass when the evaluator-only target truth is at or beyond the risk boundary or at/below the value floor. They are different failure types.
 
 ## Known-answer acceptance gates
 
 1. Frozen visible-action and evaluator-only oracle files pass SHA-256 verification.
-2. The scorer emits exactly 104 campaign-policy rows and eight policy summaries.
-3. The intentionally unsafe forced_adapt baseline is recorded with 13 false authorizations in the no-evidence fixture.
-4. The fixed decision-value policy authorizes a safe, positive-value campaign and records positive net value. The anytime decision-value policy consumes a second batch, crosses the time-uniform risk/value evidence thresholds, then authorizes without false authorization.
-5. The row-dependent and repeated-fixed-peek controls do not authorize the high-uncertainty baseline.
-6. Actual cost overruns cannot disappear from the ledger.
-7. Tests and scoring run against the exact commit in the dedicated workflow; the workflow publishes raw rows and a source/fixture/output receipt.
+2. The scorer emits exactly 117 campaign-policy rows and nine policy summaries.
+3. The intentionally unsafe forced_adapt baseline is recorded with 13 uncertified activations in the no-evidence fixture.
+4. The fixed decision-value policy authorizes a safe, positive-value campaign and records positive net value. The anytime decision-value policy consumes a second batch, crosses the time-uniform risk/value evidence thresholds, then authorizes without false-safe authorization.
+5. On the frozen null-boundary witness, the unsafe naive-peeking baseline authorizes despite hidden target risk being exactly 5%; the compliant anytime and ordinary unit-aware gates refuse to count that `FIXED_PEEKED` stream.
+6. A byte-mutated raw risk stream is rejected because its observation count no longer matches the aggregate.
+7. The row-dependent control does not authorize the high-uncertainty baseline and actual cost overruns cannot disappear from the ledger.
+8. Tests and scoring run against the exact commit in the dedicated workflow; the workflow publishes raw rows and committed-source/formatted-source/fixture/output receipts.
 
 A green mechanism test establishes only that the implementation matches these frozen examples. It does not prove the gate's assumptions on real inputs, guarantee target transportability, validate cryptographic receipts, or show that a method outperforms industry systems.
 
@@ -73,5 +75,5 @@ For risk control, the same-distribution assumption cannot be hand-waved: high-pr
 - Move from summary-only outcomes to immutable raw per-trial outcomes and an independent aggregate verifier; prove the action log contains no unselected oracle rows.
 - Run paired campaigns on the same seeds at multiple predeclared budgets and held-out shift families; resample at the independent task/source/cluster level.
 - Compare against random, uncertainty, cost-normalized uncertainty, diversity, plug-in EVSI and robust EVSI on identical information, tools, compute and all-in costs.
-- Proposed internal targets (not industry standards): zero false authorizations on all frozen negative controls; at least 10% greater net decision value at equal cost on two held-out task families with the paired task/cluster interval excluding zero and no risk-cap violation, or at least 20% lower cost at non-inferior decision quality and risk.
+- Proposed internal targets (not industry standards): zero false-safe authorizations for compliant gates on frozen negative controls, while the deliberately unsafe baseline must trigger the known false-safe witness; at least 10% greater net decision value at equal cost on two held-out task families with the paired task/cluster interval excluding zero and no risk-cap violation, or at least 20% lower cost at non-inferior decision quality and risk.
 - Publish failure cases and IID robustness tax. Do not claim SOTA until the benchmark is externally reproducible, the baselines are faithful, and results generalize beyond synthetic fixtures.
