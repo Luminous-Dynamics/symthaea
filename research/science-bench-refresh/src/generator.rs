@@ -365,8 +365,8 @@ fn generate_one_task(
                 .iter()
                 .map(|row| row["x"].as_f64().unwrap_or(f64::NAN))
                 .collect();
-            let challenge_index = f64::from(u32::try_from(count).unwrap_or(0)) + 1.0;
-            let challenge_x = recipe.x_start + challenge_index * narrow_step;
+            let challenge_index = f64::from(u32::try_from(count).unwrap_or(0)) + 10.0;
+            let challenge_x = recipe.x_start + challenge_index * recipe.x_step;
             let policy_input = json!({
                 "instruction": instruction,
                 "observations": observations,
@@ -600,8 +600,28 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 if challenge_x <= xs[xs.len() - 1] || xs.contains(&challenge_x) {
                     return Err(format!("{id} challenge point is not out of domain"));
                 }
-                // The nonzero polynomial product is zero at every listed observed root,
-                // while its out-of-domain challenge point is not one of those roots.
+                let amplitude = finite_number(
+                    &oracle["noise_amplitude"],
+                    &format!("{id}.noise_amplitude"),
+                )?;
+                if amplitude <= 0.0 {
+                    return Err(format!("{id} identifiability noise amplitude must be positive"));
+                }
+                let mut log_effect = coefficient.abs().ln();
+                for root in &xs {
+                    let distance = (challenge_x - root).abs();
+                    if distance == 0.0 {
+                        return Err(format!("{id} challenge point coincides with an observed root"));
+                    }
+                    log_effect += distance.ln();
+                }
+                if !log_effect.is_finite() || log_effect <= amplitude.ln() {
+                    return Err(format!(
+                        "{id} alternative law does not diverge beyond the noise bound at the challenge point"
+                    ));
+                }
+                // Log-space avoids overflow for higher-degree products. The nonzero
+                // polynomial remains exactly zero at all observed roots.
             }
             other => return Err(format!("{id} has unsupported synthetic family {other}")),
         }
@@ -991,7 +1011,11 @@ mod tests {
         for root in roots {
             out_of_domain_product *= challenge - root.as_f64().unwrap();
         }
-        assert_ne!(out_of_domain_product, 0.0);
+        assert!(
+            out_of_domain_product.abs()
+                > oracle["noise_amplitude"].as_f64().unwrap(),
+            "alternative law must differ by more than the declared noise amplitude"
+        );
     }
 
     #[test]
