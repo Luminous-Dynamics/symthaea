@@ -181,8 +181,8 @@ def attestation_output_issues(raw: bytes, manifest: dict[str, Any]) -> list[dict
     repository ID, source revision/ref, workflow identity and evidence bundle.
     """
     try:
-        rows = json.loads(raw.decode("utf-8", errors="strict"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
+        rows = parse_unique_json(raw)
+    except (UnicodeError, ValueError) as exc:
         return [{"code": "attestation_json_invalid", "message": str(exc)}]
     if not isinstance(rows, list) or not rows:
         return [{"code": "attestation_json_empty", "message": "verified attestation output must be a non-empty JSON array"}]
@@ -311,8 +311,8 @@ def audit_witness_execution_receipt(
             "message": "receipt bytes differ from the digest in the claim witness",
         }]
     try:
-        receipt = json.loads(raw.decode("utf-8", errors="strict"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
+        receipt = parse_unique_json(raw)
+    except (UnicodeError, ValueError) as exc:
         return [{"code": "witness_receipt_json_invalid", "message": str(exc)}]
     if not isinstance(receipt, dict):
         return [{"code": "witness_receipt_root_invalid", "message": "receipt root must be a JSON object"}]
@@ -754,7 +754,7 @@ def audit_claim_evidence_bundle(
             observed_claim_sha = digest(claim_path.read_bytes())
             if observed_claim_sha != item["claim_sha256"]:
                 raise ValueError("claim file digest differs from evaluator-pinned manifest")
-            claim_data = json.loads(claim_path.read_text(encoding="utf-8"))
+            claim_data = parse_unique_json(claim_path.read_bytes())
             if not isinstance(claim_data, dict):
                 raise ValueError("claim root must be a JSON object")
             if claim_data.get("claim_id") != item["claim_id"]:
