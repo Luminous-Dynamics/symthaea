@@ -20,16 +20,35 @@ From the repository root:
 
     python3 docs/research/pev_causal_replay_effect_benchmark_v1.py --pairs-per-arm 512 --seed 20261028 --bootstrap-replicates 3000 --output /tmp/pev_causal_replay_effect_benchmark_v1_results.json
 
-The deterministic synthetic experiment contains 512 pairs in each arm (1,024 pairs / 2,048 run summaries) and 3,000 percentile-bootstrap resamples per arm. The data-generating process plants a valid-PE mean effect of +0.08 and an invalid-PE placebo effect of 0.
+The deterministic synthetic experiment contains 512 pairs in each arm (1,024 pairs / 2,048 run summaries) and 3,000 percentile-bootstrap resamples per arm. The data-generating process plants a valid-PE mean outcome effect of +0.08 and an invalid-PE placebo effect of 0. The numeric PE evidence value is sampled independently of the planted treatment effect, so the estimator does not use the claimed treatment effect as if it were the observed PE magnitude.
 
 | Metric | Valid-PE intervention | Invalid-PE placebo |
 |---|---:|---:|
-| Mean paired outcome effect | +0.07981 | +0.00249 |
-| 95% bootstrap interval | [+0.07632, +0.08311] | [-0.00083, +0.00585] |
-| Interval excludes zero | Yes | No |
+| Mean paired outcome effect | +0.08078 | -0.00368 |
+| 95% bootstrap interval | [+0.07743, +0.08420] | [-0.00710, -0.00042] |
+| Interval excludes zero | Yes | Yes |
 | Passes predeclared criterion | Lower bound > +0.05 | Entire CI inside ±0.02 |
 
-The reference auditor also rejects all 13 deliberately malformed pair/trace mutations: mismatched scenario input, pre-intervention state, randomness tape, outcome calibration, invalid outcome score, unverified prefix replay, missing valid evidence, invalid evidence admission, role swapping, duplicate run IDs, duplicate pair IDs, boolean-as-count, and malformed intervention type.
+The reference auditor rejects all 16 deliberately malformed pair/trace mutations: mismatched scenario input, pre-intervention state, randomness tape, outcome calibration, invalid outcome score, unverified prefix replay, missing valid evidence, invalid evidence admission, role swapping, duplicate run IDs, duplicate pair IDs, boolean-as-count, malformed intervention type, a non-distinct post-intervention path, incomplete invalid-payload coverage, and rejected pairs leaking into effect estimates. It requires balanced coverage of all seven invalid payloads (73 each, except null at 74) and excludes every rejected pair from the effect arrays.
+
+
+## Repeated-seed interval calibration
+
+A separate calibration run tests interval behavior on 1,000 independent synthetic seeds, with 512 paired effects per arm and 500 bootstrap resamples per arm in each seed (1,024,000 paired effect observations in total). The calibration isolates the planted outcome-difference distribution from trace-schema validation.
+
+| Calibration measure | Valid effect (+0.08) | Placebo effect (0) |
+|---|---:|---:|
+| Empirical coverage of 95% percentile-bootstrap interval | 94.5% | 95.0% |
+| Empirical coverage of 95% paired-t interval | 94.4% | 94.8% |
+| Predeclared engineering gate pass rate | 100%: lower CI > +0.05 | 100%: CI inside ±0.02 |
+
+The placebo interval excluded zero in 5.0% of replications. That is expected sampling behavior, not a failure by itself: the placebo gate is practical equivalence inside the prespecified margin, not failure to reject a zero-effect null. These coverage rates are finite Monte Carlo estimates for this approximately Gaussian planted-effect model; they are not universal coverage guarantees and not Symthaea production evidence.
+
+Reproduce with:
+
+    python3 docs/research/pev_causal_replay_seed_sweep_v1.py --seeds 1000 --pairs-per-arm 512 --bootstrap-replicates 500 --base-seed 20261028
+
+The script and result JSON are committed alongside this benchmark; the script uses NumPy for vectorized bootstrap draws and imports the sibling causal-replay reference source.
 
 ## Evidence limits
 
