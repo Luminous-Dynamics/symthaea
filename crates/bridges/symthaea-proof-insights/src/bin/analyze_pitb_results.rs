@@ -3114,6 +3114,28 @@ mod tests {
     }
 
     #[test]
+    fn strict_null_scenario_emits_the_simultaneous_upper_bound() {
+        let families: Vec<FamilyTargetCount> = (0..24)
+            .map(|index| FamilyTargetCount {
+                family_id: format!("null-family-{index:02}"),
+                eligible_target_count: 1 + index % 3,
+            })
+            .collect();
+        let scenario = simulate_power_scenario(
+            &families, 0.35, 0.0, 0.20, 64, 128, 20261028,
+        )
+        .expect("strict-null scenario should be estimated");
+        assert_eq!(scenario.status, "estimated");
+        assert_eq!(
+            scenario.null_effect_false_claim_probability_upper_simultaneous_95,
+            Some(simultaneous_null_upper_bound(scenario.utility_gate_passes, 64))
+        );
+        assert!(scenario.null_effect_false_claim_probability_upper_simultaneous_95
+            .zip(scenario.estimated_power_upper_95)
+            .is_some_and(|(adjusted, per_cell)| adjusted >= per_cell));
+    }
+
+    #[test]
     fn power_simulation_is_reproducible_for_a_frozen_seed() {
         let families: Vec<FamilyTargetCount> = (0..24)
             .map(|index| FamilyTargetCount {
