@@ -154,3 +154,6 @@ The cross-policy matched-budget report can be regenerated after both CSVs are pr
     python3 tools/active-evidence-exact-tree/compare_cost_frontiers.py /tmp/active-evidence.csv /tmp/robust-tree.csv
 
 The comparator checks completeness of both input inventories, excludes the known-channel reference from deployable-baseline selection, computes the best feasible implemented greedy arm at each shared worst-case expected-cost budget, checks the tree's stated risk/cost aggregates against its scenario rows, and enforces frozen witness values. It does not treat the hindsight/known-channel arm as a deployable method or claim external validity.
+
+
+When the dedicated GitHub Actions qualification workflow completes, it uploads an exact-head artifact containing both deterministic result CSVs, the matched-cost frontier CSV, and a provenance receipt with the source commit/tree, toolchain versions, runner identity, and SHA-256 digests. This is designed to make the generated benchmark report inspectable without assuming the result of any queued workflow.
