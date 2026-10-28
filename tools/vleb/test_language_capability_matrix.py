@@ -75,6 +75,22 @@ def validate_matrix(data: dict[str, Any]) -> list[str]:
         if row.get("held_out_benchmark") != "not_run":
             errors.append(f"known_language_benchmark_overclaim:{name}")
 
+    supplemental = data.get("supplemental_capabilities", [])
+    cobol_indexers = [
+        row for row in supplemental
+        if row.get("component") == "VLEB fixed-format COBOL read-only source indexer"
+    ]
+    if len(cobol_indexers) != 1:
+        errors.append("cobol_indexer_component_missing_or_duplicate")
+    else:
+        component = cobol_indexers[0]
+        if component.get("status") not in ("authored_ci_pending", "validated_in_ci"):
+            errors.append("cobol_indexer_status_invalid")
+        if component.get("score_eligible") is not False:
+            errors.append("cobol_indexer_scored_without_benchmark")
+        if "does not enable COBOL in central execution dispatch" not in component.get("limitations", []):
+            errors.append("cobol_indexer_scope_boundary_missing")
+
     if data.get("reporting_rule") != "Never collapse recognition, parsing, generation, execution, test execution, independent verification and held-out performance into a single 'language supported' boolean.":
         errors.append("capability_stage_separation_missing")
     return errors
@@ -125,6 +141,19 @@ class LanguageCapabilityMatrixTests(unittest.TestCase):
         row = next(r for r in data["languages"] if r["language"] == "COBOL")
         row["dispatch_recognition"] = "supported"
         self.assertIn("legacy_dispatch_must_fail_closed:COBOL", validate_matrix(data))
+
+    def test_source_indexer_does_not_upgrade_execution_or_score_claims(self) -> None:
+        component = self.matrix["supplemental_capabilities"][0]
+        self.assertFalse(component["score_eligible"])
+        self.assertIn("does not compile or execute COBOL", component["limitations"])
+        rows = {r["language"]: r for r in self.matrix["languages"]}
+        self.assertEqual(rows["COBOL"]["dispatch_recognition"], "unsupported")
+        self.assertEqual(rows["COBOL"]["held_out_benchmark"], "not_run")
+
+    def test_indexer_cannot_be_marked_validated_without_ci_state_change(self) -> None:
+        data = json.loads(json.dumps(self.matrix))
+        data["supplemental_capabilities"][0]["status"] = "passed_sota"
+        self.assertIn("cobol_indexer_status_invalid", validate_matrix(data))
 
 
 if __name__ == "__main__":
