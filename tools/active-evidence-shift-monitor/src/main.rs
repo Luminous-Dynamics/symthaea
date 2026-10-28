@@ -95,17 +95,18 @@ struct Scenario {
     change_after: usize,
 }
 
-const SCENARIOS: [Scenario; 2] = [
-    Scenario {
-        name: "stationary_null",
-        post_shift_p: None,
-        change_after: 0,
-    },
-    Scenario {
-        name: "step_shift",
-        post_shift_p: Some(SHIFTED_P),
-        change_after: CHANGE_AFTER,
-    },
+const SCENARIOS: [Scenario; 11] = [
+    Scenario { name: "stationary_null", post_shift_p: None, change_after: 0 },
+    Scenario { name: "step_down_010", post_shift_p: Some(0.10), change_after: CHANGE_AFTER },
+    Scenario { name: "step_down_020", post_shift_p: Some(0.20), change_after: CHANGE_AFTER },
+    Scenario { name: "step_down_030", post_shift_p: Some(0.30), change_after: CHANGE_AFTER },
+    Scenario { name: "step_down_040", post_shift_p: Some(0.40), change_after: CHANGE_AFTER },
+    Scenario { name: "step_down_045", post_shift_p: Some(0.45), change_after: CHANGE_AFTER },
+    Scenario { name: "step_up_055", post_shift_p: Some(0.55), change_after: CHANGE_AFTER },
+    Scenario { name: "step_up_060", post_shift_p: Some(0.60), change_after: CHANGE_AFTER },
+    Scenario { name: "step_up_070", post_shift_p: Some(0.70), change_after: CHANGE_AFTER },
+    Scenario { name: "step_up_080", post_shift_p: Some(SHIFTED_P), change_after: CHANGE_AFTER },
+    Scenario { name: "step_up_090", post_shift_p: Some(0.90), change_after: CHANGE_AFTER },
 ];
 
 /// Lanczos approximation for log-gamma on positive values.
