@@ -59,9 +59,30 @@ class WitnessRecorderTests(unittest.TestCase):
         self, *, command_code: str, timeout_ms: int = 1000,
         result: str = "supports", expected_invocation_sha256: str | None = None,
     ) -> tuple[int, dict]:
-        command_argv = [sys.executable, "-c", command_code]
+        command_argv = [sys.executable, "verifier.py"]
         if expected_invocation_sha256 is None:
             expected_invocation_sha256 = recorder.invocation_digest(command_argv, ".", timeout_ms)
+        verifier_script = f"""
+import hashlib, json
+from pathlib import Path
+source_sha256 = hashlib.sha256(Path("legacy.cbl").read_bytes()).hexdigest()
+verifier_sha256 = hashlib.sha256(Path("verifier.py").read_bytes()).hexdigest()
+verdict = {{
+    "schema_version": "vleb-witness-verdict-v1",
+    "task_id": "vleb-private-task-0001",
+    "claim_id": "COPY.BANK.REC",
+    "source_sha256": source_sha256,
+    "verifier_sha256": verifier_sha256,
+    "result": {result!r},
+}}
+Path("verdict.json").write_text(json.dumps(verdict, sort_keys=True), encoding="utf-8")
+try:
+    exec(compile({command_code!r}, "verifier.py", "exec"), globals(), globals())
+finally:
+    Path("verdict.json").write_text(json.dumps(verdict, sort_keys=True), encoding="utf-8")
+"""
+        (self.root / "verifier.py").write_text(verifier_script, encoding="utf-8")
+        verifier_sha256 = sha((self.root / "verifier.py").read_bytes())
         args = [
             "--artifact-root", str(self.root),
             "--task-id", "vleb-private-task-0001",
@@ -69,8 +90,10 @@ class WitnessRecorderTests(unittest.TestCase):
             "--source-path", "legacy.cbl",
             "--verifier-kind", "source_index",
             "--verifier-id", "test-source-indexer",
-            "--verifier-sha256", "d" * 64,
-            "--observed-result", result,
+            "--verifier-sha256", verifier_sha256,
+            "--verifier-path", "verifier.py",
+            "--verifier-argv-index", "1",
+            "--verdict-path", "verdict.json",
             "--runtime-image-id", "sha256:" + "a" * 64,
             "--network-mode", "none",
             "--network-mode-observed", "true",
@@ -149,6 +172,8 @@ class WitnessRecorderTests(unittest.TestCase):
 
     def test_missing_trusted_run_context_fails_before_command_executes(self) -> None:
         marker = self.root / "should-not-exist.txt"
+        verifier_script = 'from pathlib import Path; Path("should-not-exist.txt").touch()\n'
+        (self.root / "verifier.py").write_text(verifier_script, encoding="utf-8")
         args = [
             "--artifact-root", str(self.root),
             "--task-id", "vleb-private-task-0001",
@@ -156,18 +181,20 @@ class WitnessRecorderTests(unittest.TestCase):
             "--source-path", "legacy.cbl",
             "--verifier-kind", "source_index",
             "--verifier-id", "test-source-indexer",
-            "--verifier-sha256", "d" * 64,
-            "--observed-result", "supports",
+            "--verifier-sha256", sha((self.root / "verifier.py").read_bytes()),
+            "--verifier-path", "verifier.py",
+            "--verifier-argv-index", "1",
+            "--verdict-path", "verdict.json",
             "--runtime-image-id", "sha256:" + "a" * 64,
             "--network-mode", "none",
             "--network-mode-observed", "true",
             "--expected-invocation-sha256", recorder.invocation_digest(
-                [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"], ".", 120000
+                [sys.executable, "verifier.py"], ".", 120000
             ),
             "--receipt-path", "claims/witness.json",
             "--stdout-path", "logs/stdout.txt",
             "--stderr-path", "logs/stderr.txt",
-            "--", sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()",
+            "--", sys.executable, "verifier.py",
         ]
         with patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(self.stderr):
             code = recorder.main(args)
@@ -176,6 +203,7 @@ class WitnessRecorderTests(unittest.TestCase):
         self.assertFalse((self.root / "claims/witness.json").exists())
 
     def test_path_traversal_is_rejected_without_receipt(self) -> None:
+        (self.root / "verifier.py").write_text("print('must not run')\\n", encoding="utf-8")
         args = [
             "--artifact-root", str(self.root),
             "--task-id", "vleb-private-task-0001",
@@ -183,18 +211,20 @@ class WitnessRecorderTests(unittest.TestCase):
             "--source-path", "../outside.cbl",
             "--verifier-kind", "source_index",
             "--verifier-id", "test-source-indexer",
-            "--verifier-sha256", "d" * 64,
-            "--observed-result", "supports",
+            "--verifier-sha256", sha((self.root / "verifier.py").read_bytes()),
+            "--verifier-path", "verifier.py",
+            "--verifier-argv-index", "1",
+            "--verdict-path", "verdict.json",
             "--runtime-image-id", "sha256:" + "a" * 64,
             "--network-mode", "none",
             "--network-mode-observed", "true",
             "--expected-invocation-sha256", recorder.invocation_digest(
-                [sys.executable, "-c", "print('should not run')"], ".", 120000
+                [sys.executable, "verifier.py"], ".", 120000
             ),
             "--receipt-path", "claims/witness.json",
             "--stdout-path", "logs/stdout.txt",
             "--stderr-path", "logs/stderr.txt",
-            "--", sys.executable, "-c", "print('should not run')",
+            "--", sys.executable, "verifier.py",
         ]
         with patch.dict(os.environ, RUN_ENV, clear=True), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(self.stderr):
             code = recorder.main(args)
