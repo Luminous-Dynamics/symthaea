@@ -12,6 +12,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/task-set.example.json`: eight-task, non-scoring task-set fixture aligned to the manifest's expected denominator and family counts.
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
+- `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
 
 ## Validate a manifest
 
@@ -86,7 +87,7 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
 
 Task IDs are full SHA-256 digests over domain-separated seed/generation/family/index inputs, and generated rows are sorted by that opaque ID rather than grouped by family. The family label remains only in the evaluator-held outer row; the runner must forward only `policy_input` to the policy.
 
-The task constructors are **synthetic protocol fixtures**, not a qualified physical/scientific benchmark. They test determinism, family-count closure, input/oracle field separation, and reproducible generation. They do not establish that the task distribution is scientifically representative, that the answer labels are correct for a physical domain, or that the evaluated policy cannot access evaluator-only data. The `generator-config.example.json` is a recipe example; real scored manifests must pin the exact config bytes and immutable generator source revision.
+The task constructors are **synthetic protocol fixtures**, not a qualified physical/scientific benchmark. CI compares them to `tools/reference_replay.py`, an independent test-only Python implementation that reconstructs generated observations/targets from seed and config rather than calling the Rust generator itself. This parity check reduces shared-code risk but still does not validate the scientific correctness of the generator's targets. They test determinism, family-count closure, input/oracle field separation, and reproducible generation. They do not establish that the task distribution is scientifically representative, that the answer labels are correct for a physical domain, or that the evaluated policy cannot access evaluator-only data. The `generator-config.example.json` is a recipe example; real scored manifests must pin the exact config bytes and immutable generator source revision.
 
 ## Current implementation boundary
 
