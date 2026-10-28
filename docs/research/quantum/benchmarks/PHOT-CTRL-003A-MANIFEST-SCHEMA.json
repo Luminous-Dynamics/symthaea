@@ -1,0 +1,647 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/quantum/benchmarks/PHOT-CTRL-003A-MANIFEST-SCHEMA.json",
+  "title": "PHOT-CTRL-003A MIS experiment preregistration manifest",
+  "description": "Structural validation for the preregistration template. Status=preregistered activates freeze completeness requirements.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "schema_version",
+    "status",
+    "purpose",
+    "freeze_required_before_confirmation",
+    "benchmark_sources",
+    "supplemental_sources",
+    "splits",
+    "canonicalization",
+    "target_policy",
+    "arms",
+    "budgets",
+    "repetitions",
+    "primary_endpoint",
+    "secondary_endpoints",
+    "cost_boundary",
+    "decision_gates",
+    "environment",
+    "result_artifacts",
+    "notes"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "PHOT-CTRL-003A"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "template-not-preregistered",
+        "preregistered",
+        "complete"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tracking_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "protocol_document": {
+      "type": "string",
+      "minLength": 1
+    },
+    "freeze_required_before_confirmation": {
+      "type": "boolean"
+    },
+    "benchmark_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "revision_or_release",
+          "instance_ids",
+          "instance_manifest_sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision_or_release": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "instance_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "instance_manifest_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "supplemental_sources": {
+      "type": "array"
+    },
+    "splits": {
+      "type": "object",
+      "required": [
+        "unit",
+        "development_families",
+        "validation_families",
+        "confirmation_families",
+        "within_family_secondary_split",
+        "split_manifest_sha256",
+        "rule"
+      ],
+      "properties": {
+        "unit": {
+          "enum": [
+            "graph-family",
+            "instance"
+          ]
+        },
+        "development_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validation_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confirmation_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "within_family_secondary_split": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "rule": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "canonicalization": {
+      "type": "object",
+      "required": [
+        "graph_encoding",
+        "canonicalization_code_sha256",
+        "per_instance_graph_sha256",
+        "target_manifest_sha256"
+      ],
+      "properties": {
+        "graph_encoding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonicalization_code_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "per_instance_graph_sha256": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "target_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        }
+      },
+      "additionalProperties": true
+    },
+    "target_policy": {
+      "type": "object",
+      "required": [
+        "tier_A",
+        "tier_B",
+        "tier_C",
+        "per_instance_targets",
+        "independent_verifier_source_sha256",
+        "independent_verifier_build_sha256",
+        "feasibility_rule"
+      ],
+      "properties": {
+        "tier_A": {
+          "type": "string"
+        },
+        "tier_B": {
+          "type": "string"
+        },
+        "tier_C": {
+          "type": "string"
+        },
+        "per_instance_targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "integer",
+              "number"
+            ]
+          }
+        },
+        "independent_verifier_source_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "independent_verifier_build_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "feasibility_rule": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "arms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "method",
+          "operational",
+          "configuration_sha256",
+          "source_revision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operational": {
+            "type": "boolean"
+          },
+          "configuration_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "source_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "solver_budget_per_trial",
+        "tuning_budget_per_operational_arm",
+        "timeout_seconds_per_trial",
+        "maximum_retries",
+        "queue_policy",
+        "compile_initialization_amortization_policy",
+        "matched_hardware_resource_policy"
+      ],
+      "properties": {
+        "solver_budget_per_trial": {
+          "type": [
+            "number",
+            "integer",
+            "null"
+          ]
+        },
+        "tuning_budget_per_operational_arm": {
+          "type": [
+            "number",
+            "integer",
+            "null"
+          ]
+        },
+        "timeout_seconds_per_trial": {
+          "type": [
+            "number",
+            "integer",
+            "null"
+          ]
+        },
+        "maximum_retries": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "queue_policy": {
+          "type": "string"
+        },
+        "compile_initialization_amortization_policy": {
+          "type": "string"
+        },
+        "matched_hardware_resource_policy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "repetitions": {
+      "type": "object",
+      "required": [
+        "minimum_independent_stochastic_runs_per_arm_instance",
+        "seed_list",
+        "pairing_key_fields",
+        "seed_stream_equivalence_claimed",
+        "arm_order_randomization_policy"
+      ],
+      "properties": {
+        "minimum_independent_stochastic_runs_per_arm_instance": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed_list": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          }
+        },
+        "pairing_key_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "seed_stream_equivalence_claimed": {
+          "type": "boolean"
+        },
+        "arm_order_randomization_policy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "primary_endpoint": {
+      "type": "object",
+      "required": [
+        "name",
+        "horizon_seconds",
+        "comparison_arm",
+        "comparator_freeze_rule",
+        "target_hit_probability_at_same_fixed_budget_required",
+        "uncertainty_method",
+        "confidence_level",
+        "number_of_bootstrap_replicates"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "horizon_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "comparison_arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparator_freeze_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_hit_probability_at_same_fixed_budget_required": {
+          "type": "boolean"
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "number_of_bootstrap_replicates": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "secondary_endpoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cost_boundary": {
+      "type": "object",
+      "required": [
+        "standardized_algorithm_runtime_excludes",
+        "deployment_all_in_latency_includes",
+        "unknown_cost_is_zero",
+        "energy_scope"
+      ],
+      "properties": {
+        "standardized_algorithm_runtime_excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deployment_all_in_latency_includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unknown_cost_is_zero": {
+          "const": false
+        },
+        "energy_scope": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "decision_gates": {
+      "type": "object",
+      "required": [
+        "zero_false_target_certificates",
+        "target_hit_probability_difference_lower_bound_minimum",
+        "champion_over_candidate_restricted_mean_time_ratio_goal",
+        "95_percent_interval_must_exclude_no_improvement",
+        "trajectory_features_must_beat_final_spin_and_graph_only_controls",
+        "adaptive_acquisition_must_beat_fixed_K_at_matched_budget",
+        "shuffled_feature_control_must_not_reproduce_treatment_effect",
+        "publish_negative_results"
+      ],
+      "properties": {
+        "zero_false_target_certificates": {
+          "type": "boolean"
+        },
+        "target_hit_probability_difference_lower_bound_minimum": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 0
+        },
+        "champion_over_candidate_restricted_mean_time_ratio_goal": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "95_percent_interval_must_exclude_no_improvement": {
+          "type": "boolean"
+        },
+        "trajectory_features_must_beat_final_spin_and_graph_only_controls": {
+          "type": "boolean"
+        },
+        "adaptive_acquisition_must_beat_fixed_K_at_matched_budget": {
+          "type": "boolean"
+        },
+        "shuffled_feature_control_must_not_reproduce_treatment_effect": {
+          "type": "boolean"
+        },
+        "publish_negative_results": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "environment": {
+      "type": "object"
+    },
+    "result_artifacts": {
+      "type": "object"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha256OrNull": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "preregistered"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "freeze_required_before_confirmation": {
+            "const": false
+          },
+          "benchmark_sources": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "revision_or_release": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "instance_ids": {
+                  "type": "array",
+                  "minItems": 1
+                },
+                "instance_manifest_sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            }
+          },
+          "splits": {
+            "properties": {
+              "development_families": {
+                "minItems": 1
+              },
+              "validation_families": {
+                "minItems": 1
+              },
+              "confirmation_families": {
+                "minItems": 1
+              },
+              "split_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "canonicalization": {
+            "properties": {
+              "canonicalization_code_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "per_instance_graph_sha256": {
+                "minProperties": 1
+              },
+              "target_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "target_policy": {
+            "properties": {
+              "per_instance_targets": {
+                "minProperties": 1
+              },
+              "independent_verifier_source_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "independent_verifier_build_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "budgets": {
+            "properties": {
+              "solver_budget_per_trial": {
+                "type": [
+                  "integer",
+                  "number"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "tuning_budget_per_operational_arm": {
+                "type": [
+                  "integer",
+                  "number"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "timeout_seconds_per_trial": {
+                "type": [
+                  "integer",
+                  "number"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "queue_policy": {
+                "minLength": 1
+              },
+              "compile_initialization_amortization_policy": {
+                "minLength": 1
+              },
+              "matched_hardware_resource_policy": {
+                "minLength": 1
+              }
+            }
+          },
+          "repetitions": {
+            "properties": {
+              "minimum_independent_stochastic_runs_per_arm_instance": {
+                "minimum": 10
+              },
+              "seed_list": {
+                "minItems": 10
+              },
+              "arm_order_randomization_policy": {
+                "minLength": 1
+              }
+            }
+          },
+          "primary_endpoint": {
+            "properties": {
+              "horizon_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "number_of_bootstrap_replicates": {
+                "type": "integer",
+                "minimum": 1000
+              }
+            }
+          },
+          "environment": {
+            "minProperties": 1
+          }
+        }
+      }
+    }
+  ]
+}
