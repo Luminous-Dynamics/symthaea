@@ -857,6 +857,20 @@ mod tests {
     }
 
     #[test]
+    fn partially_overlapping_task_slices_are_rejected() {
+        let mut value = qualified_manifest();
+        let mut duplicate_partial = value["task_slices"][0].clone();
+        duplicate_partial["modules"] = json!(["gravity"]);
+        duplicate_partial["difficulties"] = json!(["medium", "hard"]);
+        value["task_slices"].as_array_mut().unwrap().push(duplicate_partial);
+        let report = validate_value(&value).unwrap();
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| {
+            issue.contains("overlaps an already declared model/module/difficulty/system/law/noise task cell")
+        }));
+    }
+
+    #[test]
     fn every_model_requires_at_least_one_task_slice() {
         let mut value = qualified_manifest();
         value["task_slices"]
