@@ -132,6 +132,12 @@ pub enum AcquisitionBudgetError {
     },
     /// Ranking contains a vertex more than once.
     DuplicateRankingVertex { batch_id: String, vertex: usize },
+    /// Adding this batch would exceed the configured maximum attempted-run budget.
+    BatchExceedsBudget {
+        batch_id: String,
+        attempted_total: usize,
+        max_attempts: usize,
+    },
     /// Cumulative counters would overflow usize.
     CounterOverflow,
 }
@@ -181,6 +187,10 @@ impl fmt::Display for AcquisitionBudgetError {
             Self::DuplicateRankingVertex { batch_id, vertex } => write!(
                 f,
                 "batch {batch_id} ranking repeats vertex {vertex}"
+            ),
+            Self::BatchExceedsBudget { batch_id, attempted_total, max_attempts } => write!(
+                f,
+                "batch {batch_id} would raise attempts to {attempted_total}, above cap {max_attempts}"
             ),
             Self::CounterOverflow => write!(f, "cumulative acquisition counters overflowed"),
         }
@@ -290,9 +300,9 @@ impl TrajectoryAcquisitionGate {
         if attempted_total > self.config.max_attempts {
             // Do not silently discard excess work. The caller must split batches
             // to honor the budget and make the gate's accounting auditable.
-            return Err(AcquisitionBudgetError::InvalidAttemptThresholds {
-                min_attempts: self.config.min_attempts,
-                min_valid_projections: self.config.min_valid_projections,
+            return Err(AcquisitionBudgetError::BatchExceedsBudget {
+                batch_id: batch.batch_id,
+                attempted_total,
                 max_attempts: self.config.max_attempts,
             });
         }
@@ -488,7 +498,7 @@ mod tests {
         let deliberately_arbitrary = vec![3, 2, 1, 0];
         gate.observe(batch("b1", 2, 2, Some(deliberately_arbitrary.clone()))).unwrap();
         gate.observe(batch("b2", 2, 2, Some(deliberately_arbitrary.clone()))).unwrap();
-        let decision = gate.observe(batch("b3", 2, 2, Some(deliberately_arbitrary)).unwrap();
+        let decision = gate.observe(batch("b3", 2, 2, Some(deliberately_arbitrary))).unwrap();
         assert!(matches!(decision, AcquisitionDecision::StableRanking(_)));
         // The result type contains no optimum, persistency, or quality certificate.
     }
@@ -526,7 +536,7 @@ mod tests {
         let mut gate = TrajectoryAcquisitionGate::new(config()).unwrap();
         assert!(matches!(
             gate.observe(batch("oversized", 11, 11, Some(vec![0, 1, 2, 3]))),
-            Err(AcquisitionBudgetError::ValidExceedsAttempts { .. })
+            Err(AcquisitionBudgetError::BatchExceedsBudget { .. })
         ));
         assert_eq!(gate.current_snapshot().attempted_total, 0);
 
@@ -535,7 +545,7 @@ mod tests {
         gate.observe(batch("second", 2, 2, Some(vec![0, 1, 2, 3]))).unwrap();
         assert!(matches!(
             gate.observe(batch("over-cap", 7, 7, Some(vec![0, 1, 2, 3]))),
-            Err(AcquisitionBudgetError::InvalidAttemptThresholds { .. })
+            Err(AcquisitionBudgetError::BatchExceedsBudget { .. })
         ));
         assert_eq!(gate.current_snapshot().attempted_total, 4);
     }
