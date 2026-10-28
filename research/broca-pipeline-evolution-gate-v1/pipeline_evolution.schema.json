@@ -100,6 +100,7 @@
         "additionalProperties": false,
         "required": [
           "receipt_id",
+          "receipt_sha256",
           "candidate_id",
           "candidate_manifest_sha256",
           "benchmark_id",
@@ -212,6 +213,9 @@
               "number",
               "null"
             ]
+          },
+          "receipt_sha256": {
+            "$ref": "#/$defs/sha256"
           }
         }
       }
