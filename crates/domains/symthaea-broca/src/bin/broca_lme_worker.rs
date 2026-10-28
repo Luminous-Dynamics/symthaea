@@ -245,6 +245,47 @@ impl Worker {
         }
     }
 
+    fn transition_lifecycle(&mut self, operation: &str, request: &Value) -> Result<Value, String> {
+        self.require_initialized()?;
+        match operation {
+            "revoke" | "delete" => {
+                let evidence_id = request
+                    .get("evidence_id")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| format!("{operation} requires non-empty evidence_id"))?;
+                match operation {
+                    "revoke" => self.index.revoke_evidence(evidence_id)?,
+                    "delete" => self.index.delete_evidence(evidence_id)?,
+                    _ => unreachable!(),
+                }
+                Ok(json!({
+                    "evidence_id": evidence_id,
+                    "lifecycle": if operation == "revoke" { "revoked" } else { "deleted" }
+                }))
+            }
+            "supersede" => {
+                let old_evidence_id = request
+                    .get("old_evidence_id")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| "supersede requires non-empty old_evidence_id".to_string())?;
+                let new_evidence_id = request
+                    .get("new_evidence_id")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| "supersede requires non-empty new_evidence_id".to_string())?;
+                self.index.supersede_evidence(old_evidence_id, new_evidence_id)?;
+                Ok(json!({
+                    "old_evidence_id": old_evidence_id,
+                    "new_evidence_id": new_evidence_id,
+                    "lifecycle": "superseded"
+                }))
+            }
+            _ => Err(format!("unsupported lifecycle operation: {operation}")),
+        }
+    }
+
     fn query(&self, request: &Value) -> Result<Value, String> {
         self.require_initialized()?;
         let query = request
@@ -925,6 +966,46 @@ mod tests {
         }));
         assert_eq!(response["ok"], false);
         assert!(response["error"].as_str().unwrap().contains("query_image"));
+    }
+
+
+    #[test]
+    fn lifecycle_operations_remove_evidence_from_queries() {
+        let trajectory = json!({
+            "id": "trajectory-lifecycle",
+            "goal": "Open billing settings",
+            "states": [{
+                "url": "https://example.invalid/billing",
+                "text": "Billing settings and payment panel"
+            }]
+        });
+        let mut worker = Worker::new();
+        assert_eq!(worker.handle(json!({"request_id":"1","op":"init","scope_id":"web"}))["ok"], true);
+        assert_eq!(worker.handle(json!({"request_id":"2","op":"insert","trajectory":trajectory}))["ok"], true);
+
+        let before = worker.handle(json!({
+            "request_id":"3","op":"query","query":"billing settings"
+        }));
+        assert_eq!(before["ok"], true);
+        let evidence_id = before["result"]["audit"][0]["evidence_id"].as_str().unwrap().to_string();
+
+        let revoked = worker.handle(json!({
+            "request_id":"4","op":"revoke","evidence_id":evidence_id
+        }));
+        assert_eq!(revoked["ok"], true);
+        let after_revoke = worker.handle(json!({
+            "request_id":"5","op":"query","query":"billing settings"
+        }));
+        assert_eq!(after_revoke["result"]["context"].as_array().unwrap().len(), 0);
+
+        let deleted = worker.handle(json!({
+            "request_id":"6","op":"delete","evidence_id":evidence_id
+        }));
+        assert_eq!(deleted["ok"], true);
+        let after_delete = worker.handle(json!({
+            "request_id":"7","op":"query","query":"billing settings"
+        }));
+        assert_eq!(after_delete["result"]["context"].as_array().unwrap().len(), 0);
     }
 
 
