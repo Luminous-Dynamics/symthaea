@@ -220,10 +220,12 @@ fn evaluate(s: &Scenario) -> Result<ScenarioResult, String> {
         total_mass += probability;
         for (index, method) in Method::ALL.into_iter().enumerate() {
             let (lower, upper) = clamp_interval(estimate, radius(method, variance, max_weight, s.n));
-            if lower - EPS <= target_truth && target_truth <= upper + EPS {
+            if lower <= upper && lower - EPS <= target_truth && target_truth <= upper + EPS {
                 coverage[index] += probability;
             }
-            let width = upper - lower;
+            // An interval entirely outside the parameter range has an empty intersection,
+            // not a point at the nearest boundary.
+            let width = (upper - lower).max(0.0);
             weighted_width[index] += probability * width;
             worst_width[index] = worst_width[index].max(width);
         }
