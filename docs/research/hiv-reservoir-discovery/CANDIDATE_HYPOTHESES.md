@@ -29,7 +29,7 @@ The purpose of this register is to start specific, falsifiable work while avoidi
 
 **Alternative explanations:** The signature might reflect activation, cell composition, treatment status, sample handling or donor-specific effects, rather than a latency-specific program.
 
-**First test:** Verify GEO sample metadata and donor-level replication structure. Reproduce the published differential-expression direction and compare a prespecified mitochondrial score against an ordinary linear/PCA baseline using donor-grouped validation. Validate direction in an independent compatible dataset only if the measured state and biological unit match.
+**First test:** Verify GEO sample metadata and donor-level replication structure. Reproduce the published differential-expression direction and compare a prespecified mitochondrial score against an ordinary linear/PCA baseline using donor-grouped validation. Validate direction in an independent compatible dataset only if the measured state and biological unit match. With only five described participants, this is an exploratory replication/robustness exercise—not a credible basis for a broad SOTA claim, model selection, or population-level prediction; require a larger independent compatible cohort for those claims.
 
 **Falsifiable prediction:** A mitochondrial-state feature adds reproducible out-of-donor discrimination for the declared transcript state, and the gain survives a shuffled-feature negative control. If only an in-sample association appears, the predictive hypothesis fails.
 
