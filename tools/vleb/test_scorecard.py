@@ -92,6 +92,12 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     last_secure = data.get("industry_comparators", {}).get("last_secure_code_benchmark", {})
     if last_secure.get("task_count") != 450 or last_secure.get("reported_best_joint_functional_security_success_pct") != 25.1:
         errors.append("last_secure_benchmark_reference_drift")
+    claim_metric = data.get("current_measurements", {}).get("source_claim_false_support_rate_pct", {})
+    if claim_metric.get("value") is not None or claim_metric.get("eligible") is not False:
+        errors.append("source_claim_false_support_rate_fabricated")
+    claim_target = data.get("proposed_targets", {}).get("source_claim_false_support_rate_pct", {})
+    if claim_target.get("target") != 0 or claim_target.get("status") != "target_not_measured":
+        errors.append("source_claim_false_support_target_drift")
     return errors
 
 
@@ -173,6 +179,14 @@ class ScorecardTests(unittest.TestCase):
         self.assertEqual(audit["audited_submission_count"], 254)
         self.assertEqual(audit["findings"]["adjacent_top_30_verified_pairs_significant_at_alpha_0_05"], 0)
         self.assertIn("observational", audit["report_status"])
+
+    def test_claim_false_support_is_a_target_not_an_achieved_result(self) -> None:
+        measurement = self.scorecard["current_measurements"]["source_claim_false_support_rate_pct"]
+        target = self.scorecard["proposed_targets"]["source_claim_false_support_rate_pct"]
+        self.assertIsNone(measurement["value"])
+        self.assertFalse(measurement["eligible"])
+        self.assertEqual(target["target"], 0)
+        self.assertEqual(target["status"], "target_not_measured")
 
 
 if __name__ == "__main__":
