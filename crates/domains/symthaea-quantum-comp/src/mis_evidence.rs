@@ -479,6 +479,14 @@ fn parse_canonical_graph(bytes: &[u8]) -> Result<(usize, Vec<(usize, usize)>), M
     Ok((vertex_count, edges))
 }
 
+/// Parse and validate a canonical graph encoding, returning its declared vertex count.
+///
+/// This is useful for validating trace-level graph metadata even when every solver
+/// checkpoint is unverified and therefore cannot be used to mint candidate evidence.
+pub fn canonical_mis_graph_vertex_count(bytes: &[u8]) -> Result<usize, MisEvidenceError> {
+    Ok(parse_canonical_graph(bytes)?.0)
+}
+
 fn parse_canonical_candidate(bytes: &[u8], vertex_count: usize) -> Result<Vec<usize>, MisEvidenceError> {
     let text = std::str::from_utf8(bytes).map_err(|_| MisEvidenceError::InvalidUtf8)?;
     if !text.ends_with('\n') || text.contains('\r') {

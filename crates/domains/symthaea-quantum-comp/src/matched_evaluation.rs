@@ -19,9 +19,17 @@
 #[path = "mis_evidence.rs"]
 mod mis_evidence;
 pub use self::mis_evidence::{
-    MisEvidenceContext, MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, encode_canonical_mis_candidate, sha256_hex,
+    MisEvidenceContext, MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, canonical_mis_graph_vertex_count, encode_canonical_mis_candidate, sha256_hex,
     verify_mis_candidate, verify_mis_candidate_for_trial, verify_mis_candidate_for_trial_with_receipt,
     verify_mis_candidate_with_receipt,
+};
+
+#[path = "anytime_quality.rs"]
+mod anytime_quality;
+pub use self::anytime_quality::{
+    AnytimeTerminalOutcome, VerifiedAnytimeQualityError, VerifiedAnytimeQualityEvent,
+    VerifiedAnytimeQualitySummary, VerifiedAnytimeQualityTrace,
+    compare_verified_anytime_quality, compare_verified_anytime_quality_from_bundle,
 };
 
 /// Opaque evidence minted by the MIS verifier and scoped to one experiment trial.
