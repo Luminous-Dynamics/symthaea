@@ -532,4 +532,11 @@ mod tests {
         assert!((target_value(null) - null.threshold).abs() <= EPS);
         assert!(target_value(alternative) > alternative.threshold);
     }
+
+    #[test]
+    fn interval_endpoints_stay_inside_value_range_when_ips_mean_overshoots() {
+        assert_eq!(clipped_interval(2.0, 0.1), (1.0, 1.0));
+        assert_eq!(clipped_interval(-1.0, 0.1), (0.0, 0.0));
+        assert_eq!(clipped_interval(0.5, 2.0), (0.0, 1.0));
+    }
 }
