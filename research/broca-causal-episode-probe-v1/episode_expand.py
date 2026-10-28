@@ -68,6 +68,9 @@ def load_candidate_manifest(predictions_path: Path, trajectory_path: Path, evalu
     candidate_k = bm25.get("max_items")
     if isinstance(candidate_k, bool) or not isinstance(candidate_k, int) or not evaluation_k <= candidate_k <= 100:
         raise ValueError("candidate pool must be an integer in [evaluation_k, 100]")
+    question_count = manifest.get("question_count")
+    if isinstance(question_count, bool) or not isinstance(question_count, int) or question_count < 1:
+        raise ValueError("candidate manifest question_count must be a positive integer")
     return manifest, manifest_path
 
 
@@ -310,6 +313,13 @@ def main() -> int:
     )
     trajectories = read_jsonl(trajectory_path)
     predictions = read_jsonl(args.predictions)
+    if len(predictions) != candidate_manifest["question_count"]:
+        raise ValueError("candidate prediction count does not match its manifest")
+    candidate_k = candidate_manifest["bm25"]["max_items"]
+    for index, prediction in enumerate(predictions):
+        audit = prediction.get("audit")
+        if not isinstance(audit, list) or len(audit) > candidate_k:
+            raise ValueError(f"prediction {index}: audit exceeds the declared candidate pool")
     expanded = expand_predictions(trajectories, predictions, args.k, args.window)
     serialized = "".join(
         json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
