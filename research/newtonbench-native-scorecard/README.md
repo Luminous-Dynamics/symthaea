@@ -19,6 +19,7 @@ The CLI recursively reads raw `trial*.json` files from each supplied trial direc
 - Preserve `evaluation.rmsle` as **RMSLE**. It is never relabeled or converted into NRMSE.
 - Preserve `evaluation.exact_accuracy` as the upstream per-trial 0/1 result from an LLM symbolic-equivalence judge. It is not a formal proof.
 - Preserve `num_experiments`, `rounds`, and `total_tokens` as separate costs.
+- Report how many completed trials supplied each cost field separately from sums of available values; a missing field is never silently presented as a complete total.
 - Retain failures and missing counterpart trials; paired deltas use only pairs with both trials completed and the corresponding metric available.
 - The importer records source-file digests, native metric availability, and import problems. A malformed artifact does not silently disappear from the report.
 - Python's default JSON serialization may emit non-standard NaN/Infinity values. The importer normalizes standalone non-finite tokens outside strings to null, records the normalization, and does not convert an unavailable RMSLE into zero.
