@@ -807,6 +807,51 @@ mod tests {
     }
 
 
+    /// Test-only effect adapter: records the exact invocation and creates
+    /// an independent filesystem witness when dispatch crosses this injected
+    /// runner boundary. This never launches a real NixOS command.
+    #[cfg(unix)]
+    struct EffectWitnessRunner {
+        invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        observed_calls: std::sync::Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>,
+        witness_path: std::path::PathBuf,
+    }
+
+    #[cfg(unix)]
+    impl NixOSCommandRunner for EffectWitnessRunner {
+        fn run<'a>(
+            &'a self,
+            executable: &'a str,
+            args: &'a [String],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::io::Result<std::process::Output>,
+                    > + Send
+                    + 'a,
+            >,
+        > {
+            self.invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.observed_calls
+                .lock()
+                .expect("effect witness call log lock")
+                .push((executable.to_owned(), args.to_vec()));
+            let witness_path = self.witness_path.clone();
+            Box::pin(async move {
+                // The file witnesses crossing the effect-adapter boundary;
+                // it does not claim that a real OS mutation took place.
+                std::fs::write(&witness_path, b"authorized-effect-witness")?;
+                use std::os::unix::process::ExitStatusExt;
+                Ok(std::process::Output {
+                    status: std::process::ExitStatus::from_raw(0),
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                })
+            })
+        }
+    }
+
     #[cfg(unix)]
     struct StaticOutputRunner {
         invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -1229,6 +1274,142 @@ mod tests {
             ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
         ));
         assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_permit_gate_controls_independent_effect_witness() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+            Mutex,
+        };
+        use std::time::Duration;
+
+        let temp = tempfile::tempdir().unwrap();
+        let denied_witness = temp.path().join("denied-effect.witness");
+        let allowed_witness = temp.path().join("allowed-effect.witness");
+
+        let approved = NixOSCommand::RebuildSwitch {
+            flake: Some(".#approved".to_owned()),
+            extra_args: Vec::new(),
+        };
+        let (executable, args) = approved.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "effect-witness-denied-001",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut denied_ledger = ExecutionAuthorizationLedger::default();
+        let denied_permit = denied_ledger.issue(request).unwrap();
+        let denied_invocations = Arc::new(AtomicUsize::new(0));
+        let denied_calls = Arc::new(Mutex::new(Vec::new()));
+        let denied_runner = Arc::new(EffectWitnessRunner {
+            invocations: Arc::clone(&denied_invocations),
+            observed_calls: Arc::clone(&denied_calls),
+            witness_path: denied_witness.clone(),
+        });
+        let mut denied_executor = NixOSExecutor::new().with_runner(denied_runner);
+
+        // Mutate the exact flake after issuance. The permit must fail before
+        // the runner boundary, leaving no call record and no witness file.
+        let substituted = NixOSCommand::RebuildSwitch {
+            flake: Some(".#attacker-controlled".to_owned()),
+            extra_args: Vec::new(),
+        };
+        let denied = denied_executor
+            .execute_with_permit(
+                substituted,
+                1.0,
+                &mut denied_ledger,
+                &denied_permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(denied, ExecutionResult::Blocked { .. }));
+        assert_eq!(denied_invocations.load(Ordering::SeqCst), 0);
+        assert!(denied_calls.lock().unwrap().is_empty());
+        assert!(!denied_witness.exists());
+
+        // A fresh permit for the exact command crosses the runner exactly
+        // once and creates an independently observable test artifact.
+        let (executable, args) = approved.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "effect-witness-allowed-001",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut allowed_ledger = ExecutionAuthorizationLedger::default();
+        let allowed_permit = allowed_ledger.issue(request).unwrap();
+        let allowed_invocations = Arc::new(AtomicUsize::new(0));
+        let allowed_calls = Arc::new(Mutex::new(Vec::new()));
+        let allowed_runner = Arc::new(EffectWitnessRunner {
+            invocations: Arc::clone(&allowed_invocations),
+            observed_calls: Arc::clone(&allowed_calls),
+            witness_path: allowed_witness.clone(),
+        });
+        let mut allowed_executor = NixOSExecutor::new().with_runner(allowed_runner);
+
+        let first = allowed_executor
+            .execute_with_permit(
+                approved.clone(),
+                0.0,
+                &mut allowed_ledger,
+                &allowed_permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(first, ExecutionResult::Success { .. }));
+        assert_eq!(allowed_invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            std::fs::read(&allowed_witness).unwrap(),
+            b"authorized-effect-witness"
+        );
+        assert_eq!(
+            *allowed_calls.lock().unwrap(),
+            vec![(
+                "nixos-rebuild".to_owned(),
+                vec![
+                    "switch".to_owned(),
+                    "--flake".to_owned(),
+                    ".#approved".to_owned(),
+                ],
+            )]
+        );
+
+        // Replaying the consumed permit must not create or overwrite another
+        // effect witness; the original witness and single invocation remain.
+        let replay = allowed_executor
+            .execute_with_permit(
+                approved,
+                0.0,
+                &mut allowed_ledger,
+                &allowed_permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(replay, ExecutionResult::Blocked { .. }));
+        assert_eq!(allowed_invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(allowed_calls.lock().unwrap().len(), 1);
+        assert_eq!(
+            std::fs::read(&allowed_witness).unwrap(),
+            b"authorized-effect-witness"
+        );
     }
 
     #[tokio::test]
