@@ -21,6 +21,13 @@ fi
 MODE="$1"
 MANIFEST="$2"
 RECEIPT="${3:-}"
+REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCHEMA="$REPO_ROOT/docs/research/quantum/benchmarks/PHOT-CTRL-003A-MANIFEST-SCHEMA.json"
+
+if [[ ! -f "$SCHEMA" ]] || ! jq -e 'type == "object"' "$SCHEMA" >/dev/null 2>&1; then
+  echo "ERROR: preregistration schema is missing or invalid JSON: $SCHEMA" >&2
+  exit 2
+fi
 
 if [[ ! -f "$MANIFEST" ]]; then
   echo "ERROR: manifest file does not exist: $MANIFEST" >&2
@@ -88,6 +95,7 @@ fi
 manifest_sha256="$(sha256sum "$MANIFEST" | awk '{print $1}')"
 checker_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/$(basename -- "${BASH_SOURCE[0]}")"
 checker_sha256="$(sha256sum "$checker_path" | awk '{print $1}')"
+schema_sha256="$(sha256sum "$SCHEMA" | awk '{print $1}')"
 echo "PASS: preregistration manifest is complete under PHOT-CTRL-004."
 echo "Manifest SHA-256: $manifest_sha256"
 if [[ -n "$RECEIPT" ]]; then
@@ -96,6 +104,7 @@ if [[ -n "$RECEIPT" ]]; then
     --arg gate_id "PHOT-CTRL-004" \
     --arg manifest_sha256 "$manifest_sha256" \
     --arg checker_sha256 "$checker_sha256" \
+    --arg schema_sha256 "$schema_sha256" \
     '{
       schema_version: "1.0",
       protocol_id: $protocol_id,
@@ -103,6 +112,7 @@ if [[ -n "$RECEIPT" ]]; then
       outcome: "preregistration-complete",
       manifest_sha256: $manifest_sha256,
       checker_sha256: $checker_sha256,
+      readiness_schema_sha256: $schema_sha256,
       scope: "completeness-only; not independent review, statistical power, execution authorization, or a performance result"
     }' > "$RECEIPT"
   echo "Readiness receipt written: $RECEIPT"
