@@ -198,22 +198,25 @@ jobs:
           if weak_keys != {(sd, icc, association) for sd in (5.0, 10.0, 20.0) for icc in iccs for association in associations}:
               raise SystemExit("fixture weak-null grid has missing or duplicate heterogeneity/ICC/association cells")
           for row in fixture["scenarios"]:
-              expected_informative = row["study_simulations"] - row["degenerate_interval_trials"]
-              if row["informative_interval_trials"] != expected_informative:
-                  raise SystemExit("power row informative/degenerate counts must reconcile to all simulated studies")
-              expected_availability = None if row["status"] != "estimated" else expected_informative / row["study_simulations"]
               actual_availability = row["interval_availability_probability"]
-              if expected_availability is None:
-                  if actual_availability is not None:
-                      raise SystemExit("infeasible row must not report interval availability")
-              elif abs(actual_availability - expected_availability) > 1e-12:
-                  raise SystemExit("power row interval availability must use all simulated studies as denominator")
-              if expected_informative > 0 and row["status"] == "estimated":
-                  expected_conditional = row["utility_gate_passes"] / expected_informative
-                  if abs(row["conditional_utility_gate_power"] - expected_conditional) > 1e-12:
-                      raise SystemExit("conditional power must use only informative intervals")
-              elif row["conditional_utility_gate_power"] is not None:
-                  raise SystemExit("conditional power must be null when no informative interval is available")
+              if row["status"] != "estimated":
+                  if row["informative_interval_trials"] != 0 or row["degenerate_interval_trials"] != 0 or actual_availability is not None:
+                      raise SystemExit("infeasible row must have zero simulated intervals and null availability")
+                  if any(row[key] is not None for key in ("conditional_utility_gate_power","conditional_power_lower_95","conditional_power_upper_95")):
+                      raise SystemExit("infeasible row must not report conditional power")
+              else:
+                  expected_informative = row["study_simulations"] - row["degenerate_interval_trials"]
+                  if expected_informative < 0 or row["informative_interval_trials"] != expected_informative:
+                      raise SystemExit("power row informative/degenerate counts must reconcile to all simulated studies")
+                  expected_availability = expected_informative / row["study_simulations"]
+                  if abs(actual_availability - expected_availability) > 1e-12:
+                      raise SystemExit("power row interval availability must use all simulated studies as denominator")
+                  if expected_informative > 0:
+                      expected_conditional = row["utility_gate_passes"] / expected_informative
+                      if abs(row["conditional_utility_gate_power"] - expected_conditional) > 1e-12:
+                          raise SystemExit("conditional power must use only informative intervals")
+                  elif any(row[key] is not None for key in ("conditional_utility_gate_power","conditional_power_lower_95","conditional_power_upper_95")):
+                      raise SystemExit("conditional power must be null when no informative interval is available")
               if row["true_treatment_effect_percentage_points"] == 0.0:
                   if row["null_effect_false_claim_probability_upper_simultaneous_95"] < row["estimated_power_upper_95"]:
                       raise SystemExit("strict-null simultaneous upper bound must dominate the per-cell Wilson upper bound")
