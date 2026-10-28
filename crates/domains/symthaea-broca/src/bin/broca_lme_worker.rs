@@ -969,6 +969,76 @@ mod tests {
 
 
     #[test]
+    fn supersede_operation_removes_retired_evidence_and_keeps_replacement() {
+        let trajectory = json!({
+            "id": "trajectory-address-update",
+            "goal": "Update and verify the support office address",
+            "start_url": "https://example.invalid/admin/company",
+            "states": [
+                {
+                    "url": "https://example.invalid/admin/company/address",
+                    "action": "Set the support office address to 10 Old Mill Road",
+                    "text": "Support office address is 10 Old Mill Road.",
+                    "screenshot": "screenshots/old-address.png"
+                },
+                {
+                    "url": "https://example.invalid/admin/company/address",
+                    "action": "Replace the old support address with 42 New Harbour Road",
+                    "text": "Current support office address is 42 New Harbour Road. The former address 10 Old Mill Road is retired.",
+                    "screenshot": "screenshots/new-address.png"
+                }
+            ]
+        });
+        let mut worker = Worker::new();
+        assert_eq!(
+            worker.handle(json!({"request_id":"1","op":"init","scope_id":"web","bm25":{"max_items":20}}))["ok"],
+            true
+        );
+        assert_eq!(
+            worker.handle(json!({"request_id":"2","op":"insert","trajectory":trajectory}))["ok"],
+            true
+        );
+
+        let before = worker.handle(json!({
+            "request_id":"3","op":"query","query":"support office address 10 Old Mill Road"
+        }));
+        assert_eq!(before["ok"], true);
+        let audit = before["result"]["audit"].as_array().unwrap();
+        let old_id = audit.iter()
+            .find(|item| item["source_pointer"] == "/states/0/text")
+            .and_then(|item| item["evidence_id"].as_str())
+            .expect("old address evidence must be retrieved before supersession")
+            .to_string();
+        let new_id = audit.iter()
+            .find(|item| item["source_pointer"] == "/states/1/text")
+            .and_then(|item| item["evidence_id"].as_str())
+            .expect("replacement address evidence must be retrieved before supersession")
+            .to_string();
+
+        let transition = worker.handle(json!({
+            "request_id":"4",
+            "op":"supersede",
+            "old_evidence_id": old_id,
+            "new_evidence_id": new_id
+        }));
+        assert_eq!(transition["ok"], true);
+
+        let after_old = worker.handle(json!({
+            "request_id":"5","op":"query","query":"support office address 10 Old Mill Road"
+        }));
+        assert_eq!(after_old["ok"], true);
+        assert!(!after_old["result"]["audit"].as_array().unwrap().iter()
+            .any(|item| item["evidence_id"] == old_id));
+
+        let after_new = worker.handle(json!({
+            "request_id":"6","op":"query","query":"current support office address 42 New Harbour Road"
+        }));
+        assert_eq!(after_new["ok"], true);
+        assert!(after_new["result"]["audit"].as_array().unwrap().iter()
+            .any(|item| item["evidence_id"] == new_id));
+    }
+
+    #[test]
     fn bounded_reader_rejects_oversized_line() {
         let mut reader = io::Cursor::new(b"{\"op\":\"query\"}\n".to_vec());
         let error = read_bounded_line(&mut reader, 4).unwrap_err();
