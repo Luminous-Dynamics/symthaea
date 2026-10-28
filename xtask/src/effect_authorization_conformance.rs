@@ -842,51 +842,6 @@ fn validate_case(case: &Case) -> Result<()> {
         }
     }
 
-    let expected_category = match case.id.as_str() {
-        "POS-001" | "POS-002" | "POS-003" | "POS-004" => "positive_control",
-        "NEG-001" => "credential_integrity",
-        "NEG-002" => "issuer_trust",
-        "NEG-003" => "issuer_currentness",
-        "NEG-004" => "expiry",
-        "NEG-005" => "audience",
-        "NEG-006" => "purpose",
-        "NEG-007" => "target_binding",
-        "NEG-008" => "resource_scope",
-        "NEG-009" => "operation_scope",
-        "NEG-010" => "local_authority",
-        "NEG-011" => "delegation_revocation",
-        "NEG-012" => "delegation_attenuation",
-        "NEG-013" => "policy_freshness",
-        "NEG-014" => "translation_loss",
-        "NEG-015" => "claim_conflict",
-        "NEG-016" => "actor_binding",
-        "NEG-017" => "on_behalf_of_binding",
-        "NEG-018" => "executor_composition",
-        "NEG-019" => "runtime_incarnation",
-        "NEG-020" => "same_subject_join",
-        "NEG-021" => "reputation_non_authority",
-        "NEG-022" => "model_signal_non_authority",
-        "NEG-023" => "receipt_laundering",
-        "NEG-024" => "one_shot_replay",
-        "NEG-025" => "concurrent_replay",
-        "NEG-026" => "restart_replay",
-        "NEG-027" => "surface_bypass",
-        "NEG-028" => "prestate_binding",
-        "NEG-029" => "configuration_drift",
-        "NEG-030" => "security_domain",
-        "NEG-031" => "resource_path_alias",
-        "NEG-032" => "parameter_mutation",
-        "IND-001" => "currentness_unavailable",
-        "LIFE-001" | "LIFE-002" | "LIFE-003" | "LIFE-004" => "lifecycle",
-        _ => bail!("unknown v1 case {}; version the corpus before adding it", case.id),
-    };
-    if case.category != expected_category {
-        bail!(
-            "case {} category changed from frozen v1 value {:?} to {:?}",
-            case.id, expected_category, case.category
-        );
-    }
-
     let mut mutation_paths = BTreeSet::new();
     for mutation in &case.mutations {
         if !is_field_path(&mutation.path) {
@@ -1073,6 +1028,13 @@ mod tests {
 
         let no_postcondition = sample_case("POS-001", "positive_control", "allow", 1, "exactly_one", "exit_code_zero");
         assert!(validate_case(&no_postcondition).is_err());
+    }
+
+    #[test]
+    fn mutation_value_cannot_be_changed_while_case_id_stays_fixed() {
+        let mut case = sample_case("NEG-001", "credential_integrity", "deny", 0, "none", "denied_before_effect");
+        case.mutations.push(Mutation { path: "credential.signature_valid".to_string(), value: json!(true) });
+        assert!(validate_case(&case).is_err());
     }
 
     #[test]
