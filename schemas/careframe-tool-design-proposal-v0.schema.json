@@ -1,0 +1,747 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "careframe-tool-design-proposal-v0.schema.json",
+  "title": "Careframe Tool Design Proposal v0",
+  "description": "Strict proposal envelope for simulation-only robot tool concepts. Validation grants no physical or clinical authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "created_at",
+    "task",
+    "requirements",
+    "candidate_manifests",
+    "hypotheses",
+    "uncertainty",
+    "comparison_plan",
+    "authority",
+    "traceability"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "careframe-tool-design-proposal-v0"
+    },
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "intended_task",
+        "objective",
+        "work_zone",
+        "patient_data_included"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "intended_task": {
+          "enum": [
+            "sealed_supply_transfer",
+            "tray_transfer",
+            "telepresence_support",
+            "training_mannequin_measurement"
+          ]
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "work_zone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "patient_data_included": {
+          "const": false
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement_id",
+          "constraint_kind",
+          "value",
+          "units",
+          "rationale",
+          "evidence_refs"
+        ],
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "constraint_kind": {
+            "enum": [
+              "max_mass_g",
+              "max_payload_g",
+              "max_force_n",
+              "max_torque_nm",
+              "max_power_w",
+              "max_dimension_mm",
+              "must_be_unpowered",
+              "must_capture_audio",
+              "must_capture_video",
+              "must_have_privacy_shutter",
+              "must_default_capture_disabled",
+              "must_keep_patient_contact_false",
+              "must_keep_clinical_use_false",
+              "must_keep_physical_actuation_false",
+              "other_nonclinical"
+            ]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          },
+          "units": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "evidence_refs": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        }
+      }
+    },
+    "candidate_manifests": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/tool_manifest"
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "candidate_tool_id",
+          "statement",
+          "metric_id",
+          "falsifier",
+          "predicted_direction"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "candidate_tool_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "falsifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "predicted_direction": {
+            "enum": [
+              "increase",
+              "decrease",
+              "noninferiority",
+              "unknown_until_measured"
+            ]
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coverage_state",
+        "known_unknowns",
+        "out_of_distribution_conditions"
+      ],
+      "properties": {
+        "coverage_state": {
+          "enum": [
+            "within_declared_synthetic_envelope",
+            "partially_out_of_distribution",
+            "unknown"
+          ]
+        },
+        "known_unknowns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "out_of_distribution_conditions": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "comparison_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_ids",
+        "scenario_set_sha256",
+        "metric_ids",
+        "same_budget_for_all_candidates",
+        "hard_gates_non_compensatory"
+      ],
+      "properties": {
+        "baseline_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "scenario_set_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "metric_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "same_budget_for_all_candidates": {
+          "const": true
+        },
+        "hard_gates_non_compensatory": {
+          "const": true
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requires_independent_gate",
+        "physical_actuation_authorized",
+        "patient_contact_authorized",
+        "clinical_use_authorized"
+      ],
+      "properties": {
+        "requires_independent_gate": {
+          "const": true
+        },
+        "physical_actuation_authorized": {
+          "const": false
+        },
+        "patient_contact_authorized": {
+          "const": false
+        },
+        "clinical_use_authorized": {
+          "const": false
+        }
+      }
+    },
+    "traceability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_revision",
+        "model_digest_sha256",
+        "configuration_digest_sha256",
+        "task_brief_digest_sha256",
+        "tool_catalog_revision",
+        "seed"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configuration_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_brief_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "tool_catalog_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    }
+  },
+  "$defs": {
+    "tool_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "tool_id",
+        "revision",
+        "tool_kind",
+        "intended_task",
+        "contact_class",
+        "design_stage",
+        "evidence_class",
+        "mechanical",
+        "hygiene",
+        "electrical",
+        "privacy",
+        "authority"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "medical-robot-tool-manifest-v0"
+        },
+        "tool_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "tool_kind": {
+          "enum": [
+            "sealed_supply_gripper",
+            "tray_carrier",
+            "telepresence_head",
+            "trainer_probe"
+          ]
+        },
+        "intended_task": {
+          "enum": [
+            "sealed_supply_transfer",
+            "tray_transfer",
+            "telepresence_support",
+            "training_mannequin_measurement"
+          ]
+        },
+        "contact_class": {
+          "enum": [
+            "none",
+            "object_only",
+            "mannequin_only"
+          ]
+        },
+        "design_stage": {
+          "const": "concept"
+        },
+        "evidence_class": {
+          "const": "synthetic_design_proposal"
+        },
+        "mechanical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mount_interface",
+            "mass_g",
+            "payload_g",
+            "geometry_bbox_mm",
+            "max_object_force_n",
+            "max_torque_nm",
+            "retention_fail_closed"
+          ],
+          "properties": {
+            "mount_interface": {
+              "const": "SMF-TOOL-01"
+            },
+            "mass_g": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "payload_g": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "geometry_bbox_mm": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 2000
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 2000
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 2000
+                }
+              ],
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "max_object_force_n": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "max_torque_nm": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "retention_fail_closed": {
+              "const": true
+            }
+          }
+        },
+        "hygiene": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "surface_materials_declared",
+            "cleaning_claim",
+            "single_use"
+          ],
+          "properties": {
+            "surface_materials_declared": {
+              "const": true
+            },
+            "cleaning_claim": {
+              "const": "not_validated"
+            },
+            "single_use": {
+              "type": "boolean"
+            }
+          }
+        },
+        "electrical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "powered",
+            "max_power_w",
+            "protective_isolation_declared"
+          ],
+          "properties": {
+            "powered": {
+              "type": "boolean"
+            },
+            "max_power_w": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "protective_isolation_declared": {
+              "type": "boolean"
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "captures_audio",
+            "captures_video",
+            "physical_privacy_shutter",
+            "default_capture_state"
+          ],
+          "properties": {
+            "captures_audio": {
+              "type": "boolean"
+            },
+            "captures_video": {
+              "type": "boolean"
+            },
+            "physical_privacy_shutter": {
+              "const": true
+            },
+            "default_capture_state": {
+              "const": "disabled"
+            }
+          }
+        },
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "simulation_only",
+            "physical_actuation_authorized",
+            "patient_contact_authorized",
+            "clinical_use_authorized"
+          ],
+          "properties": {
+            "simulation_only": {
+              "const": true
+            },
+            "physical_actuation_authorized": {
+              "const": false
+            },
+            "patient_contact_authorized": {
+              "const": false
+            },
+            "clinical_use_authorized": {
+              "const": false
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tool_kind": {
+                "const": "sealed_supply_gripper"
+              }
+            },
+            "required": [
+              "tool_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "intended_task": {
+                "const": "sealed_supply_transfer"
+              },
+              "contact_class": {
+                "const": "object_only"
+              },
+              "mechanical": {
+                "properties": {
+                  "max_object_force_n": {
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tool_kind": {
+                "const": "tray_carrier"
+              }
+            },
+            "required": [
+              "tool_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "intended_task": {
+                "const": "tray_transfer"
+              },
+              "contact_class": {
+                "const": "object_only"
+              },
+              "mechanical": {
+                "properties": {
+                  "max_object_force_n": {
+                    "exclusiveMinimum": 0
+                  }
+                }
+              },
+              "electrical": {
+                "properties": {
+                  "powered": {
+                    "const": false
+                  },
+                  "max_power_w": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tool_kind": {
+                "const": "telepresence_head"
+              }
+            },
+            "required": [
+              "tool_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "intended_task": {
+                "const": "telepresence_support"
+              },
+              "contact_class": {
+                "const": "none"
+              },
+              "privacy": {
+                "properties": {
+                  "captures_audio": {
+                    "const": true
+                  },
+                  "captures_video": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tool_kind": {
+                "const": "trainer_probe"
+              }
+            },
+            "required": [
+              "tool_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "intended_task": {
+                "const": "training_mannequin_measurement"
+              },
+              "contact_class": {
+                "const": "mannequin_only"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "electrical": {
+                "properties": {
+                  "powered": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "powered"
+                ]
+              }
+            },
+            "required": [
+              "electrical"
+            ]
+          },
+          "then": {
+            "properties": {
+              "electrical": {
+                "properties": {
+                  "max_power_w": {
+                    "exclusiveMinimum": 0
+                  },
+                  "protective_isolation_declared": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

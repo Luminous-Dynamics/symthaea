@@ -1,0 +1,571 @@
+{
+  "schema_version": "careframe-morphology-v0",
+  "model_id": "CAREFRAME-WHEELED-UPPER-BODY-CONCEPT-001",
+  "revision": 1,
+  "morphology_kind": "wheeled_upper_body_humanoid",
+  "evidence_class": "synthetic_morphology_proposal",
+  "geometry_fidelity": "bounding_primitives_not_manufacturing_geometry",
+  "units": {
+    "length": "m",
+    "mass": "kg",
+    "joint_angle": "rad",
+    "joint_effort": "N_m",
+    "joint_velocity": "rad_s"
+  },
+  "root_link": "base_chassis",
+  "links": [
+    {
+      "link_id": "base_chassis",
+      "mass_kg": 35,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.62,
+          0.52,
+          0.24
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "left_drive_wheel",
+      "mass_kg": 1.5,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.1,
+          0.34,
+          0.34
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "right_drive_wheel",
+      "mass_kg": 1.5,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.1,
+          0.34,
+          0.34
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "front_caster",
+      "mass_kg": 0.3,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.12,
+          0.1,
+          0.1
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "rear_caster",
+      "mass_kg": 0.3,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.12,
+          0.1,
+          0.1
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "torso_yaw_carriage",
+      "mass_kg": 2,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.3,
+          0.28,
+          0.12
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "torso_shell",
+      "mass_kg": 12,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.38,
+          0.3,
+          0.62
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "sensor_mast",
+      "mass_kg": 1,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.05,
+          0.05,
+          0.24
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "head_yaw_carriage",
+      "mass_kg": 0.6,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.11,
+          0.11,
+          0.08
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "head_shell",
+      "mass_kg": 1.2,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.18,
+          0.16,
+          0.22
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "left_upper_arm",
+      "mass_kg": 1.8,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.1,
+          0.12,
+          0.3
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "left_forearm",
+      "mass_kg": 1.3,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.09,
+          0.1,
+          0.26
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "left_tool_mount",
+      "mass_kg": 0.4,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.09,
+          0.09,
+          0.06
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "right_upper_arm",
+      "mass_kg": 1.8,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.1,
+          0.12,
+          0.3
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "right_forearm",
+      "mass_kg": 1.3,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.09,
+          0.1,
+          0.26
+        ],
+        "source": "synthetic_placeholder"
+      }
+    },
+    {
+      "link_id": "right_tool_mount",
+      "mass_kg": 0.4,
+      "collision": {
+        "shape": "box",
+        "dimensions_m": [
+          0.09,
+          0.09,
+          0.06
+        ],
+        "source": "synthetic_placeholder"
+      }
+    }
+  ],
+  "joints": [
+    {
+      "joint_id": "left_drive",
+      "parent_link": "base_chassis",
+      "child_link": "left_drive_wheel",
+      "joint_type": "continuous",
+      "origin_m": [
+        0,
+        0.27,
+        -0.02
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "max_effort_nm": 8,
+      "max_velocity_rad_s": 2,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "right_drive",
+      "parent_link": "base_chassis",
+      "child_link": "right_drive_wheel",
+      "joint_type": "continuous",
+      "origin_m": [
+        0,
+        -0.27,
+        -0.02
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "max_effort_nm": 8,
+      "max_velocity_rad_s": 2,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "front_caster_fixed",
+      "parent_link": "base_chassis",
+      "child_link": "front_caster",
+      "joint_type": "fixed",
+      "origin_m": [
+        0.22,
+        0,
+        -0.1
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        0
+      ],
+      "lower_limit_rad": 0,
+      "upper_limit_rad": 0,
+      "max_effort_nm": 0,
+      "max_velocity_rad_s": 0,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "rear_caster_fixed",
+      "parent_link": "base_chassis",
+      "child_link": "rear_caster",
+      "joint_type": "fixed",
+      "origin_m": [
+        -0.22,
+        0,
+        -0.1
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        0
+      ],
+      "lower_limit_rad": 0,
+      "upper_limit_rad": 0,
+      "max_effort_nm": 0,
+      "max_velocity_rad_s": 0,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "torso_yaw",
+      "parent_link": "base_chassis",
+      "child_link": "torso_yaw_carriage",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        0,
+        0.22
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        1
+      ],
+      "lower_limit_rad": -1.2,
+      "upper_limit_rad": 1.2,
+      "max_effort_nm": 20,
+      "max_velocity_rad_s": 0.35,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "torso_mount",
+      "parent_link": "torso_yaw_carriage",
+      "child_link": "torso_shell",
+      "joint_type": "fixed",
+      "origin_m": [
+        0,
+        0,
+        0.1
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        0
+      ],
+      "lower_limit_rad": 0,
+      "upper_limit_rad": 0,
+      "max_effort_nm": 0,
+      "max_velocity_rad_s": 0,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "sensor_mast_mount",
+      "parent_link": "torso_shell",
+      "child_link": "sensor_mast",
+      "joint_type": "fixed",
+      "origin_m": [
+        0,
+        0,
+        0.34
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        0
+      ],
+      "lower_limit_rad": 0,
+      "upper_limit_rad": 0,
+      "max_effort_nm": 0,
+      "max_velocity_rad_s": 0,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "head_yaw",
+      "parent_link": "sensor_mast",
+      "child_link": "head_yaw_carriage",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        0,
+        0.13
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        1
+      ],
+      "lower_limit_rad": -1.57,
+      "upper_limit_rad": 1.57,
+      "max_effort_nm": 1,
+      "max_velocity_rad_s": 0.75,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "head_pitch",
+      "parent_link": "head_yaw_carriage",
+      "child_link": "head_shell",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        0,
+        0.04
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "lower_limit_rad": -0.55,
+      "upper_limit_rad": 0.55,
+      "max_effort_nm": 1,
+      "max_velocity_rad_s": 0.5,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "left_shoulder_pitch",
+      "parent_link": "torso_shell",
+      "child_link": "left_upper_arm",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        0.19,
+        0.24
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "lower_limit_rad": -1.6,
+      "upper_limit_rad": 1.6,
+      "max_effort_nm": 8,
+      "max_velocity_rad_s": 0.5,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "left_elbow",
+      "parent_link": "left_upper_arm",
+      "child_link": "left_forearm",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        0,
+        -0.15
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "lower_limit_rad": -2.2,
+      "upper_limit_rad": 0.1,
+      "max_effort_nm": 5,
+      "max_velocity_rad_s": 0.6,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "left_tool_mount_fixed",
+      "parent_link": "left_forearm",
+      "child_link": "left_tool_mount",
+      "joint_type": "fixed",
+      "origin_m": [
+        0,
+        0,
+        -0.13
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        0
+      ],
+      "lower_limit_rad": 0,
+      "upper_limit_rad": 0,
+      "max_effort_nm": 0,
+      "max_velocity_rad_s": 0,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "right_shoulder_pitch",
+      "parent_link": "torso_shell",
+      "child_link": "right_upper_arm",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        -0.19,
+        0.24
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "lower_limit_rad": -1.6,
+      "upper_limit_rad": 1.6,
+      "max_effort_nm": 8,
+      "max_velocity_rad_s": 0.5,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "right_elbow",
+      "parent_link": "right_upper_arm",
+      "child_link": "right_forearm",
+      "joint_type": "revolute",
+      "origin_m": [
+        0,
+        0,
+        -0.15
+      ],
+      "axis_xyz": [
+        0,
+        1,
+        0
+      ],
+      "lower_limit_rad": -2.2,
+      "upper_limit_rad": 0.1,
+      "max_effort_nm": 5,
+      "max_velocity_rad_s": 0.6,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    },
+    {
+      "joint_id": "right_tool_mount_fixed",
+      "parent_link": "right_forearm",
+      "child_link": "right_tool_mount",
+      "joint_type": "fixed",
+      "origin_m": [
+        0,
+        0,
+        -0.13
+      ],
+      "axis_xyz": [
+        0,
+        0,
+        0
+      ],
+      "lower_limit_rad": 0,
+      "upper_limit_rad": 0,
+      "max_effort_nm": 0,
+      "max_velocity_rad_s": 0,
+      "command_enabled": false,
+      "source": "synthetic_placeholder"
+    }
+  ],
+  "controller": {
+    "kinematics_only": true,
+    "commands_enabled": false,
+    "inertia_source": "not_provided_kinematic_only"
+  },
+  "authority": {
+    "simulation_only": true,
+    "physical_actuation_authorized": false,
+    "patient_contact_authorized": false,
+    "clinical_use_authorized": false
+  },
+  "caveats": [
+    "All dimensions, masses, offsets, and joint envelopes are invented placeholders for schema and graph testing.",
+    "Links use bounding boxes, not detailed collision geometry or manufacturing CAD.",
+    "No inertial calibration, actuator dynamics, cable routing, reach/human factors, tip stability, or force-limited contact validation has been performed.",
+    "This file does not authorize hardware fabrication, powering, patient contact, or clinical use."
+  ]
+}

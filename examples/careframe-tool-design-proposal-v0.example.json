@@ -1,0 +1,133 @@
+{
+  "schema_version": "careframe-tool-design-proposal-v0",
+  "proposal_id": "CAREFRAME-EXAMPLE-SEALED-SUPPLY-001",
+  "created_at": "2026-10-23T09:00:00+02:00",
+  "task": {
+    "task_id": "EXAMPLE-SEALED-SUPPLY-HANDOFF",
+    "intended_task": "sealed_supply_transfer",
+    "objective": "Move one sealed, non-medicated supply container to a marked mock handoff area in a synthetic scene.",
+    "work_zone": "synthetic_mock_ward_zone_A",
+    "patient_data_included": false
+  },
+  "requirements": [
+    {
+      "requirement_id": "REQ-PAYLOAD-001",
+      "constraint_kind": "max_payload_g",
+      "value": 1500,
+      "units": "g",
+      "rationale": "Illustrative synthetic envelope only; derive any physical limit from a reviewed hazard and payload assessment.",
+      "evidence_refs": [
+        "docs/research/medical-robotics/CARE_FRAME_TOOL_DESIGNER_CONTRACT_V0.md"
+      ]
+    },
+    {
+      "requirement_id": "REQ-AUTHORITY-001",
+      "constraint_kind": "must_keep_physical_actuation_false",
+      "value": false,
+      "units": "boolean",
+      "rationale": "A concept proposal cannot authorize physical actuation.",
+      "evidence_refs": [
+        "Symtropy tool-manifest contract v0"
+      ]
+    }
+  ],
+  "candidate_manifests": [
+    {
+      "schema_version": "medical-robot-tool-manifest-v0",
+      "tool_id": "CARE-FRAME-sealed_supply_gripper-CONCEPT-EXAMPLE-001",
+      "revision": 1,
+      "tool_kind": "sealed_supply_gripper",
+      "intended_task": "sealed_supply_transfer",
+      "contact_class": "object_only",
+      "design_stage": "concept",
+      "evidence_class": "synthetic_design_proposal",
+      "mechanical": {
+        "mount_interface": "SMF-TOOL-01",
+        "mass_g": 1500,
+        "payload_g": 1500,
+        "geometry_bbox_mm": [
+          250,
+          120,
+          180
+        ],
+        "max_object_force_n": 15,
+        "max_torque_nm": 1.5,
+        "retention_fail_closed": true
+      },
+      "hygiene": {
+        "surface_materials_declared": true,
+        "cleaning_claim": "not_validated",
+        "single_use": false
+      },
+      "electrical": {
+        "powered": true,
+        "max_power_w": 20,
+        "protective_isolation_declared": true
+      },
+      "privacy": {
+        "captures_audio": false,
+        "captures_video": false,
+        "physical_privacy_shutter": true,
+        "default_capture_state": "disabled"
+      },
+      "authority": {
+        "simulation_only": true,
+        "physical_actuation_authorized": false,
+        "patient_contact_authorized": false,
+        "clinical_use_authorized": false
+      }
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesis_id": "HYP-HANDOFF-001",
+      "candidate_tool_id": "CARE-FRAME-sealed_supply_gripper-CONCEPT-EXAMPLE-001",
+      "statement": "The candidate can retain and present the declared synthetic payload through the mock handoff sequence.",
+      "metric_id": "synthetic_handoff_completion_rate",
+      "falsifier": "Any dropped payload, envelope violation, stale tool revision accepted, or missed required abort falsifies the hypothesis.",
+      "predicted_direction": "unknown_until_measured"
+    }
+  ],
+  "uncertainty": {
+    "coverage_state": "within_declared_synthetic_envelope",
+    "known_unknowns": [
+      "No physical strength, grasp reliability, material, hygiene or clinical property has been measured.",
+      "The numeric limits are illustrative and are not specifications for a build."
+    ],
+    "out_of_distribution_conditions": [
+      "Payload outside declared envelope",
+      "Tool identity or calibration changes during an episode",
+      "Dynamic obstacle enters the handoff zone"
+    ]
+  },
+  "comparison_plan": {
+    "baseline_ids": [
+      "cart_baseline",
+      "fixed_base_manipulator_baseline"
+    ],
+    "scenario_set_sha256": "a83f0e0b67f405870146e5df874efd769fd5f87fcea668974daa2f0cf34b4470",
+    "metric_ids": [
+      "synthetic_handoff_completion_rate",
+      "intervention_count",
+      "envelope_violation_count",
+      "safe_abort_rate"
+    ],
+    "same_budget_for_all_candidates": true,
+    "hard_gates_non_compensatory": true
+  },
+  "authority": {
+    "requires_independent_gate": true,
+    "physical_actuation_authorized": false,
+    "patient_contact_authorized": false,
+    "clinical_use_authorized": false
+  },
+  "traceability": {
+    "model_id": "CAREFRAME_EXAMPLE_MODEL_NOT_A_REAL_ARTIFACT",
+    "model_revision": "example-only",
+    "model_digest_sha256": "e42961f9713a4f606984df37695b4ccbe18920659e1a450566761ee38a378952",
+    "configuration_digest_sha256": "ce2977303ff149a02003f6699452ecabe5fbffe8f575959b149b589ea3224823",
+    "task_brief_digest_sha256": "c53e7f15826933e8867e8a51e810337d4055590b7a2d0b68e4484e7f773df73b",
+    "tool_catalog_revision": "symtropy-careframe-tool-catalog-v0",
+    "seed": 1337
+  }
+}

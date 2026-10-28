@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "careframe-morphology-v0.schema.json",
+  "title": "Careframe Articulated Morphology v0",
+  "description": "Strict synthetic-only topology and bounding-geometry proposal. Passing this schema grants no physical or clinical authority and does not prove graph connectivity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model_id",
+    "revision",
+    "morphology_kind",
+    "evidence_class",
+    "geometry_fidelity",
+    "units",
+    "root_link",
+    "links",
+    "joints",
+    "controller",
+    "authority",
+    "caveats"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "careframe-morphology-v0"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "morphology_kind": {
+      "const": "wheeled_upper_body_humanoid"
+    },
+    "evidence_class": {
+      "const": "synthetic_morphology_proposal"
+    },
+    "geometry_fidelity": {
+      "const": "bounding_primitives_not_manufacturing_geometry"
+    },
+    "units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length",
+        "mass",
+        "joint_angle",
+        "joint_effort",
+        "joint_velocity"
+      ],
+      "properties": {
+        "length": {
+          "const": "m"
+        },
+        "mass": {
+          "const": "kg"
+        },
+        "joint_angle": {
+          "const": "rad"
+        },
+        "joint_effort": {
+          "const": "N_m"
+        },
+        "joint_velocity": {
+          "const": "rad_s"
+        }
+      }
+    },
+    "root_link": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "links": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    },
+    "joints": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/joint"
+      }
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kinematics_only",
+        "commands_enabled",
+        "inertia_source"
+      ],
+      "properties": {
+        "kinematics_only": {
+          "const": true
+        },
+        "commands_enabled": {
+          "const": false
+        },
+        "inertia_source": {
+          "const": "not_provided_kinematic_only"
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulation_only",
+        "physical_actuation_authorized",
+        "patient_contact_authorized",
+        "clinical_use_authorized"
+      ],
+      "properties": {
+        "simulation_only": {
+          "const": true
+        },
+        "physical_actuation_authorized": {
+          "const": false
+        },
+        "patient_contact_authorized": {
+          "const": false
+        },
+        "clinical_use_authorized": {
+          "const": false
+        }
+      }
+    },
+    "caveats": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    }
+  },
+  "$defs": {
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "link_id",
+        "mass_kg",
+        "collision"
+      ],
+      "properties": {
+        "link_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "mass_kg": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 250
+        },
+        "collision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "shape",
+            "dimensions_m",
+            "source"
+          ],
+          "properties": {
+            "shape": {
+              "enum": [
+                "box",
+                "capsule"
+              ]
+            },
+            "dimensions_m": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "minimum": 1e-7,
+                  "maximum": 2
+                },
+                {
+                  "type": "number",
+                  "minimum": 1e-7,
+                  "maximum": 2
+                },
+                {
+                  "type": "number",
+                  "minimum": 1e-7,
+                  "maximum": 2
+                }
+              ],
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "source": {
+              "const": "synthetic_placeholder"
+            }
+          }
+        }
+      }
+    },
+    "joint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "joint_id",
+        "parent_link",
+        "child_link",
+        "joint_type",
+        "origin_m",
+        "axis_xyz",
+        "max_effort_nm",
+        "max_velocity_rad_s",
+        "command_enabled",
+        "source"
+      ],
+      "properties": {
+        "joint_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parent_link": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "child_link": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "joint_type": {
+          "enum": [
+            "fixed",
+            "revolute",
+            "continuous"
+          ]
+        },
+        "origin_m": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "minimum": -10,
+              "maximum": 10
+            },
+            {
+              "type": "number",
+              "minimum": -10,
+              "maximum": 10
+            },
+            {
+              "type": "number",
+              "minimum": -10,
+              "maximum": 10
+            }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "axis_xyz": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "lower_limit_rad": {
+          "type": "number",
+          "minimum": -50,
+          "maximum": 50
+        },
+        "upper_limit_rad": {
+          "type": "number",
+          "minimum": -50,
+          "maximum": 50
+        },
+        "max_effort_nm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "max_velocity_rad_s": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "command_enabled": {
+          "const": false
+        },
+        "source": {
+          "const": "synthetic_placeholder"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "joint_type": {
+                "const": "fixed"
+              }
+            },
+            "required": [
+              "joint_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "axis_xyz": {
+                "const": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "lower_limit_rad": {
+                "const": 0
+              },
+              "upper_limit_rad": {
+                "const": 0
+              },
+              "max_effort_nm": {
+                "const": 0
+              },
+              "max_velocity_rad_s": {
+                "const": 0
+              }
+            },
+            "required": [
+              "lower_limit_rad",
+              "upper_limit_rad"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "joint_type": {
+                "const": "revolute"
+              }
+            },
+            "required": [
+              "joint_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_effort_nm": {
+                "exclusiveMinimum": 0
+              },
+              "max_velocity_rad_s": {
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "lower_limit_rad",
+              "upper_limit_rad"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "joint_type": {
+                "const": "continuous"
+              }
+            },
+            "required": [
+              "joint_type"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "lower_limit_rad"
+                  ]
+                },
+                {
+                  "required": [
+                    "upper_limit_rad"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "max_effort_nm": {
+                "exclusiveMinimum": 0
+              },
+              "max_velocity_rad_s": {
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
