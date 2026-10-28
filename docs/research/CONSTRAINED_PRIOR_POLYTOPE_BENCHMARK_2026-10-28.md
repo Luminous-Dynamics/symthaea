@@ -61,6 +61,22 @@ This experiment supports three limited conclusions:
 
 It does not demonstrate a speedup: all LPs here are tiny and wall-clock timing is sub-millisecond/millisecond scale. It does not show generalization to unrepresented graphs or mechanisms. No ACDB, CausalArena, or TCD-Arena comparison was executed.
 
+## Additional experiment: ambiguity-width sweep
+
+After the initial two-set comparison, I evaluated five nested graph/kernel marginal-bound widths while keeping the per-atom floor and diagonal/antidiagonal association bounds fixed. All three objectives were solved for each set (15 rows total). This is a separate local sweep and inherits the same synthetic-model and source-provenance limitations noted above.
+
+| Graph/kernel marginal bounds | Graph value (bits) | Kernel value (bits) | Joint value (bits) | Old six-prior policy joint regret (bits) |
+|---|---:|---:|---:|---:|
+| [0.24, 0.26] | 1.520647 | 1.568321 | 3.438245 | ~0 |
+| [0.20, 0.30] | 1.570999 | 1.616981 | 3.509153 | ~0 |
+| [0.15, 0.35] | 1.631122 | 1.675454 | 3.597787 | ~0 |
+| [0.10, 0.40] | 1.690035 | 1.732918 | 3.670224 | 0.016197 |
+| [0.05, 0.60] | 1.748079 | 1.789665 | 3.727372 | 0.047894 |
+
+The robust value rises monotonically as the admissible marginal range widens. In this fixture, the six-prior policy remains optimal for the graph and kernel objectives across all five widths, but becomes suboptimal for joint prediction at the two widest sets. This is a useful *sensitivity curve* for robustness versus conservatism; it is not a calibration curve because these bounds were chosen illustratively rather than estimated from data.
+
+The exact 15-row local output is losslessly committed as `validation/CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json.gz` (compressed SHA-256 `98e4bfa4d824ec7c73bc0743f5a90302045b32b003fc91863c630a44f1e7b318`; Git blob `02b16e9103a59d5544cc68d12d79f8909dbe296e`). Its raw local JSON is 15 rows, 5,xxx bytes, SHA-256 `58e85876088d62fb9393551df359b995c58af7ec1d51f7551ba82b4b10ebd2d4`.
+
 ## Related work and benchmark implications
 
 - Dellaporta, O'Hara and Damoulas, **Decision Making under the Exponential Family: Distributionally Robust Optimisation with Bayesian Ambiguity Sets** (ICML 2025), develops posterior-informed ambiguity sets and tractable dual formulations: https://proceedings.mlr.press/v267/dellaporta25a.html.
