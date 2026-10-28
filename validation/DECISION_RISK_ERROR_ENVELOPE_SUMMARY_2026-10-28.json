@@ -1,0 +1,63 @@
+{
+  "schema": "symthaea-decision-risk-error-envelope-summary-v1",
+  "status": "SYNTHETIC_BOUNDED_AUDIT_STUDY_NOT_DEPLOYMENT_CERTIFICATION",
+  "date": "2026-10-28",
+  "protocol": {
+    "seed": 20261028,
+    "monte_carlo_repeats": 200,
+    "cells": 128,
+    "policies": 8,
+    "latent_worlds": 16,
+    "sample_sizes_per_cell": [32, 128, 512, 2048, 4096, 8192],
+    "familywise_delta": 0.05,
+    "declared_loss_range_bits": [0.0, 4.0],
+    "audit_noise": "iid Uniform(-0.05, 0.05) added to simulator cell risk",
+    "regret_budget_bits": 0.2,
+    "nominal_radius_bits": 0.06664248830771191,
+    "epsilon_allowance_bits": 0.033357511692288094,
+    "hoeffding_observations_per_cell_for_radius_alone": 61406
+  },
+  "findings": {
+    "simultaneous_eb_coverage": "200/200 observed audit repetitions for every model and sample size; Monte Carlo only, under bounded iid synthetic audit assumptions",
+    "simultaneous_hoeffding_coverage": "200/200 observed audit repetitions for every model and sample size; Monte Carlo only, under bounded iid synthetic audit assumptions",
+    "correct_model_empirical_bernstein": {
+      "mean_epsilon_upper_4096": 0.0243,
+      "mean_regret_bound_4096": 0.1818,
+      "admission_rate_4096": 1.0
+    },
+    "small_misspec_1pct_empirical_bernstein": {
+      "true_epsilon_bits_scoring_only": 0.00945676584509414,
+      "mean_epsilon_upper_4096": 0.0325,
+      "admission_rate_4096": 0.98,
+      "admission_rate_8192": 1.0
+    },
+    "near_budget_misspecification": {
+      "true_epsilon_bits_scoring_only": 0.034857511692288234,
+      "epsilon_allowance_bits": 0.033357511692288094,
+      "plugin_unsafe_admission_rate_32": 0.03,
+      "plugin_unsafe_admission_rate_128": 0.095,
+      "plugin_unsafe_admission_rate_512": 0.05,
+      "plugin_unsafe_admission_rate_2048": 0.005,
+      "empirical_bernstein_unsafe_admissions_observed": 0,
+      "hoeffding_unsafe_admissions_observed": 0
+    },
+    "large_misspecification": {
+      "true_epsilon_5pct_bits_scoring_only": 0.056037311491315744,
+      "true_epsilon_20pct_bits_scoring_only": 0.1646225559584833,
+      "empirical_bernstein_admission_rates": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    }
+  },
+  "limitations": [
+    "synthetic 8-policy by 16-world game only",
+    "truth used only to score estimated-envelope coverage",
+    "independent bounded audit samples per latent cell are assumed and may not exist in real systems",
+    "nominal conformal radius carried over from the prior pilot",
+    "policy identity mismatch must fail the signed manifest gate before statistical certification",
+    "no external baseline implementations or real-world dataset run; no SOTA claim",
+    "Python only; native Rust and production dispatch gate not tested or integrated"
+  ],
+  "raw_results_sha256": "457c60993a037eada7d372fe9901711ec311422024763f0b2085b84fa81a9a3b",
+  "local_source_sha256": "8fd7a2eaa39d9f034de00e9f1c4f1d681d2c5c5f54f23029791c877944e43507",
+  "local_test_sha256": "7d0c1beb0ae3a366f02b13af21113254517a9fd681615763f747500ff3dd5711",
+  "combined_python_suite": "23/23 passed locally in 19.629 seconds"
+}
