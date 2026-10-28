@@ -17,9 +17,10 @@ from typing import Any
 from decision_robustness_eval import BENCHMARK_ID as AUDIT_BENCHMARK_ID
 
 ADAPTER_BENCHMARK_ID = "CASTING-DECISION-ROBUSTNESS-ADAPTER-001"
-ADAPTER_SCHEMA_VERSION = "1.0.0"
+ADAPTER_SCHEMA_VERSION = "1.1.0"
 EXPECTED_SWEEP_BENCHMARK = "CASTING-MF-COMPOSITION-001"
 REFERENCE_TOL = 1e-12
+FROZEN_REFERENCE_POINT = (1.2, 1.2)
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -188,12 +189,14 @@ def adapt_documents(
         {
             "schema_version", "benchmark_id", "source_sweep_sha256", "selector",
             "candidate_pool_sha256", "reference_point", "selected_candidate_ids",
-            "candidate_predictions",
+            "candidate_predictions", "selection_frozen_before_holdout",
         },
         "selection_manifest",
     )
     if selection["schema_version"] != ADAPTER_SCHEMA_VERSION or selection["benchmark_id"] != ADAPTER_BENCHMARK_ID:
         raise ValueError("selection_manifest schema or benchmark id is unsupported")
+    if selection["selection_frozen_before_holdout"] is not True:
+        raise ValueError("selection_manifest must declare selection_frozen_before_holdout=true")
     if _digest(selection["source_sweep_sha256"], "selection_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("selection_manifest is not bound to these exact sweep bytes")
     selector = _selector(selection["selector"], "selection_manifest.selector")
@@ -220,6 +223,8 @@ def adapt_documents(
     reference = tuple(_number(value, f"selection_manifest.reference_point[{i}]") for i, value in enumerate(reference_raw))
     if any(value <= 0 for value in reference):
         raise ValueError("reference point values must be positive")
+    if any(abs(reference[i] - FROZEN_REFERENCE_POINT[i]) > REFERENCE_TOL for i in range(2)):
+        raise ValueError(f"reference_point must equal the frozen benchmark point {FROZEN_REFERENCE_POINT}")
 
     selected_ids = selection["selected_candidate_ids"]
     if not isinstance(selected_ids, list) or not selected_ids:
@@ -237,12 +242,14 @@ def adapt_documents(
         holdout,
         {
             "schema_version", "benchmark_id", "source_sweep_sha256",
-            "candidate_pool_sha256", "selector", "shifts",
+            "candidate_pool_sha256", "selector", "shifts", "holdout_role",
         },
         "holdout_manifest",
     )
     if holdout["schema_version"] != ADAPTER_SCHEMA_VERSION or holdout["benchmark_id"] != ADAPTER_BENCHMARK_ID:
         raise ValueError("holdout_manifest schema or benchmark id is unsupported")
+    if holdout["holdout_role"] != "independent_post_selection":
+        raise ValueError("holdout_manifest.holdout_role must be independent_post_selection")
     if _digest(holdout["source_sweep_sha256"], "holdout_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("holdout manifest is not bound to these exact sweep bytes")
     if _digest(holdout["candidate_pool_sha256"], "holdout_manifest.candidate_pool_sha256") != candidate_pool_sha:
@@ -323,8 +330,8 @@ def adapt_documents(
             "cost_spent": run.get("cost_spent"),
         },
         "split": {
-            "selection_frozen_before_holdout": True,
-            "holdout_role": "independent_post_selection",
+            "selection_frozen_before_holdout": selection["selection_frozen_before_holdout"],
+            "holdout_role": holdout["holdout_role"],
             "selection_freeze_sha256": hashlib.sha256(selection_raw).hexdigest(),
             "holdout_manifest_sha256": hashlib.sha256(holdout_raw).hexdigest(),
         },
