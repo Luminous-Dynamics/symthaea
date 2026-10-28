@@ -148,6 +148,14 @@
       "family": "candidate_under_test",
       "required": true,
       "status": "synthetic-policy-added; no result claimed"
+    },
+    {
+      "id": "mf_jesmoc",
+      "family": "constrained_multiobjective_multi_fidelity_bayesian_optimization",
+      "required": true,
+      "source_paper": "https://doi.org/10.1016/j.neucom.2025.131674",
+      "source_repository": "https://github.com/fernandezdaniel/MOBOCMF",
+      "status": "public-code-version-and-environment-lock-required"
     }
   ],
   "baseline_lock": {
@@ -350,6 +358,7 @@
     "comparator_baselines": [
       "botorch_mf_hvkg",
       "botorch_momf",
+      "mf_jesmoc",
       "decision_value_of_information",
       "adaptive_budget",
       "high_only",
@@ -362,7 +371,8 @@
       "Report wall-clock and optimizer overhead as well as oracle/fidelity calls.",
       "Retain failed, crashed, aborted and refused runs; do not silently drop them.",
       "Freeze environment and immutable source/package revisions before running comparisons.",
-      "Do not compare results from the synthetic casting-like suite directly to COCO scores or claim physical foundry validity."
+      "Do not compare results from the synthetic casting-like suite directly to COCO scores or claim physical foundry validity.",
+      "Run the public MF-JESMOC implementation with a pinned commit and environment lock; retain its originally reported protocol separately from the matched-budget casting stress protocol."
     ],
     "primary_metrics": [
       "feasible high-fidelity hypervolume vs cumulative fidelity cost",
@@ -371,6 +381,7 @@
       "decision regret vs the finite-pool high-fidelity oracle (synthetic-only metric)",
       "wall-clock time, memory and optimizer overhead"
     ],
-    "statistical_gate": "At least 20 paired seeds (target 30), per-cell effects and confidence intervals, correction for multiple comparisons; three-seed defaults are diagnostic only."
+    "statistical_gate": "At least 20 paired seeds (target 30), per-cell effects and confidence intervals, correction for multiple comparisons; three-seed defaults are diagnostic only.",
+    "research_rationale": "MF-JESMOC is a directly relevant constrained multi-objective multi-fidelity method using deep Gaussian processes and cost-normalized joint-entropy reduction. It is included as a required external comparator; published claims are not treated as evidence for this repository."
   }
 }
