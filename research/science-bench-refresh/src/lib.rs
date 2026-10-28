@@ -269,34 +269,55 @@ fn scan_policy_input_for_oracle_fields(
     const FORBIDDEN_KEYS: &[&str] = &[
         "answer",
         "answerkey",
+        "answertext",
         "canonicalequation",
         "correctanswer",
+        "correctlabel",
+        "evaluator",
         "evaluatoronly",
+        "evaluationlabel",
         "evaluationtarget",
-        "familyid",
-        "taskfamily",
-        "recipekind",
-        "constructorkind",
+        "expectedanswer",
         "expectedequation",
         "expectedlaw",
+        "expectedtarget",
+        "expectedvalue",
+        "familyid",
+        "taskfamily",
         "gold",
+        "goldlabel",
+        "goldstandard",
         "groundtruth",
         "groundtruthlaw",
+        "groundtruthvalue",
+        "hiddenanswer",
         "hiddenlaw",
         "hiddentarget",
+        "oracle",
         "oracleanswer",
+        "oracledata",
         "oracleonly",
         "referenceanswer",
+        "referencevalue",
         "solution",
+        "solutionkey",
         "target",
         "targetequation",
         "targetlaw",
+        "targetvalue",
+        "trueanswer",
         "truelaw",
         "trueequation",
+        "truth",
     ];
     match value {
         serde_json::Value::Object(fields) => {
             for (key, nested) in fields {
+                if !key.is_ascii() {
+                    issues.push(format!(
+                        "policy_input contains a non-ASCII field name at {path}.{key}"
+                    ));
+                }
                 let normalized: String = key
                     .chars()
                     .filter(|character| character.is_ascii_alphanumeric())
@@ -1347,6 +1368,29 @@ mod tests {
                 "missing denylist diagnostic for {forbidden_key}"
             );
         }
+    }
+
+    #[test]
+    fn non_ascii_policy_input_field_names_are_rejected() {
+        let mut manifest = valid_qualified_manifest("sealed_refresh");
+        let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
+        // Cyrillic small te in an otherwise ASCII-looking ground-truth key.
+        task_set["tasks"][0]["policy_input"]["ground_truтh_law"] =
+            json!("fabricated-answer");
+        let task_bytes = serde_json::to_vec(&task_set).unwrap();
+        let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        manifest["task_set_commitment_sha256"] = json!(
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes)
+                .unwrap()
+        );
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+        assert!(report.task_set_commitment_matches);
+        assert!(!report.task_set_contract_valid);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("non-ASCII field name")));
     }
 
     #[test]
