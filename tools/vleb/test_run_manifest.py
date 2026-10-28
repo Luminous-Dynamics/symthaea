@@ -26,7 +26,7 @@ def valid_manifest() -> dict[str, Any]:
             "workflow_path": ".github/workflows/vleb-confirmatory.yml",
             "workflow_ref": "refs/heads/main",
             "workflow_sha": git("1"),
-            "run_id": "90001",
+            "run_id": "vleb-confirmatory-0001",
             "run_attempt": 1,
             "event": "workflow_dispatch",
             "expected_head_sha": git("2"),
