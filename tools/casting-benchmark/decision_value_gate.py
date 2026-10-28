@@ -53,7 +53,7 @@ class DecisionAction:
         _nonblank(self.action_id, "action_id")
         _nonblank(self.candidate_id, "candidate_id")
         _nonblank(self.fidelity, "fidelity")
-        if self.kind not in ACTION_KINDS:
+        if not isinstance(self.kind, str) or self.kind not in ACTION_KINDS:
             raise ValueError(f"kind must be one of {sorted(ACTION_KINDS)}")
         cost = _finite_number(self.estimated_cost_units, "estimated_cost_units")
         value = _finite_number(self.decision_loss_reduction, "decision_loss_reduction")
