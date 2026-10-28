@@ -205,36 +205,100 @@
   "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "primary_contrasts": [
     {
-      "contrast_id": "etc_variance_vs_random_interpreter",
+      "contrast_id": "measurement_variance_vs_random_interpreter",
       "left_arm_id": "etc_variance_interpreter",
       "right_arm_id": "etc_random_interpreter",
       "primary_metric": "coverage_complete_rmsle",
       "budget_profile": "measurement_matched",
-      "multiplicity_family": "primary_interpreter_acquisition"
+      "multiplicity_family": "measurement_interpreter_acquisition"
     },
     {
-      "contrast_id": "etc_pairwise_vs_random_interpreter",
+      "contrast_id": "measurement_pairwise_vs_random_interpreter",
       "left_arm_id": "etc_pairwise_interpreter",
       "right_arm_id": "etc_random_interpreter",
       "primary_metric": "coverage_complete_rmsle",
       "budget_profile": "measurement_matched",
-      "multiplicity_family": "primary_interpreter_acquisition"
+      "multiplicity_family": "measurement_interpreter_acquisition"
     },
     {
-      "contrast_id": "etc_variance_vs_random_no_interpreter",
+      "contrast_id": "measurement_variance_vs_random_no_interpreter",
       "left_arm_id": "etc_variance_no_interpreter",
       "right_arm_id": "etc_random_no_interpreter",
       "primary_metric": "coverage_complete_rmsle",
       "budget_profile": "measurement_matched",
-      "multiplicity_family": "primary_no_interpreter_acquisition"
+      "multiplicity_family": "measurement_no_interpreter_acquisition"
     },
     {
-      "contrast_id": "etc_pairwise_vs_random_no_interpreter",
+      "contrast_id": "measurement_pairwise_vs_random_no_interpreter",
       "left_arm_id": "etc_pairwise_no_interpreter",
       "right_arm_id": "etc_random_no_interpreter",
       "primary_metric": "coverage_complete_rmsle",
       "budget_profile": "measurement_matched",
-      "multiplicity_family": "primary_no_interpreter_acquisition"
+      "multiplicity_family": "measurement_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "measurement_variance_vs_native_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "native_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_interpreter_protocol_vs_native"
+    },
+    {
+      "contrast_id": "measurement_variance_vs_native_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "native_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_no_interpreter_protocol_vs_native"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_random_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "etc_random_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_pairwise_vs_random_interpreter",
+      "left_arm_id": "etc_pairwise_interpreter",
+      "right_arm_id": "etc_random_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_random_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "etc_random_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_pairwise_vs_random_no_interpreter",
+      "left_arm_id": "etc_pairwise_no_interpreter",
+      "right_arm_id": "etc_random_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_native_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "native_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_interpreter_protocol_vs_native"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_native_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "native_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_no_interpreter_protocol_vs_native"
     }
   ],
   "missing_attempt_policy": "retain_every_expected_cell_and_classify_failures",
