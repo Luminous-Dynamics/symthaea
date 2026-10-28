@@ -68,6 +68,8 @@ The public [QOBLIB Maximum Independent Set page](https://zib-aopt.github.io/QOBL
 
 Before confirmation runs, record for every selected candidate its source revision or executable digest, license/availability, graph representation, preprocessing and postprocessing, hardware, timeout, and configuration. Reproduce results where possible. If a published submission's implementation or settings cannot be recovered, explicitly record the limitation and compare the remaining eligible specialist baselines; do not silently cite its leaderboard score as a matched runtime comparison. QOBLIB reports both total runtime and time-to-solution, and its coverage differs by method/metric, so compare only complete, semantically compatible measurements.
 
+The current catalog rows have also been captured in [`QOBLIB-MIS-CATALOG-SNAPSHOT-2026-10-28.json`](./QOBLIB-MIS-CATALOG-SNAPSHOT-2026-10-28.json). The snapshot records all 50 instance names, vertex/edge counts, reported objective, and catalog status. It is a **reference inventory only**: it does not contain the graph bytes, immutable QOBLIB revision, or graph SHA-256 digests. Those must still be pinned and checked before confirmation runs. The JSON preregistration template is pre-populated with the instance identifiers to reduce accidental omissions, but its null digest/revision fields deliberately prevent treating it as preregistered.
+
 ## 5. Pairing, repetitions, and scheduling
 
 - Use at least **10 independent stochastic runs per arm and instance** where feasible, with all seeds published. This exceeds QOBLIB's minimum of five and follows its recommendation of ten or more.
