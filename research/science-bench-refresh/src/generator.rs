@@ -6,8 +6,8 @@
 //! revision still has to identify the exact source snapshot used for a run.
 
 use crate::{
-    GenerationManifestV1, compute_artifact_commitment, sha256_hex, validate_manifest_bytes,
-    verify_reveal,
+    BUILT_GENERATOR_SOURCE_REVISION, GenerationManifestV1, compute_artifact_commitment, sha256_hex,
+    validate_manifest_bytes, verify_reveal,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -683,6 +683,12 @@ pub fn generate_task_set_bytes(
     if manifest.purpose != "qualified_run" || manifest.lane != "sealed_refresh" {
         return Err("task regeneration requires a qualified sealed_refresh manifest".to_owned());
     }
+    if manifest.generator.revision != BUILT_GENERATOR_SOURCE_REVISION {
+        return Err(format!(
+            "manifest generator revision {} does not match the compiled generator source {}",
+            manifest.generator.revision, BUILT_GENERATOR_SOURCE_REVISION
+        ));
+    }
     if seed_bytes.len() < 32 {
         return Err("seed must contain at least 32 bytes".to_owned());
     }
@@ -841,7 +847,7 @@ mod tests {
             "lane": "sealed_refresh",
             "generator": {
                 "repository": "https://example.invalid/generator",
-                "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "revision": BUILT_GENERATOR_SOURCE_REVISION,
                 "configuration_sha256": sha256_hex(config_bytes)
             },
             "evaluator": {
