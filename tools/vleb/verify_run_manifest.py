@@ -626,6 +626,33 @@ def audit_claim_evidence_bundle(
                 and parsed.get("claim_id") == item["claim_id"]
                 and parsed.get("task_id") == task_id
             )
+            receipt_audits: list[dict[str, Any]] = []
+            if valid:
+                for witness in claim_data.get("witnesses", []):
+                    receipt_issues = audit_witness_execution_receipt(
+                        witness["execution_receipt_path"],
+                        witness["execution_receipt_sha256"],
+                        evidence_root,
+                        manifest=manifest,
+                        claim=claim_data,
+                        witness=witness,
+                        receipt_schema=witness_receipt_schema,
+                        expected_producer_sha256=expected_witness_receipt_producer_sha256,
+                        trusted_claim_verifier_pins=trusted_claim_verifier_pins,
+                    )
+                    receipt_audits.append({
+                        "witness_id": witness.get("witness_id"),
+                        "path": witness.get("execution_receipt_path"),
+                        "status": "passed" if not receipt_issues else "failed",
+                        "issues": receipt_issues,
+                    })
+                    if receipt_issues:
+                        valid = False
+                        result["issues"].extend({
+                            "code": entry["code"],
+                            "message": f"{item['claim_id']} / {witness.get('witness_id')}: {entry['message']}",
+                        } for entry in receipt_issues)
+            row["witness_receipts"] = receipt_audits
             if valid:
                 verdict = parsed["claim_verdict"]
                 if verdict not in ("supported", "contradicted", "unresolved"):
@@ -668,6 +695,8 @@ def validate_manifest(
     gh_executable: str = "gh",
     expected_claim_auditor_sha256: str | None = None,
     expected_claim_schema_sha256: str | None = None,
+    expected_witness_receipt_schema_sha256: str | None = None,
+    expected_witness_receipt_producer_sha256: str | None = None,
     trusted_claim_verifier_pins: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
@@ -963,6 +992,8 @@ def validate_manifest(
                 evidence_root,
                 expected_claim_auditor_sha256=expected_claim_auditor_sha256,
                 expected_claim_schema_sha256=expected_claim_schema_sha256,
+                expected_witness_receipt_schema_sha256=expected_witness_receipt_schema_sha256,
+                expected_witness_receipt_producer_sha256=expected_witness_receipt_producer_sha256,
                 trusted_claim_verifier_pins=trusted_claim_verifier_pins or {},
             )
             if claim_audit_result["status"] != "passed":
@@ -1027,6 +1058,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-verifier-binary-sha256", required=True)
     parser.add_argument("--expected-claim-auditor-sha256")
     parser.add_argument("--expected-claim-schema-sha256")
+    parser.add_argument("--expected-witness-receipt-schema-sha256")
+    parser.add_argument("--expected-witness-receipt-producer-sha256")
     parser.add_argument("--trusted-claim-verifier", action="append", default=[], metavar="KIND=SHA256")
     parser.add_argument("--gh-executable", default="gh")
     parser.add_argument("--output", type=Path)
@@ -1057,6 +1090,8 @@ def main(argv: list[str] | None = None) -> int:
         gh_executable=args.gh_executable,
         expected_claim_auditor_sha256=args.expected_claim_auditor_sha256,
         expected_claim_schema_sha256=args.expected_claim_schema_sha256,
+        expected_witness_receipt_schema_sha256=args.expected_witness_receipt_schema_sha256,
+        expected_witness_receipt_producer_sha256=args.expected_witness_receipt_producer_sha256,
         trusted_claim_verifier_pins=parse_claim_verifier_pins(args.trusted_claim_verifier),
     )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
