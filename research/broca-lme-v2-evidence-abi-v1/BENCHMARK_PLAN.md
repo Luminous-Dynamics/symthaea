@@ -28,7 +28,7 @@ The official [LongMemEval-V2 repository](https://github.com/xiaowu0162/LongMemEv
 | Codex | 69.9% | 177.2 s | 68.7% | 185.8 s |
 | AgentRunbook-C | 74.9% | 108.3 s | 70.1% | 139.9 s |
 
-These are **external reference points**, not measurements made on this branch. Hardware, model, prompt, cost and evaluator differences can invalidate a direct comparison. Use the official harness and record the benchmark revision and full run configuration before reporting a comparison.
+These are **external reference points**, not measurements made on this branch. Hardware, model, prompt, cost and evaluator differences can invalidate a direct comparison. Use the official harness and record the benchmark revision and full run configuration before reporting a comparison. The official results section currently lists the released baseline frontier above; the separately labeled official leaderboard tables report that entries are coming soon. Treat the baseline table as the reproducible reference frontier and do not import third-party claims as official leaderboard results.
 
 Two complementary benchmarks matter because answer recall is not the whole job:
 
@@ -127,10 +127,11 @@ This branch currently provides a binary-query API, not a complete benchmark back
 
 1. Compile and run focused tests on the exact head; keep the PR draft until results are known.
 2. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
-3. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
-4. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
-5. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
-6. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
-7. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
+3. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. The current implementation recomputes eligible-document statistics per query; next replace it with an immutable generation-bound inverted index and include its digest in the commit manifest so queries can use postings without rescanning all documents.
+4. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
+5. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
+6. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
+7. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
+8. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
 
 **Current claim boundary:** the exact-HDC and BM25 query APIs and tests are authored on this branch. They are not compiled or executed in this environment. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
