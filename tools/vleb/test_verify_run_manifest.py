@@ -138,6 +138,12 @@ class ManifestBundle:
             self.schema,
             self.root,
             expected,
+            expected_verifier_sha256=kwargs.pop(
+                "expected_verifier_sha256", sha(MODULE_PATH.read_bytes())
+            ),
+            expected_schema_sha256=kwargs.pop(
+                "expected_schema_sha256", sha(self.schema.read_bytes())
+            ),
             verify_attestation=kwargs.pop("verify_attestation", False),
             **kwargs,
         )
@@ -202,6 +208,14 @@ class RunManifestVerifierTests(unittest.TestCase):
     def test_out_of_band_manifest_pin_is_required(self) -> None:
         result = self.bundle.audit(expected_manifest_sha256="0" * 64)
         self.assert_issue(result, "manifest_pin_mismatch")
+
+    def test_verifier_implementation_pin_is_required(self) -> None:
+        result = self.bundle.audit(expected_verifier_sha256="0" * 64)
+        self.assert_issue(result, "verifier_pin_mismatch")
+
+    def test_manifest_schema_pin_is_required(self) -> None:
+        result = self.bundle.audit(expected_schema_sha256="0" * 64)
+        self.assert_issue(result, "schema_pin_mismatch")
 
     def test_unbundled_loose_file_cannot_override_attested_bytes(self) -> None:
         (self.bundle.root / self.bundle.paths["patch"]).write_bytes(b"changed only outside the sealed ZIP")
