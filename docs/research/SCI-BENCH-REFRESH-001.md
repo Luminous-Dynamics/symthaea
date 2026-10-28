@@ -176,7 +176,7 @@ These benchmarks are complementary, not directly commensurate. Do not compare sc
 
 1. **Protocol (this document):** freeze lanes, threat model, generation and scoring rules.
 2. **Manifest/schema + synthetic fixture:** canonical example with pre-run commitments, hidden-field boundaries and expected denominator.
-3. **Standalone Rust validator:** validate manifests/commitments, denominator closure, task-family split integrity, post-run reveal consistency and hostile mutations. Keep it independent from candidate-policy code.
+3. **Manifest validator (implemented in draft PR #8773):** strict Rust manifest parsing, unknown-field rejection, digest-format checks, pinned-revision checks for qualified runs, task-denominator closure, family-weight closure, duplicate-family rejection, reveal-policy/lane consistency, and separation between declared eligibility and proof of execution isolation. It does not recompute the hidden seed/task commitments or authenticate a runner.
 4. **Generator qualification:** positive/negative controls, duplicate/family leakage, identifiability, baseline solvability and seed replay.
 5. **Baseline-only pilot:** use pinned NewtonBench or a separately declared small synthetic profile; no candidate-policy superiority claim.
 6. **Confirmatory study:** paired frozen policies, predeclared effect and sample size, complete cost accounting, held-out generation(s), and independent review.
