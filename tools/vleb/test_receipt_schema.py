@@ -79,9 +79,12 @@ def valid_pass_receipt() -> dict[str, object]:
                 "argv": ["cargo", "test", "--locked"],
                 "working_directory": "/workspace",
                 "exit_code": 0,
+                "expected_exit_code": 0,
                 "timed_out": False,
                 "stdout_sha256": digest("2"),
                 "stderr_sha256": digest("3"),
+                "stdout_artifact": "logs/stdout.txt",
+                "stderr_artifact": "logs/stderr.txt",
                 "duration_ms": 1000,
             }
         ],
@@ -91,6 +94,7 @@ def valid_pass_receipt() -> dict[str, object]:
                 "test_id": "ledger.normal_exact_output",
                 "status": "passed",
                 "log_sha256": digest("4"),
+                "log_artifact": "logs/cargo-test.log",
                 "exit_code": 0,
                 "duration_ms": 10,
                 "notes": "schema conformance positive control",
@@ -104,6 +108,14 @@ def valid_pass_receipt() -> dict[str, object]:
                 "equivalence_status": "non_equivalent",
                 "observed_verdict": "rejected",
                 "evidence_sha256": digest("5"),
+                "compile_exit_code": 0,
+                "test_exit_code": 101,
+                "compile_log_artifact": "logs/mutation.compile.log",
+                "test_log_artifact": "logs/mutation.test.log",
+                "compile_log_sha256": digest("a"),
+                "test_log_sha256": digest("b"),
+                "expected_killer_test": "repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity",
+                "failed_test_names": ["repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity"],
                 "review_notes": "synthetic schema test only",
             }
         ],
@@ -116,6 +128,7 @@ def valid_pass_receipt() -> dict[str, object]:
                 "observed_sha256": digest("6"),
                 "mismatch_count": 0,
                 "details_sha256": digest("7"),
+                "details_artifact": "logs/diff-details.json",
             }
         ],
         "verifier": {
