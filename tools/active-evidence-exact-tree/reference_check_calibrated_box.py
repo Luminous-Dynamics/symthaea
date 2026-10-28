@@ -86,6 +86,36 @@ def intervals(n):
         result.append(row)
     return result, radius
 
+COVERAGE_GRID = (0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0)
+
+
+def binomial_pmf(n, p):
+    mass = [0.0] * (n + 1)
+    if p <= 0.0:
+        mass[0] = 1.0
+        return mass
+    if p >= 1.0:
+        mass[n] = 1.0
+        return mass
+    mode = min(n, math.floor((n + 1) * p))
+    mass[mode] = 1.0
+    for k in range(mode, 0, -1):
+        mass[k - 1] = mass[k] * (k / (n - k + 1)) * ((1.0 - p) / p)
+    for k in range(mode, n):
+        mass[k + 1] = mass[k] * ((n - k) / (k + 1)) * (p / (1.0 - p))
+    total = sum(mass)
+    return [value / total for value in mass]
+
+
+def cell_coverage(n, true_probability):
+    radius = math.sqrt(math.log(2 * CELLS / ALPHA) / (2 * n))
+    return sum(
+        probability_mass
+        for successes, probability_mass in enumerate(binomial_pmf(n, true_probability))
+        if max(0.0, successes / n - radius) <= true_probability
+        <= min(1.0, successes / n + radius)
+    )
+
 
 def evaluate_conditional(tree, truth, hypothesis, belief):
     if tree is None:
@@ -187,6 +217,17 @@ def self_test():
                 low, high = box[query][hypothesis]
                 if not (0 <= low <= NOMINAL[query][hypothesis] <= high <= 1):
                     raise ValueError("nominal parameter not inside frozen calibration interval")
+    target = 1.0 - ALPHA / CELLS
+    for n in SAMPLE_SIZES:
+        minimum_coverage = min(cell_coverage(n, p) for p in COVERAGE_GRID)
+        if minimum_coverage + 1e-10 < target:
+            raise ValueError(
+                f"n={n}: minimum grid coverage {minimum_coverage} below {target}"
+            )
+        union_bound = 1.0 - CELLS * (1.0 - minimum_coverage)
+        if union_bound + 1e-10 < 1.0 - ALPHA:
+            raise ValueError(f"n={n}: simultaneous union-bound coverage below 95%")
+
     tree = enumerate_trees(PRIOR, 0b1111, 1)[1]
     factorized = worst_box(tree, 50)
     box, _ = intervals(50)
@@ -201,7 +242,7 @@ def self_test():
         full_max = (max(full_max[0], values[0]), max(full_max[1], values[2]))
     if abs(factorized[0] - full_max[0]) > 1e-9 or abs(factorized[2] - full_max[1]) > 1e-9:
         raise ValueError("factorized 48-row-vertex maximum differs from full 2^12 vertex enumeration")
-    print("PASS: tree counts, interval inclusion/width, and exact factorized-vs-full vertex maximum")
+    print("PASS: tree counts, interval inclusion/width, exact finite-grid binomial coverage, and factorized-vs-full vertex maximum")
 
 
 def check(path):
