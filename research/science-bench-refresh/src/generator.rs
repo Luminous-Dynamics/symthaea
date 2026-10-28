@@ -916,7 +916,7 @@ mod tests {
     }
 
     #[test]
-    fn generator_schema_fixture_is_valid_json_and_matches_version() {
+    fn generator_schema_fixture_is_valid_json_and_matches_audited_templates() {
         let schema: Value = serde_json::from_str(include_str!(
             "../schema/generator-config.schema.json"
         ))
@@ -925,6 +925,17 @@ mod tests {
             schema["properties"]["schema"]["const"].as_str(),
             Some(GENERATOR_CONFIG_SCHEMA)
         );
+        let conditions = schema["properties"]["recipes"]["items"]["allOf"]
+            .as_array()
+            .expect("recipe-specific schema conditions");
+        assert_eq!(conditions.len(), 4);
+        for condition in conditions {
+            assert_eq!(
+                condition["if"]["properties"]["kind"]["const"],
+                condition["then"]["properties"]["family_id"]["const"]
+            );
+            assert!(condition["then"]["properties"]["instruction"]["const"].is_string());
+        }
         assert_eq!(sha256_hex(&demo_config()).len(), 64);
     }
 
