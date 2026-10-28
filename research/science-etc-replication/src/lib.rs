@@ -963,6 +963,23 @@ mod tests {
         assert!(schema["properties"]["primary_contrasts"]["items"]["properties"]
             ["multiplicity_family"]
             .is_object());
+        let qualified = &schema["allOf"][0]["then"];
+        assert!(qualified["properties"]["evaluator"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|name| name.as_str() == Some("judge_prompt_sha256")));
+        for audit in [
+            "prediction_coverage_audit",
+            "coverage_complete_error",
+            "sign_disagreement_audit",
+        ] {
+            assert_eq!(
+                qualified["properties"]["evaluator"]["properties"][audit]["const"]
+                    .as_bool(),
+                Some(true)
+            );
+        }
     }
 
     #[test]
