@@ -221,6 +221,9 @@ def analyze(data: Any) -> dict[str, Any]:
 
     return {
         "schema_version": "vleb-paired-analysis-v1",
+        "analysis_only": True,
+        "score_eligible": False,
+        "score_eligibility_note": "Statistics cannot grant score eligibility; the protected evaluator must admit the task and authenticate provenance, receipt, and semantic evidence first.",
         "cohort_id": data["cohort_id"],
         "protocol_sha256": data["protocol_sha256"],
         "analysis_plan": data["analysis_plan"],
