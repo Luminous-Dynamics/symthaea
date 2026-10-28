@@ -41,4 +41,4 @@ jobs:
         run: |
           rustc --edition=2024 tools/vision-dvpc-activation-gate.rs -o /tmp/vis-dvpc-022
           /tmp/vis-dvpc-022 --score
-          test "$(/tmp/vis-dvpc-022 --zero-failure-required 50000 50000 | cut -f2)" = "59"
+          test "$(/tmp/vis-dvpc-022 --zero-failure-required 25000 50000 | cut -f2)" = "72"
