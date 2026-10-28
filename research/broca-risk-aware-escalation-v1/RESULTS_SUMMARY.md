@@ -10,7 +10,7 @@
 - Five held-out regimes × 2,000 cases = 10,000 test cases.
 - 15 policies, including controls, six calibrated risk budgets and one evaluator-only oracle.
 - 150,000 per-case/policy outcome rows.
-- 14 automated tests passed.
+- 15 automated tests passed (including a singular-pivot regression test added after review).
 - Independent streaming verifier passed row/matrix checks, raw output digest, config digest, source digest and recomputed summary aggregates.
 - Negative controls reject digest tampering, dropped policy rows and outcome tampering even when altered artifact and summary digests are recomputed.
 
