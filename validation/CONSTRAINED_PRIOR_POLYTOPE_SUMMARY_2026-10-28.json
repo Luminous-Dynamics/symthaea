@@ -123,7 +123,7 @@
     },
     "committed_source_at_write_time": {
       "path": "validation/constrained_prior_polytope_benchmark.py",
-      "git_blob": "68f09fa7bef94c56bed25825241d43711b78ddb5",
+      "git_blob": "4d6dd29fbdf09de10cdfe7cba0c403a7d5ba640b",
       "byte_identical_to_local": false
     },
     "local_test": {
@@ -163,7 +163,9 @@
       "compressed_sha256": "267eeede233f4042189f4e481b79b617fbdf7db72ed5c6f2a423952f4c59f4c2",
       "repository_path": "validation/CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json.gz",
       "git_blob": "374f5b1217de29d7869f1ee65ddbe390606afe3c"
-    }
+    },
+    "exact_head_execution": false,
+    "ci_status": "latest observed CI and PR Governance workflows skipped; no remote pass claimed"
   },
   "limitations": [
     "synthetic likelihood, not Symthaea repository SCM implementation",
