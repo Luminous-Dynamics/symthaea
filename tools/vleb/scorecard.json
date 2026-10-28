@@ -182,6 +182,13 @@
       "unit": "percent",
       "scope": "exact fixed-format source-anchor indexing only",
       "admission_rule": "Measure on independently annotated authorized/synthetic corpus; report precision, recall and diagnostic recall by anchor family. This is not a full parser or modernization target."
+    },
+    "source_claim_false_support_rate_pct": {
+      "target": 0,
+      "status": "target_not_measured",
+      "unit": "percent",
+      "scope": "source-anchored legacy claim pilot",
+      "definition": "Percentage of claims labeled supported when their locked independent witness contradicts the claim or is inconclusive. Count only after witness artifacts and verifier identities are checked against out-of-band pins."
     }
   },
   "current_measurements": {
@@ -234,6 +241,12 @@
       "eligible": false,
       "status": "not_run",
       "reason": "No independently reviewed secure-legacy cohort has been evaluated."
+    },
+    "source_claim_false_support_rate_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_run",
+      "reason": "The atomic claim schema and negative controls exist, but no independently adjudicated claim corpus or trusted witness auditor has been evaluated."
     }
   },
   "metric_definitions": {
@@ -270,6 +283,27 @@
     },
     "avg_at_3": {
       "note": "Must use three attempts and the benchmark's exact aggregation rules; never relabel as pass@1."
+    },
+    "source_anchored_claim_evidence": {
+      "claim_scopes": {
+        "textual_anchor": "Proves only that a source anchor such as a PROGRAM-ID, COPY reference or PIC text exists at an exact source span.",
+        "static_structure": "Requires a pinned static analyzer/parser witness and preserves unresolved/unsupported states.",
+        "runtime_behavior": "Requires an independently executed behavioral witness; text or static indexing alone cannot establish numeric, transaction or business-rule behavior."
+      },
+      "scored_claim_requirements": [
+        "source-file digest matches bytes under the evidence root",
+        "every source span excerpt hash is recomputed",
+        "witness artifact digest matches bytes in the sealed evidence bundle",
+        "verifier implementation digest matches an out-of-band allowlist",
+        "verdict agrees with the independent witness result",
+        "runtime claims have independent execution witnesses"
+      ],
+      "do_not_score_as_supported": [
+        "free-form explanation only",
+        "self-reported success without witness bytes",
+        "unverifiable compiler/runtime claim",
+        "claim whose source span or witness hash mismatches"
+      ]
     }
   }
 }
