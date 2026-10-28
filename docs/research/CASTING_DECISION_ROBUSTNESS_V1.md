@@ -78,7 +78,7 @@ From the repository root, run:
 python3 tools/casting-benchmark/decision_robustness_eval.py \
   tools/casting-benchmark/fixtures/decision_robustness_toy.json \
   --output /tmp/casting-decision-robustness-receipt.json
-python3 -m unittest tools/casting-benchmark/test_decision_robustness_eval.py
+python3 tools/casting-benchmark/test_decision_robustness_eval.py
 ```
 
 The toy fixture intentionally selects a candidate that violates a constraint under one of two shifts while a better feasible candidate remains unselected. The receipt should report selected false-feasible count 1 of 2 predicted-feasible candidate/shift pairs, selected feasibility rate 0.5, worst-shift finite-pool retention 0, and worst-shift finite-pool regret 1.0. These are known-answer fixture values, not casting performance results. The fixture's digest strings are placeholders for schema tests only; replace them with verified artifact digests in a real experiment.
