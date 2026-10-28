@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The committed-query API currently accepts an already encoded `BinaryHV`; raw-text trajectory ingestion, a pinned query encoder, and the official LongMemEval-V2 worker remain prerequisites.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code now provides both exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 raw-text query baseline over committed text evidence. Raw trajectory ingestion and the official LongMemEval-V2 worker remain prerequisites; semantic text-to-HDC retrieval still requires a pinned, validated encoder.
 
 ## Research thesis
 
@@ -83,8 +83,8 @@ Freeze and compare these as separate arms. Do not conflate them into one adverti
 
 1. **No-memory control:** same reader/model without retrieved history.
 2. **Official simple RAG controls:** official query-to-slice and query-to-slice-plus-notes implementations.
-3. **Official strong reference:** the current AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
-4. **Broca lexical baseline:** pinned, deterministic lexical retrieval. It must be labeled lexical, not semantic HDC.
+3. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
+4. **Broca BM25 lexical baseline:** the new deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC.
 5. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
 6. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
 7. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
@@ -127,10 +127,10 @@ This branch currently provides a binary-query API, not a complete benchmark back
 
 1. Compile and run focused tests on the exact head; keep the PR draft until results are known.
 2. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
-3. Select and pin a real raw-text query encoder. Compare deterministic lexical retrieval with a trained text-to-HDC encoder rather than calling structured thought channels a text encoder.
+3. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
 4. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
 5. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
 6. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
 7. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
 
-**Current claim boundary:** the API and tests are authored on this branch. They are not compiled or executed in this environment. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
+**Current claim boundary:** the exact-HDC and BM25 query APIs and tests are authored on this branch. They are not compiled or executed in this environment. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
