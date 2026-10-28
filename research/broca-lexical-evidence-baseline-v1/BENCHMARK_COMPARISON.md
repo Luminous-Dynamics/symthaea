@@ -24,6 +24,35 @@ References:
 
 ## 2. Primary benchmark: LongMemEval-V2
 
+### Newer industry/research references checked 2026-10-28
+
+The original official LongMemEval-V2 table below remains the released historical frontier, but the official benchmark site now also reports AgentRunbook-C V2. Treat every row as a separate, configuration-bound reference, not as a single universal "SOTA" score.
+
+| Reference | Published configuration | Accuracy | Query latency | Comparison note |
+|---|---|---:|---:|---|
+| AgentRunbook-C V2 | LongMemEval-V2 small, GPT-5.4-mini, medium reasoning | 72.73% | 56.68 s | Same page reports V1 at 70.30% / 70.00 s in that setting |
+| AgentRunbook-C V2 | LongMemEval-V2 small, GPT-5.4-mini, xhigh reasoning | 75.61% | 130.54 s | Same page reports V1 at 74.90% / 108.30 s |
+| AgentRunbook-C V2 | LongMemEval-V2 small, GPT-5.6 Luna, medium reasoning | 66.52% | 24.72 s | Different reader/model setup; do not combine with the GPT-5.4-mini rows |
+| AgentRunbook-C V2 | LongMemEval-V2 small, GPT-5.6 Luna, xhigh reasoning | 75.17% | 48.94 s | Different reader/model setup; the accuracy/latency pair is configuration-specific |
+| MRAgent | LoCoMo / LongMemEval, not LongMemEval-V2 | up to 23% improvement reported | lower retrieval cost reported | Motivation for active associative reconstruction; benchmark-specific results are not transferable |
+
+Sources:
+- Official AgentRunbook-C V2 update: https://xiaowu0162.github.io/longmemeval-v2/agentrunbook-c-v2/
+- MRAgent, *Memory is Reconstructed, Not Retrieved*, ICML 2026: https://proceedings.mlr.press/v306/ji26d.html
+- Mem2ActBench, ACL 2026: https://aclanthology.org/2026.acl-long.370/
+- Agent Memory Leaderboard: https://agentmemoryleaderboard.ai/home
+
+AgentRunbook-C V2 also reports a GPT-5.4-mini medium-reasoning gain of 1.76 percentage points at 33.8% lower latency relative to V1 in its research summary; its table includes several model/reasoning settings, so use the exact row and run manifest when making paired comparisons. The headline figures differ by declared setting and must not be collapsed into one result.
+
+MRAgent's core idea is closer to our long-term target than static top-k retrieval: construct an associative cue/tag/content structure, then actively explore and prune links as intermediate evidence is discovered. Our same/adjacent-step expansion arm is intentionally a cheap, deterministic ablation—not an attempted reproduction of MRAgent. It should establish whether the weakest form of episode structure earns any improvement before Broca takes on graph construction or iterative retrieval.
+
+### External action and submission lanes
+
+- **Mem2ActBench:** 2,029 sessions, 400 tool-use tasks, with human evaluation finding 91.3% strongly memory-dependent. Use it to test whether recalled facts actually improve tool selection and parameter grounding; keep its task-success score separate from LongMemEval answer accuracy.
+- **Agent Memory Leaderboard:** Cycle 2 submissions are open as of 2026-10-28, with a published submission deadline of October 31, 2026 at 23:59 UTC+8 and evaluation closing November 4. This is an optional external validation lane, not a blocker for code progress. It requires a participant-hosted Add/Search API, so do not claim submission readiness from a local repository-only implementation.
+
+## 3. Primary benchmark: LongMemEval-V2
+
 ### Official released reference points
 
 The official benchmark page currently lists these reference results:
@@ -62,7 +91,7 @@ Use the official evaluator and LAFS calculator. Report web and enterprise separa
 - **Governance gate:** zero observed critical cross-scope exposure, deleted-memory resurrection, or unauthorized stale-memory reuse in the qualifying run. State the number of adversarial trials; zero observed failures is not proof of zero true risk.
 - **Cost gate:** publish write/index time, bytes on disk including journal and metadata, query p50/p95/p99, returned context tokens, reader cost, and background work. The official LAFS number itself uses query latency; do not imply it includes other lifecycle costs.
 
-## 3. Secondary benchmark lanes
+## 4. Secondary benchmark lanes
 
 Keep scores in separate tables; do not produce a cross-benchmark average.
 
@@ -76,7 +105,7 @@ Keep scores in separate tables; do not produce a cross-benchmark average.
 
 Start with LongMemEval-V2 small on both domains. After the adapter is valid, choose one action benchmark and one mutation benchmark. Expand only after receipts demonstrate that the system is correctly wired; the point is not to accumulate benchmark names but to falsify clear hypotheses.
 
-## 4. Paradigm-shift hypotheses to test next
+## 5. Paradigm-shift hypotheses to test next
 
 ### A. Causal episode memory
 
@@ -94,7 +123,7 @@ Model updates as append-only events and test revoke/delete/supersede after memor
 
 BM25 is the transparent control. Add dense retrieval only with a pinned embedding model. Add HDC/hybrid retrieval only after a real text-to-HDC representation exists and is separately measured. The existing ThoughtLanguageEncoder consumes structured ThoughtChannels, not arbitrary question text, and must not be presented as a semantic encoder.
 
-## 5. What would justify a SOTA claim?
+## 6. What would justify a SOTA claim?
 
 Only an apples-to-apples score from an official benchmark revision with a pinned reader, prompts, evaluation code and data split can support a benchmark-specific claim. Report (1) exact accuracy, (2) official LAFS gain, (3) latency/cost frontier, and (4) governance failure counts, with per-question artifacts. A positive synthetic result or a faster retrieval microbenchmark cannot establish end-to-end SOTA.
 
