@@ -1,6 +1,6 @@
 # VLEB COBOL indexer: read-only pilot
 
-This crate is the first narrow COBOL capability increment. It indexes **fixed-format source text only** and emits source-located anchors for program IDs, divisions, COPY references, FD/SD declarations, data levels, PIC strings, selected USAGE forms, REDEFINES, and EXEC SQL/CICS blocks.
+This crate is the first narrow COBOL capability increment. It indexes **fixed-format source text only** and emits source-located anchors for program IDs, divisions, COPY references, FD/SD declarations, data levels, PIC strings, selected USAGE forms, REDEFINES, and EXEC SQL/CICS blocks. Its JSON output is validated against `index-output.schema.json` and the synthetic `settlement.cbl` fixture by `tools/vleb/test_cobol_index_output.py`.
 
 It is deliberately not a COBOL parser, compiler, copybook expander, control-flow analyzer, business-rule interpreter, or execution backend. A hit in the index means only that a textual anchor was found at the stated physical source location.
 
