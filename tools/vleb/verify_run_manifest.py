@@ -234,12 +234,44 @@ def validate_manifest(
     artifact_root: Path,
     expected_manifest_sha256: str,
     *,
+    expected_verifier_sha256: str,
+    expected_schema_sha256: str,
     verify_attestation: bool,
     gh_executable: str = "gh",
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
-    if not HEX.fullmatch(expected_manifest_sha256):
-        return {"eligible": False, "verdict": "fail", "issues": [{"code": "invalid_manifest_pin", "message": "expected manifest digest must be lowercase SHA-256"}]}
+    for pin_name, pin in (
+        ("manifest", expected_manifest_sha256),
+        ("verifier", expected_verifier_sha256),
+        ("schema", expected_schema_sha256),
+    ):
+        if not HEX.fullmatch(pin):
+            return {
+                "eligible": False, "manifest_valid": False, "score_eligible": False,
+                "verdict": "fail",
+                "issues": [{"code": "invalid_trusted_pin", "message": f"expected {pin_name} digest must be lowercase SHA-256"}],
+            }
+    try:
+        observed_verifier_sha = digest(Path(__file__).read_bytes())
+        observed_schema_sha = digest(schema_path.read_bytes())
+    except OSError as exc:
+        return {
+            "eligible": False, "manifest_valid": False, "score_eligible": False,
+            "verdict": "unresolved",
+            "issues": [{"code": "trusted_verifier_input_unavailable", "message": str(exc)}],
+        }
+    if observed_verifier_sha != expected_verifier_sha256:
+        return {
+            "eligible": False, "manifest_valid": False, "score_eligible": False,
+            "verdict": "fail", "observed_verifier_sha256": observed_verifier_sha,
+            "issues": [{"code": "verifier_pin_mismatch", "message": "running verifier does not match caller-supplied trusted digest"}],
+        }
+    if observed_schema_sha != expected_schema_sha256:
+        return {
+            "eligible": False, "manifest_valid": False, "score_eligible": False,
+            "verdict": "fail", "observed_schema_sha256": observed_schema_sha,
+            "issues": [{"code": "schema_pin_mismatch", "message": "manifest schema does not match caller-supplied trusted digest"}],
+        }
     try:
         raw_manifest = manifest_path.read_bytes()
     except OSError as exc:
@@ -477,6 +509,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--schema", type=Path, default=Path(__file__).with_name("run-manifest.schema.json"))
     parser.add_argument("--artifact-root", type=Path, required=True)
     parser.add_argument("--expected-manifest-sha256", required=True)
+    parser.add_argument("--expected-verifier-sha256", required=True)
+    parser.add_argument("--expected-schema-sha256", required=True)
     parser.add_argument("--gh-executable", default="gh")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
@@ -492,6 +526,8 @@ def main(argv: list[str] | None = None) -> int:
         args.schema,
         args.artifact_root,
         args.expected_manifest_sha256,
+        expected_verifier_sha256=args.expected_verifier_sha256,
+        expected_schema_sha256=args.expected_schema_sha256,
         verify_attestation=verify_attestation,
         gh_executable=args.gh_executable,
     )
