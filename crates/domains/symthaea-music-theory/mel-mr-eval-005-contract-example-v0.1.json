@@ -1,0 +1,132 @@
+{
+  "schema_version": "0.1.0",
+  "contract_id": "MEL-MR-EVAL-005-SET-PITCH-001",
+  "source": {
+    "symbolic_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "audio_format": "wav-placeholder",
+    "sample_rate_hz": 44100,
+    "channel_count": 2,
+    "duration_frames": 441000
+  },
+  "authorization_mask": [
+    {
+      "region_id": "target-note-window",
+      "start_us": 1000000,
+      "end_us": 1500000,
+      "track_ids": [
+        "piano-track-1"
+      ]
+    }
+  ],
+  "requested_changes": [
+    {
+      "axis": "pitch",
+      "operation": "transpose_semitones",
+      "region_ids": [
+        "target-note-window"
+      ],
+      "target": 2,
+      "tolerance": {
+        "metric": "absolute",
+        "max_deviation": 0,
+        "unit": "semitones"
+      }
+    }
+  ],
+  "protected_invariants": [
+    {
+      "axis": "pitch",
+      "scope": "outside_mask",
+      "track_ids": [
+        "piano-track-1"
+      ],
+      "tolerance": {
+        "metric": "categorical_exact",
+        "max_deviation": 0,
+        "unit": "MIDI-note"
+      },
+      "critical": true
+    },
+    {
+      "axis": "onset",
+      "scope": "everywhere",
+      "track_ids": [
+        "piano-track-1"
+      ],
+      "tolerance": {
+        "metric": "absolute",
+        "max_deviation": 2000,
+        "unit": "microseconds"
+      },
+      "critical": true
+    },
+    {
+      "axis": "duration",
+      "scope": "everywhere",
+      "track_ids": [
+        "piano-track-1"
+      ],
+      "tolerance": {
+        "metric": "absolute",
+        "max_deviation": 2000,
+        "unit": "microseconds"
+      },
+      "critical": true
+    },
+    {
+      "axis": "note_count",
+      "scope": "everywhere",
+      "track_ids": [
+        "piano-track-1"
+      ],
+      "tolerance": {
+        "metric": "categorical_exact",
+        "max_deviation": 0,
+        "unit": "events"
+      },
+      "critical": true
+    },
+    {
+      "axis": "timbre",
+      "scope": "outside_mask",
+      "track_ids": [
+        "piano-track-1"
+      ],
+      "tolerance": {
+        "metric": "feature_distance",
+        "max_deviation": 0.05,
+        "unit": "normalized-feature-distance"
+      },
+      "critical": true
+    }
+  ],
+  "measurement": {
+    "renderer": {
+      "renderer_id": "example-synth",
+      "renderer_version": "NOT-REAL-PLACEHOLDER",
+      "instrument_bank_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "effect_chain_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "sample_rate_hz": 44100,
+      "channel_count": 2,
+      "seed": 0,
+      "deterministic": true,
+      "latency_compensation_frames": 0
+    },
+    "verifier": {
+      "symbolic_verifier_version": "MEL-MR-EVAL-004-placeholder",
+      "acoustic_pipeline_version": "MEL-MR-EVAL-005-placeholder",
+      "config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  },
+  "abstention_policy": {
+    "required_evidence": [
+      "symbolic",
+      "acoustic",
+      "replay"
+    ],
+    "on_detector_out_of_domain": "abstain",
+    "on_measurement_uncertainty": "abstain"
+  },
+  "notes": "Illustrative schema fixture only. All hashes, renderer/version strings, and the acoustic threshold are placeholders, not measurements, evidence, or validated defaults. Replace them with real content commitments and calibrated detector thresholds before any benchmark run."
+}
