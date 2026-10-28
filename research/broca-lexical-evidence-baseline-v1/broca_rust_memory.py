@@ -186,35 +186,55 @@ class BrocaRustMemory(Memory):
         context = response.get("context")
         require(isinstance(context, list), "worker query response context must be a list")
 
+        raw_audit = response.get("audit")
+        require(isinstance(raw_audit, list), "worker query response audit must be a list")
+        require(len(raw_audit) == len(context),
+                "worker context/audit item counts differ; refusing unpaired retrieval output")
+
         checked: list[MemoryContextItem] = []
-        for index, item in enumerate(context):
+        for index, (item, audit_item) in enumerate(zip(context, raw_audit)):
             require(isinstance(item, dict), f"context item {index} must be an object")
             require(set(item) == {"type", "value"},
                     f"context item {index} must contain exactly type and value")
             kind = item.get("type")
             value = item.get("value")
-            require(kind in {"text", "image"}, f"context item {index} has invalid type")
+            require(kind == "text",
+                    f"lexical BM25 worker returned unsupported context type {kind!r}")
             require(isinstance(value, str) and value.strip(),
                     f"context item {index} value must be a non-empty string")
-            if kind == "image":
-                image_path = Path(value)
-                require(image_path.is_absolute() and image_path.is_file(),
-                        f"context item {index} image path does not exist")
+            require(isinstance(audit_item, dict), f"audit item {index} must be an object")
+            require(isinstance(audit_item.get("evidence_id"), str) and audit_item["evidence_id"],
+                    f"audit item {index} evidence_id must be non-empty")
+            require(isinstance(audit_item.get("trajectory_id"), str) and audit_item["trajectory_id"],
+                    f"audit item {index} trajectory_id must be non-empty")
+            require(isinstance(audit_item.get("source_pointer"), str) and audit_item["source_pointer"].startswith("/"),
+                    f"audit item {index} source_pointer must be a JSON Pointer")
+            content_digest = audit_item.get("content_sha256")
+            require(
+                isinstance(content_digest, str)
+                and len(content_digest) == 64
+                and all(character in "0123456789abcdef" for character in content_digest),
+                f"audit item {index} content_sha256 is invalid",
+            )
+            actual_digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+            require(actual_digest == content_digest,
+                    f"context/audit content digest mismatch at item {index}")
             checked.append({"type": kind, "value": value})
 
         query_context = self.get_query_context()
         invocation_id = query_context.get("query_invocation_id")
         if invocation_id:
-            self._audit_by_invocation[invocation_id] = {
-                "protocol_id": PROTOCOL_ID,
-                "scope_id": self.scope_id,
-                "retrieval_type": "lexical_bm25",
-                "worker_sha256": self.worker_sha256,
-                "audit": response.get("audit", []),
-                "image_query_received_but_not_used": bool(
-                    response.get("image_query_received_but_not_used", False)
-                ),
-            }
+            with self._lock:
+                self._audit_by_invocation[invocation_id] = {
+                    "protocol_id": PROTOCOL_ID,
+                    "scope_id": self.scope_id,
+                    "retrieval_type": "lexical_bm25",
+                    "worker_sha256": self.worker_sha256,
+                    "audit": raw_audit,
+                    "image_query_received_but_not_used": bool(
+                        response.get("image_query_received_but_not_used", False)
+                    ),
+                }
         return checked
 
     def post_query_hook(
