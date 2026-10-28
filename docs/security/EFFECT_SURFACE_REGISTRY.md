@@ -18,6 +18,28 @@ cargo run -p xtask -- effect-surface-registry --require-evidence-records
 
 The strict invocation is expected to fail today because none of the entries has exact qualification evidence. This is intentional. The flag checks that records claim qualification and carry evidence-shaped identities; it does not independently verify receipts, so its success is not a security qualification result.
 
+
+## Rust effect-primitive discovery (candidate-only)
+
+Run the AST discovery command from the repository root:
+
+\`\`\`sh
+cargo run -p xtask -- effect-primitive-scan --out reports/effect-primitive-scan.json
+\`\`\`
+
+It recursively scans Rust files across the repository, excluding generated/cache directories (.git, target, node_modules, .direnv, .cache, .venv, .devenv). The deterministic JSON report records:
+
+- repository HEAD when Git can identify it;
+- number of source files discovered and parsed;
+- parse failures (any parse failure makes the command exit nonzero);
+- each candidate's repository-relative source path, line/column, syntactic call path, heuristic class, source-file SHA-256, and site-identity SHA-256.
+
+The first classifier recognizes direct AST call expressions that look like process command construction, direct `fs` reads/writes/mutations, file-handle open/create calls, common socket connect/bind calls, and `libc::system`. It intentionally emits **candidate sites**, not confirmed effects. A `Command::new` call does not prove that a process was spawned, and a path matching `fs` does not prove a particular file was changed.
+
+The scanner is not a sound whole-program effect analysis. It does not resolve aliases, types, control flow or reachability; analyze macro token bodies, FFI internals, generated sources in excluded build directories, scripts, dynamic loading, trait-object dispatch, or arbitrary indirect calls; nor prove the absence of unlisted effect families. It may produce both false positives and false negatives.
+
+Do not claim “all effect sites registered” from a scan alone. The intended next iteration is to adjudicate candidates against the registry, add explicit classifications/exclusions with human-reviewed reasons, and build exact-call-path positive/negative controls with side-effect witnesses. The scan report is a review input and a discovery ratchet, not a qualification receipt.
+
 ## What the checker establishes
 
 The Rust xtask command validates the v1 schema, uniqueness of surface IDs, repository-relative source paths, required claim-boundary fields, qualification-evidence shape, and whether every recorded source anchor occurs in its recorded file. It emits the inspected Git HEAD when available. Its registry identity digest (printed as `registry_identity_sha256`) is SHA-256 over compact serialized parsed JSON after removing the `qualification_evidence` field from every entry; this prevents a qualification record from having to contain a digest of a document that includes that very digest. The digest still binds all other registry fields, including the source baseline and entry descriptions.
