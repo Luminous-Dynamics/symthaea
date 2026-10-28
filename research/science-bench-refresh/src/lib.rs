@@ -23,6 +23,8 @@ pub struct GenerationManifestV1 {
     pub generator: GeneratorV1,
     pub evaluator: EvaluatorV1,
     pub seed_commitment_sha256: String,
+    pub protocol_commitment_sha256: String,
+    pub seed_commitment_sha256: String,
     pub task_set_commitment_sha256: String,
     pub expected_task_count: u64,
     pub task_family_mixture: Vec<TaskFamilyV1>,
@@ -88,6 +90,214 @@ pub struct ValidationReportV1 {
     pub task_family_weight_sum: f64,
     pub issues: Vec<String>,
     pub admission_reason: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ProtocolCommitContextV1<'a> {
+    schema: &'a str,
+    generation_id: &'a str,
+    purpose: &'a str,
+    lane: &'a str,
+    generator: &'a GeneratorV1,
+    evaluator: &'a EvaluatorV1,
+    expected_task_count: u64,
+    task_family_mixture: &'a [TaskFamilyV1],
+    policy_freeze: &'a PolicyFreezeV1,
+    budget: &'a BudgetV1,
+    analysis_plan_sha256: &'a str,
+    post_run_reveal_policy: &'a str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RevealVerificationReportV1 {
+    pub schema: String,
+    pub manifest_sha256: String,
+    pub generation_id: String,
+    pub protocol_commitment_expected: String,
+    pub protocol_commitment_recomputed: String,
+    pub seed_commitment_expected: String,
+    pub seed_commitment_recomputed: String,
+    pub seed_commitment_matches: bool,
+    pub task_set_commitment_expected: String,
+    pub task_set_commitment_recomputed: String,
+    pub task_set_commitment_matches: bool,
+    pub seed_bytes: u64,
+    pub task_set_bytes: u64,
+    pub verified: bool,
+    pub issues: Vec<String>,
+}
+
+pub const REVEAL_REPORT_SCHEMA: &str =
+    "symthaea.science_bench_refresh_reveal_verification.v1";
+const COMMITMENT_PREFIX: &[u8] = b"symthaea.science_bench_refresh.commitment.v1\0";
+const MIN_SEED_BYTES: usize = 32;
+
+fn parse_manifest_for_commitment(bytes: &[u8]) -> Result<GenerationManifestV1, String> {
+    serde_json::from_slice(bytes)
+        .map_err(|error| format!("manifest JSON does not match the strict v1 shape: {error}"))
+}
+
+fn protocol_context(manifest: &GenerationManifestV1) -> ProtocolCommitContextV1<'_> {
+    ProtocolCommitContextV1 {
+        schema: &manifest.schema,
+        generation_id: &manifest.generation_id,
+        purpose: &manifest.purpose,
+        lane: &manifest.lane,
+        generator: &manifest.generator,
+        evaluator: &manifest.evaluator,
+        expected_task_count: manifest.expected_task_count,
+        task_family_mixture: &manifest.task_family_mixture,
+        policy_freeze: &manifest.policy_freeze,
+        budget: &manifest.budget,
+        analysis_plan_sha256: &manifest.analysis_plan_sha256,
+        post_run_reveal_policy: &manifest.post_run_reveal_policy,
+    }
+}
+
+fn protocol_commitment_for_manifest(
+    manifest: &GenerationManifestV1,
+) -> Result<String, String> {
+    let context = serde_json::to_vec(&protocol_context(manifest))
+        .map_err(|error| format!("cannot serialize protocol commitment context: {error}"))?;
+    let context_len = u64::try_from(context.len())
+        .map_err(|_| "protocol context exceeds u64 byte length".to_owned())?;
+    let mut hasher = Sha256::new();
+    hasher.update(COMMITMENT_PREFIX);
+    hasher.update(b"protocol.v1\0");
+    hasher.update(context_len.to_be_bytes());
+    hasher.update(&context);
+    Ok(hex_digest(hasher.finalize().as_slice()))
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
+}
+
+fn artifact_commitment_for(
+    kind: &str,
+    protocol_commitment: &str,
+    artifact_bytes: &[u8],
+) -> Result<String, String> {
+    let kind_domain: &[u8] = match kind {
+        "seed" => b"seed.v1\0",
+        "task-set" => b"task-set.v1\0",
+        other => return Err(format!("unsupported commitment kind: {other}")),
+    };
+    if !is_lower_hex(protocol_commitment, 64) {
+        return Err("protocol commitment must be 64 lowercase hexadecimal characters".to_owned());
+    }
+    let context = protocol_commitment.as_bytes();
+    let context_len = u64::try_from(context.len())
+        .map_err(|_| "protocol commitment exceeds u64 byte length".to_owned())?;
+    let payload_len = u64::try_from(artifact_bytes.len())
+        .map_err(|_| "artifact exceeds u64 byte length".to_owned())?;
+    let mut hasher = Sha256::new();
+    hasher.update(COMMITMENT_PREFIX);
+    hasher.update(kind_domain);
+    hasher.update(context_len.to_be_bytes());
+    hasher.update(context);
+    hasher.update(payload_len.to_be_bytes());
+    hasher.update(artifact_bytes);
+    Ok(hex_digest(hasher.finalize().as_slice()))
+}
+
+/// Compute the commitment to all frozen non-artifact manifest fields.
+/// Commitment fields themselves are excluded to avoid circularity.
+pub fn compute_protocol_commitment(manifest_bytes: &[u8]) -> Result<String, String> {
+    let manifest = parse_manifest_for_commitment(manifest_bytes)?;
+    protocol_commitment_for_manifest(&manifest)
+}
+
+/// Compute an artifact commitment bound to the protocol context encoded in a
+/// manifest. This deliberately ignores the manifest's declared digest fields
+/// and recomputes the context from the rest of the manifest.
+pub fn compute_artifact_commitment(
+    manifest_bytes: &[u8],
+    kind: &str,
+    artifact_bytes: &[u8],
+) -> Result<String, String> {
+    if kind == "seed" && artifact_bytes.len() < MIN_SEED_BYTES {
+        return Err(format!(
+            "seed artifact must contain at least {MIN_SEED_BYTES} bytes of entropy"
+        ));
+    }
+    if kind == "task-set" && artifact_bytes.is_empty() {
+        return Err("task-set artifact must not be empty".to_owned());
+    }
+    let protocol_commitment = compute_protocol_commitment(manifest_bytes)?;
+    artifact_commitment_for(kind, &protocol_commitment, artifact_bytes)
+}
+
+/// Verify a post-run reveal against the exact precommitted protocol, seed and
+/// task-set bytes. This establishes byte-level commitment consistency only;
+/// it cannot prove the runner enforced secrecy or executed the declared policy.
+pub fn verify_reveal(
+    manifest_bytes: &[u8],
+    seed_bytes: &[u8],
+    task_set_bytes: &[u8],
+) -> Result<RevealVerificationReportV1, String> {
+    let manifest: GenerationManifestV1 = parse_manifest_for_commitment(manifest_bytes)?;
+    let validation = validate_manifest_bytes(manifest_bytes)?;
+    if !validation.valid {
+        return Err(format!(
+            "manifest failed structural validation: {}",
+            validation.issues.join("; ")
+        ));
+    }
+    if manifest.purpose != "qualified_run" || manifest.lane != "sealed_refresh" {
+        return Err(
+            "reveal verification requires purpose=qualified_run and lane=sealed_refresh"
+                .to_owned(),
+        );
+    }
+    if seed_bytes.len() < MIN_SEED_BYTES {
+        return Err(format!(
+            "revealed seed must contain at least {MIN_SEED_BYTES} bytes"
+        ));
+    }
+    if task_set_bytes.is_empty() {
+        return Err("revealed task-set artifact must not be empty".to_owned());
+    }
+
+    let protocol_computed = protocol_commitment_for_manifest(&manifest)?;
+    let seed_computed = artifact_commitment_for("seed", &protocol_computed, seed_bytes)?;
+    let task_set_computed =
+        artifact_commitment_for("task-set", &protocol_computed, task_set_bytes)?;
+    let seed_matches = seed_computed == manifest.seed_commitment_sha256;
+    let task_set_matches = task_set_computed == manifest.task_set_commitment_sha256;
+    let mut issues = Vec::new();
+    if !seed_matches {
+        issues.push("revealed seed does not match the manifest commitment".to_owned());
+    }
+    if !task_set_matches {
+        issues.push("revealed task-set bytes do not match the manifest commitment".to_owned());
+    }
+    let verified = seed_matches && task_set_matches;
+
+    Ok(RevealVerificationReportV1 {
+        schema: REVEAL_REPORT_SCHEMA.to_owned(),
+        manifest_sha256: sha256_hex(manifest_bytes),
+        generation_id: manifest.generation_id,
+        protocol_commitment_expected: manifest.protocol_commitment_sha256,
+        protocol_commitment_recomputed: protocol_computed,
+        seed_commitment_expected: manifest.seed_commitment_sha256,
+        seed_commitment_recomputed: seed_computed,
+        seed_commitment_matches: seed_matches,
+        task_set_commitment_expected: manifest.task_set_commitment_sha256,
+        task_set_commitment_recomputed: task_set_computed,
+        task_set_commitment_matches: task_set_matches,
+        seed_bytes: u64::try_from(seed_bytes.len())
+            .map_err(|_| "seed artifact exceeds u64 byte length".to_owned())?,
+        task_set_bytes: u64::try_from(task_set_bytes.len())
+            .map_err(|_| "task-set artifact exceeds u64 byte length".to_owned())?,
+        verified,
+        issues,
+    })
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
@@ -220,6 +430,12 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
         &mut issues,
     );
     check_sha256(
+        "protocol_commitment_sha256",
+        &manifest.protocol_commitment_sha256,
+        is_qualified,
+        &mut issues,
+    );
+    check_sha256(
         "seed_commitment_sha256",
         &manifest.seed_commitment_sha256,
         is_qualified,
@@ -322,6 +538,14 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
 
     if manifest.budget.max_wall_clock_seconds == 0 {
         issues.push("budget.max_wall_clock_seconds must be greater than zero".to_owned());
+    }
+
+    match protocol_commitment_for_manifest(&manifest) {
+        Ok(computed) if computed != manifest.protocol_commitment_sha256 => {
+            issues.push("protocol_commitment_sha256 does not match the frozen manifest context".to_owned());
+        }
+        Ok(_) => {}
+        Err(error) => issues.push(format!("cannot recompute protocol commitment: {error}")),
     }
 
     let valid = issues.is_empty();
