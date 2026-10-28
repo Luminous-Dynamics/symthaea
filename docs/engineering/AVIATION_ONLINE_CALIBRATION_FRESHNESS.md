@@ -87,6 +87,12 @@ Report uncertainty using independent run seeds and event/time blocks; don't trea
 
 These are proposed targets and must be revised before the final test if the operationally material shift scale is changed—not after inspecting outcomes.
 
+## Decision-readiness composition
+
+The companion [ADRG-001 gate](./AVIATION_DECISION_READINESS_GATE.md) now composes the feature audit, split audit, independent plan verifier, online monitor status, distributional-risk assessment, network harm assessment and active calibration-receipt ID. Drift alarms, support-shift alarms, stale receipts and any rejected/indeterminate upstream status block promotion. The positive state is only `EligibleForHumanReview`, not dispatch authorization.
+
+The synthetic example now runs the composed readiness gate. Its predeclared compound-weather stream intentionally trips the drift monitor; the resulting run manifest should report a blocked decision even when the feature, split, plan and modeled cost assessments pass. This is a contract fixture, not measured detector performance.
+
 ## Integration contract
 
 A future orchestrator should implement an explicit state machine:
@@ -101,6 +107,6 @@ Transitions must be monotone and auditable. Reusing a prior calibration requires
 
 ## Test status and claim ceiling
 
-Seventeen Rust unit tests and five public-API integration fixtures are defined for the monitor. They have not been compiled or executed because the current environment lacks `cargo`/ `rustc`. Passing synthetic tests would establish behavior only for these contracts and fixtures, not detection performance on real airline data or a guarantee under arbitrary temporal dependence.
+Nineteen Rust unit tests and five public-API integration fixtures are defined for the monitor. They have not been compiled or executed because the current environment lacks `cargo`/ `rustc`. Passing synthetic tests would establish behavior only for these contracts and fixtures, not detection performance on real airline data or a guarantee under arbitrary temporal dependence.
 
 Follow-up: [AVIATION-ENTERPRISE-011 #8795](https://github.com/Luminous-Dynamics/symthaea/issues/8795).
