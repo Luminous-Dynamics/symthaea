@@ -195,7 +195,7 @@ The new `--eprocess-family-csv` report compares five predeclared monitoring stra
 - Beta(20, 20), a local alternative concentrated near the nominal rate p0=0.5.
 - Equal-weight portfolio of all four e-processes, with weights fixed at 1/4 before observations.
 
-A convex mixture of e-processes is again an e-process under the same null, so the portfolio retains the anytime-valid Ville guarantee. It does not choose the prior after seeing the observed shift. The CSV includes stationary-null and selection-bias controls plus downward and upward step shifts spanning p1=0.10–0.45 and p1=0.55–0.90. This makes symmetry explicit for the p0=0.5, symmetric-prior fixture and verifies it through a separate reference. It records the stable-null alarm probability, false alarms before a true shift, post-shift detection probability, and conditional delay.
+A convex mixture of e-processes is again an e-process under the same null, so the portfolio retains the anytime-valid Ville guarantee. It does not choose the prior after seeing the observed shift. The CSV includes stationary-null and selection-bias controls, downward and upward step shifts spanning p1=0.10–0.45 and p1=0.55–0.90, and six stable streams whose actual event rate differs from the declared p0=0.5 by 0.01–0.05. This makes symmetry explicit for the p0=0.5, symmetric-prior fixture and adds a negative control for baseline misspecification. It records stationary alarm probability, false alarms before a true shift, post-shift detection probability, and conditional delay. The 18 scenarios across five families produce 90 rows.
 
 An independent exact-DP Python prototype gave the following horizon-1,000 results at the fixed anytime-valid threshold:
 
@@ -207,8 +207,30 @@ An independent exact-DP Python prototype gave the following horizon-1,000 result
 | Beta(20, 20) | 0.001884 | 22.83% | 97.92% | 99.99% | 99.99% |
 | Equal portfolio | 0.002778 | 17.93% | 96.75% | 99.84% | 99.84% |
 
-These are exact finite-Bernoulli probabilities for the predeclared model and horizon—not real-world results or evidence that Beta(20,20) is universally better. The single-prior policies have different realized null alarm probabilities below the common theoretical bound; the equal portfolio achieves a useful compromise and raises weak-shift power versus the original Jeffreys monitor in this fixture. We must also test p1 near 0 or 1, gradual ramps, transient bursts, serial dependence, misspecified p0, and different horizons before selecting a default. If comparing tuned thresholds, calibrate and evaluate on disjoint synthetic/validation regimes; do not choose the prior or threshold on the sealed test alternatives.
+These are exact finite-Bernoulli probabilities for the predeclared model and horizon—not real-world results or evidence that Beta(20,20) is universally better. The single-prior policies have different realized null alarm probabilities below the common theoretical bound; the equal portfolio raises weak-shift power versus the original Jeffreys monitor in this fixture. We must not choose a default based only on this grid.
 
 **Important protocol distinction:** the family report uses the same Ville threshold for every policy, so each remains anytime-valid. It is not a matched-realized-false-alarm leaderboard; actual null alarm probabilities are emitted so the trade-offs stay visible. The next calibration experiment should compare power at matched empirical false-alarm budgets without calling finite-horizon-calibrated thresholds anytime-valid.
 
 The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls now compare 60 rows (five families × 12 scenarios) in the branch. Their output still requires exact-head CI before being described as Rust-qualified.
+
+
+### Nominal-rate misspecification is a separate failure mode
+
+The e-process guarantee assumes that the declared nominal probability is correct. The new stable-baseline scenarios hold the observed process stationary but set its true rate to p ∈ {0.45, 0.48, 0.49, 0.51, 0.52, 0.55} while the monitor continues to use p0=0.50. This is a deliberately misspecified null, not evidence of a new environmental change. It must not be interpreted as a violation of Ville's inequality.
+
+Independent exact-DP Python prototype results for the e-process family at the same log(240) threshold and horizon 1,000:
+
+| Actual stationary event rate | Beta(1/2,1/2) | Beta(1,1) | Beta(5,5) | Beta(20,20) | Equal portfolio |
+|---:|---:|---:|---:|---:|---:|
+| 0.45 | 21.33% | 24.67% | 31.47% | 35.33% | 29.49% |
+| 0.48 | 0.90% | 1.10% | 1.55% | 1.73% | 1.36% |
+| 0.49 | 0.40% | 0.44% | 0.48% | 0.44% | 0.45% |
+| 0.50 | 0.31% | 0.31% | 0.27% | 0.19% | 0.28% |
+| 0.52 | 0.90% | 1.10% | 1.55% | 1.73% | 1.36% |
+| 0.55 | 21.33% | 24.67% | 31.47% | 35.33% | 29.49% |
+
+The allocated per-cell error is 0.4167%. At p=0.48, all five alternatives alarm more often than that amount. Even p=0.49 nudges some families slightly above the nominal bound. These are not false-alarm guarantee violations: the actual data-generating rate no longer equals the null used in the e-value. They demonstrate why estimating the nominal rate from limited baseline data is itself part of the inference problem.
+
+A stronger next method should separately model uncertainty in the reference rate—for example, by comparing a reference-stream confidence sequence with the monitored stream, or by a valid composite-null betting process whose guarantee holds over a prespecified p0 interval. The baseline and test regimes must be separate; estimating p0 and choosing the monitor threshold on the same stream would introduce another source of optimism. The present branch exposes this limitation but does not claim to solve composite-null monitoring.
+
+The Rust e-process family, exact dynamic program, independent standard-library Python reference, and negative controls now compare 90 rows (five families × 18 scenarios). Their output still requires exact-head CI before being described as Rust-qualified.
