@@ -416,6 +416,7 @@ def audit_claim_evidence_bundle(
         "supported": 0,
         "contradicted": 0,
         "unresolved": 0,
+        "failed": 0,
         "claims": [],
         "issues": [],
     }
@@ -538,6 +539,7 @@ def audit_claim_evidence_bundle(
             "code": "claim_inventory_duplicate",
             "message": "claim IDs and claim paths must be unique in the evaluator-pinned manifest",
         })
+        mark_unresolved_claims()
         return result
 
     all_valid = True
@@ -589,6 +591,7 @@ def audit_claim_evidence_bundle(
                 "code": "claim_input_invalid",
                 "message": f"{item['claim_id']}: {exc}",
             })
+            result["failed"] += 1
             result["claims"].append(row)
             all_valid = False
             continue
@@ -665,8 +668,9 @@ def audit_claim_evidence_bundle(
                 row["status"] = "failed"
                 result["issues"].append({
                     "code": "claim_evidence_audit_failed",
-                    "message": f"{item['claim_id']}: claim auditor did not validate the pinned evidence chain",
+                    "message": f"{item['claim_id']}: claim auditor or execution receipt did not validate",
                 })
+                result["failed"] += 1
                 all_valid = False
         except (OSError, subprocess.TimeoutExpired) as exc:
             row["status"] = "unresolved"
@@ -675,6 +679,7 @@ def audit_claim_evidence_bundle(
                 "code": "claim_evidence_audit_unavailable",
                 "message": f"{item['claim_id']}: {exc}",
             })
+            result["unresolved"] += 1
             all_valid = False
         result["claims"].append(row)
 
