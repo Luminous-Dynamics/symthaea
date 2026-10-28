@@ -297,7 +297,7 @@ impl MatchedTrialRecord {
     ///
     /// The report-level validator additionally binds the receipt to the report's
     /// graph and verifier digests before a comparison is accepted.
-    pub fn verified_target_hit(&self, target_size: usize) -> bool {
+    fn verified_target_hit(&self, target_size: usize) -> bool {
         if self.verification != CandidateVerification::VerifiedIndependentSet
             || self.conflict_count != Some(0)
         {
