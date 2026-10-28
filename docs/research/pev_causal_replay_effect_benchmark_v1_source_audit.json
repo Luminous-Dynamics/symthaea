@@ -1,0 +1,22 @@
+{
+  "source_path": "/mnt/data/pev_causal_replay_effect_benchmark_v1.py",
+  "source_sha256": "11b28f937123fbc17abce8d035ef945f0def23203b498c2c713cff21af0dd3a5",
+  "source_git_blob_sha1": "0400beb0dfba45a2af629eb8bf93f2cac602366c",
+  "results_path": "/mnt/data/pev_causal_replay_effect_benchmark_v1_results.json",
+  "results_sha256": "4bf0b796de79321e5f628c4749e0a3219c4b47728ebb9107cd9ebf9401b91686",
+  "results_git_blob_sha1": "78a09c85da539158af9466e1323ac8df7e5f06e2",
+  "repository_source_matches_local_git_blob": true,
+  "repository_results_match_local_git_blob": true,
+  "python_syntax_compile": "PASS",
+  "reference_estimator_test": "PASS_CAUSAL_REPLAY_REFERENCE_ONLY",
+  "pairs_per_arm": 512,
+  "paired_run_summaries": 2048,
+  "bootstrap_replicates_per_arm": 3000,
+  "mutations_detected": 13,
+  "mutations_injected": 13,
+  "synthetic_ground_truth_valid_pe_effect": 0.08,
+  "synthetic_ground_truth_invalid_pe_effect": 0.0,
+  "production_symthaea_imported": false,
+  "rust_compiled_or_executed": false,
+  "status": "PASS_SYNTHETIC_REFERENCE_AND_SOURCE_AUDIT_ONLY"
+}
