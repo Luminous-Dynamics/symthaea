@@ -154,6 +154,15 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
             "runs[{index}] scenario_id is not in the registered scenario grid"
         );
         ensure!(!score.stream_id.trim().is_empty(), "runs[{index}] stream_id must not be empty");
+        // Detect duplicate cell identities before checking stream-ID uniqueness. A duplicated
+        // record necessarily repeats its stream ID too, but the more actionable error is the
+        // violated dataset × seed × scenario key, not the secondary stream-reuse symptom.
+        let key = (score.dataset_id.clone(), score.seed, score.scenario_id.clone());
+        ensure!(
+            observed_keys.insert(key.clone()),
+            "duplicate panel record at dataset={}, seed={}, scenario={}",
+            key.0, key.1, key.2
+        );
         ensure!(
             observed_stream_ids.insert(score.stream_id.as_str()),
             "stream_id is reused across panel cells; every dataset × seed × scenario needs its own pinned stream identity"
