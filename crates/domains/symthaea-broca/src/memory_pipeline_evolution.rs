@@ -77,6 +77,8 @@ pub struct PipelineCandidate {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvaluationReceipt {
     pub receipt_id: String,
+    /// Hash of this receipt with this field set to the empty string.
+    pub receipt_sha256: String,
     pub candidate_id: String,
     pub candidate_manifest_sha256: String,
     pub benchmark_id: String,
@@ -173,6 +175,22 @@ pub fn candidate_manifest_sha256(candidate: &PipelineCandidate) -> Result<String
     let bytes = serde_json::to_vec(&body)
         .map_err(|error| format!("cannot serialize candidate manifest: {error}"))?;
     Ok(sha256_hex(&bytes))
+}
+
+
+/// Digest the full evaluation receipt after blanking its own digest field.
+/// Struct serialization has a fixed field order; the schema version pins this shape.
+pub fn evaluation_receipt_sha256(receipt: &EvaluationReceipt) -> Result<String, String> {
+    let mut digest_input = receipt.clone();
+    digest_input.receipt_sha256.clear();
+    let bytes = serde_json::to_vec(&digest_input)
+        .map_err(|error| format!("cannot serialize evaluation receipt: {error}"))?;
+    Ok(sha256_hex(&bytes))
+}
+
+fn seal_receipt(receipt: &mut EvaluationReceipt) {
+    receipt.receipt_sha256 =
+        evaluation_receipt_sha256(receipt).expect("evaluation receipt serialization is infallible");
 }
 
 /// Validate candidate lineage, receipt references, digests and optimizer-visible
@@ -287,6 +305,21 @@ pub fn validate_evolution_trace(trace: &PipelineEvolutionTrace) -> Result<(), Ve
         if receipt.receipt_id.trim().is_empty() {
             errors.push("receipt_id must be non-empty".to_string());
             continue;
+        }
+        if !is_sha256(&receipt.receipt_sha256) {
+            errors.push(format!("receipt {} has invalid receipt_sha256", receipt.receipt_id));
+        } else {
+            match evaluation_receipt_sha256(receipt) {
+                Ok(expected) if expected != receipt.receipt_sha256 => errors.push(format!(
+                    "receipt {} receipt digest mismatch",
+                    receipt.receipt_id
+                )),
+                Err(error) => errors.push(format!(
+                    "receipt {} digest serialization failed: {error}",
+                    receipt.receipt_id
+                )),
+                _ => {}
+            }
         }
         if receipts.insert(receipt.receipt_id.as_str(), receipt).is_some() {
             errors.push(format!("duplicate receipt_id: {}", receipt.receipt_id));
@@ -577,8 +610,9 @@ mod tests {
     }
 
     fn receipt(id: &str, candidate: &PipelineCandidate, split: EvaluationSplit, accuracy: f64, cost: f64) -> EvaluationReceipt {
-        EvaluationReceipt {
+        let mut receipt = EvaluationReceipt {
             receipt_id: id.to_string(),
+            receipt_sha256: String::new(),
             candidate_id: candidate.candidate_id.clone(),
             candidate_manifest_sha256: candidate.manifest_sha256.clone(),
             benchmark_id: "LongMemEval-V2/small/web".to_string(),
@@ -599,7 +633,9 @@ mod tests {
             baseline_candidate_id: None,
             paired_lift_pp: None,
             paired_ci95_lower_pp: None,
-        }
+        };
+        seal_receipt(&mut receipt);
+        receipt
     }
 
     fn matched_trace() -> PipelineEvolutionTrace {
@@ -612,6 +648,7 @@ mod tests {
         trial_test.baseline_candidate_id = Some("baseline".to_string());
         trial_test.paired_lift_pp = Some(4.0);
         trial_test.paired_ci95_lower_pp = Some(1.5);
+        seal_receipt(&mut trial_test);
         PipelineEvolutionTrace {
             schema: PIPELINE_EVOLUTION_SCHEMA.to_string(),
             benchmark_id: root_dev.benchmark_id.clone(),
@@ -642,6 +679,7 @@ mod tests {
         trace.candidates[1].manifest_sha256 = updated_manifest.clone();
         for receipt in trace.receipts.iter_mut().filter(|receipt| receipt.candidate_id == "trial") {
             receipt.candidate_manifest_sha256 = updated_manifest.clone();
+            seal_receipt(receipt);
         }
         assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("built from held-out")));
     }
@@ -672,6 +710,7 @@ mod tests {
         receipt.paired_lift_pp = Some(-0.5);
         receipt.paired_ci95_lower_pp = Some(-0.8);
         receipt.lifecycle_cost_units = 70.0;
+        seal_receipt(receipt);
         let result = assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).unwrap();
         assert_eq!(result.outcome, PromotionOutcome::EfficiencyWin);
     }
@@ -695,28 +734,46 @@ mod tests {
     #[test]
     fn rejects_unmatched_protocol_or_case_set() {
         let mut trace = matched_trace();
-        trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().protocol_sha256 = digest("different protocol");
+        let changed = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        changed.protocol_sha256 = digest("different protocol");
+        seal_receipt(changed);
         assert!(assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).is_err());
 
         let mut trace = matched_trace();
-        trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().case_set_sha256 = digest("different cases");
+        let changed = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        changed.case_set_sha256 = digest("different cases");
+        seal_receipt(changed);
         assert!(assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).is_err());
     }
 
     #[test]
     fn governance_incidents_block_promotion_even_with_high_accuracy() {
         let mut trace = matched_trace();
-        trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().critical_governance_events = 1;
+        let changed = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        changed.critical_governance_events = 1;
+        seal_receipt(changed);
         assert!(assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).is_err());
     }
 
     #[test]
     fn insufficient_independent_groups_block_promotion() {
         let mut trace = matched_trace();
-        trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().paired_group_count = 12;
+        let changed = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        changed.paired_group_count = 12;
+        seal_receipt(changed);
         assert!(assess_promotion(&trace, "trial", "baseline", "trial-heldout", "baseline-heldout", PromotionPolicy::default()).is_err());
     }
 
+
+
+    #[test]
+    fn rejects_metric_tampering_without_matching_receipt_digest() {
+        let mut trace = matched_trace();
+        let receipt = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        receipt.accuracy = 0.99;
+        let errors = validate_evolution_trace(&trace).unwrap_err();
+        assert!(errors.iter().any(|item| item.contains("receipt digest mismatch")));
+    }
 
     #[test]
     fn invalid_promotion_policy_is_rejected() {
@@ -741,7 +798,9 @@ mod tests {
         assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("immutable manifest digest")));
 
         let mut trace = matched_trace();
-        trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap().candidate_manifest_sha256 = digest("mutated candidate");
+        let changed = trace.receipts.iter_mut().find(|r| r.receipt_id == "trial-heldout").unwrap();
+        changed.candidate_manifest_sha256 = digest("mutated candidate");
+        seal_receipt(changed);
         assert!(validate_evolution_trace(&trace).unwrap_err().iter().any(|item| item.contains("candidate manifest digest mismatch")));
     }
 }
