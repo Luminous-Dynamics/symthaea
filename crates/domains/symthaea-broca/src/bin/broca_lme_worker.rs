@@ -342,9 +342,29 @@ fn collect_trajectory_evidence(
         .and_then(Value::as_array)
         .filter(|states| !states.is_empty());
 
-    // Only allowlisted trajectory fields become retrieval evidence. In
-    // particular, root outcome, benchmark question metadata, and arbitrary
-    // metadata fields are never copied into the evidence corpus.
+    if trajectory
+        .get("outcome")
+        .is_some_and(|outcome| !outcome.is_null() && !outcome.is_string())
+    {
+        return Err("trajectory outcome must be a string or null".into());
+    }
+
+    // The official public-state schema requires root goal/start_url. The
+    // legacy content schema derives its goal from metadata.original_goal and
+    // its start URL from the first content state's URL.
+    if public_states.is_some() {
+        if trajectory.get("goal").and_then(Value::as_str).is_none() {
+            return Err("public-state trajectory requires a string goal".into());
+        }
+        if trajectory
+            .get("start_url")
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.trim().is_empty())
+        {
+            return Err("public-state trajectory requires a non-empty start_url".into());
+        }
+    }
+
     if let Some(value) = trajectory
         .get("goal")
         .and_then(Value::as_str)
@@ -392,57 +412,87 @@ fn collect_trajectory_evidence(
             if !state.is_object() {
                 return Err(format!("trajectory state {state_index} must be an object"));
             }
-            for key in ["url", "action"] {
-                if let Some(value) = state.get(key).and_then(Value::as_str) {
-                    if !value.trim().is_empty() {
+            let url = state
+                .get("url")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("public-state trajectory state {state_index} requires a non-empty url"))?;
+            fields.push((
+                format!("/states/{state_index}/url"),
+                url.to_string(),
+                Some(state_index),
+            ));
+
+            if let Some(action) = state.get("action") {
+                if !action.is_null() {
+                    let action_text = action
+                        .as_str()
+                        .ok_or_else(|| format!("trajectory state {state_index} action must be a string or null"))?;
+                    if !action_text.trim().is_empty() {
                         fields.push((
-                            format!("/states/{state_index}/{key}"),
-                            value.to_string(),
+                            format!("/states/{state_index}/action"),
+                            action_text.to_string(),
                             Some(state_index),
                         ));
                     }
-                } else if state.get(key).is_some_and(|value| !value.is_null()) {
-                    return Err(format!("trajectory state {state_index} field {key} must be a string or null"));
                 }
-            }
-            let thought_key = if state.get("thoughts").and_then(Value::as_str).is_some() {
-                "thoughts"
-            } else {
-                "thought"
-            };
-            if let Some(value) = state.get(thought_key).and_then(Value::as_str) {
-                if !value.trim().is_empty() {
-                    fields.push((
-                        format!("/states/{state_index}/{thought_key}"),
-                        value.to_string(),
-                        Some(state_index),
-                    ));
-                }
-            } else if state.get(thought_key).is_some_and(|value| !value.is_null()) {
-                return Err(format!("trajectory state {state_index} field {thought_key} must be a string or null"));
             }
 
-            let text_key = if state.get("accessibility_tree").and_then(Value::as_str).is_some() {
+            // Mirror upstream get("thought", get("thoughts")) precedence.
+            let thought_key = if state.get("thought").is_some() {
+                "thought"
+            } else {
+                "thoughts"
+            };
+            if let Some(thought) = state.get(thought_key) {
+                if !thought.is_null() {
+                    let thought_text = thought
+                        .as_str()
+                        .ok_or_else(|| format!("trajectory state {state_index} {thought_key} must be a string or null"))?;
+                    if !thought_text.trim().is_empty() {
+                        fields.push((
+                            format!("/states/{state_index}/{thought_key}"),
+                            thought_text.to_string(),
+                            Some(state_index),
+                        ));
+                    }
+                }
+            }
+
+            // Mirror upstream accessibility_tree-over-text precedence and
+            // require its expected string field rather than hiding type errors.
+            let text_key = if state.get("accessibility_tree").is_some() {
                 "accessibility_tree"
             } else {
                 "text"
             };
-            if let Some(value) = state.get(text_key).and_then(Value::as_str) {
-                if !value.trim().is_empty() {
-                    fields.push((
-                        format!("/states/{state_index}/{text_key}"),
-                        value.to_string(),
-                        Some(state_index),
-                    ));
-                }
-            } else if state.get(text_key).is_some_and(|value| !value.is_null()) {
-                return Err(format!("trajectory state {state_index} field {text_key} must be a string"));
+            let text = state
+                .get(text_key)
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("trajectory state {state_index} {text_key} must be a string"))?;
+            if !text.trim().is_empty() {
+                fields.push((
+                    format!("/states/{state_index}/{text_key}"),
+                    text.to_string(),
+                    Some(state_index),
+                ));
             }
+
+            let screenshot = state
+                .get("screenshot")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("trajectory state {state_index} requires a non-empty screenshot path"))?;
+            let _ = screenshot; // Schema-check only; this lexical worker never opens images.
         }
     } else if let Some(content) = trajectory.get("content").and_then(Value::as_array) {
         if content.is_empty() {
             return Err("trajectory content must be a non-empty array when states are absent".into());
         }
+        if trajectory.get("metadata").and_then(Value::as_object).is_none() {
+            return Err("content-schema trajectory requires a metadata object".into());
+        }
+
         for (state_index, state) in content.iter().enumerate() {
             if !state.is_object() {
                 return Err(format!("trajectory content state {state_index} must be an object"));
@@ -459,16 +509,19 @@ fn collect_trajectory_evidence(
             ));
 
             for key in ["action", "thoughts"] {
-                if let Some(value) = state.get(key).and_then(Value::as_str) {
-                    if !value.trim().is_empty() {
-                        fields.push((
-                            format!("/content/{state_index}/{key}"),
-                            value.to_string(),
-                            Some(state_index),
-                        ));
+                if let Some(item) = state.get(key) {
+                    if !item.is_null() {
+                        let text = item
+                            .as_str()
+                            .ok_or_else(|| format!("trajectory content state {state_index} {key} must be a string or null"))?;
+                        if !text.trim().is_empty() {
+                            fields.push((
+                                format!("/content/{state_index}/{key}"),
+                                text.to_string(),
+                                Some(state_index),
+                            ));
+                        }
                     }
-                } else if state.get(key).is_some_and(|value| !value.is_null()) {
-                    return Err(format!("trajectory content state {state_index} field {key} must be a string or null"));
                 }
             }
 
@@ -487,8 +540,12 @@ fn collect_trajectory_evidence(
                     Some(state_index),
                 ));
             }
-            // Screenshot paths remain out of the lexical corpus; the worker
-            // explicitly does not claim image retrieval or visual grounding.
+            let screenshot = observation
+                .get("screenshot")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("trajectory content state {state_index} requires observation.screenshot"))?;
+            let _ = screenshot; // Schema-check only; this lexical worker never opens images.
         }
     } else {
         return Err("trajectory requires a non-empty states array or content array".into());
@@ -750,10 +807,12 @@ mod tests {
         let trajectory = json!({
             "id": "trajectory-18",
             "goal": "Find the invoice tab",
+            "start_url": "https://example.invalid/",
             "states": [{
                 "url": "https://example.invalid/invoices",
                 "action": "open Invoices",
-                "text": "Invoices heading New Invoice button"
+                "text": "Invoices heading New Invoice button",
+                "screenshot": "state-0.png"
             }]
         });
         let bytes = stable_json_bytes(&trajectory).unwrap();
@@ -787,7 +846,8 @@ mod tests {
         let trajectory = json!({
             "id": "trajectory-19",
             "goal": "Open account settings",
-            "states": [{"url":"https://example.invalid/account","text":"Account Settings"}]
+            "start_url": "https://example.invalid/",
+            "states": [{"url":"https://example.invalid/account","text":"Account Settings","screenshot":"state-0.png"}]
         });
         let mut worker = Worker::new();
         worker.handle(json!({"request_id":"1","op":"init","scope_id":"web"}));
