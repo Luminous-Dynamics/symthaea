@@ -96,7 +96,7 @@ class WitnessRecorderTests(unittest.TestCase):
 
     def test_records_command_run_identity_and_output_digests(self) -> None:
         code, receipt = self.run_recorder(
-            command_code="from pathlib import Path; Path('index.json').write_text('{\\\"copy_references\\\":[\\\"BANK-REC\\\"]}\\\\n'); print('indexed')"
+            command_code="import os; from pathlib import Path; Path('index.json').write_text('{\\\"copy_references\\\":[\\\"BANK-REC\\\"]}'); print(os.getenv('GITHUB_TOKEN', 'absent'))"
         )
         self.assertEqual(code, 0, self.stderr.getvalue())
         self.assertEqual(receipt["run_binding"]["run_id"], "90001")
@@ -109,15 +109,25 @@ class WitnessRecorderTests(unittest.TestCase):
         self.assertEqual(outputs["logs/stdout.txt"]["sha256"], sha((self.root / "logs/stdout.txt").read_bytes()))
         self.assertEqual(outputs["logs/stderr.txt"]["sha256"], sha((self.root / "logs/stderr.txt").read_bytes()))
         self.assertNotIn("GITHUB_TOKEN", receipt["invocation"])
+        self.assertIn("absent", (self.root / "logs/stdout.txt").read_text(encoding="utf-8"))
         self.assertNotIn("must-not-reach-verifier", (self.root / "logs/stdout.txt").read_text(encoding="utf-8"))
 
     def test_timeout_forces_inconclusive_result_and_preserves_streams(self) -> None:
         code, receipt = self.run_recorder(
-            command_code="import time; time.sleep(1)", timeout_ms=10, result="supports"
+            command_code="from pathlib import Path; import time; Path('index.json').write_text('{}'); time.sleep(1)", timeout_ms=10, result="supports"
         )
         self.assertEqual(code, 0, self.stderr.getvalue())
         self.assertTrue(receipt["process"]["timed_out"])
         self.assertIsNone(receipt["process"]["exit_code"])
+        self.assertEqual(receipt["observed_result"], "inconclusive")
+
+    def test_nonzero_verifier_exit_cannot_be_recorded_as_support(self) -> None:
+        code, receipt = self.run_recorder(
+            command_code="from pathlib import Path; Path('index.json').write_text('{}'); raise SystemExit(3)",
+            result="supports",
+        )
+        self.assertEqual(code, 0, self.stderr.getvalue())
+        self.assertEqual(receipt["process"]["exit_code"], 3)
         self.assertEqual(receipt["observed_result"], "inconclusive")
 
     def test_missing_trusted_run_context_fails_before_command_executes(self) -> None:
