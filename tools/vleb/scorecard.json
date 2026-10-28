@@ -254,6 +254,11 @@
       "target": 100,
       "status": "target_not_measured",
       "definition": "Pooled trace-mapped logical test IDs divided by all required logical test IDs from the locked scored-task cohort."
+    },
+    "benchmark_auditor_sentinel_mutation_kill_rate_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "All reviewed cohort-auditor guard-bypass sentinel mutations are detected by the existing adversarial test suite, after the unmodified suite passes."
     }
   },
   "current_measurements": {
@@ -342,6 +347,12 @@
       "eligible": false,
       "status": "not_measured",
       "reason": "The pinned cohort rollup is draft code; no locked cohort has been admitted and reported at an exact validated head."
+    },
+    "benchmark_auditor_sentinel_mutation_kill_rate_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The auditor self-mutation campaign is new draft work; no exact-head passing campaign result has been recorded."
     }
   },
   "metric_definitions": {
@@ -455,6 +466,24 @@
         "missing/invalid audit reports invalidate the cohort rather than removing assigned tasks",
         "report both pooled numerator and denominator",
         "never average per-task percentages"
+      ],
+      "composite_weighted_score": false
+    },
+    "benchmark_auditor_sentinel_mutation_kill_rate": {
+      "formula": "killed reviewed guard-bypass sentinel mutations / all reviewed sentinel mutations",
+      "pass_requirements": [
+        "unmodified adversarial suite passes first",
+        "every mutation anchor occurs exactly once",
+        "every mutated Python module compiles before execution",
+        "the test suite actually runs against the mutation",
+        "every reviewed guard-bypass mutation causes the suite to fail",
+        "syntax/import/startup failures and timeouts count as invalid, not killed"
+      ],
+      "denominator_rules": [
+        "freeze the sentinel mutation catalog before running the campaign",
+        "report killed, survived and invalid mutations separately",
+        "any survived or invalid sentinel fails the campaign",
+        "never treat mutation kill rate as candidate-task success or score eligibility"
       ],
       "composite_weighted_score": false
     }

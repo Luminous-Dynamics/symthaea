@@ -260,6 +260,16 @@ class AdmissionCohortTests(unittest.TestCase):
         self.assertFalse(result["cohort_integrity_valid"])
         self.assertIn("runtime_image_mismatch",{item["code"] for item in result["issues"]})
 
+    def test_report_from_different_network_mode_is_rejected(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["network_mode"]="enabled"
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("runtime_network_mode_mismatch",{item["code"] for item in result["issues"]})
+
     def test_wrong_trusted_auditor_pin_is_rejected(self)->None:
         result=self.fixture.summarize(expected_auditor_sha256="c"*64)
         self.assertFalse(result["cohort_integrity_valid"])

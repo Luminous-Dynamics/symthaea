@@ -81,6 +81,8 @@ jobs:
         run: python tools/vleb/test_scorecard.py
       - name: Test pinned admission cohort rollup and anti-denominator controls
         run: python tools/vleb/test_summarize_admission_cohort.py
+      - name: Mutation-test cohort auditor guardrails
+        run: python tools/vleb/run_auditor_mutation_campaign.py
       - name: Validate trusted run manifest schema and controls
         run: python tools/vleb/test_run_manifest.py
       - name: Test run manifest integrity and provenance checker

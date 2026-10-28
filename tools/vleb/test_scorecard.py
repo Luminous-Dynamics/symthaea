@@ -112,6 +112,16 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
         if current.get("value") is not None or current.get("eligible") is not False:
             errors.append(metric_name + "_score_fabricated")
 
+    auditor_mutation_target = data.get("proposed_targets", {}).get("benchmark_auditor_sentinel_mutation_kill_rate_pct", {})
+    if auditor_mutation_target.get("target") != 100 or auditor_mutation_target.get("status") != "target_not_measured":
+        errors.append("auditor_sentinel_mutation_target_drift")
+    auditor_mutation_current = data.get("current_measurements", {}).get("benchmark_auditor_sentinel_mutation_kill_rate_pct", {})
+    if auditor_mutation_current.get("value") is not None or auditor_mutation_current.get("eligible") is not False:
+        errors.append("auditor_sentinel_mutation_score_fabricated")
+    auditor_mutation_definition = data.get("metric_definitions", {}).get("benchmark_auditor_sentinel_mutation_kill_rate", {})
+    if auditor_mutation_definition.get("composite_weighted_score") is not False:
+        errors.append("auditor_sentinel_mutation_must_not_use_weighted_score")
+
     baseline_target = data.get("proposed_targets", {}).get("per_test_baseline_oracle_alignment_pct", {})
     if baseline_target.get("target") != 100 or baseline_target.get("status") != "target_not_measured":
         errors.append("per_test_baseline_oracle_target_drift")

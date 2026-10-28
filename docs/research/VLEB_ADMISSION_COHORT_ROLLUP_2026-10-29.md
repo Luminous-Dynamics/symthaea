@@ -73,3 +73,11 @@ This roll-up provides auditable denominators for the admission dimensions. It is
 Each cohort row now pins the concrete receipt run ID and attempt number, expected checkout revision, immutable runtime image ID, and expected network mode in addition to the audit-report digest and protocol/auditor pins. The independent auditor emits those fields only after checking its receipt and execution environment; the rollup compares them with the evaluator-pinned row. This makes replaying an otherwise valid report from a different run attempt, checkout revision, or runtime image a cohort-integrity error.
 
 This still depends on the protected evaluator being the authority for the cohort-manifest digest and pinned report digest. A JSON report containing identity fields is not by itself a cryptographic attestation; the live confirmatory pipeline must continue to verify the actual GitHub/Sigstore evidence bundle separately.
+
+## Meta-evaluation: mutate the evaluator's own guardrails
+
+The workflow now also runs `tools/vleb/run_auditor_mutation_campaign.py`. It first executes the unmodified cohort rollup test suite and requires it to pass. It then produces ten reviewed, syntactically valid guard-bypass mutations: bypass cohort/report digests, weaken locked task inventory, accept an unexpected task, drop run/attempt or revision/image/network binding, restore permissive JSON parsing, ignore eligible-report/admission consistency, and leak score eligibility.
+
+A mutation is counted as killed only when the test suite actually starts and fails on the mutated implementation. Syntax errors, import/startup failures, and timeouts count as invalid, not killed. The campaign fails if any sentinel survives or is invalid. Target is 100% kill of this frozen sentinel catalog; the metric is not a candidate success score and the tool emits `score_eligible=false`.
+
+This is a first-step meta-evaluation rather than a comprehensive proof that the auditor is correct. The sentinel catalog is deliberately reviewable; expanding it with independently designed mutants and mutation families is part of the next research phase.
