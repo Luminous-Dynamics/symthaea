@@ -556,6 +556,10 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 }
                 let one = &oracle["one_compatible_law"];
                 let alternative = &oracle["alternative_compatible_law"];
+                let alternative_coefficient = finite_number(
+                    &alternative["coefficient"],
+                    &format!("{id}.alternative.coefficient"),
+                )?;
                 if required_text(&alternative["kind"], &format!("{id}.alternative.kind"))?
                     != "linear_plus_vanishing_polynomial"
                     || !close_enough(
@@ -566,8 +570,7 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                         finite_number(&one["intercept"], &format!("{id}.one.intercept"))?,
                         finite_number(&alternative["base_intercept"], &format!("{id}.alternative.intercept"))?,
                     )
-                    || finite_number(&alternative["coefficient"], &format!("{id}.alternative.coefficient"))?
-                        == 0.0
+                    || alternative_coefficient == 0.0
                 {
                     return Err(format!("{id} lacks a distinct, compatible alternative law"));
                 }
@@ -607,7 +610,7 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 if amplitude <= 0.0 {
                     return Err(format!("{id} identifiability noise amplitude must be positive"));
                 }
-                let mut log_effect = coefficient.abs().ln();
+                let mut log_effect = alternative_coefficient.abs().ln();
                 for root in &xs {
                     let distance = (challenge_x - root).abs();
                     if distance == 0.0 {
