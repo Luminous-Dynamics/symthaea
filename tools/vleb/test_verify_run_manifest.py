@@ -130,6 +130,43 @@ class ManifestBundle:
         self.tmp.cleanup()
 
 
+def synthetic_attestation(manifest: dict[str, Any]) -> bytes:
+    repo = manifest["repository"]
+    candidate = manifest["candidate"]
+    bundle = manifest["evidence_bundle"]
+    provenance = manifest["provenance"]
+    signer_uri = f"https://github.com/{repo['full_name']}/{repo['workflow_path']}@{repo['workflow_ref']}"
+    run_uri = (
+        f"https://github.com/{repo['full_name']}/actions/runs/"
+        f"{repo['run_id']}/attempts/{repo['run_attempt']}"
+    )
+    return jbytes([{
+        "verificationResult": {
+            "signature": {
+                "certificate": {
+                    "subjectAlternativeName": {"type": "URI", "value": signer_uri},
+                    "issuer": "https://token.actions.githubusercontent.com",
+                    "sourceRepositoryIdentifier": str(repo["repository_id"]),
+                    "sourceRepositoryDigest": candidate["checkout_revision"],
+                    "sourceRepositoryRef": repo["workflow_ref"],
+                    "githubWorkflowRepository": repo["full_name"],
+                    "githubWorkflowRef": repo["workflow_ref"],
+                    "githubWorkflowSHA": repo["workflow_sha"],
+                    "buildSignerURI": signer_uri,
+                    "runInvocationURI": run_uri,
+                }
+            },
+            "statement": {
+                "predicateType": provenance["predicate_type"],
+                "subject": [{
+                    "name": bundle["path"],
+                    "digest": {"sha256": bundle["sha256"]},
+                }],
+            },
+        }
+    }])
+
+
 class RunManifestVerifierTests(unittest.TestCase):
     def setUp(self) -> None:
         self.bundle = ManifestBundle()
@@ -183,6 +220,61 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
         self.bundle.manifest["provenance"]["signer_workflow"] = ".github/workflows/untrusted.yml"
         self.assert_issue(self.bundle.audit(repin_for_test=True), "confirmatory_signer_mismatch")
+
+
+    def test_attestation_certificate_and_subject_positive_control(self) -> None:
+        raw = synthetic_attestation(self.bundle.manifest)
+        self.assertEqual(verifier.attestation_output_issues(raw, self.bundle.manifest), [])
+
+    def test_attestation_repository_id_mismatch_is_rejected(self) -> None:
+        output = json.loads(synthetic_attestation(self.bundle.manifest))
+        output[0]["verificationResult"]["signature"]["certificate"]["sourceRepositoryIdentifier"] = "999999"
+        self.assertIn("attestation_repository_id_mismatch", {
+            row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)
+        })
+
+    def test_attestation_source_revision_mismatch_is_rejected(self) -> None:
+        output = json.loads(synthetic_attestation(self.bundle.manifest))
+        output[0]["verificationResult"]["signature"]["certificate"]["sourceRepositoryDigest"] = "9" * 40
+        self.assertIn("attestation_source_digest_mismatch", {
+            row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)
+        })
+
+    def test_attestation_ref_and_workflow_identity_mismatch_are_rejected(self) -> None:
+        output = json.loads(synthetic_attestation(self.bundle.manifest))
+        cert = output[0]["verificationResult"]["signature"]["certificate"]
+        cert["sourceRepositoryRef"] = "refs/heads/untrusted"
+        cert["buildSignerURI"] = "https://github.com/untrusted/repo/.github/workflows/other.yml@refs/heads/main"
+        codes = {row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)}
+        self.assertIn("attestation_source_ref_mismatch", codes)
+        self.assertIn("attestation_signer_uri_mismatch", codes)
+        self.assertIn("attestation_certificate_identity_mismatch", codes)
+
+    def test_attestation_run_attempt_mismatch_is_rejected(self) -> None:
+        output = json.loads(synthetic_attestation(self.bundle.manifest))
+        output[0]["verificationResult"]["signature"]["certificate"]["runInvocationURI"] += "/wrong"
+        self.assertIn("attestation_run_id_mismatch", {
+            row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)
+        })
+
+    def test_attestation_subject_digest_mismatch_is_rejected(self) -> None:
+        output = json.loads(synthetic_attestation(self.bundle.manifest))
+        output[0]["verificationResult"]["statement"]["subject"][0]["digest"]["sha256"] = "0" * 64
+        self.assertIn("attestation_subject_digest_mismatch", {
+            row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)
+        })
+
+    def test_attestation_predicate_type_mismatch_is_rejected(self) -> None:
+        output = json.loads(synthetic_attestation(self.bundle.manifest))
+        output[0]["verificationResult"]["statement"]["predicateType"] = "https://example.invalid/other"
+        self.assertIn("attestation_predicate_type_mismatch", {
+            row["code"] for row in verifier.attestation_output_issues(jbytes(output), self.bundle.manifest)
+        })
+
+    def test_malformed_attestation_output_is_unresolved_not_passed(self) -> None:
+        self.assertIn("attestation_json_invalid", {
+            row["code"] for row in verifier.attestation_output_issues(b"not-json", self.bundle.manifest)
+        })
 
 
 if __name__ == "__main__":
