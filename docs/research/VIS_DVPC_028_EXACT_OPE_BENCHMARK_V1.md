@@ -37,6 +37,14 @@ rustc --edition=2024 -O tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028
 /tmp/vis-dvpc-028 --sweep
 ```
 
+## Partial identification under exact-zero support
+
+For the `zero_support` scenario, action A has target mass 0.5, logging probability 1, and reward mean 0.2; action B has target mass 0.5 and zero logging probability. Given only the declared reward range [0,1], the synthetic structural identification region is [0.1, 0.6]. The underlying scenario has target value 0.5, but that oracle truth must not be interpreted as identified from the logging data.
+
+The benchmark includes an observational-equivalence witness: two worlds differ only in action B's reward mean (0 versus 1). They induce the same logger-observable event probabilities (0.8, 0.2, 0, 0), but their target-policy values are 0.1 and 0.6. Both have the same structural region [0.1, 0.6] and both suppress point-estimator metrics. This is an executable impossibility control: the logs cannot distinguish those worlds without extra evidence or assumptions.
+
+The region uses evaluator-known population means for the supported actions in this synthetic DGP. For real finite logs, the supported contribution is estimated and needs its own uncertainty interval; do not present this structural region as a statistical confidence interval.
+
 ## Independent numerical known answers
 
 An independent exact-enumeration reference calculation for `propensity_misspecified_correct_q` gives IPS expected estimate `0.738095238095` while DR remains `0.500000000000` in expectation because its reward model is correct. Under simultaneous misspecification in `both_misspecified`, DR expectation is `0.420833333333` (true value 0.5). For `weak_overlap_001_misspecified`, the same reference gives IPS variance `3.300084175084`, SNIPS expected estimate `0.233448729630`, clipped-IPS expected estimate `0.120000000000`, and SWITCH expected estimate `0.350000000000` with variance `0.006743476431`. The Rust tests pin these values within a declared `1e-8` tolerance.
