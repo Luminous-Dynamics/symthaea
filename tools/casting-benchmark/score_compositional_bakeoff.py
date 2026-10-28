@@ -614,6 +614,349 @@ def _replay_diwa_run(run: dict, errors: list[str]) -> None:
             )
             _near(promotion.get("predicted_margin"), margin, f"{label} selected promotion margin", errors)
 
+
+JOINT_POLICY = "joint_action_cost_aware"
+JOINT_TRACE_KEYS = {
+    "step", "budget_before", "eligible_action_count", "selected_candidate_id",
+    "selected_fidelity", "selected_score", "selected_effective_cost",
+    "selected_deferred_validation_cost", "selected_decision_impact", "selection_mode",
+}
+JOINT_INFORMATION_FRACTION = {"low": 0.25, "medium": 0.60, "high": 1.0}
+JOINT_FIDELITY_ORDER = {"low": 0, "medium": 1, "high": 2}
+JOINT_SCORE_WEIGHTS = {
+    "feasible_hypervolume_gain": 0.70,
+    "constraint_boundary_information": 0.20,
+    "frontier_objective_information": 0.10,
+}
+
+
+def _joint_distance(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    if len(a) != len(b):
+        raise ValueError("joint-action coordinate dimensions differ")
+    return math.sqrt(statistics.fmean((x - y) ** 2 for x, y in zip(a, b)))
+
+
+def _joint_local_delta(
+    candidate_id: int,
+    pairs: list[tuple[int, tuple[float, float, float]]],
+    dimension: int,
+    seed: int,
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    if not pairs:
+        return (0.0, 0.0, 0.0), (0.12, 0.12, 0.12)
+    target = design_point(candidate_id, dimension, seed)
+    ranked = sorted(
+        ((_joint_distance(target, design_point(other, dimension, seed)), other, delta)
+         for other, delta in pairs),
+        key=lambda item: (item[0], item[1]),
+    )[:min(4, len(pairs))]
+    raw_weights = [1.0 / ((distance + 0.02) ** 2) for distance, _, _ in ranked]
+    total = sum(raw_weights)
+    weights = [value / total for value in raw_weights]
+    means = tuple(
+        sum(weight * row[2][j] for weight, row in zip(weights, ranked))
+        for j in range(3)
+    )
+    global_scales = []
+    for j in range(3):
+        values = [delta[j] for _, delta in pairs]
+        center = statistics.median(values)
+        mad = statistics.median([abs(value - center) for value in values])
+        mean = statistics.fmean(values)
+        variance = statistics.fmean((value - mean) ** 2 for value in values)
+        global_scales.append(max(1e-6, 1.4826 * mad, 0.5 * math.sqrt(max(0.0, variance))))
+    nearest_distance = ranked[0][0]
+    scales = []
+    for j in range(3):
+        local_variance = sum(
+            weight * (row[2][j] - means[j]) ** 2
+            for weight, row in zip(weights, ranked)
+        )
+        scales.append(max(
+            1e-6,
+            math.sqrt(
+                local_variance
+                + (0.35 * global_scales[j]) ** 2
+                + (nearest_distance * global_scales[j]) ** 2
+            ),
+        ))
+    return means, tuple(scales)
+
+
+def _joint_prediction(
+    candidate_id: int,
+    by_id: dict[int, dict[str, dict]],
+    dimension: int,
+    seed: int,
+) -> tuple[tuple[float, float], float, tuple[float, float, float], float]:
+    low_medium = []
+    medium_high = []
+    for cid, levels in by_id.items():
+        low, medium, high = levels.get("low"), levels.get("medium"), levels.get("high")
+        if low is not None and medium is not None:
+            low_medium.append((cid, (
+                medium["objectives"][0] - low["objectives"][0],
+                medium["objectives"][1] - low["objectives"][1],
+                medium["constraint_margin"] - low["constraint_margin"],
+            )))
+        if medium is not None and high is not None:
+            medium_high.append((cid, (
+                high["objectives"][0] - medium["objectives"][0],
+                high["objectives"][1] - medium["objectives"][1],
+                high["constraint_margin"] - medium["constraint_margin"],
+            )))
+    lm_mean, lm_sigma = _joint_local_delta(candidate_id, low_medium, dimension, seed)
+    mh_mean, mh_sigma = _joint_local_delta(candidate_id, medium_high, dimension, seed)
+    levels = by_id.get(candidate_id, {})
+    spatial_distance = 0.0
+    if levels.get("medium") is not None:
+        base = levels["medium"]
+        objectives = tuple(base["objectives"][j] + mh_mean[j] for j in range(2))
+        margin = base["constraint_margin"] + mh_mean[2]
+        sigma = mh_sigma
+    elif levels.get("low") is not None:
+        base = levels["low"]
+        objectives = tuple(base["objectives"][j] + lm_mean[j] + mh_mean[j] for j in range(2))
+        margin = base["constraint_margin"] + lm_mean[2] + mh_mean[2]
+        sigma = tuple(math.sqrt(lm_sigma[j] ** 2 + mh_sigma[j] ** 2) for j in range(3))
+    else:
+        sampled = [cid for cid, observed in by_id.items() if observed]
+        if not sampled:
+            return (0.5, 0.5), 0.0, (0.20, 0.20, 0.20), 1.0
+        source_id = min(
+            sampled,
+            key=lambda other: (_joint_distance(
+                design_point(candidate_id, dimension, seed),
+                design_point(other, dimension, seed)
+            ), other),
+        )
+        source_levels = by_id[source_id]
+        source_distance = _joint_distance(
+            design_point(candidate_id, dimension, seed),
+            design_point(source_id, dimension, seed),
+        )
+        spatial_distance = source_distance
+        if "high" in source_levels:
+            base = source_levels["high"]
+            objectives = tuple(base["objectives"])
+            margin = base["constraint_margin"]
+            sigma = (0.08, 0.08, 0.08)
+        elif "medium" in source_levels:
+            base = source_levels["medium"]
+            objectives = tuple(base["objectives"][j] + mh_mean[j] for j in range(2))
+            margin = base["constraint_margin"] + mh_mean[2]
+            sigma = mh_sigma
+        else:
+            base = source_levels["low"]
+            objectives = tuple(base["objectives"][j] + lm_mean[j] + mh_mean[j] for j in range(2))
+            margin = base["constraint_margin"] + lm_mean[2] + mh_mean[2]
+            sigma = tuple(math.sqrt(lm_sigma[j] ** 2 + mh_sigma[j] ** 2) for j in range(3))
+    if spatial_distance > 0.0:
+        sigma = tuple(math.sqrt(sigma[j] ** 2 + (0.08 * spatial_distance) ** 2) for j in range(3))
+    return objectives, margin, sigma, spatial_distance
+
+
+def _joint_impact(
+    objectives: tuple[float, float],
+    margin: float,
+    sigma: tuple[float, float, float],
+    high_archive: list[dict],
+) -> float:
+    sigma0, sigma1, sigma_margin = sigma
+    p_feasible = 0.5 * (
+        1.0 + math.erf(margin / (max(sigma_margin, 1e-6) * math.sqrt(2.0)))
+    )
+    points = [
+        tuple(row["objectives"]) for row in high_archive
+        if float(row["constraint_margin"]) >= 0.0
+    ]
+    gain = max(0.0, hypervolume_2d(points + [objectives]) - hypervolume_2d(points)) / 1.44
+    boundary = min(1.0, sigma_margin / 0.08) * math.exp(
+        -abs(margin) / max(sigma_margin, 1e-6)
+    )
+    front = []
+    best_y = math.inf
+    for x, y in sorted(set(points)):
+        if x >= REFERENCE_POINT[0] or y >= REFERENCE_POINT[1]:
+            continue
+        if y < best_y:
+            front.append((x, y))
+            best_y = y
+    distance = (
+        min(math.sqrt((objectives[0] - x) ** 2 + (objectives[1] - y) ** 2) for x, y in front)
+        if front else 0.0
+    )
+    objective_information = min(1.0, (sigma0 + sigma1) / 0.20) * math.exp(-distance / 0.10)
+    return (
+        JOINT_SCORE_WEIGHTS["feasible_hypervolume_gain"] * p_feasible * gain
+        + JOINT_SCORE_WEIGHTS["constraint_boundary_information"] * boundary
+        + JOINT_SCORE_WEIGHTS["frontier_objective_information"] * objective_information
+    )
+
+
+def _joint_choose_action(
+    history: list[dict],
+    dimension: int,
+    seed: int,
+    design_count: int,
+    costs: dict[str, int],
+    remaining_budget: int,
+) -> dict | None:
+    candidate_ids = tuple(range(design_count))
+    by_id: dict[int, dict[str, dict]] = {}
+    for row in history:
+        by_id.setdefault(int(row["candidate_id"]), {})[str(row["fidelity"])] = row
+    low_rows = [row for row in history if row["fidelity"] == "low"]
+    medium_count = sum(row["fidelity"] == "medium" for row in history)
+    high_rows = [row for row in history if row["fidelity"] == "high"]
+    high_count = len(high_rows)
+    if len(low_rows) < min(6, len(candidate_ids)):
+        seen = {int(row["candidate_id"]) for row in low_rows}
+        candidates = [cid for cid in candidate_ids if cid not in seen]
+        if not candidates or costs["low"] > remaining_budget:
+            return None
+        def separation(cid: int) -> float:
+            return min(
+                (_joint_distance(design_point(cid, dimension, seed),
+                                 design_point(int(row["candidate_id"]), dimension, seed))
+                 for row in low_rows),
+                default=1.0,
+            )
+        winner = min(candidates, key=lambda cid: (-separation(cid), cid))
+        return {
+            "candidate_id": winner, "fidelity": "low", "score": separation(winner),
+            "effective_cost": costs["low"], "deferred_validation_cost": 0.0,
+            "decision_impact": 0.0, "eligible_action_count": len(candidates),
+            "selection_mode": "bootstrap_space_filling",
+        }
+    predictions = {}
+    impacts = {}
+    diversities = {}
+    for cid in candidate_ids:
+        if "high" in by_id.get(cid, {}):
+            continue
+        predicted, margin, sigma, _ = _joint_prediction(cid, by_id, dimension, seed)
+        predictions[cid] = (predicted, margin, sigma)
+        impacts[cid] = _joint_impact(predicted, margin, sigma, high_rows)
+        sampled_low_ids = [int(row["candidate_id"]) for row in low_rows]
+        diversities[cid] = min(
+            (_joint_distance(design_point(cid, dimension, seed),
+                             design_point(other, dimension, seed))
+             for other in sampled_low_ids),
+            default=1.0,
+        )
+    max_impact = max(impacts.values(), default=1e-6)
+    actions = []
+    for cid, (predicted, margin, sigma) in predictions.items():
+        levels = by_id.get(cid, {})
+        if "low" not in levels:
+            eligible = ("low",)
+        elif "medium" not in levels:
+            eligible = ("medium", "high")
+        else:
+            eligible = ("high",)
+        impact = impacts[cid]
+        validation_probability = min(0.95, max(0.05, impact / max(max_impact, 1e-6)))
+        for fidelity in eligible:
+            call_cost = costs[fidelity]
+            if call_cost > remaining_budget:
+                continue
+            deferred = validation_probability * costs["high"] if fidelity != "high" else 0.0
+            effective_cost = call_cost + deferred
+            info = JOINT_INFORMATION_FRACTION[fidelity]
+            score = (impact * info + 0.02 * diversities[cid] * info) / effective_cost
+            if high_count == 0:
+                if fidelity == "high":
+                    score *= 1.25 if "medium" in levels else 0.65
+                elif fidelity == "medium" and medium_count < 2:
+                    score *= 1.40
+            actions.append({
+                "candidate_id": cid, "fidelity": fidelity, "score": score,
+                "effective_cost": effective_cost,
+                "deferred_validation_cost": deferred, "decision_impact": impact,
+                "eligible_action_count": 0, "selection_mode": "joint_acquisition",
+            })
+    if not actions:
+        return None
+    actions.sort(key=lambda item: (
+        -item["score"], item["candidate_id"], JOINT_FIDELITY_ORDER[item["fidelity"]]
+    ))
+    winner = dict(actions[0])
+    winner["eligible_action_count"] = len(actions)
+    return winner
+
+
+def _replay_joint_action_run(
+    run: dict,
+    costs: dict[str, int],
+    budget: int,
+    errors: list[str],
+) -> None:
+    label = f"run[{run.get('policy')}] joint-action replay"
+    trace = run.get("joint_action_trace")
+    if run.get("policy") != JOINT_POLICY:
+        if trace != []:
+            errors.append(f"{label}: non-joint policy must have an empty joint_action_trace")
+        return
+    ledger = run.get("evaluations")
+    if not isinstance(ledger, list) or not isinstance(trace, list) or len(trace) != len(ledger):
+        errors.append(f"{label}: trace length must equal the raw evaluation ledger length")
+        return
+    dim, seed, count = int(run["dimension"]), int(run["seed"]), int(run["design_count"])
+    spent = 0
+    promotions = {
+        int(row["candidate_id"]): row for row in run.get("promotion_records", [])
+        if isinstance(row, dict) and isinstance(row.get("candidate_id"), int)
+        and not isinstance(row.get("candidate_id"), bool)
+    }
+    for index, observation in enumerate(ledger):
+        entry = trace[index]
+        entry_label = f"{label}.trace[{index}]"
+        if not _require_keys(entry, JOINT_TRACE_KEYS, entry_label, errors):
+            continue
+        expected = _joint_choose_action(ledger[:index], dim, seed, count, costs, budget - spent)
+        if expected is None:
+            errors.append(f"{entry_label}: policy made an action after no affordable action remained")
+            continue
+        if entry.get("step") != index + 1:
+            errors.append(f"{entry_label}: step index mismatch")
+        _near(entry.get("budget_before"), budget - spent, f"{entry_label}.budget_before", errors)
+        _near(entry.get("eligible_action_count"), expected["eligible_action_count"], f"{entry_label}.eligible_action_count", errors)
+        if entry.get("selected_candidate_id") != expected["candidate_id"]:
+            errors.append(f"{entry_label}: candidate is not the independently recomputed winner")
+        if entry.get("selected_fidelity") != expected["fidelity"]:
+            errors.append(f"{entry_label}: fidelity is not the independently recomputed winner")
+        if observation.get("candidate_id") != expected["candidate_id"] or observation.get("fidelity") != expected["fidelity"]:
+            errors.append(f"{entry_label}: raw ledger action disagrees with the recomputed choice")
+        if entry.get("selection_mode") != expected["selection_mode"]:
+            errors.append(f"{entry_label}: selection mode mismatch")
+        for key, expected_key in (
+            ("selected_score", "score"),
+            ("selected_effective_cost", "effective_cost"),
+            ("selected_deferred_validation_cost", "deferred_validation_cost"),
+            ("selected_decision_impact", "decision_impact"),
+        ):
+            _near(entry.get(key), float(expected[expected_key]), f"{entry_label}.{key}", errors)
+        if expected["fidelity"] == "high":
+            by_id: dict[int, dict[str, dict]] = {}
+            for prior in ledger[:index]:
+                by_id.setdefault(int(prior["candidate_id"]), {})[str(prior["fidelity"])] = prior
+            _, predicted_margin, _, _ = _joint_prediction(
+                int(expected["candidate_id"]), by_id, dim, seed
+            )
+            promotion = promotions.get(int(expected["candidate_id"]))
+            if promotion is None or promotion.get("method") != JOINT_POLICY:
+                errors.append(f"{entry_label}: missing registered promotion record for high-fidelity call")
+            else:
+                _near(promotion.get("predicted_margin"), predicted_margin,
+                      f"{entry_label}.predicted_margin", errors)
+        spent += costs[str(observation["fidelity"])]
+    if spent <= budget:
+        next_action = _joint_choose_action(ledger, dim, seed, count, costs, budget - spent)
+        if next_action is not None:
+            errors.append(f"{label}: policy stopped while an affordable joint action remained")
+
+
 def score_document(
     document: dict,
     repo_root: Path | None = None,
