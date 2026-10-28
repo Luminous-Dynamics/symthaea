@@ -181,9 +181,14 @@ pub fn verify_mis_candidate(
     let (vertex_count, edges) = parse_canonical_graph(graph_bytes)?;
     let vertices = parse_canonical_candidate(candidate_bytes, vertex_count)?;
     let selected_count = vertices.len();
+    // Build membership once, then scan each edge. This is O(V + E) even on dense graphs.
+    let mut selected = vec![false; vertex_count];
+    for &vertex in &vertices {
+        selected[vertex] = true;
+    }
     let mut conflicts = 0usize;
     for &(u, v) in &edges {
-        if vertices.binary_search(&u).is_ok() && vertices.binary_search(&v).is_ok() {
+        if selected[u] && selected[v] {
             conflicts += 1;
         }
     }
@@ -396,7 +401,7 @@ fn canonical_receipt_bytes(
         MisEvidenceVerdict::VerifiedConflict => "verified-conflict",
     };
     format!(
-        "SYMTHEA-MIS-RECEIPT-V1\ninstance_sha256 {instance_sha256}\nverifier_sha256 {verifier_sha256}\ncandidate_sha256 {candidate_sha256}\ntarget_size {target_size}\ncandidate_size {candidate_size}\nconflict_count {conflict_count}\nverdict {verdict}\n"
+        "SYMTHEA-MIS-RECEIPT-V2\ninstance_sha256 {instance_sha256}\nverifier_sha256 {verifier_sha256}\ncandidate_sha256 {candidate_sha256}\ntarget_size {target_size}\ncandidate_size {candidate_size}\nconflict_count {conflict_count}\nverdict {verdict}\n"
     ).into_bytes()
 }
 
@@ -548,6 +553,7 @@ mod tests {
     fn verifies_candidate_and_binds_exact_artifact_bytes() {
         let bytes = candidate(&[0, 2]);
         let evidence = verify_mis_candidate(GRAPH, &bytes, 2, VERIFIER).unwrap();
+        assert!(evidence.receipt_bytes().starts_with(b"SYMTHEA-MIS-RECEIPT-V2\n"));
         assert_eq!(evidence.verdict(), MisEvidenceVerdict::VerifiedIndependentSet);
         assert_eq!(evidence.conflict_count(), 0);
         assert!(evidence.reaches_target());
