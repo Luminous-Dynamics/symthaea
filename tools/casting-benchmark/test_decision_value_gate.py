@@ -116,6 +116,10 @@ class DecisionValueGateTests(unittest.TestCase):
         self.assertEqual(result.disposition, "replicate")
         self.assertEqual(result.action_id, "repeat-measurement")
 
+    def test_rejects_edge_whitespace_in_action_identity(self):
+        with self.assertRaisesRegex(ValueError, "edge whitespace"):
+            self.choose([DecisionAction(" action ", "candidate", "evaluate", "low", 1, 1, 0)])
+
     def test_unhashable_action_kind_is_rejected_cleanly(self):
         with self.assertRaisesRegex(ValueError, "kind must be one of"):
             self.choose([action("bad-kind", kind=[] )])
@@ -139,6 +143,10 @@ class DecisionValueGateTests(unittest.TestCase):
                     self.choose([action("bad", cost=bad_cost)])
         with self.assertRaisesRegex(ValueError, "finite"):
             self.choose([action("bad-value", value=math.nan)])
+
+    def test_rejects_extremely_large_integer_cost(self):
+        with self.assertRaisesRegex(ValueError, "finite"):
+            self.choose([action("huge-cost", cost=10**10000)])
 
     def test_rejects_negative_value_and_invalid_risk_proxy(self):
         with self.assertRaisesRegex(ValueError, "non-negative"):
