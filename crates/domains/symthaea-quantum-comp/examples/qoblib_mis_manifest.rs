@@ -299,12 +299,12 @@ mod tests {
     const BLOB: &str = "433ad3290665909e1ee5c17abfa8c946391938dc";
 
     fn line(name: &str, path: &str, blob: &str, size: usize, vertices: usize, edges: usize) -> String {
-        format!("{name}\\t{path}\\t{blob}\\t{size}\\t{vertices}\\t{edges}\\n")
+        format!("{name}\t{path}\t{blob}\t{size}\t{vertices}\t{edges}\n")
     }
     #[test]
     fn parses_pinned_manifest_without_mutating_source_identity() {
         let manifest = format!(
-            "# source_commit={COMMIT}\\n# source_repo=ZIB-AOPT/QOBLIB\\n{}",
+            "# source_commit={COMMIT}\n# source_repo=ZIB-AOPT/QOBLIB\n{}",
             line(
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
@@ -332,13 +332,13 @@ mod tests {
             52,
             454
         );
-        let manifest = format!("# source_commit={COMMIT}\\n{row}{row}");
+        let manifest = format!("# source_commit={COMMIT}\n{row}{row}");
         assert!(parse_pinned_manifest(&manifest).is_err());
     }
 
     #[test]
     fn validates_graph_counts_against_pinned_metadata() {
-        let canonical = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n0 1\\n2 3\\n";
+        let canonical = b"SYMTHEA-MIS-GRAPH-V1\nvertices 4\nedges 2\n0 1\n2 3\n";
         let pinned = PinnedFile {
             name: "tiny".into(),
             relative_path: "07-independentset/instances/tiny.gph".into(),
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn rejects_pinned_vertex_or_edge_count_mismatch() {
         let wrong_vertices = format!(
-            "# source_commit={COMMIT}\\n{}",
+            "# source_commit={COMMIT}\n{}",
             line(
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
@@ -373,7 +373,7 @@ mod tests {
         assert_eq!(entries[0].expected_vertices, 51);
 
         let wrong_edges = format!(
-            "# source_commit={COMMIT}\\n{}",
+            "# source_commit={COMMIT}\n{}",
             line(
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn rejects_wrong_filename_and_malformed_blob_id() {
         let wrong_filename = format!(
-            "# source_commit={COMMIT}\\n{}",
+            "# source_commit={COMMIT}\n{}",
             line(
                 "aves-sparrow-social",
                 "07-independentset/instances/another-name.gph",
@@ -403,7 +403,7 @@ mod tests {
         assert!(parse_pinned_manifest(&wrong_filename).is_err());
 
         let malformed_blob = format!(
-            "# source_commit={COMMIT}\\n{}",
+            "# source_commit={COMMIT}\n{}",
             line(
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
