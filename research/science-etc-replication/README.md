@@ -41,7 +41,7 @@ cargo run --locked --manifest-path research/science-etc-replication/Cargo.toml -
   research/science-etc-replication/fixtures/run-manifest.example.json
 ```
 
-The validator checks the expected eight-arm grid, native-metric preservation, exact task-slice identity and model coverage, pinned source/model/judge identities for qualified runs, sorted measurement caps, enforced over-budget rejection, and preregistered primary contrast references. It reports the expected attempt count separately for each budget profile.
+The validator checks the expected eight-arm grid, native-metric preservation, exact task-slice identity, model coverage, and cell-level non-overlap across the model × module × difficulty × system × law-version × noise key. It also checks pinned source/model/judge identities for qualified runs, sorted measurement caps, enforced over-budget rejection, preregistered primary contrast references, and multiplicity families for confirmatory contrasts. It reports the expected attempt count separately for each budget profile.
 
 The example fixture includes eight fixed arms and 12 predeclared example contrasts, split across measurement-matched and interaction-matched budget profiles. It should validate structurally but must fail if invoked with `--require-qualified`. The placeholder hashes and unresolved model/upstream identities prevent admission for scoring.
 
