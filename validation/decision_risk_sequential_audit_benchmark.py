@@ -3,9 +3,9 @@
 
 Synthetic finite-cell benchmark. A fixed-time empirical-Bernstein bound is valid
 at a prespecified sample size; repeatedly checking it and stopping opportunistically
-does not preserve that single-look guarantee. The finite-look method spends delta/L
-across a predeclared list of L looks. The all-time method uses a summable schedule.
-Neither is claimed as SOTA.
+does not preserve that single-look guarantee. The time-uniform method here uses a
+summable alpha-spending schedule plus a fixed-time empirical-Bernstein inequality.
+This is intentionally simple and conservative, not claimed as SOTA.
 """
 from __future__ import annotations
 import hashlib
@@ -51,7 +51,13 @@ def finite_look_radius(variance: np.ndarray, n: int, n_cells: int, n_looks: int,
 
 
 def anytime_radius(variance: np.ndarray, n: int, n_cells: int, delta: float = DELTA) -> np.ndarray:
-    """Time-uniform radius via summable delta_n = delta * 6/(pi^2*n^2)."""
+    """Time-uniform cellwise radius by union bound over all n >= 1.
+
+    Allocate delta_n = delta * 6/(pi^2*n^2), whose sum across n is delta.
+    At each n, allocate delta_n familywise across the n_cells two-sided bounds.
+    This is an anytime guarantee only under the stated independent bounded audit
+    sampling assumptions and fixed predeclared cell family.
+    """
     if not (0 < delta < 1) or n_cells < 1:
         raise ValueError("invalid familywise delta or cell count")
     delta_n = delta * 6.0 / (math.pi ** 2 * n ** 2)
@@ -76,8 +82,9 @@ def run(*, repeats: int = N_REPEATS, sample_sizes: tuple[int, ...] = SAMPLE_SIZE
     if EPSILON_ALLOWANCE_BITS <= 0:
         raise ValueError("regret budget leaves no error allowance")
 
-    # Fixed 4-cell family; Bernoulli audit losses create high variance while
-    # remaining in the predeclared [0,1] range.
+    # Fixed 4-cell family; Bernoulli audit losses attain high variance while
+    # remaining in the predeclared [0,1] range. The planning matrix differs from
+    # the true mean matrix only in one candidate cell.
     truth = np.array([[0.50, 0.52], [0.48, 0.55]], dtype=float)
     eps_near = EPSILON_ALLOWANCE_BITS + 1e-5
     models = {
@@ -90,20 +97,21 @@ def run(*, repeats: int = N_REPEATS, sample_sizes: tuple[int, ...] = SAMPLE_SIZE
     true_errors = {name: float(np.max(np.abs(model-truth))) for name, model in models.items()}
     k = truth.size
     rng = np.random.default_rng(SEED)
-    methods = ("fixed_time_repeated_peek", "finite_look_alpha_spending", "anytime_alpha_spending")
+    # Counts for each method/model/endpoint; audit stream is nested within repeat.
     stats = {name: {method: {"false_admissions": 0, "any_admission": 0,
                               "admitted_by_look": {str(n): 0 for n in sizes},
                               "sum_stopping_n": 0, "stopped": 0,
                               "final_upper_bound_sum": 0.0}
-                    for method in methods}
+                    for method in ("fixed_time_repeated_peek", "finite_look_alpha_spending", "anytime_alpha_spending")}
              for name in models}
 
     for _ in range(repeats):
+        # Generate nested Bernoulli audit streams (all outcomes in [0,1]).
         draws = rng.binomial(1, truth[None, :, :], size=(sizes[-1], *truth.shape)).astype(float)
         csum = np.cumsum(draws, axis=0)
         csq = np.cumsum(draws * draws, axis=0)
         for name, model in models.items():
-            for method in methods:
+            for method in ("fixed_time_repeated_peek", "finite_look_alpha_spending", "anytime_alpha_spending"):
                 rec = stats[name][method]
                 stopped = False
                 last_upper = float("inf")
@@ -120,7 +128,8 @@ def run(*, repeats: int = N_REPEATS, sample_sizes: tuple[int, ...] = SAMPLE_SIZE
                         radii = anytime_radius(variances, n, k, DELTA)
                     upper = float(np.max(np.abs(model - means) + radii))
                     last_upper = upper
-                    if upper <= EPSILON_ALLOWANCE_BITS + TOL:
+                    admitted = upper <= EPSILON_ALLOWANCE_BITS + TOL
+                    if admitted:
                         rec["admitted_by_look"][str(n)] += 1
                         if true_errors[name] > EPSILON_ALLOWANCE_BITS + TOL:
                             rec["false_admissions"] += 1
@@ -154,11 +163,9 @@ def run(*, repeats: int = N_REPEATS, sample_sizes: tuple[int, ...] = SAMPLE_SIZE
         "status": "SYNTHETIC_SEQUENTIAL_AUDIT_BENCHMARK_NOT_PRODUCTION_CERTIFICATION",
         "protocol": {
             "seed": SEED, "repeats": repeats, "looks": list(sizes), "cells": k,
-            "loss_range": [LOSS_MIN, LOSS_MAX],
-            "cell_outcomes": "independent Bernoulli draws with per-cell means given by fixed true risk matrix",
+            "loss_range": [LOSS_MIN, LOSS_MAX], "cell_outcomes": "independent Bernoulli draws with per-cell means given by fixed true risk matrix",
             "familywise_delta_per_fixed_look": DELTA,
             "time_uniform_alpha_spending": "delta_n = delta * 6/(pi^2*n^2), sum_n delta_n = delta; cellwise two-sided empirical-Bernstein bound",
-            "finite_look_alpha_spending": "delta/L per each of L predeclared looks; familywise across cells and both tails",
             "true_max_cell_error_bits": true_errors,
             "regret_budget_bits": REGRET_BUDGET_BITS,
             "decision_radius_bits": RADIUS_BITS,
@@ -166,7 +173,7 @@ def run(*, repeats: int = N_REPEATS, sample_sizes: tuple[int, ...] = SAMPLE_SIZE
         },
         "methods": {
             "fixed_time_repeated_peek": "Uses the single-look empirical-Bernstein bound with delta=0.10 at each checkpoint; it is not claimed valid uniformly over opportunistic stopping.",
-            "finite_look_alpha_spending": "Uses delta/L per each of L predeclared looks and familywise correction across cells; valid for the exact look schedule under bounded independent sampling.",
+            "finite_look_alpha_spending": "Uses delta/L per each of L predeclared looks and familywise correction across cells; valid for the stated fixed look schedule under bounded independent sampling.",
             "anytime_alpha_spending": "Uses summable alpha spending across every integer sample size and the predeclared finite family of cells; valid under bounded independent sampling and fixed model/support assumptions.",
         },
         "results": results,
@@ -174,8 +181,8 @@ def run(*, repeats: int = N_REPEATS, sample_sizes: tuple[int, ...] = SAMPLE_SIZE
             "fixed finite four-cell Bernoulli toy; not a real-world distribution or industry benchmark",
             "true risk means used only to score the false-admission event",
             "both alpha-spending methods use union bounds, not an optimized betting confidence sequence",
-            "finite-look method is valid only for the exact predeclared look schedule; adding unscheduled peeks requires a new error allocation",
-            "does not protect against shared audit bias or incomplete support; those require the separate preflight/receipt gate",
+            "the finite-look method is valid only for the exact predeclared look schedule; adding unscheduled peeks requires a new error allocation",
+            "does not protect against shared audit bias, hidden dependence or incomplete support; those require the separate preflight/receipt gate",
             "no published baseline implementation run; no SOTA claim",
             "not integrated into native Rust decision or dispatch path",
         ],
