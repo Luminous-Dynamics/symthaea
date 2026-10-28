@@ -334,6 +334,13 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.assertEqual(result["requirement_traceability"]["traced_source_item_count"], 7)
         self.assertEqual(result["requirement_traceability"]["required_test_count"], 5)
         self.assertEqual(result["requirement_traceability"]["traced_required_test_count"], 5)
+        baseline = result["per_test_baseline_oracle_alignment"]
+        self.assertTrue(baseline["complete"])
+        self.assertEqual(baseline["concrete_execution_count"], 5)
+        self.assertEqual(baseline["expected_status_count"], 5)
+        self.assertEqual(baseline["observed_status_count"], 5)
+        self.assertEqual(baseline["matching_status_count"], 5)
+        self.assertEqual(baseline["alignment_pct"], 100.0)
 
     def test_task_digest_must_match_out_of_band_pin(self) -> None:
         self.bundle.inputs = replace(self.bundle.inputs, expected_task_sha256="0" * 64)
@@ -535,6 +542,11 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.bundle.refresh_task_hash()
         result = self.bundle.run_audit()
         self.assert_issue(result, "baseline_expectation_mismatch")
+        baseline = result["per_test_baseline_oracle_alignment"]
+        self.assertFalse(baseline["complete"])
+        self.assertEqual(baseline["concrete_execution_count"], 5)
+        self.assertEqual(baseline["matching_status_count"], 4)
+        self.assertEqual(baseline["alignment_pct"], 80.0)
 
     def test_baseline_must_fail_preregistered_behavior_test(self) -> None:
         raw = (

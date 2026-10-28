@@ -240,6 +240,34 @@ def requirement_traceability_summary(task: dict[str, Any], issues: list[dict[str
     }
 
 
+def baseline_alignment_summary(
+    mapping: dict[str, list[str]],
+    expected: dict[str, str],
+    observed: dict[str, str],
+) -> dict[str, Any]:
+    """Summarize per-test baseline-oracle alignment; never grants eligibility."""
+    concrete_ids = [execution_id for execution_ids in mapping.values() for execution_id in execution_ids]
+    expected_count = sum(1 for execution_id in concrete_ids if expected.get(execution_id) in ("passed", "failed"))
+    observed_count = sum(1 for execution_id in concrete_ids if observed.get(execution_id) in ("ok", "FAILED"))
+    matching_count = sum(
+        1 for execution_id in concrete_ids
+        if (
+            expected.get(execution_id) == "passed" and observed.get(execution_id) == "ok"
+        ) or (
+            expected.get(execution_id) == "failed" and observed.get(execution_id) == "FAILED"
+        )
+    )
+    denominator = len(concrete_ids)
+    return {
+        "concrete_execution_count": denominator,
+        "expected_status_count": expected_count,
+        "observed_status_count": observed_count,
+        "matching_status_count": matching_count,
+        "alignment_pct": (100.0 * matching_count / denominator) if denominator else None,
+        "complete": denominator > 0 and expected_count == denominator and observed_count == denominator and matching_count == denominator,
+    }
+
+
 def evidence_path(root: Path, relative: Any, label: str, issues: list[dict[str, str]]) -> Path | None:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         issues.append({"code": "unsafe_evidence_path", "message": f"{label}: expected a non-empty POSIX relative path"})
@@ -429,6 +457,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
 
     ref_hashes = oracle.get("reference_evidence_sha256", {})
     ref_paths = oracle.get("reference_evidence_artifacts", {})
+    baseline_observed: dict[str, str] = {}
     for name in ("baseline_log", "reference_log", "reference_patch", "test_bundle"):
         if name not in ref_hashes or name not in ref_paths:
             issues.append({"code": "oracle_control_evidence_missing", "message": f"task lacks reference evidence path/hash for {name}"})
@@ -438,6 +467,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
             continue
         if name == "baseline_log":
             tests = parse_test_log(raw)
+            baseline_observed = tests
             mapped = {test for rows in mapping.values() for test in rows}
             if not any(tests.get(test) == "FAILED" for test in mapped) or b"test result: FAILED" not in raw:
                 issues.append({"code": "baseline_control_not_demonstrated", "message": "baseline must fail a preregistered behavior test"})
@@ -628,6 +658,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
         "expected_image_id": inputs.expected_image_id,
         "required_test_count": len(required_ids),
         "requirement_traceability": traceability_summary,
+        "per_test_baseline_oracle_alignment": baseline_alignment_summary(mapping, baseline_expectations, baseline_observed),
         "observed_test_result_count": len(results),
         "required_mutation_count": len(expected_active),
         "observed_mutation_result_count": len(mutation_rows),
