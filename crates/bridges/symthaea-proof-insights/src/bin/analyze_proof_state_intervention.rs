@@ -1361,23 +1361,39 @@ fn estimate(points: Vec<Point>, replicates: usize, seed: u64) -> Metric {
     samples.sort_by(f64::total_cmp);
     let lower = percentile(&samples, 0.025);
     let upper = percentile(&samples, 0.975);
+    let (interval_status, lower_95, upper_95) = match (lower, upper) {
+        (Some(lower), Some(upper)) if upper - lower > f64::EPSILON => {
+            ("reported_descriptive_interval", Some(lower), Some(upper))
+        }
+        // A zero-width bootstrap interval has no empirical resolution. Match
+        // the other PITB analyzers by suppressing it rather than implying that
+        // a degenerate resampling distribution supports an informative interval.
+        _ => ("suppressed_degenerate_interval", None, None),
+    };
     Metric {
         numerator,
         denominator,
         estimate: Some(estimate),
         independent_components: components.len(),
-        interval_status: "reported_descriptive_interval",
-        lower_95: lower,
-        upper_95: upper,
+        interval_status,
+        lower_95,
+        upper_95,
     }
 }
 
 fn percentile(sorted_values: &[f64], probability: f64) -> Option<f64> {
-    if sorted_values.is_empty() {
+    if sorted_values.is_empty() || !(0.0..=1.0).contains(&probability) {
         return None;
     }
-    let index = ((sorted_values.len() - 1) as f64 * probability).floor() as usize;
-    sorted_values.get(index).copied()
+    // Match the linearly interpolated percentile convention used by PITB's
+    // success-cost-frontier and counterfactual-sensitivity analyzers.
+    let position = probability * (sorted_values.len() - 1) as f64;
+    let lower_index = position.floor() as usize;
+    let upper_index = position.ceil() as usize;
+    let weight = position - lower_index as f64;
+    let lower = *sorted_values.get(lower_index)?;
+    let upper = *sorted_values.get(upper_index)?;
+    Some(lower * (1.0 - weight) + upper * weight)
 }
 
 fn metric_json(metric: Metric) -> Value {
@@ -1492,9 +1508,12 @@ mod tests {
     }
 
     #[test]
-    fn percentile_selects_lower_index_for_evenly_sorted_samples() {
+    fn percentile_uses_linear_interpolation_and_rejects_invalid_inputs() {
         assert_eq!(percentile(&[0.0, 0.5, 1.0], 0.5), Some(0.5));
+        assert_eq!(percentile(&[0.0, 10.0], 0.25), Some(2.5));
         assert_eq!(percentile(&[], 0.5), None);
+        assert_eq!(percentile(&[0.0, 1.0], -0.1), None);
+        assert_eq!(percentile(&[0.0, 1.0], 1.1), None);
     }
 
     #[test]
@@ -1541,6 +1560,22 @@ mod tests {
         assert_eq!(result.interval_status, "reported_descriptive_interval");
         assert!(result.lower_95.is_some());
         assert!(result.upper_95.is_some());
+    }
+
+    #[test]
+    fn degenerate_bootstrap_interval_is_suppressed_at_twenty_components() {
+        let points = (0..20)
+            .map(|index| Point {
+                component_id: format!("component-{index}"),
+                success: true,
+            })
+            .collect();
+        let result = estimate(points, 1_000, 31);
+        assert_eq!(result.independent_components, 20);
+        assert_eq!(result.interval_status, "suppressed_degenerate_interval");
+        assert!(result.estimate.is_some());
+        assert_eq!(result.lower_95, None);
+        assert_eq!(result.upper_95, None);
     }
 
     fn checked_in_synthetic_inputs() -> (Value, Value) {
