@@ -280,12 +280,15 @@ def build_manifests(sweep: Any, sweep_raw: bytes, selector: dict[str, Any], gene
                 "constraint_margin": shifted_margin,
             })
         shifts.append({"shift_id": family, "shift_family": family, "evaluations": observations})
+    selection_rendered = json.dumps(selection, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    selection_manifest_sha = hashlib.sha256(selection_rendered.encode("utf-8")).hexdigest()
     holdout = {
         "schema_version": SCHEMA_VERSION,
         "benchmark_id": "CASTING-DECISION-ROBUSTNESS-ADAPTER-001",
         "source_sweep_sha256": sweep_digest,
         "manifest_generator_sha256": generator_digest,
         "candidate_pool_sha256": pool_digest,
+        "selection_manifest_sha256": selection_manifest_sha,
         "selector": selector_out,
         "holdout_role": "synthetic_post_selection_diagnostic",
         "evidence_class": "synthetic",
