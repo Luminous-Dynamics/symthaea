@@ -123,7 +123,14 @@
           }
         },
         "working_directory": {
-          "$ref": "#/$defs/relativePath"
+          "anyOf": [
+            {
+              "const": "."
+            },
+            {
+              "$ref": "#/$defs/relativePath"
+            }
+          ]
         },
         "timeout_ms": {
           "type": "integer",
