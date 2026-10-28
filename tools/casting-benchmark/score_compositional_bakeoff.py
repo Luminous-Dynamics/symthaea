@@ -28,6 +28,13 @@ SUPPORTED_FAMILIES = (
 )
 SUPPORTED_DIMENSIONS = (2, 5, 10)
 POLICY_ORDER = ("high_only", "low_screen", "fixed_top_k", "discrepancy_aware", "adaptive_budget")
+ALLOWED_PROMOTION_METHODS = {
+    "high_only": set(),
+    "low_screen": {"low_predicted_margin"},
+    "fixed_top_k": {"medium_top_k"},
+    "discrepancy_aware": {"discrepancy_anchor", "discrepancy_corrected"},
+    "adaptive_budget": {"adaptive_discrepancy_anchor", "adaptive_cost_aware_corrected"},
+}
 REFERENCE_POINT = (1.2, 1.2)
 TOL = 1e-9
 PRIMES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53)
@@ -423,6 +430,7 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
             continue
         false_promotions = 0
         predicted_feasible = 0
+        seen_promotion_ids = set()
         for pi, promotion in enumerate(run["promotion_records"]):
             plabel = f"{label}.promotion_records[{pi}]"
             if not _require_keys(promotion, PROMOTION_KEYS, plabel, errors):
@@ -431,12 +439,18 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
             if isinstance(cid, bool) or not isinstance(cid, int) or cid not in observed_high:
                 errors.append(f"{plabel} lacks corresponding high-fidelity observation")
                 continue
+            if cid in seen_promotion_ids:
+                errors.append(f"{plabel} duplicates a candidate promotion")
+            seen_promotion_ids.add(cid)
             _near(promotion["observed_high_margin"], observed_high[cid][1], f"{plabel}.observed_high_margin", errors)
-            if not _finite(promotion["predicted_margin"]) or not isinstance(promotion["method"], str) or not promotion["method"]:
-                errors.append(f"{plabel} has invalid promotion fields")
+            method = promotion["method"]
+            if not _finite(promotion["predicted_margin"]) or not isinstance(method, str) or method not in ALLOWED_PROMOTION_METHODS.get(policy, set()):
+                errors.append(f"{plabel} has invalid or unregistered promotion fields for policy {policy!r}")
                 continue
             predicted_feasible += int(promotion["predicted_margin"] >= 0.0)
             false_promotions += int(promotion["predicted_margin"] >= 0.0 and observed_high[cid][1] < 0.0)
+        if policy == "high_only" and run["promotion_records"]:
+            errors.append(f"{label} high_only must not emit promotion records")
         _near(run["predicted_feasible_promotion_count"], predicted_feasible, f"{label}.predicted_feasible_promotion_count", errors)
         _near(run["false_promotion_count"], false_promotions, f"{label}.false_promotion_count", errors)
         rate = false_promotions / predicted_feasible if predicted_feasible else None
