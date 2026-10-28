@@ -65,7 +65,7 @@ def required_env(name: str) -> str:
 def env_context() -> dict[str, Any]:
     # These values must be injected by the protected workflow, not from the
     # candidate patch or the agent-controlled command.
-    return {
+    context = {
         "repository_full_name": required_env("GITHUB_REPOSITORY"),
         "repository_id": int(required_env("VLEB_REPOSITORY_ID")),
         "run_id": required_env("GITHUB_RUN_ID"),
@@ -76,6 +76,13 @@ def env_context() -> dict[str, Any]:
         "workflow_sha": required_env("VLEB_WORKFLOW_SHA"),
         "workflow_ref": required_env("GITHUB_WORKFLOW_REF"),
     }
+    if context["repository_id"] < 1 or not context["run_id"].isdigit() or context["run_attempt"] < 1:
+        raise ValueError("trusted repository/run identity is invalid")
+    for field in ("source_repository_digest", "candidate_checkout_revision", "workflow_sha"):
+        value = context[field]
+        if len(value) != 40 or any(char not in "0123456789abcdef" for char in value):
+            raise ValueError(f"trusted runner variable for {field} must be a lowercase Git SHA")
+    return context
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -132,6 +139,12 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("receipt, stdout and stderr paths must be distinct")
         if receipt_path in (source, cwd) or stdout_path == source or stderr_path == source:
             raise ValueError("receipt/output paths may not overwrite the source or working directory")
+
+        if not args.runtime_image_id.startswith("sha256:") or len(args.runtime_image_id) != 71 or any(
+            char not in "0123456789abcdef" for char in args.runtime_image_id[7:]
+        ):
+            raise ValueError("runtime image ID must use sha256:<64 lowercase hexadecimal characters>")
+        run_context = env_context()
 
         input_rows: list[dict[str, str]] = []
         for value in [args.source_path, *args.inputs]:
@@ -195,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
             "task_id": args.task_id,
             "claim_id": args.claim_id,
             "source_sha256": digest(source.read_bytes()),
-            "run_binding": env_context(),
+            "run_binding": run_context,
             "runtime": {
                 "immutable_image_id": args.runtime_image_id,
                 "network_mode": args.network_mode,
