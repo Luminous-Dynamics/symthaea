@@ -49,6 +49,18 @@ Each variant must compile before the contract suite is run. A compile failure, t
 
 The catalog contains 17 probes; only these four semantic source mutants are executable in the current harness. The remaining semantic and evidence-manipulation probes remain planned and must not be represented as executed. Even a 4/4 kill result would be an initial oracle-smoke test, not a broad mutation score or a production-safety result.
 
+## Independent evidence auditor
+
+`tools/vleb/audit_receipt.py` recomputes artifact hashes and checks the task's logical-test inventory against concrete execution names, baseline/reference controls, environment identity, mutation target tests, differential evidence, timing and costs. The CLI requires caller-supplied pins for the task contract, protocol, candidate patch, auditor source, checkout revision and immutable runtime image; these must come from the trusted evaluator/run manifest, not from receipt fields.
+
+Run its synthetic adversarial unit tests with:
+
+```sh
+python tools/vleb/test_receipt_auditor.py
+```
+
+The auditor deliberately rejects public-development fixtures and does not currently verify external host-attestation signatures. Hashes prove that bytes match a digest, not that the logs truthfully came from the claimed runtime. For confirmatory studies, package the complete evidence bundle and verify signed provenance from a dedicated trusted runner before allowing a score.
+
 ## Validation status
 
 The reference crate currently contains 17 unit tests and 4 CLI integration tests, including a seeded differential reducer over 64 generated ledgers, permutation invariance, arbitrary duplicate multiplicity, maximum-value arithmetic, strict integer-token syntax and malformed CSV cases. These tests were authored but have not been compiled or executed in this environment because rustc and cargo are unavailable. CI results must be checked at the exact PR head. The fixture is not score-eligible until those tests execute, an independent reviewer approves the oracle, and adversarial task admission is complete.
