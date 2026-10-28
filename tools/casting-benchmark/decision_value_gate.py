@@ -84,6 +84,7 @@ class GateDecision:
     estimated_cost_units: float
     reserved_cost_units: float
     decision_loss_reduction: float | None
+    normalized_constraint_risk_reduction: float | None
     value_per_cost: float | None
     quality_target_met: bool
     risk_gate_satisfied: bool
@@ -146,6 +147,7 @@ def choose_next_step(
             estimated_cost_units=0.0,
             reserved_cost_units=0.0,
             decision_loss_reduction=None,
+            normalized_constraint_risk_reduction=None,
             value_per_cost=None,
             quality_target_met=quality_target_met,
             risk_gate_satisfied=risk_gate_satisfied,
@@ -193,6 +195,7 @@ def choose_next_step(
             estimated_cost_units=0.0,
             reserved_cost_units=0.0,
             decision_loss_reduction=None,
+            normalized_constraint_risk_reduction=None,
             value_per_cost=None,
             quality_target_met=quality_target_met,
             risk_gate_satisfied=risk_gate_satisfied,
@@ -202,7 +205,7 @@ def choose_next_step(
     # Deterministic tie handling: score descending, risk reduction descending,
     # then action_id ascending. Keep the raw score in the receipt.
     scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
-    score, _, _, selected = scored[0]
+    score, risk_proxy, _, selected = scored[0]
     return GateDecision(
         disposition=selected.kind,
         reason_code="highest_decision_value_per_cost",
@@ -212,6 +215,7 @@ def choose_next_step(
         estimated_cost_units=float(selected.estimated_cost_units),
         reserved_cost_units=float(selected.estimated_cost_units),
         decision_loss_reduction=float(selected.decision_loss_reduction),
+        normalized_constraint_risk_reduction=risk_proxy,
         value_per_cost=score,
         quality_target_met=quality_target_met,
         risk_gate_satisfied=risk_gate_satisfied,
