@@ -1042,6 +1042,41 @@ mod tests {
     }
 
     #[test]
+    fn task_set_schema_is_valid_and_matches_strict_record_shape() {
+        use std::collections::BTreeSet;
+
+        fn names(value: &Value) -> BTreeSet<String> {
+            value["properties"]
+                .as_object()
+                .expect("properties object")
+                .keys()
+                .cloned()
+                .collect()
+        }
+
+        fn required(value: &Value) -> BTreeSet<String> {
+            value["required"]
+                .as_array()
+                .expect("required array")
+                .iter()
+                .map(|item| item.as_str().expect("field name").to_owned())
+                .collect()
+        }
+
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/task-set.schema.json"
+        ))
+        .expect("valid task-set JSON Schema");
+        assert_eq!(names(&schema), required(&schema));
+        let record = &schema["properties"]["tasks"]["items"];
+        assert_eq!(names(record), required(record));
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(TASK_SET_SCHEMA)
+        );
+    }
+
+    #[test]
     fn sha256_implementation_matches_known_answer() {
         assert_eq!(
             sha256_hex(b"abc"),
