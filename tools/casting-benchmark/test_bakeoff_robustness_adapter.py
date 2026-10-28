@@ -86,6 +86,7 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "source_sweep_sha256": hashlib.sha256(sweep_raw).hexdigest(),
         "candidate_pool_sha256": candidate_pool_sha,
         "manifest_generator_sha256": "9" * 64,
+        "selection_manifest_sha256": hashlib.sha256(selection_raw).hexdigest(),
         "selector": selector,
         "holdout_role": "synthetic_post_selection_diagnostic",
         "evidence_class": "synthetic",
