@@ -47,7 +47,7 @@ impl Boundary {
     fn should_check(self, n: usize, horizon: usize) -> bool {
         match self {
             Self::FixedFinalOnly => n == horizon,
-            Self::FixedTimeRepeated | Self::TimeUniform => true,
+            Self::FixedTimeRepeated | Self::TimeUniform | Self::BetaMixtureEProcess => true,
         }
     }
 
