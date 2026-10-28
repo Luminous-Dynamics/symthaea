@@ -153,6 +153,11 @@ pub fn verify_edit_locality_with_config(
     let (requested_property, requested_passed) = match request.operation {
         EditOperation::Transpose { semitones } => {
             validate_semitones(semitones)?;
+            if semitones == 0 {
+                return Err(EditLocalityError::UnsupportedEdit(
+                    "zero-semitone transposition is indistinguishable from a no-op",
+                ));
+            }
             let errors = source
                 .iter()
                 .zip(target)
@@ -180,6 +185,11 @@ pub fn verify_edit_locality_with_config(
         }
         EditOperation::ScaleDurations { factor } => {
             validate_factor(factor)?;
+            if factor.ln().abs() <= config.duration_log_ratio_tolerance {
+                return Err(EditLocalityError::UnsupportedEdit(
+                    "duration scale is not distinguishable from a no-op at the configured tolerance",
+                ));
+            }
             let errors = source
                 .iter()
                 .zip(target)
@@ -206,14 +216,24 @@ pub fn verify_edit_locality_with_config(
                 ));
             }
             let source_origin = source[0].onset_beats;
-            let errors = source
+            let expected_onsets: Vec<f64> = source
                 .iter()
-                .zip(target)
-                .map(|(s, t)| {
-                    let expected =
-                        target_start_beats + factor * (s.onset_beats - source_origin);
-                    (t.onset_beats - expected).abs()
-                })
+                .map(|s| target_start_beats + factor * (s.onset_beats - source_origin))
+                .collect();
+            let maximum_requested_movement = source
+                .iter()
+                .zip(&expected_onsets)
+                .map(|(s, expected)| (expected - s.onset_beats).abs())
+                .fold(0.0_f64, f64::max);
+            if maximum_requested_movement <= config.onset_tolerance_beats {
+                return Err(EditLocalityError::UnsupportedEdit(
+                    "onset edit is not distinguishable from a no-op at the configured tolerance",
+                ));
+            }
+            let errors = target
+                .iter()
+                .zip(&expected_onsets)
+                .map(|(t, expected)| (t.onset_beats - expected).abs())
                 .collect::<Vec<_>>();
             let check = make_check(
                 "requested_onset_scaling",
@@ -227,6 +247,11 @@ pub fn verify_edit_locality_with_config(
         }
         EditOperation::PitchAt { index, semitones } => {
             validate_semitones(semitones)?;
+            if semitones == 0 {
+                return Err(EditLocalityError::UnsupportedEdit(
+                    "zero-semitone local pitch edit is indistinguishable from a no-op",
+                ));
+            }
             if index >= n {
                 return Err(EditLocalityError::InvalidInput(
                     "pitch edit index must lie within the source sequence",
@@ -251,6 +276,11 @@ pub fn verify_edit_locality_with_config(
         }
         EditOperation::DurationAt { index, factor } => {
             validate_factor(factor)?;
+            if factor.ln().abs() <= config.duration_log_ratio_tolerance {
+                return Err(EditLocalityError::UnsupportedEdit(
+                    "local duration scale is not distinguishable from a no-op at the configured tolerance",
+                ));
+            }
             if index >= n {
                 return Err(EditLocalityError::InvalidInput(
                     "duration edit index must lie within the source sequence",
@@ -511,6 +541,32 @@ mod tests {
         assert!(!evidence.requested_property_passed);
         assert!(evidence.protected_properties_passed);
         assert!(!evidence.passed);
+    }
+
+    #[test]
+    fn rejects_requested_operations_that_are_indistinguishable_from_no_op() {
+        let source = simple_source();
+        let cases = [
+            EditRequest { operation: EditOperation::Transpose { semitones: 0 } },
+            EditRequest { operation: EditOperation::ScaleDurations { factor: 1.02 } },
+            EditRequest { operation: EditOperation::PitchAt { index: 1, semitones: 0 } },
+            EditRequest { operation: EditOperation::DurationAt { index: 1, factor: 1.02 } },
+            EditRequest {
+                operation: EditOperation::ScaleOnsets {
+                    factor: 1.005,
+                    target_start_beats: source[0].onset_beats,
+                }
+            },
+        ];
+        for request in cases {
+            assert!(
+                matches!(
+                    verify_edit_locality(&source, &source, &request),
+                    Err(EditLocalityError::UnsupportedEdit(_))
+                ),
+                "no-op-like edit must not be certified: {request:?}"
+            );
+        }
     }
 
     #[test]
