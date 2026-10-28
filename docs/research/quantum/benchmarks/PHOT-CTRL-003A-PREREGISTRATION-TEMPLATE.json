@@ -1,0 +1,223 @@
+{
+  "protocol_id": "PHOT-CTRL-003A",
+  "schema_version": "0.1",
+  "status": "template-not-preregistered",
+  "purpose": "Freeze instance split, targets, baseline, budget, primary metric, uncertainty method, and decision thresholds before confirmation runs.",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8753",
+  "protocol_document": "docs/research/quantum/benchmarks/PHOT-CTRL-003A-HELDOUT-ABLATION-PROTOCOL.md",
+  "freeze_required_before_confirmation": true,
+  "benchmark_sources": [
+    {
+      "name": "QOBLIB-MIS",
+      "revision_or_release": null,
+      "instance_ids": [],
+      "instance_manifest_sha256": null
+    }
+  ],
+  "supplemental_sources": [],
+  "splits": {
+    "unit": "graph-family",
+    "development_families": [],
+    "validation_families": [],
+    "confirmation_families": [],
+    "within_family_secondary_split": null,
+    "split_manifest_sha256": null,
+    "rule": "No tuning or model/selector changes using confirmation results."
+  },
+  "canonicalization": {
+    "graph_encoding": "TBD",
+    "canonicalization_code_sha256": null,
+    "per_instance_graph_sha256": {},
+    "target_manifest_sha256": null
+  },
+  "target_policy": {
+    "tier_A": "independently-proven-optimum",
+    "tier_B": "frozen-best-known-cardinality-not-an-optimality-claim",
+    "tier_C": "predeclared-application-threshold",
+    "per_instance_targets": {},
+    "independent_verifier_source_sha256": null,
+    "independent_verifier_build_sha256": null,
+    "feasibility_rule": "Target hit requires independently verified, conflict-free independent set cardinality >= frozen target."
+  },
+  "arms": [
+    {
+      "id": "A",
+      "method": "strong-specialist-mis",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "B",
+      "method": "classical-portfolio-selected-on-development-families",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "C",
+      "method": "graph-only-ordering",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "D",
+      "method": "final-spin-frequency-ordering",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "E",
+      "method": "time-resolved-trajectory-ordering",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "F",
+      "method": "shuffled-feature-negative-control",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "G",
+      "method": "seeded-random-ordering",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "H",
+      "method": "fixed-K-acquisition",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "I",
+      "method": "adaptive-acquisition",
+      "operational": true,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "J",
+      "method": "exact-solver-tractable-subset",
+      "operational": false,
+      "configuration_sha256": null,
+      "source_revision": null
+    },
+    {
+      "id": "K",
+      "method": "oracle-feature-analysis-ceiling",
+      "operational": false,
+      "configuration_sha256": null,
+      "source_revision": null
+    }
+  ],
+  "budgets": {
+    "solver_budget_per_trial": null,
+    "tuning_budget_per_operational_arm": null,
+    "timeout_seconds_per_trial": null,
+    "maximum_retries": null,
+    "queue_policy": "TBD",
+    "compile_initialization_amortization_policy": "TBD",
+    "matched_hardware_resource_policy": "TBD"
+  },
+  "repetitions": {
+    "minimum_independent_stochastic_runs_per_arm_instance": 10,
+    "seed_list": [],
+    "pairing_key_fields": [
+      "protocol_id",
+      "graph_sha256",
+      "target",
+      "budget_id",
+      "verifier_sha256",
+      "pair_id",
+      "seed_id"
+    ],
+    "seed_stream_equivalence_claimed": false,
+    "arm_order_randomization_policy": "TBD"
+  },
+  "primary_endpoint": {
+    "name": "restricted-mean-all-in-time-to-verified-target",
+    "horizon_seconds": null,
+    "comparison_arm": "B",
+    "comparator_freeze_rule": "Select and freeze the eligible classical champion on development/validation only; do not select using confirmation outcomes.",
+    "target_hit_probability_at_same_fixed_budget_required": true,
+    "uncertainty_method": "family-clustered-paired-bootstrap",
+    "confidence_level": 0.95,
+    "number_of_bootstrap_replicates": null
+  },
+  "secondary_endpoints": [
+    "standardized-algorithm-runtime",
+    "deployment-all-in-latency",
+    "target-hit-rate",
+    "verified-feasibility-rate",
+    "verifier-failure-rate",
+    "timeout-and-crash-rates",
+    "best-verified-cardinality-anytime-curve",
+    "normalized-shortfall-from-frozen-target",
+    "time-to-first-feasible",
+    "time-to-proof-where-supported",
+    "stage-costs",
+    "total-system-energy-only-at-matched-measurement-boundary",
+    "peak-memory"
+  ],
+  "cost_boundary": {
+    "standardized_algorithm_runtime_excludes": [
+      "queue-wait",
+      "compile-initialization"
+    ],
+    "deployment_all_in_latency_includes": [
+      "queue-wait",
+      "acquisition",
+      "preprocessing",
+      "feature-extraction",
+      "transfer",
+      "compile-initialization",
+      "solve",
+      "repair",
+      "verification",
+      "receipt-persistence"
+    ],
+    "unknown_cost_is_zero": false,
+    "energy_scope": "TBD"
+  },
+  "decision_gates": {
+    "zero_false_target_certificates": true,
+    "target_hit_probability_difference_lower_bound_minimum": -0.01,
+    "champion_over_candidate_restricted_mean_time_ratio_goal": 1.25,
+    "95_percent_interval_must_exclude_no_improvement": true,
+    "trajectory_features_must_beat_final_spin_and_graph_only_controls": true,
+    "adaptive_acquisition_must_beat_fixed_K_at_matched_budget": true,
+    "shuffled_feature_control_must_not_reproduce_treatment_effect": true,
+    "publish_negative_results": true
+  },
+  "environment": {
+    "operating_system": null,
+    "cpu_model": null,
+    "gpu_model": null,
+    "qpu_model": null,
+    "ram_bytes": null,
+    "thread_count": null,
+    "container_or_nix_derivation_sha256": null,
+    "compiler_versions": {},
+    "dependency_lock_sha256": null,
+    "energy_measurement_boundary": null
+  },
+  "result_artifacts": {
+    "per_attempt_record_schema_version": null,
+    "raw_event_log_location": null,
+    "verifier_receipt_location": null,
+    "result_manifest_sha256": null
+  },
+  "notes": [
+    "Nulls and empty arrays indicate fields that must be frozen; this file is not an executed or preregistered experiment.",
+    "Do not infer quantum advantage, hardware performance, or SOTA from the existence of this manifest.",
+    "QOBLIB's standardized runtime excludes queue and compilation; report a separate deployment all-in clock."
+  ]
+}
