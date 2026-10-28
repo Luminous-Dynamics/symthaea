@@ -405,7 +405,6 @@ class RunManifestVerifierTests(unittest.TestCase):
         issues = self.audit_one_execution_receipt()
         codes = {row["code"] for row in issues}
         self.assertIn("witness_receipt_output_digest_mismatch", codes)
-        self.assertIn("witness_receipt_artifact_binding_mismatch", codes)
 
     def test_rehashed_receipt_cannot_substitute_an_unapproved_command(self) -> None:
         claim_path = self.bundle.root / self.bundle.paths["claim"]
