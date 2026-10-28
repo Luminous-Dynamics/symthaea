@@ -415,217 +415,269 @@ class PyPhiValidator:
         return value, elapsed, output["metric_id"]
 
     def validate_topology(self, topology: TopologySpec) -> ValidationResult:
-        """
-        Validate HDC-Φ against PyPhi for a single topology.
-
-        Args:
-            topology: Topology to validate
-
-        Returns:
-            ValidationResult with both calculations
-        """
-        logger.info(f"Validating {topology.name} (n={topology.n_nodes})...")
-
+        """Compare both methods on one exact TPM, state, profile, and model digest."""
+        logger.info("Validating %s (n=%d)...", topology.name, topology.n_nodes)
         result = ValidationResult(
             topology_name=topology.name,
             n_nodes=topology.n_nodes,
-            hdc_phi=0.0,
-            pyphi_phi=None
+            model_sha256="",
         )
-
-        # HDC calculation (always possible)
         try:
-            hdc_phi, hdc_std, hdc_time = self.compute_hdc_phi(topology)
-            result.hdc_phi = hdc_phi
-            result.hdc_std = hdc_std
-            result.hdc_computation_time = hdc_time
-        except Exception as e:
-            result.error_message = f"HDC error: {e}"
+            tpm, state, payload = self.build_model(topology)
+            result.model_sha256 = payload["model_sha256"]
+        except Exception as exc:
+            result.error_message = f"model construction: {type(exc).__name__}: {exc}"
             return result
 
-        # PyPhi calculation (may be intractable for large n)
-        if PYPHI_AVAILABLE and topology.n_nodes <= 8:
-            try:
-                pyphi_phi, pyphi_time = self.compute_pyphi_phi(topology)
-                result.pyphi_phi = pyphi_phi
-                result.pyphi_computation_time = pyphi_time
-            except Exception as e:
-                result.error_message = f"PyPhi error: {e}"
-                logger.warning(f"PyPhi failed for {topology.name}: {e}")
+        errors: List[str] = []
+        try:
+            value, elapsed, metric_id = self.compute_candidate_phi(payload)
+            result.candidate_phi = value
+            result.candidate_computation_time = elapsed
+            result.candidate_metric_id = metric_id
+        except Exception as exc:
+            errors.append(f"candidate: {type(exc).__name__}: {exc}")
 
+        try:
+            value, elapsed = self.compute_pyphi_phi(topology, tpm, state)
+            result.pyphi_phi_s = value
+            result.pyphi_computation_time = elapsed
+        except Exception as exc:
+            errors.append(f"PyPhi: {type(exc).__name__}: {exc}")
+
+        result.error_message = "; ".join(errors) if errors else None
         return result
 
-    def run_validation(self, max_nodes: int = 8) -> ValidationReport:
-        """
-        Run complete cross-validation.
+    def run_validation(
+        self,
+        max_nodes: int = 8,
+        min_valid_pairs: Optional[int] = None,
+        min_pearson: Optional[float] = None,
+    ) -> ValidationReport:
+        """Run the paired-model comparison; qualification is disabled without explicit gates."""
+        report = ValidationReport(
+            pyphi_version=PYPHI_VERSION,
+            formalism_profile=FORMALISM_PROFILE,
+            min_valid_pairs=min_valid_pairs,
+            min_pearson=min_pearson,
+        )
+        if max_nodes < 2 or max_nodes > MAX_EXACT_NODES:
+            report.qualification_reasons.append(
+                f"max_nodes must be in [2, {MAX_EXACT_NODES}], got {max_nodes}"
+            )
+            return report
+        if not PYPHI_AVAILABLE:
+            report.qualification_reasons.append("PyPhi is unavailable")
+        if PYPHI_VERSION != EXPECTED_PYPHI_VERSION:
+            report.qualification_reasons.append(
+                f"PyPhi version must be exactly {EXPECTED_PYPHI_VERSION}; got {PYPHI_VERSION!r}"
+            )
+        if min_valid_pairs is None or min_valid_pairs < 2:
+            report.qualification_reasons.append(
+                "A preregistered --min-valid-pairs >= 2 gate was not supplied"
+            )
+        if min_pearson is None or not math.isfinite(min_pearson) or not -1.0 <= min_pearson <= 1.0:
+            report.qualification_reasons.append(
+                "A preregistered finite --min-pearson gate in [-1, 1] was not supplied"
+            )
 
-        Args:
-            max_nodes: Maximum number of nodes to test (PyPhi tractability limit)
+        topologies = [
+            topology for topology in self.create_test_topologies()
+            if topology.n_nodes <= max_nodes
+        ]
+        if not topologies:
+            report.qualification_reasons.append("No topologies were selected")
+            return report
 
-        Returns:
-            Complete validation report
-        """
-        topologies = self.create_test_topologies()
-        topologies = [t for t in topologies if t.n_nodes <= max_nodes]
+        report.results = [self.validate_topology(topology) for topology in topologies]
+        paired = [
+            item for item in report.results
+            if item.candidate_phi is not None and item.pyphi_phi_s is not None
+            and item.error_message is None and len(item.model_sha256) == 64
+        ]
+        report.n_validated = len(paired)
+        report.n_failed = len(report.results) - report.n_validated
 
-        report = ValidationReport()
-
-        for topology in topologies:
-            result = self.validate_topology(topology)
-            report.results.append(result)
-
-            if result.pyphi_phi is not None:
-                report.n_validated += 1
-            elif result.error_message:
-                report.n_failed += 1
-
-        # Compute aggregate metrics
         self._compute_report_metrics(report)
 
+        if report.n_failed:
+            report.qualification_reasons.append(
+                f"{report.n_failed} of {len(report.results)} selected cases did not produce a valid paired result"
+            )
+        if min_valid_pairs is not None and report.n_validated < min_valid_pairs:
+            report.qualification_reasons.append(
+                f"Only {report.n_validated} valid pairs; minimum required is {min_valid_pairs}"
+            )
+        if report.correlation is None or not math.isfinite(report.correlation):
+            report.qualification_reasons.append("Pearson correlation is unavailable or non-finite")
+        elif min_pearson is not None and math.isfinite(min_pearson) and report.correlation < min_pearson:
+            report.qualification_reasons.append(
+                f"Pearson correlation {report.correlation:.6f} is below the preregistered threshold {min_pearson:.6f}"
+            )
+
+        # This can qualify only the candidate/reference comparison on this declared
+        # finite fixture set. It does not certify formal equivalence to IIT.
+        if not report.qualification_reasons:
+            report.qualification_status = "COMPARISON_CRITERIA_MET_NOT_FORMAL_EQUIVALENCE"
+        else:
+            report.qualification_status = "NOT_QUALIFIED"
         return report
 
-    def _compute_report_metrics(self, report: ValidationReport):
-        """Compute correlation and error metrics for the report."""
-        # Get paired results where both methods succeeded
+    def _compute_report_metrics(self, report: ValidationReport) -> None:
+        """Calculate metrics only from finite, explicitly paired results."""
         paired = [
-            (r.hdc_phi, r.pyphi_phi)
+            (r.candidate_phi, r.pyphi_phi_s)
             for r in report.results
-            if r.pyphi_phi is not None
+            if r.candidate_phi is not None and r.pyphi_phi_s is not None
+            and r.error_message is None and len(r.model_sha256) == 64
+            and math.isfinite(r.candidate_phi) and math.isfinite(r.pyphi_phi_s)
         ]
-
+        report.correlation = None
+        report.mean_absolute_error = None
+        report.max_absolute_error = None
+        report.agreement_within_10_percent = None
         if len(paired) < 2:
-            logger.warning("Not enough paired results for correlation")
+            report.qualification_reasons.append(
+                f"Need at least 2 finite paired measurements to calculate metrics; got {len(paired)}"
+            )
             return
 
-        hdc_values = np.array([p[0] for p in paired])
-        pyphi_values = np.array([p[1] for p in paired])
+        candidate_values = np.asarray([p[0] for p in paired], dtype=np.float64)
+        reference_values = np.asarray([p[1] for p in paired], dtype=np.float64)
+        if (
+            not np.all(np.isfinite(candidate_values))
+            or not np.all(np.isfinite(reference_values))
+            or float(np.ptp(candidate_values)) <= 1e-12
+            or float(np.ptp(reference_values)) <= 1e-12
+        ):
+            report.qualification_reasons.append(
+                "Correlation is undefined: data are non-finite or one score vector is constant"
+            )
+            return
 
-        # Correlation
-        correlation = np.corrcoef(hdc_values, pyphi_values)[0, 1]
+        correlation = float(np.corrcoef(candidate_values, reference_values)[0, 1])
+        if not math.isfinite(correlation):
+            report.qualification_reasons.append("Pearson correlation is non-finite")
+            return
+        errors = np.abs(candidate_values - reference_values)
+        relative_errors = errors / np.maximum(np.abs(reference_values), 1e-12)
         report.correlation = correlation
-
-        # Errors
-        errors = np.abs(hdc_values - pyphi_values)
         report.mean_absolute_error = float(np.mean(errors))
         report.max_absolute_error = float(np.max(errors))
+        report.agreement_within_10_percent = float(np.mean(relative_errors <= 0.10) * 100.0)
 
-        # Agreement within 10%
-        relative_errors = errors / np.maximum(pyphi_values, 0.001)
-        report.agreement_within_10_percent = float(
-            np.mean(relative_errors < 0.10) * 100
-        )
-
-    def generate_report(self, report: ValidationReport, output_path: Path):
-        """
-        Generate markdown validation report.
-
-        Args:
-            report: Validation report
-            output_path: Path to save markdown file
-        """
-        md = []
-        md.append("# PyPhi Cross-Validation Report")
-        md.append(f"\n**Generated**: {__import__('datetime').datetime.now().isoformat()}")
-        md.append(f"**Status**: {'PASS' if report.correlation > 0.90 else 'NEEDS REVIEW'}")
-        md.append("")
-
-        md.append("## Summary Statistics")
-        md.append("")
-        md.append(f"- **Correlation (r)**: {report.correlation:.4f}")
-        md.append(f"- **Mean Absolute Error**: {report.mean_absolute_error:.4f}")
-        md.append(f"- **Max Absolute Error**: {report.max_absolute_error:.4f}")
-        md.append(f"- **Agreement within 10%**: {report.agreement_within_10_percent:.1f}%")
-        md.append(f"- **Validated topologies**: {report.n_validated}")
-        md.append(f"- **Failed topologies**: {report.n_failed}")
-        md.append("")
-
-        # Validation target
-        md.append("## Validation Target")
-        md.append("")
-        if report.correlation > 0.90:
-            md.append("✅ **PASS**: Correlation r > 0.90 achieved!")
-        elif report.correlation > 0.80:
-            md.append("⚠️ **MARGINAL**: Correlation 0.80 < r < 0.90")
+    def generate_report(self, report: ValidationReport, output_path: Path) -> None:
+        """Write a claim-bounded report; unqualified reports never print a PASS."""
+        md = [
+            "# Symthaea / PyPhi Paired-Model Comparison",
+            "",
+            f"**Generated:** {__import__('datetime').datetime.now().isoformat()}",
+            f"**Status:** {report.qualification_status}",
+            f"**PyPhi version:** {report.pyphi_version or 'unavailable'}",
+            f"**Formalism profile:** {report.formalism_profile}",
+            f"**Candidate metric:** {RUST_CANDIDATE_METRIC_ID}",
+            f"**Minimum valid pairs:** {report.min_valid_pairs if report.min_valid_pairs is not None else 'NOT SET'}",
+            f"**Minimum Pearson r:** {report.min_pearson if report.min_pearson is not None else 'NOT SET'}",
+            "",
+            "## Claim ceiling",
+            "",
+            "The Rust value is a candidate full-system-mechanism MIP score computed from an explicit TPM. "
+            "It is compared with PyPhi's IIT_3_0 system integrated information (φ_s) on the same TPM "
+            "and state. This comparison does not establish formal equivalence to IIT, agreement outside "
+            "the selected finite cases, or any claim about consciousness.",
+            "",
+            "A candidate score is never substituted when the Rust adapter fails. Missing and invalid "
+            "results remain unpaired and count against qualification.",
+            "",
+            "## Summary statistics",
+            "",
+            f"- **Pearson r:** {report.correlation:.6f}" if report.correlation is not None else "- **Pearson r:** unavailable",
+            f"- **Mean absolute error:** {report.mean_absolute_error:.6f}" if report.mean_absolute_error is not None else "- **Mean absolute error:** unavailable",
+            f"- **Maximum absolute error:** {report.max_absolute_error:.6f}" if report.max_absolute_error is not None else "- **Maximum absolute error:** unavailable",
+            f"- **Agreement within 10% (relative to |φ_s|):** {report.agreement_within_10_percent:.2f}%" if report.agreement_within_10_percent is not None else "- **Agreement within 10%:** unavailable",
+            f"- **Valid paired cases:** {report.n_validated}",
+            f"- **Unpaired/failed cases:** {report.n_failed}",
+            "",
+            "## Qualification reasons",
+            "",
+        ]
+        if report.qualification_reasons:
+            md.extend(f"- {reason}" for reason in report.qualification_reasons)
         else:
-            md.append("❌ **FAIL**: Correlation r < 0.80")
-        md.append("")
-
-        md.append("## Detailed Results")
-        md.append("")
-        md.append("| Topology | Nodes | HDC-Φ | PyPhi-Φ | Error | Status |")
-        md.append("|----------|-------|-------|---------|-------|--------|")
-
-        for r in report.results:
-            pyphi_str = f"{r.pyphi_phi:.4f}" if r.pyphi_phi else "N/A"
-            if r.pyphi_phi:
-                error = abs(r.hdc_phi - r.pyphi_phi)
-                error_str = f"{error:.4f}"
-                status = "✅" if error < 0.05 else "⚠️"
-            else:
-                error_str = "N/A"
-                status = "⏳"
-
-            md.append(f"| {r.topology_name} | {r.n_nodes} | {r.hdc_phi:.4f} | "
-                     f"{pyphi_str} | {error_str} | {status} |")
-
-        md.append("")
-        md.append("## Notes")
-        md.append("")
-        md.append("- HDC-Φ: Approximation using algebraic connectivity of HDC similarity graph")
-        md.append("- PyPhi-Φ: Exact IIT 3.0 calculation (intractable for n > 10)")
-        md.append("- Error: Absolute difference between methods")
-        md.append("- N/A: PyPhi computation failed or exceeded timeout")
-        md.append("")
-
-        md.append("## Methodology")
-        md.append("")
-        md.append("1. Generate identical topologies for both methods")
-        md.append("2. Compute HDC-Φ using Symthaea's RealPhiCalculator")
-        md.append("3. Compute exact Φ using PyPhi (IIT 3.0)")
-        md.append("4. Calculate Pearson correlation coefficient")
-        md.append("5. Report absolute and relative errors")
-        md.append("")
-
-        output_path.write_text("\n".join(md))
-        logger.info(f"Report saved to {output_path}")
+            md.append("- All declared comparison gates passed for this finite fixture set.")
+        md.extend([
+            "",
+            "## Per-case results",
+            "",
+            "| Case | Nodes | Model SHA-256 | Candidate score | PyPhi φ_s | Abs. error | Status |",
+            "|---|---:|---|---:|---:|---:|---|",
+        ])
+        for result in report.results:
+            paired = result.candidate_phi is not None and result.pyphi_phi_s is not None and result.error_message is None
+            error = abs(result.candidate_phi - result.pyphi_phi_s) if paired else None
+            candidate = f"{result.candidate_phi:.8f}" if result.candidate_phi is not None else "N/A"
+            reference = f"{result.pyphi_phi_s:.8f}" if result.pyphi_phi_s is not None else "N/A"
+            error_text = f"{error:.8f}" if error is not None else "N/A"
+            status = "PAIRED" if paired else "FAILED / UNPAIRED"
+            md.append(
+                f"| {result.topology_name} | {result.n_nodes} | {result.model_sha256 or 'N/A'} | "
+                f"{candidate} | {reference} | {error_text} | {status} |"
+            )
+            if result.error_message:
+                md.append("")
+                md.append(f"**{result.topology_name} error:** {result.error_message}")
+        md.extend([
+            "",
+            "## Reproducibility contract",
+            "",
+            "- TPM rows are state-by-node; state ordering is little-endian (unit 0 is the least significant bit).",
+            "- Both implementations receive the same TPM, candidate state, topology-derived connectivity, and IIT_3_0 profile.",
+            "- The model SHA-256 is computed over the canonical JSON model description and returned by the Rust adapter; a mismatched digest fails the pair.",
+            "- The current acceptance status is for this finite fixture set only; held-out generator families and independent known-answer fixtures remain separate gates.",
+            "",
+        ])
+        output_path.write_text("\n".join(md) + "\n", encoding="utf-8")
+        logger.info("Report saved to %s", output_path)
 
 
-def main():
-    """Run cross-validation and generate report."""
+def main(argv: Optional[List[str]] = None) -> int:
+    """Run the comparison; exit nonzero unless explicitly gated criteria are met."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="PyPhi Cross-Validation")
-    parser.add_argument("--max-nodes", type=int, default=8,
-                       help="Maximum nodes to test (PyPhi limit)")
+    parser = argparse.ArgumentParser(description="Fail-closed Symthaea / PyPhi comparison")
+    parser.add_argument("--max-nodes", type=int, default=4,
+                        help="Maximum nodes to test (2..8; default 4 keeps the first run small)")
+    parser.add_argument("--min-valid-pairs", type=int, default=None,
+                        help="Predeclared minimum number of valid paired cases; required to qualify")
+    parser.add_argument("--min-pearson", type=float, default=None,
+                        help="Predeclared minimum Pearson r in [-1,1]; required to qualify")
+    parser.add_argument("--cargo", type=str, default="cargo",
+                        help="Cargo executable used to run the maintained Rust TPM adapter")
     parser.add_argument("--output", type=str, default="PYPHI_VALIDATION_REPORT.md",
-                       help="Output report path")
-    args = parser.parse_args()
+                        help="Output report path")
+    args = parser.parse_args(argv)
 
-    validator = PyPhiValidator()
+    if args.max_nodes < 2 or args.max_nodes > MAX_EXACT_NODES:
+        parser.error(f"--max-nodes must be in [2, {MAX_EXACT_NODES}]")
+    if args.min_valid_pairs is not None and args.min_valid_pairs < 2:
+        parser.error("--min-valid-pairs must be >= 2")
+    if args.min_pearson is not None and (not math.isfinite(args.min_pearson) or not -1.0 <= args.min_pearson <= 1.0):
+        parser.error("--min-pearson must be finite and in [-1,1]")
 
-    print("\n" + "=" * 60)
-    print("🧠 Symthaea PyPhi Cross-Validation Framework")
-    print("=" * 60)
-    print(f"\nPyPhi available: {PYPHI_AVAILABLE}")
-    print(f"Max nodes: {args.max_nodes}")
-    print("")
-
-    report = validator.run_validation(max_nodes=args.max_nodes)
-
-    print("\n📊 Results Summary")
-    print("-" * 40)
-    print(f"Correlation (r): {report.correlation:.4f}")
-    print(f"Mean Absolute Error: {report.mean_absolute_error:.4f}")
-    print(f"Validated: {report.n_validated}, Failed: {report.n_failed}")
-
-    if report.correlation > 0.90:
-        print("\n✅ VALIDATION PASSED: r > 0.90")
-    else:
-        print("\n⚠️ VALIDATION NEEDS REVIEW")
-
+    validator = PyPhiValidator(symthaea_binary=args.cargo)
+    report = validator.run_validation(
+        max_nodes=args.max_nodes,
+        min_valid_pairs=args.min_valid_pairs,
+        min_pearson=args.min_pearson,
+    )
     validator.generate_report(report, Path(args.output))
-    print(f"\n📄 Report saved to: {args.output}")
+    print(f"Status: {report.qualification_status}")
+    print(f"Valid paired cases: {report.n_validated}; unpaired/failed: {report.n_failed}")
+    print(f"Report saved to: {args.output}")
+    if report.qualification_status != "COMPARISON_CRITERIA_MET_NOT_FORMAL_EQUIVALENCE":
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
