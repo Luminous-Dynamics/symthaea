@@ -12,7 +12,7 @@ The current `crates/domains/symthaea-broca/src/memory_bridge.rs` queries `HdcSto
 
 `memory_evidence.rs` defines a typed payload contract and a process-local ID resolver:
 
-- each evidence record binds an HDC numeric ID to a stable evidence ID, environment/scope, trajectory and step provenance, source digest, payload and payload digest;
+- each evidence record binds an HDC numeric ID to a stable evidence ID, environment/scope, trajectory and step provenance, source digest, payload and payload digest; `EvidenceIndex::insert` verifies the source digest against the exact source bytes supplied by the ingestion adapter;
 - active evidence is eligible only within the matching scope and its optional validity interval;
 - revoked, superseded and deleted records are not returned;
 - deletion keeps a tombstone in the resolver so an old candidate ID cannot silently resurrect its payload;
@@ -30,7 +30,7 @@ The current `crates/domains/symthaea-broca/src/memory_bridge.rs` queries `HdcSto
 
 ## Hard limitation
 
-This increment is deliberately **not** the real LongMemEval-V2 worker. It does not ingest trajectory objects, encode raw query text into `ContinuousHV`, persist the payload map/tombstones, or wire into `MemoryBridge`; the resolver is process-local. A production implementation must atomically persist the vector-to-payload mapping and lifecycle changes, and tests must demonstrate that deletion/revocation survive process restart and index rebuild. No benchmark score or performance claim is made.
+This increment is deliberately **not** the real LongMemEval-V2 worker. It does not ingest trajectory objects, encode raw query text into `ContinuousHV`, persist the payload map/tombstones, or wire into `MemoryBridge`; the resolver is process-local. The source digest must be computed over the exact canonical source bytes supplied by the adapter; the contract does not silently reserialize JSON. A production implementation must atomically persist the vector-to-payload mapping and lifecycle changes, and tests must demonstrate that deletion/revocation survive process restart and index rebuild. No benchmark score or performance claim is made.
 
 ## Local validation
 
