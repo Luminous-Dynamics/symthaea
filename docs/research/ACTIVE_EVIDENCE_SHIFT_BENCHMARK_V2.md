@@ -319,14 +319,25 @@ Required protocol:
 
 ## 27. Matched-edge CUSUM reference pilot (synthetic, provisional)
 
-The stacked implementation PR [#8822](https://github.com/Luminous-Dynamics/symthaea/pull/8822) adds upper/lower reflected Bernoulli CUSUM arms. Rather than giving CUSUM only a formal alpha allocation and then comparing it to the composite process at a different realized false-alarm rate, its threshold is selected by exact DP to match the existing composite-band betting e-process's *realized alarm probability at p=0.52* over 1,000 observations.
+The stacked implementation PR [#8822](https://github.com/Luminous-Dynamics/symthaea/pull/8822) adds upper/lower reflected Bernoulli CUSUM arms. Rather than giving CUSUM only a formal alpha allocation and comparing it to the composite process at a different realized false-alarm rate, its threshold is selected by exact DP to match the existing composite-band betting e-process's *realized alarm probability at p=0.52* over 1,000 observations.
 
 An independent local DP prototype obtained:
 - reference composite edge alarm probability: 0.000891588;
 - smallest CUSUM integer threshold: 1,374, score 54.96;
-- CUSUM alarm probability at the boundary: 0.000885901; the previous threshold 1,373 gives 0.000894015 and is too liberal for this matched target;
+- CUSUM alarm probability at the boundary: 0.000885901; threshold 1,373 gives 0.000894015 and is too liberal for this matched target;
 - two-sided CUSUM union-bound receipt: 0.001771803, below the per-cell allocation 0.004166667.
 
-At a change after observation 100 and horizon 1,000, the matched-edge prototype gives CUSUM upper-arm power of 7.226% at p1=.55 and 93.336% at p1=.60, compared with 1.769% and 73.527% for the composite-band e-process in the current exact-DP pilot. At p1=.70 and .80 both are near 100% by the horizon. CUSUM mean detection delay conditional on detection remains long (about 774 observations at p1=.55 and 623 at p1=.60), so the power gain is not a free win.
+At a change after observation 100 and horizon 1,000, the matched-edge prototype gives these CUSUM upper-arm results against the composite-band e-process:
 
-**Claim ceiling:** these values are from independent local exact-DP calculations, not from the stacked Rust PR's artifact or CI. The matched point is a stable constant edge rate, not an empirical matched-FPR evaluation over every predictable in-band schedule. The CUSUM family false-alarm bound is the directional union bound; this is distinct from pointwise realized FPR and from the composite process's formal alpha guarantee. The next qualification step is exact-head Rust/reference parity plus broader predictable schedules and source-held-out real streams. Do not call this state of the art or general superiority.
+| Post-change event rate | Composite detection | CUSUM detection | Mean delay | Median delay | P90 delay |
+|---:|---:|---:|---:|---:|---:|
+| 0.55 | 1.769% | 7.226% | 773.9 | 796 | 883 |
+| 0.60 | 73.527% | 93.336% | 622.7 | 618 | 799 |
+| 0.70 | about 99.987% | effectively 100% | 290.0 | 287 | 350 |
+| 0.80 | about 99.987% | effectively 100% | 186.7 | 186 | 215 |
+
+Conditional delay statistics apply only among detected runs. At p1=.55, most runs still fail to detect within the horizon; the conditional latency metrics describe the selected minority and must be read with the detection probability.
+
+The CUSUM implementation and independent reference now also test deterministic alternating rates and a state-conditioned predictable feedback schedule entirely inside [0.48, 0.52]. The latter chooses each next conditional rate based only on the CUSUM state before that observation. The theoretical guarantee comes from monotone coupling of each one-sided score to its constant boundary-rate process; the exact-DP schedules are regression controls for implementation errors.
+
+**Claim ceiling:** these values are from independent local exact-DP calculations, not from the stacked Rust PR's artifact or CI. The matched point is a stable constant edge rate, not a matched-worst-case FPR evaluation over every predictable in-band schedule. The CUSUM family false-alarm bound is the directional union bound; this is distinct from pointwise realized FPR and from the composite process's formal alpha guarantee. Exact-head Rust/reference parity, formatting checks, broader predictable schedules, and source-held-out real streams remain pending. Do not call this state of the art or general superiority.
