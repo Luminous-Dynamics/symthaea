@@ -851,12 +851,14 @@ mod tests {
 
     #[test]
     fn ignores_comments_and_identification_area_after_column_72() {
-        let source = concat!(
-            "      * PROGRAM-ID. FALSEID.\n",
-            "       IDENTIFICATION DIVISION.\n",
-            "       PROGRAM-ID. REALID.                                                FAKE-TEXT\n",
+        let mut source = String::from(
+            "      * PROGRAM-ID. COMMENT-ID.\n       IDENTIFICATION DIVISION.\n",
         );
-        let result = index(source);
+        let mut record = format!("{:<72}", "       PROGRAM-ID. REALID.");
+        record.push_str(" PROGRAM-ID. FALSEID.\n");
+        source.push_str(&record);
+
+        let result = index(&source);
         assert_eq!(result.program_id.as_ref().map(|p| p.name.as_str()), Some("REALID"));
         assert!(!result.diagnostics.iter().any(|d| d.code == "duplicate_program_id"));
     }
