@@ -1,0 +1,102 @@
+name: Active Evidence Exact Tree
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/active-evidence-exact-tree/**"
+      - ".github/workflows/active-evidence-exact-tree.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-tree Rust and reference qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/active-evidence-exact-tree/Cargo.toml -- --check
+
+      - name: Locked Rust tests
+        run: cargo test --locked --manifest-path tools/active-evidence-exact-tree/Cargo.toml
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path tools/active-evidence-exact-tree/Cargo.toml --all-targets -- -D warnings
+
+      - name: Exact Rust outputs and independent reference checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > "$temp_dir/greedy-first.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > "$temp_dir/greedy-second.csv"
+          cmp "$temp_dir/greedy-first.csv" "$temp_dir/greedy-second.csv"
+          python3 tools/active-evidence-exact-tree/reference_check.py "$temp_dir/greedy-first.csv"
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > "$temp_dir/tree-first.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > "$temp_dir/tree-second.csv"
+          cmp "$temp_dir/tree-first.csv" "$temp_dir/tree-second.csv"
+          python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py --self-test
+          python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py "$temp_dir/tree-first.csv"
+
+      - name: Reject mutated aggregate outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin active-evidence-exact-tree > "$temp_dir/original.csv"
+          python3 - "$temp_dir/original.csv" "$temp_dir/mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[0]["expected_decision_regret"] = "999"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-exact-tree/reference_check.py "$temp_dir/mutated.csv"; then
+            echo "reference checker accepted a mutated aggregate row" >&2
+            exit 1
+          fi
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin robust_tree > "$temp_dir/tree-original.csv"
+          python3 - "$temp_dir/tree-original.csv" "$temp_dir/tree-mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[0]["worst_case_ambiguity_regret"] = "999"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py "$temp_dir/tree-mutated.csv"; then
+            echo "robust-tree checker accepted a mutated aggregate row" >&2
+            exit 1
+          fi
