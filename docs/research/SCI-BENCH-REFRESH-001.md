@@ -89,6 +89,8 @@ The Rust validator implements a versioned, domain-separated commitment profile:
 
 All three use SHA-256 with a fixed protocol prefix, a distinct domain for `protocol`, `seed`, or `task-set`, and explicit unsigned 64-bit big-endian length framing. The protocol context uses a versioned `serde_json` struct projection that excludes the three commitment fields to avoid a circular digest. Artifact commitments bind the protocol digest, so altering a frozen budget, task family, generator/evaluator revision, policy identity, or reveal rule invalidates the context and both artifact commitments.
 
+The task-set artifact follows `research/science-bench-refresh/schema/task-set.schema.json`. Each row binds a unique task ID, a declared family ID, a policy-visible `policy_input` object, and a separate evaluator-only object. At reveal time, the validator checks that the generation ID matches, row count equals the frozen expected denominator, IDs are unique, per-family counts equal the manifest, and policy inputs do not contain known oracle-field names (including in nested structures). The runner must physically provide only `policy_input` to the evaluated policy; this structural check does not prove runtime isolation.
+
 CLI entry points:
 
 - `protocol-commit MANIFEST.json` computes the frozen non-artifact context commitment.
@@ -188,6 +190,7 @@ Do not use a universal fixed percentage gain as the only success criterion. Firs
 - **NewtonBench** evaluates interactive scientific-law discovery across 324 tasks and 12 physics domains, with metaphysical shifts and increasing difficulty/noise: https://arxiv.org/abs/2510.07172
 - **SRBench** demonstrates the value of standardized reproducible symbolic-regression comparisons and emphasizes that no single method dominates every dataset; its updated benchmark discussion includes accuracy/complexity/resource trade-offs: https://doi.org/10.1145/3712255.3734309
 - **ScienceAgentBench** provides a complementary set of real scientific tasks sourced from peer-reviewed publications, with expert validation; synthetic law recovery is not a substitute for it: https://hal.cs.princeton.edu/scienceagentbench
+- **SCI-AGENT-EXAM** (arXiv:2610.32441, 23 Oct 2026) covers 120 expert-curated tasks across 11 fields and seven workflow task types, requiring structured answers, executable artifacts, and written reports. It also evaluates execution trajectories and stability. The paper reports an 80.9 overall score for its top agent but only 26.0% of runs at or above its 0.95 success threshold; this illustrates why mean score alone is insufficient, but is not directly comparable to law-discovery metrics: https://arxiv.org/abs/2610.32441
 - **GravityBench** is a complementary interactive physics-discovery environment and demonstrates the need to evaluate observation planning as well as equation output: https://gravitybench.github.io/
 
 These benchmarks are complementary, not directly commensurate. Do not compare scores across them without matching task definitions, scoring semantics, budgets and evaluation units.
@@ -202,6 +205,7 @@ Do not publish one cross-benchmark leaderboard number. These benchmarks measure 
 | Autonomous experiment design | Science-Gym and/or GravityBench policy baselines, including random/fixed observation selection and strongest available native baseline | Whether the policy chooses informative observations under a controlled budget | Superiority to offline symbolic-regression solvers on non-comparable tasks |
 | Offline symbolic regression | A frozen snapshot of eligible top methods from SRBench/SRBench++, with method revisions, tuning budget and resource envelope captured | Accuracy/complexity/resource trade-offs on compatible equation-recovery tasks | That an agent can independently design experiments or manage scientific workflow |
 | Real scientific workflows | ScienceAgentBench tasks or another independently sourced, rights-cleared task set with expert/domain validation | A bounded check of transfer into real data-driven scientific tasks | Exact law-discovery performance on synthetic physics; its metric must not be pooled with the others |
+| Scientific-workflow trajectories | SCI-AGENT-EXAM: 120 expert-curated tasks across 11 fields and 7 workflow types, with executable + text deliverables and trajectory analysis | Stability, execution efficiency, task-type strengths and result quality across scientific workflows | A direct law-discovery score; its composite is not commensurate with NewtonBench or SRBench |
 
 Selection of the strongest comparator must be reproducible from a dated source snapshot. Do not select only the baseline that loses: keep complementary methods when their strengths differ, and document hyperparameter/tuning effort. SRBench's own motivation is that no single symbolic-regression method dominates across all datasets, and it explicitly considers accuracy, complexity and energy/cost trade-offs.
 
