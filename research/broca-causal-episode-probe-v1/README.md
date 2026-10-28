@@ -27,7 +27,7 @@ This is not a causal graph and does not solve currentness. The stale-address adv
 - `fixtures/trajectories.jsonl`: five small web-agent trajectories with explicit action and observation fields.
 - `fixtures/questions.jsonl`: paired queries annotated with required support, stale/forbidden support, and plausible distractors using source JSON Pointers.
 - `run_probe.py`: feeds the fixtures to the actual Rust `broca-lme-worker`, collects its ranked audit records, and writes a worker/config/dataset receipt.
-- `score_probe.py`: strict, dependency-free scoring for complete-chain retrieval, support recall, first-support reciprocal rank, stale-support hits, and distractor retrieval.
+- `score_probe.py`: strict, dependency-free scoring for required-support recall, ordinary and stale-aware complete chains, first-support reciprocal rank, stale-support hits, and distractor retrieval.
 - `test_score_probe.py`: offline unit tests for scoring and fail-closed dataset matching.
 
 The worker must be built from the exact Symthaea checkout under test. A probe run is not a substitute for the official LongMemEval-V2 harness.
@@ -70,7 +70,8 @@ The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixt
 ## Metrics and interpretation
 
 - **Required-support recall@k:** fraction of annotated required source pointers present in the top-k audit.
-- **Complete-chain rate@k:** fraction of questions for which every required support pointer appears in the top-k audit. This is the primary probe metric.
+- **Complete-chain rate@k:** fraction of questions for which every required support pointer appears in the top-k audit, even if stale/forbidden evidence is also present.
+- **Stale-aware complete-chain rate@k:** fraction of questions for which every required pointer is present and no annotated forbidden pointer appears in the same top-k audit. This is the primary diagnostic metric; report ordinary complete-chain rate as well so the cost of stale evidence remains visible. This local metric is not the official FAMA score.
 - **First-support MRR@k:** reciprocal rank of the first required support item, averaged across questions.
 - **Forbidden/stale hit rate@k:** fraction of annotated stale pointers retrieved in top-k; also report the fraction of questions with any stale hit.
 - **Distractor retrieval rate@k:** fraction of annotated plausible-but-non-supporting pointers retrieved in top-k. These are reported, not automatically treated as critical failures: a useful verifier may retrieve a decoy in order to refute it.
