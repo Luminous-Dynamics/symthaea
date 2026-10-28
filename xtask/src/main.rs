@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod effect_surface_registry;
 mod effect_authorization_conformance;
+mod effect_harness_mutations;
 mod effect_primitive_scan;
 mod manifest;
 mod rhn_sweep;
@@ -91,6 +92,11 @@ enum Commands {
     EffectAuthorizationConformance {
         #[arg(long, default_value = "docs/security/effect-authorization-conformance.v1.json")]
         corpus: PathBuf,
+    },
+    /// Validate the frozen authorization harness mutation inventory; does not inject mutations.
+    AuthorizationHarnessMutations {
+        #[arg(long, default_value = "docs/research/authorization-harness-mutations.v0.json")]
+        inventory: PathBuf,
     },
 }
 
@@ -205,6 +211,18 @@ fn main() -> anyhow::Result<()> {
                 root.join(corpus)
             };
             effect_authorization_conformance::check(&corpus_path)?;
+        }
+        Commands::AuthorizationHarnessMutations { inventory } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let inventory_path = if inventory.is_absolute() {
+                inventory
+            } else {
+                root.join(inventory)
+            };
+            effect_harness_mutations::check(&inventory_path)?;
         }
     }
     Ok(())
