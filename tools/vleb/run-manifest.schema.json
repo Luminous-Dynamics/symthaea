@@ -47,7 +47,9 @@
         "run_attempt",
         "event",
         "expected_head_sha",
-        "repository_id"
+        "repository_id",
+        "source_repository_digest",
+        "source_repository_ref"
       ],
       "properties": {
         "full_name": {
@@ -89,6 +91,13 @@
         "repository_id": {
           "type": "integer",
           "minimum": 1
+        },
+        "source_repository_digest": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "source_repository_ref": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
