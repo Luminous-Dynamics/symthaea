@@ -540,7 +540,7 @@ impl LexicalIndex {
             return Err("lexical index generation does not match evidence generation".into());
         }
         let expected: BTreeSet<u64> = evidence.records.iter()
-            .filter_map(|(id, record)| matches!(record.payload, EvidencePayload::Text { .. }).then_some(*id))
+            .filter_map(|(id, record)| matches!(&record.payload, EvidencePayload::Text { .. }).then_some(*id))
             .collect();
         let actual: BTreeSet<u64> = self.documents.keys().copied().collect();
         if expected != actual {
@@ -1141,6 +1141,45 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn lexical_index_round_trip_and_indexed_bm25_match_reference_ranking() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(text_record(7, "evidence-relevant", "web", "cart checkout button opens shopping cart"), b"canonical trajectory bytes").unwrap();
+        evidence.insert(text_record(8, "evidence-unrelated", "web", "mountain trails and hiking boots"), b"canonical trajectory bytes").unwrap();
+        let mut expired = text_record(9, "evidence-expired", "web", "cart checkout button opens shopping cart");
+        expired.valid_until_unix_ms = Some(150);
+        evidence.insert(expired, b"canonical trajectory bytes").unwrap();
+        let mut other_scope = text_record(10, "evidence-other-scope", "enterprise", "cart checkout button opens shopping cart");
+        evidence.insert(other_scope.clone(), b"canonical trajectory bytes").unwrap();
+        other_scope.hdc_id = 11;
+        other_scope.evidence_id = "evidence-revoked".into();
+        other_scope.scope_id = "web".into();
+        evidence.insert(other_scope, b"canonical trajectory bytes").unwrap();
+        evidence.revoke(11).unwrap();
+
+        let index = LexicalIndex::build(&evidence, 4).unwrap();
+        let bytes = index.to_json_bytes().unwrap();
+        let restored = LexicalIndex::from_json_bytes(&bytes).unwrap();
+        restored.validate_for_evidence(&evidence, 4).unwrap();
+        assert_eq!(restored.to_json_bytes().unwrap(), bytes);
+
+        let query = "Where is the cart checkout button?";
+        let reference = evidence.rank_text(query, "web", 150, 20).unwrap();
+        let indexed = evidence.rank_text_indexed(&restored, 4, query, "web", 150, 20).unwrap();
+        assert_eq!(indexed, reference, "indexed BM25 must match the reference ranker exactly");
+        assert!(evidence.rank_text_indexed(&restored, 5, query, "web", 150, 20).is_err());
+    }
+
+    #[test]
+    fn lexical_index_rejects_wrong_generation_and_document_set() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(text_record(7, "evidence-text", "web", "lexical index generation test"), b"canonical trajectory bytes").unwrap();
+        let mut index = LexicalIndex::build(&evidence, 3).unwrap();
+        assert!(index.validate_for_evidence(&evidence, 4).is_err());
+        index.documents.remove(&7);
+        assert!(index.validate_for_evidence(&evidence, 3).is_err());
+    }
 
     #[test]
     fn lexical_bm25_ranks_relevant_text_and_filters_scope_time_and_lifecycle() {
