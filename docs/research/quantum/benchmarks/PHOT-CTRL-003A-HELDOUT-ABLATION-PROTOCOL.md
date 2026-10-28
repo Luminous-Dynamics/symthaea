@@ -82,21 +82,23 @@ The catalog snapshot is now tied to QOBLIB commit [`1e0e7c523cd9707dd541cc9e5a30
 
 ### Primary outcome
 
-Use **restricted mean all-in time to independently verified target** over a frozen horizon. A target miss is retained as not-yet-attained through the horizon, not assigned an invented fast time and not removed by a success-only speedup calculation. Report target-hit probability at the same fixed budget alongside it.
+Use a **failure-inclusive restricted mean of directly measured deployment time-to-verified-target**, over a frozen horizon H. For each attempt, record the target state and a direct monotonic-clock interval from request/job entry (including queue delay) through persistence of the independently verified result. A within-horizon hit contributes its observed deployment elapsed time only if the target is independently verified and the clock reading is present and ≤ H. Every other outcome contributes exactly H: infeasible/unverified output, target miss, timeout/crash/abort, missing deployment clock, or hit after H.
 
-If deployment queue times are not controlled or applicable, report both clocks below and do not conflate them.
+This is a fixed-horizon operational score, not a Kaplan–Meier survival estimate. Report within-horizon target-hit probability separately from the restricted mean. A hit exactly at H counts as a hit but contributes H to the restricted-time mean. If neither arm has a verified hit within H, report both means as H and do not present a restricted-mean ratio as a useful speedup.
 
 ### Mandatory secondary outcomes
 
-- Standardized algorithm runtime and deployment all-in latency as separate metrics.
+- **Directly observed standardized algorithm runtime** and **directly observed deployment all-in latency** as separate clock intervals.
 - Target hit rate, verified feasible-solution rate, unverified/malformed output rate, timeout/crash rate, and paired hit-rate difference.
-- Best verified cardinality versus time; normalized shortfall from the frozen target; incumbent curves and time-to-first-feasible.
+- Best verified cardinality versus direct elapsed time; normalized shortfall from the frozen target; incumbent curves and time-to-first-feasible.
 - Exact-optimum gap and time-to-proof for Tier A instances where the relevant solver can certify them.
-- Acquisition, preprocessing, feature extraction, transfer, compilation/initialization, solve, repair, independent verification, and receipt/persistence costs.
+- Acquisition, preprocessing, feature extraction, transfer, compilation/initialization, solve, repair, independent verification, and receipt/persistence costs as **stage diagnostics**; preserve missing values as unknown.
 - Total-system energy only when both arms use the same explicitly measured system boundary. Never compare device-only energy with full-system energy.
 - Memory use, processor utilization, throughput, and scaling by vertex/edge count as descriptive engineering metrics.
 
-**Standardized algorithm runtime** excludes queue wait and compilation/initialization when following QOBLIB's convention. **Deployment all-in latency** includes queue delay and amortized compile/init, plus every applicable stage needed to return a verified result. State which clock every number uses. Missing measurements are unknown, not zero.
+**Standardized algorithm runtime** is measured directly using the frozen QOBLIB-compatible interval that excludes queue wait and compilation/initialization. **Deployment all-in latency** is measured directly from request/job entry through persistence of the verified result, including queue and amortized compile/init. Use monotonic clocks, record the exact interval boundaries, and report the timing convention for every number.
+
+Stage durations may overlap or run concurrently. **Never sum per-stage durations and call the sum end-to-end latency.** Missing stage diagnostics do not erase a directly observed wall-clock interval. Missing direct clock intervals remain unknown and cannot produce a clock ratio or a within-horizon hit; unknown is never zero.
 
 Conditional speedup on trials where both arms hit a target is a secondary diagnostic only; it is survivor-biased. Always include the outcomes and hit rates for every attempted pair.
 
