@@ -38,11 +38,33 @@ The helper script scripts/research/run-photonic-contract-tests.sh compiles the f
 
 ## Candidate and verifier-receipt evidence boundary
 
-A target-hit record must include the SHA-256-shaped identity of the exact candidate bytes and a content-addressed verifier-receipt reference. The report validator binds the receipt metadata to the canonical graph digest, verifier digest, candidate digest, frozen target, candidate cardinality, conflict count, and verdict. A verified target hit is not counted when the receipt reference or any required matching metadata is absent or inconsistent.
+The stacked follow-up implementation in `mis_evidence.rs` now defines a narrow canonical format for graph bytes and candidate bytes and checks them independently:
 
-**Important limit:** `matched_evaluation.rs` validates receipt references and metadata; it does not fetch receipt bytes, recompute a receipt digest from those bytes, or authenticate a signature. The producer/ingestion boundary must independently run the verifier, validate the actual receipt artifact, and only then provide these parsed metadata fields. The current crate's existing `ResearchArtifactReceipt` uses a non-cryptographic FNV fingerprint and explicitly is not a signature, so it is not sufficient on its own as an independently authenticated verifier receipt. If the receipt-ingestion step cannot be demonstrated, the evidence must remain unverified and must not count as a target hit.
+- Recomputes SHA-256 from the exact original graph and candidate byte slices.
+- Rejects non-canonical line endings, ambiguous decimal encodings, duplicate/unsorted edges, self-loops, out-of-range vertices, duplicate/unsorted candidate vertices, and declared-count mismatches.
+- Counts selected-edge conflicts in O(V + E) using a candidate-membership bitmap and one edge scan. A candidate with a conflict gets a conflict receipt, never a target hit; a feasible candidate below the frozen target also is not a hit.
+- Constructs a deterministic `SYMTHEA-MIS-RECEIPT-V2` receipt from the recomputed graph/candidate digests, verifier digest, target, size, conflict count, verdict, and an explicit context-present field.
+- `verify_mis_candidate_with_receipt` re-runs verification and requires the actual persisted receipt bytes to exactly match the reconstructed receipt bytes; it also recomputes the receipt SHA-256. The trial-bound follow-up adds protocol/trial/pair/seed binding to that context.
+- Returns an opaque `VerifiedMisCandidate` whose fields cannot be constructed or modified through the crate's safe public API. The matched evaluator requires this evidence token and rebinds its metadata to the trial and report.
 
-This boundary prevents accidental “verified” dispositions from being represented without a receipt reference, but it is not an authenticity proof against a malicious report producer. A later integration should consume the project's concrete verifier output format and verify its cryptographic commitment/signature where the trust model requires one.
+The SHA-256 implementation is dependency-free and has known-answer vectors for empty input, `abc`, the standard quick-brown-fox vector, multi-block input, and lengths around SHA-256 padding boundaries. These tests are authored but have not yet been executed in Rust at the time of this draft; exact-head CI remains required.
+
+**Trust limit:** hashes establish byte identity/integrity, not signer identity or trusted execution. The verifier digest is supplied by the caller and must be pinned to the actual reviewed verifier build/source outside this module. This module does not sign receipts or authenticate the machine that executed it. The existing `ResearchArtifactReceipt` still uses a non-cryptographic FNV fingerprint and is not suitable as an authenticated verifier receipt. Do not claim malicious-producer resistance, independent lab reproduction, or cryptographic attestation until a separate trust mechanism is implemented and audited.
+
+## Pinned QOBLIB input manifest
+
+The following files were added with the verifier follow-up:
+
+- `QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv` pins the 50 graph file paths, Git blob SHA-1s, byte sizes, expected vertex/edge counts, immutable QOBLIB commit, and data-license reference.
+- `crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs` is a Rust CLI that validates the exact checkout commit, complete `.gph` inventory, each file's size and Git blob ID, and the actual canonicalized vertex/edge counts against the pinned catalog. It emits **raw-source SHA-256** and **canonical-graph SHA-256** from the file bytes.
+- The CLI compiles standalone, avoiding Cargo workspace discovery:
+  `rustc --edition=2024 -Awarnings crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs -o /tmp/qoblib-mis-manifest`
+  `/tmp/qoblib-mis-manifest <qoblib-root> docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv <output-manifest.tsv>`
+- `.github/workflows/qoblib-mis-input-integrity.yml` checks out the immutable QOBLIB commit, runs standalone Rust verifier/parser tests, compiles the CLI, validates all 50 input files and graph dimensions, and uploads the generated digest manifest as a workflow artifact on success.
+
+The raw source hash preserves dataset provenance; the canonical graph hash identifies the exact semantic graph bytes consumed by the independent verifier. Keep both. The generated digests are not populated into the preregistration template until the full 50-file workflow succeeds and the split/target/budget fields are frozen.
+
+The standalone tests exercise parser and canonicalizer/verifier contracts; only the dedicated integrity workflow executes the actual Git checkout and hashes the complete source set. At this writing, that exact-head integration workflow has not yet been observed passing, so the data manifest is still pending validation.
 
 ## Negative controls in unit tests
 
