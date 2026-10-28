@@ -107,6 +107,6 @@ Transitions must be monotone and auditable. Reusing a prior calibration requires
 
 ## Test status and claim ceiling
 
-Nineteen Rust unit tests and five public-API integration fixtures are defined for the monitor. They have not been compiled or executed because the current environment lacks `cargo`/ `rustc`. Passing synthetic tests would establish behavior only for these contracts and fixtures, not detection performance on real airline data or a guarantee under arbitrary temporal dependence.
+Eighteen Rust unit tests and five public-API integration fixtures are defined for the monitor. They have not been compiled or executed because the current environment lacks `cargo`/ `rustc`. Passing synthetic tests would establish behavior only for these contracts and fixtures, not detection performance on real airline data or a guarantee under arbitrary temporal dependence.
 
 Follow-up: [AVIATION-ENTERPRISE-011 #8795](https://github.com/Luminous-Dynamics/symthaea/issues/8795).
