@@ -294,6 +294,9 @@ pub struct FragmentAssemblerV2 {
 }
 
 impl FragmentAssemblerV2 {
+    /// Configure empty reassembly state from validated stream metadata. The
+    /// supplied frame is not counted as received; callers must pass every
+    /// received frame to feed(), including this one.
     pub fn new(first: &LoRaFragmentV2) -> Option<Self> {
         if !first.is_well_formed() {
             return None;
@@ -472,6 +475,19 @@ mod tests {
 
         assert!(fragment_v2(1, &[]).is_err());
         assert!(fragment_v2(1, &vec![0u8; V2_MAX_ENCODED_LEN + 1]).is_err());
+    }
+
+    #[test]
+    fn v2_frames_are_not_accepted_by_the_legacy_parser() {
+        use super::super::lora_fragment::LoRaFragment;
+
+        let frames = fragment_v2(3, &sample(2105, 11)).unwrap();
+        for frame in frames {
+            assert!(
+                LoRaFragment::from_bytes(&frame.to_bytes()).is_none(),
+                "reserved V2 flag must make legacy parser fail closed"
+            );
+        }
     }
 
     #[test]
