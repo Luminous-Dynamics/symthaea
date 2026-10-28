@@ -226,6 +226,7 @@ jobs:
           grep -q '"verified": true' /tmp/sbr-regeneration-report.json
           grep -q '"byte_exact_match": true' /tmp/sbr-regeneration-report.json
           grep -q '"task_set_contract_valid": true' /tmp/sbr-regeneration-report.json
+          grep -q '"synthetic_semantics_valid": true' /tmp/sbr-regeneration-report.json
           test "$(jq '.tasks | length' /tmp/sbr-generated-task-set.json)" -eq 8
 
           # Independent stdlib-only reference implementation, not production code.
