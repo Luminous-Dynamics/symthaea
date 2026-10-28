@@ -407,10 +407,10 @@ impl MatchedTrialRecord {
             validate_sha256("candidate_sha256", candidate_sha256)?;
         }
         if let Some(receipt) = self.verifier_receipt.as_ref() {
-            validate_sha256("verifier_receipt_sha256", &receipt.receipt_sha256)?;
-            validate_sha256("receipt_instance_sha256", &receipt.instance_sha256)?;
-            validate_sha256("receipt_verifier_sha256", &receipt.verifier_sha256)?;
-            validate_sha256("receipt_candidate_sha256", &receipt.candidate_sha256)?;
+            validate_sha256("verifier_receipt_sha256", receipt.receipt_sha256())?;
+            validate_sha256("receipt_instance_sha256", receipt.instance_sha256())?;
+            validate_sha256("receipt_verifier_sha256", receipt.verifier_sha256())?;
+            validate_sha256("receipt_candidate_sha256", receipt.candidate_sha256())?;
 
             let candidate_sha256 = self.candidate_sha256.as_deref().ok_or_else(|| {
                 MatchedEvaluationError::MissingCandidateDigest(self.trial_id.clone())
