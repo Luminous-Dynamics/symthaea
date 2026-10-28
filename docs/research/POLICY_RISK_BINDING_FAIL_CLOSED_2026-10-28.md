@@ -37,10 +37,10 @@ A digest is an integrity binding, not authentication. The trusted manifest SHA-2
 
 ## Validation
 
-Seven local tests pass, covering deterministic canonicalization, row permutation, policy-order mismatch, execution-order mismatch, hypothesis-order mismatch, trust-anchor/self-digest tampering, duplicate IDs, non-finite values, and negative losses. The combined decision-sufficient, negative-control, and policy-risk-binding suites pass **15/15 local tests** in 12.85 seconds. The source/test files were committed and their Git blob hashes fetched from the PR branch exactly match the executed local files:
+Eight local tests pass, covering deterministic canonicalization, row permutation, policy-order mismatch, execution-order mismatch, hypothesis-order mismatch, trust-anchor/self-digest tampering, duplicate IDs, non-finite values, negative losses, and the real finite-game risk tensor's policy-row ordering. The combined decision-sufficient, negative-control, and policy-risk-binding suites pass **16/16 local tests** in 11.773 seconds. The source/test files were committed and their Git blob hashes fetched from the PR branch exactly match the executed local files:
 
 - validation/policy_risk_binding.py Git blob: 66cccbbf9b6bbe9d04fce05ac998a3fc0e576b27; SHA-256: c2c709906a91dc6b9c80d313c6d5497be96c2ea55b04977a5ab977951a1b4c4b.
-- validation/test_policy_risk_binding.py Git blob: 29b8176acd6dae0b6ab674c8f3537fffef786374; SHA-256: bb180baed9c4eb4092ed6f9dd10ae523439df90e48ae430ee2560316f96a4241.
+- validation/test_policy_risk_binding.py Git blob: 30a9dcfaf181b2cb4a6c6069ebc5648a09e25168; SHA-256: e26b2da17d6057361fd6e63eb3970cb504ffd1f5610b15181a55494643121186.
 
 ## Next production integration gate
 
