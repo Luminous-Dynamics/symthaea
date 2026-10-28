@@ -14,7 +14,7 @@ import json
 import math
 import random
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from statistics import NormalDist, median
 from typing import Any
