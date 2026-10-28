@@ -297,6 +297,24 @@ struct PowerScenario {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+struct WeakNullScenario {
+    status: String,
+    assumed_family_icc: f64,
+    requested_family_effect_heterogeneity_sd_percentage_points: f64,
+    study_simulations: usize,
+    bootstrap_replicates_per_simulated_study: usize,
+    false_claims: usize,
+    degenerate_interval_trials: usize,
+    estimated_false_claim_probability: Option<f64>,
+    monte_carlo_standard_error: Option<f64>,
+    false_claim_probability_lower_95: Option<f64>,
+    false_claim_probability_upper_95: Option<f64>,
+    mean_observed_effect_percentage_points: Option<f64>,
+    mean_realized_family_effect_heterogeneity_sd_percentage_points: Option<f64>,
+    interpretation: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct PowerReport {
     schema_version: String,
     protocol_id: String,
@@ -324,6 +342,10 @@ struct PowerReport {
     maximum_false_claim_probability_at_zero_effect: f64,
     null_effect_false_claim_probability_max: Option<f64>,
     null_effect_false_claim_probability_upper_95_max: Option<f64>,
+    weak_null_family_effect_heterogeneity_sd_grid_percentage_points: Vec<f64>,
+    weak_null_scenarios: Vec<WeakNullScenario>,
+    weak_null_false_claim_probability_max: Option<f64>,
+    weak_null_false_claim_probability_upper_95_max: Option<f64>,
     estimated_power_at_20pp_and_icc_020: Option<f64>,
     estimated_power_at_20pp_and_icc_020_lower_95: Option<f64>,
     power_gate_passed: bool,
@@ -623,6 +645,34 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             )?);
         }
     }
+    let weak_null_sd_grid_pp = [5.0_f64, 10.0, 20.0];
+    let mut weak_null_scenarios = Vec::with_capacity(weak_null_sd_grid_pp.len() * icc_grid.len());
+    for (sd_index, sd_pp) in weak_null_sd_grid_pp.iter().copied().enumerate() {
+        for (icc_index, icc) in icc_grid.iter().copied().enumerate() {
+            let scenario_index = sd_index * icc_grid.len() + icc_index;
+            let scenario_seed = config
+                .bootstrap_seed
+                .wrapping_add(0xD1B5_4A32_D192_ED03)
+                .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
+            weak_null_scenarios.push(simulate_weak_null_scenario(
+                &family_target_counts,
+                baseline_rate,
+                sd_pp / 100.0,
+                icc,
+                simulations,
+                bootstrap_replicates,
+                scenario_seed,
+            )?);
+        }
+    }
+    let weak_null_false_claim_probability_max = weak_null_scenarios
+        .iter()
+        .filter_map(|scenario| scenario.estimated_false_claim_probability)
+        .reduce(f64::max);
+    let weak_null_false_claim_probability_upper_95_max = weak_null_scenarios
+        .iter()
+        .filter_map(|scenario| scenario.false_claim_probability_upper_95)
+        .reduce(f64::max);
     let null_effect_false_claim_probability_max = scenarios
         .iter()
         .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
@@ -644,7 +694,8 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         twenty_point_scenario.and_then(|scenario| scenario.estimated_power_lower_95);
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
         && estimated_power_at_20pp_and_icc_020_lower_95.is_some_and(|power| power >= 0.80)
-        && null_effect_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
+        && null_effect_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05)
+        && weak_null_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
         "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20 and the zero-effect false-claim scenario. This is a design-planning result, not evidence that insight transfer succeeds."
@@ -657,7 +708,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 
     let design_digest = run_design_sha256(&config)?;
     let report = PowerReport {
-        schema_version: "pitb.power-report.v0".to_string(),
+        schema_version: "pitb.power-report.v1".to_string(),
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_design_sha256: design_digest,
@@ -683,6 +734,10 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         maximum_false_claim_probability_at_zero_effect: 0.05,
         null_effect_false_claim_probability_max,
         null_effect_false_claim_probability_upper_95_max,
+        weak_null_family_effect_heterogeneity_sd_grid_percentage_points: weak_null_sd_grid_pp.to_vec(),
+        weak_null_scenarios,
+        weak_null_false_claim_probability_max,
+        weak_null_false_claim_probability_upper_95_max,
         estimated_power_at_20pp_and_icc_020,
         estimated_power_at_20pp_and_icc_020_lower_95,
         power_gate_passed,
@@ -691,6 +746,8 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             "Family sizes are taken from eligible validation outcomes and reused as the projected evaluation-family-size distribution; test eligibility may differ.".to_string(),
             "A beta-binomial family random effect induces the specified baseline Bernoulli ICC; treatment success shares the same latent family difficulty with its marginal success rate shifted by the scenario effect.".to_string(),
             "Arm outcomes are sampled independently conditional on family difficulty, so additional within-target pairing correlation is not assumed; this is an explicit approximation, not an empirically estimated ICC.".to_string(),
+            "A separate weak-null grid assigns normally generated family-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points across the preregistered ICC grid; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
+            "The weak-null grid tests false-claim probability when positive and negative family effects cancel on average. It is a finite family-size stress model, not proof of nominal coverage under every outcome dependence, missingness, or family-selection process.".to_string(),
             "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
             "Power estimates and their Monte Carlo standard errors are design simulations only. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
@@ -1341,7 +1398,7 @@ fn validate_power_report(
     eligible_validation: &[&TargetOutcome],
     validation_scores: &BTreeMap<String, f64>,
 ) -> Result<()> {
-    if report.schema_version != "pitb.power-report.v0" {
+    if report.schema_version != "pitb.power-report.v1" {
         bail!("unsupported power report schema {}", report.schema_version);
     }
     if report.protocol_id != EXPECTED_PROTOCOL_ID
@@ -1608,6 +1665,9 @@ fn validate_power_report(
             .is_some_and(|value| value >= 0.80)
         && report
             .null_effect_false_claim_probability_upper_95_max
+            .is_some_and(|value| value <= 0.05)
+        && report
+            .weak_null_false_claim_probability_upper_95_max
             .is_some_and(|value| value <= 0.05);
     if report.power_gate_passed != recomputed_gate || !report.power_gate_passed {
         bail!("preregistered power-planning no-go: confirmatory held-out scoring is blocked");
