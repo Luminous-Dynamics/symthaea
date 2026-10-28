@@ -123,6 +123,7 @@ impl ConsciousReasoningEngine {
         self.pending_posthoc = Some(PosthocOutcome {
             gate_passed,
             outcome_good,
+            decision_cycle: None,
             prediction_error: prediction_error.filter(|value| value.is_finite()),
             prediction_evidence: None,
         });
@@ -134,19 +135,38 @@ impl ConsciousReasoningEngine {
     /// snapshot because it is stored inside the pending outcome itself.
     pub fn record_posthoc_with_evidence(
         &mut self,
+        decision_cycle: Option<u64>,
         gate_passed: bool,
         outcome_good: bool,
         prediction_evidence: Option<PredictionErrorEvidence>,
     ) {
-        let prediction_error = prediction_evidence
-            .as_ref()
-            .and_then(|evidence| {
-                evidence.value_for_observation(evidence.observation_cycle())
-            })
+        // Bind the stored evidence to the decision cycle, not merely to the
+        // evidence object's self-reported observation cycle. A mismatch becomes
+        // stale diagnostic evidence and cannot supply the compatibility scalar.
+        let prediction_evidence = prediction_evidence.map(|evidence| {
+            let expected_status = match decision_cycle {
+                Some(cycle) => evidence.status_for_observation(cycle),
+                None => crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable,
+            };
+            if expected_status == evidence.status() {
+                evidence
+            } else {
+                PredictionErrorEvidence::from_comparison(
+                    expected_status,
+                    None,
+                    evidence.prediction_cycle(),
+                    evidence.observation_cycle(),
+                )
+            }
+        });
+        let prediction_error = decision_cycle
+            .zip(prediction_evidence.as_ref())
+            .and_then(|(cycle, evidence)| evidence.value_for_observation(cycle))
             .map(f64::from);
         self.pending_posthoc = Some(PosthocOutcome {
             gate_passed,
             outcome_good,
+            decision_cycle,
             prediction_error,
             prediction_evidence,
         });
