@@ -318,10 +318,11 @@ python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \
 
 python3 tools/casting-benchmark/score_compositional_bakeoff.py \
   /tmp/casting-compositional-results.json \
+  --allow-diagnostic-subset \
   --receipt /tmp/casting-compositional-receipt.json
 ```
 
-The scorer independently reimplements the Halton pool, all six scenario response equations, objective/constraint composition, ledger accounting, promotion labels and exact 2D hypervolume. It checks the result against pre-run SHA-256 digests of the runner/scorer/scenario/manifests. The receipt is unsigned; hashes establish byte identity, not signer identity or proof of execution. Every successful receipt remains labelled `COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE`.
+The scorer independently reimplements the Halton pool, all six scenario response equations, objective/constraint composition, ledger accounting, promotion methods and exact 2D hypervolume. It checks the result against pre-run SHA-256 digests of the runner/scorer/scenario/manifests. By default it only emits a formal-scope receipt for the full preregistered default matrix; pass `--allow-diagnostic-subset` for a quick subset, which is explicitly labelled `diagnostic_subset` and is not a substitute for the full protocol. The receipt is unsigned; hashes establish byte identity, not signer identity or proof of execution. Every successful receipt remains labelled `COMPOSITIONAL_SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE`.
 
 Tests include diagonal parity across all families/fidelities, component separation for an off-diagonal cell, full trace replay, and adversarial objective/cost mutation checks:
 
