@@ -468,6 +468,22 @@ mod tests {
     }
 
     #[test]
+    fn action_payload_keys_are_not_misclassified_as_benchmark_metadata() {
+        let mut trajectory: Value = serde_json::from_str(&sample_line()).unwrap();
+        trajectory["states"][0]["action"] = serde_json::json!({
+            "type": "fill",
+            "field_name": "answer",
+            "value": "customer-provided trajectory input"
+        });
+        let records = ingest_longmemeval_v2_jsonl(
+            [trajectory.to_string().into_bytes()],
+            |_, _| Some("scope".to_string()),
+        )
+        .expect("action payload fields are trajectory evidence, not gold metadata");
+        assert_eq!(records.len(), 2);
+    }
+
+    #[test]
     fn unknown_fields_and_invalid_order_are_rejected() {
         let mut unknown: Value = serde_json::from_str(&sample_line()).unwrap();
         unknown.as_object_mut().unwrap().insert("new_field".into(), Value::Bool(true));
