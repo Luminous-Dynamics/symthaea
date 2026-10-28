@@ -57,6 +57,11 @@ class PairedResultsTests(unittest.TestCase):
         unknown["unexpected"] = True
         self.assertNotEqual(list(validator.iter_errors(unknown)), [])
 
+    def test_analysis_output_records_candidate_configuration_pins(self) -> None:
+        result = analyze(valid_input())
+        self.assertEqual(result["candidates"]["A"]["configuration_sha256"], sha("b"))
+        self.assertEqual(result["protocol_sha256"], sha("a"))
+
     def test_analysis_output_never_grants_score_eligibility(self) -> None:
         result = analyze(valid_input())
         self.assertTrue(result["analysis_only"])

@@ -313,6 +313,7 @@ def analyze(data: Any) -> dict[str, Any]:
         "cohort_id": data["cohort_id"],
         "protocol_sha256": data["protocol_sha256"],
         "analysis_plan": data["analysis_plan"],
+        "candidates": data["candidates"],
         "assignment_accounting": {
             "assigned_tasks": len(tasks),
             "scored_tasks": len(scored),
@@ -361,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
         data = json.loads(raw.decode("utf-8"), parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"non-finite JSON number {value!r} is not allowed")))
         result = analyze(data)
         result["input_sha256"] = observed
+        result["analysis_tool_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         print(json.dumps({"eligible": False, "error": str(exc)}, indent=2), file=sys.stderr)
         return 2
