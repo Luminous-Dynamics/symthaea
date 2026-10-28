@@ -91,6 +91,8 @@ def score_dataset(
     predictions: list[dict[str, Any]],
     k: int,
 ) -> dict[str, Any]:
+    if not questions:
+        raise ValueError("questions must not be empty")
     if isinstance(k, bool) or not isinstance(k, int) or not 1 <= k <= 100:
         raise ValueError("k must be an integer in [1, 100]")
     question_by_id: dict[str, dict[str, Any]] = {}
