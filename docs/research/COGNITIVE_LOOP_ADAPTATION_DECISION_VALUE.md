@@ -308,3 +308,20 @@ This distinction is essential before extending the benchmark to robotics, energy
 The driver receipt now includes `feature_stream_sha256` over the canonical serialized feature events and `receipt_sha256` over the canonical receipt with that digest field empty. The independent auditor recomputes both. A raw feature edit without updating the commitment is rejected; adversarial semantic tests may reseal altered fixtures so they exercise the intended causal/integrity gate rather than failing only on a stale outer hash.
 
 These checks detect accidental mutation and establish self-consistency. A digest stored beside the bytes is not an external trust anchor: an editor who can rewrite both the payload and its digest can create another internally consistent receipt. For confirmatory use, publish/pin the expected stream and receipt digests in an independently controlled bundle or preregistration record before interpreting outcomes, and retain the explicit claim boundary against malicious or non-isolated runners.
+
+## State-of-the-art reproduction gate: registration is not execution
+
+A direct inspection of the public KDD 2026 reference repository changes the next implementation priority. Its README describes a Python 3.10+ / CapyMOA benchmark, and its `requirements.txt` pins `capymoa==0.9.0`. Its stream configuration names seven streams: Asfault, Covtype, Electricity, GasSensorArray, NOAA, Posture, and Rialto. Its `src/config.py` declares a broad comparator/tuning inventory, but at the inspected revision the active `DETECTORS` map has 12 registrations while the ABCDx and STUDD registrations are commented out; parameter-space definitions still exist for those names. A declared parameter space is not an executed detector, and a method listed in Symthaea's manifest is not a measured comparator.
+
+Reference artifacts inspected:
+- [KDD 2026 paper and evaluation contract](https://doi.org/10.1145/3770855.3819070)
+- [Upstream benchmark README](https://github.com/vcerqueira/experiments-drift_evaluation/blob/main/README.md)
+- [Upstream detector/tuning configuration](https://github.com/vcerqueira/experiments-drift_evaluation/blob/main/src/config.py)
+- [Upstream stream timing and transformation configuration](https://github.com/vcerqueira/experiments-drift_evaluation/blob/main/src/streams/config.py)
+- [Pinned Python dependency list](https://github.com/vcerqueira/experiments-drift_evaluation/blob/main/requirements.txt)
+
+The upstream branch can move, so these paths are research leads rather than immutable evidence. Before any reproduction claim, pin a specific upstream commit SHA, source hashes, runtime/environment lock, dataset artifacts, transformations, detector configuration, classifier and retraining semantics, random seeds, and label timing. Reconcile the paper's 14 method families with what is actually executable at that exact commit; retain unavailable variants as explicit exclusions rather than filling in expected values or silently substituting aliases.
+
+For the Symthaea implementation, use a small status machine per comparator: `registered → implementation-pinned → executable → validated → measured`, with a reasoned `excluded` branch. A state transition requires concrete artifact evidence. The benchmark should use the upstream runner as an **evaluation-only reference adapter** if faithful comparison requires Python; Rust remains the authoritative trace validator, scorer, and production implementation. This keeps production Rust-first without pretending a reimplementation is equivalent before parity testing.
+
+The next SOTA milestone is therefore not “all 14 names appear in JSON.” It is a pinned, reproducible reference run whose raw per-cycle alarms, valid-observation count, source revision, access track, stream digest, configuration digest, and seed feed the same Rust score path as Symthaea's own detector. Only then should the seven-dataset, leave-one-dataset-out comparison begin. The KDD 2026 paper's published benchmark is the reference target; until this is reproduced on comparable information streams, comparisons to its reported ranking remain unverified.
