@@ -21,6 +21,7 @@ The CLI recursively reads raw `trial*.json` files from each supplied trial direc
 - Preserve `num_experiments`, `rounds`, and `total_tokens` as separate costs.
 - Report how many completed trials supplied each cost field separately from sums of available values; a missing field is never silently presented as a complete total.
 - Retain failures and missing counterpart trials; paired deltas use only pairs with both trials completed and the corresponding metric available.
+- Report paired effects by module, noise, equation difficulty, system type and law version as well as the pooled scorecard, so pooled gains cannot hide a regression on a difficult stratum.
 - The importer records source-file digests, native metric availability, and import problems. A malformed artifact does not silently disappear from the report.
 - Python's default JSON serialization may emit non-standard NaN/Infinity values. The importer normalizes standalone non-finite tokens outside strings to null, records the normalization, and does not convert an unavailable RMSLE into zero.
 
