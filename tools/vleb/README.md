@@ -11,6 +11,7 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Pinned admission-cohort schema](admission-cohort.schema.json)
 - [Admission-cohort rollup tool](summarize_admission_cohort.py)
 - [Admission-cohort adversarial tests](test_summarize_admission_cohort.py)
+- [Auditor guardrail mutation campaign](run_auditor_mutation_campaign.py)
 - [Admission-cohort rollup protocol](../../docs/research/VLEB_ADMISSION_COHORT_ROLLUP_2026-10-29.md)
 - [Evidence receipt schema](evidence-receipt.schema.json)
 - [Trusted run-manifest schema](run-manifest.schema.json)

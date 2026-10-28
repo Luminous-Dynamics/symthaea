@@ -168,7 +168,7 @@ class AdmissionCohortTests(unittest.TestCase):
 
     def test_audit_report_digest_tampering_is_rejected(self)->None:
         path,report,row=self.fixture.reports[0]
-        report["eligible"]=False
+        report["nonsemantic_annotation"]="tampered-but-still-well-formed"
         path.write_bytes(jbytes(report))
         result=self.fixture.summarize()
         self.assertFalse(result["cohort_integrity_valid"])
@@ -260,13 +260,27 @@ class AdmissionCohortTests(unittest.TestCase):
         self.assertFalse(result["cohort_integrity_valid"])
         self.assertIn("runtime_image_mismatch",{item["code"] for item in result["issues"]})
 
+    def test_report_from_different_network_mode_is_rejected(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["network_mode"]="enabled"
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("runtime_network_mode_mismatch",{item["code"] for item in result["issues"]})
+
     def test_wrong_trusted_auditor_pin_is_rejected(self)->None:
         result=self.fixture.summarize(expected_auditor_sha256="c"*64)
         self.assertFalse(result["cohort_integrity_valid"])
         self.assertIn("cohort_row_auditor_mismatch",{row["code"] for row in result["issues"]})
 
     def test_duplicate_json_object_keys_are_rejected(self)->None:
-        self.fixture.manifest_path.write_text('{"schema_version":"vleb-admission-cohort-v1","schema_version":"other"}')
+        raw=jbytes(self.fixture.manifest).decode("utf-8")
+        anchor='"cohort_id": "october-cohort-001",'
+        self.assertIn(anchor,raw)
+        raw=raw.replace(anchor,anchor+'\n  "cohort_id": "october-cohort-001",',1)
+        self.fixture.manifest_path.write_text(raw,encoding="utf-8")
         result=self.fixture.summarize()
         self.assertFalse(result["cohort_integrity_valid"])
         self.assertIn("strict_json_invalid",{row["code"] for row in result["issues"]})

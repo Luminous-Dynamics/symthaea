@@ -254,6 +254,28 @@
       "target": 100,
       "status": "target_not_measured",
       "definition": "Pooled trace-mapped logical test IDs divided by all required logical test IDs from the locked scored-task cohort."
+    },
+    "benchmark_auditor_sentinel_mutation_kill_rate_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "All reviewed cohort-auditor guard-bypass sentinel mutations are detected by the existing adversarial test suite, after the unmodified suite passes."
+    },
+    "benchmark_auditor_sentinel_family_kill_rate_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Each independently named evaluator guardrail family must kill 100% of its frozen, reviewed sentinel mutations without invalid or not-run mutants.",
+      "families": [
+        "cohort_manifest_integrity",
+        "report_integrity",
+        "execution_identity",
+        "admission_consistency",
+        "score_safety"
+      ],
+      "requirements": [
+        "all mutations in a family execute after the unmodified suite passes",
+        "no family may contain a surviving or invalid sentinel",
+        "report family-level counts, not only the overall rate"
+      ]
     }
   },
   "current_measurements": {
@@ -342,6 +364,18 @@
       "eligible": false,
       "status": "not_measured",
       "reason": "The pinned cohort rollup is draft code; no locked cohort has been admitted and reported at an exact validated head."
+    },
+    "benchmark_auditor_sentinel_mutation_kill_rate_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The auditor self-mutation campaign is new draft work; no exact-head passing campaign result has been recorded."
+    },
+    "benchmark_auditor_sentinel_family_kill_rate_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "Per-family sentinel mutation reporting is draft work and has not produced an exact-head CI result."
     }
   },
   "metric_definitions": {
@@ -455,6 +489,39 @@
         "missing/invalid audit reports invalidate the cohort rather than removing assigned tasks",
         "report both pooled numerator and denominator",
         "never average per-task percentages"
+      ],
+      "composite_weighted_score": false
+    },
+    "benchmark_auditor_sentinel_mutation_kill_rate": {
+      "formula": "killed reviewed guard-bypass sentinel mutations / all reviewed sentinel mutations",
+      "pass_requirements": [
+        "unmodified adversarial suite passes first",
+        "every mutation anchor occurs exactly once",
+        "every mutated Python module compiles before execution",
+        "the test suite actually runs against the mutation",
+        "every reviewed guard-bypass mutation causes the suite to fail",
+        "syntax/import/startup failures and timeouts count as invalid, not killed"
+      ],
+      "denominator_rules": [
+        "freeze the sentinel mutation catalog before running the campaign",
+        "report killed, survived and invalid mutations separately",
+        "any survived or invalid sentinel fails the campaign",
+        "never treat mutation kill rate as candidate-task success or score eligibility"
+      ],
+      "composite_weighted_score": false
+    },
+    "benchmark_auditor_sentinel_family_kill_rate": {
+      "formula": "within each frozen guardrail family, killed valid sentinel mutations / all sentinel mutations assigned to that family",
+      "pass_requirements": [
+        "the unmodified test suite passes",
+        "every sentinel mutation executes and causes its targeted suite to fail",
+        "all guardrail families report 100% kill rate with zero invalid or unrun mutants"
+      ],
+      "denominator_rules": [
+        "freeze family assignments with the mutation catalog",
+        "report expected, executed, killed, survived, invalid and not-run counts per family",
+        "the overall rate cannot mask a weak or unevaluated family",
+        "composite_weighted_score is false"
       ],
       "composite_weighted_score": false
     }

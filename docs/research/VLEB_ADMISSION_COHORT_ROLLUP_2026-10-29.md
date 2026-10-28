@@ -73,3 +73,20 @@ This roll-up provides auditable denominators for the admission dimensions. It is
 Each cohort row now pins the concrete receipt run ID and attempt number, expected checkout revision, immutable runtime image ID, and expected network mode in addition to the audit-report digest and protocol/auditor pins. The independent auditor emits those fields only after checking its receipt and execution environment; the rollup compares them with the evaluator-pinned row. This makes replaying an otherwise valid report from a different run attempt, checkout revision, or runtime image a cohort-integrity error.
 
 This still depends on the protected evaluator being the authority for the cohort-manifest digest and pinned report digest. A JSON report containing identity fields is not by itself a cryptographic attestation; the live confirmatory pipeline must continue to verify the actual GitHub/Sigstore evidence bundle separately.
+
+## Meta-evaluation: mutate the evaluator's own guardrails
+
+The workflow now also runs `tools/vleb/run_auditor_mutation_campaign.py`. It first executes the unmodified cohort rollup test suite and requires it to pass. It then produces eleven reviewed, syntactically valid guard-bypass mutations: bypass cohort/report digests, weaken locked task inventory, accept an unexpected task, drop run/attempt or revision/image/network binding, restore permissive JSON parsing, ignore eligible-report/admission consistency, and leak score eligibility.
+
+A mutation is counted as killed only when the test suite actually starts and fails on the mutated implementation. Syntax errors, import/startup failures, and timeouts count as invalid, not killed. The campaign reports killed/survived/invalid/not-run counts by family. The campaign fails if any sentinel survives or is invalid, or if any family is incomplete. Target is 100% kill of this frozen sentinel catalog and of each named family; the metric is not a candidate success score and the tool emits `score_eligible=false`.
+
+This is a first-step meta-evaluation rather than a comprehensive proof that the auditor is correct. The sentinel catalog is deliberately reviewable; expanding it with independently designed mutants and mutation families is part of the next research phase.
+
+The report distinguishes five families: cohort-manifest integrity, audit-report integrity, execution identity, admission consistency, and score-safety policy. A total rate cannot hide a family that was never run or whose sentinel survives.
+
+
+## Connection to component-based benchmark audits
+
+AgentSuite's COBA framework, published in ICML/PMLR 2026, structures benchmark validity checks across four interacting components: User, Environment, Ground Truth, and Evaluation. That offers a useful complement to VLEB's source requirement trace, runtime/provenance pins, reviewed baseline expectations, and evaluation-policy sentinels ([AgentSuite / COBA, PMLR 306](https://proceedings.mlr.press/v306/suh26a.html)).
+
+The mutation campaign introduced here currently covers cohort/report integrity, execution identity, admission consistency, and score-safety policy. It does not yet mutate the entire task/oracle-generation pipeline or independently assess human-review quality. Those should be distinct future families rather than silently treated as covered by the current 11-sentinel pilot.
