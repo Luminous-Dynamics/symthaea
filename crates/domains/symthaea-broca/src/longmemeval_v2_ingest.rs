@@ -8,10 +8,13 @@
 //! It deliberately accepts trajectory records only: question records, gold
 //! answers, evaluator instructions and question IDs are rejected. Each emitted
 //! record is tied to a canonical per-state source digest and a stable opaque ID.
-//! A trusted caller must map (domain, environment) to an authorized scope and
-//! must use a separately pinned encoder if it also populates the HDC vector
-//! store. This module does not claim that its text payload is a semantic HDC
-//! encoding.
+//! A trusted caller must map (domain, environment) to an authorized scope.
+//! This module does not claim that its text payload is a semantic HDC encoding.
+//!
+//! Integration boundary: the current typed commit path requires a live HDC
+//! vector for every Active evidence ID, so these records cannot yet be committed
+//! as a clean lexical-only corpus without an encoder. Issue #8786 tracks the
+//! necessary data-model separation. Do not create fake vectors to bypass it.
 
 use super::memory_evidence::{
     EVIDENCE_SCHEMA_VERSION, EvidenceLifecycle, EvidencePayload, EvidenceRecord, EvidenceSource,
