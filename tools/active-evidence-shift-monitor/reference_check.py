@@ -112,7 +112,8 @@ CUSUM_FIELDS = (
     "null_lower", "null_upper", "threshold_scaled", "threshold_score",
     "matched_reference_alarm_probability", "calibration_boundary_alarm_probability",
     "family_worst_case_union_bound", "scenario_or_pre_shift_alarm_probability",
-    "post_shift_detection_probability", "mean_post_shift_detection_delay", "per_cell_alpha",
+    "post_shift_detection_probability", "mean_post_shift_detection_delay",
+    "median_post_shift_detection_delay", "p90_post_shift_detection_delay", "per_cell_alpha",
     "survival_probability",
 )
 BETA_A = 0.5
@@ -888,6 +889,18 @@ def simulate_cusum_null_schedule(direction, threshold, horizon, conditional_p_at
     return alarm_probability, survival
 
 
+def conditional_detection_delay_quantile(first_alarm, change_after, horizon, detection, quantile):
+    if detection <= 0.0:
+        return None
+    target_mass = detection * quantile
+    cumulative = 0.0
+    for n in range(change_after + 1, horizon + 1):
+        cumulative += first_alarm[n]
+        if cumulative >= target_mass:
+            return float(n - change_after)
+    return float(max(0, horizon - change_after))
+
+
 def simulate_cusum_scenario(direction, scenario, threshold):
     """Run one directional CUSUM exactly and snapshot the preregistered horizons."""
     horizon_max = HORIZONS[-1]
@@ -937,16 +950,26 @@ def simulate_cusum_scenario(direction, scenario, threshold):
                     for n in range(change_after + 1, horizon + 1)) / detection
                 if detection > 0.0 else None
             )
+            median_delay = conditional_detection_delay_quantile(
+                first_alarm, change_after, horizon, detection, 0.50
+            )
+            p90_delay = conditional_detection_delay_quantile(
+                first_alarm, change_after, horizon, detection, 0.90
+            )
             scenario_alarm = pre_alarm
         else:
             scenario_alarm = sum(first_alarm[1:horizon + 1])
             detection = None
             delay = None
+            median_delay = None
+            p90_delay = None
         rows.append({
             "horizon": str(horizon),
             "scenario_or_pre_shift_alarm_probability": f"{scenario_alarm:.12f}",
             "post_shift_detection_probability": as_text_precise(detection),
             "mean_post_shift_detection_delay": as_text_precise(delay),
+            "median_post_shift_detection_delay": as_text_precise(median_delay),
+            "p90_post_shift_detection_delay": as_text_precise(p90_delay),
             "survival_probability": f"{survival_at[horizon]:.12f}",
         })
     return rows
@@ -991,6 +1014,8 @@ def cusum_reference_rows():
                     "scenario_or_pre_shift_alarm_probability": metrics["scenario_or_pre_shift_alarm_probability"],
                     "post_shift_detection_probability": metrics["post_shift_detection_probability"],
                     "mean_post_shift_detection_delay": metrics["mean_post_shift_detection_delay"],
+                    "median_post_shift_detection_delay": metrics["median_post_shift_detection_delay"],
+                    "p90_post_shift_detection_delay": metrics["p90_post_shift_detection_delay"],
                     "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
                     "survival_probability": metrics["survival_probability"],
                 })
@@ -1021,6 +1046,7 @@ def check_cusum_csv(path):
     )
     optional_numeric_fields = (
         "post_shift_detection_probability", "mean_post_shift_detection_delay",
+        "median_post_shift_detection_delay", "p90_post_shift_detection_delay",
     )
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
@@ -1052,9 +1078,14 @@ def check_cusum_csv(path):
         is_target_shift = got["scenario_class"] == "target_shift"
         detection_text = got["post_shift_detection_probability"]
         delay_text = got["mean_post_shift_detection_delay"]
+        median_text = got["median_post_shift_detection_delay"]
+        p90_text = got["p90_post_shift_detection_delay"]
         if is_target_shift and detection_text == "NA":
             raise ValueError(f"CUSUM target-shift row lacks detection metric on line {line}")
-        if not is_target_shift and (detection_text != "NA" or delay_text != "NA"):
+        if not is_target_shift and (
+            detection_text != "NA" or delay_text != "NA"
+            or median_text != "NA" or p90_text != "NA"
+        ):
             raise ValueError(f"CUSUM non-target scenario was mislabeled as a target detection on line {line}")
         alarm = float(got["scenario_or_pre_shift_alarm_probability"])
         detection = 0.0 if detection_text == "NA" else float(detection_text)
