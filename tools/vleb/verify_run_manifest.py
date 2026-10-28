@@ -50,7 +50,7 @@ def safe_file(root: Path, relative: Any) -> Path:
     return resolved
 
 
-def extract_evidence_bundle(bundle_path: Path, destination: Path) -> None:
+def extract_evidence_bundle(bundle_path: Path, destination: Path) -> int:
     """Extract only regular, canonical ZIP members with strict size/path limits."""
     max_members = 100_000
     max_member_bytes = 512 * 1024 * 1024
@@ -68,6 +68,7 @@ def extract_evidence_bundle(bundle_path: Path, destination: Path) -> None:
             raise ValueError(f"evidence bundle member count outside allowed range: {len(infos)}")
         seen: set[str] = set()
         total_size = 0
+        file_count = sum(1 for info in infos if not info.is_dir())
 
         for info in infos:
             name = info.filename
@@ -89,7 +90,8 @@ def extract_evidence_bundle(bundle_path: Path, destination: Path) -> None:
             mode = (info.external_attr >> 16) & 0xFFFF
             if stat.S_ISLNK(mode):
                 raise ValueError(f"symlink evidence member rejected: {name!r}")
-            if mode and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+            file_type = stat.S_IFMT(mode)
+            if file_type not in (0, stat.S_IFREG, stat.S_IFDIR):
                 raise ValueError(f"special file evidence member rejected: {name!r}")
             if info.flag_bits & 0x1:
                 raise ValueError(f"encrypted evidence member rejected: {name!r}")
@@ -123,6 +125,7 @@ def extract_evidence_bundle(bundle_path: Path, destination: Path) -> None:
                     output.write(chunk)
             if written != info.file_size:
                 raise ValueError(f"evidence member size mismatch: {info.filename!r}")
+    return file_count
 
 
 def attestation_output_issues(raw: bytes, manifest: dict[str, Any]) -> list[dict[str, str]]:
@@ -375,7 +378,12 @@ def validate_manifest(
     evidence_root = Path(temporary_evidence.name)
     if bundle_path is not None:
         try:
-            extract_evidence_bundle(bundle_path, evidence_root)
+            observed_artifact_count = extract_evidence_bundle(bundle_path, evidence_root)
+            if observed_artifact_count != bundle["artifact_count"]:
+                issues.append({
+                    "code": "evidence_bundle_inventory_mismatch",
+                    "message": f"manifest declares {bundle['artifact_count']} bundle files, observed {observed_artifact_count}",
+                })
         except (OSError, ValueError, zipfile.BadZipFile) as exc:
             issues.append({"code": "evidence_bundle_invalid", "message": str(exc)})
 
