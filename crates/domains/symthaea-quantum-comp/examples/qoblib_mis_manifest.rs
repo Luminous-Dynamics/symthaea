@@ -1,7 +1,8 @@
 //! Hashes and canonicalizes the pinned QOBLIB MIS source set.
 //!
-//! Usage:
-//! `cargo run -p symthaea-quantum-comp --example qoblib_mis_manifest -- <qoblib-repository-root> <pinned-files.tsv> <output.tsv>`
+//! Usage (standalone; no Cargo workspace discovery):
+//! `rustc --edition=2024 -Awarnings crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs -o /tmp/qoblib-mis-manifest`
+//! `/tmp/qoblib-mis-manifest <qoblib-repository-root> <pinned-files.tsv> <output.tsv>`
 //!
 //! The QOBLIB checkout must be at the exact commit embedded in the TSV. This tool
 //! validates Git blob SHA-1 and byte size, then computes SHA-256 over the source
