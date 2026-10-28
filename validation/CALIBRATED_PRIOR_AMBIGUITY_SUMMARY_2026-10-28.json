@@ -8,7 +8,6 @@
     "seed": 20261028,
     "target_coverage": 0.9,
     "n_observations_for_q_estimate": 120,
-    "radius": 0.09388554557343382,
     "estimate": "multinomial counts plus symmetric Dirichlet(0.5) smoothing",
     "meta_regimes": [
       "diffuse",
@@ -18,13 +17,14 @@
       "diagonal-correlated",
       "anti-correlated"
     ],
-    "features": [
+    "feature_map": [
       "4 graph marginals",
       "4 kernel marginals",
       "diagonal mass",
       "anti-diagonal mass"
     ],
-    "set": "Q(qhat,rho) = {q in simplex: max(abs(C q-C qhat)) <= rho}"
+    "calibrated_radius": 0.09388554557343382,
+    "set": "Q(qhat,rho) = {q in simplex: ||Cq-Cqhat||_infinity <= rho}"
   },
   "coverage": {
     "calibrated": {
@@ -80,27 +80,27 @@
       "empirical": 0.9
     }
   ],
-  "metrics": {
+  "regret_bits": {
     "graph": {
-      "calibrated_regret_mean_bits": 0,
-      "calibrated_regret_p95_bits": 0,
-      "fixed_set_regret_mean_bits": 0,
-      "six_prior_regret_mean_bits": 0,
-      "full_simplex_regret_mean_bits": 0
+      "calibrated_mean": 0,
+      "calibrated_p95": 0,
+      "fixed_marginal_mean": 0,
+      "six_prior_mean": 0,
+      "full_simplex_mean": 0
     },
     "kernel": {
-      "calibrated_regret_mean_bits": 0,
-      "calibrated_regret_p95_bits": 0,
-      "fixed_set_regret_mean_bits": 0,
-      "six_prior_regret_mean_bits": 1.3248661427193535e-15,
-      "full_simplex_regret_mean_bits": 1.7236212457305555e-14
+      "calibrated_mean": 0,
+      "calibrated_p95": 0,
+      "fixed_marginal_mean": 0,
+      "six_prior_mean": 1.3248661427193535e-15,
+      "full_simplex_mean": 1.7236212457305555e-14
     },
     "joint": {
-      "calibrated_regret_mean_bits": 0.013793389321797474,
-      "calibrated_regret_p95_bits": 0.05848206566451841,
-      "fixed_set_regret_mean_bits": 0.09780927166286144,
-      "six_prior_regret_mean_bits": 0.021071759313684373,
-      "full_simplex_regret_mean_bits": 0.10633186574628817
+      "calibrated_mean": 0.013793389321797474,
+      "calibrated_p95": 0.05848206566451841,
+      "fixed_marginal_mean": 0.09780927166286144,
+      "six_prior_mean": 0.021071759313684373,
+      "full_simplex_mean": 0.10633186574628817
     }
   },
   "verification": {
@@ -110,30 +110,52 @@
       "numpy": "2.3.5",
       "scipy": "1.17.0"
     },
-    "local_source_sha256": "721a8747cbf1f6cce9215f52a0ed902da39914ca3bc455fcde87648cc61350e8",
-    "local_test_sha256": "921fee6d7df004f95fadaad5b2e6467a7cd5adf055855ad7b03b7a3df597369f",
-    "raw_results": {
+    "local_source": {
+      "path": "validation/calibrated_prior_ambiguity_benchmark.py",
+      "bytes": 14054,
+      "sha256": "721a8747cbf1f6cce9215f52a0ed902da39914ca3bc455fcde87648cc61350e8",
+      "git_blob": "e9a9ed213156ea54e9f22b466dfa5cc886caf1b6"
+    },
+    "committed_source": {
+      "path": "validation/calibrated_prior_ambiguity_benchmark.py",
+      "git_blob": "3ac11da28acbad9754ae917fb990c2d75dfd20ed",
+      "byte_identical_to_local": false
+    },
+    "local_test": {
+      "path": "validation/test_calibrated_prior_ambiguity_benchmark.py",
+      "bytes": 1701,
+      "sha256": "921fee6d7df004f95fadaad5b2e6467a7cd5adf055855ad7b03b7a3df597369f",
+      "git_blob": "3e44a3a69bd7ec4b70da6c76494fdc424c5582b6"
+    },
+    "committed_test": {
+      "path": "validation/test_calibrated_prior_ambiguity_benchmark.py",
+      "git_blob": "3e44a3a69bd7ec4b70da6c76494fdc424c5582b6",
+      "byte_identical_to_local": true
+    },
+    "raw_result_artifact": {
       "filename": "CALIBRATED_PRIOR_AMBIGUITY_RESULTS_2026-10-28.json",
       "bytes": 163680,
-      "sha256": "6a3a8bfcb77f032662c2d060db40803ddf5c453ceca937f3f46c8bdc51e61f3c"
+      "sha256": "6a3a8bfcb77f032662c2d060db40803ddf5c453ceca937f3f46c8bdc51e61f3c",
+      "committed": false
     },
-    "compressed_results": {
+    "compressed_result_artifact": {
       "filename": "CALIBRATED_PRIOR_AMBIGUITY_RESULTS_2026-10-28.json.gz",
       "bytes": 20371,
-      "sha256": "48c8a3409a6129601776d215c89d86a2bc720e87e1d19eb267e400653297fb64"
+      "sha256": "48c8a3409a6129601776d215c89d86a2bc720e87e1d19eb267e400653297fb64",
+      "committed": false
     },
-    "local_source_equals_committed": false,
     "exact_head_execution": false,
+    "repository_scm_integration": false,
     "external_benchmark_run": false,
-    "numerical_margin_is_formal_interval_arithmetic_proof": false
+    "speedup_claim": false
   },
   "limitations": [
-    "synthetic meta-population not fitted to real causal environments",
-    "marginal coverage only under declared exchangeability; not conditional per-regime coverage",
-    "only ten low-dimensional prior features calibrated",
-    "synthetic likelihood, 16 hypotheses, 8 horizon-two policy trees",
-    "local source and committed branch source not yet byte-identical",
-    "no external causal benchmark or SOTA claim"
+    "synthetic meta-population is illustrative and not fitted to real causal environments",
+    "split-conformal coverage is marginal under the declared exchangeability assumptions, not conditional subgroup coverage",
+    "only ten prior features are calibrated; joint prior remains underdetermined outside these features",
+    "synthetic likelihood, 16 hypotheses, and eight deterministic horizon-two policy trees",
+    "committed benchmark source is not byte-identical to the local executed source",
+    "no external causal-discovery benchmark was executed"
   ],
-  "next_gate": "Byte-align and exact-head rerun; then report coverage-regret-set-size curves, per-regime coverage and matched external causal discovery comparisons."
+  "next_gate": "Byte-align source and rerun from exact branch head; evaluate calibration coverage/regret/set-size curves, subgroup and shift coverage, and integrate the actual Symthaea SCM likelihood."
 }
