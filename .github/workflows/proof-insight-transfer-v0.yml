@@ -812,8 +812,8 @@ jobs:
               raise SystemExit("cross-split families must share one component")
           if imap["008"] == imap["001"]:
               raise SystemExit("soft conceptual similarity must not join components")
-          if clean["relationship_inventory_status"] != "independently_reviewed_complete" or clean["qualification_status"] != "qualified_complete_same_split_components" or not clean["qualified_for_confirmatory_resampling"]:
-              raise SystemExit("clean synthetic inventory should exercise positive schema shape only")
+          if clean["relationship_inventory_status"] != "independently_reviewed_complete" or clean["qualification_status"] != "structurally_eligible_receipt_unverified" or clean["qualified_for_confirmatory_resampling"]:
+              raise SystemExit("clean synthetic inventory must remain unqualified until receipt verification")
           if clean["total_component_count"] != 372 or clean["independent_component_count_by_split"] != {"train":260,"validation":56,"test":56}:
               raise SystemExit("clean synthetic inventory must retain isolated families")
           bad = copy.deepcopy(incomplete); bad["qualification_status"] = "qualified_complete_same_split_components"; bad["qualified_for_confirmatory_resampling"] = True
@@ -832,7 +832,7 @@ jobs:
           try: validator.validate(bad)
           except ValidationError: pass
           else: raise SystemExit("schema accepted incomplete family mapping")
-          print("PITB_COMPONENT_MANIFEST_CONTRACT_PASS: 372-family mapping, isolated families, deterministic membership, hard/unresolved vs soft/dismissed relations, cross-split fail-closed status, negative controls; clean path synthetic only")
+          print("PITB_COMPONENT_MANIFEST_CONTRACT_PASS: 372-family mapping, isolated families, deterministic membership, hard/unresolved vs soft/dismissed relations, cross-split fail-closed status, negative controls; clean graph is structurally eligible but receipt-unverified, therefore unqualified")
           PY
       - name: Validate counterfactual mutation qualification schema and controls
         shell: bash
