@@ -13,15 +13,18 @@
 //! - 2: fragment_index
 //! - 3: total_fragments, including XOR parity
 //! - 4: payload_len
-//! - 5: flags (bit 0 = XOR parity, bit 1 = V2 length binding)
+//! - 5: flags (bit 0 = XOR parity, bit 1 = V2 length binding,
+//!   bit 2 = fragment-AEAD-overhead capacity profile)
 //! - 6..8: CRC-16/CCITT
 //! - 8..10: exact encoded_len (u16 little-endian)
 //! - 10..: payload
 //!
-//! The 10-byte header reduces per-frame data capacity from 214 to 212 bytes.
-//! CRC detects accidental corruption; it does NOT authenticate metadata. An
-//! authenticated deployment must bind this header under fragment AEAD or an
-//! equivalent authenticated envelope. This prototype is research code only.
+//! Plaintext V2 carries 212 payload bytes per frame. The optional AEAD-budget
+//! profile carries 184 bytes because the 10-byte frame plus 12-byte nonce and
+//! 16-byte tag must fit within the declared 222-byte transport MTU. This profile
+//! only sizes frames; it does not encrypt or define a nonce lifecycle. CRC
+//! detects accidental corruption, not authenticity. This codec is not wired
+//! into the production sender/receiver.
 
 use super::lora_fragment::crc16_ccitt;
 
@@ -379,6 +382,7 @@ impl FragmentAssemblerV2 {
             || frame.thought_id != self.thought_id
             || frame.total_fragments != self.total_fragments
             || frame.encoded_len() != self.encoded_len
+            || LoRaFragmentV2::payload_capacity_from_flags(frame.flags) != self.payload_capacity
         {
             return false;
         }
@@ -505,6 +509,68 @@ mod tests {
             assembler.feed(frame);
         }
         assert_eq!(assembler.assemble().as_deref(), Some(original.as_slice()));
+    }
+
+    #[test]
+    fn aead_budget_profile_fits_outer_overhead_and_reconstructs_every_single_loss() {
+        assert_eq!(V2_AEAD_PAYLOAD_SIZE, 184);
+        assert_eq!(
+            V2_HEADER_SIZE + V2_AEAD_PAYLOAD_SIZE + V2_FRAGMENT_AEAD_OVERHEAD,
+            V2_MTU
+        );
+
+        for len in [
+            1usize,
+            184,
+            185,
+            1800,
+            2104,
+            2105,
+            2133,
+            V2_MAX_AEAD_ENCODED_LEN,
+        ] {
+            let original = sample(len, 0xAEAD_u64.wrapping_add(len as u64));
+            let frames = fragment_v2_with_aead_overhead(0xA11D, &original).unwrap();
+            assert!(
+                frames
+                    .iter()
+                    .all(|frame| frame.to_bytes().len() + V2_FRAGMENT_AEAD_OVERHEAD <= V2_MTU),
+                "all frames plus outer AEAD overhead must fit: encoded_len={len}"
+            );
+
+            for lost_index in 0..frames.len() - 1 {
+                let first_received = frames
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, frame)| (index != lost_index).then_some(frame))
+                    .expect("at least one fragment remains");
+                let mut assembler = FragmentAssemblerV2::new(first_received).unwrap();
+                for (index, frame) in frames.iter().enumerate() {
+                    if index == lost_index {
+                        continue;
+                    }
+                    assembler.feed(&LoRaFragmentV2::from_bytes(&frame.to_bytes()).unwrap());
+                }
+                assert!(
+                    assembler.is_complete(),
+                    "AEAD-budget encoded_len={len}, lost={lost_index}"
+                );
+                assert_eq!(
+                    assembler.assemble().as_deref(),
+                    Some(original.as_slice()),
+                    "AEAD-budget encoded_len={len}, lost={lost_index}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn assembler_rejects_mixed_capacity_profiles_even_when_length_and_count_match() {
+        let plain = fragment_v2(3, &sample(100, 1)).unwrap();
+        let aead_budget = fragment_v2_with_aead_overhead(3, &sample(100, 2)).unwrap();
+        let mut assembler = FragmentAssemblerV2::new(&plain[0]).unwrap();
+        assert!(!assembler.feed(&aead_budget[0]));
+        assert_eq!(assembler.received.iter().filter(|&&v| v).count(), 0);
     }
 
     #[test]
