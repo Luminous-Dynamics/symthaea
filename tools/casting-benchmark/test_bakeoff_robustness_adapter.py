@@ -29,6 +29,12 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "policy": "low_screen",
     }
     candidate_pool_sha = "e" * 64
+    generator_sha = hashlib.sha256(
+        (Path(__file__).resolve().parent / "prepare_synthetic_robustness_manifests.py").read_bytes()
+    ).hexdigest()
+    runner_sha = hashlib.sha256(
+        (Path(__file__).resolve().parents[2] / "tools/casting-benchmark/multifidelity_compositional_bakeoff.py").read_bytes()
+    ).hexdigest()
     design_count = 75
     sweep = {
         "benchmark_id": "CASTING-MF-COMPOSITION-001",
@@ -42,7 +48,7 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "design_count": design_count,
         "cost_budget": 200,
         "fidelity_costs": {"low": 1, "medium": 5, "high": 25},
-        "source_sha256": {"tools/casting-benchmark/example.py": "f" * 64},
+        "source_sha256": {"tools/casting-benchmark/multifidelity_compositional_bakeoff.py": runner_sha},
         "run_count": 1,
         "paired_runs": [{
             **selector,
@@ -65,7 +71,7 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "source_sweep_sha256": hashlib.sha256(sweep_raw).hexdigest(),
         "selector": selector,
         "candidate_pool_sha256": candidate_pool_sha,
-        "manifest_generator_sha256": "9" * 64,
+        "manifest_generator_sha256": generator_sha,
         "nominal_prediction_source": "test_low_fidelity_reference",
         "nominal_prediction_evaluations": design_count,
         "nominal_prediction_fidelity": "low",
@@ -146,7 +152,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         converted = adapt_documents(sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw)
         self.assertEqual(converted["source_run"]["sweep_sha256"], hashlib.sha256(sweep_raw).hexdigest())
-        self.assertEqual(converted["source_run"]["manifest_generator_sha256"], "9" * 64)
+        self.assertEqual(converted["source_run"]["manifest_generator_sha256"], hashlib.sha256((Path(__file__).resolve().parent / "prepare_synthetic_robustness_manifests.py").read_bytes()).hexdigest())
         adapter_bytes = Path(adapter.__file__).resolve().read_bytes()
         self.assertEqual(converted["source_run"]["adapter_sha256"], hashlib.sha256(adapter_bytes).hexdigest())
         self.assertEqual(converted["split"]["selection_freeze_sha256"], hashlib.sha256(selection_raw).hexdigest())
@@ -210,7 +216,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
 
     def test_rejects_malformed_source_digest(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
-        sweep["source_sha256"]["tools/casting-benchmark/example.py"] = "bad-digest"
+        sweep["source_sha256"]["tools/casting-benchmark/multifidelity_compositional_bakeoff.py"] = "bad-digest"
         updated_raw = _canonical(sweep)
         selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
         holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
