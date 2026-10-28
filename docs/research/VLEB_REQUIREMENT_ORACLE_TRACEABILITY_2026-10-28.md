@@ -41,3 +41,13 @@ This traceability layer addresses a narrower, auditable part of that problem: it
 Every concrete executable test mapped to a logical requirement now has a frozen per-test baseline expectation ("passed" or "failed") for private holdout/confirmatory tasks. The independent auditor checks each expected status against the actual baseline log. This complements the overall two-sided gate (empty/baseline patch fails, reference passes) and prevents an unrelated failure from masking a baseline that does not discriminate a specific claimed requirement.
 
 These expectations must be assigned from reviewed baseline evidence before evaluating the candidate; they are not inferred from the candidate result. Schema admission requires a status for every concrete execution ID, and the auditor rejects missing, duplicate, unknown, or contradictory entries.
+
+
+## Machine-readable admission metrics
+
+The independent receipt-audit JSON now emits:
+- `requirement_traceability`: counts of declared/traced contract source items and required/traced logical test IDs, with a completion flag;
+- `per_test_baseline_oracle_alignment`: concrete execution denominator, count with frozen expected status, count with unambiguous observed status, count whose status matches, percent alignment, and a completion flag;
+- the trusted task-contract, protocol, candidate-patch, receipt, and auditor digests.
+
+The alignment percent is a diagnostic for each task audit. Cohort reporting must pool matching/denominator counts rather than take an unweighted average of per-task percentages, and it must not promote any result to score-eligible.
