@@ -36,14 +36,14 @@
       "data_files_described": [
         "data_cd4_protein.csv",
         "data_clinical.csv",
-        "intact_dna.csv",
+        "data_intact_dna.csv",
         "data_plasma_protein.csv",
         "data_rnaseq_count.csv",
         "README.md"
       ],
       "status": "listed_not_acquired",
       "notes": [
-        "The public Dryad landing page lists intact_dna.csv (not data_intact_dna.csv); verify the actual downloaded archive before capture.",
+        "The Dryad landing-page file list names data_intact_dna.csv, while the descriptive README section refers to intact_dna.csv; the benchmark follows the landing-page file listing and must verify the downloaded archive before analysis.",
         "Published report found many undetectable intact-DNA values.",
         "The paper reports no significant differential host-gene expression association with intact HIV DNA.",
         "Ancestry covariates used in the paper may not all be present in the released file set.",
