@@ -525,6 +525,7 @@ def audit_claim_evidence_bundle(
             "code": "claim_audit_tool_path_invalid",
             "message": str(exc),
         })
+        mark_unresolved_claims()
         return result
     if result["issues"]:
         mark_unresolved_claims()
