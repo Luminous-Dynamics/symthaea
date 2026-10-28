@@ -247,17 +247,27 @@ pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
         ensure!(outcome.value.is_finite(), "revealed outcome must be finite");
         ensure!(outcome.prediction_tick < receipt.stream_length_ticks, "outcome prediction tick is out of range");
         ensure!(
-            outcome.available_at_tick == outcome.prediction_tick + receipt.label_delay_ticks,
+            outcome.outcome_id == format!("outcome-{:08}", outcome.prediction_tick),
+            "outcome ID does not bind to its prediction tick"
+        );
+        let expected_reveal_tick = outcome.prediction_tick.checked_add(receipt.label_delay_ticks)
+            .context("outcome reveal tick overflow")?;
+        ensure!(
+            outcome.available_at_tick == expected_reveal_tick,
             "outcome reveal tick does not match the registered label delay"
         );
         ensure!(outcome.available_at_tick < receipt.stream_length_ticks,
             "receipt contains an outcome that was not available during the replay horizon");
     }
 
+    let expected_policy_id = receipt.decisions.first()
+        .map(|decision| decision.policy_id.as_str())
+        .unwrap_or_default();
+    ensure!(!expected_policy_id.trim().is_empty(), "decision policy_id must not be empty");
     for (index, decision) in receipt.decisions.iter().enumerate() {
         let tick = index as u64;
         ensure!(decision.decision_tick == tick, "decision ticks must be contiguous and ordered");
-        ensure!(!decision.policy_id.trim().is_empty(), "decision policy_id must not be empty");
+        ensure!(decision.policy_id == expected_policy_id, "policy_id changes within one replay receipt");
         ensure!(decision.prediction.is_finite(), "decision prediction must be finite");
         let expected_features: BTreeSet<String> = receipt.feature_events.iter()
             .filter(|event| event.available_at_tick <= tick)
@@ -349,7 +359,8 @@ mod tests {
             Ok(PolicyAction {
                 prediction: 0.0,
                 consumed_feature_ids: Vec::new(),
-                consumed_outcome_ids: vec!["outcome-99999999".to_owned()],
+                // This is a real outcome ID for a future reveal, not an arbitrary unknown ID.
+                consumed_outcome_ids: vec!["outcome-00000000".to_owned()],
             })
         }
     }
@@ -387,6 +398,41 @@ mod tests {
         let error = scenario(vec![0.0; 6]).run(&mut policy)
             .expect_err("unknown/future outcome reference must be rejected");
         assert!(error.to_string().contains("unknown or not-yet-delivered outcome ID"));
+    }
+
+    #[test]
+    fn policy_cannot_consume_a_feature_before_its_delivery_tick() {
+        struct ClaimDelayedFeature;
+        impl PolicyAdapter for ClaimDelayedFeature {
+            fn policy_id(&self) -> &str { "claim-delayed-feature" }
+            fn decide(&mut self, _observation: &PolicyObservation) -> anyhow::Result<PolicyAction> {
+                Ok(PolicyAction {
+                    prediction: 0.0,
+                    consumed_feature_ids: vec!["feature-arrives-later".to_owned()],
+                    consumed_outcome_ids: Vec::new(),
+                })
+            }
+        }
+        let events = vec![
+            FeatureEvent {
+                event_id: "feature-now".to_owned(),
+                source_tick: 0,
+                available_at_tick: 0,
+                value: 1.0,
+            },
+            FeatureEvent {
+                event_id: "feature-arrives-later".to_owned(),
+                source_tick: 0,
+                available_at_tick: 3,
+                value: 99.0,
+            },
+        ];
+        let scenario = ReplayScenario::new(
+            "delayed-feature-test".to_owned(), events, vec![0.0; 5], 1,
+        ).expect("valid delayed-feature scenario");
+        let error = scenario.run(&mut ClaimDelayedFeature)
+            .expect_err("future feature consumption must fail");
+        assert!(error.to_string().contains("unknown or not-yet-delivered feature ID"));
     }
 
     #[test]
