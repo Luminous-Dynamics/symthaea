@@ -241,6 +241,158 @@ CLAIM_WITNESS_KINDS = {
 }
 
 
+def audit_witness_execution_receipt(
+    receipt_path_value: str,
+    receipt_sha256: str,
+    evidence_root: Path,
+    *,
+    manifest: dict[str, Any],
+    claim: dict[str, Any],
+    witness: dict[str, Any],
+    receipt_schema: dict[str, Any],
+    expected_producer_sha256: str,
+    trusted_claim_verifier_pins: dict[str, str],
+) -> list[dict[str, str]]:
+    """Verify one recorded invocation against the trusted run and source bindings."""
+    issues: list[dict[str, str]] = []
+    try:
+        receipt_path = safe_file(evidence_root, receipt_path_value)
+        raw = receipt_path.read_bytes()
+    except (OSError, ValueError) as exc:
+        return [{"code": "witness_receipt_path_invalid", "message": str(exc)}]
+    if digest(raw) != receipt_sha256:
+        return [{
+            "code": "witness_receipt_digest_mismatch",
+            "message": "receipt bytes differ from the digest in the claim witness",
+        }]
+    try:
+        receipt = json.loads(raw.decode("utf-8", errors="strict"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        return [{"code": "witness_receipt_json_invalid", "message": str(exc)}]
+    if not isinstance(receipt, dict):
+        return [{"code": "witness_receipt_root_invalid", "message": "receipt root must be a JSON object"}]
+    try:
+        Draft202012Validator.check_schema(receipt_schema)
+        schema_errors = list(Draft202012Validator(
+            receipt_schema, format_checker=FormatChecker()
+        ).iter_errors(receipt))
+    except Exception as exc:
+        return [{"code": "witness_receipt_schema_invalid", "message": str(exc)}]
+    for error in schema_errors:
+        location = ".".join(map(str, error.absolute_path)) or "$"
+        issues.append({
+            "code": "witness_receipt_schema_invalid",
+            "message": f"{location}: {error.message}",
+        })
+    if issues:
+        return issues
+
+    repository = manifest["repository"]
+    candidate = manifest["candidate"]
+    runtime = manifest["runtime"]
+    run_binding = {
+        "repository_full_name": repository["full_name"],
+        "repository_id": repository["repository_id"],
+        "run_id": repository["run_id"],
+        "run_attempt": repository["run_attempt"],
+        "source_repository_digest": repository["source_repository_digest"],
+        "source_repository_ref": repository["source_repository_ref"],
+        "candidate_checkout_revision": candidate["checkout_revision"],
+        "workflow_sha": repository["workflow_sha"],
+        "workflow_ref": repository["workflow_ref"],
+    }
+    observed_binding = receipt["run_binding"]
+    for key, expected in run_binding.items():
+        if observed_binding.get(key) != expected:
+            issues.append({
+                "code": "witness_receipt_run_binding_mismatch",
+                "message": f"run_binding.{key} differs from evaluator-pinned manifest",
+            })
+    expected_runtime = {
+        "immutable_image_id": runtime["immutable_image_id"],
+        "network_mode": runtime["network_mode"],
+        "network_mode_observed": runtime["network_mode_observed"],
+    }
+    for key, expected in expected_runtime.items():
+        if receipt["runtime"].get(key) != expected:
+            issues.append({
+                "code": "witness_receipt_runtime_mismatch",
+                "message": f"runtime.{key} differs from evaluator-pinned manifest",
+            })
+    if receipt["task_id"] != manifest["task"]["task_id"]:
+        issues.append({"code": "witness_receipt_task_mismatch", "message": "receipt task ID differs from manifest task"})
+    if receipt["claim_id"] != claim.get("claim_id"):
+        issues.append({"code": "witness_receipt_claim_mismatch", "message": "receipt claim ID differs from claim record"})
+    if receipt["source_sha256"] != claim.get("source", {}).get("sha256"):
+        issues.append({"code": "witness_receipt_source_mismatch", "message": "receipt source digest differs from claim source"})
+    if receipt["observed_result"] != witness.get("observed_result"):
+        issues.append({"code": "witness_receipt_result_mismatch", "message": "receipt observation differs from claim witness result"})
+
+    producer = receipt["producer"]
+    if producer.get("source_sha256") != expected_producer_sha256:
+        issues.append({"code": "witness_receipt_producer_mismatch", "message": "receipt producer source digest differs from evaluator pin"})
+    verifier = receipt["verifier"]
+    kind = witness.get("kind")
+    expected_verifier = trusted_claim_verifier_pins.get(kind) if isinstance(kind, str) else None
+    if (
+        verifier.get("kind") != kind
+        or verifier.get("id") != witness.get("verifier_id")
+        or verifier.get("sha256") != witness.get("verifier_sha256")
+        or expected_verifier is None
+        or verifier.get("sha256") != expected_verifier
+    ):
+        issues.append({"code": "witness_receipt_verifier_mismatch", "message": "receipt verifier identity differs from witness and out-of-band pin"})
+
+    inputs = receipt["inputs"]
+    source_path = claim["source"]["path"]
+    if not any(row.get("path") == source_path and row.get("sha256") == claim["source"]["sha256"] for row in inputs):
+        issues.append({"code": "witness_receipt_source_input_missing", "message": "receipt inputs do not bind the exact claimed source bytes"})
+    input_paths: list[str] = []
+    for row in inputs:
+        path_value = row["path"]
+        input_paths.append(path_value)
+        try:
+            path = safe_file(evidence_root, path_value)
+            if digest(path.read_bytes()) != row["sha256"]:
+                issues.append({"code": "witness_receipt_input_digest_mismatch", "message": f"input bytes changed: {path_value}"})
+        except (OSError, ValueError) as exc:
+            issues.append({"code": "witness_receipt_input_invalid", "message": f"{path_value}: {exc}"})
+    if len(input_paths) != len(set(input_paths)):
+        issues.append({"code": "witness_receipt_duplicate_input", "message": "receipt input paths must be unique"})
+
+    outputs = receipt["outputs"]
+    output_paths: list[str] = []
+    output_roles = {row.get("role") for row in outputs}
+    if not {"stdout", "stderr"}.issubset(output_roles):
+        issues.append({"code": "witness_receipt_streams_missing", "message": "receipt must bind both stdout and stderr artifacts"})
+    output_digest_by_path: dict[str, str] = {}
+    for row in outputs:
+        path_value = row["path"]
+        output_paths.append(path_value)
+        output_digest_by_path[path_value] = row["sha256"]
+        try:
+            path = safe_file(evidence_root, path_value)
+            if digest(path.read_bytes()) != row["sha256"]:
+                issues.append({"code": "witness_receipt_output_digest_mismatch", "message": f"output bytes changed: {path_value}"})
+        except (OSError, ValueError) as exc:
+            issues.append({"code": "witness_receipt_output_invalid", "message": f"{path_value}: {exc}"})
+    if len(output_paths) != len(set(output_paths)):
+        issues.append({"code": "witness_receipt_duplicate_output", "message": "receipt output paths must be unique"})
+    observed_witness_path = witness.get("artifact_path")
+    if output_digest_by_path.get(observed_witness_path) != witness.get("artifact_sha256"):
+        issues.append({
+            "code": "witness_receipt_artifact_binding_mismatch",
+            "message": "claim witness artifact is not bound to the matching output digest in its execution receipt",
+        })
+    process = receipt["process"]
+    if process.get("timed_out") and receipt["observed_result"] != "inconclusive":
+        issues.append({"code": "witness_receipt_timeout_misclassified", "message": "timed-out executions must be inconclusive"})
+    if process.get("timed_out") is not True and process.get("exit_code") is None:
+        issues.append({"code": "witness_receipt_process_status_missing", "message": "non-timeout execution must record an exit code"})
+
+    return issues
+
+
 def audit_claim_evidence_bundle(
     manifest: dict[str, Any],
     evidence_root: Path,
