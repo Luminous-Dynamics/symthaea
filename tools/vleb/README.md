@@ -7,6 +7,11 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Research protocol and statistical plan](../../docs/research/VERIFIED_LEGACY_ENGINEERING_BENCHMARK_2026-10-24.md)
 - [Task contract schema](task-contract.schema.json)
 - [Evidence receipt schema](evidence-receipt.schema.json)
+- [Trusted run-manifest schema](run-manifest.schema.json)
+- [Run-manifest validator and confirmatory attestation verification](verify_run_manifest.py)
+- [Run-manifest schema and adversarial tests](test_run_manifest.py)
+- [Run-manifest verifier tests](test_verify_run_manifest.py)
+- [Confirmatory-run provenance procedure](CONFIRMATORY_RUNS.md)
 - [Synthetic ledger task contract](examples/ledger-reconciliation/task.json)
 - [Rust reference implementation and test instructions](ledger-reconcile/README.md)
 - [Fixture integrity gate](check-fixture-integrity.sh)
@@ -20,7 +25,9 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 
 ## Current validation state
 
-The latest completed VLEB workflow on head `61bd340938ceb435953da39d999264c84ab2674f` passed formatting, fixture integrity, receipt-schema conformance, independent auditor tests, 20 Rust unit tests, 4 CLI integration tests, strict Clippy, mutation-generator unit tests, scorecard invariants, and the executable mutation campaign. Four registered semantic mutants were compiled and rejected by their preregistered target tests (0 survivors, 0 unresolved). The [run and artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40657592360) preserve the CI record and raw mutation evidence.
+The latest completed baseline VLEB workflow before the run-manifest additions passed at head `6386bcfb45d28dc431fd9285bf5afb0f35ffd3c2`, run [40657774817](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40657774817). It passed formatting, fixture integrity, receipt-schema conformance, independent auditor tests, 20 Rust unit tests, 4 CLI integration tests, strict Clippy, mutation-generator unit tests, scorecard invariants, and the semantic mutation campaign. Four registered semantic mutants were compiled and rejected by their preregistered target tests (0 survivors, 0 unresolved). The raw mutation artifact is [12802810670](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40657774817/artifacts/12802810670), archive SHA-256 `3a4b44a9f4b1bf5d3ec7027fb4266def6381d69d5d50c74975071f500c7c8f74`.
+
+The run-manifest schema, verifier and its tests were added after that passing baseline; their CI must pass at the exact current head before the new provenance path is called validated.
 
 The scorecard deliberately keeps the Legacy-Bench model score, AASSR, security correctness and cost per independently verified fix at **not measured**. The public ledger task is a development fixture only. Its 4/4 mutation result is an oracle smoke test, not the 90% broad mutation target, and is not evidence of production banking or mainframe equivalence.
 
