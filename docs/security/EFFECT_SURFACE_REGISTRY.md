@@ -164,3 +164,24 @@ The checker now pins each v1 vector's **full semantic tuple** in Rust: category,
 
 
 The next implementation stage is tracked in [ACTION-EFFECT-HARNESS-001 / #8769](https://github.com/Luminous-Dynamics/symthaea/issues/8769): execute the corpus against instrumented effect boundaries and independently witnessed postconditions, reusing the existing Action Runtime rather than adding a parallel authority kernel.
+
+
+## Research update: separate enforcement from agent behavior and replay stability
+
+The benchmark must have two independent tracks rather than a single "agent security" percentage:
+
+1. **Deterministic enforcement track:** submit a frozen typed operation to the authorization/runtime boundary, then count the decision, adapter invocations, observed side effects and independent postcondition. This isolates the policy/enforcement layer from whether a model chose to ask for a tool.
+2. **Model-mediated request track:** replay frozen prompts and context against pinned model/configuration versions, recording whether the agent requested an action, which exact typed operation it requested, and whether the authorization layer allowed, denied, or held that request.
+
+This separation is important because APort's September 21, 2026 replay analysis reports that replaying recorded attacks differently changed observed action rates and rankings: Level 2 moved from 0.40% to 3.18%, while Level 4 had a net difference of 69 yet 355 paired cases disagreed. Similar totals can hide different individual decisions; a single aggregate score or model ranking is not enough. See [APort Research](https://aport.io/research/).
+
+The Mergen v1.0.0 benchmark reports 322/322 attack cases detected and 0/229 benign cases blocked at its deterministic policy layer, from a fixed 551-case corpus run through the live gate in decide-only mode. Its documentation explicitly distinguishes that from end-to-end human interruption and notes limits of what the fixed working-tree fixtures represent. See [Mergen methodology](https://mergen.app/docs/agent-security-benchmark). This is a useful baseline for narrow gate quality, not evidence of actual postconditions or comprehensive whole-system security.
+
+For Symthaea, comparisons should therefore:
+- preserve matched prompt/model/policy/replay pairs, report per-case disagreements and transition matrices, and not infer stability from unchanged total rates;
+- report request propensity, authorization outcome, actual effect and verified postcondition as distinct denominators;
+- use paired tests for matched outcomes and session/prompt-clustered confidence intervals for repeated trials rather than treating correlated replays as independent observations;
+- stratify results by attack family, policy profile, operation class, model/configuration and runtime version;
+- publish the corpus, exact source and profile digests, full raw rows, failed/missing runs and analysis code.
+
+This makes a stronger research claim possible than "100% on our fixtures": independent parties can reproduce both what the agent tried to do and what the enforcement boundary actually permitted to happen. The current 41-case corpus is a contract seed, nowhere near the scale required for a broad adversarial generalization claim.
