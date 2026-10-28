@@ -257,6 +257,19 @@ jobs:
           test "$python_seed_exit" -eq 2
           grep -q 'independent semantic replay differs' /tmp/sbr-reference-mutated-seed.stderr
 
+          # A changed generator-config file must fail the independent oracle's digest check.
+          cp "$config" /tmp/sbr-reference-mutated-config.json
+          printf ' ' >> /tmp/sbr-reference-mutated-config.json
+          set +e
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin \
+            /tmp/sbr-reference-mutated-config.json /tmp/sbr-generated-task-set.json \
+            > /tmp/sbr-reference-mutated-config.json.out 2> /tmp/sbr-reference-mutated-config.stderr
+          python_config_exit=$?
+          set -e
+          test "$python_config_exit" -eq 2
+          grep -q 'generator config bytes do not match manifest digest' /tmp/sbr-reference-mutated-config.stderr
+
           # Mutation 1: changing the pinned generator config must fail closed.
           cp "$config" /tmp/sbr-mutated-config.json
           printf ' ' >> /tmp/sbr-mutated-config.json
