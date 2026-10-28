@@ -20,6 +20,8 @@ const RISK_ALPHA: f64 = 0.025;
 const VALUE_ALPHA: f64 = 0.025;
 const RISK_CAP: f64 = 0.05;
 const VALUE_FLOOR_MILLI: f64 = 500.0;
+const RISK_ALTERNATIVES: [f64; 4] = [0.001, 0.01, 0.025, 0.04];
+const VALUE_LAMBDAS: [f64; 2] = [0.5, 1.0];
 const PPM: f64 = 1_000_000.0;
 
 const ACTION_HEADER: &[&str] = &[
@@ -32,6 +34,7 @@ const ORACLE_HEADER: &[&str] = &[
     "outcome_complete", "risk_trials", "risk_failures", "value_n",
     "value_sum_milli", "value_min_milli", "value_max_milli",
     "evidence_unit_kind", "target_calibrated", "provenance_ok", "sealed_touched",
+    "risk_sequence", "value_sequence",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,6 +90,8 @@ struct Outcome {
     target_calibrated: bool,
     provenance_ok: bool,
     sealed_touched: bool,
+    risk_sequence: Vec<bool>,
+    value_sequence: Vec<i64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -126,16 +131,20 @@ enum Policy {
     CostFirst,
     DecisionValue,
     RiskAwareValue,
+    DecisionValueAnytime,
+    RiskAwareValueAnytime,
 }
 
 impl Policy {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 8] = [
         Self::FixedFallback,
         Self::ForcedAdapt,
         Self::HighestUncertainty,
         Self::CostFirst,
         Self::DecisionValue,
         Self::RiskAwareValue,
+        Self::DecisionValueAnytime,
+        Self::RiskAwareValueAnytime,
     ];
 
     fn label(self) -> &'static str {
@@ -144,8 +153,10 @@ impl Policy {
             Self::ForcedAdapt => "forced_adapt",
             Self::HighestUncertainty => "highest_uncertainty",
             Self::CostFirst => "cost_first",
-            Self::DecisionValue => "decision_value",
-            Self::RiskAwareValue => "risk_aware_value",
+            Self::DecisionValue => "decision_value_fixed",
+            Self::RiskAwareValue => "risk_aware_value_fixed",
+            Self::DecisionValueAnytime => "decision_value_anytime",
+            Self::RiskAwareValueAnytime => "risk_aware_value_anytime",
         }
     }
 }
@@ -302,6 +313,17 @@ fn parse_oracle(text: &str, actions: &[Action]) -> Result<BTreeMap<(String, Stri
         if f.len() != ORACLE_HEADER.len() {
             return Err(format!("oracle line {line_no}: expected {} columns", ORACLE_HEADER.len()));
         }
+        let risk_sequence: Vec<bool> = f[15].chars().map(|c| match c {
+            '0' => Ok(false),
+            '1' => Ok(true),
+            _ => Err(format!("oracle line {line_no}: risk sequence must contain only 0/1")),
+        }).collect::<Result<_, _>>()?;
+        let value_sequence: Vec<i64> = if f[16].is_empty() {
+            Vec::new()
+        } else {
+            f[16].split(',').map(|value| parse_i64(value, "value_sequence", line_no))
+                .collect::<Result<_, _>>()?
+        };
         let o = Outcome {
             gross_value_milli: parse_i64(f[2], "gross_value_milli", line_no)?,
             actual_cost_units: parse_u64(f[3], "actual_cost_units", line_no)?,
@@ -316,6 +338,8 @@ fn parse_oracle(text: &str, actions: &[Action]) -> Result<BTreeMap<(String, Stri
             target_calibrated: parse_bool(f[12], "target_calibrated", line_no)?,
             provenance_ok: parse_bool(f[13], "provenance_ok", line_no)?,
             sealed_touched: parse_bool(f[14], "sealed_touched", line_no)?,
+            risk_sequence,
+            value_sequence,
         };
         if o.actual_cost_units == 0 {
             return Err(format!("oracle line {line_no}: actual cost must be positive"));
@@ -337,8 +361,26 @@ fn parse_oracle(text: &str, actions: &[Action]) -> Result<BTreeMap<(String, Stri
                 return Err(format!("oracle line {line_no}: value sum violates sample bounds"));
             }
         }
-        if !o.outcome_complete && (o.risk_trials != 0 || o.value_n != 0) {
-            return Err(format!("oracle line {line_no}: incomplete outcomes must not expose partial counts"));
+        if o.risk_sequence.len() != o.risk_trials {
+            return Err(format!("oracle line {line_no}: risk sequence length differs from risk_trials"));
+        }
+        if o.risk_sequence.iter().filter(|failed| **failed).count() != o.risk_failures {
+            return Err(format!("oracle line {line_no}: risk sequence failures differ from risk_failures"));
+        }
+        if o.value_sequence.len() != o.value_n {
+            return Err(format!("oracle line {line_no}: value sequence length differs from value_n"));
+        }
+        if o.value_sequence.iter().any(|v| *v < 0 || *v > 1_000 || *v < o.value_min_milli || *v > o.value_max_milli) {
+            return Err(format!("oracle line {line_no}: value sequence item outside declared bounded support"));
+        }
+        if o.value_sequence.iter().sum::<i64>() != o.value_sum_milli {
+            return Err(format!("oracle line {line_no}: value sequence sum differs from value_sum_milli"));
+        }
+        if !o.outcome_complete && (o.risk_trials != 0 || o.value_n != 0 || !o.risk_sequence.is_empty() || !o.value_sequence.is_empty()) {
+            return Err(format!("oracle line {line_no}: incomplete outcomes must not expose partial observations"));
+        }
+        if o.outcome_complete && ((o.risk_trials == 0) != (o.value_n == 0)) {
+            return Err(format!("oracle line {line_no}: complete evidence must provide both risk and value observations"));
         }
         if !matches!(o.evidence_unit_kind.as_str(), "IID" | "INDEPENDENT_CLUSTER" | "ROW_DEPENDENT" | "FIXED_PEEKED" | "NONE") {
             return Err(format!("oracle line {line_no}: unknown evidence unit kind"));
@@ -526,6 +568,135 @@ fn evaluate_gate(selected: &[Action], oracle: &BTreeMap<(String, String), Outcom
     }
 }
 
+fn log_mean_exp(log_values: &[f64]) -> f64 {
+    let max_log = log_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    max_log + log_values.iter().map(|v| (v - max_log).exp()).sum::<f64>().ln()
+        - (log_values.len() as f64).ln()
+}
+
+fn log_risk_e_value(n: usize, failures: usize) -> f64 {
+    if n == 0 || failures > n {
+        return f64::NEG_INFINITY;
+    }
+    let logs: Vec<f64> = RISK_ALTERNATIVES.iter().map(|q| {
+        (failures as f64) * (q / RISK_CAP).ln()
+            + ((n - failures) as f64) * ((1.0 - q) / (1.0 - RISK_CAP)).ln()
+    }).collect();
+    log_mean_exp(&logs)
+}
+
+fn log_value_e_value(values_milli: &[i64]) -> Result<f64, String> {
+    if values_milli.is_empty() || values_milli.iter().any(|v| !(0..=1_000).contains(v)) {
+        return Err("anytime-value observations must be a nonempty stream in [0, 1]".into());
+    }
+    let logs: Vec<f64> = VALUE_LAMBDAS.iter().map(|lambda| {
+        values_milli.iter().map(|v| {
+            let x = *v as f64 / 1_000.0;
+            (1.0 + lambda * (x - VALUE_FLOOR_MILLI / 1_000.0)).ln()
+        }).sum::<f64>()
+    }).collect();
+    Ok(log_mean_exp(&logs))
+}
+
+fn evaluate_anytime_gate(
+    selected: &[Action],
+    oracle: &BTreeMap<(String, String), Outcome>,
+) -> GateReport {
+    let mut risk_stream = Vec::<bool>::new();
+    let mut value_stream = Vec::<i64>::new();
+    let mut unit_kind: Option<String> = None;
+    let mut risk_crossed = false;
+    let mut value_crossed = false;
+    let threshold = (1.0 / RISK_ALPHA).ln();
+
+    for action in selected.iter().filter(|a| a.kind == ActionKind::Measure) {
+        let outcome = &oracle[&(action.campaign_id.clone(), action.action_id.clone())];
+        if !outcome.outcome_complete {
+            continue;
+        }
+        if !outcome.provenance_ok || outcome.sealed_touched {
+            return GateReport {
+                status: GateStatus::Denied, reason: "provenance_failure_or_sealed_access",
+                risk_upper: None, value_lcb_milli: None,
+                risk_n: risk_stream.len(), risk_failures: risk_stream.iter().filter(|x| **x).count(),
+                value_n: value_stream.len(), unit_kind,
+            };
+        }
+        if !outcome.target_calibrated {
+            return GateReport {
+                status: GateStatus::Denied, reason: "source_to_target_calibration_failure",
+                risk_upper: None, value_lcb_milli: None,
+                risk_n: risk_stream.len(), risk_failures: risk_stream.iter().filter(|x| **x).count(),
+                value_n: value_stream.len(), unit_kind,
+            };
+        }
+        if !matches!(outcome.evidence_unit_kind.as_str(), "IID" | "INDEPENDENT_CLUSTER") {
+            continue;
+        }
+        if let Some(prior) = &unit_kind {
+            if prior != &outcome.evidence_unit_kind {
+                return GateReport {
+                    status: GateStatus::InsufficientEvidence, reason: "mixed_independent_unit_definitions",
+                    risk_upper: None, value_lcb_milli: None,
+                    risk_n: risk_stream.len(), risk_failures: risk_stream.iter().filter(|x| **x).count(),
+                    value_n: value_stream.len(), unit_kind,
+                };
+            }
+        } else {
+            unit_kind = Some(outcome.evidence_unit_kind.clone());
+        }
+        risk_stream.extend(outcome.risk_sequence.iter().copied());
+        value_stream.extend(outcome.value_sequence.iter().copied());
+
+        // Each acquisition returns a batch. Check the e-process at the actual
+        // observation boundary (after the batch arrives), not at fictional
+        // unobserved intermediate stopping times.
+        let failures = risk_stream.iter().filter(|failed| **failed).count();
+        if log_risk_e_value(risk_stream.len(), failures) >= threshold {
+            risk_crossed = true;
+        }
+        if log_value_e_value(&value_stream).is_ok_and(|log_e| log_e >= threshold) {
+            value_crossed = true;
+        }
+    }
+
+    let diagnostic = evaluate_gate(selected, oracle);
+    let risk_n = risk_stream.len();
+    let risk_failures = risk_stream.iter().filter(|failed| **failed).count();
+    let value_n = value_stream.len();
+    if risk_n == 0 || value_n == 0 || unit_kind.is_none() {
+        return GateReport {
+            status: GateStatus::InsufficientEvidence, reason: "no_admissible_complete_independent_evidence",
+            risk_upper: diagnostic.risk_upper, value_lcb_milli: diagnostic.value_lcb_milli,
+            risk_n, risk_failures, value_n, unit_kind,
+        };
+    }
+    if !risk_crossed || !value_crossed {
+        return GateReport {
+            status: GateStatus::InsufficientEvidence,
+            reason: if !risk_crossed { "anytime_risk_e_value_not_crossed" } else { "anytime_value_e_value_not_crossed" },
+            risk_upper: diagnostic.risk_upper, value_lcb_milli: diagnostic.value_lcb_milli,
+            risk_n, risk_failures, value_n, unit_kind,
+        };
+    }
+    GateReport {
+        status: GateStatus::Authorized, reason: "anytime_risk_and_value_e_values_crossed",
+        risk_upper: diagnostic.risk_upper, value_lcb_milli: diagnostic.value_lcb_milli,
+        risk_n, risk_failures, value_n, unit_kind,
+    }
+}
+
+fn evaluate_policy_gate(
+    policy: Policy,
+    selected: &[Action],
+    oracle: &BTreeMap<(String, String), Outcome>,
+) -> GateReport {
+    match policy {
+        Policy::DecisionValueAnytime | Policy::RiskAwareValueAnytime => evaluate_anytime_gate(selected, oracle),
+        _ => evaluate_gate(selected, oracle),
+    }
+}
+
 fn selection_score(action: &Action, risk_aware: bool) -> i64 {
     let cost = (action.estimated_cost_units as i64).saturating_mul(COST_TO_VALUE_MILLI);
     let risk_penalty = if risk_aware {
@@ -545,10 +716,10 @@ fn choose_action<'a>(policy: Policy, pool: Vec<&'a Action>) -> Option<&'a Action
         Policy::CostFirst => pool.into_iter().min_by(|a, b| {
             a.estimated_cost_units.cmp(&b.estimated_cost_units).then_with(|| a.action_id.cmp(&b.action_id))
         }),
-        Policy::DecisionValue => pool.into_iter().max_by(|a, b| {
+        Policy::DecisionValue | Policy::DecisionValueAnytime => pool.into_iter().max_by(|a, b| {
             selection_score(a, false).cmp(&selection_score(b, false)).then_with(|| b.action_id.cmp(&a.action_id))
         }),
-        Policy::RiskAwareValue => pool.into_iter().filter(|a| a.predicted_risk_ppm as f64 / PPM <= RISK_CAP)
+        Policy::RiskAwareValue | Policy::RiskAwareValueAnytime => pool.into_iter().filter(|a| a.predicted_risk_ppm as f64 / PPM <= RISK_CAP)
             .max_by(|a, b| {
                 selection_score(a, true).cmp(&selection_score(b, true))
                     .then_with(|| b.action_id.cmp(&a.action_id))
@@ -583,7 +754,7 @@ fn simulate(
                 actual_cost_units = outcome.actual_cost_units;
                 gross_value_milli = outcome.gross_value_milli;
                 activated = true;
-                let gate = evaluate_gate(&selected, oracle);
+                let gate = evaluate_policy_gate(policy, &selected, oracle);
                 false_authorization = gate.status != GateStatus::Authorized;
                 budget_overrun = actual_cost_units > budget;
             }
@@ -593,7 +764,7 @@ fn simulate(
             if budget_overrun {
                 break;
             }
-            let gate = evaluate_gate(&selected, oracle);
+            let gate = evaluate_policy_gate(policy, &selected, oracle);
             if gate.status == GateStatus::Denied {
                 break;
             }
@@ -609,8 +780,9 @@ fn simulate(
                 .collect();
             let chosen = choose_action(policy, pool);
             let Some(action) = chosen else { break };
-            if matches!(policy, Policy::DecisionValue | Policy::RiskAwareValue) {
-                let score = selection_score(action, policy == Policy::RiskAwareValue);
+            if matches!(policy, Policy::DecisionValue | Policy::RiskAwareValue | Policy::DecisionValueAnytime | Policy::RiskAwareValueAnytime) {
+                let risk_aware = matches!(policy, Policy::RiskAwareValue | Policy::RiskAwareValueAnytime);
+                let score = selection_score(action, risk_aware);
                 if score <= 0 {
                     break;
                 }
@@ -624,7 +796,7 @@ fn simulate(
             if action.kind == ActionKind::Activate {
                 activated = true;
                 gross_value_milli = outcome.gross_value_milli;
-                let gate_after = evaluate_gate(&selected, oracle);
+                let gate_after = evaluate_policy_gate(policy, &selected, oracle);
                 false_authorization = gate_after.status != GateStatus::Authorized;
                 budget_overrun = actual_cost_units > budget;
                 break;
@@ -636,7 +808,7 @@ fn simulate(
         }
     }
 
-    let gate = evaluate_gate(&selected, oracle);
+    let gate = evaluate_policy_gate(policy, &selected, oracle);
     let net_value_milli = gross_value_milli.saturating_sub((actual_cost_units as i64).saturating_mul(COST_TO_VALUE_MILLI));
     RunResult {
         campaign_id: campaign_id.to_owned(),
@@ -747,6 +919,28 @@ mod tests {
     }
 
     #[test]
+    fn anytime_risk_process_respects_the_declared_batch_boundary() {
+        let threshold = (1.0 / RISK_ALPHA).ln();
+        assert!(log_risk_e_value(72, 0) < threshold);
+        assert!(log_risk_e_value(192, 0) > threshold);
+        assert!(log_value_e_value(&vec![1_000; 72]).unwrap() > threshold);
+    }
+
+    #[test]
+    fn anytime_policy_collects_more_evidence_before_activating() {
+        let (actions, oracle) = fixture();
+        let candidates: Vec<Action> = actions.iter().filter(|a| a.campaign_id == "C01-positive").cloned().collect();
+        let fixed = simulate("C01-positive", Policy::DecisionValue, &candidates, &oracle);
+        let anytime = simulate("C01-positive", Policy::DecisionValueAnytime, &candidates, &oracle);
+        assert!(fixed.activated);
+        assert!(anytime.activated, "{anytime:?}");
+        assert!(!anytime.false_authorization);
+        assert!(anytime.selected_ids.contains(&"m-high".to_owned()));
+        assert!(anytime.selected_ids.contains(&"m-good".to_owned()));
+        assert!(anytime.actual_cost_units > fixed.actual_cost_units);
+    }
+
+    #[test]
     fn iid_zero_failure_evidence_can_authorize_at_the_72_trial_boundary() {
         let (actions, oracle) = fixture();
         let selected = selected_measure("C01-positive", "m-high", &actions);
@@ -837,8 +1031,8 @@ mod tests {
         let a = score_fixture().unwrap();
         let b = score_fixture().unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.matches("RESULT\t").count(), 13 * 6);
-        assert_eq!(a.matches("SUMMARY\t").count(), 6);
+        assert_eq!(a.matches("RESULT\t").count(), 13 * 8);
+        assert_eq!(a.matches("SUMMARY\t").count(), 8);
         assert!(a.contains("\tfalse_authorizations="));
         assert!(a.contains("\tbudget_overruns="));
         assert!(a.contains("\tnet_value_milli="));
