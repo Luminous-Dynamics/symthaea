@@ -559,6 +559,7 @@ impl CodingAgent {
                         if pending.gate_evaluated {
                             if let Some(evidence) = pending.prediction_evidence_at_decision {
                                 self.cognitive_loop.record_reasoning_posthoc_with_evidence(
+                                    pending.decision_cycle,
                                     pending.gate_passed,
                                     result.success,
                                     Some(evidence),
