@@ -217,13 +217,13 @@ pub fn verify_policy_risk_binding(
     validate_hypothesis_ids(runtime_hypothesis_ids)?;
     validate_policy_ids(execution_policy_ids)?;
 
-    if runtime_policy_ids != trusted_manifest.policy_ids {
+    if runtime_policy_ids != trusted_manifest.policy_ids.as_slice() {
         return Err(PolicyRiskBindingError::RuntimePolicyOrderMismatch);
     }
-    if runtime_hypothesis_ids != trusted_manifest.hypothesis_ids {
+    if runtime_hypothesis_ids != trusted_manifest.hypothesis_ids.as_slice() {
         return Err(PolicyRiskBindingError::RuntimeHypothesisOrderMismatch);
     }
-    if execution_policy_ids != trusted_manifest.policy_ids {
+    if execution_policy_ids != trusted_manifest.policy_ids.as_slice() {
         return Err(PolicyRiskBindingError::ExecutionPolicyOrderMismatch);
     }
     if runtime_rows != trusted_manifest.rows || runtime_columns != trusted_manifest.columns {
