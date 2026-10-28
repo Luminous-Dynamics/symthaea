@@ -70,6 +70,7 @@ EPROCESS_FAMILY_ORDER = (
 )
 EPROCESS_FAMILY_SCENARIOS = (
     "stationary_null",
+    "step_down_010", "step_down_020", "step_down_030", "step_down_040", "step_down_045",
     "step_up_055", "step_up_060", "step_up_070", "step_up_080", "step_up_090",
     "selection_bias_no_environment_shift",
 )
@@ -571,7 +572,7 @@ def eprocess_family_self_test():
             raise ValueError(f"{family} failed the selection-bias negative control")
         for scenario in EPROCESS_FAMILY_SCENARIOS:
             row = indexed[(family, scenario)]
-            if scenario.startswith("step_up_"):
+            if scenario.startswith("step_"):
                 total = (
                     float(row["false_alarm_probability"])
                     + float(row["detection_probability"])
