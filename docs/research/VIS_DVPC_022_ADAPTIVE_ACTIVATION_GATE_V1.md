@@ -29,11 +29,11 @@ The net-value lower confidence bound is computed rather than accepted as an inpu
 
 ## Exact risk arithmetic
 
-For n independent Bernoulli target-region trials, k observed failures and one-sided error level alpha, the upper Clopper-Pearson bound solves P_p[X <= k] = alpha. The implementation uses the closed form for k=0 and binomial-tail bisection otherwise. At alpha=0.05, zero failures require at least 59 independent trials to put the upper bound below 0.05; 58 trials do not suffice. One failure requires more trials. This is valid only under the stated independent Bernoulli model and the declared target-region sampling design.
+For n independent Bernoulli target-region trials, k observed failures and one-sided error level alpha, the upper Clopper-Pearson bound solves P_p[X <= k] = alpha. The implementation uses the closed form for k=0 and binomial-tail bisection otherwise. The risk and value claims share a declared error budget: this fixture allocates 5% total alpha as 2.5% to risk and 2.5% to value. By the union bound, combined coverage is at least 95% if both marginal methods and sampling assumptions hold. At risk alpha=0.025 and cap 0.05, zero failures require at least 72 independent trials; 71 do not suffice. One failure requires 120 trials to pass the 5% risk cap in this fixture. The alpha budget covers only this pair of claims; repeated looks, multiple subgroups, or repeated certification campaigns require further preregistered allocation or a valid sequential/multiplicity method. This is valid only under the stated independent Bernoulli model and the declared target-region sampling design.
 
 ## Frozen fixture and baselines
 
-The fixture includes positive known answers and negative controls for the 58/59 boundary, tiny samples, one observed failure, no-op opportunity, source/target shift, absent target calibration, trivial activation, negative net value, budget overrun, campaign truncation, sealed-data contamination, missing provenance, action-digest mismatch, and value-evidence-digest mismatch. The evaluator does not see outcomes for unselected decisions; this activation gate is based on preregistered aggregate evidence fields.
+The fixture includes positive known answers and negative controls for the 71/72 joint-confidence boundary, tiny samples, one observed failure, no-op opportunity, source/target shift, absent target calibration, trivial activation, negative net value, budget overrun, campaign truncation, sealed-data contamination, missing provenance, action-digest mismatch, and value-evidence-digest mismatch. The evaluator does not see outcomes for unselected decisions; this activation gate is based on preregistered aggregate evidence fields.
 
 Compare at least: fixed safe fallback, forced adaptation, naive point-estimate threshold, and certificate gate. Report activation rate, false-activation rate, risk upper bound, net decision-value lower bound, all-in cost, abstention/insufficient-evidence rate, and risk-coverage/value-cost frontiers separately. Do not collapse them into an opaque scalar.
 
@@ -41,7 +41,7 @@ Compare at least: fixed safe fallback, forced adaptation, naive point-estimate t
 
 - 100% correct known-answer classifications on the frozen fixture.
 - Zero authorization on all fixture negative controls, including separate action and value-evidence digest failures.
-- Exact 58-versus-59 zero-failure boundary and correct monotonicity in sample size/failures.
+- Exact 71-versus-72 zero-failure boundary under the 5% joint error budget, rejection when marginal alpha allocations exceed the budget, and correct monotonicity in sample size/failures.
 - 100% fail-closed handling of provenance, digest, target calibration, shift and sealed-set controls.
 - Explicit all-in costs and campaign capacity in every report.
 - No SOTA, safety, calibration, or generalization claim from synthetic fixtures alone.
