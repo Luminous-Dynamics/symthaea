@@ -174,5 +174,75 @@
     "local source/test do not currently byte-match committed branch copies",
     "no external causal-discovery benchmark run"
   ],
-  "next_gate": "Byte-align local/committed source and tests, regenerate exact artifact, then integrate with actual Symthaea action/observation semantics."
+  "next_gate": "Byte-align local/committed source and tests, regenerate exact artifact, then integrate with actual Symthaea action/observation semantics.",
+  "width_sweep": {
+    "status": "LOCAL_SYNTHETIC_EXPLORATORY_SOURCE_TEST_MISMATCH_APPLIES",
+    "rows": 15,
+    "raw_result": {
+      "filename": "CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json",
+      "bytes": 5931,
+      "sha256": "58e85876088d62fb9393551df359b995c58af7ec1d51f7551ba82b4b10ebd2d4"
+    },
+    "compressed_result": {
+      "repository_path": "validation/CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json.gz",
+      "bytes": 897,
+      "sha256": "98e4bfa4d824ec7c73bc0743f5a90302045b32b003fc91863c630a44f1e7b318",
+      "git_blob": "02b16e9103a59d5544cc68d12d79f8909dbe296e",
+      "committed": true
+    },
+    "marginal_bounds": [
+      [
+        0.24,
+        0.26
+      ],
+      [
+        0.2,
+        0.3
+      ],
+      [
+        0.15,
+        0.35
+      ],
+      [
+        0.1,
+        0.4
+      ],
+      [
+        0.05,
+        0.6
+      ]
+    ],
+    "robust_values_bits": {
+      "graph": [
+        1.5206470557969263,
+        1.5709998257040612,
+        1.631121590827671,
+        1.6900351285540065,
+        1.7480789690826999
+      ],
+      "kernel": [
+        1.5683213856703722,
+        1.6169812005519844,
+        1.6754535086152063,
+        1.7329176193046598,
+        1.7896651076498444
+      ],
+      "joint": [
+        3.4382452830304557,
+        3.509152781158468,
+        3.5977871538184822,
+        3.670224151142573,
+        3.7273718790559807
+      ]
+    },
+    "legacy_six_prior_policy_joint_regret_bits": [
+      0,
+      0,
+      0,
+      0.016197375335925468,
+      0.04789403045770069
+    ],
+    "interpretation": "robust value monotonically rises with ambiguity width on this fixture; legacy joint policy begins to lose at marginal bounds [0.10,0.40]",
+    "not_calibrated_from_data": true
+  }
 }
