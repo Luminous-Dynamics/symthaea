@@ -139,6 +139,24 @@ class CompositionalBakeoffTests(unittest.TestCase):
         self.assertEqual(first["evaluations"], second["evaluations"])
         self.assertEqual(first["promotion_records"], second["promotion_records"])
 
+    def test_scorer_rejects_tampered_decision_score(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("decision_value_of_information",),
+            design_count=75,
+        )
+        trace = document["paired_runs"][0]["decision_value_trace"]
+        self.assertEqual(len(trace), 2)
+        self.assertEqual(len(trace[0]["candidate_scores"]), 58)
+        self.assertEqual(len(trace[1]["candidate_scores"]), 57)
+        trace[0]["candidate_scores"][0]["score"] += 0.01
+        with self.assertRaisesRegex(ValueError, "replay rejected"):
+            score_document(document, ROOT, allow_diagnostic_subset=True)
+
     def test_scorer_rejects_modified_objective_value(self) -> None:
         document = run_sweep(
             objective_families=("local_bias_island",),
