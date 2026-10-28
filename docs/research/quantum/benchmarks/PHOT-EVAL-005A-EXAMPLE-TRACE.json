@@ -5,7 +5,7 @@
   "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "trial_id": "synthetic-candidate-trial-001",
   "pair_id": "synthetic-pair-001",
-  "seed_id": "fixture-seed-7",
+  "seed_id": "7",
   "budget_id": "fixture-budget-1000ms",
   "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
