@@ -72,6 +72,9 @@ struct SweepResult {
     target_value: f64,
     verdict: &'static str,
     unsupported_target_mass: f64,
+    supported_target_contribution: f64,
+    identified_lower: f64,
+    identified_upper: f64,
     enumerated_states: usize,
     probability_mass: f64,
     metrics: Vec<Metrics>,
@@ -165,15 +168,37 @@ fn unsupported_target_mass(s: &Scenario) -> f64 {
     mass
 }
 
+fn logged_event_probabilities(s: &Scenario) -> [f64; 4] {
+    [
+        s.logging_a * (1.0 - s.reward_a),
+        s.logging_a * s.reward_a,
+        (1.0 - s.logging_a) * (1.0 - s.reward_b),
+        (1.0 - s.logging_a) * s.reward_b,
+    ]
+}
+
+fn identification_region(s: &Scenario) -> (f64, f64, f64) {
+    let target_b = 1.0 - s.target_a;
+    let logging_b = 1.0 - s.logging_a;
+    let supported = (if s.logging_a > 0.0 { s.target_a * s.reward_a } else { 0.0 })
+        + (if logging_b > 0.0 { target_b * s.reward_b } else { 0.0 });
+    let unsupported = unsupported_target_mass(s);
+    (supported, supported, (supported + unsupported).min(1.0))
+}
+
 fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
     let truth = target_value(s);
     let unsupported_mass = unsupported_target_mass(s);
+    let (supported_target_contribution, identified_lower, identified_upper) = identification_region(s);
     if unsupported_mass > EPS {
         return Ok(SweepResult {
             scenario: s.clone(),
             target_value: truth,
             verdict: "NOT_IDENTIFIED",
             unsupported_target_mass: unsupported_mass,
+            supported_target_contribution,
+            identified_lower,
+            identified_upper,
             enumerated_states: 0,
             probability_mass: 0.0,
             metrics: Vec::new(),
@@ -184,12 +209,7 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
     let logging_b = 1.0 - s.logging_a;
     let estimated_logging_b = 1.0 - s.estimated_logging_a;
     let q_target = s.target_a * s.qhat_a + target_b * s.qhat_b;
-    let event_probabilities = [
-        s.logging_a * (1.0 - s.reward_a),
-        s.logging_a * s.reward_a,
-        logging_b * (1.0 - s.reward_b),
-        logging_b * s.reward_b,
-    ];
+    let event_probabilities = logged_event_probabilities(s);
     let state_count = 4usize.pow(s.n as u32);
     let mut distribution: Vec<(f64, [f64; 6])> = Vec::with_capacity(state_count);
     let mut probability_mass = 0.0;
@@ -285,6 +305,9 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
         target_value: truth,
         verdict: "SUPPORT_OK_SYNTHETIC_ONLY",
         unsupported_target_mass: 0.0,
+        supported_target_contribution,
+        identified_lower,
+        identified_upper,
         enumerated_states: distribution.len(),
         probability_mass,
         metrics,
@@ -294,7 +317,7 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
 fn run_sweep(input: &str) -> Result<String, String> {
     let scenarios = parse_grid(input)?;
     let mut out = String::from(
-        "HEADER\trecord_type\tscenario_id\testimator\tverdict\tmetric\tvalue\n",
+        "record_type\tscenario_id\testimator\tverdict\tmetric\tvalue\n",
     );
     for scenario in scenarios {
         let result = enumerate(&scenario)?;
@@ -303,11 +326,22 @@ fn run_sweep(input: &str) -> Result<String, String> {
             "SCENARIO\t{}\t-\t{}\toracle_truth_evaluator_only\t{:.12}",
             result.scenario.id, result.verdict, result.target_value
         );
-        let _ = writeln!(
-            out,
-            "SCENARIO\t{}\t-\t{}\tunsupported_target_mass\t{:.12}",
-            result.scenario.id, result.verdict, result.unsupported_target_mass
-        );
+        for (field, value) in [
+            ("supported_target_contribution", result.supported_target_contribution),
+            ("unsupported_target_mass", result.unsupported_target_mass),
+            ("lower_bound", result.identified_lower),
+            ("upper_bound", result.identified_upper),
+            ("singleton_region", if (result.identified_upper - result.identified_lower).abs() <= EPS { 1.0 } else { 0.0 }),
+        ] {
+            let _ = writeln!(
+                out,
+                "IDENTIFICATION_REGION\t{}\t-\t{}\t{}\t{:.12}",
+                result.scenario.id,
+                if (result.identified_upper - result.identified_lower).abs() <= EPS { "IDENTIFIED_SINGLETON" } else { "PARTIALLY_IDENTIFIED" },
+                field,
+                value
+            );
+        }
         if result.verdict == "NOT_IDENTIFIED" {
             let _ = writeln!(
                 out,
@@ -470,6 +504,40 @@ mod tests {
     }
 
     #[test]
+    fn zero_support_emits_structural_region_not_a_confidence_interval() {
+        let report = enumerate(&scenario("zero_support")).unwrap();
+        assert_eq!(report.verdict, "NOT_IDENTIFIED");
+        assert!((report.supported_target_contribution - 0.1).abs() < EPS);
+        assert!((report.identified_lower - 0.1).abs() < EPS);
+        assert!((report.identified_upper - 0.6).abs() < EPS);
+        assert!(report.identified_lower <= report.target_value);
+        assert!(report.target_value <= report.identified_upper);
+        assert!(report.metrics.is_empty());
+    }
+
+    #[test]
+    fn zero_support_two_worlds_have_identical_logged_law_but_different_target_values() {
+        let base = scenario("zero_support");
+        let mut low_world = base.clone();
+        low_world.reward_b = 0.0;
+        let mut high_world = base;
+        high_world.reward_b = 1.0;
+        assert_eq!(logged_event_probabilities(&low_world), logged_event_probabilities(&high_world));
+        assert!((target_value(&low_world) - 0.1).abs() < EPS);
+        assert!((target_value(&high_world) - 0.6).abs() < EPS);
+        let low = enumerate(&low_world).unwrap();
+        let high = enumerate(&high_world).unwrap();
+        assert_eq!(low.verdict, "NOT_IDENTIFIED");
+        assert_eq!(high.verdict, "NOT_IDENTIFIED");
+        assert!((low.identified_lower - high.identified_lower).abs() < EPS);
+        assert!((low.identified_upper - high.identified_upper).abs() < EPS);
+        assert!(low.identified_lower <= target_value(&low_world));
+        assert!(target_value(&low_world) <= low.identified_upper);
+        assert!(high.identified_lower <= target_value(&high_world));
+        assert!(target_value(&high_world) <= high.identified_upper);
+    }
+
+    #[test]
     fn exact_zero_support_is_not_identified_and_metrics_are_suppressed() {
         let report = enumerate(&scenario("zero_support")).unwrap();
         assert_eq!(report.verdict, "NOT_IDENTIFIED");
@@ -487,6 +555,9 @@ mod tests {
         assert!(first.contains("SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED"));
         assert!(first.contains("METRIC\thealthy_correct\tIPS\tSUPPORT_OK_SYNTHETIC_ONLY\texpected\t0.500000000000"));
         assert!(first.contains("confidence_intervals\tNOT_COMPUTED"));
+        assert!(first.starts_with("record_type\tscenario_id\testimator\tverdict\tmetric\tvalue\n"));
+        assert!(first.contains("IDENTIFICATION_REGION\tzero_support\t-\tPARTIALLY_IDENTIFIED\tlower_bound\t0.100000000000"));
+        assert!(first.contains("IDENTIFICATION_REGION\tzero_support\t-\tPARTIALLY_IDENTIFIED\tupper_bound\t0.600000000000"));
     }
 
     #[test]
