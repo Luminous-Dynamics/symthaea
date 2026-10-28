@@ -82,6 +82,11 @@ Report nominal expected delta, worst-case expected delta across the declared TV 
 
 ## Test status and claim ceiling
 
-Twelve Rust unit tests are defined, covering exact hand calculations, TV radius zero/full, identical costs, probability-mass validation, stable row ordering, radius-mismatch rejection, and a scenario where nominal improvement turns into a positive worst-case expected cost delta. No Rust compile/test is claimed because the current environment has no `cargo` or `rustc`.
+Twelve Rust unit tests are defined, covering exact hand calculations, TV radius zero/full, identical costs, probability-mass validation, stable row ordering, radius-mismatch rejection, and a scenario where nominal improvement turns into a positive worst-case expected cost delta. Three integration-oracle tests independently enumerate tiny probability grids and compare the resulting maximum expected cost against the production greedy transfer method, including zero-probability stress atoms. These are defined but not run: the current environment has no `cargo` or `rustc`.
 
 Any passing result is bounded to the finite support and the declared TV ambiguity set. It does not prove distribution-free robustness, airline savings, causal intervention effects, operational authority, airworthiness or regulatory certification.
+
+
+## Tracking
+
+Implementation and reproduction follow-up: [AVIATION-ENTERPRISE-008 #8752](https://github.com/Luminous-Dynamics/symthaea/issues/8752). Related implementation PR: [#8586](https://github.com/Luminous-Dynamics/symthaea/pull/8586).
