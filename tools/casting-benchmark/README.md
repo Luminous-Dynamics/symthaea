@@ -357,5 +357,5 @@ python3 tools/casting-benchmark/score_compositional_bakeoff.py \
 For the default cost map of low=1, medium=5, high=25, the policy's fixed allocation spends 60 + 40 + 100 = 200 cost units. It must be compared against all five earlier policies on the exact same candidate pool and seed. The compositional full matrix expands from 4,860 to **5,832 policy runs**. A good result would be a paired gain over the strongest baseline across held-out compositions—not a win against high-only alone. External MF-HVKG and MOMF remain required baselines.
 
 Research basis: BoTorch's MF-HVKG selects evaluations for expected value of information about the Pareto set, while MOMF includes fidelity as an additional objective. Recent constrained Bayesian-optimization work also highlights difficulty at active feasibility boundaries. DIWA is therefore not claimed as a new general acquisition principle; its contribution is a transparent, auditable challenger targeted at compositional model-error and decision-risk stress. Sources:
-- https://botorch.org/docs/v0.13.0/tutorials/Multi_objective_multi_fidelity_BO
+- https://github.com/meta-pytorch/botorch/blob/v0.18.1/tutorials/Multi_objective_multi_fidelity_BO/Multi_objective_multi_fidelity_BO.ipynb
 - https://link.springer.com/article/10.1007/s10589-026-00826-9
