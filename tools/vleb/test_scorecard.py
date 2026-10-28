@@ -36,6 +36,8 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
 
     current = data.get("current_measurements", {})
     for measure_name, measurement in current.items():
+        if "value" not in measurement:
+            continue
         value = measurement.get("value")
         if value is None and measurement.get("eligible") is not False:
             errors.append("null_measurement_eligible:" + measure_name)
