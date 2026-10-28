@@ -16,8 +16,8 @@ The current `crates/domains/symthaea-broca/src/memory_bridge.rs` queries `HdcSto
 - active evidence is eligible only within the matching scope and its optional validity interval;
 - revoked, superseded and deleted records are not returned;
 - deletion keeps a tombstone in the resolver; snapshot/restore preserves deleted, revoked and superseded records and rejects a duplicate-ID reinsert after restart;
-- deterministic snapshot bytes are HDC-ID ordered, schema-versioned and checksummed; restore rebuilds ID maps from records and rejects malformed digests, duplicate identities, corrupt text content, and dangling/cross-scope supersession links;
-- `EvidenceCommitManifest` binds exact HDC-index bytes and evidence-snapshot bytes to one nonzero generation, detecting stale index/snapshot pairings before a query is admitted;
+- deterministic snapshot bytes require an explicit nonzero generation, are HDC-ID ordered and schema-versioned, and bind schema + generation + records in the snapshot digest; restore rebuilds ID maps from records and rejects malformed digests, duplicate identities, corrupt text content, and dangling/cross-scope supersession links;
+- `EvidenceCommitManifest` binds exact HDC-index bytes and evidence-snapshot bytes to one nonzero generation, rejects a manifest/snapshot generation mismatch, and detects later artifact substitution; the coordinator must still ensure the index bytes were produced for that generation;
 - text payload digests are verified before emission; image paths are canonicalized under a trusted payload root and their file-byte digests are checked;
 - duplicate HDC/evidence IDs, malformed digests, invalid lifecycle shapes, path traversal, and corrupt payloads fail closed;
 - resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained.
