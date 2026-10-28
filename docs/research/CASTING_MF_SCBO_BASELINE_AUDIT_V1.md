@@ -118,3 +118,14 @@ The exact discrete VOI calculator added to the research branch is mathematically
 Before a model-driven VOI policy participates in a primary comparison, archive a calibration study using predictions made before observations are revealed. Include held-out predictive log score or Brier score, reliability diagnostics where applicable, and stratification near the constraint boundary and across shift families. If no suitable calibrated distribution exists, use the deterministic proxy track and label it accordingly. A correct decision-theoretic formula paired with a misspecified model can systematically purchase the wrong evaluations.
 
 No calibrated predictive model or performance improvement is claimed by the current exact-discrete reference calculator.
+
+
+## 8. Prequential forecast scoring prerequisite
+
+The branch now includes `tools/casting-benchmark/forecast_validation.py`. It scores probability vectors made available before an outcome against the eventual observed outcome using multiclass Brier score, log loss, fixed-bin top-label reliability and regime-stratified reports. The outcome record binds to the canonical forecast digest; the scorer rejects any forecast bytes that no longer match the recorded digest.
+
+This is an offline validator, not a timing authority. A valid digest proves byte agreement, not that the forecast was actually emitted before the outcome. A production evaluation must also preserve the policy's input/output boundary and independently archive forecast-time events; do not allow the optimizer to read any outcomes or holdout shifts before decisions are frozen.
+
+The score report is descriptive. For repeated observations, define the independent unit and uncertainty method; do not treat correlated rows as independent. A low score on one synthetic regime does not imply physical calibration, and a high aggregate score must not hide boundary/shift degradation.
+
+Implementation and unit tests are committed to the research branch and wired to the focused CI job. They have not yet been claimed passing pending an exact-head run.
