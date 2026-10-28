@@ -58,6 +58,7 @@ class ClaimFixture:
                 "artifact_sha256": sha(self.evidence_raw),
                 "execution_receipt_path": "index-receipt.json",
                 "execution_receipt_sha256": sha(self.execution_receipt_raw),
+                "invocation_sha256": "f" * 64,
                 "verifier_id": "test-source-indexer",
                 "verifier_sha256": "d" * 64,
                 "observed_result": "supports",
