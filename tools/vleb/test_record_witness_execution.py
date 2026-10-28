@@ -162,7 +162,7 @@ class WitnessRecorderTests(unittest.TestCase):
             "--network-mode", "none",
             "--network-mode-observed", "true",
             "--expected-invocation-sha256", recorder.invocation_digest(
-                [sys.executable, "-c", "print('should not run')"], ".", 120000
+                [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"], ".", 120000
             ),
             "--receipt-path", "claims/witness.json",
             "--stdout-path", "logs/stdout.txt",
@@ -188,6 +188,9 @@ class WitnessRecorderTests(unittest.TestCase):
             "--runtime-image-id", "sha256:" + "a" * 64,
             "--network-mode", "none",
             "--network-mode-observed", "true",
+            "--expected-invocation-sha256", recorder.invocation_digest(
+                [sys.executable, "-c", "print('should not run')"], ".", 120000
+            ),
             "--receipt-path", "claims/witness.json",
             "--stdout-path", "logs/stdout.txt",
             "--stderr-path", "logs/stderr.txt",
