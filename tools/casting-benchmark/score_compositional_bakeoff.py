@@ -819,6 +819,8 @@ def score_document(
         else:
             _near(run["false_promotion_rate"], rate, f"{label}.false_promotion_rate", errors)
 
+        _replay_diwa_run(run, errors)
+
     expected_keys = {
         (obj, con, dim, float(sev), seed, policy)
         for obj, con, dim, sev, seed, policy in itertools.product(
