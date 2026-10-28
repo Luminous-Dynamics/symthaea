@@ -84,7 +84,11 @@
       "filename": "PRIOR_SET_COVERAGE_DOUBLE_ORACLE_RESULTS_2026-10-28.json",
       "bytes": 22070,
       "sha256": "b5aed02a4581054676f2602eef6f6577ec075f452e6987cd2895c757eddd2435",
-      "committed_to_repository": false
+      "committed_losslessly_as": "validation/PRIOR_SET_COVERAGE_DOUBLE_ORACLE_RESULTS_2026-10-28.json.gz",
+      "compressed_bytes": 6278,
+      "compressed_sha256": "116cb94a72a54716a5fc1a768ae06a784db1529773f3c3d087db39741edb3565",
+      "git_blob": "b1c2cb863f86f93fd0462c411f3dc43d88ec1315",
+      "decompresses_to_raw_sha256": true
     },
     "maximum_raw_double_oracle_vs_full_game_difference_bits": 3.2085445411667024e-13,
     "outward_numerical_margin_each_side_bits": 1e-9,
@@ -99,8 +103,7 @@
     "only eight deterministic horizon-two policy trees; no scaling claim",
     "full-simplex guarantee covers prior weights over the fixed 16-hypothesis support only",
     "no external causal-discovery benchmark was executed",
-    "runtime numbers do not establish speedup",
-    "the full 22,070-byte risk-matrix result JSON remains local-only; its SHA-256 is recorded in verification.local_result_artifact"
+    "runtime numbers do not establish speedup"
   ],
   "next_gate": "Integrate against the exact Symthaea action/likelihood code, then qualify held-out causal recovery and compare exact frontier, epsilon pruning, column generation and prior/world double oracle at equal certificate tolerances."
 }
