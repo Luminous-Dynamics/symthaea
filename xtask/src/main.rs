@@ -12,6 +12,7 @@ mod cognitive_replay_receipt;
 mod cognitive_replay_driver;
 mod cognitive_adaptation_audit;
 mod cognitive_adaptation_replay;
+mod cognitive_missingness;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -102,6 +103,14 @@ enum Commands {
         /// Raw replay receipt to validate and bind to the score. Required for confirmatory panels.
         #[arg(long)]
         receipt: Option<PathBuf>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Score bounded-loss identification bounds and MNAR sensitivity for missing outcomes.
+    /// This is a statistical score, not a proof of measurement authenticity or causal identification.
+    ScoreCognitiveMissingness {
+        #[arg(long)]
+        input: PathBuf,
         #[arg(long)]
         out: Option<PathBuf>,
     },
@@ -279,6 +288,16 @@ fn main() -> anyhow::Result<()> {
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
                 println!("Wrote counterfactual adaptation utility score to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::ScoreCognitiveMissingness { input, out } => {
+            let result = cognitive_missingness::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote informative-missingness identification score to {}", path.display());
             } else {
                 println!("{rendered}");
             }
