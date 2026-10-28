@@ -65,6 +65,15 @@ struct WriterLock {
     _file: File,
 }
 
+/// Explicit visible-file retention result. This is not a secure-erasure receipt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidencePruneReport {
+    pub current_generation: u64,
+    pub retained_generation_window_start: u64,
+    pub removed_generation_directories: Vec<String>,
+    pub removed_staging_directories: usize,
+}
+
 impl Drop for WriterLock {
     fn drop(&mut self) {
         // Best-effort cleanup; if it fails, the next writer fails closed.
@@ -171,6 +180,112 @@ impl EvidenceDiskStore {
             return Err("CURRENT pointer has invalid generation or manifest digest".into());
         }
         self.read_generation(&pointer).map(Some)
+    }
+
+    /// Remove old visible generation directories under the exclusive writer lock.
+    ///
+    /// retain_generations is a window of generation numbers, including CURRENT.
+    /// CURRENT is always retained. Published-but-never-current future generations
+    /// are discarded, along with stale staging directories. If multiple immutable
+    /// artifacts exist for a retained historical generation, all are preserved
+    /// because this store has no authenticated predecessor chain to distinguish
+    /// a former commit from a failed alternate commit at that generation.
+    ///
+    /// This removes visible files only. It is NOT secure erasure: filesystem
+    /// journals, snapshots, backups, SSD remapping, or external copies may retain
+    /// the bytes. Use application-level encryption/crypto-erasure where required.
+    pub fn prune_history(&self, retain_generations: usize) -> Result<EvidencePruneReport, String> {
+        if retain_generations == 0 {
+            return Err("retain_generations must be at least 1".into());
+        }
+        let _local = self.local_writer.lock()
+            .map_err(|_| "evidence store writer mutex is poisoned".to_string())?;
+        let _process = self.acquire_process_lock()?;
+        let current = self.recover()?
+            .ok_or_else(|| "cannot prune evidence history without a committed CURRENT generation".to_string())?;
+
+        let current_path = self.root.join(CURRENT_FILE);
+        let pointer_bytes = read_regular_file(&current_path)?;
+        let pointer: CurrentPointer = serde_json::from_slice(&pointer_bytes)
+            .map_err(|error| format!("invalid CURRENT pointer during prune: {error}"))?;
+        if pointer.generation != current.generation {
+            return Err("CURRENT changed while acquiring the retention lock".into());
+        }
+        let current_dir_name = generation_directory_name(pointer.generation, &pointer.manifest_sha256);
+        let generations = self.root.join("generations");
+        let retain_u64 = u64::try_from(retain_generations).unwrap_or(u64::MAX);
+        let width = retain_u64.saturating_sub(1);
+        let window_start = current.generation.saturating_sub(width);
+
+        let mut generation_dirs: Vec<(u64, String, PathBuf)> = Vec::new();
+        let mut staging_dirs: Vec<PathBuf> = Vec::new();
+        for entry in fs::read_dir(&generations)
+            .map_err(|error| format!("failed to enumerate evidence generations: {error}"))?
+        {
+            let entry = entry.map_err(|error| format!("failed to read generation entry: {error}"))?;
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let metadata = fs::symlink_metadata(&path)
+                .map_err(|error| format!("failed to inspect generation entry: {error}"))?;
+            if metadata.file_type().is_symlink() {
+                return Err(format!("refusing to prune symlinked generation entry {name}"));
+            }
+            if name.starts_with(".staging-") {
+                if !metadata.is_dir() {
+                    return Err(format!("staging entry is not a directory: {name}"));
+                }
+                staging_dirs.push(path);
+                continue;
+            }
+            if !name.starts_with("generation-") || !metadata.is_dir() {
+                return Err(format!("unrecognized evidence generation entry: {name}"));
+            }
+            let rest = name.strip_prefix("generation-").expect("prefix checked");
+            let (number, digest) = rest.split_once('-')
+                .ok_or_else(|| format!("malformed generation directory name: {name}"))?;
+            if number.len() != 20 || digest.len() != 64 || !is_sha256(digest) {
+                return Err(format!("malformed generation directory name: {name}"));
+            }
+            let generation = number.parse::<u64>()
+                .map_err(|_| format!("invalid generation number in {name}"))?;
+            if generation == 0 {
+                return Err(format!("zero generation number in {name}"));
+            }
+            generation_dirs.push((generation, name, path));
+        }
+
+        if !generation_dirs.iter().any(|(_, name, _)| name == &current_dir_name) {
+            return Err("CURRENT generation directory is missing from retention scan".into());
+        }
+
+        // Never delete while the directory inventory contains malformed entries;
+        // after the full scan succeeds, apply the already-decided deletion set.
+        generation_dirs.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+        let mut removed_generation_directories = Vec::new();
+        for (generation, name, path) in generation_dirs {
+            let is_current = name == current_dir_name;
+            let outside_window = generation < window_start || generation > current.generation;
+            let alternate_at_current_generation = generation == current.generation && !is_current;
+            if !is_current && (outside_window || alternate_at_current_generation) {
+                fs::remove_dir_all(&path)
+                    .map_err(|error| format!("failed to prune generation {name}: {error}"))?;
+                removed_generation_directories.push(name);
+            }
+        }
+
+        let mut removed_staging_directories = 0usize;
+        for path in staging_dirs {
+            fs::remove_dir_all(&path)
+                .map_err(|error| format!("failed to remove stale staging directory {}: {error}", path.display()))?;
+            removed_staging_directories += 1;
+        }
+        sync_directory(&generations)?;
+        Ok(EvidencePruneReport {
+            current_generation: current.generation,
+            retained_generation_window_start: window_start,
+            removed_generation_directories,
+            removed_staging_directories,
+        })
     }
 
     #[cfg(test)]
