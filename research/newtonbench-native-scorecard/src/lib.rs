@@ -914,7 +914,8 @@ pub fn audit(
     );
     let (rmsle_se, rmsle_lower, rmsle_upper) = standard_error_ci95(&rmsle_deltas);
     let (accuracy_se, accuracy_lower, accuracy_upper) = standard_error_ci95(&accuracy_deltas);
-    let (experiments_se, experiments_lower, experiments_upper) = standard_error_ci95(&experiment_deltas);
+    let (experiments_se, experiments_lower, experiments_upper) =
+        standard_error_ci95(&experiment_deltas);
     let (rounds_se, rounds_lower, rounds_upper) = standard_error_ci95(&round_deltas);
     let (tokens_se, tokens_lower, tokens_upper) = standard_error_ci95(&token_deltas);
     let comparison = ComparisonSummaryV1 {
@@ -1164,6 +1165,8 @@ mod tests {
             (report.body.comparison.mean_rmsle_delta_tool_minus_vanilla.unwrap() + 0.3).abs()
                 < 1.0e-12
         );
+        assert_eq!(report.body.comparison.rmsle_delta_ci95_lower, None);
+        assert_eq!(report.body.comparison.rmsle_delta_ci95_upper, None);
         assert_eq!(report.body.comparison.exact_accuracy_pair_count, 1);
         assert_eq!(report.body.comparison.mean_exact_accuracy_delta_tool_minus_vanilla, Some(1.0));
         assert_eq!(report.body.comparison.mean_experiments_delta_tool_minus_vanilla, Some(-1.0));
