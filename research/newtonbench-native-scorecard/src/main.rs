@@ -38,10 +38,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn collect_trial_artifacts(root: &Path) -> io::Result<Vec<ArtifactInput>> {
-    if !root.is_dir() {
+    let metadata = fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("trial directory does not exist or is not a directory: {}", root.display()),
+            format!(
+                "trial input root must be a real directory, not a symlink: {}",
+                root.display()
+            ),
         ));
     }
     let mut paths = Vec::new();
