@@ -163,7 +163,9 @@ pub fn calibrate_tv_radius(
     let k = frequencies.len() as f64;
     let delta = f64::from(failure_probability_ppm) / f64::from(PROBABILITY_SCALE_PPM);
     let coordinate_bound = ((2.0 * k / delta).ln() / (2.0 * count_total as f64)).sqrt();
-    let tv_allowance = (0.5 * k * coordinate_bound).min(1.0);
+    let raw_tv_allowance = 0.5 * k * coordinate_bound;
+    let sampling_allowance_capped = raw_tv_allowance >= 1.0;
+    let tv_allowance = raw_tv_allowance.min(1.0);
     let sampling_allowance_ppm =
         (tv_allowance * f64::from(PROBABILITY_SCALE_PPM)).ceil() as u32;
     let unsaturated = u64::from(empirical_tv_ppm) + u64::from(sampling_allowance_ppm);
@@ -176,7 +178,7 @@ pub fn calibrate_tv_radius(
         empirical_tv_distance_ppm: empirical_tv_ppm,
         sampling_allowance_ppm,
         required_tv_radius_ppm,
-        capped_at_maximum_radius: unsaturated > u64::from(PROBABILITY_SCALE_PPM),
+        capped_at_maximum_radius: sampling_allowance_capped || unsaturated > u64::from(PROBABILITY_SCALE_PPM),
         assumption: "independent calibration episodes from one fixed finite-support distribution",
     })
 }
@@ -837,6 +839,20 @@ mod tests {
             calibrate_tv_radius_from_episodes(&[episode("b", "airport-a", "x")], &[bad_mass], 50_000),
             Err(RadiusCalibrationError::NominalRegimeProbabilityMassMismatch { .. })
         ));
+    }
+
+ 
+    #[test]
+    fn sampling_allowance_cap_is_reported_even_if_empirical_tv_is_zero() {
+        let items = vec![
+            CalibrationFrequency { scenario_id: "a".into(), nominal_probability_ppm: 500_000, observed_count: 1 },
+            CalibrationFrequency { scenario_id: "b".into(), nominal_probability_ppm: 500_000, observed_count: 1 },
+        ];
+        let report = calibrate_tv_radius(&items, 50_000).unwrap();
+        assert_eq!(report.empirical_tv_distance_ppm, 0);
+        assert_eq!(report.sampling_allowance_ppm, PROBABILITY_SCALE_PPM);
+        assert_eq!(report.required_tv_radius_ppm, PROBABILITY_SCALE_PPM);
+        assert!(report.capped_at_maximum_radius);
     }
 
 }
