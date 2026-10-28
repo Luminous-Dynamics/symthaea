@@ -34,8 +34,11 @@ The output probabilities should sum to one. The null test checks that the single
 
     cargo test --locked --manifest-path tools/active-evidence-shift-monitor/Cargo.toml
     cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml > /tmp/shift-monitor.csv
+    cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --sentinel-budget-csv > /tmp/sentinel-budget.csv
     python3 tools/active-evidence-shift-monitor/reference_check.py --self-test
     python3 tools/active-evidence-shift-monitor/reference_check.py /tmp/shift-monitor.csv
+    python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget-self-test
+    python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget /tmp/sentinel-budget.csv
 
 ## Exploratory Python reference results
 
@@ -142,3 +145,26 @@ The per-cell alpha allocation is 0.004167. The randomized-sentinel stream remain
 **Paradigm shift:** separate *what changed in the world* from *what the acquisition policy chose to observe*. A detector should use a randomized sentinel/audit stream, known inclusion probabilities with a justified design-based estimator, or explicitly condition its null on the acquisition policy. Adaptive observations and random audits must be tracked as separate evidence channels. Sentinel labels and compute must remain charged to the acquisition budget; this fixture demonstrates the identification problem, not that a specific weighted or adaptive correction is already validated.
 
 The Rust DP, independent Python reference checker, and negative control now include this scenario. They still need exact-head workflow qualification before this is described as Rust-verified evidence.
+
+
+## 19. Sentinel budget versus drift detection
+
+The second executable report makes audit cost an explicit dimension. It fixes a total budget of 1,000 labels and a target-population change from p=0.5 to p=0.8 after 100 total labels. For sentinel fractions q in {0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0}, labels assigned to sentinels are sampled from the target population on a deterministic, regularly spaced audit cadence; the rest can be assigned to the adaptive policy. The drift detector consumes only the randomized sentinel stream. This keeps the null interpretable instead of quietly treating policy-selected labels as representative.
+
+The following values come from a separate exact-DP Python prototype of the same finite Bernoulli model. The Rust implementation and independent CSV reference checker now encode the same frontier, but exact-head workflow parity has not yet been established.
+
+| Sentinel share of total label budget | Sentinel labels | No-environment-shift alarm probability | Detection after a genuine p=0.5 to p=0.8 shift by end of budget | Mean delay after shift, in total-label equivalents |
+|---:|---:|---:|---:|---:|
+| 0% | 0 | ~1.000000 (selection-only stream; spurious) | Not identifiable from a representative audit channel | — |
+| 5% | 50 | 0.002118 | 57.69% | 614 |
+| 10% | 100 | 0.002461 | 96.96% | 473 |
+| 20% | 200 | 0.002711 | 99.85% | 285 |
+| 25% | 250 | 0.002774 | 99.84% | 241 |
+| 50% | 500 | 0.002938 | 99.79% | 148 |
+| 100% | 1,000 | 0.003059 | 99.75% | 95 |
+
+**Read this as a cost–power frontier, not a universal recommendation.** In this fixture, a 10% randomized audit budget is enough to achieve about 97% detection by the 1,000-label horizon for the specified abrupt shift, while a 5% audit budget detects only about 58%. More sentinel labels improve detection delay, but spend less budget on exploitation/acquisition. The 0% row has almost-certain apparent drift because the policy-selected stream has event rate 0.74 even when the target is stable. This example does not demonstrate that 10% is optimal for other tasks or weak/gradual shifts.
+
+A subtlety: the “no-environment-shift alarm probability” for q>0 is the probability of an alarm on the randomized sentinel channel over its own number of observations; for q=0 it is the spurious alarm probability of the adaptively selected channel over the full budget. The genuine-shift column excludes alarms that occur before the change; that pre-change false-alarm probability is also emitted separately in the CSV. Delay is conditional on detection after the shift and converted to total-label equivalents by dividing sentinel-count delay by q.
+
+This benchmark now allows the next experiment to sweep not only sentinel share but also change magnitude, change onset, stratum prevalence, misspecified audit inclusion probabilities, and rare/unsupported target groups. A later version should compare a random sentinel channel against valid design-based reweighting and policy-conditioned nulls; this release does not claim any of those corrections is already qualified.
