@@ -382,7 +382,7 @@ The implementation retains the same explicit limitations as the fixed-bet PRM: t
 
 `audit-cognitive-adaptation-panel` goes beyond the panel’s receipt-link metadata. It reopens the protocol, panel input, each per-cell utility input, and every replay receipt; independently re-runs the receipt-bound scorer for each registered cell; requires exact equality with the stored score; rejects reused identities and unsafe paths; and recomputes the panel comparison.
 
-The command requires an external `--expected-bundle-sha256` supplied by a preregistration record independent of the outcome bundle. It also checks the protocol metric version, declared 7 × 50 × 8 grid, and exact scenario set. This makes an audit reproducible against an independently pinned bundle rather than trusting the digest embedded in that same bundle.
+The command requires an external `--expected-bundle-sha256` supplied by a preregistration record independent of the outcome bundle. It also checks the protocol metric version, the exact seven registered dataset IDs (`Asfault`, `Electricity`, `Covertype`, `GasSensorArray`, `NOAA`, `Posture`, `Rialto`), seed IDs `0..49`, all eight scenario IDs, and the 2,800-cell grid. This makes an audit reproducible against an independently pinned bundle rather than trusting the digest embedded in that same bundle.
 
 ```bash
 cargo run --locked -p xtask -- audit-cognitive-adaptation-panel \
