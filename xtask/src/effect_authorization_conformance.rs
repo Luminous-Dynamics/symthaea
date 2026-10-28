@@ -180,6 +180,9 @@ fn validate(manifest: &Manifest, corpus_sha256: String) -> Result<Summary> {
         );
     }
     require_nonempty("owner", &manifest.owner)?;
+    if manifest.owner != "Luminous-Dynamics/symthaea" {
+        bail!("v1 benchmark owner must remain Luminous-Dynamics/symthaea");
+    }
     require_nonempty("purpose", &manifest.purpose)?;
     require_nonempty("related_work.registry", &manifest.related_work.registry)?;
     require_nonempty("related_work.federated_identity_issue", &manifest.related_work.federated_identity_issue)?;
@@ -187,9 +190,15 @@ fn validate(manifest: &Manifest, corpus_sha256: String) -> Result<Summary> {
     require_nonempty("related_work.mycelix_claim_recognition_issue", &manifest.related_work.mycelix_claim_recognition_issue)?;
     require_nonempty("related_work.mycelix_typed_receipt_issue", &manifest.related_work.mycelix_typed_receipt_issue)?;
     require_nonempty("fixture_contract.baseline_fixture", &manifest.fixture_contract.baseline_fixture)?;
+    if manifest.fixture_contract.baseline_fixture != "valid_federated_authorized_operation_v1" {
+        bail!("v1 baseline fixture identity changed; add an explicit reviewed corpus version");
+    }
     require_nonempty("fixture_contract.isolation", &manifest.fixture_contract.isolation)?;
     require_nonempty("fixture_contract.mutation_semantics", &manifest.fixture_contract.mutation_semantics)?;
     require_nonempty("test_profile.id", &manifest.test_profile.id)?;
+    if manifest.test_profile.id != "strict_current_authority_v1" {
+        bail!("v1 security profile identity changed; create a separately reviewed benchmark profile");
+    }
     require_nonempty("case_schema.expected_effect_adapter_invocations_for_case", &manifest.case_schema.expected_effect_adapter_invocations_for_case)?;
     require_nonempty("case_schema.effect_witness", &manifest.case_schema.effect_witness)?;
     require_nonempty("case_schema.terminal_class", &manifest.case_schema.terminal_class)?;
@@ -1016,6 +1025,24 @@ mod tests {
         let digest = format!("{:x}", sha2::Sha256::digest(raw));
         let result = super::validate(&manifest, digest);
         assert!(result.is_ok(), "committed v1 corpus failed structural validation: {result:?}");
+    }
+
+    #[test]
+    fn fixture_identity_cannot_be_relabelled_in_v1() {
+        let raw = include_bytes!("../../docs/security/effect-authorization-conformance.v1.json");
+        let mut manifest: super::Manifest = serde_json::from_slice(raw).unwrap();
+        manifest.fixture_contract.baseline_fixture = "different_fixture".to_string();
+        let digest = format!("{:x}", sha2::Sha256::digest(raw));
+        assert!(super::validate(&manifest, digest).is_err());
+    }
+
+    #[test]
+    fn test_profile_identity_cannot_be_relabelled_in_v1() {
+        let raw = include_bytes!("../../docs/security/effect-authorization-conformance.v1.json");
+        let mut manifest: super::Manifest = serde_json::from_slice(raw).unwrap();
+        manifest.test_profile.id = "permissive_profile".to_string();
+        let digest = format!("{:x}", sha2::Sha256::digest(raw));
+        assert!(super::validate(&manifest, digest).is_err());
     }
 
     #[test]
