@@ -8,7 +8,7 @@ This branch is stacked on [PR #8682](https://github.com/Luminous-Dynamics/symtha
 
 - `EvidenceRecord.source_pointer` binds an item to the exact string in the canonical trajectory JSON, not merely to a digest of the whole source object. The batch verifier parses source JSON once and validates each pointer before committing any record.
 - `EvidenceIndex::insert_batch_atomic` validates every record and pointer before any mutation, so a malformed final record cannot leave half a trajectory indexed.
-- `EvidenceIndex::search_bm25` provides deterministic, model-free BM25 retrieval over active text evidence, after scope/time/lifecycle and payload-digest checks.
+- `EvidenceIndex::search_bm25` provides deterministic, model-free BM25 retrieval over active text evidence. Payload digests and tokens are computed once at ingestion; a compact inverted index stores term postings, while query-time scope/time/lifecycle filtering recomputes corpus statistics from eligible documents and visits only postings for query terms.
 - The `broca-lme-worker` binary accepts bounded JSONL requests, supports one pinned `web` or `enterprise` scope per process, ingests official-style trajectory objects, and returns reader context plus a separate provenance/score audit.
 - `broca_rust_memory.py` is the thin Python `Memory` adapter for the official harness. It checks request IDs, response shapes, timeouts, line bounds and worker binary SHA-256; the retrieval/ranking remains in Rust. Its save/load journal hashes and replays the exact trajectory set into the pinned worker binary.
 - `install_longmemeval_adapter.py` installs the adapter into a clean, explicitly pinned upstream checkout, with dry-run behavior by default.
@@ -38,7 +38,7 @@ python3 research/broca-lexical-evidence-baseline-v1/install_longmemeval_adapter.
   --upstream /path/to/LongMemEval-V2 --apply
 ```
 
-The installer adds a `broca_rust` method to upstream `evaluation/run_eval.py`, registers the adapter, and records the worker path/scope/BM25 settings in its generated memory config. It modifies only the selected local checkout; it does not open a PR against the upstream benchmark repository.
+The installer adds a `broca_rust` method to upstream `evaluation/run_eval.py`, registers the adapter, adds it to the non-shared parallel prompt-build allowlist (each memory instance owns its worker), and records the worker path/scope/BM25 settings in its generated memory config. It modifies only the selected local checkout; it does not open a PR against the upstream benchmark repository. Parallel prompt building is supported only after the installer patch has been applied to the pinned checkout.
 
 After building the worker, run one official domain per invocation, for example:
 
