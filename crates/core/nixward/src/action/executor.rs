@@ -814,6 +814,8 @@ mod tests {
     struct EffectWitnessRunner {
         invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
         observed_calls: std::sync::Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>,
+        expected_executable: String,
+        expected_args: Vec<String>,
         witness_path: std::path::PathBuf,
     }
 
@@ -837,8 +839,19 @@ mod tests {
                 .lock()
                 .expect("effect witness call log lock")
                 .push((executable.to_owned(), args.to_vec()));
+            let expected_executable = self.expected_executable.clone();
+            let expected_args = self.expected_args.clone();
+            let observed_executable = executable.to_owned();
+            let observed_args = args.to_vec();
             let witness_path = self.witness_path.clone();
             Box::pin(async move {
+                // Harness-sensitivity control: do not create a witness unless
+                // the adapter receives the exact executable and ordered argv.
+                if observed_executable != expected_executable || observed_args != expected_args {
+                    return Err(std::io::Error::other(
+                        "effect witness adapter received unexpected executable/argv",
+                    ));
+                }
                 // Spawn a harmless child-process fixture and pass the path as
                 // an argv element, not shell-interpolated command text. It
                 // produces a real temporary-file witness but never launches
@@ -1322,6 +1335,8 @@ mod tests {
         let denied_runner = Arc::new(EffectWitnessRunner {
             invocations: Arc::clone(&denied_invocations),
             observed_calls: Arc::clone(&denied_calls),
+            expected_executable: "nixos-rebuild".to_owned(),
+            expected_args: vec!["switch".to_owned(), "--flake".to_owned(), ".#approved".to_owned()],
             witness_path: denied_witness.clone(),
         });
         let mut denied_executor = NixOSExecutor::new().with_runner(denied_runner);
@@ -1366,6 +1381,8 @@ mod tests {
         let allowed_runner = Arc::new(EffectWitnessRunner {
             invocations: Arc::clone(&allowed_invocations),
             observed_calls: Arc::clone(&allowed_calls),
+            expected_executable: "nixos-rebuild".to_owned(),
+            expected_args: vec!["switch".to_owned(), "--flake".to_owned(), ".#approved".to_owned()],
             witness_path: allowed_witness.clone(),
         });
         let mut allowed_executor = NixOSExecutor::new().with_runner(allowed_runner);
@@ -1417,6 +1434,35 @@ mod tests {
             std::fs::read(&allowed_witness).unwrap(),
             b"authorized-effect-witness"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_effect_witness_fails_closed_on_unexpected_adapter_argv() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+            Mutex,
+        };
+
+        let temp = tempfile::tempdir().unwrap();
+        let witness_path = temp.path().join("unexpected-argv.witness");
+        let invocations = Arc::new(AtomicUsize::new(0));
+        let observed_calls = Arc::new(Mutex::new(Vec::new()));
+        let runner = EffectWitnessRunner {
+            invocations: Arc::clone(&invocations),
+            observed_calls: Arc::clone(&observed_calls),
+            expected_executable: "nixos-rebuild".to_owned(),
+            expected_args: vec!["switch".to_owned(), "--flake".to_owned(), ".#expected".to_owned()],
+            witness_path: witness_path.clone(),
+        };
+        let unexpected_args = vec!["switch".to_owned(), "--flake".to_owned(), ".#unexpected".to_owned()];
+
+        let result = runner.run("nixos-rebuild", &unexpected_args).await;
+        assert!(result.is_err());
+        assert_eq!(invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(observed_calls.lock().unwrap().len(), 1);
+        assert!(!witness_path.exists());
     }
 
     #[tokio::test]
