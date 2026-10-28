@@ -294,6 +294,17 @@ mod tests {
 
         let nonfinite = PendingReasoningOutcome::capture(&reasoning, Some(f64::NAN));
         assert_eq!(nonfinite.prediction_error_at_decision, None);
+
+        let evidence = PredictionErrorEvidence::valid(0.42, Some(10), 11).unwrap();
+        let typed = PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(evidence));
+        assert_eq!(typed.prediction_error_at_decision, Some(f64::from(0.42_f32)));
+        let frozen = typed.prediction_evidence_at_decision.as_ref().unwrap();
+        assert_eq!(frozen.observation_cycle(), 11);
+        assert_eq!(frozen.prediction_cycle(), Some(10));
+
+        let without_provenance = PendingReasoningOutcome::capture_with_evidence(&reasoning, None);
+        assert_eq!(without_provenance.prediction_error_at_decision, None);
+        assert!(without_provenance.prediction_evidence_at_decision.is_none());
     }
 
     #[test]
