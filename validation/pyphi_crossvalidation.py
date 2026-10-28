@@ -102,7 +102,7 @@ class ValidationReport:
 
 
 class PyPhiValidator:
-    """Validates HDC-Φ against exact PyPhi Φ calculation."""
+    """Compares a named Symthaea TPM candidate score with PyPhi φ_s; no equivalence is assumed."""
 
     def __init__(self, symthaea_binary: str = "cargo"):
         """
@@ -279,6 +279,14 @@ class PyPhiValidator:
                 f"Exact comparison supports 2..={MAX_EXACT_NODES} nodes; got {topology.n_nodes}"
             )
 
+        for edge in topology.edges:
+            if len(edge) != 2:
+                raise ValueError(f"edge must contain exactly two node indices: {edge!r}")
+            i, j = edge
+            if not (0 <= i < topology.n_nodes and 0 <= j < topology.n_nodes):
+                raise ValueError(f"edge endpoint outside node range 0..{topology.n_nodes - 1}: {edge!r}")
+            if i == j:
+                raise ValueError(f"self-loop not supported by this topology fixture contract: {edge!r}")
         adjacency = self.edges_to_adjacency(topology.n_nodes, topology.edges)
         n_states = 1 << topology.n_nodes
         tpm = np.zeros((n_states, topology.n_nodes), dtype=np.float64)
@@ -346,7 +354,7 @@ class PyPhiValidator:
 
     def compute_candidate_phi(
         self, payload: dict
-    ) -> Tuple[float, float, str]:
+    ) -> Tuple[float, float, str, str]:
         """Call the maintained Rust TPM adapter; failures never create scores."""
         start = __import__("time").monotonic()
         command = [
@@ -500,6 +508,8 @@ class PyPhiValidator:
             item for item in report.results
             if item.candidate_phi is not None and item.pyphi_phi_s is not None
             and item.error_message is None and len(item.model_sha256) == 64
+            and isinstance(item.rust_payload_blake3, str) and len(item.rust_payload_blake3) == 64
+            and item.candidate_metric_id == RUST_CANDIDATE_METRIC_ID
         ]
         report.n_validated = len(paired)
         report.n_failed = len(report.results) - report.n_validated
@@ -536,6 +546,8 @@ class PyPhiValidator:
             for r in report.results
             if r.candidate_phi is not None and r.pyphi_phi_s is not None
             and r.error_message is None and len(r.model_sha256) == 64
+            and isinstance(r.rust_payload_blake3, str) and len(r.rust_payload_blake3) == 64
+            and r.candidate_metric_id == RUST_CANDIDATE_METRIC_ID
             and math.isfinite(r.candidate_phi) and math.isfinite(r.pyphi_phi_s)
         ]
         report.correlation = None
@@ -619,7 +631,12 @@ class PyPhiValidator:
             "|---|---:|---|---|---:|---:|---:|---|",
         ])
         for result in report.results:
-            paired = result.candidate_phi is not None and result.pyphi_phi_s is not None and result.error_message is None
+            paired = (
+                result.candidate_phi is not None and result.pyphi_phi_s is not None
+                and result.error_message is None
+                and isinstance(result.rust_payload_blake3, str) and len(result.rust_payload_blake3) == 64
+                and result.candidate_metric_id == RUST_CANDIDATE_METRIC_ID
+            )
             error = abs(result.candidate_phi - result.pyphi_phi_s) if paired else None
             candidate = f"{result.candidate_phi:.8f}" if result.candidate_phi is not None else "N/A"
             reference = f"{result.pyphi_phi_s:.8f}" if result.pyphi_phi_s is not None else "N/A"
