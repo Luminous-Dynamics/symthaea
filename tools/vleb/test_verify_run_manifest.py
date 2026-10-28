@@ -112,6 +112,8 @@ class ManifestBundle:
             "subject_path": self.paths["bundle"],
         })
         self.manifest_path = self.root / "run-manifest.json"
+        self.trusted_auditor_sha256 = self.manifest["auditor"]["source_sha256"]
+        self.trusted_verifier_binary_sha256 = self.manifest["auditor"]["verifier_binary_sha256"]
         self.write_manifest()
         self.trusted_sha = sha(self.manifest_path.read_bytes())
 
@@ -143,6 +145,12 @@ class ManifestBundle:
             ),
             expected_schema_sha256=kwargs.pop(
                 "expected_schema_sha256", sha(self.schema.read_bytes())
+            ),
+            expected_auditor_sha256=kwargs.pop(
+                "expected_auditor_sha256", self.trusted_auditor_sha256
+            ),
+            expected_verifier_binary_sha256=kwargs.pop(
+                "expected_verifier_binary_sha256", self.trusted_verifier_binary_sha256
             ),
             verify_attestation=kwargs.pop("verify_attestation", False),
             **kwargs,
@@ -216,6 +224,14 @@ class RunManifestVerifierTests(unittest.TestCase):
     def test_manifest_schema_pin_is_required(self) -> None:
         result = self.bundle.audit(expected_schema_sha256="0" * 64)
         self.assert_issue(result, "schema_pin_mismatch")
+
+    def test_auditor_source_pin_is_required(self) -> None:
+        result = self.bundle.audit(expected_auditor_sha256="0" * 64)
+        self.assert_issue(result, "auditor_pin_mismatch")
+
+    def test_receipt_verifier_binary_pin_is_required(self) -> None:
+        result = self.bundle.audit(expected_verifier_binary_sha256="0" * 64)
+        self.assert_issue(result, "receipt_verifier_binary_pin_mismatch")
 
     def test_unbundled_loose_file_cannot_override_attested_bytes(self) -> None:
         (self.bundle.root / self.bundle.paths["patch"]).write_bytes(b"changed only outside the sealed ZIP")
