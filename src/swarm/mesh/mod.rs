@@ -69,6 +69,10 @@
 mod dual_layer;
 mod lora_fragment;
 mod mesh_receiver;
+#[cfg(test)]
+mod fragment_channel_model;
+#[cfg(test)]
+mod deadline_channel_model;
 pub mod sensor;
 
 // Sovereign Inoculation modules
