@@ -428,6 +428,27 @@ class RunManifestVerifierTests(unittest.TestCase):
         issues = self.audit_one_execution_receipt()
         self.assertIn("witness_receipt_run_binding_mismatch", {row["code"] for row in issues})
 
+    def test_execution_receipt_rejects_duplicate_json_keys_even_after_rehash(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_path = self.bundle.root / witness["execution_receipt_path"]
+        raw = receipt_path.read_bytes().rstrip()
+        self.assertTrue(raw.endswith(b"}"))
+        duplicate_raw = (
+            raw[:-1]
+            + b', "observed_result":"contradicts"}\\n'
+        )
+        receipt_path.write_bytes(duplicate_raw)
+        witness["execution_receipt_sha256"] = sha(duplicate_raw)
+        claim_path.write_bytes(jbytes(claim))
+
+        issues = self.audit_one_execution_receipt()
+        self.assertIn(
+            "witness_receipt_json_invalid",
+            {row["code"] for row in issues},
+        )
+
     def test_execution_receipt_rejects_mutated_output_bytes(self) -> None:
         (self.bundle.root / self.bundle.paths["claim_witness"]).write_bytes(b'{"copy_references":[]}\\n')
         issues = self.audit_one_execution_receipt()
