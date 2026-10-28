@@ -245,7 +245,7 @@ pub struct HdcStoreIdentity {
 }
 
 impl HdcStoreIdentity {
-    fn validate(&self) -> Result<(), String> {
+    pub(crate) fn validate_for_recovery(&self) -> Result<(), String> {
         if self.store_generation == 0 || self.checksum_version == 0 {
             return Err("HDC store identity generation and checksum version must be nonzero".into());
         }
@@ -285,7 +285,7 @@ impl EvidenceCommitManifest {
         evidence_snapshot_bytes: &[u8],
         identity: HdcStoreIdentity,
     ) -> Result<Self, String> {
-        identity.validate()?;
+        identity.validate_for_recovery()?;
         Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity))
     }
 
@@ -329,6 +329,9 @@ impl EvidenceCommitManifest {
         }
         if !is_sha256(&self.hdc_index_sha256) || !is_sha256(&self.evidence_snapshot_sha256) {
             return Err("evidence commit manifest contains an invalid SHA-256 digest".into());
+        }
+        if let Some(identity) = &self.hdc_store_identity {
+            identity.validate_for_recovery()?;
         }
         Ok(())
     }
