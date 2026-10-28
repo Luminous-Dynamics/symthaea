@@ -14,7 +14,9 @@ import re
 import sys
 from pathlib import Path
 from statistics import mean, stdev
+from collections import Counter
 
+INVALID_PAYLOADS = [None, 0.0, 1.0, -1.0, "NaN", "+Infinity", "-Infinity"]
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -43,8 +45,8 @@ def make_pair(index: int, arm: str, effect: float, rng: random.Random) -> dict:
     if not 0.0 <= y1 <= 1.0:
         raise AssertionError("synthetic outcome outside [0,1]; adjust DGP rather than clip")
     intervention = "valid_pe" if arm == "valid_pe" else "invalid_pe_payload"
-    invalid_payloads = [None, 0.0, 1.0, -1.0, "NaN", "+Infinity", "-Infinity"]
-    invalid_payload = invalid_payloads[index % len(invalid_payloads)] if intervention == "invalid_pe_payload" else None
+    invalid_payload = INVALID_PAYLOADS[index % len(INVALID_PAYLOADS)] if intervention == "invalid_pe_payload" else None
+    valid_pe_value = round(rng.random(), 8)
     common = {"decision_id": decision_id, "scenario_digest": scenario_digest,
               "initial_state_digest": initial_digest, "pre_intervention_state_digest": prefix_digest,
               "randomness_tape_digest": tape_digest, "outcome_calibration_digest": calibration_digest,
@@ -57,8 +59,8 @@ def make_pair(index: int, arm: str, effect: float, rng: random.Random) -> dict:
                  "execution_path_digest": digest({"path": intervention, "pair": pair_id}),
                  "evidence_id": f"evidence-{pair_id}" if intervention == "valid_pe" else None,
                  "pe_transition_count": 1 if intervention == "valid_pe" else 0,
-                 "compatibility_payload": round(effect, 8) if intervention == "valid_pe" else invalid_payload,
-                 "pe_value": round(effect, 8) if intervention == "valid_pe" else None}
+                 "compatibility_payload": valid_pe_value if intervention == "valid_pe" else invalid_payload,
+                 "pe_value": valid_pe_value if intervention == "valid_pe" else None}
     return {"pair_id": pair_id, "expected_intervention": intervention,
             "control": control, "treatment": treatment}
 
@@ -90,6 +92,14 @@ def audit_pair(pair: dict) -> dict:
         errors.append("CONTROL_ROLE_MISMATCH")
     if treatment.get("branch") != "treatment": errors.append("TREATMENT_BRANCH_LABEL_MISMATCH")
     if treatment.get("intervention") != expected: errors.append("TREATMENT_INTERVENTION_MISMATCH")
+    run_ids = [control.get("run_id"), treatment.get("run_id")]
+    if all(isinstance(x, str) and x for x in run_ids) and run_ids[0] == run_ids[1]:
+        errors.append("PAIR_RUN_ID_COLLISION")
+    path_digests = [control.get("execution_path_digest"), treatment.get("execution_path_digest")]
+    if any(not valid_digest(x) for x in path_digests):
+        errors.append("EXECUTION_PATH_DIGEST_INVALID")
+    elif path_digests[0] == path_digests[1]:
+        errors.append("POST_INTERVENTION_PATH_NOT_DISTINCT")
     for label, run in (("control", control), ("treatment", treatment)):
         if not isinstance(run.get("run_id"), str) or not run["run_id"]:
             errors.append(f"{label.upper()}_RUN_ID_MISSING")
@@ -136,10 +146,12 @@ def payload_key(v: object) -> tuple:
     return (type(v).__name__, repr(v))
 
 
-def audit_panel(pairs: list) -> dict:
+def audit_panel(pairs: list, *, require_arm_coverage: bool = False) -> dict:
     if not isinstance(pairs, list) or not pairs:
         return {"accepted": False, "status": "FAIL", "errors": ["PAIR_PANEL_EMPTY_OR_INVALID"], "pairs": 0}
     errors, pair_ids, run_ids = [], set(), set()
+    arm_counts = Counter()
+    placebo_payload_counts = Counter()
     arm_effects = {"valid_pe": [], "invalid_pe_payload": []}
     for i, pair in enumerate(pairs):
         result = audit_pair(pair)
@@ -157,10 +169,29 @@ def audit_panel(pairs: list) -> dict:
                 if rid in run_ids: errors.append(f"RUN_ID_DUPLICATE:{rid}")
                 run_ids.add(rid)
         arm = pair.get("expected_intervention")
-        if isinstance(arm, str) and arm in arm_effects and result.get("effect") is not None:
+        if isinstance(arm, str): arm_counts[arm] += 1
+        treatment = pair.get("treatment")
+        if isinstance(arm, str) and arm in arm_effects and result["accepted"] and result.get("effect") is not None:
             arm_effects[arm].append(result["effect"])
+        if arm == "invalid_pe_payload" and isinstance(treatment, dict):
+            placebo_payload_counts[payload_key(treatment.get("compatibility_payload"))] += 1
+    if require_arm_coverage:
+        required_arms = {"valid_pe", "invalid_pe_payload"}
+        if set(arm_counts) != required_arms:
+            errors.append("REQUIRED_INTERVENTION_ARM_MISSING_OR_UNEXPECTED")
+        if arm_counts.get("valid_pe", 0) != arm_counts.get("invalid_pe_payload", 0):
+            errors.append("INTERVENTION_ARM_SAMPLE_COUNTS_UNBALANCED")
+        n_placebo = arm_counts.get("invalid_pe_payload", 0)
+        if n_placebo < len(INVALID_PAYLOADS):
+            errors.append("INVALID_PAYLOAD_ARM_UNDERPOWERED")
+        elif len(placebo_payload_counts) != len(INVALID_PAYLOADS) or set(placebo_payload_counts) != {payload_key(x) for x in INVALID_PAYLOADS}:
+            errors.append("INVALID_PAYLOAD_ARM_COVERAGE_INCOMPLETE")
+        elif max(placebo_payload_counts.values()) - min(placebo_payload_counts.values()) > 1:
+            errors.append("INVALID_PAYLOAD_ARM_COVERAGE_UNBALANCED")
     return {"accepted": not errors, "status": "PASS" if not errors else "FAIL", "pairs": len(pairs),
-            "errors": errors, "effects": arm_effects}
+            "errors": errors, "effects": arm_effects,
+            "arm_counts": dict(arm_counts),
+            "invalid_payload_counts": {repr(k): v for k, v in placebo_payload_counts.items()}}
 
 
 def bootstrap_ci(values: list[float], *, seed: int, replicates: int = 3000, alpha: float = 0.05) -> dict:
@@ -186,7 +217,7 @@ def run_experiment(n_per_arm: int = 512, seed: int = 20261028, replicates: int =
     rng = random.Random(seed)
     pairs = [make_pair(i, "valid_pe", 0.08, rng) for i in range(n_per_arm)]
     pairs += [make_pair(i, "invalid_pe_payload", 0.0, rng) for i in range(n_per_arm)]
-    panel = audit_panel(pairs)
+    panel = audit_panel(pairs, require_arm_coverage=True)
     if not panel["accepted"]:
         raise AssertionError(panel["errors"][:10])
     valid = panel["effects"]["valid_pe"]
@@ -259,6 +290,20 @@ def run_mutation_tests(pair: dict) -> dict:
     panel = audit_panel([base, pair2])
     if panel["accepted"] or not any("PAIR_ID_DUPLICATE:" in e for e in panel["errors"]): raise AssertionError("duplicate pair ID mutation not detected")
     mutations["duplicate_pair_id"] = {"detected": True, "expected_error": "PAIR_ID_DUPLICATE"}
+    m = json.loads(json.dumps(base)); m["treatment"]["execution_path_digest"] = m["control"]["execution_path_digest"]
+    panel = audit_panel([m])
+    if panel["accepted"] or not any("POST_INTERVENTION_PATH_NOT_DISTINCT" in e for e in panel["errors"]): raise AssertionError("non-distinct causal replay path not detected")
+    mutations["non_distinct_post_intervention_path"] = {"detected": True, "expected_error": "POST_INTERVENTION_PATH_NOT_DISTINCT"}
+    placebo_pairs = [make_pair(i, "invalid_pe_payload", 0.0, random.Random(i + 11)) for i in range(100)]
+    for pair in placebo_pairs: pair["treatment"]["compatibility_payload"] = None
+    coverage_panel = audit_panel([make_pair(i, "valid_pe", 0.08, random.Random(i)) for i in range(100)] + placebo_pairs, require_arm_coverage=True)
+    if coverage_panel["accepted"] or not any("INVALID_PAYLOAD_ARM_COVERAGE_INCOMPLETE" in e for e in coverage_panel["errors"]): raise AssertionError("incomplete invalid-payload arm coverage not detected")
+    mutations["incomplete_placebo_payload_coverage"] = {"detected": True, "expected_error": "INVALID_PAYLOAD_ARM_COVERAGE_INCOMPLETE"}
+    # A failing panel may report zero effects, but must not leak estimates from rejected pairs.
+    m = json.loads(json.dumps(base)); m["treatment"]["outcome_score"] = 1.5
+    rejected_panel = audit_panel([m])
+    if rejected_panel["accepted"] or rejected_panel["effects"]["valid_pe"]: raise AssertionError("rejected pair contributed to effect estimates")
+    mutations["rejected_pairs_excluded_from_effects"] = {"detected": True, "expected_error": "failed pair excluded from estimates"}
     return mutations
 
 
