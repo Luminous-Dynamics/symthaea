@@ -1,0 +1,69 @@
+name: VIS-DVPC-035 sequential OPE stopping audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-sequential-ope.rs"
+      - "tests/fixtures/vision-dvpc-035-sequential.tsv"
+      - "tests/fixtures/vision-dvpc-035.SHA256SUMS"
+      - "docs/research/VIS_DVPC_035_SEQUENTIAL_OPE_V1.md"
+      - ".github/workflows/vis-dvpc-035-sequential-ope.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-sequential-ope.rs"
+      - "tests/fixtures/vision-dvpc-035-sequential.tsv"
+      - "tests/fixtures/vision-dvpc-035.SHA256SUMS"
+      - "docs/research/VIS_DVPC_035_SEQUENTIAL_OPE_V1.md"
+      - ".github/workflows/vis-dvpc-035-sequential-ope.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and frozen scenarios
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Verify frozen scenario digest
+        run: sha256sum -c tests/fixtures/vision-dvpc-035.SHA256SUMS
+      - name: Run exact sequential coverage tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-sequential-ope.rs -o /tmp/vis-dvpc-035-tests
+          /tmp/vis-dvpc-035-tests
+      - name: Enumerate all stopping paths and enforce controls
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-sequential-ope.rs -o /tmp/vis-dvpc-035
+          /tmp/vis-dvpc-035 --sweep | tee /tmp/vis-dvpc-035-results.tsv
+          test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-035-results.tsv)" = "180"
+          grep -Fq 'NOT_IDENTIFIED' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'confidence_intervals' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'SUPPRESSED' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq '0.437500000000' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq '0.281250000000' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'ALPHA_SPENDING_HOEFFDING_CS' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'ASSUMPTION_VIOLATION_DESCRIPTIVE_ONLY' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'published_off_policy_confidence_sequence_algorithm' /tmp/vis-dvpc-035-results.tsv
+          grep -Fq 'NOT_IMPLEMENTED' /tmp/vis-dvpc-035-results.tsv
+      - name: Create reproducibility receipt
+        run: |
+          {
+            printf 'VIS_DVPC_035_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-sequential-ope.rs tests/fixtures/vision-dvpc-035.SHA256SUMS tests/fixtures/vision-dvpc-035-sequential.tsv /tmp/vis-dvpc-035-results.tsv
+          } > /tmp/vis-dvpc-035-receipt.tsv
+          cat /tmp/vis-dvpc-035-receipt.tsv
+      - name: Publish exact output and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-035-sequential-ope
+          path: |
+            /tmp/vis-dvpc-035-results.tsv
+            /tmp/vis-dvpc-035-receipt.tsv
+          retention-days: 90
