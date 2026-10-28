@@ -113,7 +113,8 @@ pub use interop::{AdapterAuthority, IntegrationDeclaration, IntegrationTarget};
 pub use matched_evaluation::{
     CandidateVerification, EnergyRecord, EnergyScope, MatchedArmReport,
     MatchedComparisonSummary, MatchedEvaluationError, MatchedPairResult,
-    MatchedTrialRecord, StageCostsMs, TimeWinner, TrialTermination, compare_matched_arms,
+    MatchedTrialRecord, StageCostsMs, TimeWinner, TrialTermination, VerifierReceiptEvidence,
+    compare_matched_arms,
 };
 pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
