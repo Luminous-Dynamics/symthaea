@@ -44,6 +44,22 @@ File: `crates/domains/symthaea-operations-research/src/aviation_distributional_r
 - Zero-probability scenarios are permitted as explicit modeled stress cases and can receive probability mass inside the ambiguity set. A zero-probability case must be justified by the scenario-generation protocol; it is not proof that an omitted real event is covered.
 - The module does not estimate nominal probabilities, calibrate the radius, generate disruption scenarios, validate aircraft constraints, or prove generalization beyond the supplied support.
 
+## Finite-sample radius calibration
+
+The companion module `aviation_probability_calibration.rs` adds a transparent conservative baseline for selecting a TV radius from the Calibration partition, rather than choosing an arbitrary radius by inspecting final results.
+
+Given a frozen nominal distribution (p), empirical calibration frequencies (\hat p), (K) finite-support categories, (n) independent calibration episodes and failure probability (δ), use a union-Hoeffding bound:
+[
+epsilon = sqrt{\frac{\log(2K/\delta)}{2n}},
+\qquad
+\rho = \min\left(1, \operatorname{TV}(p,\hat p)+\frac K2\epsilon\right).
+]
+The code reports empirical TV distance, the sampling allowance, failure probability, episode count and resulting radius separately. It uses integer ppm for probability inputs and rounds the empirical distance and final radius upward. When evidence is sparse or the support is large, the bound may saturate at (ρ=1); that is a visible conservatism cost, not a reason to silently lower the confidence level.
+
+**Assumption boundary:** this bound requires independent draws from one fixed finite-support distribution. Airline disruptions may be temporally dependent, season-dependent and nonstationary. Count complete event episodes rather than rows; calibrate separately across relevant regimes/time blocks and take a predeclared envelope where appropriate. This baseline does not guarantee coverage under arbitrary drift or for omitted categories. The split-integrity module can validate declared cluster separation and chronology, but cannot prove independence or data lineage.
+
+A relevant comparator is Momtaz (2026), *Rolling-Calibrated Conformal Decision Support for Seasonal Airport Taxi-Time Planning under Distribution Shift*, which evaluates rolling conformal calibration across 17 IATA seasons and 722 EUROCONTROL CODA airports. It specifically illustrates the trade-off between under-planning and extra padding. https://doi.org/10.19139/soic-2310-5070-3782. A second comparator is Yang and Jin (ICML 2026), *Multi-Distribution Robust Conformal Prediction*, which considers finite-sample valid coverage across multiple heterogeneous source distributions. https://proceedings.mlr.press/v306/yang26ad.html. Neither paper validates this module; they define fairer calibration/reliability comparisons.
+
 ## Required benchmark
 
 Compare the same candidate and incumbent using:
@@ -99,3 +115,8 @@ Any passing result is bounded to the finite support and the declared TV ambiguit
 ## Tracking
 
 Implementation and reproduction follow-up: [AVIATION-ENTERPRISE-008 #8752](https://github.com/Luminous-Dynamics/symthaea/issues/8752). Related implementation PR: [#8586](https://github.com/Luminous-Dynamics/symthaea/pull/8586).
+
+
+## Executable calibration integration (28 October 2026)
+
+The synthetic example `examples/aviation_calibration_protocol_benchmark.rs` now uses `calibrate_tv_radius` on explicitly labeled calibration frequencies, evaluates the resulting radius using `evaluate_tv_robust_cost_delta`, and separately reports a predeclared sensitivity curve. This demonstrates composition across the split auditor, tuning provenance gate, finite-sample radius calibration and DRO evaluator. It is not an operational dataset pipeline; in a real run, the frequencies must be derived from frozen Calibration event clusters, and the Test partition must not be used to choose the confidence level or other settings.
