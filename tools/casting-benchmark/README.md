@@ -375,6 +375,10 @@ The protocol now requires an auxiliary fixed-scalarization comparison after the 
 
 Reference: https://doi.org/10.1007/s11081-026-10078-5
 
+## Research frontier and proposed acceptance targets
+
+See [CASTING_RESEARCH_FRONTIER_2026-10-28.md](../../docs/research/CASTING_RESEARCH_FRONTIER_2026-10-28.md) for a research-backed benchmark ladder, the external methods to lock (MF-HVKG, MOMF, MF-JESMOC), physical-validation requirements, and explicitly aspirational quality-per-cost and false-feasibility targets. These targets are proposed gates, not current results.
+
 ## Adaptive joint candidate–fidelity acquisition (research candidate)
 
 `multifidelity_joint_action_policy.py` adds `joint_action_cost_aware` as a seventh policy. Unlike DIWA's frozen 60/8/4 allocation, it ranks affordable `(candidate, fidelity)` actions online after a six-call low-fidelity space-filling bootstrap. Its score combines estimated feasible hypervolume gain, constraint-boundary information, frontier uncertainty, paired local fidelity discrepancies, and the proxy cost of later high-fidelity validation. Each call records the budget, selected pair, score, effective cost and validation-cost proxy.
