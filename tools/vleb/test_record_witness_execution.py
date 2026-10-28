@@ -55,7 +55,13 @@ class WitnessRecorderTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def run_recorder(self, *, command_code: str, timeout_ms: int = 1000, result: str = "supports") -> tuple[int, dict]:
+    def run_recorder(
+        self, *, command_code: str, timeout_ms: int = 1000,
+        result: str = "supports", expected_invocation_sha256: str | None = None,
+    ) -> tuple[int, dict]:
+        command_argv = [sys.executable, "-c", command_code]
+        if expected_invocation_sha256 is None:
+            expected_invocation_sha256 = recorder.invocation_digest(command_argv, ".", timeout_ms)
         args = [
             "--artifact-root", str(self.root),
             "--task-id", "vleb-private-task-0001",
@@ -70,12 +76,13 @@ class WitnessRecorderTests(unittest.TestCase):
             "--network-mode-observed", "true",
             "--working-directory", ".",
             "--timeout-ms", str(timeout_ms),
+            "--expected-invocation-sha256", expected_invocation_sha256,
             "--receipt-path", "claims/witness.json",
             "--stdout-path", "logs/stdout.txt",
             "--stderr-path", "logs/stderr.txt",
             "--output-artifact", "index.json",
             "--",
-            sys.executable, "-c", command_code,
+            *command_argv,
         ]
         self.stdout = io.StringIO()
         self.stderr = io.StringIO()
@@ -121,6 +128,16 @@ class WitnessRecorderTests(unittest.TestCase):
         self.assertIsNone(receipt["process"]["exit_code"])
         self.assertEqual(receipt["observed_result"], "inconclusive")
 
+    def test_changed_command_is_rejected_against_external_invocation_pin(self) -> None:
+        marker = self.root / "must-not-run.txt"
+        code, _ = self.run_recorder(
+            command_code=f"from pathlib import Path; Path({str(marker)!r}).touch()",
+            expected_invocation_sha256="0" * 64,
+        )
+        self.assertEqual(code, 2)
+        self.assertFalse(marker.exists())
+        self.assertIn("differs from evaluator-pinned invocation", self.stderr.getvalue())
+
     def test_nonzero_verifier_exit_cannot_be_recorded_as_support(self) -> None:
         code, receipt = self.run_recorder(
             command_code="from pathlib import Path; Path('index.json').write_text('{}'); raise SystemExit(3)",
@@ -144,6 +161,9 @@ class WitnessRecorderTests(unittest.TestCase):
             "--runtime-image-id", "sha256:" + "a" * 64,
             "--network-mode", "none",
             "--network-mode-observed", "true",
+            "--expected-invocation-sha256", recorder.invocation_digest(
+                [sys.executable, "-c", "print('should not run')"], ".", 120000
+            ),
             "--receipt-path", "claims/witness.json",
             "--stdout-path", "logs/stdout.txt",
             "--stderr-path", "logs/stderr.txt",
