@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod effect_surface_registry;
+mod effect_primitive_scan;
 mod manifest;
 mod rhn_sweep;
 
@@ -75,6 +76,15 @@ enum Commands {
         /// Refuse success while any record lacks a complete recorded qualification-evidence entry.
         #[arg(long)]
         require_evidence_records: bool,
+    },
+    /// Discover candidate direct-call sites for process, filesystem, and socket effects.
+    /// Candidate discovery does not establish reachability or authorization correctness.
+    EffectPrimitiveScan {
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        /// Optional path for a deterministic JSON report; otherwise prints JSON to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
@@ -169,6 +179,14 @@ fn main() -> anyhow::Result<()> {
                 root.join(registry)
             };
             effect_surface_registry::check(&root, &registry_path, require_evidence_records)?;
+        }
+        Commands::EffectPrimitiveScan { root, out } => {
+            let root = if root.is_absolute() {
+                root
+            } else {
+                std::env::current_dir()?.join(root)
+            };
+            effect_primitive_scan::scan(&root, out.as_deref())?;
         }
     }
     Ok(())
