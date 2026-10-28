@@ -64,6 +64,7 @@ pub mod substrate;
 pub mod topology;
 pub mod trajectory_prior;
 pub mod trajectory_history;
+pub mod trajectory_budget;
 pub mod validation_snapshot;
 pub mod verification_matrix;
 
@@ -151,6 +152,10 @@ pub use trajectory_prior::{
 pub use trajectory_history::{
     HistoryFeatureError, HistoryOrdering, HistoryOutcome, TrajectoryFrame, TrajectoryHistory,
     TrajectoryHistorySummary, VertexHistoryFeatures,
+};
+pub use trajectory_budget::{
+    AcquisitionBatch, AcquisitionBudgetConfig, AcquisitionBudgetError, AcquisitionDecision,
+    AcquisitionSnapshot, TrajectoryAcquisitionGate,
 };
 pub use validation_snapshot::{ValidationSnapshot, current_validation_snapshot};
 pub use verification_matrix::{
