@@ -342,15 +342,15 @@ This is deliberately an **interpretable challenger, not an exact Bayesian expect
 Run the single-policy diagnostic and replay it:
 
 ```sh
-python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \\
-  --objective-families local_bias_island,warped_coordinates \\
-  --constraint-families constraint_boundary,discontinuous_step \\
-  --dimensions 2 --severities 0.5,1 --seeds 17,23 --design-count 75 \\
-  --policies decision_value_of_information \\
+python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \
+  --objective-families local_bias_island,warped_coordinates \
+  --constraint-families constraint_boundary,discontinuous_step \
+  --dimensions 2 --severities 0.5,1 --seeds 17,23 --design-count 75 \
+  --policies decision_value_of_information \
   > /tmp/casting-diwa-results.json
 
-python3 tools/casting-benchmark/score_compositional_bakeoff.py \\
-  /tmp/casting-diwa-results.json --allow-diagnostic-subset \\
+python3 tools/casting-benchmark/score_compositional_bakeoff.py \
+  /tmp/casting-diwa-results.json --allow-diagnostic-subset \
   --receipt /tmp/casting-diwa-receipt.json
 ```
 
