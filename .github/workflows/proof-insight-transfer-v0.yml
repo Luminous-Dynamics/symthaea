@@ -359,6 +359,33 @@ jobs:
           else:
               raise SystemExit("negative control failed: missing validation exposure list was accepted")
 
+          other_test_family = next(
+              family_id for family_id, split_name in assignments.items()
+              if split_name == "test" and family_id not in fixture["known_exposed_test_family_ids"]
+          )
+          other_validation_family = next(
+              family_id for family_id, split_name in assignments.items()
+              if split_name == "validation" and family_id not in fixture["known_exposed_validation_family_ids"]
+          )
+
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_validation_family_ids"].append(other_test_family)
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: a non-quarantined test family was accepted in validation exposure list")
+
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_test_family_ids"].append(other_validation_family)
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: a non-quarantined validation family was accepted in test exposure list")
+
           bad = copy.deepcopy(fixture)
           bad["known_exposed_validation_family_ids"].append("089")
           try:
@@ -366,16 +393,7 @@ jobs:
           except (ValidationError, ValueError):
               pass
           else:
-              raise SystemExit("negative control failed: test family 089 was accepted in validation quarantine")
-
-          bad = copy.deepcopy(fixture)
-          bad["known_exposed_test_family_ids"].append("012")
-          try:
-              check_split_aware_config(bad)
-          except (ValidationError, ValueError):
-              pass
-          else:
-              raise SystemExit("negative control failed: validation family 012 was accepted in test quarantine")
+              raise SystemExit("negative control failed: overlapping exposure lists were accepted")
 
           bad = copy.deepcopy(fixture)
           bad["known_exposed_validation_family_ids"] = []
@@ -404,7 +422,7 @@ jobs:
           else:
               raise SystemExit("negative control failed: duplicate validation quarantine ID was accepted")
 
-          print("PITB_RUN_CONFIG_V1_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and six malformed-config controls; fixture is synthetic and not a benchmark run")
+          print("PITB_RUN_CONFIG_V1_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and seven malformed-config controls; fixture is synthetic and not a benchmark run")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
