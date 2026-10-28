@@ -267,7 +267,7 @@ fn bind_replay_receipt(
 pub fn score_counterfactual_utility(
     mut input: CounterfactualUtilityInput,
 ) -> anyhow::Result<CounterfactualUtilityScore> {
-    ensure!(input.schema_version == 3, "counterfactual utility schema_version must be 2");
+    ensure!(input.schema_version == 3, "counterfactual utility schema_version must be 3");
     nonempty(&input.dataset_id, "dataset_id")?;
     nonempty(&input.stream_id, "stream_id")?;
     nonempty(&input.scenario_id, "scenario_id")?;
