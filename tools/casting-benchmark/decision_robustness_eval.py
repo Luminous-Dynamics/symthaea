@@ -104,13 +104,14 @@ def validate_document(document: Any) -> dict[str, Any]:
     source_run = _require_exact_keys(
         doc["source_run"],
         {
-            "sweep_sha256", "candidate_pool_sha256", "objective_family",
+            "sweep_sha256", "adapter_sha256", "candidate_pool_sha256", "objective_family",
             "constraint_family", "dimension", "severity", "seed", "policy",
             "fidelity_costs", "cost_budget", "cost_spent",
         },
         "source_run",
     )
     _sha256(source_run["sweep_sha256"], "source_run.sweep_sha256")
+    _sha256(source_run["adapter_sha256"], "source_run.adapter_sha256")
     _sha256(source_run["candidate_pool_sha256"], "source_run.candidate_pool_sha256")
     for field in ("objective_family", "constraint_family", "policy"):
         if not isinstance(source_run[field], str) or not source_run[field].strip():
