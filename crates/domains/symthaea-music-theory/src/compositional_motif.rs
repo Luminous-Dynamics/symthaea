@@ -704,7 +704,7 @@ mod tests {
             0,
             source.len(),
         );
-        assert!(source.len() * source.len() > MAX_ALIGNMENT_CELLS);
+        assert!((source.len() + 1) * (source.len() + 1) > MAX_ALIGNMENT_CELLS);
         assert!(
             verify_compositional_transform(&source, &source, 0.0, &claim).is_err(),
             "quadratic work must be bounded before allocating DP matrices"
