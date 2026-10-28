@@ -65,6 +65,8 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "source_sweep_sha256": hashlib.sha256(sweep_raw).hexdigest(),
         "selector": selector,
         "candidate_pool_sha256": candidate_pool_sha,
+        "manifest_generator_sha256": "9" * 64,
+        "nominal_prediction_source": "test_low_fidelity_reference",
         "reference_point": [1.2, 1.2],
         "selected_candidate_ids": [0],
         "selection_frozen_before_holdout": True,
@@ -83,8 +85,11 @@ def fixture_documents() -> tuple[dict, bytes, dict, bytes, dict, bytes]:
         "benchmark_id": ADAPTER_BENCHMARK_ID,
         "source_sweep_sha256": hashlib.sha256(sweep_raw).hexdigest(),
         "candidate_pool_sha256": candidate_pool_sha,
+        "manifest_generator_sha256": "9" * 64,
         "selector": selector,
-        "holdout_role": "independent_post_selection",
+        "holdout_role": "synthetic_post_selection_diagnostic",
+        "evidence_class": "synthetic",
+        "shift_suite_id": "test-synthetic-shift-suite",
         "shifts": [
             {
                 "shift_id": "boundary-shift",
@@ -133,6 +138,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         converted = adapt_documents(sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw)
         self.assertEqual(converted["source_run"]["sweep_sha256"], hashlib.sha256(sweep_raw).hexdigest())
+        self.assertEqual(converted["source_run"]["manifest_generator_sha256"], "9" * 64)
         adapter_bytes = Path(adapter.__file__).resolve().read_bytes()
         self.assertEqual(converted["source_run"]["adapter_sha256"], hashlib.sha256(adapter_bytes).hexdigest())
         self.assertEqual(converted["split"]["selection_freeze_sha256"], hashlib.sha256(selection_raw).hexdigest())
@@ -227,7 +233,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
     def test_rejects_holdout_manifest_with_wrong_role(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         holdout["holdout_role"] = "optimizer_trace"
-        with self.assertRaisesRegex(ValueError, "holdout_role must be independent_post_selection"):
+        with self.assertRaisesRegex(ValueError, "not a supported frozen role"):
             adapt_documents(sweep, sweep_raw, selection, selection_raw, holdout, _canonical(holdout))
 
     def test_rejects_selection_id_outside_candidate_pool(self) -> None:
