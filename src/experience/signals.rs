@@ -521,6 +521,15 @@ mod tests {
     }
 
     #[test]
+    fn legacy_serialized_signals_fail_closed_on_missing_validity() {
+        let legacy = r#"{"prediction_error":0.9,"uncertainty":0.2,"coherence":0.5,"confidence":0.7,"salience":0.4,"phi_monitor":0.0}"#;
+        let signals: PrincipledSignals =
+            serde_json::from_str(legacy).expect("legacy signal payload remains readable");
+        assert!(!signals.prediction_error_valid);
+        assert_eq!(signals.prediction_error_value(), None);
+    }
+
+    #[test]
     fn empty_or_non_finite_similarity_is_unavailable_not_maximum_surprise() {
         assert_eq!(SignalComputer::compute_prediction_error(&[]), None);
         assert_eq!(SignalComputer::compute_prediction_error(&[0.5, f32::NAN]), None);
