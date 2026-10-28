@@ -16,7 +16,9 @@ pub struct LedgerError {
 
 impl LedgerError {
     fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into() }
+        Self {
+            message: message.into(),
+        }
     }
 }
 
@@ -82,7 +84,8 @@ impl LedgerReport {
         let mut output = String::new();
         output.push_str("{\n");
         output.push_str("  \"schema_version\": \"vleb-ledger-output-v1\",\n");
-        output.push_str("  \"currency_semantics\": \"integer_minor_units_unspecified_currency\",\n");
+        output
+            .push_str("  \"currency_semantics\": \"integer_minor_units_unspecified_currency\",\n");
         output.push_str("  \"accounts\": [");
 
         if self.accounts.is_empty() {
@@ -94,10 +97,19 @@ impl LedgerReport {
                 output.push_str("      \"account_id\": ");
                 push_json_string(&mut output, &account.account_id);
                 output.push_str(",\n");
-                output.push_str(&format!("      \"credits_minor\": {},\n", account.credits_minor));
-                output.push_str(&format!("      \"debits_minor\": {},\n", account.debits_minor));
+                output.push_str(&format!(
+                    "      \"credits_minor\": {},\n",
+                    account.credits_minor
+                ));
+                output.push_str(&format!(
+                    "      \"debits_minor\": {},\n",
+                    account.debits_minor
+                ));
                 output.push_str(&format!("      \"net_minor\": {},\n", account.net_minor));
-                output.push_str(&format!("      \"unique_transactions\": {}\n", account.unique_transactions));
+                output.push_str(&format!(
+                    "      \"unique_transactions\": {}\n",
+                    account.unique_transactions
+                ));
                 output.push_str("    }");
                 if index + 1 != self.accounts.len() {
                     output.push(',');
@@ -111,8 +123,14 @@ impl LedgerReport {
         output.push_str(&format!("    \"credits_minor\": {},\n", self.credits_minor));
         output.push_str(&format!("    \"debits_minor\": {},\n", self.debits_minor));
         output.push_str(&format!("    \"net_minor\": {},\n", self.net_minor));
-        output.push_str(&format!("    \"unique_transactions\": {},\n", self.unique_transactions));
-        output.push_str(&format!("    \"exact_duplicate_rows_ignored\": {}\n", self.exact_duplicate_rows_ignored));
+        output.push_str(&format!(
+            "    \"unique_transactions\": {},\n",
+            self.unique_transactions
+        ));
+        output.push_str(&format!(
+            "    \"exact_duplicate_rows_ignored\": {}\n",
+            self.exact_duplicate_rows_ignored
+        ));
         output.push_str("  }\n");
         output.push_str("}\n");
         output
@@ -217,27 +235,33 @@ pub fn reconcile_csv(input: &str) -> Result<LedgerReport, LedgerError> {
 
         match side {
             Side::Credit => {
-                account.credits_minor = account.credits_minor
+                account.credits_minor = account
+                    .credits_minor
                     .checked_add(amount_minor)
                     .ok_or_else(|| LedgerError::new("account credit total overflow"))?;
-                totals.credits_minor = totals.credits_minor
+                totals.credits_minor = totals
+                    .credits_minor
                     .checked_add(amount_minor)
                     .ok_or_else(|| LedgerError::new("global credit total overflow"))?;
             }
             Side::Debit => {
-                account.debits_minor = account.debits_minor
+                account.debits_minor = account
+                    .debits_minor
                     .checked_add(amount_minor)
                     .ok_or_else(|| LedgerError::new("account debit total overflow"))?;
-                totals.debits_minor = totals.debits_minor
+                totals.debits_minor = totals
+                    .debits_minor
                     .checked_add(amount_minor)
                     .ok_or_else(|| LedgerError::new("global debit total overflow"))?;
             }
         }
 
-        account.unique_transactions = account.unique_transactions
+        account.unique_transactions = account
+            .unique_transactions
             .checked_add(1)
             .ok_or_else(|| LedgerError::new("account transaction count overflow"))?;
-        totals.unique_transactions = totals.unique_transactions
+        totals.unique_transactions = totals
+            .unique_transactions
             .checked_add(1)
             .ok_or_else(|| LedgerError::new("global transaction count overflow"))?;
     }
@@ -265,7 +289,9 @@ pub fn reconcile_csv(input: &str) -> Result<LedgerReport, LedgerError> {
 
 fn validate_identifier(name: &str, value: &str, row_number: usize) -> Result<(), LedgerError> {
     if value.trim().is_empty() {
-        return Err(LedgerError::new(format!("row {row_number} {name} must not be empty")));
+        return Err(LedgerError::new(format!(
+            "row {row_number} {name} must not be empty"
+        )));
     }
     if value != value.trim() {
         return Err(LedgerError::new(format!(
@@ -315,18 +341,24 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
                     index += 1;
                 }
                 b'\n' => {
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     rows.push(std::mem::take(&mut row));
                     touched = false;
                     index += 1;
                 }
                 b'\r' => {
                     if bytes.get(index + 1) != Some(&b'\n') {
-                        return Err(LedgerError::new(format!("bare carriage return at byte {index}")));
+                        return Err(LedgerError::new(format!(
+                            "bare carriage return at byte {index}"
+                        )));
                     }
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     rows.push(std::mem::take(&mut row));
                     touched = false;
                     index += 2;
@@ -340,15 +372,19 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
             },
             CsvState::Unquoted => match byte {
                 b',' => {
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     state = CsvState::FieldStart;
                     touched = true;
                     index += 1;
                 }
                 b'\n' => {
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     rows.push(std::mem::take(&mut row));
                     state = CsvState::FieldStart;
                     touched = false;
@@ -358,8 +394,10 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
                     if bytes.get(index + 1) != Some(&b'\n') {
                         return Err(LedgerError::new(format!("bare carriage return at byte {index}")));
                     }
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     rows.push(std::mem::take(&mut row));
                     state = CsvState::FieldStart;
                     touched = false;
@@ -405,15 +443,19 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
             },
             CsvState::QuoteClosed => match byte {
                 b',' => {
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     state = CsvState::FieldStart;
                     touched = true;
                     index += 1;
                 }
                 b'\n' => {
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     rows.push(std::mem::take(&mut row));
                     state = CsvState::FieldStart;
                     touched = false;
@@ -423,8 +465,10 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
                     if bytes.get(index + 1) != Some(&b'\n') {
                         return Err(LedgerError::new(format!("bare carriage return at byte {index}")));
                     }
-                    row.push(String::from_utf8(std::mem::take(&mut field))
-                        .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+                    row.push(
+                        String::from_utf8(std::mem::take(&mut field))
+                            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+                    );
                     rows.push(std::mem::take(&mut row));
                     state = CsvState::FieldStart;
                     touched = false;
@@ -444,8 +488,9 @@ fn parse_csv(input: &str) -> Result<Vec<Vec<String>>, LedgerError> {
     }
 
     if touched || !field.is_empty() || !row.is_empty() || state == CsvState::QuoteClosed {
-        row.push(String::from_utf8(field)
-            .map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?);
+        row.push(
+            String::from_utf8(field).map_err(|_| LedgerError::new("CSV contains invalid UTF-8"))?,
+        );
         rows.push(row);
     }
 
@@ -478,7 +523,8 @@ mod tests {
 
     const INPUT: &str = include_str!("../../examples/ledger-reconciliation/input.csv");
     const EXPECTED: &str = include_str!("../../examples/ledger-reconciliation/expected.json");
-    const CONFLICT: &str = include_str!("../../examples/ledger-reconciliation/conflicting-duplicate.csv");
+    const CONFLICT: &str =
+        include_str!("../../examples/ledger-reconciliation/conflicting-duplicate.csv");
 
     #[test]
     fn fixture_matches_exact_expected_output() {
