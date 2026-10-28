@@ -9,6 +9,7 @@ mod cognitive_adaptation_utility;
 mod cognitive_adaptation_panel;
 mod cognitive_drift_baselines;
 mod cognitive_replay_receipt;
+mod cognitive_adaptation_audit;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -120,6 +121,14 @@ enum Commands {
 
     /// Aggregate five-arm utility records across the complete preregistered dataset × seed × scenario grid.
     CompareCognitiveAdaptationPanel {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Independently reopen raw receipts and recompute every score in a confirmatory adaptation panel.
+    AuditCognitiveAdaptationPanel {
+        /// JSON bundle manifest; all artifact paths are relative to its directory.
         #[arg(long)]
         input: PathBuf,
         #[arg(long)]
@@ -285,6 +294,16 @@ fn main() -> anyhow::Result<()> {
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
                 println!("Wrote cognitive adaptation panel result to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::AuditCognitiveAdaptationPanel { input, out } => {
+            let result = cognitive_adaptation_audit::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote independently audited adaptation panel to {}", path.display());
             } else {
                 println!("{rendered}");
             }
