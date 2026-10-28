@@ -22,7 +22,7 @@ From the repository root:
 
     python3 docs/research/pev_counterfactual_influence_benchmark_v1.py --self-test --cases 100000 --seed 20261028 --output /tmp/pev_counterfactual_influence_benchmark_v1_results.json
 
-The local run accepted 100,000 generated paired trials (900,000 branch summaries: one baseline, seven invalid variants, one valid-PE positive control per trial) and detected all seven injected faults: invalid-payload state divergence, valid-PE no-op learner, missing positive-control admission, duplicate admission, non-target collateral change, counterfactual input mismatch, and independent-outcome suppression.
+The local run accepted 100,000 generated paired trials (900,000 branch summaries: one baseline, seven invalid variants, one valid-PE positive control per trial) and detected all eight injected faults: invalid-payload state divergence, valid-PE no-op learner, missing positive-control admission, duplicate admission, non-target collateral change, counterfactual input mismatch, independent-outcome suppression, and a declared target consumer missing from the consumer map.
 
 ## Security and epistemic limits
 
