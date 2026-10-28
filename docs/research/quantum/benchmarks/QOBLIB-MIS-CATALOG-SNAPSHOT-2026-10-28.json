@@ -1,0 +1,431 @@
+{
+  "schema_version": "1.0",
+  "dataset": "QOBLIB Maximum Independent Set",
+  "snapshot_date": "2026-10-28",
+  "source_url": "https://zib-aopt.github.io/QOBLIB/problem/07/",
+  "source_type": "live website catalog snapshot",
+  "immutable_dataset_revision": null,
+  "canonical_graph_sha256_by_instance": null,
+  "status": "reference-inventory-only-not-preregistered",
+  "summary": {
+    "instance_count": 50,
+    "page_reported_optimal_count": 39,
+    "vertices_min": 17,
+    "vertices_max": 4000,
+    "edges_min": 39,
+    "edges_max": 3997732
+  },
+  "interpretation": {
+    "best_objective": "Value reported on the QOBLIB MIS catalog page at snapshot time. For status best-known, do not treat this as a proven optimum.",
+    "optimal": "Catalog marked the instance Optimal as of the snapshot date.",
+    "best_known": "Catalog marked the instance Best known as of the snapshot date.",
+    "limitations": [
+      "This is a manual snapshot of catalog metadata, not graph input bytes.",
+      "The source page is live and can change. No immutable source revision or graph SHA-256 values are pinned here.",
+      "Do not call this a preregistered benchmark set until a QOBLIB repository revision, graph canonicalization scheme, per-instance graph digests, target manifest, and split assignments are frozen.",
+      "Do not infer cross-family generalization from multiple instances drawn from a single generator or benchmark family."
+    ]
+  },
+  "instances": [
+    {
+      "name": "aves-sparrow-social",
+      "vertices": 52,
+      "edges": 454,
+      "best_objective": 13,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "brock200-1",
+      "vertices": 200,
+      "edges": 14834,
+      "best_objective": 6,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "brock200-2",
+      "vertices": 200,
+      "edges": 10024,
+      "best_objective": 12,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "brock200-3",
+      "vertices": 200,
+      "edges": 12048,
+      "best_objective": 9,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "brock200-4",
+      "vertices": 200,
+      "edges": 13089,
+      "best_objective": 8,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "brock400-1",
+      "vertices": 400,
+      "edges": 20077,
+      "best_objective": 27,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "brock800-1",
+      "vertices": 800,
+      "edges": 112095,
+      "best_objective": 23,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "C125-9",
+      "vertices": 125,
+      "edges": 787,
+      "best_objective": 34,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "C500-9",
+      "vertices": 500,
+      "edges": 12418,
+      "best_objective": 57,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "C4000-5",
+      "vertices": 4000,
+      "edges": 3997732,
+      "best_objective": 18,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "c-fat200-1",
+      "vertices": 200,
+      "edges": 1534,
+      "best_objective": 18,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "chesapeake",
+      "vertices": 39,
+      "edges": 170,
+      "best_objective": 17,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "es60fst01",
+      "vertices": 123,
+      "edges": 159,
+      "best_objective": 60,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "es60fst02",
+      "vertices": 186,
+      "edges": 280,
+      "best_objective": 88,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "es60fst03",
+      "vertices": 113,
+      "edges": 142,
+      "best_objective": 55,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "es60fst04",
+      "vertices": 162,
+      "edges": 238,
+      "best_objective": 78,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "farm",
+      "vertices": 17,
+      "edges": 39,
+      "best_objective": 10,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "football",
+      "vertices": 35,
+      "edges": 118,
+      "best_objective": 16,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "frb45-21-3",
+      "vertices": 945,
+      "edges": 58245,
+      "best_objective": 45,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "frb50-23-3",
+      "vertices": 1150,
+      "edges": 81068,
+      "best_objective": 50,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "frb53-24-1",
+      "vertices": 1272,
+      "edges": 94227,
+      "best_objective": 53,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "frb59-26-2",
+      "vertices": 1534,
+      "edges": 126163,
+      "best_objective": 58,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "frb100-40",
+      "vertices": 4000,
+      "edges": 572774,
+      "best_objective": 96,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "gen200_p0-9_44",
+      "vertices": 200,
+      "edges": 1990,
+      "best_objective": 44,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "hamming6-2",
+      "vertices": 64,
+      "edges": 1824,
+      "best_objective": 2,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "hamming6-4",
+      "vertices": 64,
+      "edges": 704,
+      "best_objective": 12,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "hamming10-4",
+      "vertices": 1024,
+      "edges": 89600,
+      "best_objective": 40,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "ibm32",
+      "vertices": 32,
+      "edges": 90,
+      "best_objective": 13,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "insecta-ant-colony1-day38",
+      "vertices": 56,
+      "edges": 1134,
+      "best_objective": 6,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "insecta-ant-colony3-day09",
+      "vertices": 160,
+      "edges": 8883,
+      "best_objective": 9,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "johnson8-2-4",
+      "vertices": 28,
+      "edges": 210,
+      "best_objective": 7,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "johnson8-4-4",
+      "vertices": 70,
+      "edges": 1855,
+      "best_objective": 5,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "johnson16-2-4",
+      "vertices": 120,
+      "edges": 5460,
+      "best_objective": 15,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "karate",
+      "vertices": 34,
+      "edges": 78,
+      "best_objective": 20,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "keller4",
+      "vertices": 171,
+      "edges": 5100,
+      "best_objective": 11,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "keller6",
+      "vertices": 3361,
+      "edges": 1026582,
+      "best_objective": 59,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "mammalia-kangaroo-interactions",
+      "vertices": 17,
+      "edges": 91,
+      "best_objective": 4,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "MANN-a9",
+      "vertices": 45,
+      "edges": 918,
+      "best_objective": 3,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "p_hat1500-1",
+      "vertices": 1500,
+      "edges": 839327,
+      "best_objective": 12,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "p_hat1500-3",
+      "vertices": 1500,
+      "edges": 277006,
+      "best_objective": 94,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "R_500_005_1",
+      "vertices": 500,
+      "edges": 6256,
+      "best_objective": 91,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "R_1000_005_1",
+      "vertices": 1000,
+      "edges": 24670,
+      "best_objective": 117,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "sloane_1dc_64",
+      "vertices": 64,
+      "edges": 543,
+      "best_objective": 10,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "sloane_1dc_128",
+      "vertices": 128,
+      "edges": 1471,
+      "best_objective": 16,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "sloane_1zc_128",
+      "vertices": 128,
+      "edges": 1120,
+      "best_objective": 18,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "sloane_2dc_128",
+      "vertices": 128,
+      "edges": 5173,
+      "best_objective": 5,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "socfb-haverford76",
+      "vertices": 1446,
+      "edges": 59589,
+      "best_objective": 282,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "socfb-trinity100",
+      "vertices": 2613,
+      "edges": 111996,
+      "best_objective": 499,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "sorrell4",
+      "vertices": 2048,
+      "edges": 504451,
+      "best_objective": 24,
+      "status": "optimal",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    },
+    {
+      "name": "sorrell7",
+      "vertices": 2048,
+      "edges": 39424,
+      "best_objective": 198,
+      "status": "best-known",
+      "instance_page": "https://zib-aopt.github.io/QOBLIB/problem/07/"
+    }
+  ]
+}
