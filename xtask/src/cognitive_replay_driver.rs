@@ -364,7 +364,8 @@ mod tests {
     }
 
     fn scenario(targets: Vec<f64>) -> ReplayScenario {
-        ReplayScenario::new("driver-contract-test".to_owned(), features(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0]), targets, 2)
+        let feature_values: Vec<f64> = (0..targets.len()).map(|tick| tick as f64).collect();
+        ReplayScenario::new("driver-contract-test".to_owned(), features(&feature_values), targets, 2)
             .expect("valid scenario")
     }
 
@@ -400,7 +401,7 @@ mod tests {
 
     #[test]
     fn changing_hidden_future_targets_cannot_change_earlier_decisions() {
-        let original_targets = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
+        let original_targets = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
         let mut changed_targets = original_targets.clone();
         changed_targets[4] = -400.0;
         changed_targets[5] = 900.0;
@@ -408,11 +409,11 @@ mod tests {
         let mut second_policy = ConsumeDeliveredPolicy;
         let first = scenario(original_targets).run(&mut first_policy).expect("first replay");
         let second = scenario(changed_targets).run(&mut second_policy).expect("second replay");
-        let first_prefix = serde_json::to_value(&first.decisions[..4]).unwrap();
-        let second_prefix = serde_json::to_value(&second.decisions[..4]).unwrap();
+        // Outcomes from ticks 4 and 5 arrive at ticks 6 and 7, respectively.
+        let first_prefix = serde_json::to_value(&first.decisions[..6]).unwrap();
+        let second_prefix = serde_json::to_value(&second.decisions[..6]).unwrap();
         assert_eq!(first_prefix, second_prefix);
-        assert_eq!(first.decisions[4].eligible_outcome_ids, second.decisions[4].eligible_outcome_ids);
-        assert_ne!(first.decisions[4].prediction, second.decisions[4].prediction);
+        assert_ne!(first.decisions[6].prediction, second.decisions[6].prediction);
     }
 
     #[test]
