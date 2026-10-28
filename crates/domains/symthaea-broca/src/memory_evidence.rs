@@ -585,8 +585,8 @@ impl EvidenceIndex {
     ///
     /// Missing IDs, duplicates, inactive records, invalid times and cross-scope
     /// records are skipped. A present but corrupt payload is an error, not
-    /// accepted evidence. The order follows the candidate ranking after
-    /// ineligible records are omitted.
+    /// accepted evidence. The order follows candidate ranking after ineligible
+    /// records are omitted.
     pub fn resolve_with_provenance(
         &self,
         hdc_hits: &[u64],
@@ -642,17 +642,6 @@ impl EvidenceIndex {
             .into_iter()
             .map(|resolved| resolved.item)
             .collect())
-    }           let Some(record) = self.records.get(hdc_id) else {
-                // A stale vector hit with no payload mapping must never turn
-                // into evidence via a fallback to caller-supplied text.
-                continue;
-            };
-            if !record.is_eligible_for(scope_id, now_ms) {
-                continue;
-            }
-            output.push(record.context_item(payload_root)?);
-        }
-        Ok(output)
     }
 }
 
