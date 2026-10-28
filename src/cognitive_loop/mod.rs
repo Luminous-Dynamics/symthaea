@@ -1159,6 +1159,21 @@ impl CognitiveLoopService {
             re.record_posthoc_with_optional_pe(gate_passed, outcome_good, prediction_error);
         }
     }
+
+    /// Record a posthoc gate outcome with the immutable decision-time PE evidence.
+    /// Missing typed evidence remains missing; callers must not synthesize cycle
+    /// provenance from a scalar compatibility payload.
+    #[cfg(feature = "reasoning_engine")]
+    pub fn record_reasoning_posthoc_with_evidence(
+        &mut self,
+        gate_passed: bool,
+        outcome_good: bool,
+        prediction_evidence: Option<PredictionErrorEvidence>,
+    ) {
+        if let Some(ref mut re) = self.reasoning_engine {
+            re.record_posthoc_with_evidence(gate_passed, outcome_good, prediction_evidence);
+        }
+    }
 }
 
 #[cfg(test)]
