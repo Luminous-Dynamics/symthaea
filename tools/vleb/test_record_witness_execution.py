@@ -133,7 +133,17 @@ finally:
         self.assertEqual(code, 0, self.stderr.getvalue())
         self.assertEqual(receipt["run_binding"]["run_id"], "90001")
         self.assertEqual(receipt["run_binding"]["run_attempt"], 2)
-        self.assertEqual(receipt["verifier"]["sha256"], "d" * 64)
+        self.assertEqual(receipt["verifier"]["sha256"], sha((self.root / "verifier.py").read_bytes()))
+        self.assertEqual(receipt["verifier"]["path"], "verifier.py")
+        self.assertEqual(receipt["verifier"]["argv_index"], 1)
+        self.assertEqual(
+            next(row for row in receipt["inputs"] if row["path"] == "verifier.py")["sha256"],
+            receipt["verifier"]["sha256"],
+        )
+        self.assertEqual(
+            next(row for row in receipt["outputs"] if row["role"] == "verdict")["path"],
+            "verdict.json",
+        )
         self.assertEqual(receipt["source_sha256"], sha((self.root / "legacy.cbl").read_bytes()))
         self.assertEqual(receipt["observed_result"], "supports")
         outputs = {row["path"]: row for row in receipt["outputs"]}
