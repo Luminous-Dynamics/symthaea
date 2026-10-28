@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive is now authored, but it is not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, an opt-in trajectory-diversity selector, and a token-budget packing policy are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -105,6 +105,26 @@ Evaluate with identical evidence, query set and length-bounded context budget:
 Report top-k trajectory concentration (max share and entropy), distinct trajectories/states, relevant-state recall, contiguous-span precision, duplicate-token ratio, context tokens, query latency/cost, and answer accuracy by each of the five LME-V2 abilities. Static-state queries should penalize unnecessary neighbors; dynamic-state/workflow queries should test whether isolating single states loses transition evidence. Tune on development questions, freeze policy, then evaluate held-out test questions and official LAFS Gain.
 
 This ablation separates a retrieval-policy win from a representation/index win. Keep it separate from HDC kernel throughput and exact-search parity.
+
+### Context-budget packing (new opt-in policy)
+
+The token-budget packer is a deterministic *context assembly* policy after ranking, not a new retrieval score. It processes candidates by descending relevance score and ascending HDC ID, skips an item that cannot fit in the remaining declared budget, and continues trying smaller candidates. It can optionally compose with a per-trajectory quota. This is a hypothesis about context utilization, not an asserted accuracy or latency improvement.
+
+The cost map must use a pinned model tokenizer and the same canonical framing/serialization contract used by the reader. Byte length is not an acceptable substitute. Tokenization is not generally additive across concatenated items, so the caller must also count the final serialized context and fail closed if the actual rendered input exceeds the budget. The policy's additive cost check is not a substitute for that final guard.
+
+Compare these arms using an identical oversampled candidate pool and held-out queries:
+
+1. **Rank-prefix baseline:** preserve rank order and stop when the next item would exceed the budget.
+2. **Skip-and-pack:** the new policy skips non-fitting items and continues through the ranking.
+3. **Skip-and-pack + trajectory cap:** additionally limit sibling states, with the cap tuned only on development questions.
+4. **Token-cost-aware reranking:** future, separate ablation (for example score per token); do not merge this with packing or infer that raw BM25 score is calibrated utility.
+5. **Oracle-fit diagnostic:** an upper-bound packing analysis only; oracle labels and future answer outcomes must never be policy features.
+
+Report answer accuracy overall and by all five LongMemEval-V2 abilities, relevant-state recall, context tokens from the final serializer, unused budget, trajectory concentration/entropy, duplicate-token ratio, retrieval latency, reader latency, and cost. Report paired differences with 95% paired bootstrap confidence intervals. Preserve per-question receipts that bind candidate IDs/scores, eligibility decisions, costs, selected IDs, final token count, generation, prompt/tokenizer identity, and answer/evaluator configuration.
+
+**Hard gates:** zero final-prompt budget overruns; zero out-of-scope or inactive evidence; deterministic outputs for the same ranking/costs/generation; no silent fallback when a selected record or cost entry is missing; no answer-key or future-state features. Compare policies at the same *actual serialized-token* budget, not merely the same candidate count.
+
+**Decision rule:** keep the new policy opt-in unless held-out paired evaluation shows a quality–cost improvement against the rank-prefix baseline. A possible project threshold is non-inferior answer quality within a preregistered 1 percentage point while reducing measured context or total lifecycle cost by at least 25%, or a statistically supported quality increase of at least 3 percentage points at equal declared budgets. These are proposed local decision rules, not accepted industry standards; freeze the criterion before viewing held-out results.
 
 ## Required baseline arms
 
