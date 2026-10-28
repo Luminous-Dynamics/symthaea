@@ -14,8 +14,9 @@
 //! simulate interruption boundaries in-process; true power-loss qualification
 //! must be performed on each claimed filesystem/device configuration.
 
-use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity};
+use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, MemoryContextItem};
 use std::collections::BTreeSet;
+use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, HdcStoreReader, IndexOpenPolicy};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -72,6 +73,17 @@ pub struct EvidencePruneReport {
     pub retained_generation_window_start: u64,
     pub removed_generation_directories: Vec<String>,
     pub removed_staging_directories: usize,
+}
+
+/// Result of a query against one verified, immutable evidence/HDC generation.
+///
+/// Candidate IDs and scores are retained for audit/benchmark diagnostics; only
+/// the scope- and lifecycle-eligible payloads are emitted as context.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommittedEvidenceQuery {
+    pub generation: u64,
+    pub candidates: Vec<(u64, f32)>,
+    pub context: Vec<MemoryContextItem>,
 }
 
 impl Drop for WriterLock {
@@ -180,6 +192,95 @@ impl EvidenceDiskStore {
             return Err("CURRENT pointer has invalid generation or manifest digest".into());
         }
         self.read_generation(&pointer).map(Some)
+    }
+
+    /// Query the exact HDC index and evidence snapshot named by one CURRENT pointer.
+    ///
+    /// This is the first query-serving boundary for the disk store: it reads one
+    /// pointer, verifies that generation, opens the HDC bytes from that same
+    /// immutable generation, rechecks the typed HDC identity, performs exact
+    /// nearest-neighbor search, and only then resolves scope/lifecycle/time-
+    /// eligible payloads. It intentionally refuses legacy opaque-byte fixture
+    /// commits because those do not bind a real HDC identity.
+    ///
+    /// `Ok(None)` means no generation has ever been committed. Any malformed
+    /// or mismatched committed state is an error; callers must not turn it into
+    /// a successful answer or fall back to a separate mutable HDC store.
+    pub fn query_committed_context(
+        &self,
+        query: &BinaryHV,
+        candidate_k: usize,
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: impl AsRef<Path>,
+        max_items: usize,
+    ) -> Result<Option<CommittedEvidenceQuery>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+
+        // Read CURRENT exactly once so candidate search and payload resolution
+        // cannot intentionally select different generations across a commit.
+        let pointer_bytes = match read_optional_regular_file(&self.root.join(CURRENT_FILE))? {
+            Some(bytes) => bytes,
+            None => return Ok(None),
+        };
+        let pointer: CurrentPointer = serde_json::from_slice(&pointer_bytes)
+            .map_err(|error| format!("invalid CURRENT pointer: {error}"))?;
+        if pointer.schema_version != CURRENT_SCHEMA_VERSION {
+            return Err("unsupported CURRENT pointer schema version".into());
+        }
+        if pointer.generation == 0 || !is_sha256(&pointer.manifest_sha256) {
+            return Err("CURRENT pointer has invalid generation or manifest digest".into());
+        }
+
+        let recovered = self.read_generation(&pointer)?;
+        let identity = recovered.manifest.hdc_store_identity()
+            .ok_or_else(|| "committed query requires a typed HDC identity; opaque-byte fixtures cannot serve context".to_string())?;
+        identity.validate_for_recovery()?;
+
+        let index_path = self.root
+            .join("generations")
+            .join(generation_directory_name(pointer.generation, &pointer.manifest_sha256))
+            .join(INDEX_FILE);
+        let reader = HdcStoreReader::open(&index_path)
+            .map_err(|error| format!("committed query could not open its HDC generation: {error}"))?;
+
+        // Revalidate the reader that will actually answer the query. The earlier
+        // recovery pass validates the manifest's exact file bytes; this second
+        // check ensures the opened mapping still matches that committed identity.
+        let checksum = reader.content_checksum();
+        if reader.generation() != identity.store_generation
+            || reader.live_count() != identity.live_count
+            || checksum.version != identity.checksum_version
+            || checksum.live_count != identity.live_count
+            || checksum.hex() != identity.checksum_hex
+        {
+            return Err("opened query HDC generation no longer matches committed identity".into());
+        }
+        if reader.ids().collect::<BTreeSet<_>>() != recovered.evidence_index.active_hdc_ids() {
+            return Err("opened query HDC live IDs do not match committed active evidence IDs".into());
+        }
+
+        let candidates = if candidate_k == 0 {
+            Vec::new()
+        } else {
+            reader.scan_similar(query, candidate_k)
+        };
+        let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
+        let context = recovered.evidence_index.resolve(
+            &candidate_ids,
+            scope_id,
+            now_ms,
+            payload_root.as_ref(),
+            max_items,
+        )?;
+
+        Ok(Some(CommittedEvidenceQuery {
+            generation: recovered.generation,
+            candidates,
+            context,
+        }))
     }
 
     /// Remove old visible generation directories under the exclusive writer lock.
