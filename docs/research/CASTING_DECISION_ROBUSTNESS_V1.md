@@ -1,7 +1,7 @@
 # CASTING Decision Robustness Audit v1
 
 **Benchmark ID:** CASTING-DECISION-ROBUSTNESS-001  
-**Status:** research harness implemented; ready for controlled known-answer testing, not yet integrated with the main bake-off  
+**Status:** research harness and strict bake-off adapter implemented; no production shift manifest / physical evidence supplied  
 **Scope:** two-objective constrained optimization with a fixed reference point  
 **Evidence labels:** synthetic / simulator / physical must remain distinct
 
@@ -15,13 +15,13 @@ It complements, rather than replaces, the compositional multi-fidelity bake-off 
 
 1. Freeze the candidate pool, nominal predictions, selected-candidate flags, reference point, source revision, and selection trace **before** running any holdout shift. Record the frozen-selection SHA-256.
 2. Freeze a holdout manifest with scenario-family definitions, parameter ranges, seeds, simulator revision, and evaluation budget. Record its SHA-256. Do not use these holdout observations to tune or reselect candidates for the same reported run.
-3. Evaluate **every candidate in the declared pool under every shift**. Missing or duplicate candidate/shift rows fail closed. This makes finite-pool regret comparable and prevents selective omission of bad candidates.
+3. Use `tools/casting-benchmark/adapt_bakeoff_to_robustness.py` to bind an unaltered compositional sweep, a frozen selection/prediction manifest and a sealed shift manifest. The adapter requires the exact sweep hash, selector, and candidate-pool digest to agree. Evaluate **every candidate in the declared pool under every shift**. Missing or duplicate candidate/shift rows fail closed. This makes finite-pool regret comparable and prevents selective omission of bad candidates.
 4. Normalize both minimized objectives into the interval [0, reference_point[i]) using transformations frozen before evaluation. The reference point is shared across policies and shifts; do not tune it per run.
-5. Score raw inputs with tools/casting-benchmark/decision_robustness_eval.py. Archive input bytes, receipt, evaluator revision, environment, and source digests. The receipt hashes the exact input bytes and the evaluator source bytes.
+5. Score adapter output with `tools/casting-benchmark/decision_robustness_eval.py`. Archive all three source artifacts, converted input bytes, receipt, evaluator revision, environment, and source digests. The receipt hashes the exact converted input bytes and evaluator source bytes, and includes the source run's sweep and candidate-pool digests.
 6. Keep one row per task, selection, candidate, and shift in the raw archive. Preserve failed, timed-out, invalid, and refused evaluations as outcomes in the acquisition layer; do not omit failures from the accounting.
 7. Report synthetic stress fixtures, public optimization benchmarks, engineering simulator results, and physical foundry observations as separate evidence classes.
 
-The split fields in the input document are declarations, not cryptographic attestations of how data were collected. Reviewers must verify the hashes against controlled artifacts and independently check that the holdout really remained sealed.
+The source selection manifest must contain `schema_version`, `benchmark_id`, `source_sweep_sha256`, `selector`, `candidate_pool_sha256`, `reference_point`, `selected_candidate_ids`, and one frozen nominal prediction for every candidate in the pool. The holdout manifest must contain the same selector and source/candidate-pool digests plus complete observations for every candidate in every named shift. Neither predictions nor shifted observations are inferred or invented by the adapter. The split fields in the input document are declarations, not cryptographic attestations of how data were collected. Reviewers must verify the hashes against controlled artifacts and independently check that the holdout really remained sealed.
 
 ## Required shift families
 
@@ -82,3 +82,21 @@ python3 tools/casting-benchmark/test_decision_robustness_eval.py
 ```
 
 The toy fixture intentionally selects a candidate that violates a constraint under one of two shifts while a better feasible candidate remains unselected. The receipt should report selected false-feasible count 1 of 2 predicted-feasible candidate/shift pairs, selected feasibility rate 0.5, worst-shift finite-pool retention 0, and worst-shift finite-pool regret 1.0. These are known-answer fixture values, not casting performance results. The fixture's digest strings are placeholders for schema tests only; replace them with verified artifact digests in a real experiment.
+
+## Adapter contract and reproducible invocation
+
+From the repository root after generating an unaltered compositional sweep JSON:
+
+```sh
+python3 tools/casting-benchmark/adapt_bakeoff_to_robustness.py \
+  sweep.json frozen-selection-and-predictions.json sealed-holdout-shifts.json \
+  --output /tmp/robustness-input.json
+python3 tools/casting-benchmark/decision_robustness_eval.py \
+  /tmp/robustness-input.json --output /tmp/robustness-receipt.json
+python3 tools/casting-benchmark/test_decision_robustness_eval.py
+python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
+```
+
+The adapter only accepts the existing compositional synthetic sweep format today. The selection manifest must bind to the exact bytes of that sweep and its candidate-pool digest. The selected set is explicit and frozen; the full candidate prediction list must contain every ID from `0` through `design_count - 1`. The holdout manifest must repeat the selector and sweep/pool digests and provide every candidate exactly once for each shift. Missing values, duplicate candidate IDs, ambiguous run selectors, or digest mismatches abort conversion.
+
+The nominal prediction table and shifted observations are separate upstream artifacts: this adapter is **not** a shift generator, a casting simulator, or a model that generates predictions. No adapter run has yet been made against an actual saved bake-off JSON plus independent shift manifests. The schema and adapter tests are synthetic known-answer tests until that end-to-end execution is archived.
