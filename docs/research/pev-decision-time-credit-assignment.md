@@ -170,3 +170,12 @@ The deterministic synthetic run accepted 100,000 single-epoch traces and six tes
 **Security qualification:** the hash chain is tamper-evident only if the trusted root is retained; it is not an authenticity proof because an editor who can rewrite the whole trace can recompute the chain. Signing or externally anchoring a root digest is a separate design decision. Keep hashed content to canonical metadata only; do not include raw user text or secrets.
 
 See pev_trace_audit_v2_contract.md for the complete v2 protocol, limits, and implementation gate. The missing next proof is still an exact-head Rust test that emits real decision/posthoc traces, including checkpoint/restore and reset boundaries, and passes those raw traces to the independent auditor.
+
+
+## 12. Counterfactual causal-influence benchmark
+
+Section 10's trace audit and section 11's envelope still establish only record consistency. A correctly hashed trace can claim PE influence while the consumer ignores the evidence, or hide invalid-PE effects outside recorded channels. The new paired counterfactual reference benchmark therefore holds input, initial-state digest, and gate/outcome calibration constant while replaying no-PE, seven invalid compatibility payloads, and a valid-PE positive control.
+
+The locally executed synthetic run accepted 100,000 paired trials (900,000 branch summaries) and rejected all seven deliberate mutations: invalid-payload state divergence, valid-PE no-op, missing/duplicate positive-control admission, protected-channel collateral change, counterfactual input mismatch, and independent-outcome suppression. See pev_counterfactual_influence_benchmark_v1.md for the schema and exact reproduction command.
+
+**Interpretation limit:** these are synthetic state-digest fixtures, not production Rust causality evidence. The next gate is to replay identical observations/actions/seeds through the real PE consumer path, emit accepted evidence IDs and independently auditable before/after state summaries, then run this checker against those exact-head traces. Keep correctness and utility as separate scorecards.
