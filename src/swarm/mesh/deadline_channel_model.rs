@@ -26,7 +26,11 @@ const ACK_TURNAROUND_US: u64 = 100_000;
 const ACK_TIMEOUT_US: u64 = 1_000_000;
 // Hypothetical 8-byte outer header plus 16-byte fragment bitmap/control body.
 const ACK_PHY_BYTES: usize = 24;
-const PAYLOAD_BYTES: usize = 2048;
+// Production uncompressed-envelope baseline: 1-byte compression tag + full WisdomPacket.
+const BASELINE_ENVELOPE_BYTES: usize = super::WISDOM_PACKET_SIZE + 1;
+// Packet AEAD adds the 12-byte nonce and 16-byte Poly1305 tag to that envelope.
+const PACKET_AEAD_ENVELOPE_BYTES: usize = BASELINE_ENVELOPE_BYTES + 12 + 16;
+const RAW_HV_BYTES: usize = 2048;
 const HASH_BUCKETS: u64 = 1_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,13 +209,17 @@ fn loss_threshold_ppm(
     }
 }
 
-fn frame_lengths() -> Vec<usize> {
-    let payload = vec![0xA5; PAYLOAD_BYTES];
+fn frame_lengths_for_bytes(payload_len: usize) -> Vec<usize> {
+    let payload = vec![0xA5; payload_len];
     let frames = fragment(0xC0DE, &payload);
     frames
         .iter()
         .map(|frame| HEADER_SIZE + usize::from(frame.payload_len))
         .collect()
+}
+
+fn frame_lengths() -> Vec<usize> {
+    frame_lengths_for_bytes(BASELINE_ENVELOPE_BYTES)
 }
 
 struct EventSimulation<'a> {
@@ -396,12 +404,65 @@ fn by_deadline(outcome: Outcome, deadline_us: u64) -> bool {
     outcome.delivered_us.is_some_and(|delivered| delivered <= deadline_us)
 }
 
+
+#[test]
+fn wire_profile_airtime_accounts_for_vector_envelope_and_packet_aead() {
+    let raw_hv = frame_lengths_for_bytes(RAW_HV_BYTES);
+    let plain_envelope = frame_lengths_for_bytes(BASELINE_ENVELOPE_BYTES);
+    let packet_aead = frame_lengths_for_bytes(PACKET_AEAD_ENVELOPE_BYTES);
+
+    assert_eq!(RAW_HV_BYTES, 2048);
+    assert_eq!(BASELINE_ENVELOPE_BYTES, 2105);
+    assert_eq!(PACKET_AEAD_ENVELOPE_BYTES, 2133);
+    for sizes in [&raw_hv, &plain_envelope, &packet_aead] {
+        assert_eq!(sizes.len(), 11);
+        assert_eq!(sizes.iter().filter(|size| **size == LORA_MTU).count(), 10);
+        assert_eq!(sizes[10], LORA_MTU, "XOR parity occupies a full MTU");
+        assert!(sizes.iter().all(|size| *size <= LORA_MTU));
+    }
+    assert_eq!(raw_hv[9], 130);
+    assert_eq!(plain_envelope[9], 187);
+    assert_eq!(packet_aead[9], 215);
+
+    // Analytical PHY reference sums, not measured radio completion latency.
+    let expected = [
+        (7, 3_351_040, 3_432_960, 3_473_920),
+        (9, 10_659_840, 10_905_600, 11_028_480),
+        (12, 77_250_560, 79_216_640, 80_035_840),
+    ];
+    for (sf, raw_expected, plain_expected, aead_expected) in expected {
+        let sum = |sizes: &[usize]| -> u64 {
+            sizes[..10]
+                .iter()
+                .map(|size| lora_time_on_air_us_for_sf(*size, sf))
+                .sum()
+        };
+        let raw_airtime = sum(&raw_hv);
+        let plain_airtime = sum(&plain_envelope);
+        let aead_airtime = sum(&packet_aead);
+        assert_eq!(raw_airtime, raw_expected, "raw-HV-only SF{sf}");
+        assert_eq!(plain_airtime, plain_expected, "uncompressed envelope SF{sf}");
+        assert_eq!(aead_airtime, aead_expected, "packet-AEAD envelope SF{sf}");
+        assert!(raw_airtime < plain_airtime && plain_airtime < aead_airtime);
+        eprintln!(
+            "mesh-wire-footprint profile=raw_hv/envelope/packet_aead sf={} data_airtime_us={}/{}/{} bytes={}/{}/{} frames=10 parity_frame=222",
+            sf,
+            raw_airtime,
+            plain_airtime,
+            aead_airtime,
+            RAW_HV_BYTES,
+            BASELINE_ENVELOPE_BYTES,
+            PACKET_AEAD_ENVELOPE_BYTES,
+        );
+    }
+}
+
 #[test]
 fn deadline_model_uses_fragment_lengths_and_distinguishes_deadlines() {
     let sizes = frame_lengths();
     assert_eq!(sizes.len(), 11);
     assert_eq!(sizes.iter().filter(|size| **size == LORA_MTU).count(), 10);
-    assert_eq!(sizes.iter().filter(|size| **size == 130).count(), 1);
+    assert_eq!(sizes.iter().filter(|size| **size == 187).count(), 1);
     assert!(sizes.iter().all(|size| *size <= LORA_MTU));
 
     let model = ChannelModel::Iid { loss_per_mille: 0 };
