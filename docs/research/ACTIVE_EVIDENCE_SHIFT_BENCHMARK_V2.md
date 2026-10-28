@@ -317,27 +317,23 @@ Required protocol:
 **Acceptance criteria proposed for the next lane:** zero violations of the composite-null guarantee in the exact finite-state schedule tests; all baselines compared at preregistered matched empirical false-alarm operating points; no scenario-level detection claim where the target did not shift; repeatable paired evaluation on at least three source-distinct streams plus synthetic adversarial controls; and no “beats SOTA” claim until data, code, thresholds, and exact result receipts are independently reproduced. These are proposed gates, not results already achieved.
 
 
-## 27. Matched-edge CUSUM reference pilot (synthetic, provisional)
+## 27. Family-wise matched CUSUM reference pilot (synthetic, provisional)
 
-The stacked implementation PR [#8822](https://github.com/Luminous-Dynamics/symthaea/pull/8822) adds upper/lower reflected Bernoulli CUSUM arms. Rather than giving CUSUM only a formal alpha allocation and comparing it to the composite process at a different realized false-alarm rate, its threshold is selected by exact DP to match the existing composite-band betting e-process's *realized alarm probability at p=0.52* over 1,000 observations.
+The stacked implementation PR [#8822](https://github.com/Luminous-Dynamics/symthaea/pull/8822) adds upper/lower reflected Bernoulli CUSUM arms. A review identified a fairness problem in the first pilot: matching each one-sided CUSUM to the reference detector's *entire* two-sided false-alarm rate made the combined two-arm CUSUM more permissive. The current design corrects this before qualification by splitting the composite detector's exact family-wise false-alarm target equally across the two CUSUM directions.
 
-An independent local DP prototype obtained:
-- reference composite edge alarm probability: 0.000891588;
-- smallest CUSUM integer threshold: 1,374, score 54.96;
-- CUSUM alarm probability at the boundary: 0.000885901; threshold 1,373 gives 0.000894015 and is too liberal for this matched target;
-- two-sided CUSUM union-bound receipt: 0.001771803, below the per-cell allocation 0.004166667.
+The composite-band betting e-process's exact-DP alarm probability at the stable p=0.52 edge over 1,000 observations is 0.000891587934. Each directional CUSUM target is half that, 0.000445793967. The smallest calibrated integer threshold is 1,444 (score 57.76), with directional boundary crossing 0.000445549101; threshold 1,443 yields 0.000450088025 and is too liberal. The resulting two-direction union bound is 0.000891098203, below the composite reference rate and below the per-cell alpha 0.004166667.
 
-At a change after observation 100 and horizon 1,000, the matched-edge prototype gives these CUSUM upper-arm results against the composite-band e-process:
+At an abrupt change after observation 100 and horizon 1,000, the independent local exact-DP prototype gives:
 
-| Post-change event rate | Composite detection | CUSUM detection | Mean delay | Median delay | P90 delay |
+| Post-change event rate | Composite-band detection | CUSUM one-direction detection | Mean delay | Median delay | P90 delay |
 |---:|---:|---:|---:|---:|---:|
-| 0.55 | 1.769% | 7.226% | 773.9 | 796 | 883 |
-| 0.60 | 73.527% | 93.336% | 622.7 | 618 | 799 |
-| 0.70 | about 99.987% | effectively 100% | 290.0 | 287 | 350 |
-| 0.80 | about 99.987% | effectively 100% | 186.7 | 186 | 215 |
+| 0.55 | 1.769% | 4.884% | 784.3 | 806 | 885 |
+| 0.60 | 73.527% | 90.407% | 648.6 | 647 | 819 |
+| 0.70 | about 99.987% | effectively 100% | 305.6 | 302 | 367 |
+| 0.80 | about 99.987% | effectively 100% | 196.7 | 196 | 225 |
 
-Conditional delay statistics apply only among detected runs. At p1=.55, most runs still fail to detect within the horizon; the conditional latency metrics describe the selected minority and must be read with the detection probability.
+Delay quantiles are conditional on detections. Especially for p1=.55, the low detection probability must be read alongside conditional latency; missed runs must not disappear from the latency report. At this family-matched synthetic operating point the one-direction CUSUM arm gains about 3.1 percentage points of detection at p1=.55 and 16.9 points at p1=.60, but conditional delay remains long for weak shifts.
 
-The CUSUM implementation and independent reference now also test deterministic alternating rates and a state-conditioned predictable feedback schedule entirely inside [0.48, 0.52]. The latter chooses each next conditional rate based only on the CUSUM state before that observation. The theoretical guarantee comes from monotone coupling of each one-sided score to its constant boundary-rate process; the exact-DP schedules are regression controls for implementation errors.
+The implementation and independent Python reference also test predictable null schedules fully within [0.48, 0.52]: deterministic alternation between endpoints, and a feedback schedule whose next conditional rate depends only on the current score before the next observation. The mathematical bound is via monotone coupling of each direction to its constant boundary-rate process; the exact-DP schedule tests are regression controls for implementation errors, not a substitute for held-out real-stream validation.
 
-**Claim ceiling:** these values are from independent local exact-DP calculations, not from the stacked Rust PR's artifact or CI. The matched point is a stable constant edge rate, not a matched-worst-case FPR evaluation over every predictable in-band schedule. The CUSUM family false-alarm bound is the directional union bound; this is distinct from pointwise realized FPR and from the composite process's formal alpha guarantee. Exact-head Rust/reference parity, formatting checks, broader predictable schedules, and source-held-out real streams remain pending. Do not call this state of the art or general superiority.
+**Claim ceiling:** all these values are independent local exact-DP calculations, not results from the stacked Rust PR's artifact or CI. This is a constant-edge family-matched synthetic comparison, not evidence of superiority on general distribution shift. Exact-head Rust/reference parity, formatting checks, external version-pinned baselines, and source-held-out real streams remain pending. Do not call this state of the art or general superiority.
