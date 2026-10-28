@@ -17,7 +17,7 @@ from typing import Any
 from decision_robustness_eval import BENCHMARK_ID as AUDIT_BENCHMARK_ID
 
 ADAPTER_BENCHMARK_ID = "CASTING-DECISION-ROBUSTNESS-ADAPTER-001"
-ADAPTER_SCHEMA_VERSION = "1.1.0"
+ADAPTER_SCHEMA_VERSION = "1.2.0"
 EXPECTED_SWEEP_BENCHMARK = "CASTING-MF-COMPOSITION-001"
 REFERENCE_TOL = 1e-12
 FROZEN_REFERENCE_POINT = (1.2, 1.2)
@@ -190,6 +190,7 @@ def adapt_documents(
             "schema_version", "benchmark_id", "source_sweep_sha256", "selector",
             "candidate_pool_sha256", "reference_point", "selected_candidate_ids",
             "candidate_predictions", "selection_frozen_before_holdout",
+            "manifest_generator_sha256", "nominal_prediction_source",
         },
         "selection_manifest",
     )
@@ -197,6 +198,10 @@ def adapt_documents(
         raise ValueError("selection_manifest schema or benchmark id is unsupported")
     if selection["selection_frozen_before_holdout"] is not True:
         raise ValueError("selection_manifest must declare selection_frozen_before_holdout=true")
+    generator_sha = _digest(selection["manifest_generator_sha256"], "selection_manifest.manifest_generator_sha256")
+    nominal_prediction_source = selection["nominal_prediction_source"]
+    if not isinstance(nominal_prediction_source, str) or not nominal_prediction_source.strip():
+        raise ValueError("selection_manifest.nominal_prediction_source must be non-empty")
     if _digest(selection["source_sweep_sha256"], "selection_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("selection_manifest is not bound to these exact sweep bytes")
     selector = _selector(selection["selector"], "selection_manifest.selector")
@@ -243,13 +248,20 @@ def adapt_documents(
         {
             "schema_version", "benchmark_id", "source_sweep_sha256",
             "candidate_pool_sha256", "selector", "shifts", "holdout_role",
+            "manifest_generator_sha256", "evidence_class", "shift_suite_id",
         },
         "holdout_manifest",
     )
     if holdout["schema_version"] != ADAPTER_SCHEMA_VERSION or holdout["benchmark_id"] != ADAPTER_BENCHMARK_ID:
         raise ValueError("holdout_manifest schema or benchmark id is unsupported")
-    if holdout["holdout_role"] != "independent_post_selection":
-        raise ValueError("holdout_manifest.holdout_role must be independent_post_selection")
+    if holdout["holdout_role"] not in {"independent_post_selection", "synthetic_post_selection_diagnostic"}:
+        raise ValueError("holdout_manifest.holdout_role is not a supported frozen role")
+    if holdout["evidence_class"] != "synthetic" or holdout["holdout_role"] != "synthetic_post_selection_diagnostic":
+        raise ValueError("this adapter accepts synthetic diagnostics only; do not label generated shifts as independent physical validation")
+    if not isinstance(holdout["shift_suite_id"], str) or not holdout["shift_suite_id"].strip():
+        raise ValueError("holdout_manifest.shift_suite_id must be non-empty")
+    if _digest(holdout["manifest_generator_sha256"], "holdout_manifest.manifest_generator_sha256") != generator_sha:
+        raise ValueError("selection and holdout manifests must use the same generator digest")
     if _digest(holdout["source_sweep_sha256"], "holdout_manifest.source_sweep_sha256") != sweep_sha:
         raise ValueError("holdout manifest is not bound to these exact sweep bytes")
     if _digest(holdout["candidate_pool_sha256"], "holdout_manifest.candidate_pool_sha256") != candidate_pool_sha:
@@ -285,6 +297,7 @@ def adapt_documents(
     if not isinstance(evaluations, list) or not evaluations:
         raise ValueError("selected sweep run has no evaluation ledger")
     seen_eval_keys = set()
+    high_candidate_ids = set()
     summed_cost = 0
     for i, observation in enumerate(evaluations):
         if not isinstance(observation, dict):
@@ -298,12 +311,16 @@ def adapt_documents(
         if key in seen_eval_keys:
             raise ValueError(f"selected run has duplicate candidate/fidelity observation {key}")
         seen_eval_keys.add(key)
+        if fidelity == "high":
+            high_candidate_ids.add(cid)
         _objective_pair(observation.get("objectives"), f"selected run evaluation {i}.objectives", reference)
         _number(observation.get("constraint_margin"), f"selected run evaluation {i}.constraint_margin")
         cost_units = observation.get("cost_units")
         if isinstance(cost_units, bool) or not isinstance(cost_units, int) or cost_units != run_costs[fidelity]:
             raise ValueError(f"selected run evaluation {i}.cost_units disagrees with its fidelity cost")
         summed_cost += cost_units
+    if set(selected_ids) != high_candidate_ids:
+        raise ValueError("selected_candidate_ids must equal exactly the run's high-fidelity candidate IDs")
     declared_spent = _number(run.get("cost_spent"), "selected run cost_spent")
     if abs(summed_cost - declared_spent) > REFERENCE_TOL:
         raise ValueError("selected run cost_spent disagrees with its evaluation ledger")
@@ -311,14 +328,17 @@ def adapt_documents(
         raise ValueError("selected run cost_spent exceeds the declared budget")
     fidelity_costs = run_costs
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "benchmark_id": AUDIT_BENCHMARK_ID,
         "task_id": f'{selector["objective_family"]}__{selector["constraint_family"]}__d{selector["dimension"]}__s{selector["severity"]}',
         "run_id": f'{selector["policy"]}__seed{selector["seed"]}__budget{run.get("cost_budget")}',
         "source_run": {
             "sweep_sha256": sweep_sha,
             "adapter_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
+            "manifest_generator_sha256": generator_sha,
             "candidate_pool_sha256": candidate_pool_sha,
+            "nominal_prediction_source": nominal_prediction_source,
+            "evidence_class": holdout["evidence_class"],
             "objective_family": selector["objective_family"],
             "constraint_family": selector["constraint_family"],
             "dimension": selector["dimension"],
