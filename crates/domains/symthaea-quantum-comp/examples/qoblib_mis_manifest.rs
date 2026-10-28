@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use symthaea_quantum_comp::{canonicalize_dimacs_graph, sha256_hex};
@@ -252,5 +252,3 @@ fn run_git(repository_root: &Path, args: &[&str]) -> Result<String, Box<dyn Erro
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
 
-#[allow(dead_code)]
-fn _path_keepalive(_: PathBuf) {}
