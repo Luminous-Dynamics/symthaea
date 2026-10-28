@@ -819,6 +819,32 @@ mod tests {
     }
 
     #[test]
+    fn posthoc_rejects_evidence_from_another_decision_cycle() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+        let wrong_cycle = PredictionErrorEvidence::valid(0.88, Some(4), 5).unwrap();
+
+        engine.record_posthoc_with_evidence(Some(6), true, false, Some(wrong_cycle));
+        ctx.cycle_id = 7;
+        engine.reason(&ctx);
+
+        let outcome = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("gate outcome is preserved even when PE provenance mismatches");
+        assert_eq!(outcome.decision_cycle, Some(6));
+        assert_eq!(outcome.prediction_error, None);
+        assert_eq!(
+            outcome.prediction_evidence.as_ref().unwrap().status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(
+            outcome.prediction_evidence.as_ref().unwrap().observation_cycle(),
+            5
+        );
+    }
+
+    #[test]
     fn posthoc_serialization_preserves_invalid_typed_evidence() {
         let mut engine = ConsciousReasoningEngine::new();
         let mut ctx = make_context(0.8, 0.8, 25_000);
