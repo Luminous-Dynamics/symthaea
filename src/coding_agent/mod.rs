@@ -61,6 +61,8 @@ use crate::cognitive_loop::motor_output_bridge::{
     ActionType, MotorActionRequest, MotorOutputBridge, MotorOutputResult,
 };
 use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
+#[cfg(feature = "reasoning_engine")]
+use crate::cognitive_loop::PredictionErrorEvidence;
 use crate::consciousness::fep_active_inference::MotorCommandType;
 #[cfg(feature = "code_generation")]
 use crate::language::code_orchestrator::CodeOrchestrator;
@@ -840,12 +842,27 @@ impl CodingAgent {
         // gate result is only attributable to this attempt on those two phases.
         #[cfg(feature = "reasoning_engine")]
         if matches!(self.phase, TaskPhase::Generating | TaskPhase::Fixing) {
+            // Prefer the evidence identity already attached to this CycleResult.
+            // A valid numeric scalar without cycle metadata is not enough to
+            // manufacture decision-time provenance.
+            let prediction_evidence = cycle_result
+                .metadata
+                .prediction_evidence
+                .as_ref()
+                .map(|metadata| {
+                    PredictionErrorEvidence::from_comparison(
+                        metadata.status,
+                        (cycle_result.prediction_error_valid
+                            && cycle_result.prediction_error.is_finite())
+                        .then_some(cycle_result.prediction_error),
+                        metadata.prediction_cycle,
+                        metadata.observation_cycle,
+                    )
+                });
             self.pending_reasoning_outcome =
-                Some(consciousness_bridge::PendingReasoningOutcome::capture(
+                Some(consciousness_bridge::PendingReasoningOutcome::capture_with_evidence(
                     &reasoning,
-                    signals
-                        .prediction_error_valid
-                        .then_some(signals.prediction_error as f64),
+                    prediction_evidence,
                 ));
         }
 
