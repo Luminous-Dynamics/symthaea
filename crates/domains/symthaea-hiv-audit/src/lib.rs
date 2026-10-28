@@ -454,6 +454,40 @@ mod tests {
     }
 
     #[test]
+    fn parses_csv_and_hashes_uuid_set_without_emitting_identifiers() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-hiv-audit-unique-{}.csv",
+            std::process::id()
+        ));
+        fs::write(&path, "uuid,gene_a,gene_b\nparticipant-a,2,3\nparticipant-b,4,5\n")
+            .expect("write test CSV");
+        let (audit, ids) = audit_csv(&path).expect("audit valid CSV");
+        assert_eq!(audit.data_rows, 2);
+        assert_eq!(audit.columns, 3);
+        assert_eq!(audit.unique_uuid_count, 2);
+        assert_eq!(audit.duplicate_uuid_rows, 0);
+        assert_eq!(ids.len(), 2);
+        assert!(!audit.uuid_set_sha256.contains("participant-a"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn duplicate_uuid_rows_are_counted_for_fail_closed_capture() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-hiv-audit-duplicate-{}.csv",
+            std::process::id()
+        ));
+        fs::write(&path, "uuid,gene_a\nparticipant-a,2\nparticipant-a,9\n")
+            .expect("write test CSV");
+        let (audit, ids) = audit_csv(&path).expect("audit syntactically valid CSV");
+        assert_eq!(audit.data_rows, 2);
+        assert_eq!(audit.unique_uuid_count, 1);
+        assert_eq!(audit.duplicate_uuid_rows, 1);
+        assert_eq!(ids.len(), 1);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn dataset_registry_selection_fails_closed_on_unknown_ids() {
         let manifest = DatasetManifest {
             schema_version: "1.0".to_owned(),
