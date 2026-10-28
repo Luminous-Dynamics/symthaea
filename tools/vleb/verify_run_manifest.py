@@ -329,6 +329,8 @@ def audit_witness_execution_receipt(
         issues.append({"code": "witness_receipt_result_mismatch", "message": "receipt observation differs from claim witness result"})
 
     producer = receipt["producer"]
+    if producer.get("id") != "vleb-record-witness-execution":
+        issues.append({"code": "witness_receipt_producer_id_mismatch", "message": "receipt producer ID is not the trusted VLEB recorder"})
     if producer.get("source_sha256") != expected_producer_sha256:
         issues.append({"code": "witness_receipt_producer_mismatch", "message": "receipt producer source digest differs from evaluator pin"})
     verifier = receipt["verifier"]
@@ -378,6 +380,8 @@ def audit_witness_execution_receipt(
             issues.append({"code": "witness_receipt_output_invalid", "message": f"{path_value}: {exc}"})
     if len(output_paths) != len(set(output_paths)):
         issues.append({"code": "witness_receipt_duplicate_output", "message": "receipt output paths must be unique"})
+    if set(input_paths) & set(output_paths):
+        issues.append({"code": "witness_receipt_input_output_alias", "message": "receipt input and output paths must not alias"})
     observed_witness_path = witness.get("artifact_path")
     if output_digest_by_path.get(observed_witness_path) != witness.get("artifact_sha256"):
         issues.append({
