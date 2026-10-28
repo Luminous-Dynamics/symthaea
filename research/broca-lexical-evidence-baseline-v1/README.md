@@ -104,7 +104,7 @@ The adapter must pass only `result.context` to the reader. The separate audit is
 - Maximum input JSONL line: 32 MiB.
 - Maximum individual evidence text field: 4 MiB.
 - Maximum evidence items per trajectory: 50,000.
-- Malformed JSON, wrong request IDs, duplicate trajectory IDs, unknown operations, invalid source pointers, digest mismatches, and ID collisions fail closed.
+- Malformed JSON, wrong request IDs, duplicate trajectory IDs, unknown operations, invalid source pointers, source/content digest mismatches, invalid lifecycle transitions, and ID collisions fail closed.
 - A non-empty image query is surfaced as `image_query_received_but_not_used`; no visual capability is claimed.
 - The Rust worker's live index is process-local. The Python adapter's save/load path persists a digest-bound event journal and rebuilds the index with the same pinned binary/config; it does not persist a byte-for-byte memory index. After save_memory completes, replay applies inserted trajectories and subsequent revoke/delete/supersede events in order, so saved tombstones remain non-resolvable after worker restart. This is save/load durability, not a crash-safe write-ahead log: mutations remain in the adapter's temporary journal until the harness saves the memory. Logical deletion is not physical secure erasure.
 
