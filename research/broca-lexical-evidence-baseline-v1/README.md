@@ -9,7 +9,7 @@ This branch is stacked on [PR #8682](https://github.com/Luminous-Dynamics/symtha
 - `EvidenceRecord.source_pointer` binds an item to the exact string in the canonical trajectory JSON, not merely to a digest of the whole source object. The batch verifier parses source JSON once and validates each pointer before committing any record.
 - `EvidenceIndex::insert_batch_atomic` validates every record and pointer before any mutation, so a malformed final record cannot leave half a trajectory indexed.
 - `EvidenceIndex::search_bm25` provides deterministic, model-free BM25 retrieval over active text evidence. Payload digests and tokens are computed once at ingestion; a compact inverted index stores term postings, while query-time scope/time/lifecycle filtering recomputes corpus statistics from eligible documents and visits only postings for query terms.
-- The `broca-lme-worker` binary accepts bounded JSONL requests, supports one pinned `web` or `enterprise` scope per process, ingests official-style trajectory objects, and returns reader context plus a separate provenance/score audit.
+- The `broca-lme-worker` binary accepts bounded JSONL requests, supports one pinned `web` or `enterprise` scope per process, ingests both official public-state (`states`) and legacy `content`/`metadata.original_goal` trajectory schemas, and returns reader context plus a separate provenance/score audit. Required source fields are schema-checked; outcome/question/evaluator fields are never indexed.
 - `broca_rust_memory.py` is the thin Python `Memory` adapter for the official harness. It checks request IDs, response shapes, timeouts, line bounds and worker binary SHA-256; the retrieval/ranking remains in Rust. Its save/load journal hashes and replays the exact trajectory set into the pinned worker binary.
 - `install_longmemeval_adapter.py` installs the adapter into a clean, explicitly pinned upstream checkout, with dry-run behavior by default.
 - The worker excludes root-level `outcome`, question IDs, question text, answer fields, screenshots and evaluator metadata from ingestion. It deliberately does not claim visual understanding or semantic embeddings.
@@ -21,6 +21,7 @@ From the repository root when a Rust toolchain is available:
 ```sh
 cargo test -p symthaea-broca --lib memory_evidence
 cargo test -p symthaea-broca --bin broca-lme-worker
+python3 research/broca-lexical-evidence-baseline-v1/test_broca_rust_memory.py
 cargo run --locked -p symthaea-broca --bin broca-lme-worker
 ```
 
@@ -93,7 +94,7 @@ The adapter must pass only `result.context` to the reader. The separate audit is
 - Maximum evidence items per trajectory: 50,000.
 - Malformed JSON, wrong request IDs, duplicate trajectory IDs, unknown operations, invalid source pointers, digest mismatches, and ID collisions fail closed.
 - A non-empty image query is surfaced as `image_query_received_but_not_used`; no visual capability is claimed.
-- Worker state is process-local. Persistent storage, save/load support, deletion across restarts, and a Python `Memory` adapter are **not implemented yet**.
+- The Rust worker state is process-local. The Python adapter's save/load path persists a digest-bound source-trajectory journal and rebuilds the worker index with the same pinned binary/config; it does not persist a byte-for-byte memory index. Lifecycle mutations such as revoke/delete are not currently exposed by the JSONL worker or persisted across restarts. Logical deletion is not physical secure erasure.
 
 ## Experiment design
 
