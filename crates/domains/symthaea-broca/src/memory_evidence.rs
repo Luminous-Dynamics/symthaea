@@ -994,6 +994,110 @@ impl EvidenceIndex {
         Ok(selected)
     }
 
+    /// Pack ranked lexical candidates within a caller-supplied context-token budget.
+    ///
+    /// Costs must be produced by the pinned model tokenizer and canonical context-item
+    /// serializer, not inferred from UTF-8 length. Because tokenization across item
+    /// boundaries may not be additive, callers must also check the final serialized
+    /// context token count before sending it to a reader. This method enforces the
+    /// declared additive cost contract; it does not replace that final guard.
+    ///
+    /// Candidates are considered by score descending, then HDC ID ascending. An item
+    /// that does not fit is skipped rather than ending the scan, allowing smaller
+    /// lower-ranked evidence to use remaining budget. Optional trajectory caps are
+    /// opt-in and count only selected, eligible text items.
+    ///
+    /// The caller should oversample the ranking before packing. No quality gain is
+    /// assumed: packing may trade a top-ranked long item for several lower-ranked
+    /// short items and must be evaluated under an equal final serialized-token budget.
+    pub(crate) fn pack_text_candidates_under_token_budget(
+        &self,
+        ranked_candidates: &[(u64, f32)],
+        candidate_token_costs: &BTreeMap<u64, usize>,
+        scope_id: &str,
+        now_ms: u64,
+        token_budget: usize,
+        max_candidates: usize,
+        per_trajectory_limit: Option<usize>,
+    ) -> Result<Vec<(u64, f32)>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if per_trajectory_limit.is_some_and(|limit| limit == 0) {
+            return Err("per_trajectory_limit must be positive when present".into());
+        }
+
+        let mut ordered = ranked_candidates.to_vec();
+        if ordered.iter().any(|(_, score)| !score.is_finite() || *score < 0.0) {
+            return Err("candidate scores must be finite and non-negative".into());
+        }
+        ordered.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+
+        // Validate the entire unique candidate pool before selection. An unknown ID
+        // or missing/zero declared cost must not become harmless merely because its
+        // rank, scope, lifecycle, or size would otherwise exclude it.
+        let mut validated_ids = BTreeSet::new();
+        for (hdc_id, _) in &ordered {
+            if !validated_ids.insert(*hdc_id) {
+                continue;
+            }
+            if !self.records.contains_key(hdc_id) {
+                return Err(format!("ranked lexical candidate references unknown HDC ID {hdc_id}"));
+            }
+            let cost = candidate_token_costs.get(hdc_id)
+                .ok_or_else(|| format!("missing token cost for HDC ID {hdc_id}"))?;
+            if *cost == 0 {
+                return Err(format!("token cost must be positive for HDC ID {hdc_id}"));
+            }
+        }
+        if token_budget == 0 || max_candidates == 0 || ordered.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut seen_ids = BTreeSet::new();
+        let mut trajectory_counts = BTreeMap::<String, usize>::new();
+        let mut used_cost = 0usize;
+        let mut selected = Vec::with_capacity(max_candidates.min(ordered.len()));
+        for (hdc_id, score) in ordered {
+            if !seen_ids.insert(hdc_id) {
+                continue;
+            }
+            let record = self.records.get(&hdc_id)
+                .ok_or_else(|| format!("ranked lexical candidate references unknown HDC ID {hdc_id}"))?;
+            if !record.is_eligible_for(scope_id, now_ms)
+                || !matches!(&record.payload, EvidencePayload::Text { .. })
+            {
+                continue;
+            }
+
+            if let Some(limit) = per_trajectory_limit {
+                let count = trajectory_counts.get(&record.source.trajectory_id).copied().unwrap_or(0);
+                if count >= limit {
+                    continue;
+                }
+            }
+
+            let token_cost = *candidate_token_costs.get(&hdc_id)
+                .ok_or_else(|| format!("missing token cost for HDC ID {hdc_id}"))?;
+            let remaining = token_budget - used_cost;
+            if token_cost > remaining {
+                continue;
+            }
+
+            used_cost += token_cost;
+            if per_trajectory_limit.is_some() {
+                *trajectory_counts.entry(record.source.trajectory_id.clone()).or_default() += 1;
+            }
+            selected.push((hdc_id, score));
+            if selected.len() == max_candidates {
+                break;
+            }
+        }
+        Ok(selected)
+    }
+
     /// Deterministic BM25 lexical retrieval over eligible text evidence.
     ///
     /// This is a transparent lexical baseline, not a semantic encoder. It reads
@@ -1381,6 +1485,98 @@ mod tests {
         assert!(ranked.iter().all(|(id, _)| *id != 9 && *id != 10));
         assert!(ranked.iter().all(|(_, score)| score.is_finite() && *score > 0.0));
         assert!(index.rank_text("!!!", "web", 150, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn token_budget_packing_skips_oversize_items_and_preserves_rank_order() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, trajectory_id, value) in [
+            (1, "long-high-score", "trajectory-a", "longest context"),
+            (2, "medium-score", "trajectory-b", "medium context"),
+            (3, "small-score", "trajectory-c", "small"),
+        ] {
+            let (record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", trajectory_id, value,
+            );
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+
+        let ranked = [(3, 0.80), (1, 0.99), (2, 0.90), (1, 0.99)];
+        let costs = BTreeMap::from([(1, 6usize), (2, 4usize), (3, 1usize)]);
+        let selected = evidence.pack_text_candidates_under_token_budget(
+            &ranked, &costs, "web", 150, 5, 3, None,
+        ).unwrap();
+
+        // The top-ranked item cannot fit. The packer skips it, keeps the next
+        // highest-ranked item that fits, then fills the final token with item 3.
+        assert_eq!(selected, vec![(2, 0.90), (3, 0.80)]);
+        assert!(selected.iter().map(|(id, _)| costs[id]).sum::<usize>() <= 5);
+    }
+
+    #[test]
+    fn token_budget_packing_rechecks_scope_lifecycle_validity_and_trajectory_cap() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, scope, trajectory_id, value) in [
+            (1, "active-a1", "web", "trajectory-a", "active first"),
+            (2, "active-a2", "web", "trajectory-a", "active sibling"),
+            (3, "private", "enterprise", "trajectory-b", "private context"),
+            (4, "expired", "web", "trajectory-c", "expired context"),
+            (5, "revoked", "web", "trajectory-d", "revoked context"),
+            (6, "active-e", "web", "trajectory-e", "another current context"),
+        ] {
+            let (mut record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, scope, trajectory_id, value,
+            );
+            if id == 4 {
+                record.valid_until_unix_ms = Some(150);
+            }
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+        evidence.revoke(5).unwrap();
+
+        let ranked = [(1, 0.99), (2, 0.98), (3, 0.97), (4, 0.96), (5, 0.95), (6, 0.80)];
+        let costs = BTreeMap::from([
+            (1, 2usize), (2, 2usize), (3, 2usize),
+            (4, 2usize), (5, 2usize), (6, 2usize),
+        ]);
+        let selected = evidence.pack_text_candidates_under_token_budget(
+            &ranked, &costs, "web", 150, 4, 5, Some(1),
+        ).unwrap();
+
+        assert_eq!(selected, vec![(1, 0.99), (6, 0.80)]);
+        assert!(selected.iter().map(|(id, _)| costs[id]).sum::<usize>() <= 4);
+    }
+
+    #[test]
+    fn token_budget_packing_fails_closed_on_malformed_scores_ids_and_costs() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-seven", "web", "candidate evidence"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let costs = BTreeMap::from([(7, 1usize)]);
+
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(7, f32::NAN)], &costs, "web", 150, 5, 2, None,
+        ).is_err());
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(7, -0.1)], &costs, "web", 150, 5, 2, None,
+        ).is_err());
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(404, 0.5)], &BTreeMap::from([(404, 1usize)]), "web", 150, 5, 2, None,
+        ).is_err());
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(7, 0.5)], &BTreeMap::new(), "web", 150, 5, 2, None,
+        ).is_err());
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(7, 0.5)], &BTreeMap::from([(7, 0usize)]), "web", 150, 5, 2, None,
+        ).is_err());
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(7, 0.5)], &costs, "", 150, 5, 2, None,
+        ).is_err());
+        assert!(evidence.pack_text_candidates_under_token_budget(
+            &[(7, 0.5)], &costs, "web", 150, 5, 2, Some(0),
+        ).is_err());
     }
 
     #[test]
