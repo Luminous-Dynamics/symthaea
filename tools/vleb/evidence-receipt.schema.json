@@ -407,6 +407,9 @@
           "stderr_artifact": {
             "type": "string",
             "minLength": 1
+          },
+          "expected_exit_code": {
+            "type": "integer"
           }
         }
       }
@@ -953,11 +956,15 @@
                 },
                 "stderr_sha256": {
                   "$ref": "#/$defs/sha256"
+                },
+                "expected_exit_code": {
+                  "type": "integer"
                 }
               },
               "required": [
                 "stdout_artifact",
-                "stderr_artifact"
+                "stderr_artifact",
+                "expected_exit_code"
               ]
             }
           },
