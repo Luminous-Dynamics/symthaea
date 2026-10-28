@@ -242,7 +242,7 @@ struct EvidenceIndexSnapshot {
 /// This detects accidentally mixing an old vector index with a newer payload
 /// snapshot (or vice versa). It is an unkeyed consistency manifest, not a
 /// signature: authenticate or externally pin its bytes when storage is hostile.
-pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V2";
+pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V3";
 
 /// Identity of the actual on-disk HDC store committed alongside evidence.
 /// The CRC checksum checks logical parity; exact HDC file bytes are separately
@@ -280,6 +280,8 @@ pub struct EvidenceCommitManifest {
     evidence_snapshot_sha256: String,
     /// Present only for the typed production commit path.
     hdc_store_identity: Option<HdcStoreIdentity>,
+    /// SHA-256 of the immutable generation-bound lexical inverted index, when present.
+    lexical_index_sha256: Option<String>,
 }
 
 impl EvidenceCommitManifest {
@@ -299,6 +301,41 @@ impl EvidenceCommitManifest {
     ) -> Result<Self, String> {
         identity.validate_for_recovery()?;
         Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity))
+    }
+
+    /// Construct a typed commit manifest that also binds a serialized lexical index.
+    pub fn new_with_hdc_identity_and_lexical_index(
+        generation: u64,
+        hdc_index_bytes: &[u8],
+        evidence_snapshot_bytes: &[u8],
+        identity: HdcStoreIdentity,
+        lexical_index_bytes: &[u8],
+    ) -> Result<Self, String> {
+        if lexical_index_bytes.is_empty() {
+            return Err("serialized lexical index bytes must be non-empty".into());
+        }
+        let mut manifest = Self::new_with_hdc_identity(
+            generation, hdc_index_bytes, evidence_snapshot_bytes, identity,
+        )?;
+        manifest.lexical_index_sha256 = Some(sha256_hex(lexical_index_bytes));
+        manifest.validate_envelope()?;
+        Ok(manifest)
+    }
+
+    pub fn lexical_index_sha256(&self) -> Option<&str> {
+        self.lexical_index_sha256.as_deref()
+    }
+
+    /// Verify whether the optional lexical index is present exactly as declared.
+    pub fn verify_lexical_index(&self, lexical_index_bytes: Option<&[u8]>) -> Result<(), String> {
+        self.validate_envelope()?;
+        match (self.lexical_index_sha256.as_deref(), lexical_index_bytes) {
+            (Some(expected), Some(bytes)) if sha256_hex(bytes) == expected => Ok(()),
+            (Some(_), Some(_)) => Err("lexical index digest does not match commit manifest".into()),
+            (Some(_), None) => Err("committed lexical index is missing".into()),
+            (None, Some(_)) => Err("unmanifested lexical index artifact is present".into()),
+            (None, None) => Ok(()),
+        }
     }
 
     fn new_with_optional_hdc_identity(
@@ -325,6 +362,7 @@ impl EvidenceCommitManifest {
             hdc_index_sha256: sha256_hex(hdc_index_bytes),
             evidence_snapshot_sha256: sha256_hex(evidence_snapshot_bytes),
             hdc_store_identity: identity,
+            lexical_index_sha256: None,
         })
     }
 
@@ -344,6 +382,9 @@ impl EvidenceCommitManifest {
         }
         if let Some(identity) = &self.hdc_store_identity {
             identity.validate_for_recovery()?;
+        }
+        if self.lexical_index_sha256.as_deref().is_some_and(|digest| !is_sha256(digest)) {
+            return Err("evidence commit manifest contains an invalid lexical-index SHA-256 digest".into());
         }
         Ok(())
     }
