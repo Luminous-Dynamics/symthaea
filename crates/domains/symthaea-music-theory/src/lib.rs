@@ -117,7 +117,7 @@ pub use motif_foundry::{
 pub use compositional_motif::{
     AxisEvidence, COMPOSITIONAL_MOTIF_CONTRACT_VERSION, CompositionalMotifEvidence,
     CompositionalTransform, CompositionalVerificationConfig, CompositionalVerificationError,
-    PitchOrientation, SelectionMode, SourceSelection, SymbolicEvent,
+    PitchOrientation, SelectionMode, SourceSelection, SymbolicEvent, MAX_ALIGNMENT_CELLS,
     verify_compositional_transform, verify_compositional_transform_with_config,
 };
 pub use motif_return::{
