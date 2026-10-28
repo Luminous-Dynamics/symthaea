@@ -381,7 +381,11 @@ mod tests {
     fn full_tv_radius_can_concentrate_mass_on_the_worst_scenario() {
         let report = evaluate_tv_robust_cost_delta(&scenarios(), PROBABILITY_SCALE_PPM).unwrap();
         assert_eq!(report.worst_case_expected_delta_units, 20.0);
-        assert_eq!(report.worst_case_probability_ppm_for("disruption"), Some(1_000_000));
+        assert_eq!(
+            report.probabilities.iter().find(|row| row.scenario_id == "disruption")
+                .map(|row| row.worst_case_probability_ppm),
+            Some(1_000_000)
+        );
     }
 
     #[test]
@@ -499,16 +503,9 @@ mod tests {
             nominal_probability_ppm: 0,
             candidate_minus_baseline_cost_units: 20,
         });
-        items[2].nominal_probability_ppm -= 0; // preserve exact probability mass
         let report = evaluate_tv_robust_cost_delta(&items, 100_000).unwrap();
         assert_eq!(report.worst_single_scenario_id, "adverse");
         assert_eq!(report.worst_single_scenario_delta_units, 20);
     }
 
-    impl DistributionalRobustReport {
-        fn worst_case_probability_ppm_for(&self, id: &str) -> Option<u32> {
-            self.probabilities.iter().find(|row| row.scenario_id == id)
-                .map(|row| row.worst_case_probability_ppm)
-        }
-    }
 }
