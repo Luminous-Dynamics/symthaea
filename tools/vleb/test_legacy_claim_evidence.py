@@ -56,11 +56,16 @@ def semantic_errors(claim: dict[str, Any]) -> list[str]:
     scope = claim.get("claim_scope")
     verdict = claim.get("verdict")
     witnesses = claim.get("witnesses", [])
+    witness_results = [witness.get("observed_result") for witness in witnesses]
     execution_results = [
         witness.get("observed_result")
         for witness in witnesses
         if witness.get("kind") == "independent_execution"
     ]
+    if verdict == "supported" and "supports" not in witness_results:
+        errors.append("supported_verdict_lacks_supporting_witness")
+    if verdict == "contradicted" and "contradicts" not in witness_results:
+        errors.append("contradicted_verdict_lacks_contradicting_witness")
     if verdict == "supported" and scope == "runtime_behavior" and "supports" not in execution_results:
         errors.append("runtime_claim_requires_independent_execution_support")
     if verdict == "contradicted" and scope == "runtime_behavior" and "contradicts" not in execution_results:
