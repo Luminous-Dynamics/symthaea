@@ -100,6 +100,12 @@ class ManifestBundle:
         witness_producer_sha = sha((self.root / self.paths["witness_receipt_producer"]).read_bytes())
         witness_receipt_schema_sha = sha((self.root / self.paths["witness_receipt_schema"]).read_bytes())
         verifier_sha = "d" * 64
+        invocation_argv = ["vleb-cobol-index", "--format", "fixed", "legacy.cbl"]
+        invocation_sha = sha(json.dumps({
+            "argv": invocation_argv,
+            "working_directory": ".",
+            "timeout_ms": 120000,
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
         witness_receipt = {
             "schema_version": "vleb-witness-execution-receipt-v1",
             "task_id": "vleb-private-task-0001",
@@ -127,7 +133,8 @@ class ManifestBundle:
             },
             "verifier": {"kind": "source_index", "id": "test-source-indexer", "sha256": verifier_sha},
             "invocation": {
-                "argv": ["vleb-cobol-index", "--format", "fixed", "legacy.cbl"],
+                "argv": invocation_argv,
+                "argv_sha256": invocation_sha,
                 "working_directory": ".",
                 "timeout_ms": 120000,
                 "environment_sha256": "e" * 64,
@@ -169,6 +176,7 @@ class ManifestBundle:
                 "artifact_sha256": sha(witness_raw),
                 "execution_receipt_path": self.paths["claim_execution_receipt"],
                 "execution_receipt_sha256": sha(execution_receipt_raw),
+                "invocation_sha256": invocation_sha,
                 "verifier_id": "test-source-indexer",
                 "verifier_sha256": verifier_sha,
                 "observed_result": "supports",
