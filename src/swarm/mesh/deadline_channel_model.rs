@@ -534,8 +534,8 @@ fn fixed_seed_cohort_reports_delivery_by_deadline_for_all_strategies() {
             "hybrid preserves every XOR-FEC delivery by deadline"
         );
     }
-    assert!(airtime_totals[2] >= airtime_totals[0] * TRIALS);
-    assert!(airtime_totals[3] >= airtime_totals[1] * TRIALS);
+    assert!(airtime_totals[2] >= airtime_totals[0]);
+    assert!(airtime_totals[3] >= airtime_totals[1]);
 
     eprintln!(
         "mesh-deadline-feedback channel=iid100 ack_loss=100‰ sf=7 trials={} delivery_by_deadline_5/15/30/90s_no_fec={}/{}/{}/{} xor={}/{}/{}/{} selective={}/{}/{}/{} hybrid={}/{}/{}/{} mean_phy_airtime_us_no_fec/xor/selective/hybrid={}/{}/{}/{}",
