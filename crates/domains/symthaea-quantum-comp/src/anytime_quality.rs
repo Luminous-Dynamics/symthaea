@@ -129,6 +129,8 @@ pub struct VerifiedAnytimeQualitySummary {
 pub enum VerifiedAnytimeQualityError {
     /// Trace schema version is unsupported.
     InvalidSchemaVersion,
+    /// Protocol identifier is not the version implemented by this evaluator.
+    UnsupportedProtocolId,
     /// Trace clock boundary differs from the frozen protocol definition.
     InvalidClockBoundary,
     /// Empty or noncanonical identifier.
@@ -177,6 +179,7 @@ impl fmt::Display for VerifiedAnytimeQualityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchemaVersion => write!(f, "unsupported anytime trace schema version"),
+            Self::UnsupportedProtocolId => write!(f, "unsupported anytime trace protocol identifier"),
             Self::InvalidClockBoundary => write!(f, "trace clock boundary does not match protocol"),
             Self::InvalidIdentifier(field) => write!(f, "invalid identifier: {field}"),
             Self::InvalidDigest(field) => write!(f, "invalid SHA-256 digest: {field}"),
@@ -265,6 +268,9 @@ pub fn compare_verified_anytime_quality(
         return Err(VerifiedAnytimeQualityError::InvalidClockBoundary);
     }
     validate_identifier(&trace.protocol_id, "protocol_id")?;
+    if trace.protocol_id != "PHOT-EVAL-005A" {
+        return Err(VerifiedAnytimeQualityError::UnsupportedProtocolId);
+    }
     validate_identifier(&trace.trial_id, "trial_id")?;
     validate_identifier(&trace.pair_id, "pair_id")?;
     validate_identifier(&trace.budget_id, "budget_id")?;
@@ -651,6 +657,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_verified_disposition_that_disagrees_with_receipt() {
+        let mut event = verified_event("valid", 100.0, &[0, 1, 2], "trial-1", "pair-1", 7);
+        event.verifier_disposition = CandidateVerification::VerifiedConflict;
+        assert!(matches!(
+            compare_verified_anytime_quality(GRAPH, &trace(
+                AnytimeTerminalOutcome::FeasibleBelowTarget, vec![event],
+            )),
+            Err(VerifiedAnytimeQualityError::VerificationDispositionMismatch(_))
+        ));
+    }
+
+    #[test]
     fn rejects_duplicate_ids_decreasing_times_unsafe_paths_and_bad_cards() {
         let first = unverified_event("one", 100.0, &[0, 1]);
         let duplicate = unverified_event("one", 200.0, &[0, 1]);
@@ -685,6 +703,17 @@ mod tests {
         ));
     }
 
+
+
+    #[test]
+    fn rejects_unsupported_protocol_id() {
+        let mut invalid = trace(AnytimeTerminalOutcome::MissingOutput, vec![]);
+        invalid.protocol_id = "PHOT-EVAL-999Z".to_owned();
+        assert!(matches!(
+            compare_verified_anytime_quality(GRAPH, &invalid),
+            Err(VerifiedAnytimeQualityError::UnsupportedProtocolId)
+        ));
+    }
 
     #[test]
     fn rejects_unsupported_schema_and_clock_boundary() {
