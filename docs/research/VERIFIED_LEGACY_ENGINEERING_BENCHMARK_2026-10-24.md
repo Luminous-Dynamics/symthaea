@@ -74,6 +74,12 @@ For financial and mainframe migration tasks, add state-transition traces as firs
 - On the secure-legacy lane, pre-register a maximum critical/high vulnerability escape rate before the confirmatory run; do not choose the threshold after seeing results.
 - Report cost per independently verified fix and p50/p90 duration, alongside abstention and unresolved rates.
 
+## Measurement ledger and claim discipline
+
+The current evidence/target split is recorded in [`tools/vleb/scorecard.json`](../../tools/vleb/scorecard.json) and guarded by `tools/vleb/test_scorecard.py`. External model scores, proposed targets and Symthaea measurements are separate objects. The current 4/4 source-mutant result is recorded only as a synthetic ledger smoke test; Legacy-Bench score, AASSR, security correctness and cost per verified fix remain `not_run` or `not_measured`.
+
+This distinction should be preserved in papers and progress reports: a passing implementation test, an oracle-smoke mutation result, a model benchmark score and a signed provenance result are four different evidence claims.
+
 ## Research questions
 
 1. Can Symthaea improve verified repair success over a matched baseline agent on previously unseen legacy tasks?
