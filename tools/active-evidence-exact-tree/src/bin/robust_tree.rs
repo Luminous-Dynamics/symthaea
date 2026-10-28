@@ -217,19 +217,19 @@ fn print_csv(filter: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 fn main() -> ExitCode {
-    let mut filter = None;
+    let mut filter: Option<String> = None;
     for arg in env::args().skip(1) {
         if arg == "--help" || arg == "-h" {
             eprintln!("Usage: cargo run --bin robust_tree -- [--scenario=NAME]");
             return ExitCode::SUCCESS;
         } else if let Some(value) = arg.strip_prefix("--scenario=") {
-            filter = Some(value);
+            filter = Some(value.to_owned());
         } else {
             eprintln!("unknown argument: {arg}");
             return ExitCode::from(2);
         }
     }
-    match print_csv(filter) {
+    match print_csv(filter.as_deref()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => { eprintln!("{error}"); ExitCode::from(2) }
     }
