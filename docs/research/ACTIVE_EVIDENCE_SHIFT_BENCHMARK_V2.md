@@ -125,3 +125,20 @@ Independent Python reference findings on this hand-defined model:
 This is an algorithmic pilot, **not confirmatory evidence**. The best greedy baseline is selected on the same four scenarios; only four hand-defined ambiguity models are used; the cost limit is on expected cost rather than each trajectory; and no Uncertainty Herding or R-IDeA implementation is included. The Rust binaries and independent CSV parity gate are committed, but Rust compilation/tests and exact-head workflow qualification have not yet been confirmed.
 
 This pilot suggests the next research question should be: **can a sequentially calibrated, fixed-horizon decision-tree policy maintain its regret advantage when the ambiguity set is estimated from calibration data rather than hand-coded, and when the test shift family is held out?** The main confirmatory protocol above remains unchanged: this pilot may be used for development, not as the held-out test.
+
+
+## 14. Separate prediction, decision, and discovery objectives
+
+Do not report one blended "active-learning success" score. Pre-register distinct outcomes for:
+- **Predictive learning:** held-out predictive risk/calibration after a fixed annotation budget.
+- **Decision support:** cumulative downstream decision regret under a frozen task-loss model.
+- **Discovery/exploitation:** recovery of high-value candidates under a preregistered utility definition.
+- **Safety / selective prediction:** risk-coverage frontier and harmful-action rate, with abstention charged explicit operational costs.
+
+A recent real-data active-learning benchmark on 1,202 experimental rare-earth extraction measurements with prospective validation on four independently synthesized ligands found that acquisition rankings depended on the objective: exploitation recovered top candidates but produced a weaker predictive model; broader exploration/random selection was better for predictive fit; and active learning did not improve prediction over random acquisition in that study. It also reported that row-level predictive R²=0.94 collapsed to 0.20 through -0.03 under leakage-controlled group splits by ligand/source/structural family. Those results are domain-specific, but they are a direct warning against random-row splits and conflating discovery with predictive quality. Reference: https://pubmed.ncbi.nlm.nih.gov/42626177/ (Harish, ACS Omega, 2026).
+
+Implementation consequence: any real-task extension must split by task/source/domain/causal family, use a matched acquisition unit (including batches if the operational label unit is a group), and report each objective separately. If there is a genuine business or scientific utility tradeoff, report the Pareto frontier; do not hide the tradeoff in an unvalidated weighted sum.
+
+The ICLR 2025 Uncertainty Herding work specifically targets the low-/high-label-budget tension, so every acquisition comparison must include low through high budgets and cannot tune the "low-budget" boundary after looking at test results: https://proceedings.iclr.cc/paper_files/paper/2025/hash/0302fb83c62991efbccf0a003e4f5a92-Abstract-Conference.html.
+
+Finally, apply the generalization distinction emphasized by NIST AI 800-3: benchmark performance on a fixed scenario set and expected performance over a broader task population are different estimands. State which one is reported, and only generalize with an analysis design whose independent units match the population claim: https://doi.org/10.6028/NIST.AI.800-3.
