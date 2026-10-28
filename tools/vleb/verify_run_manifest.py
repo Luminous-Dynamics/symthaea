@@ -296,6 +296,7 @@ def audit_claim_evidence_bundle(
             "message": "manifest claim-schema digest differs from evaluator-supplied pin",
         })
     if not trusted_claim_verifier_pins:
+        result["status"] = "unresolved"
         result["issues"].append({
             "code": "claim_verifier_pins_missing",
             "message": "at least one trusted witness-verifier pin must be supplied out of band",
@@ -361,6 +362,27 @@ def audit_claim_evidence_bundle(
             source = claim_data.get("source")
             if not isinstance(source, dict) or source.get("sha256") != item["source_sha256"]:
                 raise ValueError("claim source digest differs from evaluator-pinned source digest")
+            witnesses = claim_data.get("witnesses", [])
+            missing_kinds = sorted({
+                witness.get("kind")
+                for witness in witnesses
+                if isinstance(witness, dict)
+                and witness.get("kind") not in trusted_claim_verifier_pins
+            })
+            if missing_kinds:
+                row["status"] = "unresolved"
+                row["issues"] = [{
+                    "code": "claim_verifier_pin_missing",
+                    "message": f"no out-of-band verifier pin for witness kinds: {', '.join(missing_kinds)}",
+                }]
+                result["unresolved"] += 1
+                result["issues"].append({
+                    "code": "claim_verifier_pin_missing",
+                    "message": f"{item['claim_id']}: no out-of-band verifier pin for witness kinds: {', '.join(missing_kinds)}",
+                })
+                result["claims"].append(row)
+                all_valid = False
+                continue
         except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
             row["issues"] = [{"code": "claim_input_invalid", "message": str(exc)}]
             result["issues"].append({
