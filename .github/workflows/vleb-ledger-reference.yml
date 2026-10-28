@@ -39,6 +39,8 @@ jobs:
         run: bash tools/vleb/check-fixture-integrity.sh
       - name: Install pinned JSON Schema validator
         run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate task-contract admission controls
+        run: python tools/vleb/test_task_contract_schema.py
       - name: Validate fail-closed evidence receipt schema
         run: python tools/vleb/test_receipt_schema.py
       - name: Test independent receipt auditor and adversarial controls
