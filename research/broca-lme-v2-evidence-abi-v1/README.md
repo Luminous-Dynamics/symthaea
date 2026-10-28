@@ -1,6 +1,6 @@
 # Broca evidence payload ABI for LongMemEval-V2
 
-**State:** Rust evidence-contract prototype plus deterministic snapshot/restore and paired-artifact commit-manifest primitives. Unit tests are authored but not compiled in this environment; this is not a completed benchmark integration.
+**State:** Rust evidence-contract prototype plus deterministic snapshot/restore, a V2 generation-bound manifest, and a fail-closed Unix disk-generation store. The typed production commit now binds the actual HdcStore generation, logical checksum and active live-ID set, and recovery reopens the committed HDC file independently. Tests are authored but not compiled in this environment; this is not a completed LongMemEval-V2 integration or persistence qualification.
 
 ## The concrete interface mismatch
 
@@ -33,6 +33,29 @@ Report these as distinct retrieval arms. Do not label a lexical feature hash as 
 - duplicate HDC/evidence IDs, malformed digests, invalid lifecycle shapes, path traversal, and corrupt payloads fail closed;
 - resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained.
 
+## Disk-generation persistence prototype
+
+`crates/domains/symthaea-broca/src/memory_evidence_persistence.rs` now exposes a single-writer store:
+
+```rust
+let store = EvidenceDiskStore::open("/var/lib/broca/memory-generations")?;
+let generation = store.commit_hdc_store(&mut hdc_store, &evidence_index)?;
+let recovered = store.recover()?.ok_or("no committed generation")?;
+assert_eq!(recovered.generation, generation);
+```
+
+The exact API may evolve during review; the example communicates intended use, not a compiled integration result.
+
+- Data is staged in an immutable generation directory. HDC-index and evidence-snapshot bytes are synced; the manifest is written and verified; then `CURRENT` is atomically replaced last.
+- Recovery verifies the pointer, manifest digest, artifact digests and snapshot invariants. For typed commits it opens the committed bytes with HdcStoreReader and verifies internal HDC generation, logical checksum, live count, and exact equality between HDC live IDs and Active evidence IDs. It never falls back to an older generation on corruption.
+- A delete tombstone survives disk restore, and a previous ID cannot be reinserted in the restored evidence index.
+- An exclusive writer lock prevents concurrent committers. A process crash may leave the lock behind; operators must verify that the prior writer is gone before removing it.
+- The implementation currently requires Unix directory fsync and same-filesystem rename semantics. It does not claim portable power-loss guarantees or malicious-writer authenticity.
+- The production API is typed: commit_hdc_store syncs the real HdcStore and rejects any mismatch between live vector IDs and Active evidence IDs. The opaque-byte commit helper is available only to module tests. The caller still must apply vector deletion/update and lifecycle mutation as one application-level operation; the store can detect a mismatch, not infer operator intent.
+- `prune_history(retain_generations)` removes visible old generation directories outside an explicit generation window, drops unpublished future-generation artifacts and orphan staging directories, and refuses to run without a verified CURRENT commit. It is protected by the writer lock and reports which generation directories were removed.
+
+Authored unit tests include successful generation rollover, delete/restart non-resurrection, interrupted commits, fail-closed corrupt artifacts, lock refusal, dangling CURRENT symlink rejection, empty-index rejection, corrupt snapshot rejection, real-HdcStore generation/checksum/live-ID binding, mismatch rejection, delete-before-tombstone ordering, substituted-index rejection, and retention cleanup/fail-closed tests. They have **not** been compiled or executed in this environment. In-process failpoints are not equivalent to actual process-kill or power-cut tests.
+
 ## Intended end-to-end path
 
 1. Ingest each official trajectory. Store its raw evidence payload and provenance in an evidence store, and assign the same stable numeric ID to its HDC representation.
@@ -43,7 +66,7 @@ Report these as distinct retrieval arms. Do not label a lexical feature hash as 
 
 ## Hard limitation
 
-This increment is deliberately **not** the real LongMemEval-V2 worker. It does not ingest trajectory objects, encode raw query text into `ContinuousHV`, or wire into `MemoryBridge`; no durable storage engine or disk transaction is implemented. Snapshot/restore gives the adapter a deterministic format and tests in-memory restart reconstruction, but callers must still atomically publish the HDC index and evidence snapshot under a commit manifest and fail closed on mismatches. The unkeyed digests detect accidental corruption and mismatched artifacts, not a malicious writer; hostile storage requires an external digest pin or signature. Restoring a source digest does not re-verify source provenance without the original canonical source bytes. Image bytes are verified at resolution time. No benchmark score or performance claim is made.
+This increment is deliberately **not** the real LongMemEval-V2 worker. It does not ingest trajectory objects, encode raw query text into `ContinuousHV`, or wire into `MemoryBridge`. The disk coordinator and typed HDC binding are a prototype, not a qualified storage engine: tests are not yet compiled, the supported filesystem assumptions need crash/power-loss qualification, and the app-level mutation path must coordinate vector and evidence updates. The unkeyed digests detect accidental corruption and mismatched artifacts, not a malicious writer; hostile storage requires an external digest pin or signature. Restoring a source digest does not re-verify source provenance without the original canonical source bytes. Image bytes are verified at resolution time. No benchmark score or performance claim is made.
 
 ## Local validation
 

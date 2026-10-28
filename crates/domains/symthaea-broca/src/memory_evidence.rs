@@ -230,37 +230,94 @@ struct EvidenceIndexSnapshot {
 /// This detects accidentally mixing an old vector index with a newer payload
 /// snapshot (or vice versa). It is an unkeyed consistency manifest, not a
 /// signature: authenticate or externally pin its bytes when storage is hostile.
-pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V1";
+pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V2";
+
+/// Identity of the actual on-disk HDC store committed alongside evidence.
+/// The CRC checksum checks logical parity; exact HDC file bytes are separately
+/// bound by SHA-256 in the manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HdcStoreIdentity {
+    pub store_generation: u64,
+    pub live_count: u64,
+    pub checksum_version: u32,
+    pub checksum_hex: String,
+}
+
+impl HdcStoreIdentity {
+    pub(crate) fn validate_for_recovery(&self) -> Result<(), String> {
+        if self.store_generation == 0 || self.checksum_version == 0 {
+            return Err("HDC store identity generation and checksum version must be nonzero".into());
+        }
+        if self.checksum_hex.len() != 16
+            || !self.checksum_hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err("HDC store checksum must be 16 lowercase hexadecimal characters".into());
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceCommitManifest {
     schema_version: String,
-    /// Monotonic generation assigned by the persistence coordinator, starting at 1.
+    /// Monotonic envelope generation assigned by the persistence coordinator, starting at 1.
     generation: u64,
     hdc_index_sha256: String,
     evidence_snapshot_sha256: String,
+    /// Present only for the typed production commit path.
+    hdc_store_identity: Option<HdcStoreIdentity>,
 }
 
 impl EvidenceCommitManifest {
-    /// Construct a pair-binding manifest for exact persisted bytes.
+    /// Construct a low-level pair-binding manifest for fixtures that are not a
+    /// real HdcStore. Production callers should prefer new_with_hdc_identity.
     pub fn new(generation: u64, hdc_index_bytes: &[u8], evidence_snapshot_bytes: &[u8]) -> Result<Self, String> {
+        Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, None)
+    }
+
+    /// Construct a manifest that commits the actual HDC store's logical identity
+    /// in addition to the exact on-disk file-byte digest.
+    pub fn new_with_hdc_identity(
+        generation: u64,
+        hdc_index_bytes: &[u8],
+        evidence_snapshot_bytes: &[u8],
+        identity: HdcStoreIdentity,
+    ) -> Result<Self, String> {
+        identity.validate_for_recovery()?;
+        Self::new_with_optional_hdc_identity(generation, hdc_index_bytes, evidence_snapshot_bytes, Some(identity))
+    }
+
+    fn new_with_optional_hdc_identity(
+        generation: u64,
+        hdc_index_bytes: &[u8],
+        evidence_snapshot_bytes: &[u8],
+        identity: Option<HdcStoreIdentity>,
+    ) -> Result<Self, String> {
         if generation == 0 {
             return Err("evidence commit generation must start at 1".into());
         }
-        // Refuse to bind to a snapshot from a different generation.
         let snapshot: EvidenceIndexSnapshot = serde_json::from_slice(evidence_snapshot_bytes)
             .map_err(|error| format!("invalid evidence snapshot: {error}"))?;
         if snapshot.generation != generation {
             return Err("evidence snapshot generation does not match commit manifest".into());
         }
         EvidenceIndex::restore_snapshot(evidence_snapshot_bytes)?;
+        if let Some(identity) = &identity {
+            identity.validate_for_recovery()?;
+        }
         Ok(Self {
             schema_version: EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string(),
             generation,
             hdc_index_sha256: sha256_hex(hdc_index_bytes),
             evidence_snapshot_sha256: sha256_hex(evidence_snapshot_bytes),
+            hdc_store_identity: identity,
         })
+    }
+
+    pub fn hdc_store_identity(&self) -> Option<&HdcStoreIdentity> {
+        self.hdc_store_identity.as_ref()
     }
 
     fn validate_envelope(&self) -> Result<(), String> {
@@ -272,6 +329,9 @@ impl EvidenceCommitManifest {
         }
         if !is_sha256(&self.hdc_index_sha256) || !is_sha256(&self.evidence_snapshot_sha256) {
             return Err("evidence commit manifest contains an invalid SHA-256 digest".into());
+        }
+        if let Some(identity) = &self.hdc_store_identity {
+            identity.validate_for_recovery()?;
         }
         Ok(())
     }
@@ -441,6 +501,19 @@ impl EvidenceIndex {
             }
         }
         Ok(index)
+    }
+
+    /// IDs whose evidence lifecycle is active. This set must exactly match the
+    /// live IDs in the real HDC index for a production commit.
+    pub fn active_hdc_ids(&self) -> BTreeSet<u64> {
+        self.records.iter()
+            .filter_map(|(hdc_id, record)| (record.lifecycle == EvidenceLifecycle::Active).then_some(*hdc_id))
+            .collect()
+    }
+
+    /// IDs retained as payload lineage, including inactive tombstones.
+    pub fn all_hdc_ids(&self) -> BTreeSet<u64> {
+        self.records.keys().copied().collect()
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
