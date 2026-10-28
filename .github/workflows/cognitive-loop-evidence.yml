@@ -49,7 +49,9 @@ permissions:
 
 concurrency:
   group: cognitive-loop-evidence-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Never interrupt a running contract test merely because another research commit lands.
+  # GitHub may coalesce pending runs for this group; the latest head will still be checked.
+  cancel-in-progress: false
 
 jobs:
   manifest-contract:
