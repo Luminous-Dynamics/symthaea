@@ -142,7 +142,7 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
         parse_failures,
         candidate_count: candidates.len(),
         candidate_sites: candidates,
-        scan_scope: "candidate_discovery_direct_call_expressions_only",
+        scan_scope: "candidate_discovery_direct_calls_and_receiver_chain_methods",
         claim_boundary: "not_complete_not_security_qualification_not_proof_of_reachability_or_effect",
     };
     let had_parse_failures = !report.parse_failures.is_empty();
@@ -178,7 +178,7 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-impl CandidateVisitor<'_> {
+impl<'source> CandidateVisitor<'source> {
     fn push_candidate(
         &mut self,
         line: usize,
@@ -405,7 +405,7 @@ mod tests {
     use sha2::Digest;
     use syn::parse_quote;
 
-    use super::{CandidateVisitor, classify_call};
+    use super::{CandidateVisitor, classify_call, classify_method_call};
 
     #[test]
     fn classifies_direct_process_construction() {
@@ -443,6 +443,64 @@ mod tests {
         assert_eq!(
             classify_call(&ffi).map(|result| result.0),
             Some("ffi_process_execution")
+        );
+    }
+
+    #[test]
+    fn classifies_command_dispatch_methods_but_not_unrelated_output_methods() {
+        let source = r#"
+            std::process::Command::new("sh").arg("-c").arg("true").output();
+            report.output();
+        "#;
+        let file = syn::parse_file(source).unwrap();
+        let source_sha = format!("{:x}", sha2::Sha256::digest(source.as_bytes()));
+        let mut visitor = CandidateVisitor {
+            source_path: "fixtures/process_chain.rs",
+            source_sha256: &source_sha,
+            candidates: Vec::new(),
+        };
+        use syn::visit::Visit;
+        visitor.visit_file(&file);
+
+        assert!(visitor.candidates.iter().any(|site| {
+            site.class == "process_dispatch_method" && site.callee == "<method>::output"
+        }));
+        assert_eq!(
+            visitor.candidates
+                .iter()
+                .filter(|site| site.class == "process_dispatch_method")
+                .count(),
+            1,
+            "unrelated report.output() must not be treated as a command dispatch"
+        );
+    }
+
+    #[test]
+    fn classifies_file_handle_writes_through_unwrap_chains() {
+        let source = r#"
+            std::fs::File::create("sentinel").unwrap().write_all(b"effect");
+            report.write_all(b"not a file");
+        "#;
+        let file = syn::parse_file(source).unwrap();
+        let source_sha = format!("{:x}", sha2::Sha256::digest(source.as_bytes()));
+        let mut visitor = CandidateVisitor {
+            source_path: "fixtures/file_chain.rs",
+            source_sha256: &source_sha,
+            candidates: Vec::new(),
+        };
+        use syn::visit::Visit;
+        visitor.visit_file(&file);
+
+        assert!(visitor.candidates.iter().any(|site| {
+            site.class == "filesystem_handle_io_method" && site.callee == "<method>::write_all"
+        }));
+        assert_eq!(
+            visitor.candidates
+                .iter()
+                .filter(|site| site.class == "filesystem_handle_io_method")
+                .count(),
+            1,
+            "unrelated report.write_all() must not be classified as a file-handle effect"
         );
     }
 
