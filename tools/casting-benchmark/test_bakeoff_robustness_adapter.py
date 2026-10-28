@@ -246,6 +246,7 @@ class BakeoffRobustnessAdapterTests(unittest.TestCase):
     def test_rejects_ambiguous_run_selector(self) -> None:
         sweep, sweep_raw, selection, selection_raw, holdout, holdout_raw = fixture_documents()
         sweep["paired_runs"].append(dict(sweep["paired_runs"][0]))
+        sweep["run_count"] = 2
         updated_raw = _canonical(sweep)
         selection["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
         holdout["source_sweep_sha256"] = hashlib.sha256(updated_raw).hexdigest()
