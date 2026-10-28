@@ -47,7 +47,7 @@ For context, the full-simplex optimum from the previous pilot was 1.815263 (grap
 - Local constrained benchmark SHA-256: `0744255d0c42760d795a3d8639b8c3c6b001af649ee88e860301065c896c8400`.
 - Local constrained regression SHA-256: `418ecbb4b62b9faa199228a1cee6cc2da0a454dc7d856755f865deb5125c7688`.
 - Raw result artifact: 14,333 bytes, SHA-256 `8923e1a7b85d26be97fbfd790686972e8989074af2a691820ed3657255ac1da8`.
-- Lossless `gzip -n` artifact: 2,453 bytes, SHA-256 `267eeede233f4042189f4e481b79b617fbdf7db72ed5c6f2a423952f4c59f4c2`.
+- Lossless `gzip -n` artifact: 2,453 bytes, SHA-256 `267eeede233f4042189f4e481b79b617fbdf7db72ed5c6f2a423952f4c59f4c2`, committed as `validation/CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json.gz` (Git blob `374f5b1217de29d7869f1ee65ddbe390606afe3c`).
 
 Important: the local versions used for the 17/17 run are not currently byte-identical to the committed branch copies. Their local Git blob hashes are `8c68d2b8d65ef6586dd1234b293176157c17fb3a` and `ac5cd9c3ccc33a46692aba61ebbc7ba55cb8fff4`; the branch blobs at the time of writing are `68f09fa7bef94c56bed25825241d43711b78ddb5` and `9d3723d9cbc0c20de182db4de8b8f71a3cfdb4f3`. Therefore, the local test result is evidence about the local source/test pair, **not exact-head execution evidence for the branch files**. This mismatch is a release-blocking provenance item, not a reason to claim green remote CI.
 
