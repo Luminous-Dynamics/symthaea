@@ -283,18 +283,14 @@ impl EvidenceRecord {
 ///
 /// Production persistence must commit lifecycle/tombstone state atomically with
 /// the durable vector index. This in-memory resolver does not solve that yet.
-#[derive(Debug, Clone)]
-struct LexicalDocument {
-    terms: BTreeMap<String, usize>,
-    length: usize,
-}
-
 #[derive(Debug, Default)]
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
     evidence_ids: BTreeMap<String, u64>,
-    // Text is hashed and tokenized once at ingestion, not on every query.
-    lexical_documents: BTreeMap<u64, LexicalDocument>,
+    // Text is digest-checked and tokenized once at ingestion. Postings keep each
+    // term once per vocabulary key instead of duplicating term strings per doc.
+    lexical_postings: BTreeMap<String, Vec<(u64, usize)>>,
+    lexical_document_lengths: BTreeMap<u64, usize>,
 }
 
 impl EvidenceIndex {
@@ -321,7 +317,7 @@ impl EvidenceIndex {
             .map_err(|error| format!("source bytes are not valid JSON: {error}"))?;
         let mut incoming_hdc_ids = BTreeSet::new();
         let mut incoming_evidence_ids = BTreeSet::new();
-        let mut pending_lexical: Vec<(u64, Option<LexicalDocument>)> =
+        let mut pending_lexical: Vec<(u64, Option<(usize, Vec<(String, usize)>)>)> =
             Vec::with_capacity(records.len());
 
         for record in &records {
@@ -347,10 +343,7 @@ impl EvidenceIndex {
                         for token in &tokens {
                             *terms.entry(token.clone()).or_insert(0usize) += 1;
                         }
-                        Some(LexicalDocument {
-                            terms,
-                            length: tokens.len(),
-                        })
+                        Some((tokens.len(), terms.into_iter().collect()))
                     }
                 }
                 EvidencePayload::Image { .. } => None,
@@ -375,8 +368,14 @@ impl EvidenceIndex {
             self.records.insert(record.hdc_id, record);
         }
         for (hdc_id, document) in pending_lexical {
-            if let Some(document) = document {
-                self.lexical_documents.insert(hdc_id, document);
+            if let Some((length, terms)) = document {
+                self.lexical_document_lengths.insert(hdc_id, length);
+                for (term, term_frequency) in terms {
+                    self.lexical_postings
+                        .entry(term)
+                        .or_default()
+                        .push((hdc_id, term_frequency));
+                }
             }
         }
         Ok(count)
@@ -458,88 +457,89 @@ impl EvidenceIndex {
             return Ok(Vec::new());
         }
 
-        struct IndexedText<'a> {
-            hdc_id: u64,
-            record: &'a EvidenceRecord,
-            lexical: &'a LexicalDocument,
-        }
-
-        // Insertion verified each text digest and built its term frequencies once.
-        // Query-time work therefore does not repeatedly tokenize large AXTree text.
-        let mut documents = Vec::new();
-        for (hdc_id, record) in &self.records {
+        // Count the eligible lexical corpus and its average length from compact
+        // metadata only. Full text is not tokenized or hashed again per query.
+        let mut document_count = 0usize;
+        let mut total_document_length = 0usize;
+        for (hdc_id, length) in &self.lexical_document_lengths {
+            let Some(record) = self.records.get(hdc_id) else {
+                continue;
+            };
             if !record.is_eligible_for(scope_id, now_ms) {
                 continue;
             }
-            if !matches!(&record.payload, EvidencePayload::Text { .. }) {
-                continue;
-            }
-            let Some(lexical) = self.lexical_documents.get(hdc_id) else {
-                continue;
-            };
-            documents.push(IndexedText {
-                hdc_id: *hdc_id,
-                record,
-                lexical,
-            });
+            document_count += 1;
+            total_document_length += length;
         }
-
-        if documents.is_empty() {
+        if document_count == 0 {
             return Ok(Vec::new());
         }
-
-        let document_count = documents.len() as f64;
-        let average_length = documents
-            .iter()
-            .map(|document| document.lexical.length as f64)
-            .sum::<f64>()
-            / document_count;
+        let average_length = total_document_length as f64 / document_count as f64;
         if !average_length.is_finite() || average_length <= 0.0 {
             return Ok(Vec::new());
         }
 
-        // Only document frequencies for query terms are needed. Compute them
-        // over currently eligible documents, so revocation/supersession/scope
-        // changes are reflected without re-tokenizing the corpus.
+        // Only postings for query terms are visited. Lifecycle/scope/time
+        // eligibility is applied before document frequency and candidates, so
+        // revoked or out-of-scope postings cannot distort the BM25 statistics.
         let mut document_frequency: BTreeMap<String, usize> =
             query_terms.iter().cloned().map(|term| (term, 0)).collect();
-        for document in &documents {
-            for term in &query_terms {
-                if document.lexical.terms.contains_key(term) {
-                    *document_frequency
-                        .get_mut(term)
-                        .expect("query term frequency entry was initialized") += 1;
+        let mut candidate_term_frequencies: BTreeMap<u64, BTreeMap<String, usize>> =
+            BTreeMap::new();
+        for term in &query_terms {
+            let Some(postings) = self.lexical_postings.get(term) else {
+                continue;
+            };
+            for (hdc_id, term_frequency) in postings {
+                let Some(record) = self.records.get(hdc_id) else {
+                    continue;
+                };
+                if !record.is_eligible_for(scope_id, now_ms) {
+                    continue;
                 }
+                *document_frequency
+                    .get_mut(term)
+                    .expect("query term frequency entry was initialized") += 1;
+                candidate_term_frequencies
+                    .entry(*hdc_id)
+                    .or_default()
+                    .insert(term.clone(), *term_frequency);
             }
         }
 
         let mut hits = Vec::new();
-        for document in documents {
+        for (hdc_id, term_frequencies) in candidate_term_frequencies {
+            let Some(record) = self.records.get(&hdc_id) else {
+                continue;
+            };
+            let Some(length) = self.lexical_document_lengths.get(&hdc_id) else {
+                continue;
+            };
             let mut score = 0.0f64;
             for term in &query_terms {
-                let Some(&term_frequency) = document.lexical.terms.get(term) else {
+                let Some(&term_frequency) = term_frequencies.get(term) else {
                     continue;
                 };
                 let df = *document_frequency.get(term).unwrap_or(&0) as f64;
-                let idf = (1.0 + (document_count - df + 0.5) / (df + 0.5)).ln();
+                let idf =
+                    (1.0 + (document_count as f64 - df + 0.5) / (df + 0.5)).ln();
                 let tf = term_frequency as f64;
                 let length_norm = config.k1
-                    * (1.0 - config.b
-                        + config.b * document.lexical.length as f64 / average_length);
+                    * (1.0 - config.b + config.b * *length as f64 / average_length);
                 score += idf * (tf * (config.k1 + 1.0)) / (tf + length_norm);
             }
 
             if score <= 0.0 || !score.is_finite() {
                 continue;
             }
-            let EvidencePayload::Text { value } = &document.record.payload else {
+            let EvidencePayload::Text { value } = &record.payload else {
                 continue;
             };
             hits.push(LexicalEvidenceHit {
-                hdc_id: document.hdc_id,
-                evidence_id: document.record.evidence_id.clone(),
-                source: document.record.source.clone(),
-                content_sha256: document.record.content_sha256.clone(),
+                hdc_id,
+                evidence_id: record.evidence_id.clone(),
+                source: record.source.clone(),
+                content_sha256: record.content_sha256.clone(),
                 bm25_score: score,
                 context: MemoryContextItem {
                     kind: MemoryContextType::Text,
@@ -833,7 +833,8 @@ mod tests {
             .is_err());
         // The valid first item must not be indexed before the second was checked.
         assert!(index.records.is_empty());
-        assert!(index.lexical_documents.is_empty());
+        assert!(index.lexical_postings.is_empty());
+        assert!(index.lexical_document_lengths.is_empty());
         assert!(index.insert(valid, &source_bytes).is_ok());
     }
     #[test]
