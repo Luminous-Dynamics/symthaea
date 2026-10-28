@@ -321,6 +321,8 @@ mod tests {
         assert_eq!(entries[0].name, "aves-sparrow-social");
         assert_eq!(entries[0].git_blob_sha1, BLOB);
         assert_eq!(entries[0].size_bytes, 3652);
+        assert_eq!(entries[0].expected_vertices, 52);
+        assert_eq!(entries[0].expected_edges, 454);
     }
 
     #[test]
