@@ -20,10 +20,10 @@ Each run has one globally unique `trial_id`; paired baseline/candidate runs shar
 Each candidate event records:
 - elapsed deployment time from request/job entry, on a monotonic clock, through the persistence boundary for the candidate and its verification evidence;
 - the exact candidate bytes' SHA-256 and a relative artifact path;
-- an explicit verifier disposition;
-- for a verified event, the receipt bytes' relative path and SHA-256, plus the verified cardinality when the candidate is feasible.
+- a verifier disposition and, optionally, a caller-reported cardinality for diagnostics only;
+- for a claimed verified event, the receipt bytes' relative path and SHA-256.
 
-The consumer must read the referenced bytes and recompute their SHA-256 values. It must independently verify graph feasibility and check that receipt context matches the graph, verifier, protocol, trial, pair, seed, candidate digest, and verdict. Strings shaped like hashes, schema validity, and caller-supplied status fields are not evidence by themselves.
+The verified cardinality is recomputed from the candidate bytes by the independent verifier. It is not a trusted input field in the trace. The consumer must read the referenced bytes and recompute their SHA-256 values. It must independently verify graph feasibility and check that receipt context matches the graph, verifier, protocol, trial, pair, seed, candidate digest, and verdict. Strings shaped like hashes, schema validity, and caller-supplied status or cardinality fields are not evidence by themselves.
 
 All candidate attempts remain in the trace, including verifier errors, infeasible outputs, missing receipts, context mismatches, and untrusted artifacts. A non-verified candidate may include a reported cardinality for diagnostics, but it has no verified cardinality and contributes nothing to the quality curve. A purported verified checkpoint whose receipt bytes are absent, malformed, digest-mismatched, context-mismatched, or inconsistent with an independent re-verification invalidates the trace; do not silently downgrade it and continue reporting a score.
 
