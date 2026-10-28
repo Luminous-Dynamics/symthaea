@@ -137,3 +137,23 @@ The first scorecard is a hard admission gate for claiming evidence correctness. 
 ### Proposed falsifiable superiority criterion
 
 After correctness gates pass, pre-register a practical superiority target: improve the **dataset-macro primary utility metric by at least 5% relative to the strongest matched baseline**, with a paired 95% confidence interval excluding zero, while meeting the same access track and compute/memory budget. Report all datasets, worst-task results and negative controls. If this threshold is not met, publish the result as non-superior or inconclusive; do not change the threshold after seeing held-out results. The 5% target is a proposed engineering criterion, not a literature-derived universal standard.
+
+## 10. Independent trajectory-trace auditor (reference implementation)
+
+The repository now includes `pev_trace_audit_reference_v1.py` and its deterministic results JSON. This auditor is deliberately separate from the production Rust call graph; it consumes ordered JSON event traces and checks decision-time evidence identity, cycle binding, invalid-payload non-use, posthoc immutability, duplicate admission, and positive controls.
+
+Run from the repository root:
+
+```sh
+python3 docs/research/pev_trace_audit_reference_v1.py --self-test --cases 100000 --seed 20261028
+```
+
+The checked reference run accepted 100,000 clean generated trace cases (69,740 valid PE, 20,268 non-valid evidence, 9,992 missing/no-reference cases) and detected all six injected defects: invalid-sentinel promotion, duplicate evidence replay, stale-cycle admission, future-PE substitution, independent outcome suppression, and a no-op learner that suppresses all valid-PE influence.
+
+**Interpretation limit:** this is an independent Python reference auditor, not production Python and not Rust verification. It tests the trace contract against synthetic fixtures; it does not establish that the current live Rust integration emits complete traces, that the Rust tests compile, or that Symthaea beats a task-utility baseline. The next step is to port the minimal invariants into Rust tests and feed the auditor traces emitted from exact-head production test runs.
+
+### Why separate trace reliability from task score?
+
+The newly available paper *Trial by Trace: Benchmarking AI Agent Harnesses for Reliability and Failure Attribution* (arXiv:2610.32285, posted 23 October 2026) proposes separating task success from harness reliability, using trajectory traces and mechanism-based failure attribution. It reports that some runs can succeed at the task while still failing a harness criterion. This supports a two-axis evaluation design for Symthaea: one score for task/learning utility, another for evidence and harness integrity. Its reported scores are not directly comparable to this PE-specific synthetic audit: [paper](https://arxiv.org/abs/2610.32285).
+
+The auditor contract must evolve alongside implementation. In particular, current reference traces do not yet cover a persisted event digest, reset epochs, tamper-evident hash chaining, or cross-process resume from a real Rust checkpoint. These remain explicit extensions rather than implied guarantees.
