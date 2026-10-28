@@ -157,5 +157,70 @@
     "committed benchmark source is not byte-identical to the local executed source",
     "no external causal-discovery benchmark was executed"
   ],
-  "next_gate": "Byte-align source and rerun from exact branch head; evaluate calibration coverage/regret/set-size curves, subgroup and shift coverage, and integrate the actual Symthaea SCM likelihood."
+  "next_gate": "Byte-align source and rerun from exact branch head; evaluate calibration coverage/regret/set-size curves, subgroup and shift coverage, and integrate the actual Symthaea SCM likelihood.",
+  "observation_budget_sweep": {
+    "schema": "symthaea-calibrated-prior-observation-budget-sweep-v1",
+    "status": "SYNTHETIC_META_DISTRIBUTION_NOT_REAL_WORLD_COVERAGE",
+    "protocol": {
+      "n_calibration": 400,
+      "n_test": 120,
+      "seed": 20261030,
+      "target_coverage": 0.9,
+      "observation_budgets": [
+        30,
+        60,
+        120,
+        240
+      ]
+    },
+    "rows": [
+      {
+        "observations": 30,
+        "radius": 0.1956523150249488,
+        "coverage": 0.9333333333333333,
+        "joint_regret_mean_bits": 0.06099010460307889,
+        "joint_regret_p95_bits": 0.12792216927600514
+      },
+      {
+        "observations": 60,
+        "radius": 0.1312477722442864,
+        "coverage": 0.9166666666666666,
+        "joint_regret_mean_bits": 0.02991677987001382,
+        "joint_regret_p95_bits": 0.09047540804578519
+      },
+      {
+        "observations": 120,
+        "radius": 0.09139659888018303,
+        "coverage": 0.8916666666666667,
+        "joint_regret_mean_bits": 0.015433205035514737,
+        "joint_regret_p95_bits": 0.053560544355454
+      },
+      {
+        "observations": 240,
+        "radius": 0.06675393982700106,
+        "coverage": 0.9416666666666667,
+        "joint_regret_mean_bits": 0.007632116460895011,
+        "joint_regret_p95_bits": 0.032040732128816994
+      }
+    ],
+    "total_runtime_seconds": 6.358100078999996,
+    "raw_artifact": {
+      "filename": "CALIBRATED_PRIOR_OBSERVATION_BUDGET_SWEEP_2026-10-28.json",
+      "bytes": 7690,
+      "sha256": "56ee43b2d2e13a87ce4f1dcb3c9e90c46c3434abda99e0af4c2893ac6041586f",
+      "committed": false
+    },
+    "compressed_artifact": {
+      "filename": "CALIBRATED_PRIOR_OBSERVATION_BUDGET_SWEEP_2026-10-28.json.gz",
+      "bytes": 1283,
+      "sha256": "a0110c50ed6dfec9d037abe2b049dd43b33d9ca7767691a83db738972da928b8",
+      "git_blob": "3ec7bd83c4cb7dd48b4ff3f3606102b5f1d88aa4",
+      "committed": true
+    },
+    "limitations": [
+      "synthetic six-regime prior meta-population",
+      "coverage point estimates use only 120 test draws",
+      "does not certify deployment distribution shift"
+    ]
+  }
 }
