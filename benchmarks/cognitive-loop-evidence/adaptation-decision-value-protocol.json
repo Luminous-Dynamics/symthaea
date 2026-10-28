@@ -425,6 +425,7 @@
     "command": "audit-cognitive-adaptation-panel",
     "schema_version": 1,
     "bundle_fields": [
+      "schema_version",
       "panel_path",
       "panel_sha256",
       "protocol_path",
@@ -448,9 +449,10 @@
       "Reject reused cell identities, scoring inputs, replay receipt bytes, and run IDs.",
       "Recompute every utility score from the raw scoring input and receipt and require exact equality with the panel score.",
       "Require every confirmatory cell to use run_kind=replay.",
-      "Recompute the complete panel comparison after all cells pass."
+      "Recompute the complete panel comparison after all cells pass.",
+      "Require the bundle's raw-byte SHA-256 to match a separately supplied expected digest from an independent preregistration record."
     ],
-    "preregistration": "Publish the bundle-manifest digest before inspecting held-out outcomes; otherwise the audit proves reproducibility but not protection from post-hoc selection.",
+    "preregistration": "Publish the bundle-manifest SHA-256 in an independent timestamped preregistration record before inspecting held-out outcomes; pass it through --expected-bundle-sha256. A bundle hash stored only inside the bundle is not an independent pin.",
     "limitation": "Artifact audit does not prove honest runner execution, effective oracle sandboxing, dataset representativeness, or deployment superiority."
   }
 }
