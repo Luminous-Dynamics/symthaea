@@ -356,7 +356,7 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
             if isinstance(cid, bool) or not isinstance(cid, int) or not 0 <= cid < document["design_count"]:
                 errors.append(f"{elabel} invalid candidate_id")
                 continue
-            if fidelity not in count_map:
+            if not isinstance(fidelity, str) or fidelity not in count_map:
                 errors.append(f"{elabel} invalid fidelity")
                 continue
             seen_eval_ids.append((cid, fidelity))
