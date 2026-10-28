@@ -1095,7 +1095,7 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.matches("RESULT\t").count(), 13 * 9);
         assert_eq!(a.matches("SUMMARY\t").count(), 9);
-        assert!(a.contains("\tfalse_authorizations="));
+        assert!(a.contains("\tuncertified_activations="));
         assert!(a.contains("\tbudget_overruns="));
         assert!(a.contains("\tnet_value_milli="));
     }
