@@ -57,6 +57,11 @@ jobs:
           python3 tools/casting-benchmark/test_decision_robustness_eval.py
           python3 tools/casting-benchmark/test_bakeoff_robustness_adapter.py
           python3 tools/casting-benchmark/test_prepare_synthetic_robustness_manifests.py
+          python3 tools/casting-benchmark/test_decision_value_gate.py
+          python3 tools/casting-benchmark/test_decision_action_ledger.py
+          python3 tools/casting-benchmark/test_decision_value_trace_integration.py
+          python3 tools/casting-benchmark/test_discrete_decision_voi.py
+          python3 tools/casting-benchmark/test_forecast_validation.py
 
           # End-to-end synthetic diagnostic: runner -> frozen selection/shift
           # manifests -> hash-checking adapter -> independent receipt evaluator.
