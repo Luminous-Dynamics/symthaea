@@ -368,7 +368,25 @@ jobs:
           else:
               raise SystemExit("negative control failed: empty validation quarantine was accepted")
 
-          print("PITB_RUN_CONFIG_V1_PASS: strict schema, frozen partition digest, split-aware exposure IDs, disjoint quarantines and four malformed-config controls; fixture is synthetic and not a benchmark run")
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_test_family_ids"] = ["012"]
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: missing test family 089 was accepted")
+
+          bad = copy.deepcopy(fixture)
+          bad["known_exposed_validation_family_ids"].append("012")
+          try:
+              check_split_aware_config(bad)
+          except (ValidationError, ValueError):
+              pass
+          else:
+              raise SystemExit("negative control failed: duplicate validation quarantine ID was accepted")
+
+          print("PITB_RUN_CONFIG_V1_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and six malformed-config controls; fixture is synthetic and not a benchmark run")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
