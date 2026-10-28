@@ -81,6 +81,79 @@ impl VerifiedMisCandidate {
     }
 }
 
+/// Convert a QOBLIB-style DIMACS edge graph into the strict canonical graph encoding.
+///
+/// Supported input records are comment lines beginning with `c`, one problem line
+/// `p edge N M`, and exactly M undirected edge rows `e U V` using DIMACS one-based
+/// vertex labels. Comments and record order do not affect the canonical output, but
+/// duplicate edges, self-loops, out-of-range labels, duplicate headers, malformed
+/// records, and declared edge-count mismatch are rejected. Preserve and separately
+/// hash the original source bytes for dataset provenance; the returned bytes are the
+/// canonical semantic graph representation used by the verifier.
+pub fn canonicalize_dimacs_graph(raw_bytes: &[u8]) -> Result<Vec<u8>, MisEvidenceError> {
+    let text = std::str::from_utf8(raw_bytes).map_err(|_| MisEvidenceError::InvalidUtf8)?;
+    let mut header: Option<(usize, usize)> = None;
+    let mut raw_edges = Vec::new();
+    let mut saw_edge = false;
+
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line == "c" || line.starts_with("c ") || line.starts_with("c\\t") {
+            continue;
+        }
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        match fields.first().copied() {
+            Some("p") => {
+                if header.is_some() || saw_edge {
+                    return Err(MisEvidenceError::InvalidDimacsHeaderPosition);
+                }
+                if fields.len() != 4 || fields[1] != "edge" {
+                    return Err(MisEvidenceError::InvalidDimacsHeader);
+                }
+                let vertices = parse_decimal(fields[2])?;
+                let edges = parse_decimal(fields[3])?;
+                header = Some((vertices, edges));
+            }
+            Some("e") => {
+                let (vertex_count, _) = header.ok_or(MisEvidenceError::DimacsEdgeBeforeHeader)?;
+                if fields.len() != 3 {
+                    return Err(MisEvidenceError::InvalidDimacsEdge);
+                }
+                saw_edge = true;
+                let first = parse_decimal(fields[1])?;
+                let second = parse_decimal(fields[2])?;
+                if first == 0 || second == 0 || first > vertex_count || second > vertex_count || first == second {
+                    return Err(MisEvidenceError::InvalidDimacsVertex);
+                }
+                let u = first - 1;
+                let v = second - 1;
+                raw_edges.push(if u < v { (u, v) } else { (v, u) });
+            }
+            _ => return Err(MisEvidenceError::InvalidDimacsRecord),
+        }
+    }
+
+    let (vertex_count, declared_edges) = header.ok_or(MisEvidenceError::MissingDimacsHeader)?;
+    if raw_edges.len() != declared_edges {
+        return Err(MisEvidenceError::DimacsEdgeCountMismatch);
+    }
+    raw_edges.sort_unstable();
+    if raw_edges.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(MisEvidenceError::DuplicateDimacsEdge);
+    }
+
+    let mut canonical = format!(
+        "SYMTHEA-MIS-GRAPH-V1\\nvertices {vertex_count}\\nedges {declared_edges}\\n"
+    );
+    for (u, v) in raw_edges {
+        canonical.push_str(&format!("{u} {v}\\n"));
+    }
+    Ok(canonical.into_bytes())
+}
+
 /// Parse, hash, and independently validate canonical graph and candidate bytes.
 ///
 /// Graph format (UTF-8, LF line endings, final newline, zero-based vertices):
@@ -345,6 +418,15 @@ pub enum MisEvidenceError {
     CandidateVertexOutOfRange(usize),
     CandidateVerticesNotStrictlySorted,
     InvalidVerifierDigest,
+    InvalidDimacsHeader,
+    InvalidDimacsHeaderPosition,
+    MissingDimacsHeader,
+    InvalidDimacsEdge,
+    InvalidDimacsVertex,
+    InvalidDimacsRecord,
+    DimacsEdgeBeforeHeader,
+    DimacsEdgeCountMismatch,
+    DuplicateDimacsEdge,
     ZeroTarget,
     ReceiptBytesMismatch,
     ReceiptDigestMismatch,
@@ -368,6 +450,15 @@ impl fmt::Display for MisEvidenceError {
             Self::CandidateVertexOutOfRange(v) => write!(f, "candidate vertex {v} is outside the graph"),
             Self::CandidateVerticesNotStrictlySorted => write!(f, "candidate vertices must be strictly sorted with no duplicates"),
             Self::InvalidVerifierDigest => write!(f, "verifier digest must be 64 lowercase hexadecimal characters"),
+            Self::InvalidDimacsHeader => write!(f, "DIMACS header must be exactly 'p edge N M'"),
+            Self::InvalidDimacsHeaderPosition => write!(f, "DIMACS problem header is duplicated or appears after an edge"),
+            Self::MissingDimacsHeader => write!(f, "DIMACS problem header is missing"),
+            Self::InvalidDimacsEdge => write!(f, "DIMACS edge must be exactly 'e U V'"),
+            Self::InvalidDimacsVertex => write!(f, "DIMACS edge has a zero, self-loop, or out-of-range vertex"),
+            Self::InvalidDimacsRecord => write!(f, "unsupported or malformed DIMACS record"),
+            Self::DimacsEdgeBeforeHeader => write!(f, "DIMACS edge appears before its problem header"),
+            Self::DimacsEdgeCountMismatch => write!(f, "DIMACS declared edge count does not match edge rows"),
+            Self::DuplicateDimacsEdge => write!(f, "DIMACS input contains a duplicate undirected edge"),
             Self::ZeroTarget => write!(f, "target cardinality must be positive"),
             Self::ReceiptBytesMismatch => write!(f, "persisted receipt bytes differ from recomputed receipt"),
             Self::ReceiptDigestMismatch => write!(f, "persisted receipt digest does not match its bytes"),
@@ -412,6 +503,45 @@ mod tests {
         for (length, expected) in padding_boundaries {
             assert_eq!(sha256_hex(&vec![b'a'; length]), expected, "length {length}");
         }
+    }
+
+    #[test]
+    fn canonicalizes_dimacs_graph_with_one_based_vertices_and_unsorted_edges() {
+        let raw = b"c sample graph\\np edge 4 2\\ne 4 3\\ne 2 1\\n";
+        let expected = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n0 1\\n2 3\\n";
+        let canonical = canonicalize_dimacs_graph(raw).unwrap();
+        assert_eq!(canonical, expected);
+        assert_eq!(sha256_hex(&canonical), sha256_hex(expected));
+        let with_comments_and_reordered_edges = b"c reordered\\np edge 4 2\\ne 1 2\\nc between rows\\ne 3 4\\n";
+        assert_eq!(canonicalize_dimacs_graph(with_comments_and_reordered_edges).unwrap(), expected);
+    }
+
+    #[test]
+    fn rejects_bad_dimacs_header_counts_duplicate_edges_and_invalid_vertices() {
+        assert!(matches!(
+            canonicalize_dimacs_graph(b"e 1 2\\np edge 3 1\\n"),
+            Err(MisEvidenceError::DimacsEdgeBeforeHeader)
+        ));
+        assert!(matches!(
+            canonicalize_dimacs_graph(b"p edge 3 2\\ne 1 2\\n"),
+            Err(MisEvidenceError::DimacsEdgeCountMismatch)
+        ));
+        assert!(matches!(
+            canonicalize_dimacs_graph(b"p edge 3 2\\ne 1 2\\ne 2 1\\n"),
+            Err(MisEvidenceError::DuplicateDimacsEdge)
+        ));
+        assert!(matches!(
+            canonicalize_dimacs_graph(b"p edge 3 1\\ne 0 2\\n"),
+            Err(MisEvidenceError::InvalidDimacsVertex)
+        ));
+        assert!(matches!(
+            canonicalize_dimacs_graph(b"p edge 3 1\\ne 2 2\\n"),
+            Err(MisEvidenceError::InvalidDimacsVertex)
+        ));
+        assert!(matches!(
+            canonicalize_dimacs_graph(b"p edge 3 1\\ne 1 4\\n"),
+            Err(MisEvidenceError::InvalidDimacsVertex)
+        ));
     }
 
     #[test]
