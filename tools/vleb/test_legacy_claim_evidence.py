@@ -47,6 +47,9 @@ def valid_text_claim() -> dict[str, Any]:
             "invocation_sha256": "f" * 64,
             "verifier_id": "vleb-cobol-index",
             "verifier_sha256": "d" * 64,
+            "verifier_path": "vleb-cobol-index",
+            "verifier_argv_index": 0,
+            "verdict_path": "evidence/cobol-verdict.json",
             "observed_result": "supports",
         }],
         "unresolved_reason": None,
@@ -127,6 +130,9 @@ class LegacyClaimEvidenceTests(unittest.TestCase):
             "invocation_sha256": "b" * 64,
             "verifier_id": "pinned-cobol-test-runner",
             "verifier_sha256": "f" * 64,
+            "verifier_path": "evidence/roundtrip-test.py",
+            "verifier_argv_index": 1,
+            "verdict_path": "evidence/roundtrip-verdict.json",
             "observed_result": "supports",
         })
         self.assertEqual(self.errors(claim), [])
@@ -150,6 +156,9 @@ class LegacyClaimEvidenceTests(unittest.TestCase):
             "invocation_sha256": "b" * 64,
             "verifier_id": "pinned-transaction-model",
             "verifier_sha256": "f" * 64,
+            "verifier_path": "evidence/replay-test.py",
+            "verifier_argv_index": 1,
+            "verdict_path": "evidence/replay-verdict.json",
             "observed_result": "contradicts",
         }]
         self.assertEqual(self.errors(claim), [])
