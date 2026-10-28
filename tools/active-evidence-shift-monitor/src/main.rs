@@ -133,7 +133,7 @@ struct Scenario {
     change_after: usize,
 }
 
-const SCENARIOS: [Scenario; 12] = [
+const SCENARIOS: [Scenario; 18] = [
     Scenario {
         name: "stationary_null",
         pre_shift_p: NOMINAL_P,
@@ -207,6 +207,45 @@ const SCENARIOS: [Scenario; 12] = [
     Scenario {
         name: "selection_bias_no_environment_shift",
         pre_shift_p: 0.74,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    // Stable streams with a true rate different from the model's fixed nominal p0=0.5.
+    // These are assumption-sensitivity controls: an alarm is expected if the baseline
+    // rate is misspecified, and does not by itself establish a later environment change.
+    Scenario {
+        name: "stable_baseline_rate_045",
+        pre_shift_p: 0.45,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    Scenario {
+        name: "stable_baseline_rate_048",
+        pre_shift_p: 0.48,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    Scenario {
+        name: "stable_baseline_rate_049",
+        pre_shift_p: 0.49,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    Scenario {
+        name: "stable_baseline_rate_051",
+        pre_shift_p: 0.51,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    Scenario {
+        name: "stable_baseline_rate_052",
+        pre_shift_p: 0.52,
+        post_shift_p: None,
+        change_after: 0,
+    },
+    Scenario {
+        name: "stable_baseline_rate_055",
+        pre_shift_p: 0.55,
         post_shift_p: None,
         change_after: 0,
     },
@@ -445,6 +484,12 @@ fn print_eprocess_family_csv() {
                     | "step_up_080"
                     | "step_up_090"
                     | "selection_bias_no_environment_shift"
+                    | "stable_baseline_rate_045"
+                    | "stable_baseline_rate_048"
+                    | "stable_baseline_rate_049"
+                    | "stable_baseline_rate_051"
+                    | "stable_baseline_rate_052"
+                    | "stable_baseline_rate_055"
             ) {
                 continue;
             }
