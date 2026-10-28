@@ -799,7 +799,7 @@ fn simulate(
                 false_authorization = gate.status != GateStatus::Authorized;
                 false_safe_authorization = gate.status == GateStatus::Authorized
                     && (outcome.target_truth_risk_ppm as f64 / PPM > RISK_CAP
-                        || outcome.target_truth_value_mean_milli as f64 <= VALUE_FLOOR_MILLI);
+                        || outcome.target_truth_value_mean_milli as f64 < VALUE_FLOOR_MILLI);
                 budget_overrun = actual_cost_units > budget;
             }
         }
@@ -844,7 +844,7 @@ fn simulate(
                 false_authorization = gate_after.status != GateStatus::Authorized;
                 false_safe_authorization = gate_after.status == GateStatus::Authorized
                     && (outcome.target_truth_risk_ppm as f64 / PPM > RISK_CAP
-                        || outcome.target_truth_value_mean_milli as f64 <= VALUE_FLOOR_MILLI);
+                        || outcome.target_truth_value_mean_milli as f64 < VALUE_FLOOR_MILLI);
                 budget_overrun = actual_cost_units > budget;
                 break;
             }
