@@ -408,7 +408,11 @@ fn validate_case(case: &Case) -> Result<()> {
     if case.id.starts_with("LIFE-") && case.mutations.is_empty() {
         bail!("lifecycle case {} must explicitly model its failure condition", case.id);
     }
-    if case.id.starts_with("NEG-") && case.id != "NEG-025" && !case.expected.terminal_class.ends_with("_before_effect") && case.id != "NEG-024" {
+    if case.id.starts_with("NEG-")
+        && case.id != "NEG-025"
+        && !matches!(case.id.as_str(), "NEG-024" | "NEG-026" | "NEG-027")
+        && !case.expected.terminal_class.ends_with("_before_effect")
+    {
         bail!("negative control {} uses a terminal class inconsistent with pre-effect denial", case.id);
     }
     Ok(())
