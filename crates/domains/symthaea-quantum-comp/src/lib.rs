@@ -62,6 +62,8 @@ pub mod stability;
 pub mod statistics;
 pub mod substrate;
 pub mod topology;
+pub mod trajectory_prior;
+pub mod trajectory_history;
 pub mod validation_snapshot;
 pub mod verification_matrix;
 
@@ -142,6 +144,14 @@ pub use statistics::{
 };
 pub use substrate::{BackendKind, ConfidenceLevel, SubstrateProfile};
 pub use topology::TopologySummary;
+pub use trajectory_prior::{
+    PriorOrdering, TrajectoryAttempt, TrajectoryOutcome, TrajectoryPriorError,
+    TrajectoryPriorSummary, VertexTrajectorySummary, WilsonInterval,
+};
+pub use trajectory_history::{
+    HistoryFeatureError, HistoryOrdering, HistoryOutcome, TrajectoryFrame, TrajectoryHistory,
+    TrajectoryHistorySummary, VertexHistoryFeatures,
+};
 pub use validation_snapshot::{ValidationSnapshot, current_validation_snapshot};
 pub use verification_matrix::{
     VerificationMatrix, VerificationMatrixRow, VerificationStage, current_verification_matrix,
