@@ -501,6 +501,125 @@ mod tests {
         );
     }
 
+
+    fn exhaustive_mis_optimum(vertex_count: usize, edges: &[(usize, usize)]) -> usize {
+        let mut best = 0_usize;
+        for mask in 0..(1_usize << vertex_count) {
+            let feasible = edges.iter().all(|&(u, v)| {
+                !(mask & (1_usize << u) != 0 && mask & (1_usize << v) != 0)
+            });
+            if feasible {
+                best = best.max(mask.count_ones() as usize);
+            }
+        }
+        best
+    }
+
+    fn ordered_exact_mis(edges: &[(usize, usize)], order: &[usize]) -> usize {
+        fn visit(
+            position: usize,
+            count: usize,
+            order: &[usize],
+            edges: &[(usize, usize)],
+            chosen: &mut [bool],
+            best: &mut usize,
+        ) {
+            if count + order.len().saturating_sub(position) <= *best {
+                return;
+            }
+            if position == order.len() {
+                *best = (*best).max(count);
+                return;
+            }
+
+            let vertex = order[position];
+            let may_include = edges.iter().all(|&(u, v)| {
+                if u == vertex {
+                    !chosen[v]
+                } else if v == vertex {
+                    !chosen[u]
+                } else {
+                    true
+                }
+            });
+
+            if may_include {
+                chosen[vertex] = true;
+                visit(position + 1, count + 1, order, edges, chosen, best);
+                chosen[vertex] = false;
+            }
+            // The exclude branch is always visited; the prior only orders variables.
+            visit(position + 1, count, order, edges, chosen, best);
+        }
+
+        let mut chosen = vec![false; order.len()];
+        let mut best = 0_usize;
+        visit(0, 0, order, edges, &mut chosen, &mut best);
+        best
+    }
+
+    #[test]
+    fn all_ordering_policies_preserve_exact_mis_optimum_on_every_graph_through_five_vertices() {
+        for vertex_count in 0..=5 {
+            let possible_edges: Vec<(usize, usize)> = (0..vertex_count)
+                .flat_map(|u| ((u + 1)..vertex_count).map(move |v| (u, v)))
+                .collect();
+            let graph_count = 1_usize << possible_edges.len();
+
+            for graph_mask in 0..graph_count {
+                let edges: Vec<(usize, usize)> = possible_edges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, &edge)| {
+                        (graph_mask & (1_usize << index) != 0).then_some(edge)
+                    })
+                    .collect();
+                let attempts: Vec<_> = (0..4)
+                    .map(|sample| {
+                        let spins = (0..vertex_count)
+                            .map(|vertex| {
+                                if (vertex * 3 + sample * 5 + graph_mask % 7) % 4 < 2 {
+                                    1
+                                } else {
+                                    -1
+                                }
+                            })
+                            .collect();
+                        attempt(
+                            &format!("graph-{graph_mask}-sample-{sample}"),
+                            sample as u64,
+                            TrajectoryOutcome::ProjectedSpins(spins),
+                        )
+                    })
+                    .collect();
+                let prior =
+                    TrajectoryPriorSummary::from_attempts(vertex_count, &attempts, true)
+                        .expect("valid synthetic projected samples");
+                let mut degrees = vec![0_usize; vertex_count];
+                for &(u, v) in &edges {
+                    degrees[u] += 1;
+                    degrees[v] += 1;
+                }
+
+                let optimum = exhaustive_mis_optimum(vertex_count, &edges);
+                for policy in [
+                    PriorOrdering::DegreeOnly,
+                    PriorOrdering::BiasFirst,
+                    PriorOrdering::UncertaintyFirst,
+                ] {
+                    let order = prior
+                        .ordered_vertices(&degrees, policy)
+                        .expect("degree vector matches graph");
+                    assert_eq!(
+                        ordered_exact_mis(&edges, &order),
+                        optimum,
+                        "ordering changed exact MIS optimum for n={vertex_count}, graph={graph_mask}, policy={policy:?}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn rejects_mismatched_degree_vector() {
         let attempts = vec![attempt("a", 1, TrajectoryOutcome::ProjectedSpins(vec![1, -1]))];
