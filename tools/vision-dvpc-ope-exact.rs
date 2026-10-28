@@ -286,8 +286,7 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
 fn run_sweep(input: &str) -> Result<String, String> {
     let scenarios = parse_grid(input)?;
     let mut out = String::from(
-        "HEADER\trecord_type\tscenario_id\testimator\tverdict\tmetric\tvalue
-",
+        "HEADER\trecord_type\tscenario_id\testimator\tverdict\tmetric\tvalue\n",
     );
     for scenario in scenarios {
         let result = enumerate(&scenario)?;
@@ -339,10 +338,8 @@ fn run_sweep(input: &str) -> Result<String, String> {
             }
         }
     }
-    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tconfidence_intervals\tNOT_COMPUTED
-");
-    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tproduction_authorization\tNOT_CLAIMED
-");
+    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tconfidence_intervals\tNOT_COMPUTED\n");
+    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tproduction_authorization\tNOT_CLAIMED\n");
     Ok(out)
 }
 
@@ -461,13 +458,8 @@ mod tests {
 
     #[test]
     fn malformed_scenarios_fail_closed() {
-        assert!(parse_grid("bad header
-").is_err());
-        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap
-x\t0\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5
-").is_err());
-        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap
-x\t6\t1.4\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5
-").is_err());
+        assert!(parse_grid("bad header\n").is_err());
+        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap\nx\t0\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n").is_err());
+        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap\nx\t6\t1.4\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n").is_err());
     }
 }
