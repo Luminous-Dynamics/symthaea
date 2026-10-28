@@ -54,6 +54,7 @@ pub mod peer_trust;
 pub mod plan_freshness;
 pub mod plugin;
 pub mod policy_ablation;
+pub mod policy_risk_binding;
 pub mod recovery_journal;
 pub mod recovery_planner;
 pub mod recovery_validation;
