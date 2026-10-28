@@ -84,3 +84,13 @@ jobs:
           set -e
           test "$contrast_exit" -eq 2
           grep -q 'unknown right arm' /tmp/etc-mutated-contrast-report.json
+
+          # Partial overlap is also a duplicate denominator, even when slice rows differ.
+          jq '.task_slices += [(.task_slices[0] | .modules = ["gravity"] | .difficulties = ["medium", "hard"])]' \
+            "$manifest" > /tmp/etc-mutated-overlap.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-etc-replication/Cargo.toml -- /tmp/etc-mutated-overlap.json > /tmp/etc-mutated-overlap-report.json
+          overlap_exit=$?
+          set -e
+          test "$overlap_exit" -eq 2
+          grep -q 'overlaps an already declared model/module/difficulty/system/law/noise task cell' /tmp/etc-mutated-overlap-report.json
