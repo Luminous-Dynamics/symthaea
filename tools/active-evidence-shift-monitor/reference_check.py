@@ -104,6 +104,16 @@ EPROCESS_FAMILY_FIELDS = (
     "scenario_or_pre_shift_alarm_probability", "post_shift_detection_probability",
     "mean_post_shift_detection_delay", "per_cell_alpha", "survival_probability", "log_e_threshold",
 )
+CUSUM_SCALE = 25
+CUSUM_UPPER_INCREMENT = 12
+CUSUM_LOWER_INCREMENT = 13
+CUSUM_SIDE_ALPHA = PER_CELL_ALPHA / 2.0
+CUSUM_FIELDS = (
+    "direction", "scenario", "scenario_class", "horizon", "change_after", "p0", "null_lower",
+    "null_upper", "threshold_scaled", "threshold_score", "scenario_or_pre_shift_alarm_probability",
+    "post_shift_detection_probability", "mean_post_shift_detection_delay", "per_side_alpha",
+    "survival_probability",
+)
 BETA_A = 0.5
 BETA_B = 0.5
 
@@ -800,6 +810,214 @@ def self_test():
     print("PASS: optional-stopping negative control, null controls, shift detection, selection-bias counterexample, formula witness, and mass conservation")
 
 
+def cusum_next_state(state, event):
+    return state + CUSUM_UPPER_INCREMENT if event else max(0, state - CUSUM_LOWER_INCREMENT)
+
+
+def cusum_alarm_probability(horizon, threshold, event_probability):
+    """Independent exact DP for one-sided reflected CUSUM under constant event rate."""
+    if threshold <= 0:
+        return 1.0
+    active = [0.0] * threshold
+    active[0] = 1.0
+    alarm = 0.0
+    for n in range(1, horizon + 1):
+        next_active = [0.0] * threshold
+        reachable_states = min(threshold, (n - 1) * CUSUM_UPPER_INCREMENT + 1)
+        for state, mass in enumerate(active[:reachable_states]):
+            if mass == 0.0:
+                continue
+            for event, branch_mass in (
+                (True, mass * event_probability),
+                (False, mass * (1.0 - event_probability)),
+            ):
+                next_state = cusum_next_state(state, event)
+                if next_state >= threshold:
+                    alarm += branch_mass
+                else:
+                    next_active[next_state] += branch_mass
+        active = next_active
+    return alarm
+
+
+def calibrate_cusum_threshold(horizon, alpha):
+    """Smallest integer threshold whose exact p=.52 boundary alarm probability meets alpha."""
+    low, high = 1, horizon * CUSUM_UPPER_INCREMENT + 1
+    while low < high:
+        middle = low + (high - low) // 2
+        if cusum_alarm_probability(horizon, middle, COMPOSITE_NULL_UPPER) <= alpha:
+            high = middle
+        else:
+            low = middle + 1
+    return low
+
+
+def simulate_cusum_scenario(direction, scenario, threshold):
+    """Run one directional CUSUM exactly and snapshot the preregistered horizons."""
+    horizon_max = HORIZONS[-1]
+    active = [0.0] * threshold
+    active[0] = 1.0
+    first_alarm = [0.0] * (horizon_max + 1)
+    survival_at = {}
+    checkpoint_index = 0
+
+    for n in range(1, horizon_max + 1):
+        post_shift_p = SHIFT_PROBABILITIES[scenario]
+        observed_p = (
+            SHIFT_PROBABILITIES[scenario]
+            if post_shift_p is not None and n > CHANGE_AFTER
+            else PRE_SHIFT_PROBABILITIES[scenario]
+        )
+        event_p = observed_p if direction == "upper_cusum" else 1.0 - observed_p
+        next_active = [0.0] * threshold
+        reachable_states = min(threshold, (n - 1) * CUSUM_UPPER_INCREMENT + 1)
+        for state, mass in enumerate(active[:reachable_states]):
+            if mass == 0.0:
+                continue
+            for event, branch_mass in (
+                (True, mass * event_p),
+                (False, mass * (1.0 - event_p)),
+            ):
+                next_state = cusum_next_state(state, event)
+                if next_state >= threshold:
+                    first_alarm[n] += branch_mass
+                else:
+                    next_active[next_state] += branch_mass
+        active = next_active
+
+        if checkpoint_index < len(HORIZONS) and n == HORIZONS[checkpoint_index]:
+            survival_at[n] = sum(active)
+            checkpoint_index += 1
+
+    rows = []
+    is_target_shift = scenario_class(scenario) == "target_shift"
+    change_after = CHANGE_AFTER if post_shift_p is not None else 0
+    for horizon in HORIZONS:
+        if is_target_shift:
+            pre_alarm = sum(first_alarm[1:min(change_after, horizon) + 1])
+            detection = sum(first_alarm[change_after + 1:horizon + 1])
+            delay = (
+                sum((n - change_after) * first_alarm[n]
+                    for n in range(change_after + 1, horizon + 1)) / detection
+                if detection > 0.0 else None
+            )
+            scenario_alarm = pre_alarm
+        else:
+            scenario_alarm = sum(first_alarm[1:horizon + 1])
+            detection = None
+            delay = None
+        rows.append({
+            "horizon": str(horizon),
+            "scenario_or_pre_shift_alarm_probability": f"{scenario_alarm:.12f}",
+            "post_shift_detection_probability": as_text(detection),
+            "mean_post_shift_detection_delay": as_text(delay),
+            "survival_probability": f"{survival_at[horizon]:.12f}",
+        })
+    return rows
+
+
+def cusum_reference_rows():
+    threshold = calibrate_cusum_threshold(HORIZONS[-1], CUSUM_SIDE_ALPHA)
+    rows = []
+    for direction in ("upper_cusum", "lower_cusum"):
+        for scenario in SCENARIOS:
+            for metrics in simulate_cusum_scenario(direction, scenario, threshold):
+                post_shift_p = SHIFT_PROBABILITIES[scenario]
+                rows.append({
+                    "direction": direction,
+                    "scenario": scenario,
+                    "scenario_class": scenario_class(scenario),
+                    "horizon": metrics["horizon"],
+                    "change_after": str(CHANGE_AFTER) if post_shift_p is not None else "NA",
+                    "p0": f"{P0:.12f}",
+                    "null_lower": f"{COMPOSITE_NULL_LOWER:.12f}",
+                    "null_upper": f"{COMPOSITE_NULL_UPPER:.12f}",
+                    "threshold_scaled": str(threshold),
+                    "threshold_score": f"{threshold / CUSUM_SCALE:.12f}",
+                    "scenario_or_pre_shift_alarm_probability": metrics["scenario_or_pre_shift_alarm_probability"],
+                    "post_shift_detection_probability": metrics["post_shift_detection_probability"],
+                    "mean_post_shift_detection_delay": metrics["mean_post_shift_detection_delay"],
+                    "per_side_alpha": f"{CUSUM_SIDE_ALPHA:.12f}",
+                    "survival_probability": metrics["survival_probability"],
+                })
+    return rows
+
+
+def check_cusum_csv(path):
+    expected = cusum_reference_rows()
+    try:
+        with open(path, newline="", encoding="utf-8") as source:
+            reader = csv.DictReader(source)
+            if tuple(reader.fieldnames or ()) != CUSUM_FIELDS:
+                raise ValueError(f"CUSUM header mismatch: {reader.fieldnames}")
+            actual = list(reader)
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise ValueError(f"cannot read CUSUM output CSV: {exc}") from exc
+    if len(actual) != len(expected):
+        raise ValueError(f"CUSUM row count mismatch: expected {len(expected)}, got {len(actual)}")
+    key_fields = ("direction", "scenario", "horizon")
+    text_fields = (
+        "direction", "scenario", "scenario_class", "horizon", "change_after", "threshold_scaled",
+        "post_shift_detection_probability", "mean_post_shift_detection_delay",
+    )
+    numeric_fields = (
+        "p0", "null_lower", "null_upper", "threshold_score",
+        "scenario_or_pre_shift_alarm_probability", "per_side_alpha", "survival_probability",
+    )
+    for line, (got, want) in enumerate(zip(actual, expected), 2):
+        if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
+            raise ValueError(f"CUSUM row key mismatch on line {line}")
+        for field in text_fields:
+            if got[field] != want[field]:
+                raise ValueError(f"CUSUM {field} mismatch on line {line}: {got[field]} != {want[field]}")
+        for field in numeric_fields:
+            try:
+                value = float(got[field])
+                target = float(want[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid CUSUM numeric {field} on line {line}") from exc
+            if not math.isfinite(value) or abs(value - target) > 5e-10:
+                raise ValueError(f"CUSUM {field} mismatch on line {line}: {value} != {target}")
+    print(f"PASS: independently recomputed all {len(expected)} exact-DP CUSUM rows")
+
+
+def cusum_self_test():
+    threshold = calibrate_cusum_threshold(HORIZONS[-1], CUSUM_SIDE_ALPHA)
+    boundary_alarm = cusum_alarm_probability(HORIZONS[-1], threshold, COMPOSITE_NULL_UPPER)
+    previous_alarm = cusum_alarm_probability(HORIZONS[-1], threshold - 1, COMPOSITE_NULL_UPPER)
+    if boundary_alarm > CUSUM_SIDE_ALPHA + EPS or previous_alarm <= CUSUM_SIDE_ALPHA - EPS:
+        raise ValueError("CUSUM threshold is not the minimum exact boundary threshold")
+    symmetric_lower_alarm = cusum_alarm_probability(
+        HORIZONS[-1], threshold, 1.0 - COMPOSITE_NULL_LOWER
+    )
+    if abs(boundary_alarm - symmetric_lower_alarm) > EPS:
+        raise ValueError("symmetric upper/lower CUSUM calibration diverged")
+
+    controls = (
+        ("upper_cusum", "stationary_null"),
+        ("lower_cusum", "stationary_null"),
+        ("upper_cusum", "within_band_transition_049_to_051"),
+        ("lower_cusum", "within_band_transition_049_to_051"),
+    )
+    for direction, scenario in controls:
+        metrics = simulate_cusum_scenario(direction, scenario, threshold)[-1]
+        alarm = float(metrics["scenario_or_pre_shift_alarm_probability"])
+        survival = float(metrics["survival_probability"])
+        if alarm > CUSUM_SIDE_ALPHA + EPS:
+            raise ValueError(f"{direction} exceeded its finite-horizon null allocation on {scenario}")
+        if abs(alarm + survival - 1.0) > 1e-9:
+            raise ValueError(f"{direction} did not conserve mass on {scenario}")
+
+    up_power = float(simulate_cusum_scenario("upper_cusum", "step_up_080", threshold)[-1]["post_shift_detection_probability"])
+    down_power = float(simulate_cusum_scenario("lower_cusum", "step_down_010", threshold)[-1]["post_shift_detection_probability"])
+    selection_alarm = float(simulate_cusum_scenario("upper_cusum", "selection_bias_no_environment_shift", threshold)[-1]["scenario_or_pre_shift_alarm_probability"])
+    if up_power < 0.99 or down_power < 0.99:
+        raise ValueError(f"CUSUM large-shift power controls failed: up={up_power}, down={down_power}")
+    if selection_alarm < 0.99:
+        raise ValueError("CUSUM failed the selection-induced alarm negative control")
+    print("PASS: exact minimum threshold, symmetric directions, within-band control, mass conservation, large-shift power, and selection-bias negative control")
+
+
 def main(argv):
     try:
         if len(argv) == 2 and argv[1] == "--self-test":
@@ -817,6 +1035,12 @@ def main(argv):
         if len(argv) == 3 and argv[1] == "--eprocess-family":
             check_eprocess_family_csv(argv[2])
             return 0
+        if len(argv) == 2 and argv[1] == "--cusum-self-test":
+            cusum_self_test()
+            return 0
+        if len(argv) == 3 and argv[1] == "--cusum":
+            check_cusum_csv(argv[2])
+            return 0
         if len(argv) == 2 and argv[1] not in ("-h", "--help"):
             check_csv(argv[1])
             return 0
@@ -826,6 +1050,8 @@ def main(argv):
         print("       reference_check.py --sentinel-budget-self-test")
         print("       reference_check.py --eprocess-family OUTPUT.csv")
         print("       reference_check.py --eprocess-family-self-test")
+        print("       reference_check.py --cusum OUTPUT.csv")
+        print("       reference_check.py --cusum-self-test")
         return 2
     except (OSError, UnicodeError, csv.Error, ValueError, AssertionError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
