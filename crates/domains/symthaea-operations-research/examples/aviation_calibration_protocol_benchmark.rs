@@ -12,7 +12,10 @@ use symthaea_operations_research::aviation_calibration_protocol::{
     SplitAuditStatus, SplitIntegrityPolicy, SplitRecord, TuningChoice,
 };
 use symthaea_operations_research::aviation_distributional_robustness::{
-    evaluate_tv_robustness_curve, ScenarioCostDelta,
+    evaluate_tv_robustness_curve, evaluate_tv_robust_cost_delta, ScenarioCostDelta,
+};
+use symthaea_operations_research::aviation_probability_calibration::{
+    calibrate_tv_radius, CalibrationFrequency,
 };
 
 fn main() {
@@ -60,6 +63,21 @@ fn main() {
         process::exit(1);
     }
 
+    let calibration = match calibrate_tv_radius(
+        &[
+            CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: 60 },
+            CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: 30 },
+            CalibrationFrequency { scenario_id: "compound-weather".into(), nominal_probability_ppm: 100_000, observed_count: 10 },
+        ],
+        50_000,
+    ) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("TV-radius calibration failed: {error:?}");
+            process::exit(1);
+        }
+    };
+
     let scenarios = [
         ScenarioCostDelta {
             scenario_id: "routine".into(),
@@ -89,6 +107,17 @@ fn main() {
         }
     };
 
+    let calibrated_report = match evaluate_tv_robust_cost_delta(
+        &scenarios,
+        calibration.required_tv_radius_ppm,
+    ) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("calibrated-radius evaluation failed: {error:?}");
+            process::exit(1);
+        }
+    };
+
     let mut json = String::new();
     writeln!(
         &mut json,
@@ -110,8 +139,16 @@ fn main() {
     }
     writeln!(
         &mut json,
-        "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"robustness_curve\": [",
-        tuning.status
+        "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"radius_calibration\": {{\"calibration_episodes\": {}, \"failure_probability_ppm\": {}, \"empirical_tv_ppm\": {}, \"sampling_allowance_ppm\": {}, \"required_tv_radius_ppm\": {}, \"capped_at_maximum\": {}}},\n  \"calibrated_radius_evaluation\": {{\"worst_case_expected_delta_units\": {}, \"worst_single_scenario_id\": \"{}\"}},\n  \"robustness_curve\": [",
+        tuning.status,
+        calibration.calibration_episode_count,
+        calibration.failure_probability_ppm,
+        calibration.empirical_tv_distance_ppm,
+        calibration.sampling_allowance_ppm,
+        calibration.required_tv_radius_ppm,
+        calibration.capped_at_maximum_radius,
+        calibrated_report.worst_case_expected_delta_units(),
+        calibrated_report.worst_single_scenario_id()
     ).expect("write to String");
     for (index, point) in curve.points.iter().enumerate() {
         let comma = if index + 1 == curve.points.len() { "" } else { "," };
