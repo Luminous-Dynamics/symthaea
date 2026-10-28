@@ -111,18 +111,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         let source_sha256 = sha256_hex(&bytes);
         let canonical = canonicalize_dimacs_graph(&bytes)?;
         let canonical_sha256 = sha256_hex(&canonical);
-        let (vertices, edges) = canonical_graph_counts(&canonical)?;
-        if vertices != pinned.expected_vertices || edges != pinned.expected_edges {
-            return Err(format!(
-                "{} graph dimensions mismatch: expected {} vertices / {} edges, got {} vertices / {} edges",
-                pinned.name,
-                pinned.expected_vertices,
-                pinned.expected_edges,
-                vertices,
-                edges
-            )
-            .into());
-        }
+        let (vertices, edges) = verify_expected_dimensions(
+            &pinned.name,
+            &canonical,
+            pinned.expected_vertices,
+            pinned.expected_edges,
+        )?;
         output.push_str(&format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             pinned.name,
@@ -248,6 +242,22 @@ fn verify_instance_directory_inventory(
     Ok(())
 }
 
+fn verify_expected_dimensions(
+    instance_name: &str,
+    canonical_graph: &[u8],
+    expected_vertices: usize,
+    expected_edges: usize,
+) -> Result<(usize, usize), Box<dyn Error>> {
+    let (vertices, edges) = canonical_graph_counts(canonical_graph)?;
+    if vertices != expected_vertices || edges != expected_edges {
+        return Err(format!(
+            "{instance_name} graph dimensions mismatch: expected {expected_vertices} vertices / {expected_edges} edges, got {vertices} vertices / {edges} edges"
+        )
+        .into());
+    }
+    Ok((vertices, edges))
+}
+
 fn canonical_graph_counts(bytes: &[u8]) -> Result<(usize, usize), Box<dyn Error>> {
     let text = std::str::from_utf8(bytes)?;
     let mut lines = text.lines();
@@ -337,6 +347,14 @@ mod tests {
         );
         let manifest = format!("# source_commit={COMMIT}\\n{row}{row}");
         assert!(parse_pinned_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn verifies_expected_dimensions_and_rejects_catalog_mismatch() {
+        let canonical = b"SYMTHEA-MIS-GRAPH-V1\\nvertices 4\\nedges 2\\n0 1\\n2 3\\n";
+        assert_eq!(verify_expected_dimensions("fixture", canonical, 4, 2).unwrap(), (4, 2));
+        assert!(verify_expected_dimensions("fixture", canonical, 5, 2).is_err());
+        assert!(verify_expected_dimensions("fixture", canonical, 4, 1).is_err());
     }
 
     #[test]
