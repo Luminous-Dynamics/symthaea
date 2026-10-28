@@ -382,6 +382,18 @@ mod tests {
     }
 
     #[test]
+    fn serializes_context_items_to_official_type_value_shape() {
+        let item = MemoryContextItem {
+            kind: MemoryContextType::Text,
+            value: "button opens cart".to_string(),
+        };
+        let json = serde_json::to_value(item).unwrap();
+        assert_eq!(json["type"], "text");
+        assert_eq!(json["value"], "button opens cart");
+        assert!(json.get("kind").is_none());
+    }
+
+    #[test]
     fn resolves_text_with_digest_and_preserves_hit_order() {
         let mut index = EvidenceIndex::new();
         index.insert(text_record(7, "evidence-a", "web", "cart icon opens cart"), b"canonical trajectory bytes").unwrap();
