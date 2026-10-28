@@ -19,7 +19,7 @@
 #[path = "mis_evidence.rs"]
 mod mis_evidence;
 pub use self::mis_evidence::{
-    MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, sha256_hex,
+    MisEvidenceError, MisEvidenceVerdict, VerifiedMisCandidate, encode_canonical_mis_candidate, sha256_hex,
     verify_mis_candidate, verify_mis_candidate_with_receipt,
 };
 
