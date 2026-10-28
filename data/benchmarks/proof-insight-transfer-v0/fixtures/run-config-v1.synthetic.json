@@ -1,0 +1,24 @@
+{
+  "schema_version": "pitb.run-config.v1",
+  "protocol_id": "proof-insight-transfer-v0",
+  "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "split_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+  "baseline_selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "known_exposed_validation_family_ids": [
+    "012"
+  ],
+  "known_exposed_test_family_ids": [
+    "089"
+  ],
+  "bootstrap_replicates": 10000,
+  "bootstrap_seed": 20261028,
+  "model_version": "synthetic-model-v0",
+  "checker_version": "lean-toolchain-pinned-synthetic-v0",
+  "budget": {
+    "max_model_calls": 8,
+    "max_tokens": 16000,
+    "max_wall_ms": 300000,
+    "max_cost_microusd": 500000
+  }
+}
