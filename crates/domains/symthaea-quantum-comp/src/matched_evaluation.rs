@@ -24,7 +24,8 @@ pub use self::mis_evidence::{
     verify_mis_candidate_with_receipt,
 };
 
-/// Evidence minted only by re-hashing and independently verifying canonical MIS artifacts.
+/// Opaque evidence minted by the MIS verifier and scoped to one experiment trial.
+/// A generic unscoped verifier result cannot satisfy the matched evaluator.
 pub type VerifierReceiptEvidence = VerifiedMisCandidate;
 
 use std::collections::{HashMap, HashSet};
