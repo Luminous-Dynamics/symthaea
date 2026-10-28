@@ -437,6 +437,16 @@ mod tests {
     }
 
     #[test]
+    fn weak_overlap_misspecification_matches_independent_numeric_known_answers() {
+        let report = enumerate(&scenario("weak_overlap_001_misspecified")).unwrap();
+        assert!((metric(&report, Estimator::Ips).variance - 3.300084175084).abs() < 1e-8);
+        assert!((metric(&report, Estimator::Snips).expected - 0.233448729630).abs() < 1e-8);
+        assert!((metric(&report, Estimator::ClippedIps).expected - 0.12).abs() < 1e-8);
+        assert!((metric(&report, Estimator::Switch).expected - 0.35).abs() < 1e-8);
+        assert!((metric(&report, Estimator::Switch).variance - 0.006743476431).abs() < 1e-8);
+    }
+
+    #[test]
     fn exact_zero_support_is_not_identified_and_metrics_are_suppressed() {
         let report = enumerate(&scenario("zero_support")).unwrap();
         assert_eq!(report.verdict, "NOT_IDENTIFIED");
