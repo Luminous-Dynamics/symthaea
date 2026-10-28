@@ -355,6 +355,71 @@ class RunManifestVerifierTests(unittest.TestCase):
         self.assertFalse(result["eligible"], result)
         self.assertIn(code, {row["code"] for row in result["issues"]}, result)
 
+    def audit_one_execution_receipt(self) -> list[dict[str, str]]:
+        claim = json.loads((self.bundle.root / self.bundle.paths["claim"]).read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_schema = json.loads(
+            (self.bundle.root / self.bundle.paths["witness_receipt_schema"]).read_text(encoding="utf-8")
+        )
+        return verifier.audit_witness_execution_receipt(
+            witness["execution_receipt_path"],
+            witness["execution_receipt_sha256"],
+            self.bundle.root,
+            manifest=self.bundle.manifest,
+            claim=claim,
+            witness=witness,
+            receipt_schema=receipt_schema,
+            expected_producer_sha256=sha(
+                (ROOT / "tools/vleb/record_witness_execution.py").read_bytes()
+            ),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+
+    def test_execution_receipt_matches_exact_task_run_source_and_runtime(self) -> None:
+        self.assertEqual(self.audit_one_execution_receipt(), [])
+
+    def test_execution_receipt_from_another_run_attempt_is_rejected_even_when_rehashed(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_path = self.bundle.root / witness["execution_receipt_path"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["run_binding"]["run_attempt"] = 9
+        raw = jbytes(receipt)
+        receipt_path.write_bytes(raw)
+        witness["execution_receipt_sha256"] = sha(raw)
+        claim_path.write_bytes(jbytes(claim))
+        issues = self.audit_one_execution_receipt()
+        self.assertIn("witness_receipt_run_binding_mismatch", {row["code"] for row in issues})
+
+    def test_execution_receipt_rejects_mutated_output_bytes(self) -> None:
+        (self.bundle.root / self.bundle.paths["claim_witness"]).write_bytes(b'{"copy_references":[]}\\n')
+        issues = self.audit_one_execution_receipt()
+        codes = {row["code"] for row in issues}
+        self.assertIn("witness_receipt_output_digest_mismatch", codes)
+        self.assertIn("witness_receipt_artifact_binding_mismatch", codes)
+
+    def test_execution_receipt_rejects_wrong_external_verifier_pin(self) -> None:
+        claim = json.loads((self.bundle.root / self.bundle.paths["claim"]).read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_schema = json.loads(
+            (self.bundle.root / self.bundle.paths["witness_receipt_schema"]).read_text(encoding="utf-8")
+        )
+        issues = verifier.audit_witness_execution_receipt(
+            witness["execution_receipt_path"],
+            witness["execution_receipt_sha256"],
+            self.bundle.root,
+            manifest=self.bundle.manifest,
+            claim=claim,
+            witness=witness,
+            receipt_schema=receipt_schema,
+            expected_producer_sha256=sha(
+                (ROOT / "tools/vleb/record_witness_execution.py").read_bytes()
+            ),
+            trusted_claim_verifier_pins={"source_index": "e" * 64},
+        )
+        self.assertIn("witness_receipt_verifier_mismatch", {row["code"] for row in issues})
+
     def test_claim_audit_passes_only_with_pinned_source_and_witness(self) -> None:
         result = verifier.audit_claim_evidence_bundle(
             self.bundle.manifest,
