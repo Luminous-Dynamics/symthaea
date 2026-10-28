@@ -50,8 +50,8 @@ def safe_file(root: Path, relative: Any) -> Path:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         raise ValueError("path must be a non-empty canonical POSIX relative path")
     rel = PurePosixPath(relative)
-    if rel.is_absolute() or ".." in rel.parts or "." in rel.parts:
-        raise ValueError("absolute or traversal path rejected")
+    if rel.is_absolute() or ".." in rel.parts or "." in rel.parts or str(rel) != relative:
+        raise ValueError("absolute, traversal, or non-canonical path rejected")
     resolved_root = root.resolve(strict=True)
     cursor = resolved_root
     for component in rel.parts:
@@ -180,6 +180,11 @@ def _validate_report(
         elif not isinstance(pct,(int,float)) or isinstance(pct,bool) or abs(float(pct)-expected_pct)>1e-8:
             issues.append({"code":"baseline_pct_inconsistent","message":"alignment_pct does not equal the reported matching/denominator counts"})
 
+    trace_value = report.get("requirement_traceability")
+    baseline_value = report.get("per_test_baseline_oracle_alignment")
+    if report.get("eligible") is True and isinstance(trace_value,dict) and isinstance(baseline_value,dict):
+        if trace_value.get("complete") is not True or baseline_value.get("complete") is not True:
+            issues.append({"code":"audit_eligibility_inconsistent","message":"eligible audit report must have complete requirement traceability and complete baseline alignment"})
     if issues:
         return None, issues
     return report, []

@@ -104,7 +104,15 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     if not any("never remove a requirement or test" in rule for rule in trace_definition.get("denominator_rules", [])):
         errors.append("requirement_to_test_traceability_denominator_drift")
 
-    baseline_target = data.get("proposed_targets", {}).get("per_test_baseline_oracle_alignment_pct", {})
+    for metric_name in ("requirement_source_item_coverage_pct", "required_test_trace_coverage_pct"):
+        target = data.get("proposed_targets", {}).get(metric_name, {})
+        current = data.get("current_measurements", {}).get(metric_name, {})
+        if target.get("target") != 100 or target.get("status") != "target_not_measured":
+            errors.append(metric_name + "_target_drift")
+        if current.get("value") is not None or current.get("eligible") is not False:
+            errors.append(metric_name + "_score_fabricated")
+
+        baseline_target = data.get("proposed_targets", {}).get("per_test_baseline_oracle_alignment_pct", {})
     if baseline_target.get("target") != 100 or baseline_target.get("status") != "target_not_measured":
         errors.append("per_test_baseline_oracle_target_drift")
     baseline_current = data.get("current_measurements", {}).get("per_test_baseline_oracle_alignment_pct", {})

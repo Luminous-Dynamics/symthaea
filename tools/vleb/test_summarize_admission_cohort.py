@@ -139,6 +139,16 @@ class AdmissionCohortTests(unittest.TestCase):
         self.assertIs(result["score_eligible"],False)
         self.assertIs(result["analysis_only"],True)
 
+    def test_eligible_report_cannot_claim_incomplete_admission_summaries(self)->None:
+        path,report,row=self.fixture.reports[0]
+        report["requirement_traceability"]["complete"]=False
+        path.write_bytes(jbytes(report))
+        row["audit_report_sha256"]=sha(path.read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertIn("audit_eligibility_inconsistent",{item["code"] for item in result["issues"]})
+
     def test_candidate_failures_are_measured_not_cohort_integrity_errors(self)->None:
         result=self.fixture.summarize()
         self.assertTrue(result["cohort_integrity_valid"],result["issues"])
