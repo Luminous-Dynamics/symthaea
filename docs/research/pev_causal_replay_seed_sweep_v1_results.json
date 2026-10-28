@@ -1,0 +1,20 @@
+{
+  "base_seed": 20261028,
+  "bootstrap_replicates_per_arm_per_seed": 500,
+  "empirical_95_percent_paired_t_coverage_placebo": 0.948,
+  "empirical_95_percent_paired_t_coverage_valid": 0.944,
+  "empirical_95_percent_percentile_bootstrap_coverage_placebo": 0.95,
+  "empirical_95_percent_percentile_bootstrap_coverage_valid": 0.945,
+  "pairs_per_arm_per_seed": 512,
+  "placebo_equivalence_gate_pass_rate": 1.0,
+  "placebo_percentile_ci_excludes_zero_rate_not_a_gate": 0.05,
+  "positive_control_threshold_pass_rate": 1.0,
+  "production_symthaea_imported": false,
+  "rust_compiled_or_executed": false,
+  "scope_note": "Independent synthetic repeated-seed calibration only; interval rates estimate this generator/estimator combination, not real Symthaea behavior or universal frequentist coverage. Paired-t intervals are only a cross-check for this planted approximately Gaussian outcome DGP.",
+  "seed_count": 1000,
+  "status": "PASS_ESTIMATOR_SEED_SWEEP_ONLY",
+  "synthetic_ground_truth_placebo_effect": 0.0,
+  "synthetic_ground_truth_valid_effect": 0.08,
+  "total_paired_outcome_effects": 1024000
+}
