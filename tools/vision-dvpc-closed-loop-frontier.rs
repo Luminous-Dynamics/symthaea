@@ -889,7 +889,7 @@ fn score_fixture() -> Result<String, String> {
     }
     let mut summaries: BTreeMap<Policy, Summary> = Policy::ALL.into_iter().map(|p| (p, Summary::default())).collect();
     let mut output = String::from(
-        "RESULT\tcampaign_id\tfamily\tpolicy\tselected_actions\tactivation\tgate_status\tuncertified_activation\tfalse_safe_authorization\tbudget_overrun\tactual_cost_units\tgross_value_milli\tnet_value_milli\trisk_upper_bound\tvalue_lcb_milli\trisk_trials\trisk_failures\tvalue_n\tgate_reason\n"
+        "RESULT\tcampaign_id\tfamily\tpolicy\tselected_actions\tactivation\tgate_status\tuncertified_activation\tfalse_safe_authorization\tbudget_overrun\tactual_cost_units\tgross_value_milli\tnet_value_milli\tfixed_risk_upper_diagnostic\tfixed_value_lcb_diagnostic_milli\trisk_trials\trisk_failures\tvalue_n\tgate_reason\n"
     );
     for (campaign_id, candidates) in &by_campaign {
         for policy in Policy::ALL {
