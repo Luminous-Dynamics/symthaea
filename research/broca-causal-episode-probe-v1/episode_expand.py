@@ -37,10 +37,6 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def pointer_for(prefix: str, key: str) -> str:
-    return f"{prefix}/{key.replace('~', '~0').replace('/', '~1')}"
-
-
 def extract_indexed_refs(trajectories: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
     """Mirror the worker's public-state/content text allowlist for this probe."""
     result: dict[tuple[str, str], dict[str, Any]] = {}
@@ -64,8 +60,9 @@ def extract_indexed_refs(trajectories: list[dict[str, Any]]) -> dict[tuple[str, 
 
         states = trajectory.get("states")
         public_states = isinstance(states, list) and bool(states)
-        if isinstance(trajectory.get("goal"), str):
-            add(trajectory_id, "/goal", trajectory["goal"], None, "goal")
+        raw_goal = trajectory.get("goal")
+        if isinstance(raw_goal, str) and raw_goal.strip():
+            add(trajectory_id, "/goal", raw_goal, None, "goal")
         elif isinstance(trajectory.get("metadata"), dict):
             original_goal = trajectory["metadata"].get("original_goal")
             if isinstance(original_goal, str):
@@ -74,14 +71,24 @@ def extract_indexed_refs(trajectories: list[dict[str, Any]]) -> dict[tuple[str, 
                 for i, value in enumerate(original_goal):
                     add(trajectory_id, f"/metadata/original_goal/{i}", value, None, "goal")
 
-        add(trajectory_id, "/start_url", trajectory.get("start_url"), None, "url")
+        start_url = trajectory.get("start_url")
+        if public_states and (not isinstance(trajectory.get("goal"), str)
+                              or not isinstance(start_url, str) or not start_url.strip()):
+            raise ValueError(f"{trajectory_id}: public-state trajectories require goal and start_url")
+        add(trajectory_id, "/start_url", start_url, None, "url")
 
         if public_states:
             for i, state in enumerate(states):
                 if not isinstance(state, dict):
                     raise ValueError(f"{trajectory_id}: states[{i}] must be an object")
                 prefix = f"/states/{i}"
-                add(trajectory_id, f"{prefix}/url", state.get("url"), i, "url")
+                url = state.get("url")
+                if not isinstance(url, str) or not url.strip():
+                    raise ValueError(f"{trajectory_id}: states[{i}].url must be non-empty")
+                screenshot = state.get("screenshot")
+                if not isinstance(screenshot, str) or not screenshot.strip():
+                    raise ValueError(f"{trajectory_id}: states[{i}].screenshot must be non-empty")
+                add(trajectory_id, f"{prefix}/url", url, i, "url")
                 action = state.get("action")
                 if action is not None and not isinstance(action, str):
                     raise ValueError(f"{trajectory_id}: states[{i}].action must be string/null")
@@ -100,11 +107,16 @@ def extract_indexed_refs(trajectories: list[dict[str, Any]]) -> dict[tuple[str, 
             content = trajectory.get("content")
             if not isinstance(content, list) or not content:
                 raise ValueError(f"{trajectory_id}: require non-empty states or content")
+            if not isinstance(trajectory.get("metadata"), dict):
+                raise ValueError(f"{trajectory_id}: content-schema trajectories require metadata")
             for i, state in enumerate(content):
                 if not isinstance(state, dict):
                     raise ValueError(f"{trajectory_id}: content[{i}] must be an object")
                 prefix = f"/content/{i}"
-                add(trajectory_id, f"{prefix}/url", state.get("url"), i, "url")
+                url = state.get("url")
+                if not isinstance(url, str) or not url.strip():
+                    raise ValueError(f"{trajectory_id}: content[{i}].url must be non-empty")
+                add(trajectory_id, f"{prefix}/url", url, i, "url")
                 for key, role in (("action", "action"), ("thoughts", "thought")):
                     value = state.get(key)
                     if value is not None and not isinstance(value, str):
@@ -113,6 +125,9 @@ def extract_indexed_refs(trajectories: list[dict[str, Any]]) -> dict[tuple[str, 
                 observation = state.get("observation")
                 if not isinstance(observation, dict) or not isinstance(observation.get("text"), str):
                     raise ValueError(f"{trajectory_id}: content[{i}].observation.text must be a string")
+                screenshot = observation.get("screenshot")
+                if not isinstance(screenshot, str) or not screenshot.strip():
+                    raise ValueError(f"{trajectory_id}: content[{i}].observation.screenshot must be non-empty")
                 add(trajectory_id, f"{prefix}/observation/text", observation["text"], i, "observation")
     return result
 
