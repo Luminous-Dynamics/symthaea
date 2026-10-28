@@ -19,6 +19,8 @@
 //!   chronology checks, and a fail-closed guard against declared test-set tuning.
 //! - [`aviation_probability_calibration`]: conservative finite-sample TV-radius calibration
 //!   from frozen calibration-partition frequencies, with explicit sampling allowance.
+//! - [`aviation_online_drift`]: frozen-reference, anytime-valid likelihood-ratio monitoring
+//!   for predeclared categorical alternatives, with a separate out-of-support alarm.
 //! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
 //!   over paired candidate/baseline costs, with read-only reports and robust gates.
 //! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
@@ -40,6 +42,7 @@ pub mod aviation_enterprise;
 pub mod aviation_robustness;
 pub mod aviation_network_externalities;
 pub mod aviation_network_robustness;
+pub mod aviation_online_drift;
 pub mod aviation_probability_calibration;
 pub mod graph;
 pub mod inventory;
