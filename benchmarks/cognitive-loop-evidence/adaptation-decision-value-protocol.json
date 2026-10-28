@@ -420,5 +420,37 @@
     "incomplete_panel_behavior": "List missing dataset × seed × scenario cells, set complete_coverage_gate_pass=false, and emit primary_comparison=null. Do not calculate or display a confirmatory effect/interval for incomplete coverage.",
     "complete_panel_behavior": "Call the existing hierarchical paired bootstrap with dataset resampling first, then seed resampling while preserving each seed's scenario block. Orient lower post-shift task loss as positive effect for the staged candidate.",
     "caveat": "This aggregates scored summaries and verifies their declared integrity; it does not prove the underlying replay ran honestly or that summaries came from causal execution."
+  },
+  "independent_audit": {
+    "command": "audit-cognitive-adaptation-panel",
+    "schema_version": 1,
+    "bundle_fields": [
+      "panel_path",
+      "panel_sha256",
+      "protocol_path",
+      "protocol_sha256",
+      "cells"
+    ],
+    "cell_fields": [
+      "dataset_id",
+      "seed",
+      "scenario_id",
+      "run_id",
+      "utility_input_path",
+      "utility_input_sha256",
+      "replay_receipt_path",
+      "replay_receipt_sha256"
+    ],
+    "required_checks": [
+      "Verify raw protocol and panel bytes against the manifest SHA-256 digests.",
+      "Require exactly one bundle cell for every registered panel score.",
+      "Resolve all artifact paths under the canonical bundle root; reject absolute paths, traversal, and external symlinks.",
+      "Reject reused cell identities, scoring inputs, replay receipt bytes, and run IDs.",
+      "Recompute every utility score from the raw scoring input and receipt and require exact equality with the panel score.",
+      "Require every confirmatory cell to use run_kind=replay.",
+      "Recompute the complete panel comparison after all cells pass."
+    ],
+    "preregistration": "Publish the bundle-manifest digest before inspecting held-out outcomes; otherwise the audit proves reproducibility but not protection from post-hoc selection.",
+    "limitation": "Artifact audit does not prove honest runner execution, effective oracle sandboxing, dataset representativeness, or deployment superiority."
   }
 }
