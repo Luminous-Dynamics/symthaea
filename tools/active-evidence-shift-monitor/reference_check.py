@@ -114,7 +114,10 @@ def simulate(boundary, scenario, horizon):
                     next_active[next_successes] += branch_mass
         active = next_active
 
-    if scenario == "stationary_null":
+    if post_shift_p is None:
+        # No target-environment change occurred. For selection_bias_no_environment_shift,
+        # any alarm is spurious relative to the unchanged target population, even though the
+        # selected observation stream violates the detector's iid(p0) null assumption.
         false_alarm = sum(first_alarm[1:])
         detection = None
         delay = None
