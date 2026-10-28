@@ -62,6 +62,12 @@ jobs:
           python3 tools/active-evidence-exact-tree/compare_cost_frontiers.py "$artifact_dir/greedy-policy-results.csv" "$artifact_dir/robust-tree-results.csv" > "$artifact_dir/matched-cost-frontier.csv"
           test "$(wc -l < "$artifact_dir/matched-cost-frontier.csv")" -eq 10
 
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box > "$artifact_dir/calibrated-box-results.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box > "$temp_dir/calibrated-box-second.csv"
+          cmp "$artifact_dir/calibrated-box-results.csv" "$temp_dir/calibrated-box-second.csv"
+          python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py --self-test
+          python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py "$artifact_dir/calibrated-box-results.csv"
+
           {
             echo "source_commit=$(git rev-parse HEAD)"
             echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
@@ -70,7 +76,7 @@ jobs:
             echo "rustc_version=$(rustc --version)"
             echo "cargo_version=$(cargo --version)"
             echo "runner_os=$(uname -a)"
-            (cd "$artifact_dir" && sha256sum greedy-policy-results.csv robust-tree-results.csv matched-cost-frontier.csv)
+            (cd "$artifact_dir" && sha256sum greedy-policy-results.csv robust-tree-results.csv matched-cost-frontier.csv calibrated-box-results.csv)
           } > "$artifact_dir/provenance-receipt.txt"
 
       - name: Reject mutated aggregate outputs
@@ -114,6 +120,25 @@ jobs:
           PY
           if python3 tools/active-evidence-exact-tree/reference_check_robust_tree.py "$temp_dir/tree-mutated.csv"; then
             echo "robust-tree checker accepted a mutated aggregate row" >&2
+            exit 1
+          fi
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-exact-tree/Cargo.toml --bin calibrated_box > "$temp_dir/calibrated-box-original.csv"
+          python3 - "$temp_dir/calibrated-box-original.csv" "$temp_dir/calibrated-box-mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[0]["worst_case_box_regret"] = "999"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-exact-tree/reference_check_calibrated_box.py "$temp_dir/calibrated-box-mutated.csv"; then
+            echo "calibrated-box checker accepted a mutated row" >&2
             exit 1
           fi
 
