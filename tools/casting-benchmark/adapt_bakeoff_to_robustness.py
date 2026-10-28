@@ -171,10 +171,17 @@ def adapt_documents(
         raise ValueError("sweep.run_count does not match paired_runs length")
     if not isinstance(sweep["source_sha256"], dict) or not sweep["source_sha256"]:
         raise ValueError("sweep.source_sha256 must be a non-empty path-to-digest object")
+    repo_root = Path(__file__).resolve().parents[2]
     for path, digest in sweep["source_sha256"].items():
         if not isinstance(path, str) or not path or path.startswith("/") or ".." in Path(path).parts:
             raise ValueError(f"invalid source-lock path: {path!r}")
-        _digest(digest, f"sweep.source_sha256[{path!r}]")
+        expected_digest = _digest(digest, f"sweep.source_sha256[{path!r}]")
+        source_path = repo_root / path
+        if not source_path.is_file():
+            raise ValueError(f"sweep source-lock path does not exist in this checkout: {path}")
+        actual_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        if actual_digest != expected_digest:
+            raise ValueError(f"sweep source digest mismatch for {path}: expected {expected_digest}, found {actual_digest}")
     sweep_costs = _exact(sweep["fidelity_costs"], {"low", "medium", "high"}, "sweep.fidelity_costs")
     for level, value in sweep_costs.items():
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
@@ -201,6 +208,12 @@ def adapt_documents(
     if selection["selection_frozen_before_holdout"] is not True:
         raise ValueError("selection_manifest must declare selection_frozen_before_holdout=true")
     generator_sha = _digest(selection["manifest_generator_sha256"], "selection_manifest.manifest_generator_sha256")
+    generator_path = Path(__file__).resolve().with_name("prepare_synthetic_robustness_manifests.py")
+    if not generator_path.is_file():
+        raise ValueError("synthetic shift manifest generator is missing from this checkout")
+    actual_generator_sha = hashlib.sha256(generator_path.read_bytes()).hexdigest()
+    if generator_sha != actual_generator_sha:
+        raise ValueError("manifest generator digest does not match the current checkout")
     nominal_prediction_source = selection["nominal_prediction_source"]
     if not isinstance(nominal_prediction_source, str) or not nominal_prediction_source.strip():
         raise ValueError("selection_manifest.nominal_prediction_source must be non-empty")
