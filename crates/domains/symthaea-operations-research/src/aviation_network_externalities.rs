@@ -501,7 +501,7 @@ mod tests {
         ).unwrap();
         assert_eq!(result.selected_candidate_index, Some(1));
         assert!(!result.assessments[0].eligible);
-        assert!(matches!(result.assessments[0].exclusion, Some(CandidateExclusionReason::ActorHarmCeilingExceeded { .. })));
+        assert!(matches!(result.assessments[0].exclusion.as_ref(), Some(CandidateExclusionReason::ActorHarmCeilingExceeded { .. })));
     }
     #[test]
     fn constrained_selector_returns_none_when_all_candidates_violate_harm_cap() {
@@ -520,7 +520,7 @@ mod tests {
             NetworkSelectionConstraints { max_actor_regression_units: 20, minimum_net_system_benefit_units: 1 },
         ).unwrap();
         assert_eq!(result.selected_candidate_index, Some(1));
-        assert!(matches!(result.assessments[0].exclusion, Some(CandidateExclusionReason::InvalidLedger(_))));
+        assert!(matches!(result.assessments[0].exclusion.as_ref(), Some(CandidateExclusionReason::InvalidLedger(_))));
 
         let mut bad_base = base();
         bad_base.feasibility = FeasibilityStatus::Indeterminate;
