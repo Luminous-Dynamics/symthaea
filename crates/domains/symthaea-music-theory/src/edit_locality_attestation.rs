@@ -64,21 +64,12 @@ pub fn replay_edit_locality_bound(
     config: &EditLocalityConfig,
     receipt: &BoundEditLocalityEvidence,
 ) -> Result<bool, EditLocalityError> {
-    if source.len() > MAX_EDIT_LOCALITY_EVENTS || target.len() > MAX_EDIT_LOCALITY_EVENTS {
-        return Err(EditLocalityError::UnsupportedEdit(
-            "event count exceeds the edit-locality computation budget",
-        ));
-    }
+    // Re-run the verifier first so malformed input is surfaced as an explicit
+    // error, and so the base verifier enforces its event budget before hashing.
+    let recomputed = verify_edit_locality_bound_with_config(source, target, request, config)?;
     if receipt.binding_version != EDIT_LOCALITY_BINDING_VERSION {
         return Ok(false);
     }
-    if receipt.source_sha256 != event_sequence_sha256(source, "source")
-        || receipt.target_sha256 != event_sequence_sha256(target, "target")
-    {
-        return Ok(false);
-    }
-
-    let recomputed = verify_edit_locality_bound_with_config(source, target, request, config)?;
     Ok(&recomputed == receipt)
 }
 
