@@ -14,7 +14,7 @@
 //! simulate interruption boundaries in-process; true power-loss qualification
 //! must be performed on each claimed filesystem/device configuration.
 
-use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, MemoryContextItem};
+use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, MemoryContextItem, ResolvedMemoryContextItem};
 use std::collections::BTreeSet;
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, HdcStoreReader, IndexOpenPolicy};
@@ -83,7 +83,14 @@ pub struct EvidencePruneReport {
 pub struct CommittedEvidenceQuery {
     pub generation: u64,
     pub candidates: Vec<(u64, f32)>,
-    pub context: Vec<MemoryContextItem>,
+    pub resolved_context: Vec<ResolvedMemoryContextItem>,
+}
+
+impl CommittedEvidenceQuery {
+    /// Project the provenance-bearing result to the official benchmark ABI.
+    pub fn context_items(&self) -> Vec<MemoryContextItem> {
+        self.resolved_context.iter().map(|resolved| resolved.item.clone()).collect()
+    }
 }
 
 impl Drop for WriterLock {
@@ -268,7 +275,7 @@ impl EvidenceDiskStore {
             reader.scan_similar(query, candidate_k)
         };
         let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
-        let context = recovered.evidence_index.resolve(
+        let resolved_context = recovered.evidence_index.resolve_with_provenance(
             &candidate_ids,
             scope_id,
             now_ms,
@@ -279,7 +286,7 @@ impl EvidenceDiskStore {
         Ok(Some(CommittedEvidenceQuery {
             generation: recovered.generation,
             candidates,
-            context,
+            resolved_context,
         }))
     }
 
@@ -1005,8 +1012,11 @@ mod tests {
         assert_eq!(result.generation, 1);
         assert_eq!(result.candidates.len(), 2);
         assert_eq!(result.candidates[0].0, 7);
-        assert_eq!(result.context.len(), 1);
-        assert_eq!(result.context[0].value, "correct route");
+        assert_eq!(result.resolved_context.len(), 1);
+        assert_eq!(result.resolved_context[0].hdc_id, 7);
+        assert_eq!(result.resolved_context[0].evidence_id, "evidence-7");
+        assert_eq!(result.resolved_context[0].source.trajectory_id, "trajectory-typed-hdc");
+        assert_eq!(result.context_items()[0].value, "correct route");
     }
 
     #[test]
