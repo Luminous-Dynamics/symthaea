@@ -44,16 +44,34 @@
     "classification": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["exposure", "sensitivity", "difficulty"],
+      "required": [
+        "exposure",
+        "sensitivity",
+        "difficulty"
+      ],
       "properties": {
         "exposure": {
-          "enum": ["public_development", "private_holdout", "private_confirmatory"]
+          "enum": [
+            "public_development",
+            "private_holdout",
+            "private_confirmatory"
+          ]
         },
         "sensitivity": {
-          "enum": ["synthetic", "authorized_deidentified", "public_open_source"]
+          "enum": [
+            "synthetic",
+            "authorized_deidentified",
+            "public_open_source"
+          ]
         },
         "difficulty": {
-          "enum": ["introductory", "intermediate", "advanced", "expert", "unrated"]
+          "enum": [
+            "introductory",
+            "intermediate",
+            "advanced",
+            "expert",
+            "unrated"
+          ]
         },
         "reviewer_count": {
           "type": "integer",
@@ -64,13 +82,24 @@
     "source_identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_kind", "revision", "source_sha256"],
+      "required": [
+        "source_kind",
+        "revision",
+        "source_sha256"
+      ],
       "properties": {
         "source_kind": {
-          "enum": ["repository", "synthetic_fixture", "benchmark_sample"]
+          "enum": [
+            "repository",
+            "synthetic_fixture",
+            "benchmark_sample"
+          ]
         },
         "repository": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "revision": {
           "type": "string",
@@ -82,8 +111,12 @@
         "fixture_sha256": {
           "type": "object",
           "minProperties": 1,
-          "propertyNames": {"pattern": "^[a-zA-Z0-9._-]+$"},
-          "additionalProperties": {"$ref": "#/$defs/sha256"}
+          "propertyNames": {
+            "pattern": "^[a-zA-Z0-9._-]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/sha256"
+          }
         },
         "task_manifest_sha256": {
           "$ref": "#/$defs/sha256"
@@ -96,16 +129,34 @@
     "environment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["platform", "network_mode", "toolchains"],
+      "required": [
+        "platform",
+        "network_mode",
+        "toolchains"
+      ],
       "properties": {
         "platform": {
-          "enum": ["linux", "windows", "macos", "z_os", "other"]
+          "enum": [
+            "linux",
+            "windows",
+            "macos",
+            "z_os",
+            "other"
+          ]
         },
         "network_mode": {
-          "enum": ["none", "allowlisted", "enabled", "not_applicable"]
+          "enum": [
+            "none",
+            "allowlisted",
+            "enabled",
+            "not_applicable"
+          ]
         },
         "container_image_digest": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         },
         "toolchains": {
@@ -114,14 +165,33 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "version", "role"],
+            "required": [
+              "name",
+              "version",
+              "role"
+            ],
             "properties": {
-              "name": {"type": "string", "minLength": 1},
-              "version": {"type": "string", "minLength": 1},
-              "role": {
-                "enum": ["compiler", "runtime", "database", "assembler", "test_runner", "other"]
+              "name": {
+                "type": "string",
+                "minLength": 1
               },
-              "identity_sha256": {"$ref": "#/$defs/sha256"}
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "compiler",
+                  "runtime",
+                  "database",
+                  "assembler",
+                  "test_runner",
+                  "other"
+                ]
+              },
+              "identity_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
             }
           }
         },
@@ -129,9 +199,18 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "timeout_seconds": {"type": "integer", "minimum": 1},
-            "memory_mb": {"type": "integer", "minimum": 1},
-            "cpu_count": {"type": "number", "exclusiveMinimum": 0}
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "memory_mb": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "cpu_count": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
           }
         }
       }
@@ -139,7 +218,11 @@
     "behavior_contract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["task_statement", "invariants", "allowed_behavior_changes"],
+      "required": [
+        "task_statement",
+        "invariants",
+        "allowed_behavior_changes"
+      ],
       "properties": {
         "task_statement": {
           "type": "string",
@@ -148,11 +231,16 @@
         "invariants": {
           "type": "array",
           "minItems": 1,
-          "items": {"type": "string", "minLength": 5}
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
         },
         "allowed_behavior_changes": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "observable_effects": {
           "type": "array",
@@ -175,14 +263,35 @@
           }
         },
         "numeric_semantics": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": false,
           "properties": {
-            "representation": {"type": "string"},
-            "rounding": {"type": "string"},
-            "overflow": {"type": "string"},
-            "comparison": {"enum": ["exact", "absolute_tolerance", "relative_tolerance"]},
-            "tolerance": {"type": ["number", "null"], "minimum": 0}
+            "representation": {
+              "type": "string"
+            },
+            "rounding": {
+              "type": "string"
+            },
+            "overflow": {
+              "type": "string"
+            },
+            "comparison": {
+              "enum": [
+                "exact",
+                "absolute_tolerance",
+                "relative_tolerance"
+              ]
+            },
+            "tolerance": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
           }
         }
       }
@@ -195,21 +304,32 @@
         "baseline_empty_patch_must_fail",
         "reference_patch_must_pass",
         "regression_guards",
-        "negative_controls"
+        "negative_controls",
+        "test_execution_map"
       ],
       "properties": {
         "required_test_ids": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "baseline_empty_patch_must_fail": {"const": true},
-        "reference_patch_must_pass": {"const": true},
+        "baseline_empty_patch_must_fail": {
+          "const": true
+        },
+        "reference_patch_must_pass": {
+          "const": true
+        },
         "regression_guards": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "negative_controls": {
           "type": "array",
@@ -217,9 +337,16 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["control_id", "mutation_class", "expected_verdict"],
+            "required": [
+              "control_id",
+              "mutation_class",
+              "expected_verdict"
+            ],
             "properties": {
-              "control_id": {"type": "string", "minLength": 1},
+              "control_id": {
+                "type": "string",
+                "minLength": 1
+              },
               "mutation_class": {
                 "enum": [
                   "empty_patch",
@@ -237,8 +364,12 @@
                   "other_semantic"
                 ]
               },
-              "expected_verdict": {"const": "fail"},
-              "notes": {"type": "string"}
+              "expected_verdict": {
+                "const": "fail"
+              },
+              "notes": {
+                "type": "string"
+              }
             }
           }
         },
@@ -246,19 +377,89 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "reference_patch": {"$ref": "#/$defs/sha256"},
-            "baseline_log": {"$ref": "#/$defs/sha256"},
-            "reference_log": {"$ref": "#/$defs/sha256"},
-            "test_bundle": {"$ref": "#/$defs/sha256"}
+            "reference_patch": {
+              "$ref": "#/$defs/sha256"
+            },
+            "baseline_log": {
+              "$ref": "#/$defs/sha256"
+            },
+            "reference_log": {
+              "$ref": "#/$defs/sha256"
+            },
+            "test_bundle": {
+              "$ref": "#/$defs/sha256"
+            }
           }
         },
         "oracle_review": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "independent_reviewer_count": {"type": "integer", "minimum": 0},
-            "mutation_equivalence_reviewed": {"type": "boolean"},
-            "notes": {"type": "string"}
+            "independent_reviewer_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mutation_equivalence_reviewed": {
+              "type": "boolean"
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "test_execution_map": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "test_id",
+              "execution_ids"
+            ],
+            "properties": {
+              "test_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "execution_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "reference_evidence_artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline_log",
+            "reference_log",
+            "reference_patch",
+            "test_bundle"
+          ],
+          "properties": {
+            "baseline_log": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference_log": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference_patch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_bundle": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }
@@ -266,18 +467,35 @@
     "evaluation_policy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["primary_attempt_limit", "unresolved_policy", "agent_network_policy"],
+      "required": [
+        "primary_attempt_limit",
+        "unresolved_policy",
+        "agent_network_policy"
+      ],
       "properties": {
-        "primary_attempt_limit": {"const": 1},
+        "primary_attempt_limit": {
+          "const": 1
+        },
         "unresolved_policy": {
           "const": "retain_in_denominator_and_suppress_headline_score"
         },
         "agent_network_policy": {
-          "enum": ["offline", "preregistered_allowlist", "enabled_separate_condition"]
+          "enum": [
+            "offline",
+            "preregistered_allowlist",
+            "enabled_separate_condition"
+          ]
         },
-        "abstention_allowed": {"type": "boolean"},
-        "attempts_per_task_secondary": {"type": "integer", "minimum": 1},
-        "notes": {"type": "string"}
+        "abstention_allowed": {
+          "type": "boolean"
+        },
+        "attempts_per_task_secondary": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "notes": {
+          "type": "string"
+        }
       }
     },
     "evidence_schema_version": {
