@@ -463,7 +463,7 @@ mod tests {
         record.content_sha256 = hash(image_bytes);
         let item = record.context_item(root.path()).unwrap();
         assert_eq!(item.kind, MemoryContextType::Image);
-        assert_eq!(item.value, fs::canonicalize(root.path().join("step.png")).unwrap().to_string_lossy());
+        assert_eq!(item.value, fs::canonicalize(root.path().join("step.png")).unwrap().to_string_lossy().into_owned());
     }
 
     #[test]
