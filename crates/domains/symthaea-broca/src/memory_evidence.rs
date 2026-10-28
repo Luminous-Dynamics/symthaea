@@ -375,7 +375,7 @@ impl EvidenceIndex {
             if !record.is_eligible_for(scope_id, now_ms) {
                 continue;
             }
-            if !matches!(record.payload, EvidencePayload::Text { .. }) {
+            if !matches!(&record.payload, EvidencePayload::Text { .. }) {
                 continue;
             }
 
