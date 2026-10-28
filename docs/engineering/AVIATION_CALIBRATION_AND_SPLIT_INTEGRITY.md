@@ -78,6 +78,6 @@ Report:
 
 ## Test status and claim ceiling
 
-Thirteen Rust unit tests are defined in `aviation_calibration_protocol.rs`, but they have not been compiled or run here because the environment lacks `cargo` and `rustc`. Test definitions are not test results. A successful metadata audit is necessary but not sufficient for credible calibration, independent validation, airline savings or operational approval.
+Thirteen Rust unit tests and five separate integration-oracle tests are defined in `aviation_calibration_protocol.rs`, but they have not been compiled or run here because the environment lacks `cargo` and `rustc`. Test definitions are not test results. A successful metadata audit is necessary but not sufficient for credible calibration, independent validation, airline savings or operational approval.
 
-Follow-up: [AVIATION-ENTERPRISE-009: calibration and split integrity](https://github.com/Luminous-Dynamics/symthaea/issues/8753) (to be created).
+Follow-up: [AVIATION-ENTERPRISE-009: calibration and split integrity #8770](https://github.com/Luminous-Dynamics/symthaea/issues/8770). The separate public-API fixtures are in `tests/aviation_calibration_protocol_oracle.rs`.
