@@ -17,3 +17,12 @@ The PR includes a Rust unit test that replays the committed corpus and asserts a
 ## Evidence receipt contract
 
 Each verification result records the descriptor and threshold config, target offset, ordered match pairs with independent residuals, unmatched source/target indices, aggregate axis evidence and failure reasons. The receipt is JSON round-trip tested by the authored corpus replay test. This supports audit/replay but is not a cryptographic provenance receipt: callers still need to bind source/target content digests and the exact verifier build SHA when persisting evidence.
+
+
+## Additional source-level regression controls
+
+- Constant-pitch motifs cannot establish interval inversion; the Rust API returns `UnsupportedTransform` and has a dedicated regression test.
+- A bounded deletion test checks the original source index recorded in the receipt.
+- A fragment test checks that selected-subsequence indices map back to the original source sequence.
+- Local JSON Schema validation succeeded for all 108 corpus records.
+- A standalone Python reference simulation of the DP/verdict equations recorded 0/108 verdict mismatches, plus passing one-insert and one-delete controls at the configured coverage/gap boundaries. This remains an algorithm-level simulation, not execution of the Rust source.
