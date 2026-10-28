@@ -910,6 +910,26 @@ mod tests {
     }
 
     #[test]
+    fn pinned_generator_revision_must_match_compiled_source() {
+        let config = demo_config();
+        let seed = vec![0x6d; 32];
+        let mut manifest: Value =
+            serde_json::from_slice(&manifest_for_test(&config, &seed)).unwrap();
+        manifest["generator"]["revision"] = json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        let first = serde_json::to_vec(&manifest).unwrap();
+        manifest["protocol_commitment_sha256"] =
+            json!(compute_protocol_commitment(&first).unwrap());
+        let second = serde_json::to_vec(&manifest).unwrap();
+        manifest["seed_commitment_sha256"] =
+            json!(compute_artifact_commitment(&second, "seed", &seed).unwrap());
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+
+        let error = generate_task_set_bytes(&manifest_bytes, &seed, &config)
+            .expect_err("a different declared generator source must be rejected");
+        assert!(error.contains("does not match the compiled generator source"));
+    }
+
+    #[test]
     fn different_seed_cannot_reproduce_committed_task_set() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
         let final_manifest =
