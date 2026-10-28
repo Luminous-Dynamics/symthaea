@@ -259,8 +259,11 @@ impl TrajectoryPriorSummary {
             .into_iter()
             .enumerate()
             .map(|(vertex, selected_count)| {
-                let empirical_inclusion_frequency = (valid_sample_count > 0)
-                    .then_some(selected_count as f64 / valid_sample_count as f64);
+                let empirical_inclusion_frequency = if valid_sample_count > 0 {
+                    Some(selected_count as f64 / valid_sample_count as f64)
+                } else {
+                    None
+                };
                 let bias_magnitude = empirical_inclusion_frequency
                     .map(|frequency| (2.0 * frequency - 1.0).abs());
                 let uncertainty_score = bias_magnitude.map(|bias| 1.0 - bias);
