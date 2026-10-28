@@ -250,7 +250,11 @@ def _require_keys(value: Any, expected: set[str], label: str, errors: list[str])
     return True
 
 
-def score_document(document: dict, repo_root: Path | None = None) -> dict:
+def score_document(
+    document: dict,
+    repo_root: Path | None = None,
+    allow_diagnostic_subset: bool = False,
+) -> dict:
     root = repo_root or Path(__file__).resolve().parents[2]
     errors: list[str] = []
     if not _require_keys(document, TOP_KEYS, "document", errors):
@@ -269,6 +273,42 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
         costs = {"low": 1, "medium": 5, "high": 25}
     if document["source_sha256"] != source_lock(root):
         errors.append("source SHA-256 lock differs from checked-out source/manifest bytes")
+
+    # The sealed manifest defines the formal default matrix. Arbitrary subsets are
+    # useful for rapid diagnosis, but must be explicitly labelled as such rather
+    # than receiving an indistinguishable valid receipt.
+    manifest_path = root / "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+    try:
+        manifest = loads_no_duplicate_keys(manifest_path.read_text(encoding="utf-8"))
+        manifest_defaults = {
+            "objective_families": manifest["scenarios"]["objective_families"],
+            "constraint_families": manifest["scenarios"]["constraint_families"],
+            "dimensions": manifest["design_space"]["dimensions"],
+            "severities": manifest["default_sweep"]["severities"],
+            "seeds": manifest["default_sweep"]["seeds"],
+            "policies": [item["id"] for item in manifest["policies"]],
+            "design_count": manifest["candidate_pool"]["design_count"],
+            "cost_budget": manifest["budget"]["budget_units"],
+            "fidelity_costs": manifest["budget"]["costs"],
+        }
+    except (OSError, KeyError, TypeError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(f"cannot load frozen composition manifest: {exc}")
+        manifest_defaults = {}
+    declared_defaults = {
+        key: document.get(key) for key in (
+            "objective_families", "constraint_families", "dimensions", "severities",
+            "seeds", "policies", "design_count", "cost_budget", "fidelity_costs"
+        )
+    }
+    is_preregistered_default = declared_defaults == manifest_defaults
+    if not is_preregistered_default and not allow_diagnostic_subset:
+        errors.append(
+            "result differs from the full preregistered default matrix; "
+            "use --allow-diagnostic-subset for explicitly diagnostic-only runs"
+        )
+    if allow_diagnostic_subset and is_preregistered_default:
+        # Permissible, but use the stronger scope label below for this result.
+        pass
 
     def valid_sequence(key: str, allowed: tuple | None = None, kind: str = "str") -> list:
         seq = document[key]
@@ -543,6 +583,7 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
     return {
         "benchmark_id": BENCHMARK_ID,
         "receipt_label": RECEIPT_LABEL,
+        "execution_scope": "preregistered_default_matrix" if is_preregistered_default else "diagnostic_subset",
         "valid": True,
         "result_sha256": _sha(raw),
         "source_sha256": source_lock(root),
@@ -565,11 +606,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("result_json", type=Path)
     parser.add_argument("--receipt", type=Path)
+    parser.add_argument(
+        "--allow-diagnostic-subset",
+        action="store_true",
+        help="allow a non-default matrix, marked diagnostic_subset in the receipt",
+    )
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     try:
         document = loads_no_duplicate_keys(args.result_json.read_text(encoding="utf-8"))
-        receipt = score_document(document, root)
+        receipt = score_document(document, root, allow_diagnostic_subset=args.allow_diagnostic_subset)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.exit(2, f"REJECTED: {exc}\n")
     raw = json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False) + "\n"
