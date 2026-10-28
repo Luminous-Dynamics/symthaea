@@ -375,8 +375,8 @@ mod tests {
 
     #[test]
     fn candidate_set_hash_is_canonical_and_order_independent() {
-        let a = BTreeSet::from(["a".to_owned(), "b".to_owned()]);
-        let b = BTreeSet::from(["b".to_owned(), "a".to_owned()]);
+        let a: BTreeSet<String> = ["a".to_owned(), "b".to_owned()].into_iter().collect();
+        let b: BTreeSet<String> = ["b".to_owned(), "a".to_owned()].into_iter().collect();
         assert_eq!(candidate_set_hash(&a), candidate_set_hash(&b));
     }
 
