@@ -30,6 +30,8 @@ pub struct CalibrationFrequency {
 pub enum RadiusCalibrationError {
     EmptyCalibrationSet,
     EmptyScenarioId,
+    EmptyRecordId,
+    EmptyEventClusterId,
     DuplicateScenarioId { scenario_id: String },
     InvalidNominalProbability { scenario_id: String, probability_ppm: u32 },
     NominalProbabilityMassMismatch { actual_ppm: u64 },
