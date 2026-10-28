@@ -275,3 +275,10 @@ The module compares paired outcomes only when scenario/objective versions match,
 The new `select_network_candidate` helper adds a predeclared per-actor harm ceiling and minimum system-benefit requirement to candidate selection. It is a constrained policy choice—not a universal definition of fairness—and does not provide compensation or independently verify physical feasibility. Nine Rust tests are defined; they have not been compiled or executed in this environment.
 
 The current industry comparator is EUROCONTROL's network-level Capacity and Weather-Based Operations programme, which uses weather/capacity/instability triggers and cross-stakeholder coordination. Its reported 2026 results—3.1 million delay minutes saved, €400 million in estimated operational savings and 14% higher network stability on challenging days—are program-level reported outcomes, not a transferable performance target for this prototype. Further comparators include integrated recovery, flight/passenger fairness in ATFM delay assignment and air-rail recovery. Sources and benchmark constraints are in the companion specification.
+
+
+## Network robustness over a frozen scenario set (28 October 2026)
+
+A new Rust module, `crates/domains/symthaea-operations-research/src/aviation_network_robustness.rs`, evaluates candidate outcomes across identical frozen scenarios and reports mean benefit, worst-case system result, empirical upper-tail regression and worst per-actor regression. It joins by scenario ID rather than list position, requires a stable actor universe/domain mapping across the ensemble and rejects rejected/indeterminate outcomes. The assessment binds the configured tail fraction to the one used to calculate the report.
+
+The companion protocol is [AVIATION_NETWORK_ROBUSTNESS_BENCHMARK.md](./AVIATION_NETWORK_ROBUSTNESS_BENCHMARK.md). This extends AVNX's single-scenario Pareto/harm guard into a finite stress ensemble. It does not provide a distribution-free guarantee over unseen disruptions, generate plans, or replace an independent feasibility checker. Twelve unit tests are defined but not compiled or executed in this environment.
