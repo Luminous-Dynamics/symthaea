@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod effect_surface_registry;
 mod manifest;
 mod rhn_sweep;
 
@@ -65,6 +66,15 @@ enum Commands {
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
+    },
+    /// Check effect-surface registry schema and recorded source anchors.
+    /// This is inventory integrity only, not security qualification.
+    EffectSurfaceRegistry {
+        #[arg(long, default_value = "docs/security/effect-surface-registry.v1.json")]
+        registry: PathBuf,
+        /// Refuse success while any entry lacks recorded qualification evidence.
+        #[arg(long)]
+        require_qualified: bool,
     },
 }
 
@@ -147,6 +157,18 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::EffectSurfaceRegistry { registry, require_qualified } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let registry_path = if registry.is_absolute() {
+                registry
+            } else {
+                root.join(registry)
+            };
+            effect_surface_registry::check(&root, &registry_path, require_qualified)?;
         }
     }
     Ok(())
