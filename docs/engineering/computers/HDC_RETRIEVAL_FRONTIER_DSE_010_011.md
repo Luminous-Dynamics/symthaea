@@ -76,3 +76,13 @@ FAISS supports exhaustive binary Hamming search with popcount and multiple index
 ## Evidence boundary
 
 The DSE-010/011 results are small synthetic NumPy pilots. No Rust compilation, FAISS performance, production false-accept rate, energy measurement, SOTA win or real-world error guarantee is claimed. See issue #8665 for next steps.
+
+
+### DSE-010 reproducibility artifacts and timing separation
+
+The DSE-010 reference script is now included as `research/benchmarks/hdc_compositional_open_set_pilot.py`. Its 18-cell calibration summary is committed at `docs/engineering/computers/results/HDC_COMPOSITIONAL_OPEN_SET_DSE_010.csv` with manifest `..._MANIFEST.json`. Per-cell wall-clock seconds were removed from the measurement CSV because they made file hashes vary between runs even when all scores and decisions matched; only total run duration belongs in the per-run manifest. Two fresh local executions then produced byte-identical robustness and calibration measurement CSVs.
+
+- Calibration CSV SHA-256: `16a103df9ca7a2da34620a12270980d162b2867f2303ed4ec7d9da6c9a131601`.
+- Full 90-row robustness CSV SHA-256: `ee9bb2f43c9c18d06d9fb1167b9f6f4fb2700d5cb9c70d721acae7b726e2debe`.
+
+The full robustness CSV remains in the downloadable reproducibility bundle; rerun the script to regenerate it. The manifest marks the evidence as an independent NumPy pilot, not Rust qualification.
