@@ -34,6 +34,9 @@ EVENT_FIELDS = frozenset({
     "candidate_id",
     "fidelity",
     "estimated_cost_units",
+    "decision_loss_reduction",
+    "normalized_constraint_risk_reduction",
+    "value_per_cost",
     "actual_cost_units",
     "outcome_status",
     "outcome_sha256",
@@ -128,6 +131,10 @@ def _validate_event(event: Any) -> dict[str, Any]:
     if estimated_cost < 0.0:
         raise ValueError("estimated_cost_units must be non-negative")
 
+    loss_value = event["decision_loss_reduction"]
+    risk_value = event["normalized_constraint_risk_reduction"]
+    score_value = event["value_per_cost"]
+
     if event["record_type"] == "decision":
         if event["actual_cost_units"] is not None:
             raise ValueError("decision record actual_cost_units must be null")
@@ -142,11 +149,22 @@ def _validate_event(event: Any) -> dict[str, Any]:
                 raise ValueError("evaluation decisions require action_id, candidate_id and fidelity")
             if estimated_cost <= 0.0:
                 raise ValueError("action decisions require strictly positive estimated cost")
+            loss = _number(loss_value, "decision_loss_reduction")
+            risk = _number(risk_value, "normalized_constraint_risk_reduction")
+            score = _number(score_value, "value_per_cost")
+            if loss <= 0.0 or score <= 0.0:
+                raise ValueError("action decisions require positive loss reduction and value_per_cost")
+            if not 0.0 <= risk <= 1.0:
+                raise ValueError("normalized_constraint_risk_reduction must be in [0, 1]")
+            if not math.isclose(score, loss / estimated_cost, rel_tol=1e-9, abs_tol=1e-12):
+                raise ValueError("value_per_cost must equal decision_loss_reduction / estimated_cost_units")
         else:
             if action_id is not None or candidate_id is not None or fidelity is not None:
                 raise ValueError("stop/abstain decisions must not name an evaluation action")
             if estimated_cost != 0.0:
                 raise ValueError("stop/abstain decisions must have zero estimated cost")
+            if loss_value is not None or risk_value is not None or score_value is not None:
+                raise ValueError("stop/abstain decisions must not carry action-value scores")
     else:
         if disposition not in ACTION_DISPOSITIONS:
             raise ValueError("outcome records must reference evaluate/escalate/replicate decisions")
@@ -154,6 +172,15 @@ def _validate_event(event: Any) -> dict[str, Any]:
             raise ValueError("outcome records require action_id, candidate_id and fidelity")
         if estimated_cost <= 0.0:
             raise ValueError("outcome records require strictly positive estimated cost")
+        loss = _number(loss_value, "decision_loss_reduction")
+        risk = _number(risk_value, "normalized_constraint_risk_reduction")
+        score = _number(score_value, "value_per_cost")
+        if loss <= 0.0 or score <= 0.0:
+            raise ValueError("outcome records require positive decision values")
+        if not 0.0 <= risk <= 1.0:
+            raise ValueError("normalized_constraint_risk_reduction must be in [0, 1]")
+        if not math.isclose(score, loss / estimated_cost, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError("value_per_cost must equal decision_loss_reduction / estimated_cost_units")
         actual_cost = _number(event["actual_cost_units"], "actual_cost_units")
         if actual_cost < 0.0:
             raise ValueError("actual_cost_units must be non-negative")
@@ -178,6 +205,9 @@ def decision_event(
     candidate_id: str | None = None,
     fidelity: str | None = None,
     estimated_cost_units: float = 0.0,
+    decision_loss_reduction: float | None = None,
+    normalized_constraint_risk_reduction: float | None = None,
+    value_per_cost: float | None = None,
 ) -> dict[str, Any]:
     """Construct a decision event. Stopping/abstention uses zero estimated cost."""
     event = {
@@ -192,6 +222,9 @@ def decision_event(
         "candidate_id": candidate_id,
         "fidelity": fidelity,
         "estimated_cost_units": estimated_cost_units,
+        "decision_loss_reduction": decision_loss_reduction,
+        "normalized_constraint_risk_reduction": normalized_constraint_risk_reduction,
+        "value_per_cost": value_per_cost,
         "actual_cost_units": None,
         "outcome_status": None,
         "outcome_sha256": None,
@@ -224,6 +257,9 @@ def outcome_event(
         "candidate_id": decision.get("candidate_id"),
         "fidelity": decision.get("fidelity"),
         "estimated_cost_units": decision.get("estimated_cost_units"),
+        "decision_loss_reduction": decision.get("decision_loss_reduction"),
+        "normalized_constraint_risk_reduction": decision.get("normalized_constraint_risk_reduction"),
+        "value_per_cost": decision.get("value_per_cost"),
         "actual_cost_units": actual_cost_units,
         "outcome_status": outcome_status,
         "outcome_sha256": outcome_sha256,
@@ -338,6 +374,7 @@ def verify_ledger_bytes(raw: bytes) -> dict[str, Any]:
             for field in (
                 "task_id", "run_id", "action_id", "state_sha256", "policy_sha256",
                 "disposition", "candidate_id", "fidelity", "estimated_cost_units",
+                "decision_loss_reduction", "normalized_constraint_risk_reduction", "value_per_cost",
             ):
                 if record[field] != decision[field]:
                     raise ValueError(f"outcome {field} differs from its decision")
