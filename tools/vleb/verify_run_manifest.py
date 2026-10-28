@@ -127,6 +127,8 @@ def validate_manifest(
         ("protocol", manifest["protocol"]["path"], manifest["protocol"]["sha256"]),
         ("candidate patch", manifest["candidate"]["patch_path"], manifest["candidate"]["patch_sha256"]),
         ("auditor source", manifest["auditor"]["source_path"], manifest["auditor"]["source_sha256"]),
+        ("task schema", manifest["auditor"]["task_schema_path"], manifest["auditor"]["task_schema_sha256"]),
+        ("receipt schema", manifest["auditor"]["receipt_schema_path"], manifest["auditor"]["receipt_schema_sha256"]),
         ("mutation catalog", campaign["catalog_path"], campaign["catalog_sha256"]),
         ("mutation results", campaign["results_path"], campaign["results_sha256"]),
         ("evidence bundle", bundle["path"], bundle["sha256"]),
@@ -170,13 +172,71 @@ def validate_manifest(
             except (OSError, subprocess.TimeoutExpired) as exc:
                 issues.append({"code": "attestation_verification_unavailable", "message": str(exc)})
 
-    eligible = not issues and (
-        manifest["run_kind"] != "confirmatory" or attestation_result["verified"]
+    receipt_audit: dict[str, Any] = {"required": manifest["run_kind"] == "confirmatory", "status": "not_required"}
+    if manifest["run_kind"] == "confirmatory" and not issues and attestation_result["verified"]:
+        auditor = resolved.get("auditor source")
+        task_schema = resolved.get("task schema")
+        receipt_schema = resolved.get("receipt schema")
+        required_paths = [
+            resolved.get("evidence receipt"), resolved.get("task contract"),
+            resolved.get("protocol"), resolved.get("candidate patch"),
+            resolved.get("mutation catalog"), auditor, task_schema, receipt_schema,
+        ]
+        if any(path is None for path in required_paths):
+            issues.append({"code": "independent_receipt_audit_inputs_missing", "message": "a required auditor input failed path/digest validation"})
+            receipt_audit["status"] = "unresolved"
+        else:
+            argv = [
+                sys.executable, str(auditor),
+                "--receipt", str(resolved["evidence receipt"]),
+                "--task", str(resolved["task contract"]),
+                "--task-schema", str(task_schema),
+                "--receipt-schema", str(receipt_schema),
+                "--protocol", str(resolved["protocol"]),
+                "--patch", str(resolved["candidate patch"]),
+                "--catalog", str(resolved["mutation catalog"]),
+                "--evidence-root", str(artifact_root.resolve()),
+                "--expected-revision", manifest["candidate"]["checkout_revision"],
+                "--expected-image", manifest["runtime"]["immutable_image_id"],
+                "--expected-task-sha256", task["contract_sha256"],
+                "--expected-protocol-sha256", manifest["protocol"]["sha256"],
+                "--expected-patch-sha256", manifest["candidate"]["patch_sha256"],
+                "--expected-auditor-sha256", manifest["auditor"]["source_sha256"],
+                "--expected-verifier-binary-sha256", manifest["auditor"]["verifier_binary_sha256"],
+            ]
+            try:
+                completed = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, timeout=180)
+                receipt_audit["command_sha256"] = digest("\\0".join(argv).encode())
+                receipt_audit["output_sha256"] = digest(completed.stdout)
+                parsed = None
+                if completed.stdout:
+                    try:
+                        parsed = json.loads(completed.stdout.decode("utf-8", errors="strict"))
+                    except (UnicodeError, json.JSONDecodeError):
+                        parsed = None
+                receipt_audit["verdict"] = parsed.get("verdict") if isinstance(parsed, dict) else None
+                receipt_audit["issue_count"] = len(parsed.get("issues", [])) if isinstance(parsed, dict) else None
+                if completed.returncode == 0 and isinstance(parsed, dict) and parsed.get("eligible") is True:
+                    receipt_audit["status"] = "passed"
+                else:
+                    receipt_audit["status"] = "failed"
+                    issues.append({"code": "independent_receipt_audit_failed", "message": completed.stdout.decode("utf-8", errors="replace")[-4000:]})
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                receipt_audit["status"] = "unresolved"
+                issues.append({"code": "independent_receipt_audit_unavailable", "message": str(exc)})
+
+    manifest_valid = not issues and (
+        manifest["run_kind"] != "confirmatory" or (
+            attestation_result["verified"] and receipt_audit["status"] == "passed"
+        )
     )
+    score_eligible = manifest_valid and manifest["run_kind"] == "confirmatory"
     return {
         "schema_version": "vleb-run-manifest-verification-v1",
-        "eligible": eligible,
-        "verdict": "pass" if eligible else "fail",
+        "eligible": manifest_valid,
+        "manifest_valid": manifest_valid,
+        "score_eligible": score_eligible,
+        "verdict": "pass" if manifest_valid else "fail",
         "manifest_sha256": observed_manifest_sha,
         "run_id": manifest["run_id"],
         "run_kind": manifest["run_kind"],
@@ -187,6 +247,7 @@ def validate_manifest(
         "task_id": task["task_id"],
         "evidence_bundle_sha256": bundle["sha256"],
         "attestation": attestation_result,
+        "independent_receipt_audit": receipt_audit,
         "issues": issues,
     }
 
