@@ -191,7 +191,7 @@ jobs:
             .analysis_plan_sha256 = $a |
             .protocol_commitment_sha256 = $zero |
             .seed_commitment_sha256 = $zero |
-            .task_set_commitment_sha256 = $a
+            .task_set_commitment_sha256 = $zero
           ' "$manifest" > /tmp/sbr-gen-draft.json
 
           # Fixed seed is a public integration-test vector only, never a real secret.
