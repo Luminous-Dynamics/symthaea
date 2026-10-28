@@ -628,11 +628,12 @@ fn standard_error_ci95(values: &[f64]) -> (Option<f64>, Option<f64>, Option<f64>
         1.96
     };
     let margin = critical * standard_error;
-    (
-        Some(standard_error),
-        Some(average - margin),
-        Some(average + margin),
-    )
+    let lower = average - margin;
+    let upper = average + margin;
+    if !margin.is_finite() || !lower.is_finite() || !upper.is_finite() {
+        return (None, None, None);
+    }
+    (Some(standard_error), Some(lower), Some(upper))
 }
 
 fn sum_optional(values: impl Iterator<Item = Option<u64>>) -> u64 {
