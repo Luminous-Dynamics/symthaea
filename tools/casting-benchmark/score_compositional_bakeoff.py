@@ -1011,7 +1011,10 @@ def _promotion_risk_gate(false_feasible: int, validated_predicted_feasible: int)
         false_feasible / validated_predicted_feasible
         if validated_predicted_feasible > 0 else None
     )
-    certified = bound is not None and bound <= DEFAULT_PROMOTION_RISK_TARGET
+    # Selected promotions in the optimizer trace are adaptive and cannot
+    # certify the policy's own risk. The bound is descriptive until an
+    # independent held-out validation population is scored by the gate tool.
+    certified = False
     return {
         "validated_predicted_feasible_count": validated_predicted_feasible,
         "false_feasible_count": false_feasible,
@@ -1019,13 +1022,12 @@ def _promotion_risk_gate(false_feasible: int, validated_predicted_feasible: int)
         "one_sided_confidence": DEFAULT_PROMOTION_RISK_CONFIDENCE,
         "upper_confidence_bound": bound,
         "risk_target": DEFAULT_PROMOTION_RISK_TARGET,
+        "validation_source": "optimization_trace_not_independent_validation",
         "certified": certified,
-        "decision": "allow" if certified else "abstain",
+        "decision": "abstain",
         "reason": (
-            "upper_bound_within_target" if certified else
             "no_validated_predicted_feasible_promotions" if validated_predicted_feasible == 0 else
-            "observed_rate_exceeds_target" if observed > DEFAULT_PROMOTION_RISK_TARGET else
-            "insufficient_evidence_for_target"
+            "validation_not_independent_or_exchangeable"
         ),
     }
 
@@ -1333,6 +1335,10 @@ def score_document(
             "high_fidelity_call_count": run["high_fidelity_call_count"],
             "false_promotion_count": run["false_promotion_count"],
             "false_promotion_rate": run["false_promotion_rate"],
+            "false_feasible_risk_gate": _promotion_risk_gate(
+                int(run["false_promotion_count"]),
+                int(run["predicted_feasible_promotion_count"]),
+            ),
         })
 
     summaries = []
@@ -1353,6 +1359,20 @@ def score_document(
                 "median_normalized_hypervolume_fraction": statistics.median(hv_values),
                 "mean_normalized_hypervolume_fraction": statistics.fmean(hv_values),
                 "mean_false_promotion_rate": statistics.fmean(false_rates) if false_rates else None,
+                "max_descriptive_false_feasible_upper_bound": max(
+                    (
+                        upper for upper in (
+                            _risk_upper_bound(
+                                int(r["false_promotion_count"]),
+                                int(r["predicted_feasible_promotion_count"]),
+                            )
+                            for r in group
+                        ) if upper is not None
+                    ),
+                    default=None,
+                ),
+                "certified_risk_gate_run_count": 0,
+                "risk_gate_interpretation": "optimization-trace bounds are descriptive only; independent held-out validation is required for certification",
                 "mean_cost_spent": statistics.fmean(float(r["cost_spent"]) for r in group),
                 "mean_high_fidelity_calls": statistics.fmean(float(r["high_fidelity_call_count"]) for r in group),
                 "inference_status": "diagnostic_only_requires_at_least_20_paired_seeds",
