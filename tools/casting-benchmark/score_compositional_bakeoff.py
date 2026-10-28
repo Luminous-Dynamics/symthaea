@@ -319,6 +319,15 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
             run["objective_family"], run["constraint_family"], run["dimension"],
             run["severity"], run["seed"], run["policy"]
         )
+        if (
+            not isinstance(obj_family, str) or not isinstance(con_family, str)
+            or isinstance(dim, bool) or not isinstance(dim, int)
+            or not _finite(sev)
+            or isinstance(seed, bool) or not isinstance(seed, int)
+            or not isinstance(policy, str)
+        ):
+            errors.append(f"{label} has malformed run identity fields")
+            continue
         key = (obj_family, con_family, dim, float(sev), seed, policy)
         if key in indexed:
             errors.append(f"duplicate run key: {key}")
@@ -326,7 +335,7 @@ def score_document(document: dict, repo_root: Path | None = None) -> dict:
         if obj_family not in objective_families or con_family not in constraint_families:
             errors.append(f"{label} family not registered in top-level contract")
             continue
-        if dim not in dimensions or sev not in severities or seed not in seeds or policy not in policies:
+        if dim not in dimensions or float(sev) not in severities or seed not in seeds or policy not in policies:
             errors.append(f"{label} key not registered in top-level contract")
             continue
         if run["design_count"] != document["design_count"] or run["cost_budget"] != document["cost_budget"] or run["fidelity_costs"] != costs:
