@@ -43,6 +43,7 @@ pub use types::{
 use std::collections::VecDeque;
 use std::time::Instant;
 
+use crate::cognitive_loop::PredictionErrorEvidence;
 use crate::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
@@ -123,6 +124,31 @@ impl ConsciousReasoningEngine {
             gate_passed,
             outcome_good,
             prediction_error: prediction_error.filter(|value| value.is_finite()),
+            prediction_evidence: None,
+        });
+        self.calibrator.record_outcome(gate_passed, outcome_good);
+    }
+
+    /// Record a posthoc outcome with the immutable typed PE evidence available
+    /// when its associated decision was made. Later cycles cannot replace this
+    /// snapshot because it is stored inside the pending outcome itself.
+    pub fn record_posthoc_with_evidence(
+        &mut self,
+        gate_passed: bool,
+        outcome_good: bool,
+        prediction_evidence: Option<PredictionErrorEvidence>,
+    ) {
+        let prediction_error = prediction_evidence
+            .as_ref()
+            .and_then(|evidence| {
+                evidence.value_for_observation(evidence.observation_cycle())
+            })
+            .map(f64::from);
+        self.pending_posthoc = Some(PosthocOutcome {
+            gate_passed,
+            outcome_good,
+            prediction_error,
+            prediction_evidence,
         });
         self.calibrator.record_outcome(gate_passed, outcome_good);
     }
