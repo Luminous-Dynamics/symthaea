@@ -28,6 +28,14 @@ WITNESS_KINDS = (
     "independent_expert_review",
 )
 RESULTS = ("supports", "contradicts", "inconclusive")
+VERDICT_KEYS = {
+    "schema_version",
+    "task_id",
+    "claim_id",
+    "source_sha256",
+    "verifier_sha256",
+    "result",
+}
 ENV_ALLOWLIST = (
     "PATH", "HOME", "TMPDIR", "TEMP", "LANG", "LC_ALL", "TZ",
     "CARGO_HOME", "RUSTUP_HOME", "SYSTEMROOT", "WINDIR",
@@ -70,6 +78,15 @@ def safe_path(root: Path, value: str, *, must_exist: bool) -> Path:
     return resolved
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key!r}")
+        result[key] = value
+    return result
+
+
 def required_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
@@ -109,7 +126,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verifier-kind", choices=WITNESS_KINDS, required=True)
     parser.add_argument("--verifier-id", required=True)
     parser.add_argument("--verifier-sha256", required=True)
-    parser.add_argument("--observed-result", choices=RESULTS, required=True)
+    parser.add_argument("--verifier-path", required=True)
+    parser.add_argument("--verifier-argv-index", type=int, required=True)
+    parser.add_argument("--verdict-path", required=True)
     parser.add_argument("--runtime-image-id", required=True)
     parser.add_argument("--network-mode", choices=("none", "restricted", "enabled"), required=True)
     parser.add_argument("--network-mode-observed", choices=("true", "false"), required=True)
@@ -137,6 +156,10 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("a verifier command must follow --")
         if len(args.verifier_sha256) != 64 or any(ch not in "0123456789abcdef" for ch in args.verifier_sha256):
             raise ValueError("verifier SHA-256 must be 64 lowercase hexadecimal characters")
+        if args.verifier_argv_index < 0 or args.verifier_argv_index >= len(args.command):
+            raise ValueError("verifier argv index is outside the exact invocation")
+        if args.command[args.verifier_argv_index] != args.verifier_path:
+            raise ValueError("verifier path must equal the evaluator-pinned argv entry at verifier argv index")
         if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{1,127}", args.claim_id):
             raise ValueError("claim ID is invalid")
         if len(args.expected_invocation_sha256) != 64 or any(
@@ -153,6 +176,12 @@ def main(argv: list[str] | None = None) -> int:
         source = safe_path(root, args.source_path, must_exist=True)
         if not source.is_file():
             raise ValueError("source path must name a regular file")
+        verifier_path = safe_path(root, args.verifier_path, must_exist=True)
+        if not verifier_path.is_file():
+            raise ValueError("verifier path must name a regular file")
+        actual_verifier_sha256 = digest(verifier_path.read_bytes())
+        if actual_verifier_sha256 != args.verifier_sha256:
+            raise ValueError("verifier file bytes differ from evaluator-pinned verifier digest")
         cwd = safe_path(root, args.working_directory, must_exist=True)
         if not cwd.is_dir():
             raise ValueError("working directory must be a directory within artifact root")
@@ -160,14 +189,15 @@ def main(argv: list[str] | None = None) -> int:
         receipt_path = safe_path(root, args.receipt_path, must_exist=False)
         stdout_path = safe_path(root, args.stdout_path, must_exist=False)
         stderr_path = safe_path(root, args.stderr_path, must_exist=False)
-        if len({receipt_path, stdout_path, stderr_path}) != 3:
-            raise ValueError("receipt, stdout and stderr paths must be distinct")
-        if receipt_path == cwd or stdout_path == cwd or stderr_path == cwd:
+        verdict_path = safe_path(root, args.verdict_path, must_exist=False)
+        if len({receipt_path, stdout_path, stderr_path, verdict_path}) != 4:
+            raise ValueError("receipt, stdout, stderr and verdict paths must be distinct")
+        if any(path == cwd for path in (receipt_path, stdout_path, stderr_path, verdict_path)):
             raise ValueError("receipt/output paths may not name the working directory")
-        if receipt_path.exists() or stdout_path.exists() or stderr_path.exists():
-            raise ValueError("receipt and stream outputs must not exist before the invocation")
-        if receipt_path == source or stdout_path == source or stderr_path == source:
-            raise ValueError("receipt/output paths may not overwrite the source")
+        if any(path.exists() for path in (receipt_path, stdout_path, stderr_path, verdict_path)):
+            raise ValueError("receipt, stream and verdict outputs must not exist before the invocation")
+        if any(path == source or path == verifier_path for path in (receipt_path, stdout_path, stderr_path, verdict_path)):
+            raise ValueError("receipt/output paths may not overwrite source or verifier bytes")
 
         if not args.runtime_image_id.startswith("sha256:") or len(args.runtime_image_id) != 71 or any(
             char not in "0123456789abcdef" for char in args.runtime_image_id[7:]
@@ -176,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         run_context = env_context()
 
         input_rows: list[dict[str, str]] = []
-        for value in [args.source_path, *args.inputs]:
+        for value in [args.source_path, args.verifier_path, *args.inputs]:
             path = safe_path(root, value, must_exist=True)
             if not path.is_file():
                 raise ValueError(f"input is not a regular file: {value}")
@@ -184,11 +214,18 @@ def main(argv: list[str] | None = None) -> int:
             if row not in input_rows:
                 input_rows.append(row)
 
-        output_values = [("stdout", args.stdout_path), ("stderr", args.stderr_path)]
+        output_values = [
+            ("stdout", args.stdout_path),
+            ("stderr", args.stderr_path),
+            ("verdict", args.verdict_path),
+        ]
         output_values.extend(("artifact", value) for value in args.output_artifacts)
         input_paths = {row["path"] for row in input_rows}
-        if any(value in {args.receipt_path, args.source_path} or value in input_paths for _, value in output_values):
-            raise ValueError("output artifacts may not overwrite the receipt, source, or any declared input")
+        if any(
+            value == args.receipt_path or value in input_paths
+            for _, value in output_values
+        ):
+            raise ValueError("output artifacts may not overwrite the receipt, source, verifier or any declared input")
         if len({value for _, value in output_values}) != len(output_values):
             raise ValueError("output artifact paths must be unique")
         for _, value in output_values:
@@ -237,11 +274,45 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"output is not a regular file: {value}")
             output_rows.append({"path": value, "sha256": digest(path.read_bytes()), "role": role})
 
+        source_sha256 = digest(source.read_bytes())
+        observed_result = "inconclusive"
+        verdict_errors: list[str] = []
+        try:
+            verdict_raw = verdict_path.read_bytes()
+            verdict = json.loads(
+                verdict_raw.decode("utf-8", errors="strict"),
+                object_pairs_hook=_unique_json_object,
+            )
+            if not isinstance(verdict, dict) or set(verdict) != VERDICT_KEYS:
+                verdict_errors.append("verdict object has missing or unexpected fields")
+            else:
+                if verdict.get("schema_version") != "vleb-witness-verdict-v1":
+                    verdict_errors.append("verdict schema_version is unsupported")
+                if verdict.get("task_id") != args.task_id:
+                    verdict_errors.append("verdict task ID differs from evaluator task")
+                if verdict.get("claim_id") != args.claim_id:
+                    verdict_errors.append("verdict claim ID differs from evaluator claim")
+                if verdict.get("source_sha256") != source_sha256:
+                    verdict_errors.append("verdict source digest differs from source bytes")
+                if verdict.get("verifier_sha256") != args.verifier_sha256:
+                    verdict_errors.append("verdict verifier digest differs from pinned verifier bytes")
+                if verdict.get("result") not in RESULTS:
+                    verdict_errors.append("verdict result is not a supported classification")
+                if (
+                    not verdict_errors
+                    and not timed_out
+                    and signal_name is None
+                    and exit_code == 0
+                ):
+                    observed_result = verdict["result"]
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            verdict_errors.append(f"verdict output is not valid, unique-key JSON: {exc}")
+
         receipt = {
             "schema_version": "vleb-witness-execution-receipt-v1",
             "task_id": args.task_id,
             "claim_id": args.claim_id,
-            "source_sha256": digest(source.read_bytes()),
+            "source_sha256": source_sha256,
             "run_binding": run_context,
             "runtime": {
                 "immutable_image_id": args.runtime_image_id,
@@ -255,7 +326,9 @@ def main(argv: list[str] | None = None) -> int:
             "verifier": {
                 "kind": args.verifier_kind,
                 "id": args.verifier_id,
-                "sha256": args.verifier_sha256,
+                "sha256": actual_verifier_sha256,
+                "path": args.verifier_path,
+                "argv_index": args.verifier_argv_index,
             },
             "invocation": {
                 "argv": args.command,
@@ -271,11 +344,7 @@ def main(argv: list[str] | None = None) -> int:
                 "signal": signal_name,
                 "timed_out": timed_out,
             },
-            "observed_result": (
-                "inconclusive"
-                if timed_out or signal_name is not None or (exit_code != 0 and args.observed_result == "supports")
-                else args.observed_result
-            ),
+            "observed_result": observed_result,
         }
         receipt_path.parent.mkdir(parents=True, exist_ok=True)
         receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -285,6 +354,7 @@ def main(argv: list[str] | None = None) -> int:
             "process_exit_code": exit_code,
             "timed_out": timed_out,
             "observed_result": receipt["observed_result"],
+            "verdict_errors": verdict_errors,
         }, sort_keys=True))
         return 0
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
