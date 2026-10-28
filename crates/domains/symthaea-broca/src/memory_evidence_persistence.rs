@@ -213,6 +213,66 @@ impl EvidenceDiskStore {
     /// `Ok(None)` means no generation has ever been committed. Any malformed
     /// or mismatched committed state is an error; callers must not turn it into
     /// a successful answer or fall back to a separate mutable HDC store.
+    /// Query committed text evidence with a deterministic BM25 lexical baseline.
+    ///
+    /// Unlike `query_committed_context`, this path does not require a trained
+    /// text-to-HDC encoder. It is intentionally lexical and should be evaluated
+    /// as its own benchmark arm. The committed HDC index is still independently
+    /// validated as part of the generation, while candidate ranking is computed
+    /// from eligible, digest-verified text payloads in that same evidence snapshot.
+    ///
+    /// Image evidence is not ranked by this baseline. An empty lexical match
+    /// returns a successful generation with no context; integrity failures remain
+    /// errors. A store without a typed HDC commit is not allowed to serve context.
+    pub fn query_committed_text_context(
+        &self,
+        query_text: &str,
+        candidate_k: usize,
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: impl AsRef<Path>,
+        max_items: usize,
+    ) -> Result<Option<CommittedEvidenceQuery>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+
+        let pointer_bytes = match read_optional_regular_file(&self.root.join(CURRENT_FILE))? {
+            Some(bytes) => bytes,
+            None => return Ok(None),
+        };
+        let pointer: CurrentPointer = serde_json::from_slice(&pointer_bytes)
+            .map_err(|error| format!("invalid CURRENT pointer: {error}"))?;
+        if pointer.schema_version != CURRENT_SCHEMA_VERSION {
+            return Err("unsupported CURRENT pointer schema version".into());
+        }
+        if pointer.generation == 0 || !is_sha256(&pointer.manifest_sha256) {
+            return Err("CURRENT pointer has invalid generation or manifest digest".into());
+        }
+
+        let recovered = self.read_generation(&pointer)?;
+        if recovered.manifest.hdc_store_identity().is_none() {
+            return Err("committed text query requires a typed HDC identity; opaque-byte fixtures cannot serve context".into());
+        }
+        let candidates = recovered.evidence_index.rank_text(
+            query_text, scope_id, now_ms, candidate_k,
+        )?;
+        let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
+        let resolved_context = recovered.evidence_index.resolve_with_provenance(
+            &candidate_ids,
+            scope_id,
+            now_ms,
+            payload_root.as_ref(),
+            max_items,
+        )?;
+
+        Ok(Some(CommittedEvidenceQuery {
+            generation: recovered.generation,
+            candidates,
+            resolved_context,
+        }))
+    }
+
     pub fn query_committed_context(
         &self,
         query: &BinaryHV,
@@ -986,6 +1046,46 @@ mod tests {
         fs::write(root.path().join(CURRENT_FILE), b"not a current pointer").unwrap();
         assert!(store.prune_history(1).is_err());
         assert!(dir.exists(), "corrupt CURRENT must prevent retention deletion");
+    }
+
+
+    #[test]
+    fn committed_text_query_returns_grounded_lexical_context_with_provenance() {
+        let root = tempdir().unwrap();
+        let hdc_path = root.path().join("canonical.hdc");
+        let mut hdc = HdcStore::create(&hdc_path, StoreConfig::default()).unwrap();
+        hdc.append(7, &BinaryHV::random(7)).unwrap();
+        hdc.append(8, &BinaryHV::random(8)).unwrap();
+
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(active_evidence(7, "cart checkout button opens the shopping cart"), b"canonical trajectory bytes").unwrap();
+        let mut unrelated = active_evidence(8, "mountain trails and hiking boots");
+        unrelated.scope_id = "enterprise".into();
+        evidence.insert(unrelated, b"canonical trajectory bytes").unwrap();
+
+        let disk = EvidenceDiskStore::open(root.path().join("evidence-generations")).unwrap();
+        disk.commit_hdc_store(&mut hdc, &evidence).unwrap();
+        let result = disk.query_committed_text_context(
+            "Where is the cart checkout button?", 8, "web", 150, Path::new("."), 4,
+        ).unwrap().expect("typed committed generation should be queryable");
+
+        assert_eq!(result.generation, 1);
+        assert_eq!(result.resolved_context.len(), 1);
+        assert_eq!(result.resolved_context[0].hdc_id, 7);
+        assert_eq!(result.resolved_context[0].item.value, "cart checkout button opens the shopping cart");
+        assert_eq!(result.context_items()[0].kind, super::super::memory_evidence::MemoryContextType::Text);
+    }
+
+    #[test]
+    fn committed_text_query_refuses_opaque_fixture_generation() {
+        let root = tempdir().unwrap();
+        let disk = EvidenceDiskStore::open(root.path()).unwrap();
+        let evidence = sample_index("fixture-only text");
+        disk.commit(b"not a real HDC index", &evidence).unwrap();
+        let error = disk.query_committed_text_context(
+            "fixture", 4, "web", 150, Path::new("."), 5,
+        ).unwrap_err();
+        assert!(error.contains("typed HDC identity"));
     }
 
     #[test]
