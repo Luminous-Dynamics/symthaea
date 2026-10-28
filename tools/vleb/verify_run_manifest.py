@@ -399,6 +399,8 @@ def audit_claim_evidence_bundle(
     *,
     expected_claim_auditor_sha256: str | None,
     expected_claim_schema_sha256: str | None,
+    expected_witness_receipt_schema_sha256: str | None,
+    expected_witness_receipt_producer_sha256: str | None,
     trusted_claim_verifier_pins: dict[str, str],
 ) -> dict[str, Any]:
     """Audit every evaluator-pinned claim after attested bundle extraction.
@@ -443,11 +445,15 @@ def audit_claim_evidence_bundle(
         or expected_claim_schema_sha256 is None
         or not HEX.fullmatch(expected_claim_auditor_sha256)
         or not HEX.fullmatch(expected_claim_schema_sha256)
+        or expected_witness_receipt_schema_sha256 is None
+        or not HEX.fullmatch(expected_witness_receipt_schema_sha256)
+        or expected_witness_receipt_producer_sha256 is None
+        or not HEX.fullmatch(expected_witness_receipt_producer_sha256)
     ):
         result["status"] = "unresolved"
         result["issues"].append({
             "code": "claim_audit_trust_pins_missing",
-            "message": "claim auditor and schema require evaluator-supplied out-of-band SHA-256 pins",
+            "message": "claim auditor/schema and witness receipt schema/producer require evaluator-supplied out-of-band SHA-256 pins",
         })
         mark_unresolved_claims()
         return result
@@ -460,6 +466,16 @@ def audit_claim_evidence_bundle(
         result["issues"].append({
             "code": "claim_schema_pin_mismatch",
             "message": "manifest claim-schema digest differs from evaluator-supplied pin",
+        })
+    if claim_gate["witness_receipt_schema_sha256"] != expected_witness_receipt_schema_sha256:
+        result["issues"].append({
+            "code": "witness_receipt_schema_pin_mismatch",
+            "message": "manifest witness receipt schema digest differs from evaluator-supplied pin",
+        })
+    if claim_gate["witness_receipt_producer_sha256"] != expected_witness_receipt_producer_sha256:
+        result["issues"].append({
+            "code": "witness_receipt_producer_pin_mismatch",
+            "message": "manifest witness receipt producer digest differs from evaluator-supplied pin",
         })
     if not trusted_claim_verifier_pins:
         result["status"] = "unresolved"
@@ -480,6 +496,18 @@ def audit_claim_evidence_bundle(
     try:
         auditor = safe_file(evidence_root, claim_gate["auditor_path"])
         schema = safe_file(evidence_root, claim_gate["schema_path"])
+        witness_schema_path = safe_file(evidence_root, claim_gate["witness_receipt_schema_path"])
+        witness_producer_path = safe_file(evidence_root, claim_gate["witness_receipt_producer_path"])
+        if digest(witness_schema_path.read_bytes()) != expected_witness_receipt_schema_sha256:
+            result["issues"].append({
+                "code": "witness_receipt_schema_bundle_digest_mismatch",
+                "message": "witness receipt schema bytes in the attested bundle differ from external pin",
+            })
+        if digest(witness_producer_path.read_bytes()) != expected_witness_receipt_producer_sha256:
+            result["issues"].append({
+                "code": "witness_receipt_producer_bundle_digest_mismatch",
+                "message": "witness receipt producer bytes in the attested bundle differ from external pin",
+            })
         if digest(auditor.read_bytes()) != expected_claim_auditor_sha256:
             result["issues"].append({
                 "code": "claim_auditor_bundle_digest_mismatch",
@@ -490,6 +518,7 @@ def audit_claim_evidence_bundle(
                 "code": "claim_schema_bundle_digest_mismatch",
                 "message": "claim schema bytes inside the attested bundle differ from the external pin",
             })
+        witness_receipt_schema = json.loads(witness_schema_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         result["issues"].append({
             "code": "claim_audit_tool_path_invalid",
