@@ -216,6 +216,10 @@ impl EvidenceRecord {
         }
         let source_json: serde_json::Value = serde_json::from_slice(source_bytes)
             .map_err(|error| format!("source bytes are not valid JSON: {error}"))?;
+        self.verify_source_value(&source_json)
+    }
+
+    fn verify_source_value(&self, source_json: &serde_json::Value) -> Result<(), String> {
         let source_value = source_json
             .pointer(&self.source.source_pointer)
             .and_then(serde_json::Value::as_str)
@@ -304,6 +308,9 @@ impl EvidenceIndex {
         records: Vec<EvidenceRecord>,
         source_bytes: &[u8],
     ) -> Result<usize, String> {
+        let source_sha256 = sha256_hex(source_bytes);
+        let source_json: serde_json::Value = serde_json::from_slice(source_bytes)
+            .map_err(|error| format!("source bytes are not valid JSON: {error}"))?;
         let mut incoming_hdc_ids = BTreeSet::new();
         let mut incoming_evidence_ids = BTreeSet::new();
 
@@ -311,7 +318,11 @@ impl EvidenceIndex {
             if record.lifecycle != EvidenceLifecycle::Active {
                 return Err("new evidence must enter with active lifecycle".into());
             }
-            record.verify_source_bytes(source_bytes)?;
+            record.validate()?;
+            if record.source.source_sha256 != source_sha256 {
+                return Err("source_sha256 mismatch".into());
+            }
+            record.verify_source_value(&source_json)?;
             if self.records.contains_key(&record.hdc_id)
                 || !incoming_hdc_ids.insert(record.hdc_id)
             {
