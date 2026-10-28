@@ -42,7 +42,14 @@ def action_risk(b, action):
 
 
 def best_action(b):
-    return min(range(3), key=lambda a: (action_risk(b, a), a))
+    best = 0
+    best_risk = action_risk(b, 0)
+    for action in range(1, 3):
+        candidate = action_risk(b, action)
+        if candidate < best_risk - EPS:
+            best = action
+            best_risk = candidate
+    return best
 
 
 def bayes_risk(b):
