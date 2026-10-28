@@ -116,7 +116,106 @@
       "independent_reviewer_count": 0,
       "mutation_equivalence_reviewed": false,
       "notes": "Blueprint only; review and actual control runs are prerequisites for task admission."
-    }
+    },
+    "test_execution_map": [
+      {
+        "test_id": "ledger.normal_exact_output",
+        "execution_ids": [
+          "fixture_matches_exact_expected_output"
+        ]
+      },
+      {
+        "test_id": "ledger.exact_duplicate_idempotency",
+        "execution_ids": [
+          "repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity"
+        ]
+      },
+      {
+        "test_id": "ledger.account_totals",
+        "execution_ids": [
+          "account_totals_sum_to_global_totals"
+        ]
+      },
+      {
+        "test_id": "ledger.global_totals",
+        "execution_ids": [
+          "global_totals_net_is_credits_minus_debits"
+        ]
+      },
+      {
+        "test_id": "ledger.conflicting_duplicate_rejected",
+        "execution_ids": [
+          "conflicting_transaction_id_is_rejected"
+        ]
+      },
+      {
+        "test_id": "ledger.conflict_has_no_partial_effect",
+        "execution_ids": [
+          "conflicting_duplicate_exits_nonzero_without_partial_stdout"
+        ]
+      },
+      {
+        "test_id": "ledger.invalid_amount_fails_closed",
+        "execution_ids": [
+          "zero_and_negative_amounts_are_rejected"
+        ]
+      },
+      {
+        "test_id": "ledger.unknown_side_fails_closed",
+        "execution_ids": [
+          "unknown_side_is_rejected"
+        ]
+      },
+      {
+        "test_id": "ledger.overflow_fails_closed",
+        "execution_ids": [
+          "arithmetic_overflow_is_rejected"
+        ]
+      },
+      {
+        "test_id": "ledger.amount_token_canonical",
+        "execution_ids": [
+          "amount_tokens_must_be_canonical_ascii_integers"
+        ]
+      },
+      {
+        "test_id": "ledger.maximum_credit_debit_valid",
+        "execution_ids": [
+          "equal_maximum_credit_and_debit_are_valid_without_net_overflow"
+        ]
+      },
+      {
+        "test_id": "ledger.transaction_order_invariant",
+        "execution_ids": [
+          "transaction_order_does_not_change_the_result"
+        ]
+      },
+      {
+        "test_id": "ledger.final_line_ending_invariant",
+        "execution_ids": [
+          "presence_of_final_line_ending_does_not_change_semantics"
+        ]
+      },
+      {
+        "test_id": "ledger.duplicate_multiplicity_idempotent",
+        "execution_ids": [
+          "exact_duplicate_count_matches_input_multiplicity"
+        ]
+      },
+      {
+        "test_id": "ledger.generated_differential_reducer",
+        "execution_ids": [
+          "deterministic_generated_ledgers_match_independent_reference_reducer"
+        ]
+      },
+      {
+        "test_id": "ledger.malformed_csv_rejected",
+        "execution_ids": [
+          "malformed_quoting_and_unterminated_fields_are_rejected",
+          "bare_carriage_return_is_rejected"
+        ]
+      }
+    ]
   },
   "evaluation_policy": {
     "primary_attempt_limit": 1,
