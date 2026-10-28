@@ -1,0 +1,135 @@
+{
+  "schema_version": "vleb-scorecard-v1",
+  "as_of": "2026-10-28",
+  "project_status": "development_prototype",
+  "interpretation_rules": [
+    "Industry benchmark results are comparators, not Symthaea measurements.",
+    "Targets are proposals until a protocol-matched experiment measures them.",
+    "A synthetic-fixture result is not a broad benchmark score.",
+    "No score is eligible unless task admission and independent evidence requirements pass."
+  ],
+  "industry_comparators": {
+    "legacy_bench": {
+      "source_updated": "2026-10-22",
+      "metric": "avg@3",
+      "source_url": "https://fireworks.ai/specialized-intelligence-index/benchmarks/code-generation/legacy-bench",
+      "comparability_note": "Legacy-Bench uses its own task distribution and harness. Compare only using authorized full-benchmark access and a matched protocol; avg@3 is not pass@1.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "score_pct": 62,
+          "cost_usd_per_task": 0.49,
+          "duration_seconds_per_task": 434
+        },
+        {
+          "model": "Muse Spark 1.3",
+          "score_pct": 62,
+          "cost_usd_per_task": 1.98,
+          "duration_seconds_per_task": 744
+        },
+        {
+          "model": "DeepSeek V4.1 Flash",
+          "score_pct": 57.7,
+          "cost_usd_per_task": 0.14,
+          "duration_seconds_per_task": 691
+        },
+        {
+          "model": "GPT-6 Astra",
+          "score_pct": 55.7,
+          "cost_usd_per_task": 2.33,
+          "duration_seconds_per_task": 629
+        }
+      ]
+    },
+    "swe_bench_pro_v2": {
+      "source_url": "https://labs.scale.com/leaderboard/swe_bench_pro_public_v2",
+      "source_updated": "2026-09-22",
+      "task_count": 642,
+      "removed_invalid_tasks": 89,
+      "corrected_instruction_test_conflicts": 69,
+      "comparability_note": "Different benchmark and protocol; never compare its raw percentage directly with Legacy-Bench or VLEB."
+    },
+    "agent_security_league": {
+      "source_url": "https://www.endorlabs.com/research/ai-code-security-benchmark",
+      "benchmark_task_count": 200,
+      "project_count": 108,
+      "top_listed_functional_pct": 87.2,
+      "top_listed_security_correctness_pct": 37.4,
+      "source_date_for_top_entry": "2026-09-04",
+      "comparability_note": "Vendor benchmark results are contextual evidence for separating functional correctness from security correctness, not direct VLEB comparisons."
+    }
+  },
+  "proposed_targets": {
+    "legacy_bench_avg_at_3_pct": {
+      "target": 65,
+      "status": "target_not_measured",
+      "requirements": [
+        "authorized full benchmark",
+        "matched harness and budgets",
+        "protocol-matched avg@3",
+        "task-level results retained"
+      ]
+    },
+    "scored_task_admission_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Every task in a headline cohort has independently reviewed behavior requirements, empty/baseline failure, reference success and locked evidence."
+    },
+    "reviewed_non_equivalent_compilable_mutant_kill_rate_pct": {
+      "target": 90,
+      "status": "target_not_measured",
+      "definition": "Killed mutants / reviewed, non-equivalent, compilable mutants; report separately by mutation family."
+    },
+    "cost_per_verified_fix_reduction_pct": {
+      "target": 20,
+      "status": "target_not_measured",
+      "definition": "Reduction against a matched baseline with a preregistered correctness non-inferiority margin."
+    }
+  },
+  "current_measurements": {
+    "legacy_bench_avg_at_3_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_run",
+      "reason": "No authorized full Legacy-Bench evaluation of Symthaea has been run."
+    },
+    "vleb_scored_tasks": {
+      "value": 0,
+      "eligible": false,
+      "status": "none_admitted",
+      "reason": "The ledger task is public-development-only and has no independent task-admission review."
+    },
+    "assurance_adjusted_semantic_success_rate_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "No scored, held-out cohort exists."
+    },
+    "active_synthetic_mutation_smoke_test": {
+      "active_mutants": 4,
+      "compilable_mutants": 4,
+      "killed": 4,
+      "survived": 0,
+      "unresolved": 0,
+      "workflow_run_id": 40656828668,
+      "tested_head_sha": "e73227ab2a9f03d0a67261270bb53dbe77fbd078",
+      "evidence_artifact_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/40656828668/artifacts/12801803004",
+      "evidence_archive_sha256": "bb546e9fd93d8b89cd9d09c4a91595ad68c6d36b38c2a132ca34b76a8ef58496",
+      "scope": "single public synthetic ledger fixture",
+      "eligible_as_broad_mutation_score": false,
+      "interpretation": "Initial oracle-smoke test only; 4/4 must not be represented as the broad VLEB mutation target being achieved."
+    },
+    "security_correctness_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_run",
+      "reason": "No independently reviewed secure-legacy cohort has been evaluated."
+    },
+    "cost_per_independently_verified_fix_usd": {
+      "value": null,
+      "eligible": false,
+      "status": "not_run",
+      "reason": "No matched baseline versus Symthaea confirmatory trial has been run."
+    }
+  }
+}
