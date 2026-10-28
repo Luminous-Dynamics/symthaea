@@ -434,6 +434,11 @@ fn print_eprocess_family_csv() {
             if !matches!(
                 scenario.name,
                 "stationary_null"
+                    | "step_down_010"
+                    | "step_down_020"
+                    | "step_down_030"
+                    | "step_down_040"
+                    | "step_down_045"
                     | "step_up_055"
                     | "step_up_060"
                     | "step_up_070"
