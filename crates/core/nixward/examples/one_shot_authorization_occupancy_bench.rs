@@ -77,12 +77,12 @@ fn main() {
     for population in POPULATIONS {
         let mut ledger = ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
             .expect("benchmark ledger lifetime is valid");
-        let mut base_permits: Vec<ExecutionPermit> = Vec::with_capacity(population);
+        let _base_permits: Vec<ExecutionPermit> = Vec::with_capacity(population);
 
         let setup_start = Instant::now();
         for index in 0..population {
             let permit = issue(&mut ledger, format!("occupancy-{population}-base-{index}"));
-            base_permits.push(permit);
+            _base_permits.push(permit);
         }
         let base_setup_ns = elapsed_ns(setup_start);
 
@@ -116,7 +116,7 @@ fn main() {
             probes.push(Probe { permit, attempt, issue_ns });
         }
 
-        let mut issue_latencies = probes.iter().map(|probe| probe.issue_ns).collect::<Vec<_>>();
+        let issue_latencies = probes.iter().map(|probe| probe.issue_ns).collect::<Vec<_>>();
         let mut consume_latencies = Vec::with_capacity(PROBE_COUNT);
         let issued_records_before_consumes = population + PROBE_COUNT;
 
@@ -126,6 +126,7 @@ fn main() {
         println!("base_setup_ns={base_setup_ns}");
         println!("issued_records_before_consumes={issued_records_before_consumes}");
 
+        let mut profile_mismatches = 0usize;
         for (index, probe) in probes.iter().enumerate() {
             let consume_start = Instant::now();
             let outcome = ledger.consume(&probe.permit, &probe.attempt);
@@ -134,12 +135,14 @@ fn main() {
 
             if outcome.is_err() {
                 contract_mismatches += 1;
+                profile_mismatches += 1;
             }
             println!(
-                "sample={},issue_occupancy_before={},consume_issued_record_count={},issue_ns={},consume_ns={},allowed={}",
+                "sample={},issue_occupancy_before={},consume_issued_record_count={},consumed_count_before={},issue_ns={},consume_ns={},allowed={}",
                 index,
                 population + index,
                 issued_records_before_consumes,
+                index,
                 probe.issue_ns,
                 consume_ns,
                 outcome.is_ok()
@@ -148,12 +151,12 @@ fn main() {
 
         summarize("issue", &issue_latencies);
         summarize("consume", &consume_latencies);
-        println!("contract_mismatches={contract_mismatches}");
+        println!("profile_contract_mismatches={profile_mismatches}");
+        println!("cumulative_contract_mismatches={contract_mismatches}");
         println!("profile_end");
 
-        // Keep issued base permits alive for the entire profile. The ledger
-        // itself intentionally remains alive until this scope ends.
-        drop(base_permits);
+        // `_base_permits` keeps the originally issued permits alive for the
+        // entire profile; the ledger retains its own per-decision state too.
     }
 
     println!(
