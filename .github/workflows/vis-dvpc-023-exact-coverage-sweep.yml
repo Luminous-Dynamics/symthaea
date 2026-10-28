@@ -1,0 +1,47 @@
+name: VIS-DVPC-023 exact coverage sweep
+
+on:
+  pull_request:
+    paths:
+      - 'tools/vision-dvpc-coverage-sweep.rs'
+      - 'tests/fixtures/vision-dvpc-023-*'
+      - 'docs/research/VIS_DVPC_023_EXACT_COVERAGE_SWEEP_V1.md'
+      - '.github/workflows/vis-dvpc-023-exact-coverage-sweep.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/vision-dvpc-coverage-sweep.rs'
+      - 'tests/fixtures/vision-dvpc-023-*'
+      - 'docs/research/VIS_DVPC_023_EXACT_COVERAGE_SWEEP_V1.md'
+      - '.github/workflows/vis-dvpc-023-exact-coverage-sweep.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source and fixture
+        uses: actions/checkout@v4
+      - name: Install Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Verify frozen input grid
+        run: sha256sum -c tests/fixtures/vision-dvpc-023.SHA256SUMS
+      - name: Format standalone scorer
+        run: rustfmt --edition 2024 tools/vision-dvpc-coverage-sweep.rs
+      - name: Run exact-coverage unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-coverage-sweep.rs -o /tmp/vis-dvpc-023-tests
+          /tmp/vis-dvpc-023-tests
+      - name: Build and score frozen exact-distribution grid
+        run: |
+          rustc --edition=2024 tools/vision-dvpc-coverage-sweep.rs -o /tmp/vis-dvpc-023
+          /tmp/vis-dvpc-023 --sweep | tee /tmp/vis-dvpc-023-sweep.tsv
+          test "$(grep -c '^COVERAGE[[:space:]]' /tmp/vis-dvpc-023-sweep.tsv)" = "1521"
+          test "$(/tmp/vis-dvpc-023 --zero-failure-required 0.025 0.05 | cut -f2)" = "72"
+          grep '^SHIFT_CONTROL[[:space:]]' /tmp/vis-dvpc-023-sweep.tsv
+          grep '^SUMMARY[[:space:]]' /tmp/vis-dvpc-023-sweep.tsv
