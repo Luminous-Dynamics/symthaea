@@ -50,8 +50,9 @@
     },
     "seed_id": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 256
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 20,
+      "description": "Canonical base-10 u64 seed identity; leading zeroes are not allowed."
     },
     "budget_id": {
       "type": "string",
