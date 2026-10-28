@@ -9,7 +9,7 @@
 //! proof: a party able to replace the inputs and receipt can produce new hashes.
 
 use crate::edit_locality::{
-    EDIT_LOCALITY_CONTRACT_VERSION, EditLocalityConfig, EditLocalityError, EditLocalityEvidence,
+    EditLocalityConfig, EditLocalityError, EditLocalityEvidence,
     EditRequest, LocalityEvent, MAX_EDIT_LOCALITY_EVENTS, verify_edit_locality,
     verify_edit_locality_with_config,
 };
@@ -226,6 +226,6 @@ mod tests {
         let source_events = source();
         let target_events = target(&source_events);
         let receipt = verify_edit_locality_bound(&source_events, &target_events, &request()).unwrap();
-        assert_eq!(receipt.evidence.contract_version, EDIT_LOCALITY_CONTRACT_VERSION);
+        assert_eq!(receipt.evidence.contract_version, crate::edit_locality::EDIT_LOCALITY_CONTRACT_VERSION);
     }
 }
