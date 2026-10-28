@@ -36,7 +36,7 @@ pub struct DriftEvent {
     pub end_cycle: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Detection {
     pub cycle_index: u64,
