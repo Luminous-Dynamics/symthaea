@@ -342,6 +342,8 @@ def validate_manifest(
     if campaign["killed"] + campaign["survived"] > campaign["compilable"]:
         issues.append({"code": "mutation_compilable_count_inconsistent", "message": "killed and survived mutants cannot exceed compilable mutants"})
     if manifest["run_kind"] == "confirmatory":
+        if manifest["runtime"]["runner_environment"] != "github_hosted":
+            issues.append({"code": "confirmatory_runner_not_trusted", "message": "confirmatory runs currently require a GitHub-hosted runner"})
         if task["exposure"] not in ("private_holdout", "private_confirmatory"):
             issues.append({"code": "confirmatory_task_not_private", "message": "confirmatory task must be private holdout or confirmatory"})
         if task["independent_reviewer_count"] < 1:
@@ -394,6 +396,9 @@ def validate_manifest(
                 "--repo", repo["full_name"],
                 "--signer-repo", provenance["signer_repository"],
                 "--signer-workflow", expected_signer_workflow,
+                "--cert-identity", expected_uri,
+                "--cert-oidc-issuer", "https://token.actions.githubusercontent.com",
+                "--deny-self-hosted-runners",
                 "--source-digest", repo["source_repository_digest"],
                 "--source-ref", repo["source_repository_ref"],
                 "--predicate-type", provenance["predicate_type"],
