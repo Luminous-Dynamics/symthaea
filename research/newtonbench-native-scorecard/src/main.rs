@@ -64,9 +64,16 @@ fn collect_recursively(current: &Path, found: &mut Vec<PathBuf>) -> io::Result<(
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
         let path = entry.path();
-        if path.is_dir() {
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("refusing symlink inside trial artifact directory: {}", path.display()),
+            ));
+        }
+        if file_type.is_dir() {
             collect_recursively(&path, found)?;
-        } else if path.is_file() {
+        } else if file_type.is_file() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             if name.starts_with("trial") && path.extension().is_some_and(|ext| ext == "json") {
