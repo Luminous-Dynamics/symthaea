@@ -22,7 +22,7 @@ References:
 - MemoryArena: https://proceedings.mlr.press/v306/he26am.html
 - AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
 
-## 2. Primary benchmark: LongMemEval-V2
+## 2. Current competitive references
 
 ### Newer industry/research references checked 2026-10-28
 
