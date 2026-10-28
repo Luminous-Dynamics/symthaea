@@ -131,6 +131,9 @@ enum Commands {
         /// JSON bundle manifest; all artifact paths are relative to its directory.
         #[arg(long)]
         input: PathBuf,
+        /// SHA-256 published by an independent preregistration record before outcomes are examined.
+        #[arg(long)]
+        expected_bundle_sha256: String,
         #[arg(long)]
         out: Option<PathBuf>,
     },
@@ -298,8 +301,8 @@ fn main() -> anyhow::Result<()> {
                 println!("{rendered}");
             }
         }
-        Commands::AuditCognitiveAdaptationPanel { input, out } => {
-            let result = cognitive_adaptation_audit::evaluate_file(&input)?;
+        Commands::AuditCognitiveAdaptationPanel { input, expected_bundle_sha256, out } => {
+            let result = cognitive_adaptation_audit::evaluate_file(&input, &expected_bundle_sha256)?;
             let rendered = serde_json::to_string_pretty(&result)?;
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
