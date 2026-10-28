@@ -21,6 +21,19 @@ except ImportError as exc:
     raise SystemExit("jsonschema==4.26.0 is required; refusing to skip schema validation") from exc
 
 HEX = re.compile(r"^[a-f0-9]{64}$")
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key!r}")
+        result[key] = value
+    return result
+
+
+def parse_unique_json(raw: bytes) -> Any:
+    return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=_unique_json_object)
 WITNESS_KINDS = {
     "source_index",
     "static_analysis",
@@ -114,9 +127,9 @@ def validate_claim(
         }
 
     try:
-        schema = json.loads(raw_schema.decode("utf-8", errors="strict"))
-        claim = json.loads(raw_claim.decode("utf-8", errors="strict"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
+        schema = parse_unique_json(raw_schema)
+        claim = parse_unique_json(raw_claim)
+    except (UnicodeError, ValueError) as exc:
         return {
             "schema_version": "vleb-legacy-claim-audit-v1",
             "evidence_chain_valid": False,
