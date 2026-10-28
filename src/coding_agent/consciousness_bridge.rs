@@ -4,7 +4,7 @@
 //! Consciousness bridge: bidirectional signal flow between CodingAgent and
 //! the cognitive loop's reasoning engine.
 
-use crate::cognitive_loop::{CognitiveLoopService, CycleResult};
+use crate::cognitive_loop::{CognitiveLoopService, CycleResult, PredictionErrorEvidence};
 #[cfg(feature = "reasoning_engine")]
 use crate::consciousness::reasoning_engine::CodeReasoningContext;
 
@@ -47,7 +47,7 @@ impl ReasoningFeedback {
 /// intervening Testing-phase cycles would otherwise overwrite the gate/PE state
 /// that belongs to the original decision — see
 /// `feedback_plan_review_rigor_standards.md` item 5.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PendingReasoningOutcome {
     /// Whether a tool gate actually ran at decision time. If `false`, no posthoc
     /// should be recorded at all — "no gate ran" must never be reported as
@@ -55,21 +55,67 @@ pub struct PendingReasoningOutcome {
     pub gate_evaluated: bool,
     pub gate_passed: bool,
     pub reasoning_confidence: f32,
-    /// Measured PE at decision time, absent when the cycle comparison was invalid.
+    /// Decision cycle at which the gate/attempt was chosen, when known.
+    pub decision_cycle: Option<u64>,
+    /// Compatibility scalar captured at decision time. It is only usable when
+    /// finite; typed evidence below takes precedence for the live integration.
     pub prediction_error_at_decision: Option<f64>,
+    /// Immutable typed PE reference available when this decision was taken.
+    /// None means that source/observation provenance was not available.
+    pub prediction_evidence_at_decision: Option<PredictionErrorEvidence>,
 }
 
 impl PendingReasoningOutcome {
+    /// Compatibility capture for callers that only have a measured scalar.
+    /// This does not invent cycle provenance or an evidence ID.
     pub fn capture(reasoning: &ReasoningFeedback, prediction_error: Option<f64>) -> Self {
         Self {
             gate_evaluated: reasoning.gate_evaluated,
             gate_passed: !reasoning.gate_blocked,
             reasoning_confidence: reasoning.reasoning_confidence,
+            decision_cycle: None,
             prediction_error_at_decision: prediction_error.filter(|value| value.is_finite()),
+            prediction_evidence_at_decision: None,
+        }
+    }
+
+    /// Capture typed evidence and bind it to the decision cycle. A valid PE from
+    /// another cycle is retained as an explicitly stale diagnostic, never as PE.
+    pub fn capture_with_evidence(
+        reasoning: &ReasoningFeedback,
+        decision_cycle: Option<u64>,
+        prediction_evidence: Option<PredictionErrorEvidence>,
+    ) -> Self {
+        let prediction_evidence = prediction_evidence.map(|evidence| {
+            let expected_status = match decision_cycle {
+                Some(cycle) => evidence.status_for_observation(cycle),
+                None => crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable,
+            };
+            if expected_status == evidence.status() {
+                evidence
+            } else {
+                PredictionErrorEvidence::from_comparison(
+                    expected_status,
+                    None,
+                    evidence.prediction_cycle(),
+                    evidence.observation_cycle(),
+                )
+            }
+        });
+        let prediction_error_at_decision = decision_cycle
+            .zip(prediction_evidence.as_ref())
+            .and_then(|(cycle, evidence)| evidence.value_for_observation(cycle))
+            .map(f64::from);
+        Self {
+            gate_evaluated: reasoning.gate_evaluated,
+            gate_passed: !reasoning.gate_blocked,
+            reasoning_confidence: reasoning.reasoning_confidence,
+            decision_cycle,
+            prediction_error_at_decision,
+            prediction_evidence_at_decision: prediction_evidence,
         }
     }
 }
-
 pub struct CodeSignals {
     pub type_confidence: f64,
     pub involves_unsafe: bool,
@@ -268,6 +314,46 @@ mod tests {
 
         let nonfinite = PendingReasoningOutcome::capture(&reasoning, Some(f64::NAN));
         assert_eq!(nonfinite.prediction_error_at_decision, None);
+
+        let evidence = PredictionErrorEvidence::valid(0.42, Some(10), 11).unwrap();
+        let typed = PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(11), Some(evidence));
+        assert_eq!(typed.prediction_error_at_decision, Some(f64::from(0.42_f32)));
+        let frozen = typed.prediction_evidence_at_decision.as_ref().unwrap();
+        assert_eq!(typed.decision_cycle, Some(11));
+        assert_eq!(frozen.observation_cycle(), 11);
+        assert_eq!(frozen.prediction_cycle(), Some(10));
+
+        let mismatched = PredictionErrorEvidence::valid(0.71, Some(9), 10).unwrap();
+        let mismatched_pending = PendingReasoningOutcome::capture_with_evidence(
+            &reasoning,
+            Some(11),
+            Some(mismatched),
+        );
+        assert_eq!(mismatched_pending.prediction_error_at_decision, None);
+        assert_eq!(
+            mismatched_pending.prediction_evidence_at_decision.as_ref().unwrap().status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+
+        let without_provenance = PendingReasoningOutcome::capture_with_evidence(&reasoning, None, None);
+        assert_eq!(without_provenance.prediction_error_at_decision, None);
+        assert!(without_provenance.prediction_evidence_at_decision.is_none());
+
+        // A finite payload with an inconsistent source cycle is not usable PE.
+        let stale = PredictionErrorEvidence::from_comparison(
+            crate::cognitive_loop::PredictionEvidenceStatus::Valid,
+            Some(0.88),
+            Some(8),
+            11,
+        );
+        assert_eq!(
+            stale.status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(stale.value_for_observation(11), None);
+        let stale_pending =
+            PendingReasoningOutcome::capture_with_evidence(&reasoning, Some(11), Some(stale));
+        assert_eq!(stale_pending.prediction_error_at_decision, None);
     }
 
     #[test]

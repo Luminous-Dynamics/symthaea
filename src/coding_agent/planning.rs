@@ -557,11 +557,23 @@ impl CodingAgent {
                     #[cfg(feature = "reasoning_engine")]
                     if let Some(pending) = self.pending_reasoning_outcome.take() {
                         if pending.gate_evaluated {
-                            self.cognitive_loop.record_reasoning_posthoc_with_optional_pe(
-                                pending.gate_passed,
-                                result.success,
-                                pending.prediction_error_at_decision,
-                            );
+                            if let Some(evidence) = pending.prediction_evidence_at_decision {
+                                self.cognitive_loop.record_reasoning_posthoc_with_evidence(
+                                    pending.decision_cycle,
+                                    pending.gate_passed,
+                                    result.success,
+                                    Some(evidence),
+                                );
+                            } else {
+                                // Legacy scalar-only pending records stay on the
+                                // compatibility path; the live path never fabricates
+                                // typed provenance when cycle metadata is absent.
+                                self.cognitive_loop.record_reasoning_posthoc_with_optional_pe(
+                                    pending.gate_passed,
+                                    result.success,
+                                    pending.prediction_error_at_decision,
+                                );
+                            }
                         }
                     }
 

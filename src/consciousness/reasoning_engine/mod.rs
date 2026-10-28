@@ -43,6 +43,7 @@ pub use types::{
 use std::collections::VecDeque;
 use std::time::Instant;
 
+use crate::cognitive_loop::PredictionErrorEvidence;
 use crate::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
@@ -122,7 +123,52 @@ impl ConsciousReasoningEngine {
         self.pending_posthoc = Some(PosthocOutcome {
             gate_passed,
             outcome_good,
+            decision_cycle: None,
             prediction_error: prediction_error.filter(|value| value.is_finite()),
+            prediction_evidence: None,
+        });
+        self.calibrator.record_outcome(gate_passed, outcome_good);
+    }
+
+    /// Record a posthoc outcome with the immutable typed PE evidence available
+    /// when its associated decision was made. Later cycles cannot replace this
+    /// snapshot because it is stored inside the pending outcome itself.
+    pub fn record_posthoc_with_evidence(
+        &mut self,
+        decision_cycle: Option<u64>,
+        gate_passed: bool,
+        outcome_good: bool,
+        prediction_evidence: Option<PredictionErrorEvidence>,
+    ) {
+        // Bind the stored evidence to the decision cycle, not merely to the
+        // evidence object's self-reported observation cycle. A mismatch becomes
+        // stale diagnostic evidence and cannot supply the compatibility scalar.
+        let prediction_evidence = prediction_evidence.map(|evidence| {
+            let expected_status = match decision_cycle {
+                Some(cycle) => evidence.status_for_observation(cycle),
+                None => crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable,
+            };
+            if expected_status == evidence.status() {
+                evidence
+            } else {
+                PredictionErrorEvidence::from_comparison(
+                    expected_status,
+                    None,
+                    evidence.prediction_cycle(),
+                    evidence.observation_cycle(),
+                )
+            }
+        });
+        let prediction_error = decision_cycle
+            .zip(prediction_evidence.as_ref())
+            .and_then(|(cycle, evidence)| evidence.value_for_observation(cycle))
+            .map(f64::from);
+        self.pending_posthoc = Some(PosthocOutcome {
+            gate_passed,
+            outcome_good,
+            decision_cycle,
+            prediction_error,
+            prediction_evidence,
         });
         self.calibrator.record_outcome(gate_passed, outcome_good);
     }
@@ -719,6 +765,114 @@ mod tests {
     // these test the invariants that don't depend on which action gets picked;
     // the full per-action gating behavior is exercised end-to-end by the live
     // CodingAgent smoke verification instead. ──
+
+    #[test]
+    fn posthoc_retains_immutable_decision_time_pe_evidence() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+
+        let decision_evidence = PredictionErrorEvidence::valid(0.37, Some(5), 6).unwrap();
+        engine.record_posthoc_with_evidence(Some(6), true, true, Some(decision_evidence));
+        ctx.cycle_id = 6;
+        engine.reason(&ctx);
+
+        {
+            let first = engine.last_event().expect("first posthoc event should exist");
+            let outcome = first
+                .posthoc_outcome
+                .as_ref()
+                .expect("decision-time outcome should be attached");
+            assert_eq!(outcome.decision_cycle, Some(6));
+            assert_eq!(outcome.prediction_error, Some(f64::from(0.37_f32)));
+            let evidence = outcome
+                .prediction_evidence
+                .as_ref()
+                .expect("typed decision evidence should survive resolution");
+            assert_eq!(evidence.observation_cycle(), 6);
+            assert_eq!(evidence.prediction_cycle(), Some(5));
+        }
+
+        // A later outcome carries its own evidence and cannot rewrite the first event.
+        let later_evidence = PredictionErrorEvidence::valid(0.91, Some(6), 7).unwrap();
+        engine.record_posthoc_with_evidence(Some(7), false, false, Some(later_evidence));
+        ctx.cycle_id = 7;
+        engine.reason(&ctx);
+
+        let first = engine
+            .recent_events()
+            .iter()
+            .find(|event| event.cycle_id == 6)
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("original outcome remains in history");
+        assert_eq!(
+            first.prediction_evidence.as_ref().unwrap().observation_cycle(),
+            6
+        );
+        let latest = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("later posthoc event should exist");
+        assert_eq!(
+            latest.prediction_evidence.as_ref().unwrap().observation_cycle(),
+            7
+        );
+    }
+
+    #[test]
+    fn posthoc_rejects_evidence_from_another_decision_cycle() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+        let wrong_cycle = PredictionErrorEvidence::valid(0.88, Some(4), 5).unwrap();
+
+        engine.record_posthoc_with_evidence(Some(6), true, false, Some(wrong_cycle));
+        ctx.cycle_id = 7;
+        engine.reason(&ctx);
+
+        let outcome = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("gate outcome is preserved even when PE provenance mismatches");
+        assert_eq!(outcome.decision_cycle, Some(6));
+        assert_eq!(outcome.prediction_error, None);
+        assert_eq!(
+            outcome.prediction_evidence.as_ref().unwrap().status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(
+            outcome.prediction_evidence.as_ref().unwrap().observation_cycle(),
+            5
+        );
+    }
+
+    #[test]
+    fn posthoc_serialization_preserves_invalid_typed_evidence() {
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+        let invalid = PredictionErrorEvidence::invalid(
+            crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable,
+            Some(8),
+            9,
+        )
+        .unwrap();
+
+        engine.record_posthoc_with_evidence(Some(10), true, false, Some(invalid));
+        ctx.cycle_id = 10;
+        engine.reason(&ctx);
+
+        let outcome = engine
+            .last_event()
+            .and_then(|event| event.posthoc_outcome.as_ref())
+            .expect("outcome should remain available without a usable PE");
+        assert_eq!(outcome.prediction_error, None);
+        let encoded = serde_json::to_vec(outcome).expect("posthoc outcome serializes");
+        let restored: PosthocOutcome =
+            serde_json::from_slice(&encoded).expect("posthoc outcome deserializes");
+        assert_eq!(restored.prediction_error, None);
+        assert_eq!(
+            restored.prediction_evidence.unwrap().status(),
+            crate::cognitive_loop::PredictionEvidenceStatus::SourceUnavailable
+        );
+    }
 
     #[test]
     fn posthoc_without_valid_pe_preserves_gate_outcome_and_missingness() {
