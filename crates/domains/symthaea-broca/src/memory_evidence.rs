@@ -414,7 +414,7 @@ mod tests {
         index.revoke(7).unwrap();
         index.mark_deleted(8).unwrap();
         assert!(index.resolve(&[7, 8], "web", 150, Path::new("."), 10).unwrap().is_empty());
-        assert!(index.insert(text_record(7, "evidence-c", "web", "resurrected route")).is_err());
+        assert!(index.insert(text_record(7, "evidence-c", "web", "resurrected route"), b"canonical trajectory bytes").is_err());
         assert!(index.revoke(8).is_err());
     }
 
@@ -432,6 +432,15 @@ mod tests {
         other.insert(text_record(1, "web-record", "web", "web payload"), b"canonical trajectory bytes").unwrap();
         other.insert(text_record(2, "enterprise-record", "enterprise", "enterprise payload"), b"canonical trajectory bytes").unwrap();
         assert!(other.supersede(1, 2).is_err());
+    }
+
+    #[test]
+    fn rejects_provenance_digest_mismatch_before_indexing() {
+        let mut index = EvidenceIndex::new();
+        let record = text_record(9, "evidence-provenance", "web", "source-bound evidence");
+        assert!(index.insert(record.clone(), b"tampered source bytes").is_err());
+        // A failed insert must not reserve either ID.
+        assert!(index.insert(record, b"canonical trajectory bytes").is_ok());
     }
 
     #[test]
