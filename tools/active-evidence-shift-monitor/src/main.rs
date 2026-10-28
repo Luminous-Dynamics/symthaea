@@ -432,7 +432,7 @@ mod tests {
                     let metrics = evaluate(
                         boundary,
                         NOMINAL_P,
-                    scenario.pre_shift_p,
+                        scenario.pre_shift_p,
                         scenario.post_shift_p,
                         scenario.change_after,
                         horizon,
