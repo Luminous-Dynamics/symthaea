@@ -52,6 +52,7 @@ struct IntervalLook {
 #[derive(Clone, Debug)]
 struct BetLook {
     rejects: bool,
+    wealth: f64,
     log_wealth: f64,
 }
 
@@ -87,6 +88,7 @@ struct BetAccumulator {
     first_rejection: Vec<f64>,
     ever_rejection: Vec<f64>,
     survival: Vec<f64>,
+    mean_wealth: Vec<f64>,
     mean_log_wealth: Vec<f64>,
 }
 
@@ -98,6 +100,7 @@ impl BetAccumulator {
             first_rejection: vec![0.0; n],
             ever_rejection: vec![0.0; n],
             survival: vec![0.0; n],
+            mean_wealth: vec![0.0; n],
             mean_log_wealth: vec![0.0; n],
         }
     }
@@ -247,6 +250,7 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
         let mut m2 = 0.0;
         let mut bet_sum = 0.0;
         let mut bet_sum_squares = 0.0;
+        let mut wealth = 1.0;
         let mut log_wealth = 0.0;
 
         for look in 1..=s.horizon {
@@ -295,9 +299,14 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
             if !lambda.is_finite() || !(0.0..1.0).contains(&lambda) || !factor.is_finite() || factor <= 0.0 {
                 return Err(invalid(format!("{}: invalid betting factor on path {path} look {look}", s.id)));
             }
+            wealth *= factor;
             log_wealth += factor.ln();
+            if !wealth.is_finite() || !log_wealth.is_finite() {
+                return Err(invalid(format!("{}: non-finite betting wealth on path {path} look {look}", s.id)));
+            }
             bet_looks[look] = Some(BetLook {
                 rejects: log_wealth > ln_reject,
+                wealth,
                 log_wealth,
             });
             bet_sum += xi;
@@ -315,6 +324,7 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
 
             let bet = bet_looks[look].as_ref().unwrap();
             betting.pointwise_rejection[look] += path_probability * if bet.rejects { 1.0 } else { 0.0 };
+            betting.mean_wealth[look] += path_probability * bet.wealth;
             betting.mean_log_wealth[look] += path_probability * bet.log_wealth;
 
             if look >= 2 {
@@ -502,6 +512,7 @@ fn sweep(input: &str) -> Result<String, String> {
                 ("first_rejection_probability", bet.first_rejection[look]),
                 ("ever_rejection_probability", bet.ever_rejection[look]),
                 ("survival_probability", bet.survival[look]),
+                ("mean_wealth", bet.mean_wealth[look]),
                 ("mean_log_wealth", bet.mean_log_wealth[look]),
             ] {
                 write_number(&mut out, "LOOK_METRIC", &scenario.id, look, "SCALAR_BETTING_ONE_SIDED",
@@ -596,6 +607,10 @@ mod tests {
         assert!(weak.betting_ever_rejection <= ALPHA + EPS);
         close(weak.wald_ever_crossing, 0.039414394874, 1e-9);
         assert!(weak.hoeffding_ever_crossing < 1e-8);
+        for look in 1..=HORIZON {
+            close(healthy.betting.mean_wealth[look], 1.0, 1e-8);
+            close(weak.betting.mean_wealth[look], 1.0, 1e-8);
+        }
     }
 
     #[test]
