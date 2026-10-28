@@ -88,6 +88,17 @@ pub struct MemoryContextItem {
     pub value: String,
 }
 
+/// A resolved context item with the exact record and trajectory location that
+/// supplied it. Benchmark adapters may project `item` to the official
+/// `type/value` ABI while retaining this envelope for attribution and audits.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolvedMemoryContextItem {
+    pub hdc_id: u64,
+    pub evidence_id: String,
+    pub source: EvidenceSource,
+    pub item: MemoryContextItem,
+}
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -577,17 +588,20 @@ impl EvidenceIndex {
         old.validate()
     }
 
-    /// Resolve ranked HDC IDs to safe context items. Missing IDs, duplicates,
-    /// inactive records, invalid times and cross-scope records are skipped.
-    /// A present but corrupt payload is an error, not accepted evidence.
-    pub fn resolve(
+    /// Resolve ranked HDC IDs to safe context items with source provenance.
+    ///
+    /// Missing IDs, duplicates, inactive records, invalid times and cross-scope
+    /// records are skipped. A present but corrupt payload is an error, not
+    /// accepted evidence. The order follows candidate ranking after ineligible
+    /// records are omitted.
+    pub fn resolve_with_provenance(
         &self,
         hdc_hits: &[u64],
         scope_id: &str,
         now_ms: u64,
         payload_root: &Path,
         max_items: usize,
-    ) -> Result<Vec<MemoryContextItem>, String> {
+    ) -> Result<Vec<ResolvedMemoryContextItem>, String> {
         if scope_id.trim().is_empty() {
             return Err("scope_id must be non-empty".into());
         }
@@ -611,9 +625,30 @@ impl EvidenceIndex {
             if !record.is_eligible_for(scope_id, now_ms) {
                 continue;
             }
-            output.push(record.context_item(payload_root)?);
+            output.push(ResolvedMemoryContextItem {
+                hdc_id: *hdc_id,
+                evidence_id: record.evidence_id.clone(),
+                source: record.source.clone(),
+                item: record.context_item(payload_root)?,
+            });
         }
         Ok(output)
+    }
+
+    /// ABI projection for consumers that require only official `type/value`
+    /// context items. Use `resolve_with_provenance` when an audit trail is needed.
+    pub fn resolve(
+        &self,
+        hdc_hits: &[u64],
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: &Path,
+        max_items: usize,
+    ) -> Result<Vec<MemoryContextItem>, String> {
+        Ok(self.resolve_with_provenance(hdc_hits, scope_id, now_ms, payload_root, max_items)?
+            .into_iter()
+            .map(|resolved| resolved.item)
+            .collect())
     }
 }
 
@@ -905,4 +940,27 @@ mod tests {
         tampered.content_sha256 = hash(b"different bytes");
         assert!(tampered.context_item(root.path()).is_err());
     }
+
+    #[test]
+    fn resolve_with_provenance_preserves_source_and_abi_projection() {
+        let mut index = EvidenceIndex::new();
+        index.insert(
+            text_record(7, "evidence-attributed", "web", "grounded answer"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+
+        let resolved = index.resolve_with_provenance(
+            &[7, 7], "web", 150, Path::new("."), 5,
+        ).unwrap();
+        assert_eq!(resolved.len(), 1, "duplicate candidate IDs must not duplicate context");
+        assert_eq!(resolved[0].hdc_id, 7);
+        assert_eq!(resolved[0].evidence_id, "evidence-attributed");
+        assert_eq!(resolved[0].source.trajectory_id, "trajectory-001");
+        assert_eq!(resolved[0].source.step_id.as_deref(), Some("step-4"));
+        assert_eq!(resolved[0].item.value, "grounded answer");
+
+        let abi = index.resolve(&[7, 7], "web", 150, Path::new("."), 5).unwrap();
+        assert_eq!(abi, resolved.into_iter().map(|entry| entry.item).collect::<Vec<_>>());
+    }
+
 }

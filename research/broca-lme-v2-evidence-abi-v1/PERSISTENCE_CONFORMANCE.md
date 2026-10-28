@@ -10,7 +10,7 @@ The snapshot codec preserves tombstones, binds schema + generation + records int
 
 ## Implemented prototype surface
 
-`EvidenceDiskStore` exposes `open(root)`, `commit(hdc_index_bytes, &EvidenceIndex)` and `recover()`. The generation is assigned under a filesystem lock from the last fully verified commit. Staging lives under `generations/`; generation directory names bind the generation number and manifest digest. The `CURRENT` pointer is the publication point and names exactly one commit.
+`EvidenceDiskStore` exposes `open(root)`, the typed production `commit_hdc_store(&mut HdcStore, &EvidenceIndex)`, `recover()`, and `query_committed_context(&BinaryHV, candidate_k, scope_id, now_ms, payload_root, max_items)`. The generation is assigned under a filesystem lock from the last fully verified commit. The opaque-byte `commit` is test-only. Staging lives under `generations/`; generation directory names bind the generation number and manifest digest. The `CURRENT` pointer is the publication point and names exactly one commit.
 
 The implementation is intentionally conservative:
 
@@ -35,7 +35,7 @@ The persistence coordinator treats these bytes as one logical commit. The implem
 2. Flush the exact index and snapshot bytes to stable storage using same-filesystem temporary files, file sync, and atomic rename where supported. **Implemented for the declared Unix prototype assumptions**; not yet power-loss-qualified.
 3. Create the commit manifest for `g` from those exact bytes; read all three artifacts back and verify their digests and schema before publication. **Implemented** before the pointer is changed.
 4. Publish `CURRENT` last as the commit point, pointing at the immutable manifest and generation; sync the containing directory. **Implemented**. An error after pointer rename is an ambiguous durability outcome and requires `recover()` inspection.
-5. On query, load only artifacts named by the committed generation; verify index digest, snapshot digest, snapshot decoding, and generation equality before calling `resolve`. **Implemented** by `recover()`; adapter/query wiring remains open.
+5. On query, load only artifacts named by the committed generation; verify index digest, snapshot digest, snapshot decoding, and generation equality before resolving payloads. **Implemented at the storage API** by `query_committed_context`: it reads `CURRENT` once, verifies the typed manifest, opens the exact HDC index for ranking, rechecks the opened reader identity and live-ID parity, and resolves payloads against that same recovered evidence snapshot. `resolve_with_provenance` preserves the HDC/evidence ID and source trajectory/step for every emitted context item; the result can be projected to the official `type/value` ABI. Wiring the binary-query API to Broca's live `MemoryBridge`, selecting a raw-text query encoder, and implementing the official LongMemEval-V2 worker remain open.
 6. If a committed artifact is missing, corrupt, has an unknown schema, or does not match the manifest, return an integrity error. The caller must surface zero context. **Implemented at the store API**; any consuming adapter must preserve this failure rather than converting it to an empty successful result.
 7. Retain prior generations only according to a declared recovery and retention policy. If an operator explicitly authorizes recovery to an older generation, mark it as a recovery event and re-apply an authoritative deletion/revocation log before serving queries.
 
@@ -53,7 +53,7 @@ The in-memory module does not implement these filesystem steps. Atomic rename al
 
 ## Crash and adversarial matrix
 
-The disk-store prototype has deterministic in-process failpoints for commit stages plus retention tests for current-generation preservation, stale-staging cleanup, unpublished future-generation pruning, and refusal to prune on a corrupt CURRENT pointer. Qualification must additionally kill a separate process at each stage, restart from the resulting directory, and on supported lab hardware perform power-cut trials; the current failpoints do not qualify those conditions.
+The disk-store prototype has deterministic in-process failpoints for commit stages plus retention tests for current-generation preservation, stale-staging cleanup, unpublished future-generation pruning, and refusal to prune on a corrupt CURRENT pointer. Query tests additionally cover committed-generation identity, scope filtering, refusal to serve opaque-byte fixtures, and the distinction between an uninitialized store and a corrupt CURRENT pointer. Qualification must additionally kill a separate process at each stage, restart from the resulting directory, and on supported lab hardware perform power-cut trials; the current failpoints do not qualify those conditions.
 
 | Fixture | Required result |
 |---|---|

@@ -1,6 +1,6 @@
 # Broca evidence payload ABI for LongMemEval-V2
 
-**State:** Rust evidence-contract prototype plus deterministic snapshot/restore, a V2 generation-bound manifest, and a fail-closed Unix disk-generation store. The typed production commit now binds the actual HdcStore generation, logical checksum and active live-ID set, and recovery reopens the committed HDC file independently. Tests are authored but not compiled in this environment; this is not a completed LongMemEval-V2 integration or persistence qualification.
+**State:** Rust evidence-contract prototype plus deterministic snapshot/restore, a V2 generation-bound manifest, a fail-closed Unix disk-generation store, and a first query-serving API pinned to one committed generation. The typed production commit binds the actual HdcStore generation, logical checksum and active live-ID set. `query_committed_context` reopens the exact committed HDC generation, rechecks its identity, and resolves only eligible context from the matching evidence snapshot. Tests are authored but not compiled in this environment; this is not a completed LongMemEval-V2 integration or persistence qualification.
 
 ## The concrete interface mismatch
 
@@ -31,7 +31,8 @@ Report these as distinct retrieval arms. Do not label a lexical feature hash as 
 - `EvidenceCommitManifest` binds exact HDC-index bytes and evidence-snapshot bytes to one nonzero generation, rejects a manifest/snapshot generation mismatch, and detects later artifact substitution; the coordinator must still ensure the index bytes were produced for that generation;
 - text payload digests are verified before emission; image paths are canonicalized under a trusted payload root and their file-byte digests are checked;
 - duplicate HDC/evidence IDs, malformed digests, invalid lifecycle shapes, path traversal, and corrupt payloads fail closed;
-- resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained.
+- resolved context items follow the official `{type,value}` envelope, and ranked HDC-hit order is retained;
+- `EvidenceIndex::resolve_with_provenance` preserves the HDC ID, stable evidence ID, trajectory ID, and step coordinates beside each emitted item. `resolve` is a simple ABI projection that strips this audit envelope only when the caller explicitly needs the official `type/value` shape.
 
 ## Disk-generation persistence prototype
 
@@ -44,6 +45,24 @@ let recovered = store.recover()?.ok_or("no committed generation")?;
 assert_eq!(recovered.generation, generation);
 ```
 
+The query-serving path accepts an already encoded query vector and returns candidate scores plus resolved source attribution:
+
+```rust
+let result = store.query_committed_context(
+    &query_hv,
+    32,
+    "web",
+    now_ms,
+    payload_root,
+    8,
+)?;
+let official_context = result
+    .map(|result| result.context_items())
+    .unwrap_or_default();
+```
+
+Integrity errors propagate through `?`; only an uninitialized store maps to no context. The resolved list retains each emitted item's HDC ID, evidence ID and source trajectory/step. The API uses exact search and is a correctness reference, not a measured latency claim.
+
 The exact API may evolve during review; the example communicates intended use, not a compiled integration result.
 
 - Data is staged in an immutable generation directory. HDC-index and evidence-snapshot bytes are synced; the manifest is written and verified; then `CURRENT` is atomically replaced last.
@@ -53,8 +72,10 @@ The exact API may evolve during review; the example communicates intended use, n
 - The implementation currently requires Unix directory fsync and same-filesystem rename semantics. It does not claim portable power-loss guarantees or malicious-writer authenticity.
 - The production API is typed: commit_hdc_store syncs the real HdcStore and rejects any mismatch between live vector IDs and Active evidence IDs. The opaque-byte commit helper is available only to module tests. The caller still must apply vector deletion/update and lifecycle mutation as one application-level operation; the store can detect a mismatch, not infer operator intent.
 - `prune_history(retain_generations)` removes visible old generation directories outside an explicit generation window, drops unpublished future-generation artifacts and orphan staging directories, and refuses to run without a verified CURRENT commit. It is protected by the writer lock and reports which generation directories were removed.
+- `query_committed_context(&BinaryHV, candidate_k, scope_id, now_ms, payload_root, max_items)` reads `CURRENT` once, verifies the named commit, opens the HDC file from that immutable generation, rechecks HDC generation/checksum/live-ID parity, performs exact nearest-neighbor search, and resolves context against the recovered evidence snapshot. It returns the selected generation and ranked candidate IDs/scores for audit; opaque-byte test fixtures cannot serve context. It is a binary-query storage API, not a raw-text query encoder or complete benchmark adapter.
+- See [BENCHMARK_PLAN.md](./BENCHMARK_PLAN.md) for matched-comparison rules and explicit targets against the current public LongMemEval-V2 frontier.
 
-Authored unit tests include successful generation rollover, delete/restart non-resurrection, interrupted commits, fail-closed corrupt artifacts, lock refusal, dangling CURRENT symlink rejection, empty-index rejection, corrupt snapshot rejection, real-HdcStore generation/checksum/live-ID binding, mismatch rejection, delete-before-tombstone ordering, substituted-index rejection, and retention cleanup/fail-closed tests. They have **not** been compiled or executed in this environment. In-process failpoints are not equivalent to actual process-kill or power-cut tests.
+Authored persistence tests include successful generation rollover, delete/restart non-resurrection, interrupted commits, fail-closed corrupt artifacts, lock refusal, dangling CURRENT symlink rejection, empty-index rejection, corrupt snapshot rejection, real-HdcStore generation/checksum/live-ID binding, mismatch rejection, delete-before-tombstone ordering, substituted-index rejection, retention cleanup/fail-closed behavior, and the three committed-query checks (typed generation + scope filtering, opaque fixture refusal, uninitialized-versus-corrupt distinction). They have **not** been compiled or executed in this environment. In-process failpoints are not equivalent to actual process-kill or power-cut tests.
 
 ## Intended end-to-end path
 
