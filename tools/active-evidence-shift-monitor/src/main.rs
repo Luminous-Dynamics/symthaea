@@ -317,12 +317,14 @@ mod tests {
         let repeated = evaluate(
             Boundary::FixedTimeRepeated,
             NOMINAL_P,
+            NOMINAL_P,
             None,
             0,
             1000,
         );
         let anytime = evaluate(
             Boundary::TimeUniform,
+            NOMINAL_P,
             NOMINAL_P,
             None,
             0,
@@ -342,6 +344,7 @@ mod tests {
     fn anytime_monitor_detects_large_step_shift_with_bounded_null_alarm() {
         let null = evaluate(
             Boundary::TimeUniform,
+            NOMINAL_P,
             NOMINAL_P,
             None,
             0,
@@ -369,6 +372,7 @@ mod tests {
                     let metrics = evaluate(
                         boundary,
                         NOMINAL_P,
+                    scenario.pre_shift_p,
                         scenario.post_shift_p,
                         scenario.change_after,
                         horizon,
@@ -397,6 +401,7 @@ mod tests {
         let beta_null = evaluate(
             Boundary::BetaMixtureEProcess,
             NOMINAL_P,
+            NOMINAL_P,
             None,
             0,
             1000,
@@ -406,12 +411,14 @@ mod tests {
         let beta_shift = evaluate(
             Boundary::BetaMixtureEProcess,
             NOMINAL_P,
+            NOMINAL_P,
             Some(SHIFTED_P),
             CHANGE_AFTER,
             500,
         );
         let hoeffding_shift = evaluate(
             Boundary::TimeUniform,
+            NOMINAL_P,
             NOMINAL_P,
             Some(SHIFTED_P),
             CHANGE_AFTER,
@@ -437,6 +444,7 @@ mod tests {
         );
         let beta = evaluate(
             Boundary::BetaMixtureEProcess,
+            NOMINAL_P,
             NOMINAL_P,
             Some(0.40),
             CHANGE_AFTER,
