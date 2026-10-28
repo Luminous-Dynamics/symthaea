@@ -9,11 +9,11 @@
 //! selective retry, and hybrid FEC+retry.
 //!
 //! Retry strategies assume perfect aggregated feedback and one retry per
-//! initially lost data fragment. ACK loss, timing, contention, PHY airtime,
-//! hardware energy, and multi-hop effects are intentionally not modelled.
-//! The SX127x PHY airtime equation is an analytical estimate, not measured
-//! latency or energy. ACKs, contention, startup, receive windows, regulatory
-//! scheduling and multihop remain excluded.
+//! initially lost data fragment. ACK loss, contention, hardware energy, and
+//! multi-hop effects are intentionally not modelled. PHY airtime uses an
+//! analytical SX127x equation under a frozen profile; it is not measured
+//! latency or energy. ACK airtime, startup, receive windows, regulatory
+//! scheduling and collision effects remain excluded.
 //! The retry results are optimistic upper bounds, not claims about runtime
 //! behavior.
 
@@ -171,8 +171,14 @@ const DEFAULT_LORA_PHY: LoRaPhyProfile = LoRaPhyProfile {
 /// section 4.1.1.7. This is a PHY model only: ACKs, turnaround, contention,
 /// radio startup, receive windows, and inter-frame scheduling are not included.
 fn lora_time_on_air_us(payload_len: usize, profile: LoRaPhyProfile) -> u64 {
-    assert!((1..=255).contains(&payload_len), "LoRa PHY payload must be 1..=255 bytes");
-    assert!((7..=12).contains(&profile.spreading_factor), "explicit-header profile requires SF7..=SF12");
+    assert!(
+        (1..=255).contains(&payload_len),
+        "LoRa PHY payload must be 1..=255 bytes"
+    );
+    assert!(
+        (7..=12).contains(&profile.spreading_factor),
+        "explicit-header profile requires SF7..=SF12"
+    );
     assert!(profile.bandwidth_hz > 0, "bandwidth must be nonzero");
     assert!((1..=4).contains(&profile.coding_rate), "coding rate must be 1..=4");
 
@@ -180,7 +186,11 @@ fn lora_time_on_air_us(payload_len: usize, profile: LoRaPhyProfile) -> u64 {
     let bandwidth_hz = u64::from(profile.bandwidth_hz);
     let two_to_sf = 1u64 << sf;
     // Semtech requires low-data-rate optimization when symbol duration > 16 ms.
-    let de = if two_to_sf * 1_000_000 > bandwidth_hz * 16_000 { 1u32 } else { 0u32 };
+    let de = if two_to_sf * 1_000_000 > bandwidth_hz * 16_000 {
+        1u32
+    } else {
+        0u32
+    };
     let implicit_header: i64 = if profile.explicit_header { 0 } else { 1 };
     let crc: i64 = if profile.crc_enabled { 1 } else { 0 };
     let numerator = 8 * payload_len as i64 - 4 * i64::from(sf) + 28 + 16 * crc
@@ -461,7 +471,10 @@ fn semtech_time_on_air_equation_matches_reference_vectors_and_spreading_factor_s
     let mut last_data_only_us = 0u64;
     let mut last_xor_us = 0u64;
     for sf in 7..=12 {
-        let phy = LoRaPhyProfile { spreading_factor: sf, ..DEFAULT_LORA_PHY };
+        let phy = LoRaPhyProfile {
+            spreading_factor: sf,
+            ..DEFAULT_LORA_PHY
+        };
         let data_only_us: u64 = frames[..data_count]
             .iter()
             .map(|frame| lora_time_on_air_us(wire_len(frame.payload_len), phy))
@@ -470,7 +483,10 @@ fn semtech_time_on_air_equation_matches_reference_vectors_and_spreading_factor_s
             .iter()
             .map(|frame| lora_time_on_air_us(wire_len(frame.payload_len), phy))
             .sum();
-        assert!(data_only_us > last_data_only_us, "data-only airtime must rise with SF");
+        assert!(
+            data_only_us > last_data_only_us,
+            "data-only airtime must rise with SF"
+        );
         assert!(xor_us > last_xor_us, "FEC airtime must rise with SF");
         assert!(xor_us > data_only_us, "XOR parity must add PHY airtime");
         eprintln!(
