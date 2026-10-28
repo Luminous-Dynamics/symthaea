@@ -884,15 +884,15 @@
     },
     {
       "id": "NEG-030",
-      "category": "audience_replay",
-      "description": "Credential is replayed against another service/audience sharing the issuer",
+      "category": "security_domain",
+      "description": "Credential from a configured issuer is presented across a different local security domain with no recognition bridge.",
       "fixture": "valid_federated_authorized_operation_v1",
       "setup": {
         "successful_effects_before_case": 0
       },
       "mutations": [
         {
-          "path": "credential.audience_matches",
+          "path": "action.security_domain_matches",
           "value": false
         }
       ],
