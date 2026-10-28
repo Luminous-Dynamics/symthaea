@@ -291,6 +291,7 @@ struct PowerScenario {
     monte_carlo_standard_error: Option<f64>,
     estimated_power_lower_95: Option<f64>,
     estimated_power_upper_95: Option<f64>,
+    null_effect_false_claim_probability_upper_simultaneous_95: Option<f64>,
     mean_observed_effect_percentage_points: Option<f64>,
     mean_lower_95ci_percentage_points: Option<f64>,
     interpretation: String,
@@ -310,6 +311,7 @@ struct WeakNullScenario {
     monte_carlo_standard_error: Option<f64>,
     false_claim_probability_lower_95: Option<f64>,
     false_claim_probability_upper_95: Option<f64>,
+    false_claim_probability_upper_simultaneous_95: Option<f64>,
     mean_observed_effect_percentage_points: Option<f64>,
     mean_realized_family_effect_heterogeneity_sd_percentage_points: Option<f64>,
     interpretation: String,
@@ -342,11 +344,11 @@ struct PowerReport {
     required_power_at_20pp_and_icc_020: f64,
     maximum_false_claim_probability_at_zero_effect: f64,
     null_effect_false_claim_probability_max: Option<f64>,
-    null_effect_false_claim_probability_upper_95_max: Option<f64>,
+    null_effect_false_claim_probability_upper_simultaneous_95_max: Option<f64>,
     weak_null_family_effect_heterogeneity_sd_grid_percentage_points: Vec<f64>,
     weak_null_scenarios: Vec<WeakNullScenario>,
     weak_null_false_claim_probability_max: Option<f64>,
-    weak_null_false_claim_probability_upper_95_max: Option<f64>,
+    weak_null_false_claim_probability_upper_simultaneous_95_max: Option<f64>,
     estimated_power_at_20pp_and_icc_020: Option<f64>,
     estimated_power_at_20pp_and_icc_020_lower_95: Option<f64>,
     power_gate_passed: bool,
@@ -670,19 +672,19 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         .iter()
         .filter_map(|scenario| scenario.estimated_false_claim_probability)
         .reduce(f64::max);
-    let weak_null_false_claim_probability_upper_95_max = weak_null_scenarios
+    let weak_null_false_claim_probability_upper_simultaneous_95_max = weak_null_scenarios
         .iter()
-        .filter_map(|scenario| scenario.false_claim_probability_upper_95)
+        .filter_map(|scenario| scenario.false_claim_probability_upper_simultaneous_95)
         .reduce(f64::max);
     let null_effect_false_claim_probability_max = scenarios
         .iter()
         .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
         .filter_map(|scenario| scenario.estimated_utility_gate_power)
         .reduce(f64::max);
-    let null_effect_false_claim_probability_upper_95_max = scenarios
+    let null_effect_false_claim_probability_upper_simultaneous_95_max = scenarios
         .iter()
         .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
-        .filter_map(|scenario| scenario.estimated_power_upper_95)
+        .filter_map(|scenario| scenario.null_effect_false_claim_probability_upper_simultaneous_95)
         .reduce(f64::max);
     let twenty_point_scenario = scenarios.iter().find(|scenario| {
         (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
@@ -695,8 +697,10 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         twenty_point_scenario.and_then(|scenario| scenario.estimated_power_lower_95);
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
         && estimated_power_at_20pp_and_icc_020_lower_95.is_some_and(|power| power >= 0.80)
-        && null_effect_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05)
-        && weak_null_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
+        && null_effect_false_claim_probability_upper_simultaneous_95_max
+            .is_some_and(|rate| rate <= 0.05)
+        && weak_null_false_claim_probability_upper_simultaneous_95_max
+            .is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
         "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20, the strict-null scenarios, and the family-heterogeneous weak-null grid. This is a design-planning result, not evidence that insight transfer succeeds."
@@ -734,11 +738,11 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         required_power_at_20pp_and_icc_020: 0.80,
         maximum_false_claim_probability_at_zero_effect: 0.05,
         null_effect_false_claim_probability_max,
-        null_effect_false_claim_probability_upper_95_max,
+        null_effect_false_claim_probability_upper_simultaneous_95_max,
         weak_null_family_effect_heterogeneity_sd_grid_percentage_points: weak_null_sd_grid_pp.to_vec(),
         weak_null_scenarios,
         weak_null_false_claim_probability_max,
-        weak_null_false_claim_probability_upper_95_max,
+        weak_null_false_claim_probability_upper_simultaneous_95_max,
         estimated_power_at_20pp_and_icc_020,
         estimated_power_at_20pp_and_icc_020_lower_95,
         power_gate_passed,
@@ -759,7 +763,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     serialized.push(b'\n');
     fs::write(out_path, serialized).with_context(|| format!("write power report to {out_path}"))?;
     println!(
-        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} lower95={} strict_null_false_claim_upper95={} weak_null_false_claim_upper95={} gate={}",
+        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} lower95={} strict_null_false_claim_upper_simultaneous95={} weak_null_false_claim_upper_simultaneous95={} gate={}",
         report.selected_baseline_arm,
         report.eligible_validation_target_count,
         report.eligible_validation_family_count,
@@ -775,11 +779,11 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
         report
-            .null_effect_false_claim_probability_upper_95_max
+            .null_effect_false_claim_probability_upper_simultaneous_95_max
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
         report
-            .weak_null_false_claim_probability_upper_95_max
+            .weak_null_false_claim_probability_upper_simultaneous_95_max
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
         if report.power_gate_passed {
@@ -847,6 +851,7 @@ fn simulate_power_scenario(
             monte_carlo_standard_error: None,
             estimated_power_lower_95: None,
             estimated_power_upper_95: None,
+            null_effect_false_claim_probability_upper_simultaneous_95: None,
             mean_observed_effect_percentage_points: None,
             mean_lower_95ci_percentage_points: None,
             interpretation: "The requested positive effect would imply a treatment success rate above 100% at this validation baseline.".to_string(),
@@ -904,6 +909,11 @@ fn simulate_power_scenario(
         monte_carlo_standard_error: Some((power * (1.0 - power) / simulations as f64).sqrt()),
         estimated_power_lower_95: Some(wilson_interval(passes, simulations).0),
         estimated_power_upper_95: Some(wilson_interval(passes, simulations).1),
+        null_effect_false_claim_probability_upper_simultaneous_95: if true_effect.abs() <= 1e-12 {
+            Some(simultaneous_null_upper_bound(passes, simulations))
+        } else {
+            None
+        },
         mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
         mean_lower_95ci_percentage_points: Some(sum_lower / simulations as f64 * 100.0),
         interpretation: if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
@@ -1009,6 +1019,9 @@ fn simulate_weak_null_scenario(
         ),
         false_claim_probability_lower_95: Some(false_claim_lower),
         false_claim_probability_upper_95: Some(false_claim_upper),
+        false_claim_probability_upper_simultaneous_95: Some(
+            simultaneous_null_upper_bound(false_claims, simulations),
+        ),
         mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
         mean_realized_family_effect_heterogeneity_sd_percentage_points: Some(
             sum_realized_effect_sd / simulations as f64 * 100.0,
@@ -2028,18 +2041,18 @@ fn validate_power_report(
         .filter(|scenario| scenario.true_treatment_effect_percentage_points.abs() <= 1e-12)
         .filter_map(|scenario| scenario.estimated_utility_gate_power)
         .reduce(f64::max);
-    let max_null_upper = report
+    let max_null_upper_simultaneous_95 = report
         .scenarios
         .iter()
         .filter(|scenario| scenario.true_treatment_effect_percentage_points.abs() <= 1e-12)
-        .filter_map(|scenario| scenario.estimated_power_upper_95)
+        .filter_map(|scenario| scenario.null_effect_false_claim_probability_upper_simultaneous_95)
         .reduce(f64::max);
     if !same_optional_probability(
         report.null_effect_false_claim_probability_max,
         max_null_power,
     ) || !same_optional_probability(
-        report.null_effect_false_claim_probability_upper_95_max,
-        max_null_upper,
+        report.null_effect_false_claim_probability_upper_simultaneous_95_max,
+        max_null_upper_simultaneous_95,
     ) {
         bail!("power report null-effect false-claim maxima do not match its scenario rows");
     }
@@ -2068,10 +2081,10 @@ fn validate_power_report(
             .estimated_power_at_20pp_and_icc_020_lower_95
             .is_some_and(|value| value >= 0.80)
         && report
-            .null_effect_false_claim_probability_upper_95_max
+            .null_effect_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|value| value <= 0.05)
         && report
-            .weak_null_false_claim_probability_upper_95_max
+            .weak_null_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|value| value <= 0.05);
     if report.power_gate_passed != recomputed_gate || !report.power_gate_passed {
         bail!("preregistered power-planning no-go: confirmatory held-out scoring is blocked");
