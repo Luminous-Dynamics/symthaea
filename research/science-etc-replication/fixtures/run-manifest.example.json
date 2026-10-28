@@ -1,0 +1,306 @@
+{
+  "schema": "symthaea.sci_etc_replication_manifest.v1",
+  "study_id": "sci-etc-replication-fixture-001",
+  "purpose": "protocol_fixture_not_for_scoring",
+  "stage": "baseline_pilot",
+  "upstream": {
+    "repository": "https://github.com/HKUST-KnowComp/NewtonBench",
+    "revision": "NOT_PINNED",
+    "benchmark_scope": "newtonbench_direct_output_v0_noise_free",
+    "native_metrics": [
+      "native_rmsle",
+      "symbolic_accuracy"
+    ],
+    "source_snapshot_status": "unresolved_fixture"
+  },
+  "evaluator": {
+    "evaluator_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "judge_identity": "paper-reported Symbolic Accuracy judge; pin exact snapshot before run",
+    "judge_snapshot_status": "unresolved",
+    "judge_prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prediction_coverage_audit": true,
+    "coverage_complete_error": true,
+    "sign_disagreement_audit": true
+  },
+  "models": [
+    {
+      "model_id": "GPT-4.1-mini",
+      "provider": "paper-reported provider; resolve before execution",
+      "snapshot_status": "unresolved",
+      "revision_or_alias": "paper alias only; immutable snapshot not supplied",
+      "temperature": 0.4,
+      "max_output_tokens": 4096
+    },
+    {
+      "model_id": "GPT-4.1",
+      "provider": "paper-reported provider; resolve before execution",
+      "snapshot_status": "unresolved",
+      "revision_or_alias": "paper alias only; immutable snapshot not supplied",
+      "temperature": 0.4,
+      "max_output_tokens": 4096
+    }
+  ],
+  "task_slices": [
+    {
+      "model_id": "GPT-4.1-mini",
+      "modules": [
+        "gravity",
+        "coulomb_force",
+        "magnetic_force",
+        "fourier_conduction",
+        "snell_refraction",
+        "radioactive_decay",
+        "harmonic_motion",
+        "malus_intensity",
+        "sound_speed",
+        "hooke_energy",
+        "bose_einstein_occupation",
+        "heat_transfer"
+      ],
+      "difficulties": [
+        "easy",
+        "medium"
+      ],
+      "model_system": "vanilla_equation",
+      "law_version": "v0",
+      "noise_level": 0,
+      "rollouts_per_cell": 2,
+      "paired_rollout_seeds_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "model_id": "GPT-4.1",
+      "modules": [
+        "gravity",
+        "coulomb_force",
+        "magnetic_force",
+        "fourier_conduction",
+        "snell_refraction",
+        "radioactive_decay",
+        "harmonic_motion",
+        "malus_intensity",
+        "sound_speed",
+        "hooke_energy",
+        "bose_einstein_occupation",
+        "heat_transfer"
+      ],
+      "difficulties": [
+        "medium"
+      ],
+      "model_system": "vanilla_equation",
+      "law_version": "v0",
+      "noise_level": 0,
+      "rollouts_per_cell": 2,
+      "paired_rollout_seeds_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "arms": [
+    {
+      "arm_id": "native_no_interpreter",
+      "protocol": "native_baseline",
+      "acquisition": "none",
+      "interpreter": false,
+      "automatic_diagnostics": false,
+      "fresh_synthesis": false,
+      "draft_retention": "native",
+      "batch_limit_enforced": true,
+      "role": "primary_baseline"
+    },
+    {
+      "arm_id": "native_interpreter",
+      "protocol": "native_baseline",
+      "acquisition": "none",
+      "interpreter": true,
+      "automatic_diagnostics": false,
+      "fresh_synthesis": false,
+      "draft_retention": "native",
+      "batch_limit_enforced": true,
+      "role": "primary_baseline"
+    },
+    {
+      "arm_id": "etc_variance_no_interpreter",
+      "protocol": "explore_then_commit",
+      "acquisition": "variance",
+      "interpreter": false,
+      "automatic_diagnostics": true,
+      "fresh_synthesis": true,
+      "draft_retention": "retain_unless_disconfirmed",
+      "batch_limit_enforced": true,
+      "role": "primary_candidate"
+    },
+    {
+      "arm_id": "etc_pairwise_no_interpreter",
+      "protocol": "explore_then_commit",
+      "acquisition": "pairwise",
+      "interpreter": false,
+      "automatic_diagnostics": true,
+      "fresh_synthesis": true,
+      "draft_retention": "retain_unless_disconfirmed",
+      "batch_limit_enforced": true,
+      "role": "primary_candidate"
+    },
+    {
+      "arm_id": "etc_random_no_interpreter",
+      "protocol": "explore_then_commit",
+      "acquisition": "random",
+      "interpreter": false,
+      "automatic_diagnostics": true,
+      "fresh_synthesis": true,
+      "draft_retention": "retain_unless_disconfirmed",
+      "batch_limit_enforced": true,
+      "role": "random_control"
+    },
+    {
+      "arm_id": "etc_variance_interpreter",
+      "protocol": "explore_then_commit",
+      "acquisition": "variance",
+      "interpreter": true,
+      "automatic_diagnostics": true,
+      "fresh_synthesis": true,
+      "draft_retention": "retain_unless_disconfirmed",
+      "batch_limit_enforced": true,
+      "role": "primary_candidate"
+    },
+    {
+      "arm_id": "etc_pairwise_interpreter",
+      "protocol": "explore_then_commit",
+      "acquisition": "pairwise",
+      "interpreter": true,
+      "automatic_diagnostics": true,
+      "fresh_synthesis": true,
+      "draft_retention": "retain_unless_disconfirmed",
+      "batch_limit_enforced": true,
+      "role": "primary_candidate"
+    },
+    {
+      "arm_id": "etc_random_interpreter",
+      "protocol": "explore_then_commit",
+      "acquisition": "random",
+      "interpreter": true,
+      "automatic_diagnostics": true,
+      "fresh_synthesis": true,
+      "draft_retention": "retain_unless_disconfirmed",
+      "batch_limit_enforced": true,
+      "role": "random_control"
+    }
+  ],
+  "budget_profiles": {
+    "measurement_matched": {
+      "simulator_call_caps": [
+        8,
+        16,
+        32,
+        48
+      ],
+      "max_measurements_per_action": 4,
+      "final_submission_calls": 1,
+      "reject_over_budget_action": true
+    },
+    "interaction_matched": {
+      "max_model_action_calls": 10,
+      "max_tool_calls": 20,
+      "max_total_tokens": 100000,
+      "max_wall_clock_seconds": 3600
+    }
+  },
+  "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "primary_contrasts": [
+    {
+      "contrast_id": "measurement_variance_vs_random_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "etc_random_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "measurement_pairwise_vs_random_interpreter",
+      "left_arm_id": "etc_pairwise_interpreter",
+      "right_arm_id": "etc_random_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "measurement_variance_vs_random_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "etc_random_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "measurement_pairwise_vs_random_no_interpreter",
+      "left_arm_id": "etc_pairwise_no_interpreter",
+      "right_arm_id": "etc_random_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "measurement_variance_vs_native_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "native_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_interpreter_protocol_vs_native"
+    },
+    {
+      "contrast_id": "measurement_variance_vs_native_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "native_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "measurement_matched",
+      "multiplicity_family": "measurement_no_interpreter_protocol_vs_native"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_random_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "etc_random_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_pairwise_vs_random_interpreter",
+      "left_arm_id": "etc_pairwise_interpreter",
+      "right_arm_id": "etc_random_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_random_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "etc_random_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_pairwise_vs_random_no_interpreter",
+      "left_arm_id": "etc_pairwise_no_interpreter",
+      "right_arm_id": "etc_random_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_no_interpreter_acquisition"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_native_interpreter",
+      "left_arm_id": "etc_variance_interpreter",
+      "right_arm_id": "native_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_interpreter_protocol_vs_native"
+    },
+    {
+      "contrast_id": "interaction_variance_vs_native_no_interpreter",
+      "left_arm_id": "etc_variance_no_interpreter",
+      "right_arm_id": "native_no_interpreter",
+      "primary_metric": "coverage_complete_rmsle",
+      "budget_profile": "interaction_matched",
+      "multiplicity_family": "interaction_no_interpreter_protocol_vs_native"
+    }
+  ],
+  "missing_attempt_policy": "retain_every_expected_cell_and_classify_failures",
+  "claim_ceiling": "protocol_fixture_only"
+}
