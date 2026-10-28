@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/run-config-v1.schema.json",
   "title": "PITB Frozen Run Configuration v1",
-  "description": "Strict run-config v1 contract. It requires separate validation and test exposure quarantines, binds the immutable family partition, and freezes budgets, model/checker identities, and bootstrap settings. A valid shape is not evidence that any model run occurred.",
+  "description": "Strict run-config v1 contract. It requires separate validation and test exposure quarantines, binds the immutable family partition, and freezes budgets, model/checker identities, and bootstrap settings. Numeric ranges mirror the Rust u32/u64 types. A valid shape is not evidence that any model run occurred.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -75,7 +75,8 @@
     },
     "bootstrap_seed": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 18446744073709552000
     },
     "model_version": {
       "type": "string",
@@ -99,19 +100,23 @@
       "properties": {
         "max_model_calls": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 4294967295
         },
         "max_tokens": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 18446744073709552000
         },
         "max_wall_ms": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 18446744073709552000
         },
         "max_cost_microusd": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 18446744073709552000
         }
       }
     },
