@@ -15,7 +15,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let manifest = fs::read(&args[0])?;
     let trials = fs::read(&args[1])?;
-    let report = audit(&manifest, &trials)?;
+    let report = audit(&manifest, &trials).map_err(std::io::Error::other)?;
     if !report.verify_receipt() {
         return Err("generated receipt did not verify".into());
     }
