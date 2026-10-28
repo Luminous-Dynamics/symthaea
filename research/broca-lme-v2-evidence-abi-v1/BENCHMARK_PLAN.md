@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code now provides both exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 raw-text query baseline over committed text evidence. Raw trajectory ingestion and the official LongMemEval-V2 worker remain prerequisites; semantic text-to-HDC retrieval still requires a pinned, validated encoder.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive is now authored, but it is not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -90,6 +90,21 @@ For Mem2ActBench, report exact task success alongside:
 
 Use task-level controls where the same task is run with memory enabled, memory disabled, and a deliberately stale or wrong memory record. A system should improve task success with valid memory and should never become more confidently wrong when memory is stale.
 
+### Context efficiency and trajectory diversity
+
+The trajectory ingester currently produces state-level text records and repeats trajectory-wide metadata in each state's rendered text. This makes a concrete retrieval-quality hypothesis testable: a query matching a goal can allow sibling states from one trajectory to monopolize top-k, even when the question needs multiple independent examples or a transition-specific state. The official AgentRunbook-R baseline explicitly separates raw-state slices, state-transition events, and procedure/hint notes; these are useful comparison arms, not mechanisms to assume are superior.
+
+Evaluate with identical evidence, query set and length-bounded context budget:
+
+- Current BM25 state records with repeated trajectory metadata.
+- Normalized state text plus a separately indexed trajectory-level note.
+- Source-aware selection with a bounded per-trajectory quota, allowing adjacent-state expansion only for transition/workflow queries.
+- Oracle span selection, clearly labeled as a diagnostic upper bound and never included as a competitive method score.
+
+Report top-k trajectory concentration (max share and entropy), distinct trajectories/states, relevant-state recall, contiguous-span precision, duplicate-token ratio, context tokens, query latency/cost, and answer accuracy by each of the five LME-V2 abilities. Static-state queries should penalize unnecessary neighbors; dynamic-state/workflow queries should test whether isolating single states loses transition evidence. Tune on development questions, freeze policy, then evaluate held-out test questions and official LAFS Gain.
+
+This ablation separates a retrieval-policy win from a representation/index win. Keep it separate from HDC kernel throughput and exact-search parity.
+
 ## Required baseline arms
 
 Freeze and compare these as separate arms. Do not conflate them into one advertised “memory” result.
@@ -97,7 +112,7 @@ Freeze and compare these as separate arms. Do not conflate them into one adverti
 1. **No-memory control:** same reader/model without retrieved history.
 2. **Official simple RAG controls:** official query-to-slice and query-to-slice-plus-notes implementations.
 3. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
-4. **Broca BM25 lexical baseline:** the new deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC.
+4. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
 5. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
 6. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
 7. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
@@ -140,12 +155,12 @@ This branch currently provides a binary-query API, not a complete benchmark back
 
 1. Compile and run focused tests on the exact head; keep the PR draft until results are known.
 2. Verify upgrade compatibility from a real prior V2 committed generation: recovery must retain the V2 snapshot/HDC invariants, rebuild the lexical index in memory without mutating old bytes, and publish V3 with a digest-bound index on the next typed commit.
-3. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
-4. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. **The immutable generation-bound inverted index and process-local verified-generation cache are now authored.** The cache is keyed by the exact CURRENT generation + manifest digest; warm queries reuse verified evidence, postings and the read-only HDC mapping, while pointer changes force a complete reload. Next benchmark cold-load vs warm-query p50/p95/p99, index/snapshot resident memory, and cache invalidation under update/delete/revoke. Scope/time/lifecycle stats and exact HDC ranking may still be linear; use the measurements to decide whether per-scope statistic summaries, a seekable/mmap posting layout or ANN candidate generation is justified.
+3. A first Rust-native trajectory ingestion primitive is now authored at `crates/domains/symthaea-broca/src/longmemeval_v2_ingest.rs`. Its record/state fields were cross-checked against the public [LongMemEval-V2 data schema](https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/blob/main/SCHEMA.md) and the official [trajectory preparation code](https://github.com/xiaowu0162/LongMemEval-V2/blob/main/memory_modules/trajectory_store.py): required trajectory identity/domain/environment/goal/outcome/start URL, ordered state index, URL, optional original step/action/thought, accessibility-tree text and screenshot path. It rejects question/answer/evaluator metadata and unknown fields, resolves scope through caller-supplied trusted configuration, emits one text evidence record per state, and binds deterministic IDs plus canonical source digests. Screenshot paths are validated as relative beneath `screenshots/`, but image bytes are not yet materialized or emitted as image context. The Rust tests are authored but unexecuted; the module is not the official `insert(trajectory)`/`query(query, query_image)` worker. Compile/test it and run golden fixtures from a pinned upstream dataset revision before qualification.
+4. Wire the trajectory ingester through typed HDC/evidence commits and the official worker, then run BM25 as the first raw-text retrieval baseline. **The immutable generation-bound inverted index and process-local verified-generation cache are now authored.** The cache is keyed by the exact CURRENT generation + manifest digest; warm queries reuse verified evidence, postings and the read-only HDC mapping, while pointer changes force a complete reload. Next benchmark cold-load vs warm-query p50/p95/p99, index/snapshot resident memory, and cache invalidation under update/delete/revoke. Scope/time/lifecycle stats and exact HDC ranking may still be linear; use the measurements to decide whether per-scope statistic summaries, a seekable/mmap posting layout or ANN candidate generation is justified.
 5. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
 6. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
 7. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
 8. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
 9. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
 
-**Current claim boundary:** the exact-HDC and BM25 query APIs, generation-bound lexical artifact, cache and tests are authored on this branch. They are not compiled or executed in this environment. No warm/cold latency or SOTA advantage is measured. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
+**Current claim boundary:** the exact-HDC and BM25 query APIs, generation-bound lexical artifact, verified-generation cache, and first trajectory-to-text-evidence ingester are authored on this branch. They are not compiled or executed in this environment. The ingester is not yet an official worker and does not encode text into semantic HDC vectors or process benchmark query images. No warm/cold latency or SOTA advantage is measured. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.

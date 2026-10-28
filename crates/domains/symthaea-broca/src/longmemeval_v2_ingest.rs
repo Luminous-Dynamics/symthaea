@@ -1,0 +1,602 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Deterministic LongMemEval-V2 trajectory-to-evidence ingestion.
+//!
+//! This is an ingestion primitive, not the complete official benchmark worker.
+//! It deliberately accepts trajectory records only: question records, gold
+//! answers, evaluator instructions and question IDs are rejected. Each emitted
+//! record is tied to a canonical per-state source digest and a stable opaque ID.
+//! A trusted caller must map (domain, environment) to an authorized scope.
+//! This module does not claim that its text payload is a semantic HDC encoding.
+//!
+//! Integration boundary: the current typed commit path requires a live HDC
+//! vector for every Active evidence ID, so these records cannot yet be committed
+//! as a clean lexical-only corpus without an encoder. Issue #8786 tracks the
+//! necessary data-model separation. Do not create fake vectors to bypass it.
+
+use super::memory_evidence::{
+    EVIDENCE_SCHEMA_VERSION, EvidenceLifecycle, EvidencePayload, EvidenceRecord, EvidenceSource,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Component, Path};
+
+/// Canonicalization contract. Changing this requires a new version and fixture.
+pub const LME_V2_INGEST_SCHEMA_VERSION: &str = "BROCA-LME-V2-TRAJECTORY-INGEST-V1";
+
+const FORBIDDEN_METADATA_KEYS: &[&str] = &[
+    "question",
+    "questionid",
+    "questiontype",
+    "benchmarkquestionid",
+    "answer",
+    "goldanswer",
+    "referenceanswer",
+    "correctanswer",
+    "expectedanswer",
+    "answerkey",
+    "groundtruth",
+    "evalfunction",
+    "evaluationfunction",
+    "evaluator",
+];
+
+/// Official LongMemEval-V2 trajectory JSONL record.
+///
+/// Unknown fields are rejected so a schema expansion cannot silently affect the
+/// memory write path. In particular, question/answer/evaluator fields belong to
+/// the question file, not to trajectory ingestion.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LongMemEvalTrajectory {
+    pub id: String,
+    pub domain: String,
+    pub environment: String,
+    pub goal: String,
+    pub outcome: String,
+    pub start_url: String,
+    pub states: Vec<LongMemEvalState>,
+}
+
+/// One ordered state/action observation from a trajectory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LongMemEvalState {
+    pub state_index: u64,
+    pub step: Option<u64>,
+    pub url: String,
+    pub action: Option<String>,
+    pub thought: Option<String>,
+    pub accessibility_tree: String,
+    pub screenshot: String,
+}
+
+/// Parse, validate and ingest JSONL trajectory records into deterministic text
+/// evidence. The resolver must be backed by trusted configuration; source
+/// metadata is a lookup key, never authority to grant its own scope.
+///
+/// The whole batch fails on an invalid line, unknown schema, duplicate evidence
+/// identity or 64-bit HDC-ID collision. No partial batch is returned.
+pub fn ingest_longmemeval_v2_jsonl<I, S, F>(
+    lines: I,
+    mut resolve_scope: F,
+) -> Result<Vec<EvidenceRecord>, String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<[u8]>,
+    F: FnMut(&str, &str) -> Option<String>,
+{
+    let mut records = Vec::new();
+    let mut evidence_ids = BTreeSet::new();
+    let mut hdc_ids: BTreeMap<u64, String> = BTreeMap::new();
+
+    for (line_idx, line) in lines.into_iter().enumerate() {
+        let raw = line.as_ref();
+        if raw.iter().all(u8::is_ascii_whitespace) {
+            return Err(format!("trajectory JSONL line {} is blank", line_idx + 1));
+        }
+
+        let value: Value = serde_json::from_slice(raw)
+            .map_err(|error| format!("trajectory JSONL line {} is invalid JSON: {error}", line_idx + 1))?;
+        reject_question_metadata(&value)
+            .map_err(|error| format!("trajectory JSONL line {} rejected: {error}", line_idx + 1))?;
+
+        let trajectory: LongMemEvalTrajectory = serde_json::from_value(value)
+            .map_err(|error| format!("trajectory JSONL line {} violates the pinned schema: {error}", line_idx + 1))?;
+        validate_trajectory(&trajectory)
+            .map_err(|error| format!("trajectory JSONL line {} rejected: {error}", line_idx + 1))?;
+
+        let scope_id = resolve_scope(&trajectory.domain, &trajectory.environment)
+            .filter(|scope| !scope.trim().is_empty())
+            .ok_or_else(|| {
+                format!(
+                    "no trusted scope mapping for domain {:?}, environment {:?}",
+                    trajectory.domain, trajectory.environment
+                )
+            })?;
+
+        for state in &trajectory.states {
+            let source_bytes = canonical_source_bytes(&trajectory, state)?;
+            let source_sha256 = sha256_hex(&source_bytes);
+            let identity_bytes = canonical_identity_bytes(&trajectory, state)?;
+            let identity_digest = sha256_hex(&identity_bytes);
+            let evidence_id = format!("lme-v2-state:{identity_digest}");
+            let hdc_id = u64::from_str_radix(&identity_digest[..16], 16)
+                .map_err(|error| format!("invalid stable-ID digest: {error}"))?;
+
+            if !evidence_ids.insert(evidence_id.clone()) {
+                return Err(format!("duplicate trajectory-state identity {evidence_id}"));
+            }
+            if let Some(previous) = hdc_ids.insert(hdc_id, evidence_id.clone()) {
+                if previous != evidence_id {
+                    return Err(format!(
+                        "stable HDC-ID collision between {previous} and {evidence_id}; refusing ingestion"
+                    ));
+                }
+            }
+
+            let text = render_state_evidence(&trajectory, state);
+            let content_sha256 = sha256_hex(text.as_bytes());
+            let record = EvidenceRecord {
+                schema_version: EVIDENCE_SCHEMA_VERSION.to_string(),
+                evidence_id,
+                hdc_id,
+                scope_id: scope_id.clone(),
+                source: EvidenceSource {
+                    trajectory_id: trajectory.id.clone(),
+                    step_id: Some(format!("state:{}", state.state_index)),
+                    step_index: Some(state.state_index),
+                    source_sha256,
+                },
+                payload: EvidencePayload::Text { value: text },
+                content_sha256,
+                lifecycle: EvidenceLifecycle::Active,
+                occurred_at_unix_ms: None,
+                valid_from_unix_ms: None,
+                valid_until_unix_ms: None,
+                superseded_by: None,
+            };
+            record.validate().map_err(|error| format!("invalid emitted evidence: {error}"))?;
+            records.push(record);
+        }
+    }
+
+    Ok(records)
+}
+
+fn validate_trajectory(trajectory: &LongMemEvalTrajectory) -> Result<(), String> {
+    if trajectory.id.trim().is_empty() {
+        return Err("trajectory id must be non-empty".into());
+    }
+    if !matches!(trajectory.domain.as_str(), "web" | "enterprise") {
+        return Err(format!("unsupported LongMemEval-V2 domain {:?}", trajectory.domain));
+    }
+    if trajectory.environment.trim().is_empty() {
+        return Err("environment must be non-empty".into());
+    }
+    if trajectory.goal.trim().is_empty() {
+        return Err("trajectory goal must be non-empty".into());
+    }
+    if trajectory.start_url.trim().is_empty() {
+        return Err("trajectory start_url must be non-empty".into());
+    }
+    if !matches!(trajectory.outcome.as_str(), "success" | "failure") {
+        return Err(format!("unsupported trajectory outcome {:?}", trajectory.outcome));
+    }
+    if trajectory.states.is_empty() {
+        return Err("trajectory must contain at least one state".into());
+    }
+
+    let mut previous_index = None;
+    for state in &trajectory.states {
+        if previous_index.is_some_and(|previous| state.state_index <= previous) {
+            return Err("state_index values must be strictly increasing and unique".into());
+        }
+        if state.url.trim().is_empty() {
+            return Err("state url must be non-empty".into());
+        }
+        if state.screenshot.trim().is_empty() {
+            return Err("state screenshot path must be non-empty".into());
+        }
+        let screenshot_path = Path::new(&state.screenshot);
+        if screenshot_path.is_absolute() || !screenshot_path.starts_with("screenshots") {
+            return Err("state screenshot path must be relative beneath screenshots/".into());
+        }
+        if screenshot_path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+        {
+            return Err("state screenshot path must not contain parent-directory traversal".into());
+        }
+        previous_index = Some(state.state_index);
+    }
+    Ok(())
+}
+
+/// Stable canonical bytes for a state and the trajectory metadata that gives it
+/// meaning. This function is public so an audit/replay tool can independently
+/// recompute EvidenceSource.source_sha256.
+pub fn canonical_source_bytes(
+    trajectory: &LongMemEvalTrajectory,
+    state: &LongMemEvalState,
+) -> Result<Vec<u8>, String> {
+    // Hash only the fields that substantiate this evidence row. Including the
+    // full states array here would serialize the whole trajectory once per
+    // state, creating avoidable quadratic ingestion work for long histories.
+    let envelope = serde_json::json!({
+        "schema_version": LME_V2_INGEST_SCHEMA_VERSION,
+        "trajectory_id": &trajectory.id,
+        "domain": &trajectory.domain,
+        "environment": &trajectory.environment,
+        "goal": &trajectory.goal,
+        "outcome": &trajectory.outcome,
+        "start_url": &trajectory.start_url,
+        "state": state,
+    });
+    let canonical = canonicalize_value(envelope);
+    serde_json::to_vec(&canonical)
+        .map_err(|error| format!("failed to canonicalize trajectory state source: {error}"))
+}
+
+fn canonical_identity_bytes(
+    trajectory: &LongMemEvalTrajectory,
+    state: &LongMemEvalState,
+) -> Result<Vec<u8>, String> {
+    let identity = serde_json::json!({
+        "schema_version": LME_V2_INGEST_SCHEMA_VERSION,
+        "domain": trajectory.domain,
+        "environment": trajectory.environment,
+        "trajectory_id": trajectory.id,
+        "state_index": state.state_index,
+    });
+    serde_json::to_vec(&canonicalize_value(identity))
+        .map_err(|error| format!("failed to canonicalize trajectory-state identity: {error}"))
+}
+
+fn canonicalize_value(value: Value) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(items.into_iter().map(canonicalize_value).collect()),
+        Value::Object(object) => {
+            let mut entries: Vec<(String, Value)> = object.into_iter().collect();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            let mut sorted = Map::new();
+            for (key, value) in entries {
+                sorted.insert(key, canonicalize_value(value));
+            }
+            Value::Object(sorted)
+        }
+        scalar => scalar,
+    }
+}
+
+fn reject_question_metadata(value: &Value) -> Result<(), String> {
+    let Some(trajectory) = value.as_object() else {
+        // The strict typed parser below will report a non-object trajectory.
+        return Ok(());
+    };
+    reject_reserved_keys(trajectory.keys())?;
+
+    // State objects have a fixed schema too. Do not recursively inspect the
+    // arbitrary JSON value inside an action: a real form field can legitimately
+    // be named "answer" without being benchmark gold-answer metadata.
+    if let Some(Value::Array(states)) = trajectory.get("states") {
+        for state in states {
+            if let Some(fields) = state.as_object() {
+                reject_reserved_keys(fields.keys())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn reject_reserved_keys<'a>(keys: impl IntoIterator<Item = &'a String>) -> Result<(), String> {
+    for key in keys {
+        let normalized: String = key
+            .chars()
+            .filter(|character| character.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect();
+        if FORBIDDEN_METADATA_KEYS.contains(&normalized.as_str()) {
+            return Err(format!("question/evaluation metadata key {key:?} is forbidden"));
+        }
+    }
+    Ok(())
+}
+
+fn render_state_evidence(
+    trajectory: &LongMemEvalTrajectory,
+    state: &LongMemEvalState,
+) -> String {
+    let mut output = String::new();
+    output.push_str("Trajectory goal: ");
+    output.push_str(&trajectory.goal);
+    output.push_str("\nOutcome: ");
+    output.push_str(&trajectory.outcome);
+    output.push_str("\nDomain: ");
+    output.push_str(&trajectory.domain);
+    output.push_str("\nEnvironment: ");
+    output.push_str(&trajectory.environment);
+
+    output.push_str("\nStart URL: ");
+    output.push_str(&trajectory.start_url);
+    output.push_str(&format!("\nState index: {}", state.state_index));
+
+    if let Some(step) = state.step {
+        output.push_str(&format!("\nOriginal step: {step}"));
+    }
+    output.push_str("\nURL: ");
+    output.push_str(&state.url);
+    if let Some(action) = &state.action {
+        if !action.trim().is_empty() {
+            output.push_str("\nAction: ");
+            output.push_str(action);
+        }
+    }
+    if let Some(thought) = &state.thought {
+        if !thought.trim().is_empty() {
+            output.push_str("\nThought: ");
+            output.push_str(thought);
+        }
+    }
+    if !state.accessibility_tree.trim().is_empty() {
+        output.push_str("\nAccessibility tree:\n");
+        output.push_str(&state.accessibility_tree);
+    }
+
+    output
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_line() -> String {
+        serde_json::json!({
+            "id": "traj-001",
+            "domain": "web",
+            "environment": "shop-alpha",
+            "goal": "Find the replacement filter and add it to the cart",
+            "outcome": "success",
+            "start_url": "https://shop.example/",
+            "states": [{
+                "state_index": 0,
+                "step": 1,
+                "url": "https://shop.example/search",
+                "action": "click search",
+                "thought": "Search for the exact replacement part",
+                "accessibility_tree": "textbox Search; button Find",
+                "screenshot": "screenshots/traj-001/0.png"
+            }, {
+                "state_index": 2,
+                "step": 3,
+                "url": "https://shop.example/item/7",
+                "action": "click add to cart",
+                "thought": null,
+                "accessibility_tree": "button Add to cart",
+                "screenshot": "screenshots/traj-001/2.png"
+            }]
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn ingestion_emits_one_valid_evidence_record_per_state() {
+        let line = sample_line();
+        let records = ingest_longmemeval_v2_jsonl([line.as_bytes()], |domain, environment| {
+            (domain == "web" && environment == "shop-alpha")
+                .then(|| "test:shop-alpha".to_string())
+        })
+        .expect("valid trajectory");
+
+        assert_eq!(records.len(), 2);
+        assert_ne!(records[0].evidence_id, records[1].evidence_id);
+        assert_ne!(records[0].hdc_id, records[1].hdc_id);
+        assert_eq!(records[0].scope_id, "test:shop-alpha");
+        assert_eq!(records[0].source.trajectory_id, "traj-001");
+        assert_eq!(records[0].source.step_index, Some(0));
+        assert!(records.iter().all(|record| record.validate().is_ok()));
+        assert!(matches!(
+            &records[0].payload,
+            EvidencePayload::Text { value } if value.contains("Accessibility tree:\ntextbox Search")
+        ));
+    }
+
+    #[test]
+    fn source_digest_and_ids_ignore_json_whitespace_and_object_key_order() {
+        let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":"https://example.test/","states":[{"state_index":0,"step":1,"url":"https://example.test","action":"click target x","thought":"t","accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}]}"#;
+        let second = r#"{
+            "states":[{"screenshot":"screenshots/traj-order/0.png","accessibility_tree":"tree","thought":"t","action":"click target x","url":"https://example.test","step":1,"state_index":0}],
+            "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":"https://example.test/","id":"traj-order"
+        }"#;
+        let resolver = |_: &str, _: &str| Some("scope".to_string());
+
+        let first_records = ingest_longmemeval_v2_jsonl([first.as_bytes()], resolver).unwrap();
+        let second_records = ingest_longmemeval_v2_jsonl([second.as_bytes()], resolver).unwrap();
+        assert_eq!(first_records.len(), 1);
+        assert_eq!(second_records.len(), 1);
+        let left = &first_records[0];
+        let right = &second_records[0];
+        assert_eq!(left.evidence_id, right.evidence_id);
+        assert_eq!(left.hdc_id, right.hdc_id);
+        assert_eq!(left.source.source_sha256, right.source.source_sha256);
+        assert_eq!(left.content_sha256, right.content_sha256);
+
+        let value: Value = serde_json::from_slice(first.as_bytes()).unwrap();
+        let trajectory: LongMemEvalTrajectory = serde_json::from_value(value).unwrap();
+        let canonical = canonical_source_bytes(&trajectory, &trajectory.states[0]).unwrap();
+        assert!(left.verify_source_bytes(&canonical).is_ok());
+    }
+
+    #[test]
+    fn changing_a_sibling_state_does_not_change_another_states_source_digest() {
+        let mut value: Value = serde_json::from_str(&sample_line()).unwrap();
+        let trajectory: LongMemEvalTrajectory = serde_json::from_value(value.clone()).unwrap();
+        let original = canonical_source_bytes(&trajectory, &trajectory.states[0]).unwrap();
+
+        value["states"][1]["thought"] = Value::String("a different later observation".into());
+        let changed: LongMemEvalTrajectory = serde_json::from_value(value).unwrap();
+        let after = canonical_source_bytes(&changed, &changed.states[0]).unwrap();
+
+        assert_eq!(original, after);
+    }
+
+    #[test]
+    fn question_answer_and_evaluator_metadata_fail_closed() {
+        let base: Value = serde_json::from_str(&sample_line()).unwrap();
+        for (key, value) in [
+            ("question_id", Value::String("q-001".into())),
+            ("answer", Value::String("gold".into())),
+            ("eval_function", Value::String("contains".into())),
+        ] {
+            let mut injected = base.clone();
+            injected.as_object_mut().unwrap().insert(key.into(), value);
+            assert!(
+                ingest_longmemeval_v2_jsonl([injected.to_string().into_bytes()], |_, _| Some("scope".into()))
+                    .is_err(),
+                "must reject top-level {key}"
+            );
+        }
+
+        let mut nested = base;
+        nested["states"][0].as_object_mut().unwrap()
+            .insert("questionType".into(), Value::String("static".into()));
+        assert!(
+            ingest_longmemeval_v2_jsonl([nested.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
+        );
+    }
+
+    #[test]
+    fn action_text_may_contain_answer_without_being_evaluator_metadata() {
+        let mut trajectory: Value = serde_json::from_str(&sample_line()).unwrap();
+        trajectory["states"][0]["action"] =
+            Value::String("fill a field labelled answer with supplied input".into());
+        let records = ingest_longmemeval_v2_jsonl(
+            [trajectory.to_string().into_bytes()],
+            |_, _| Some("scope".to_string()),
+        )
+        .expect("action text is trajectory data, not an evaluator key");
+        assert_eq!(records.len(), 2);
+    }
+
+    #[test]
+    fn unknown_fields_and_invalid_order_are_rejected() {
+        let mut unknown: Value = serde_json::from_str(&sample_line()).unwrap();
+        unknown.as_object_mut().unwrap().insert("new_field".into(), Value::Bool(true));
+        assert!(
+            ingest_longmemeval_v2_jsonl([unknown.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
+        );
+
+        let mut unordered: Value = serde_json::from_str(&sample_line()).unwrap();
+        unordered["states"][1]["state_index"] = Value::from(0);
+        assert!(
+            ingest_longmemeval_v2_jsonl([unordered.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
+        );
+    }
+
+    #[test]
+    fn missing_trusted_scope_mapping_is_an_error() {
+        let line = sample_line();
+        let result = ingest_longmemeval_v2_jsonl([line.as_bytes()], |_, _| None);
+        assert!(result.unwrap_err().contains("no trusted scope mapping"));
+    }
+
+    #[test]
+    fn repeated_trajectory_state_identity_is_rejected() {
+        let line = sample_line();
+        let result = ingest_longmemeval_v2_jsonl(
+            [line.as_bytes(), line.as_bytes()],
+            |_, _| Some("scope".to_string()),
+        );
+        assert!(result.unwrap_err().contains("duplicate trajectory-state identity"));
+    }
+
+    #[test]
+    fn required_screenshot_url_and_safe_path_are_enforced() {
+        let base: Value = serde_json::from_str(&sample_line()).unwrap();
+
+        let mut missing_screenshot = base.clone();
+        missing_screenshot["states"][0].as_object_mut().unwrap().remove("screenshot");
+        assert!(ingest_longmemeval_v2_jsonl(
+            [missing_screenshot.to_string().into_bytes()],
+            |_, _| Some("scope".into())
+        ).is_err());
+
+        let mut missing_url = base.clone();
+        missing_url["states"][0].as_object_mut().unwrap().remove("url");
+        assert!(ingest_longmemeval_v2_jsonl(
+            [missing_url.to_string().into_bytes()],
+            |_, _| Some("scope".into())
+        ).is_err());
+
+        let mut traversal = base;
+        traversal["states"][0]["screenshot"] = Value::String("screenshots/../outside.png".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [traversal.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .unwrap_err()
+            .contains("parent-directory traversal")
+        );
+
+        let mut absolute = base.clone();
+        absolute["states"][0]["screenshot"] =
+            Value::String("/tmp/outside.png".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [absolute.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .unwrap_err()
+            .contains("relative beneath screenshots")
+        );
+
+        let mut invalid_step = base.clone();
+        invalid_step["states"][0]["step"] = Value::String("not-an-integer".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [invalid_step.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .is_err()
+        );
+
+        let mut invalid_action = base;
+        invalid_action["states"][0]["action"] =
+            serde_json::json!({"type": "click", "target": "search"});
+        assert!(
+            ingest_longmemeval_v2_jsonl(
+                [invalid_action.to_string().into_bytes()],
+                |_, _| Some("scope".into())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn blank_lines_and_unsupported_domains_fail_closed() {
+        assert!(
+            ingest_longmemeval_v2_jsonl([&b"  "[..]], |_, _| Some("scope".into())).is_err()
+        );
+        let mut invalid: Value = serde_json::from_str(&sample_line()).unwrap();
+        invalid["domain"] = Value::String("mobile".into());
+        assert!(
+            ingest_longmemeval_v2_jsonl([invalid.to_string().into_bytes()], |_, _| Some("scope".into())).is_err()
+        );
+    }
+}
