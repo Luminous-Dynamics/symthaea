@@ -68,6 +68,9 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
     collect_rust_files(&root, &mut files)?;
     files.sort();
     files.dedup();
+    if files.is_empty() {
+        bail!("effect primitive scan found no Rust source files; refusing an empty/inconclusive report");
+    }
 
     let mut candidates = Vec::new();
     let mut parse_failures = Vec::new();
