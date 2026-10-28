@@ -786,7 +786,7 @@ mod tests {
             &source_hash,
         ).unwrap();
 
-        assert_eq!(records.len(), 5);
+        assert_eq!(records.len(), 6);
         for record in &records {
             record.verify_source_bytes(&source).unwrap();
             assert!(!record.source.source_pointer.contains("outcome"));
