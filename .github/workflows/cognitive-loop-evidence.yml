@@ -14,6 +14,7 @@ on:
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
+      - "xtask/src/cognitive_adaptation_audit.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
@@ -95,6 +96,9 @@ jobs:
 
       - name: Test adaptation panel coverage and aggregation
         run: cargo test --locked -p xtask cognitive_adaptation_panel
+
+      - name: Test independent adaptation panel audit failure modes
+        run: cargo test --locked -p xtask cognitive_adaptation_audit
 
       - name: Test scalar drift baseline failure modes
         run: cargo test --locked -p xtask cognitive_drift_baselines
