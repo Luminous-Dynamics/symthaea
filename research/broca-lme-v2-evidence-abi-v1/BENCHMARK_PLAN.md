@@ -28,7 +28,20 @@ The official [LongMemEval-V2 repository](https://github.com/xiaowu0162/LongMemEv
 | Codex | 69.9% | 177.2 s | 68.7% | 185.8 s |
 | AgentRunbook-C | 74.9% | 108.3 s | 70.1% | 139.9 s |
 
-These are **external reference points**, not measurements made on this branch. Hardware, model, prompt, cost and evaluator differences can invalidate a direct comparison. Use the official harness and record the benchmark revision and full run configuration before reporting a comparison. The official results section currently lists the released baseline frontier above; the separately labeled official leaderboard tables report that entries are coming soon. Treat the baseline table as the reproducible reference frontier and do not import third-party claims as official leaderboard results.
+These are **released baseline reference points**, not measurements made on this branch. The benchmark defines the fixed reference frontier from RAG query-to-slice + notes, Codex, AgentRunbook-R, and AgentRunbook-C; its official LAFS Gain measures improvement to that accuracy–latency frontier over budgets from 1 to 200 seconds. See the [official scoring definition](https://xiaowu0162.github.io/longmemeval-v2/) and [leaderboard packaging rules](https://github.com/xiaowu0162/LongMemEval-V2/blob/main/leaderboard/README.md).
+
+A separate [AgentRunbook-C V2 research update](https://xiaowu0162.github.io/longmemeval-v2/agentrunbook-c-v2/) reports additional small-tier operating points:
+
+| Model / effort | Controller | Accuracy | Average memory-query latency |
+|---|---|---:|---:|
+| GPT-5.4-mini, medium | AgentRunbook-C V1 | 70.30% | 70.00 s |
+| GPT-5.4-mini, medium | AgentRunbook-C V2 | 72.73% | 56.68 s |
+| GPT-5.4-mini, xhigh | AgentRunbook-C V1 | 74.90% | 108.30 s |
+| GPT-5.4-mini, xhigh | AgentRunbook-C V2 | 75.61% | 130.54 s |
+| GPT-5.6 Luna, medium | AgentRunbook-C V2 | 66.52% | 24.72 s |
+| GPT-5.6 Luna, xhigh | AgentRunbook-C V2 | 75.17% | 48.94 s |
+
+These points use different model/reasoning settings and the controller's measured online memory-query latency; do not compare them directly to an HDC kernel microbenchmark. The public leaderboard section on the benchmark overview still marks its tier tables as coming soon, so cite these as published method-page results, not as an official leaderboard rank.
 
 Two complementary benchmarks matter because answer recall is not the whole job:
 
@@ -54,15 +67,15 @@ Start with at least 10,000 seeded mutation/fault schedules across commit phases 
 
 ### 2. Official long-term-memory performance
 
-The first credible frontier target is deliberately demanding:
+Use two levels of frontier targets rather than one stale scalar threshold:
 
-- **Small tier:** accuracy strictly above 74.9% and benchmark-reported latency strictly below 108.3 seconds.
-- **Medium tier:** accuracy strictly above 70.1% and benchmark-reported latency strictly below 139.9 seconds.
-- Submit the official **LAFS Gain** metric; do not replace the benchmark's score with an internal weighted score.
-- Report the official score and latency, plus local p50/p95/p99 latency, tokens/context returned, peak memory, storage bytes, query compute and cost per question.
-- Use paired bootstrap intervals (and paired correctness tests where appropriate); report per-ability results and failure cases. Only claim improvement when the official run is reproducible and uncertainty supports the claim.
+1. **Official acceptance:** submit a positive official ΔLAFS / LAFS Gain against the benchmark's fixed reference frontier using the actual official packaging helper. Report every operating point and its model, reasoning effort, reader, context budget and latency definition.
+2. **Matched V2 challenge points:** under the same model/reasoning setting and official harness, aim to beat at least one published AgentRunbook-C V2 point on both accuracy and memory-query latency—for example, exceed 72.73% while staying below 56.68 seconds at GPT-5.4-mini medium, and separately exceed 75.61% while staying below 130.54 seconds at GPT-5.4-mini xhigh. The GPT-5.6 Luna V2 points (66.52% / 24.72 s at medium; 75.17% / 48.94 s at xhigh) are separate settings and should be matched only using that same setup.
+3. **Baseline frontier:** retain the original fixed reference-table goals (>74.9% under 108.3 seconds on small; >70.1% under 139.9 seconds on medium), but do not confuse these with a claim to beat every newer V2 operating point.
+4. Report official LAFS Gain; do not replace it with an internal weighted score. Also report local p50/p95/p99 latency, tokens/context returned, peak resident memory, index size, cold-load vs warm-query times, query compute and cost per question.
+5. Use paired bootstrap intervals (and paired correctness tests where appropriate); report per-ability results and failure cases. Only claim an improvement when the official run is reproducible and uncertainty supports the claim.
 
-A result that is more accurate but slower is not enough to claim that the current frontier has been beaten. A result that is faster but loses state-tracking or multi-hop correctness is not enough either. Publish the Pareto trade-off rather than selecting only a favorable metric.
+A result that is more accurate but slower may still improve LAFS at some latency budgets, but it does not Pareto-dominate the compared point. A result that is faster but loses state-tracking or multi-hop correctness is not a better system. Publish the whole accuracy–latency frontier and matched configuration details.
 
 ### 3. Dynamic memory and task execution
 
@@ -128,11 +141,11 @@ This branch currently provides a binary-query API, not a complete benchmark back
 1. Compile and run focused tests on the exact head; keep the PR draft until results are known.
 2. Verify upgrade compatibility from a real prior V2 committed generation: recovery must retain the V2 snapshot/HDC invariants, rebuild the lexical index in memory without mutating old bytes, and publish V3 with a digest-bound index on the next typed commit.
 3. Implement a trajectory ingester that binds the exact canonical trajectory/step bytes to stable evidence identities and HDC vectors.
-4. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. **The immutable generation-bound inverted index is now implemented** and its exact digest is bound by the V3 commit manifest. Indexed ranking eliminates per-query tokenization and text-digest hashing, but recovery still parses and structurally validates the entire lexical artifact, reconstructs evidence records, and scans the HDC checksum. The next optimization is a manifest-digest-keyed verified-generation cache or seekable/mmap posting layout, measured against this exact correctness reference.
+4. Run BM25 as the first raw-text retrieval baseline once trajectory ingestion exists. **The immutable generation-bound inverted index and process-local verified-generation cache are now authored.** The cache is keyed by the exact CURRENT generation + manifest digest; warm queries reuse verified evidence, postings and the read-only HDC mapping, while pointer changes force a complete reload. Next benchmark cold-load vs warm-query p50/p95/p99, index/snapshot resident memory, and cache invalidation under update/delete/revoke. Scope/time/lifecycle stats and exact HDC ranking may still be linear; use the measurements to decide whether per-scope statistic summaries, a seekable/mmap posting layout or ANN candidate generation is justified.
 5. Separately select and pin a real text-to-HDC encoder; compare it against BM25 without calling structured thought channels a text encoder.
 6. Build the official LongMemEval-V2 `insert(trajectory)` / `query(query, query_image)` adapter. The query path must use the committed-generation resolver and return only the official `type/value` context items.
 7. Add source-to-context and context-to-answer/action attribution, then run the official baselines and full suite.
 8. Run MemoryAgentBench and Mem2ActBench as complementary evaluations; preserve their task-level outputs, not just aggregates.
 9. Only after correctness and replay/restart gates pass, compare exact retrieval to approximate/hybrid retrieval and optimize the accuracy–latency frontier.
 
-**Current claim boundary:** the exact-HDC and BM25 query APIs and tests are authored on this branch. They are not compiled or executed in this environment. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
+**Current claim boundary:** the exact-HDC and BM25 query APIs, generation-bound lexical artifact, cache and tests are authored on this branch. They are not compiled or executed in this environment. No warm/cold latency or SOTA advantage is measured. There is no measured LongMemEval-V2 result, no measured SOTA advantage, no real process-kill qualification, and no physical-erasure claim.
