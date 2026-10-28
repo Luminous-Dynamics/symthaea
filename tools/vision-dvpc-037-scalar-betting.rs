@@ -240,7 +240,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
     for path in 0..PATHS {
         let mut code = path;
         let mut path_probability = 1.0;
-        let mut samples = Vec::with_capacity(s.horizon);
         let mut wald_looks: Vec<Option<IntervalLook>> = vec![None; s.horizon + 1];
         let mut hoeffding_looks: Vec<Option<IntervalLook>> = vec![None; s.horizon + 1];
         let mut bet_looks: Vec<Option<BetLook>> = vec![None; s.horizon + 1];
@@ -260,7 +259,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
                 3 => weight_b,
                 _ => unreachable!(),
             };
-            samples.push(sample);
 
             let delta = sample - mean;
             mean += delta / look as f64;
@@ -332,9 +330,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
         let mut hoeffding_ever = false;
         let mut hoeffding_all_covered = true;
         let mut betting_ever = false;
-        let mut first_wald = None;
-        let mut first_hoeffding = None;
-        let mut first_betting = None;
 
         for look in 1..=s.horizon {
             let cs = hoeffding_looks[look].as_ref().unwrap();
@@ -343,7 +338,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
             }
             if !hoeffding_ever && cs.crosses_threshold {
                 hoeffding_ever = true;
-                first_hoeffding = Some(look);
                 hoeffding.first_crossing[look] += path_probability;
             }
             if hoeffding_ever {
@@ -362,7 +356,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
                 }
                 if !wald_ever && w.crosses_threshold {
                     wald_ever = true;
-                    first_wald = Some(look);
                     wald.first_crossing[look] += path_probability;
                 }
                 if wald_ever {
@@ -378,7 +371,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
             let bet = bet_looks[look].as_ref().unwrap();
             if !betting_ever && bet.rejects {
                 betting_ever = true;
-                first_betting = Some(look);
                 betting.first_rejection[look] += path_probability;
             }
             if betting_ever {
@@ -387,8 +379,6 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
                 betting.survival[look] += path_probability;
             }
         }
-
-        let _ = (first_wald, first_hoeffding, first_betting);
     }
 
     if (total_probability_mass - 1.0).abs() > MASS_TOLERANCE {
