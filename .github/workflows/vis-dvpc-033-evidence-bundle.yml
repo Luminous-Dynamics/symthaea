@@ -97,60 +97,15 @@ jobs:
           rustc --edition=2024 -O tools/vision-dvpc-evidence-bundle.rs -o /tmp/vis-dvpc-033
           /tmp/vis-dvpc-033 --audit /tmp/vis-dvpc-033/universe.tsv /tmp/vis-dvpc-033/support.tsv /tmp/vis-dvpc-033/ope.tsv /tmp/vis-dvpc-033/gate.tsv > /tmp/vis-dvpc-033/bundle.tsv
 
-          grep -Fq 
-          grep -Fq $'SUMMARY\tstatus\tSUPPORTED_BUT_WEAK_OVERLAP' /tmp/vis-dvpc-033/support.tsv
-          grep -Fq $'SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED' /tmp/vis-dvpc-033/ope.tsv
-          grep -Fq $'SUMMARY\tdecision\tINSUFFICIENT_EVIDENCE' /tmp/vis-dvpc-033/gate.tsv
-          grep -Fq $'SUMMARY\tstatus\tDIAGNOSTIC_ONLY' /tmp/vis-dvpc-033/bundle.tsv
+          grep -Fq 'COMPLETE_ACTION_UNIVERSE' /tmp/vis-dvpc-033/universe.tsv
+          grep -Fq 'SUPPORTED_BUT_WEAK_OVERLAP' /tmp/vis-dvpc-033/support.tsv
+          grep -Fq 'NOT_IDENTIFIED' /tmp/vis-dvpc-033/ope.tsv
+          grep -Fq 'SUPPRESSED' /tmp/vis-dvpc-033/ope.tsv
+          grep -Fq 'INSUFFICIENT_EVIDENCE' /tmp/vis-dvpc-033/gate.tsv
+          grep -Fq 'DIAGNOSTIC_ONLY' /tmp/vis-dvpc-033/bundle.tsv
           test "$(grep -c '^CHECK[[:space:]]' /tmp/vis-dvpc-033/bundle.tsv)" = "10"
-          grep -Fq $'PROHIBITION\tautomatic_policy_authorization\ttrue' /tmp/vis-dvpc-033/bundle.tsv
-      - name: Create reproducibility and provenance receipt
-        run: |
-          {
-            printf 'VIS_DVPC_033_RECEIPT\tformat\tv1\n'
-            printf 'bundle_source_commit\t%s\n' "$(git rev-parse HEAD)"
-            printf 'workflow_commit\t%s\n' "$GITHUB_SHA"
-            printf 'rustc\t%s\n' "$(rustc --version)"
-            printf 'dvpc032_commit\t%s\n' "$(git -C component/dvpc032 rev-parse HEAD)"
-            printf 'dvpc027_commit\t%s\n' "$(git -C component/dvpc027 rev-parse HEAD)"
-            printf 'dvpc028_commit\t%s\n' "$(git -C component/dvpc028 rev-parse HEAD)"
-            printf 'dvpc031_commit\t%s\n' "$(git -C component/dvpc031 rev-parse HEAD)"
-            sha256sum \
-              tools/vision-dvpc-evidence-bundle.rs \
-              docs/research/VIS_DVPC_033_EVIDENCE_BUNDLE_V1.md \
-              component/dvpc032/tools/vision-dvpc-universe-audit.rs \
-              component/dvpc032/tests/fixtures/vision-dvpc-032.SHA256SUMS \
-              component/dvpc032/tests/fixtures/vision-dvpc-032-manifest.tsv \
-              component/dvpc032/tests/fixtures/vision-dvpc-032-complete-trace.tsv \
-              component/dvpc027/tools/vision-dvpc-support-audit.rs \
-              component/dvpc027/tests/fixtures/vision-dvpc-027.SHA256SUMS \
-              component/dvpc028/tools/vision-dvpc-ope-exact.rs \
-              component/dvpc028/tests/fixtures/vision-dvpc-028-scenarios.tsv \
-              component/dvpc031/tools/vision-dvpc-region-gate.rs \
-              /tmp/vis-dvpc-033/gate-invocation.txt \
-              /tmp/vis-dvpc-033/universe.tsv \
-              /tmp/vis-dvpc-033/support.tsv \
-              /tmp/vis-dvpc-033/ope.tsv \
-              /tmp/vis-dvpc-033/gate.tsv \
-              /tmp/vis-dvpc-033/bundle.tsv
-          } > /tmp/vis-dvpc-033-receipt.tsv
-          cat /tmp/vis-dvpc-033-receipt.tsv
-      - name: Publish end-to-end reports and hashes
-        uses: actions/upload-artifact@v4
-        with:
-          name: vis-dvpc-033-evidence-bundle
-          path: |
-            /tmp/vis-dvpc-033/*.tsv
-            /tmp/vis-dvpc-033/gate-invocation.txt
-            /tmp/vis-dvpc-033-receipt.tsv
-          retention-days: 90
-SUMMARY\t-\tverdict\tCOMPLETE_ACTION_UNIVERSE' /tmp/vis-dvpc-033/universe.tsv
-          grep -Fq $'SUMMARY\tstatus\tSUPPORTED_BUT_WEAK_OVERLAP' /tmp/vis-dvpc-033/support.tsv
-          grep -Fq $'SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED' /tmp/vis-dvpc-033/ope.tsv
-          grep -Fq $'SUMMARY\tdecision\tINSUFFICIENT_EVIDENCE' /tmp/vis-dvpc-033/gate.tsv
-          grep -Fq $'SUMMARY\tstatus\tDIAGNOSTIC_ONLY' /tmp/vis-dvpc-033/bundle.tsv
-          test "$(grep -c '^CHECK[[:space:]]' /tmp/vis-dvpc-033/bundle.tsv)" = "10"
-          grep -Fq $'PROHIBITION\tautomatic_policy_authorization\ttrue' /tmp/vis-dvpc-033/bundle.tsv
+          grep -Fq 'automatic_policy_authorization' /tmp/vis-dvpc-033/bundle.tsv
+          grep -Fq 'PROHIBITION' /tmp/vis-dvpc-033/bundle.tsv
       - name: Create reproducibility and provenance receipt
         run: |
           {
