@@ -622,7 +622,6 @@ where
 const CUSUM_SCALE: usize = 25;
 const CUSUM_UPPER_INCREMENT: usize = 12;
 const CUSUM_LOWER_INCREMENT: usize = 13;
-const CUSUM_SIDE_ALPHA: f64 = PER_CELL_ALPHA / 2.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CusumDirection {
@@ -825,15 +824,31 @@ fn evaluate_cusum_scenario(
         .collect()
 }
 
-fn print_cusum_baseline_csv() {
-    let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
-    let calibration_alarm_probability = cusum_alarm_probability(
-        HORIZONS[HORIZONS.len() - 1],
-        threshold,
-        COMPOSITE_NULL_UPPER,
+fn composite_boundary_reference_alarm_probability(horizon: usize) -> f64 {
+    let table = family_alarm_table(
+        EProcessFamily::CompositeBandBetting,
+        NOMINAL_P,
+        horizon,
     );
+    evaluate_with_alarm(
+        COMPOSITE_NULL_UPPER,
+        None,
+        0,
+        horizon,
+        |n, successes| table[n][successes],
+    )
+    .false_alarm_probability
+}
+
+fn print_cusum_baseline_csv() {
+    let horizon = HORIZONS[HORIZONS.len() - 1];
+    let matched_reference_alarm_probability = composite_boundary_reference_alarm_probability(horizon);
+    let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
+    let calibration_boundary_alarm_probability =
+        cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER);
+    let family_worst_case_union_bound = 2.0 * calibration_boundary_alarm_probability;
     println!(
-        "direction,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_lower,null_upper,threshold_scaled,threshold_score,calibration_boundary_alarm_probability,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_side_alpha,survival_probability"
+        "direction,scenario,scenario_class,horizon,change_after,p0,stream_pre_p,p1,null_lower,null_upper,threshold_scaled,threshold_score,matched_reference_alarm_probability,calibration_boundary_alarm_probability,family_worst_case_union_bound,scenario_or_pre_shift_alarm_probability,post_shift_detection_probability,mean_post_shift_detection_delay,per_cell_alpha,survival_probability"
     );
     for direction in CusumDirection::ALL {
         for scenario in SCENARIOS {
@@ -848,7 +863,7 @@ fn print_cusum_baseline_csv() {
                     .map(|p| format!("{p:.12}"))
                     .unwrap_or_else(|| "NA".to_owned());
                 println!(
-                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{:.12},{},{:.12},{:.12},{:.12},{},{},{:.12},{:.12}",
+                    "{},{},{},{},{},{:.12},{:.12},{},{:.12},{:.12},{},{:.12},{:.12},{:.12},{:.12},{:.12},{},{},{:.12},{:.12}",
                     direction.name(),
                     scenario.name,
                     scenario.class.name(),
@@ -861,11 +876,13 @@ fn print_cusum_baseline_csv() {
                     COMPOSITE_NULL_UPPER,
                     threshold,
                     threshold as f64 / CUSUM_SCALE as f64,
-                    calibration_alarm_probability,
+                    matched_reference_alarm_probability,
+                    calibration_boundary_alarm_probability,
+                    family_worst_case_union_bound,
                     metrics.scenario_or_pre_shift_alarm_probability,
-                    csv_optional(metrics.post_shift_detection_probability),
-                    csv_optional(metrics.mean_post_shift_detection_delay),
-                    CUSUM_SIDE_ALPHA,
+                    csv_optional_precise(metrics.post_shift_detection_probability),
+                    csv_optional_precise(metrics.mean_post_shift_detection_delay),
+                    PER_CELL_ALPHA,
                     metrics.survival_probability
                 );
             }
@@ -954,6 +971,13 @@ fn print_eprocess_family_csv() {
 fn csv_optional(value: Option<f64>) -> String {
     match value {
         Some(number) if number.is_finite() => format!("{number:.12}"),
+        _ => "NA".to_owned(),
+    }
+}
+
+fn csv_optional_precise(value: Option<f64>) -> String {
+    match value {
+        Some(number) if number.is_finite() => format!("{number:.12e}"),
         _ => "NA".to_owned(),
     }
 }
