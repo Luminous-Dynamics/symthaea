@@ -6,15 +6,15 @@ The machine-readable inventory lives at [effect-surface-registry.v1.json](effect
 
 From the repository root:
 
-\`\`\`sh
+```sh
 cargo run -p xtask -- effect-surface-registry
-\`\`\`
+```
 
 To make a local pipeline reject this starter registry until every record is marked qualified and carries a syntactically complete evidence record:
 
-\`\`\`sh
+```sh
 cargo run -p xtask -- effect-surface-registry --require-evidence-records
-\`\`\`
+```
 
 The strict invocation is expected to fail today because none of the entries has exact qualification evidence. This is intentional. The flag checks that records claim qualification and carry evidence-shaped identities; it does not independently verify receipts, so its success is not a security qualification result.
 
@@ -23,9 +23,9 @@ The strict invocation is expected to fail today because none of the entries has 
 
 Run the AST discovery command from the repository root:
 
-\`\`\`sh
+```sh
 cargo run -p xtask -- effect-primitive-scan --out reports/effect-primitive-scan.json
-\`\`\`
+```
 
 It recursively scans Rust files across the repository, excluding generated/cache directories (.git, target, node_modules, .direnv, .cache, .venv, .devenv). The deterministic JSON report records:
 
