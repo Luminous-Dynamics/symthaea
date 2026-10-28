@@ -158,3 +158,9 @@ These are engineering targets, not measured results:
 - Every report separately counts requests, decisions, adapter calls, side effects, independently confirmed postconditions, unknown outcomes, receipt failures, timeouts and missing/incomplete rows. A crash after possible effect is not reclassified as “no effect,” and an exit code alone is not a postcondition.
 
 External context: APort Vault reports 0 unpermitted transfers across 69,297 authorization-layer evaluations at policy Levels 2–4, with 25,370 payments still executed; its dataset had 225,964 completed out of 244,776 planned evaluations, so its own missing rows remain part of the comparison. Mergen's published 551-case suite is a decision-only gate measurement, not an end-to-end side-effect guarantee. APS reports separate verifier, SDK, queued-durable and gateway layers. These are useful methodological baselines; unlike-for-like replication is required before claiming to outperform any of them.
+
+
+The checker now pins each v1 vector's **full semantic tuple** in Rust: category, setup state, exact mutation paths and JSON scalar values, authorization decision, adapter-invocation count, effect witness, and terminal class. Retaining an ID while changing `signature_valid=false` to `true`, swapping a denial into a permissive outcome, or stripping the setup state from a replay case is a contract-integrity failure. To change a vector deliberately, add a reviewed versioned corpus and checker profile rather than modifying v1 in place.
+
+
+The next implementation stage is tracked in [ACTION-EFFECT-HARNESS-001 / #8769](https://github.com/Luminous-Dynamics/symthaea/issues/8769): execute the corpus against instrumented effect boundaries and independently witnessed postconditions, reusing the existing Action Runtime rather than adding a parallel authority kernel.
