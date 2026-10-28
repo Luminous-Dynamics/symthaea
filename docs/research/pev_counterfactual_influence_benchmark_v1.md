@@ -6,13 +6,14 @@
 
 A well-formed, hash-chained trace does not prove that prediction-error (PE) evidence actually affected the intended learner—or that invalid PE had no effect. The next gate is a paired counterfactual experiment. Re-run the same decision from the same initial state with the same observation/action inputs and externally supplied gate/outcome calibration; intervene only on PE availability and compatibility payload.
 
-The auditor requires, per trial:
+The strict-schema auditor requires, per trial:
 
 1. **No-PE baseline:** no PE evidence admitted and no PE-driven transition.
 2. **Invalid-payload variants:** status is invalid, evidence is not admitted, and consumer state digests match the no-PE baseline exactly. V1 generates seven variants: null, 0, 1, -1, NaN, +Infinity, -Infinity (the non-finite tokens are represented as strings in JSON; a production encoder must separately test actual IEEE values).
 3. **Valid-PE positive control:** the predeclared target consumer admits the exact evidence ID exactly once and has an observable state change in this deliberately PE-sensitive control case.
 4. **Protected channels:** PE manipulation must not change the designated non-target consumer digests or the independent gate/outcome calibration digest.
-5. **Paired-input integrity:** input, initial-state and externally held-outcome digests must match across branches. Otherwise the comparison is confounded and fails closed.
+5. **Paired-input integrity:** input, initial-state and externally held-outcome digests must be lowercase SHA-256 values and match across branches. Otherwise the comparison is confounded and fails closed.
+6. **Schema completeness:** require exactly seven unique invalid-payload variants; validate every consumer before/after state digest; require all consumers to be classified as target or protected; require valid scalar and typed PE values to agree; reject duplicate trial/evidence IDs across a batch.
 
 The positive control is a designed sensitivity case, not a claim that every valid PE observation must change learner state. Real task utility is measured later on separate matched task panels; correctness and utility may not be collapsed into one score.
 
@@ -22,7 +23,7 @@ From the repository root:
 
     python3 docs/research/pev_counterfactual_influence_benchmark_v1.py --self-test --cases 100000 --seed 20261028 --output /tmp/pev_counterfactual_influence_benchmark_v1_results.json
 
-The local run accepted 100,000 generated paired trials (900,000 branch summaries: one baseline, seven invalid variants, one valid-PE positive control per trial) and detected all eight injected faults: invalid-payload state divergence, valid-PE no-op learner, missing positive-control admission, duplicate admission, non-target collateral change, counterfactual input mismatch, independent-outcome suppression, and a declared target consumer missing from the consumer map.
+The local run accepted 100,000 generated paired trials (900,000 branch summaries: one baseline, seven invalid variants, one valid-PE positive control per trial) and detected all sixteen injected faults: invalid-payload state divergence, valid-PE no-op learner, missing positive-control admission, duplicate admission, non-target collateral change, counterfactual input mismatch, independent-outcome suppression, and a declared target consumer missing from the consumer map.
 
 ## Security and epistemic limits
 
