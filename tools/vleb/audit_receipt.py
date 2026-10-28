@@ -27,25 +27,29 @@ TEST_LINE = re.compile(r"^\s*test\s+(.+?)\s+\.\.\.\s+(ok|FAILED)\s*$")
 
 
 @dataclass(frozen=True)
-class Inputs:
+class AuditInputs:
     receipt: Path
-    task: Path
+    task_contract: Path
     task_schema: Path
     receipt_schema: Path
     protocol: Path
-    patch: Path
-    catalog: Path
+    candidate_patch: Path
+    mutation_catalog: Path
     evidence_root: Path
     expected_revision: str
-    expected_image: str
+    expected_image_id: str
     expected_task_sha256: str
     expected_protocol_sha256: str
-    expected_patch_sha256: str
+    expected_candidate_patch_sha256: str
     expected_auditor_sha256: str
 
 
 def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def sha256_path(path: Path) -> str:
+    return digest(path.read_bytes())
 
 
 def json_object(path: Path, label: str, issues: list[dict[str, str]]) -> dict[str, Any] | None:
@@ -121,7 +125,7 @@ def checked_artifact(root: Path, relative: Any, expected: Any, label: str,
     return raw
 
 
-def parse_tests(raw: bytes) -> dict[str, str]:
+def parse_test_log(raw: bytes) -> dict[str, str]:
     """Return unique test function leaf names; ambiguous leaf names become CONFLICT."""
     seen: dict[str, str] = {}
     origins: dict[str, str] = {}
@@ -141,11 +145,11 @@ def parse_tests(raw: bytes) -> dict[str, str]:
     return seen
 
 
-def audit(inputs: Inputs) -> dict[str, Any]:
+def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
     receipt = json_object(inputs.receipt, "receipt", issues)
-    task = json_object(inputs.task, "task contract", issues)
-    catalog = json_object(inputs.catalog, "mutation catalog", issues)
+    task = json_object(inputs.task_contract, "task contract", issues)
+    catalog = json_object(inputs.mutation_catalog, "mutation catalog", issues)
     if receipt is None or task is None or catalog is None:
         return {"schema_version": "vleb-independent-audit-v1", "eligible": False, "verdict": "unresolved", "issues": issues}
 
@@ -164,9 +168,9 @@ def audit(inputs: Inputs) -> dict[str, Any]:
 
     # The receipt cannot choose its own trust roots: the evaluator supplies these pins independently.
     for label, path, claimed, pin in (
-        ("task contract", inputs.task, receipt.get("task_contract_sha256"), inputs.expected_task_sha256),
+        ("task contract", inputs.task_contract, receipt.get("task_contract_sha256"), inputs.expected_task_sha256),
         ("protocol", inputs.protocol, receipt.get("protocol_sha256"), inputs.expected_protocol_sha256),
-        ("candidate patch", inputs.patch, receipt.get("candidate_patch_sha256"), inputs.expected_patch_sha256),
+        ("candidate patch", inputs.candidate_patch, receipt.get("candidate_patch_sha256"), inputs.expected_candidate_patch_sha256),
     ):
         if not isinstance(pin, str) or not HEX.fullmatch(pin):
             issues.append({"code": "invalid_trusted_pin", "message": f"{label}: external trusted SHA-256 pin missing or malformed"})
@@ -240,7 +244,7 @@ def audit(inputs: Inputs) -> dict[str, Any]:
         if raw is None:
             continue
         if name == "baseline_log":
-            tests = parse_tests(raw)
+            tests = parse_test_log(raw)
             mapped = {test for rows in mapping.values() for test in rows}
             if not any(tests.get(test) == "FAILED" for test in mapped) or b"test result: FAILED" not in raw:
                 issues.append({"code": "baseline_control_not_demonstrated", "message": "baseline must fail a preregistered behavior test"})
@@ -258,7 +262,7 @@ def audit(inputs: Inputs) -> dict[str, Any]:
         issues.append({"code": "checkout_identity_mismatch", "message": "receipt revision differs from externally expected revision"})
     if checkout.get("clean_worktree") is not True:
         issues.append({"code": "checkout_not_clean", "message": "tested checkout must be clean after the candidate was materialized"})
-    if not IMAGE.fullmatch(inputs.expected_image) or runtime.get("immutable_image_id") != inputs.expected_image:
+    if not IMAGE.fullmatch(inputs.expected_image_id) or runtime.get("immutable_image_id") != inputs.expected_image:
         issues.append({"code": "runtime_identity_mismatch", "message": "immutable runtime image differs from external image pin"})
     if runtime.get("network_mode_observed") is not True:
         issues.append({"code": "runtime_network_unobserved", "message": "runtime network policy was not independently observed"})
@@ -353,7 +357,7 @@ def audit(inputs: Inputs) -> dict[str, Any]:
                 issues.append({"code": "mutation_compile_evidence_unconvincing", "message": f"{mid!r} compile log lacks Cargo build evidence"})
             if row.get("evidence_sha256") != digest(compile_raw + b"\0" + test_raw):
                 issues.append({"code": "mutation_evidence_digest_mismatch", "message": f"{mid!r} combined compile/test digest mismatch"})
-            parsed = parse_tests(test_raw)
+            parsed = parse_test_log(test_raw)
             failed = sorted(name for name, status in parsed.items() if status == "FAILED")
             if sorted(row.get("failed_test_names", [])) != failed:
                 issues.append({"code": "mutation_failed_test_inventory_mismatch", "message": f"{mid!r} failed-test list differs from raw log"})
@@ -414,7 +418,7 @@ def audit(inputs: Inputs) -> dict[str, Any]:
         "auditor_sha256": digest(Path(__file__).read_bytes()),
         "task_id": task.get("task_id"),
         "expected_revision": inputs.expected_revision,
-        "expected_image_id": inputs.expected_image,
+        "expected_image_id": inputs.expected_image_id,
         "required_test_count": len(required_ids),
         "observed_test_result_count": len(results),
         "required_mutation_count": len(expected_active),
@@ -439,13 +443,13 @@ def args_for_cli(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = args_for_cli(argv)
-    result = audit(Inputs(
-        receipt=args.receipt, task=args.task, task_schema=args.task_schema,
-        receipt_schema=args.receipt_schema, protocol=args.protocol, patch=args.patch,
-        catalog=args.catalog, evidence_root=args.evidence_root,
-        expected_revision=args.expected_revision, expected_image=args.expected_image,
+    result = audit_bundle(AuditInputs(
+        receipt=args.receipt, task_contract=args.task, task_schema=args.task_schema,
+        receipt_schema=args.receipt_schema, protocol=args.protocol, candidate_patch=args.patch,
+        mutation_catalog=args.catalog, evidence_root=args.evidence_root,
+        expected_revision=args.expected_revision, expected_image_id=args.expected_image,
         expected_task_sha256=args.expected_task_sha256, expected_protocol_sha256=args.expected_protocol_sha256,
-        expected_patch_sha256=args.expected_patch_sha256, expected_auditor_sha256=args.expected_auditor_sha256,
+        expected_candidate_patch_sha256=args.expected_patch_sha256, expected_auditor_sha256=args.expected_auditor_sha256,
     ))
     output = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
