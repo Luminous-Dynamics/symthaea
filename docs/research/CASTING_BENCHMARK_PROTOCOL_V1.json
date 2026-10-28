@@ -128,6 +128,26 @@
       "id": "symthaea_reliability_aware",
       "family": "candidate_under_test",
       "required": true
+    },
+    {
+      "id": "botorch_mf_hvkg",
+      "family": "multiobjective_multi_fidelity_bayesian_optimization",
+      "required": true,
+      "source": "https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO",
+      "status": "version-candidate-not-locked"
+    },
+    {
+      "id": "botorch_momf",
+      "family": "multiobjective_multi_fidelity_optimization",
+      "required": true,
+      "source": "https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO",
+      "status": "version-candidate-not-locked"
+    },
+    {
+      "id": "joint_action_cost_aware",
+      "family": "candidate_under_test",
+      "required": true,
+      "status": "synthetic-policy-added; no result claimed"
     }
   ],
   "baseline_lock": {
@@ -322,5 +342,35 @@
       ],
       "source": "https://link.springer.com/article/10.1007/s11081-026-10078-5"
     }
+  },
+  "multi_fidelity_track": {
+    "status": "baseline-lock-required-before-claim",
+    "primary_question": "Does adaptive joint choice of candidate and fidelity improve feasible Pareto hypervolume per fidelity-aware cost without increasing false-feasible promotion risk?",
+    "candidate_under_test": "joint_action_cost_aware",
+    "comparator_baselines": [
+      "botorch_mf_hvkg",
+      "botorch_momf",
+      "decision_value_of_information",
+      "adaptive_budget",
+      "high_only",
+      "sobol",
+      "nsga2"
+    ],
+    "fairness_requirements": [
+      "Use paired initial candidate pools and paired seeds within each problem instance.",
+      "Match total high-fidelity-equivalent cost and report actual low/medium/high cost units separately.",
+      "Report wall-clock and optimizer overhead as well as oracle/fidelity calls.",
+      "Retain failed, crashed, aborted and refused runs; do not silently drop them.",
+      "Freeze environment and immutable source/package revisions before running comparisons.",
+      "Do not compare results from the synthetic casting-like suite directly to COCO scores or claim physical foundry validity."
+    ],
+    "primary_metrics": [
+      "feasible high-fidelity hypervolume vs cumulative fidelity cost",
+      "false-feasible promotion rate with a denominator and confidence interval",
+      "high-fidelity evaluations to predeclared hypervolume targets",
+      "decision regret vs the finite-pool high-fidelity oracle (synthetic-only metric)",
+      "wall-clock time, memory and optimizer overhead"
+    ],
+    "statistical_gate": "At least 20 paired seeds (target 30), per-cell effects and confidence intervals, correction for multiple comparisons; three-seed defaults are diagnostic only."
   }
 }
