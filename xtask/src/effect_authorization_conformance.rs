@@ -507,6 +507,15 @@ mod tests {
     }
 
     #[test]
+    fn committed_v1_corpus_matches_the_frozen_contract() {
+        let raw = include_bytes!("../../docs/security/effect-authorization-conformance.v1.json");
+        let manifest: super::Manifest = serde_json::from_slice(raw).unwrap();
+        let digest = format!("{:x}", sha2::Sha256::digest(raw));
+        let result = super::validate(&manifest, digest);
+        assert!(result.is_ok(), "committed v1 corpus failed structural validation: {result:?}");
+    }
+
+    #[test]
     fn positive_control_cannot_pass_with_no_effect_or_missing_postcondition() {
         let good = sample_case("POS-001", "positive_control", "allow", 1, "exactly_one", "postcondition_confirmed");
         assert!(validate_case(&good).is_ok());
