@@ -14,7 +14,7 @@
 //! simulate interruption boundaries in-process; true power-loss qualification
 //! must be performed on each claimed filesystem/device configuration.
 
-use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, MemoryContextItem, ResolvedMemoryContextItem};
+use super::memory_evidence::{EvidenceCommitManifest, EvidenceIndex, HdcStoreIdentity, LexicalIndex, MemoryContextItem, ResolvedMemoryContextItem};
 use std::collections::BTreeSet;
 use symthaea_core::hdc::BinaryHV;
 use symthaea_hdc_store::{HdcStore, HdcStoreReader};
@@ -30,6 +30,7 @@ const CURRENT_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-CURRENT-V1";
 const INDEX_FILE: &str = "hdc-index.bin";
 const EVIDENCE_FILE: &str = "evidence-snapshot.json";
 const MANIFEST_FILE: &str = "commit-manifest.json";
+const LEXICAL_FILE: &str = "lexical-index.json";
 const CURRENT_FILE: &str = "CURRENT";
 const LOCK_FILE: &str = ".writer.lock";
 
@@ -47,6 +48,8 @@ pub struct RecoveredEvidenceGeneration {
     pub generation: u64,
     pub hdc_index_bytes: Vec<u8>,
     pub evidence_index: EvidenceIndex,
+    /// Present for typed production commits whose manifest binds the lexical artifact.
+    pub lexical_index: Option<LexicalIndex>,
     pub manifest: EvidenceCommitManifest,
 }
 
@@ -105,6 +108,7 @@ impl Drop for WriterLock {
 enum CommitFaultPoint {
     AfterIndexWrite,
     AfterEvidenceWrite,
+    AfterLexicalIndexWrite,
     AfterManifestWrite,
     AfterGenerationPublish,
     BeforeCurrentPublish,
@@ -254,8 +258,10 @@ impl EvidenceDiskStore {
         if recovered.manifest.hdc_store_identity().is_none() {
             return Err("committed text query requires a typed HDC identity; opaque-byte fixtures cannot serve context".into());
         }
-        let candidates = recovered.evidence_index.rank_text(
-            query_text, scope_id, now_ms, candidate_k,
+        let lexical_index = recovered.lexical_index.as_ref()
+            .ok_or_else(|| "typed committed generation has no manifest-bound lexical index".to_string())?;
+        let candidates = recovered.evidence_index.rank_text_indexed(
+            lexical_index, recovered.generation, query_text, scope_id, now_ms, candidate_k,
         )?;
         let candidate_ids: Vec<u64> = candidates.iter().map(|(id, _score)| *id).collect();
         let resolved_context = recovered.evidence_index.resolve_with_provenance(
@@ -488,10 +494,19 @@ impl EvidenceDiskStore {
         };
 
         let snapshot_bytes = evidence_index.snapshot_bytes(generation)?;
+        let lexical_index_bytes = if hdc_identity.is_some() {
+            Some(LexicalIndex::build(evidence_index, generation)?.to_json_bytes()?)
+        } else {
+            None
+        };
         let manifest = match hdc_identity {
-            Some(identity) => EvidenceCommitManifest::new_with_hdc_identity(
-                generation, hdc_index_bytes, &snapshot_bytes, identity,
-            )?,
+            Some(identity) => {
+                let lexical_bytes = lexical_index_bytes.as_deref()
+                    .ok_or_else(|| "typed HDC commit is missing its lexical index".to_string())?;
+                EvidenceCommitManifest::new_with_hdc_identity_and_lexical_index(
+                    generation, hdc_index_bytes, &snapshot_bytes, identity, lexical_bytes,
+                )?
+            }
             None => EvidenceCommitManifest::new(generation, hdc_index_bytes, &snapshot_bytes)?,
         };
         let manifest_bytes = manifest.to_json_bytes()?;
@@ -518,6 +533,13 @@ impl EvidenceDiskStore {
             let path = stage.keep();
             return Err(format!("simulated interruption after evidence snapshot write; orphan staging at {}", path.display()));
         }
+        if let Some(lexical_bytes) = lexical_index_bytes.as_deref() {
+            write_new_synced(&stage.path().join(LEXICAL_FILE), lexical_bytes)?;
+            if fault == Some(CommitFaultPoint::AfterLexicalIndexWrite) {
+                let path = stage.keep();
+                return Err(format!("simulated interruption after lexical index write; orphan staging at {}", path.display()));
+            }
+        }
 
         write_new_synced(&stage.path().join(MANIFEST_FILE), &manifest_bytes)?;
         sync_directory(stage.path())?;
@@ -536,9 +558,11 @@ impl EvidenceDiskStore {
                 }
                 // Idempotent retry after a crash between generation rename and CURRENT
                 // publication: reuse only byte-identical, internally valid artifacts.
+                let existing_lexical = read_optional_regular_file(&final_dir.join(LEXICAL_FILE)).ok().flatten();
                 let same = read_regular_file(&final_dir.join(INDEX_FILE)).ok().as_deref() == Some(hdc_index_bytes)
                     && read_regular_file(&final_dir.join(EVIDENCE_FILE)).ok().as_deref() == Some(snapshot_bytes.as_slice())
-                    && read_regular_file(&final_dir.join(MANIFEST_FILE)).ok().as_deref() == Some(manifest_bytes.as_slice());
+                    && read_regular_file(&final_dir.join(MANIFEST_FILE)).ok().as_deref() == Some(manifest_bytes.as_slice())
+                    && existing_lexical.as_deref() == lexical_index_bytes.as_deref();
                 if !same {
                     return Err("generation directory collision with different artifact bytes".into());
                 }
@@ -618,7 +642,17 @@ impl EvidenceDiskStore {
             return Err("manifest generation does not match CURRENT".into());
         }
         manifest.verify(&index_bytes, &snapshot_bytes)?;
+        let lexical_bytes = read_optional_regular_file(&dir.join(LEXICAL_FILE))?;
+        manifest.verify_lexical_index(lexical_bytes.as_deref())?;
         let evidence_index = EvidenceIndex::restore_snapshot(&snapshot_bytes)?;
+        let lexical_index = match lexical_bytes.as_deref() {
+            Some(bytes) => {
+                let index = LexicalIndex::from_json_bytes(bytes)?;
+                index.validate_for_evidence(&evidence_index, pointer.generation)?;
+                Some(index)
+            }
+            None => None,
+        };
         if let Some(identity) = manifest.hdc_store_identity() {
             identity.validate_for_recovery()?;
             // Integrity validation needs the canonical data reader, not an ANN
@@ -646,6 +680,7 @@ impl EvidenceDiskStore {
             generation: pointer.generation,
             hdc_index_bytes: index_bytes,
             evidence_index,
+            lexical_index,
             manifest,
         })
     }
