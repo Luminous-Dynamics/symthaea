@@ -152,7 +152,7 @@ FAKE_WORKER = textwrap.dedent(
                 emit(request_id, True, {
                     "context": [{"type": "text", "value": value}],
                     "audit": [{
-                        "evidence_id": "evidence-1",
+                        "evidence_id": "e" * 64,
                         "trajectory_id": next(iter(trajectory_ids), "trajectory-1"),
                         "source_pointer": "/states/0/text",
                         "source_sha256": "a" * 64,
@@ -258,7 +258,12 @@ class BrocaRustMemoryAdapterTests(unittest.TestCase):
             with self.assertRaises(TimeoutError):
                 adapter.query("billing")
 
-    def test_context_digest_mismatch_is_rejected(self):
+
+    def test_query_image_input_must_be_string_or_none(self):
+        adapter = self.make_adapter()
+        with self.assertRaises(RuntimeError):
+            adapter.query("billing", query_image={"not": "a path"})
+\n    def test_context_digest_mismatch_is_rejected(self):
         with patch.dict(os.environ, {"BROCA_FAKE_WORKER_MODE": "digest_mismatch"}):
             adapter = self.make_adapter()
             adapter.insert(self.trajectory())
