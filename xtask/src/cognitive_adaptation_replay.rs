@@ -593,8 +593,7 @@ mod tests {
         generated.receipt.run_kind = "replay".to_owned();
         let error = cognitive_replay_receipt::validate_receipt(generated.receipt)
             .expect_err("executed replay requires stronger evidence");
-        assert!(error.to_string().contains("missing task_loss")
-            || error.to_string().contains("missing task_loss_available_at_tick"));
+        assert!(error.to_string().contains("synthetic run_id cannot be relabeled"));
     }
 
     #[test]
