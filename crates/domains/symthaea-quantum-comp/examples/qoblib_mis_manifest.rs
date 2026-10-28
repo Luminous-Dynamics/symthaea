@@ -259,3 +259,70 @@ fn run_git(repository_root: &Path, args: &[&str]) -> Result<String, Box<dyn Erro
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const COMMIT: &str = "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7";
+    const BLOB: &str = "433ad3290665909e1ee5c17abfa8c946391938dc";
+
+    fn line(name: &str, path: &str, blob: &str, size: usize) -> String {
+        format!("{name}\\t{path}\\t{blob}\\t{size}\\n")
+    }
+
+    #[test]
+    fn parses_pinned_manifest_without_mutating_source_identity() {
+        let manifest = format!(
+            "# source_commit={COMMIT}\\n# source_repo=ZIB-AOPT/QOBLIB\\n{}",
+            line(
+                "aves-sparrow-social",
+                "07-independentset/instances/aves-sparrow-social.gph",
+                BLOB,
+                3652
+            )
+        );
+        let (commit, entries) = parse_pinned_manifest(&manifest).unwrap();
+        assert_eq!(commit, COMMIT);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "aves-sparrow-social");
+        assert_eq!(entries[0].git_blob_sha1, BLOB);
+        assert_eq!(entries[0].size_bytes, 3652);
+    }
+
+    #[test]
+    fn rejects_duplicate_instance_names_and_paths() {
+        let row = line(
+            "aves-sparrow-social",
+            "07-independentset/instances/aves-sparrow-social.gph",
+            BLOB,
+            3652
+        );
+        let manifest = format!("# source_commit={COMMIT}\\n{row}{row}");
+        assert!(parse_pinned_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_filename_and_malformed_blob_id() {
+        let wrong_filename = format!(
+            "# source_commit={COMMIT}\\n{}",
+            line(
+                "aves-sparrow-social",
+                "07-independentset/instances/another-name.gph",
+                BLOB,
+                3652
+            )
+        );
+        assert!(parse_pinned_manifest(&wrong_filename).is_err());
+
+        let malformed_blob = format!(
+            "# source_commit={COMMIT}\\n{}",
+            line(
+                "aves-sparrow-social",
+                "07-independentset/instances/aves-sparrow-social.gph",
+                "deadbeef",
+                3652
+            )
+        );
+        assert!(parse_pinned_manifest(&malformed_blob).is_err());
+    }
+}
