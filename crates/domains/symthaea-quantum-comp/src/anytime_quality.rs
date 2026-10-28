@@ -14,6 +14,8 @@ use std::{
     collections::{HashMap, HashSet},
     error::Error,
     fmt,
+    fs,
+    path::Path,
 };
 
 /// Terminal state for one solver attempt.
@@ -157,6 +159,12 @@ pub enum VerifiedAnytimeQualityError {
     DuplicateEventId(String),
     /// Unsafe relative artifact path.
     UnsafeArtifactPath(&'static str, String),
+    /// Evidence bundle root could not be resolved to a directory.
+    InvalidBundleRoot(String),
+    /// A referenced artifact is missing, unreadable, or not a regular file.
+    ArtifactReadFailed(String),
+    /// A symbolic link or canonical path escapes the declared evidence bundle.
+    ArtifactPathEscapesBundle(String),
     /// Candidate bytes do not match the declared digest.
     CandidateDigestMismatch(String),
     /// One artifact path was assigned conflicting digests within the same bundle.
@@ -197,6 +205,9 @@ impl fmt::Display for VerifiedAnytimeQualityError {
             Self::DecreasingTimestamps => write!(f, "event timestamps are not nondecreasing"),
             Self::DuplicateEventId(event) => write!(f, "duplicate event ID: {event}"),
             Self::UnsafeArtifactPath(field, path) => write!(f, "unsafe {field} path: {path}"),
+            Self::InvalidBundleRoot(path) => write!(f, "invalid evidence bundle root: {path}"),
+            Self::ArtifactReadFailed(path) => write!(f, "failed to read regular evidence artifact: {path}"),
+            Self::ArtifactPathEscapesBundle(path) => write!(f, "artifact path escapes evidence bundle: {path}"),
             Self::CandidateDigestMismatch(event) => write!(f, "candidate digest mismatch: {event}"),
             Self::ArtifactPathDigestConflict(path) => write!(f, "artifact path has conflicting digests: {path}"),
             Self::ReceiptDigestMismatch(event) => write!(f, "receipt digest mismatch: {event}"),
@@ -268,6 +279,62 @@ fn register_artifact_digest(
     }
     artifact_digests.insert(path.to_owned(), digest.to_owned());
     Ok(())
+}
+
+fn read_bundle_artifact(
+    canonical_root: &Path,
+    relative_path: &str,
+    field: &'static str,
+) -> Result<Vec<u8>, VerifiedAnytimeQualityError> {
+    validate_relative_artifact_path(relative_path, field)?;
+    let unresolved = canonical_root.join(relative_path);
+    let resolved = fs::canonicalize(&unresolved)
+        .map_err(|_| VerifiedAnytimeQualityError::ArtifactReadFailed(relative_path.to_owned()))?;
+    if !resolved.starts_with(canonical_root) {
+        return Err(VerifiedAnytimeQualityError::ArtifactPathEscapesBundle(
+            relative_path.to_owned(),
+        ));
+    }
+    let metadata = fs::metadata(&resolved)
+        .map_err(|_| VerifiedAnytimeQualityError::ArtifactReadFailed(relative_path.to_owned()))?;
+    if !metadata.is_file() {
+        return Err(VerifiedAnytimeQualityError::ArtifactReadFailed(relative_path.to_owned()));
+    }
+    fs::read(&resolved)
+        .map_err(|_| VerifiedAnytimeQualityError::ArtifactReadFailed(relative_path.to_owned()))
+}
+
+/// Load named candidate and receipt artifacts from a filesystem evidence bundle, then
+/// independently verify the materialized bytes and compute the anytime-quality summary.
+///
+/// This entry point binds artifact-path labels to files actually present below
+/// `bundle_root`. It canonicalizes paths and rejects symbolic links that escape the root.
+/// The graph bytes are passed separately and must still match the trace's graph SHA-256.
+/// The method does not attest who created the files or whether the elapsed timestamps are
+/// truthful; trusted-runner provenance remains a separate requirement.
+pub fn compare_verified_anytime_quality_from_bundle(
+    bundle_root: &Path,
+    graph_bytes: &[u8],
+    trace: &VerifiedAnytimeQualityTrace,
+) -> Result<VerifiedAnytimeQualitySummary, VerifiedAnytimeQualityError> {
+    let canonical_root = fs::canonicalize(bundle_root).map_err(|_| {
+        VerifiedAnytimeQualityError::InvalidBundleRoot(bundle_root.display().to_string())
+    })?;
+    if !canonical_root.is_dir() {
+        return Err(VerifiedAnytimeQualityError::InvalidBundleRoot(
+            bundle_root.display().to_string(),
+        ));
+    }
+    let mut materialized = trace.clone();
+    for event in &mut materialized.events {
+        event.candidate_bytes =
+            read_bundle_artifact(&canonical_root, &event.candidate_artifact_path, "candidate")?;
+        event.receipt_bytes = match event.receipt_artifact_path.as_deref() {
+            Some(path) => Some(read_bundle_artifact(&canonical_root, path, "receipt")?),
+            None => None,
+        };
+    }
+    compare_verified_anytime_quality(graph_bytes, &materialized)
 }
 
 /// Recompute an anytime-quality score from canonical graph and exact event artifact bytes.
@@ -743,6 +810,88 @@ mod tests {
             )),
             Err(VerifiedAnytimeQualityError::ArtifactPathDigestConflict(_))
         ));
+    }
+
+    fn temporary_bundle(label: &str) -> std::path::PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-anytime-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn write_trace_artifacts(root: &Path, trace: &VerifiedAnytimeQualityTrace) {
+        for event in &trace.events {
+            let candidate = root.join(&event.candidate_artifact_path);
+            std::fs::create_dir_all(candidate.parent().unwrap()).unwrap();
+            std::fs::write(candidate, &event.candidate_bytes).unwrap();
+            if let (Some(path), Some(bytes)) =
+                (event.receipt_artifact_path.as_deref(), event.receipt_bytes.as_deref())
+            {
+                let receipt = root.join(path);
+                std::fs::create_dir_all(receipt.parent().unwrap()).unwrap();
+                std::fs::write(receipt, bytes).unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn bundle_ingestion_reads_named_files_before_verifying_and_scoring() {
+        let trace = trace(AnytimeTerminalOutcome::FeasibleBelowTarget, vec![
+            unverified_event("unverified-8", 20.0, &[0, 1, 2, 3, 4, 5, 6, 7]),
+            verified_event("verified-2", 100.0, &[0, 1], "trial-1", "pair-1", 7),
+            verified_event("verified-4", 350.0, &[0, 1, 2, 3], "trial-1", "pair-1", 7),
+        ]);
+        let root = temporary_bundle("valid");
+        write_trace_artifacts(&root, &trace);
+        let summary =
+            compare_verified_anytime_quality_from_bundle(&root, GRAPH, &trace).unwrap();
+        assert!((summary.normalized_area_under_quality_curve - 0.31).abs() < 1e-12);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundle_ingestion_rejects_disk_bytes_that_do_not_match_trace_digests() {
+        let trace = trace(AnytimeTerminalOutcome::NoFeasibleCandidate, vec![
+            unverified_event("candidate", 20.0, &[0, 1]),
+        ]);
+        let root = temporary_bundle("tampered");
+        write_trace_artifacts(&root, &trace);
+        std::fs::write(root.join("candidates/candidate.bin"), b"tampered").unwrap();
+        assert!(matches!(
+            compare_verified_anytime_quality_from_bundle(&root, GRAPH, &trace),
+            Err(VerifiedAnytimeQualityError::CandidateDigestMismatch(_))
+        ));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bundle_ingestion_rejects_symlink_escape() {
+        use std::os::unix::fs::symlink;
+        let trace = trace(AnytimeTerminalOutcome::NoFeasibleCandidate, vec![
+            unverified_event("candidate", 20.0, &[0, 1]),
+        ]);
+        let root = temporary_bundle("escape");
+        write_trace_artifacts(&root, &trace);
+        let outside = temporary_bundle("outside");
+        let outside_file = outside.join("candidate.bin");
+        std::fs::write(&outside_file, &trace.events[0].candidate_bytes).unwrap();
+        let candidate_path = root.join("candidates/candidate.bin");
+        std::fs::remove_file(&candidate_path).unwrap();
+        symlink(&outside_file, &candidate_path).unwrap();
+        assert!(matches!(
+            compare_verified_anytime_quality_from_bundle(&root, GRAPH, &trace),
+            Err(VerifiedAnytimeQualityError::ArtifactPathEscapesBundle(_))
+        ));
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(outside).unwrap();
     }
 
     #[test]
