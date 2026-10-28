@@ -11,6 +11,7 @@
   },
   "source_run": {
     "sweep_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "adapter_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
     "candidate_pool_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "objective_family": "local_bias_island",
     "constraint_family": "constraint_boundary",
