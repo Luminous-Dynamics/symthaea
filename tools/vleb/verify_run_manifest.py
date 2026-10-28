@@ -273,6 +273,19 @@ def audit_claim_evidence_bundle(
             "message": "confirmatory run requires a pinned claim-audit section",
         })
         return result
+
+    claim_inventory_value = claim_gate.get("claims", [])
+    claim_inventory = claim_inventory_value if isinstance(claim_inventory_value, list) else []
+    result["claim_count"] = len(claim_inventory)
+
+    def mark_unresolved_claims() -> None:
+        result["unresolved"] = len(claim_inventory)
+        result["claims"] = [
+            {"claim_id": item.get("claim_id"), "status": "unresolved"}
+            for item in claim_inventory
+            if isinstance(item, dict)
+        ]
+
     if (
         expected_claim_auditor_sha256 is None
         or expected_claim_schema_sha256 is None
@@ -284,6 +297,7 @@ def audit_claim_evidence_bundle(
             "code": "claim_audit_trust_pins_missing",
             "message": "claim auditor and schema require evaluator-supplied out-of-band SHA-256 pins",
         })
+        mark_unresolved_claims()
         return result
     if claim_gate["auditor_sha256"] != expected_claim_auditor_sha256:
         result["issues"].append({
@@ -308,6 +322,7 @@ def audit_claim_evidence_bundle(
                 "message": f"invalid trusted witness-verifier pin for kind {kind!r}",
             })
     if result["issues"]:
+        mark_unresolved_claims()
         return result
 
     try:
@@ -330,6 +345,7 @@ def audit_claim_evidence_bundle(
         })
         return result
     if result["issues"]:
+        mark_unresolved_claims()
         return result
 
     claims = claim_gate["claims"]
