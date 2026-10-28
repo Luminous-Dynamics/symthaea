@@ -133,7 +133,7 @@ jobs:
               rows = list(csv.DictReader(stream))
           rows[0]["worst_case_box_regret"] = "999"
           with open(target, "w", newline="", encoding="utf-8") as stream:
-              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\\n")
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
               writer.writeheader()
               writer.writerows(rows)
           PY
