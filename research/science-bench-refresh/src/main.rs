@@ -15,8 +15,10 @@ fn usage(program: &str) {
             "  {program} protocol-commit MANIFEST.json\n",
             "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
             "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
-            "  {program} generate-task-set MANIFEST.json SEED_FILE GENERATOR_CONFIG.json OUTPUT.json\n",
-            "  {program} verify-regeneration MANIFEST.json SEED_FILE GENERATOR_CONFIG.json TASK_SET.json"
+            "  {program} generate-task-set MANIFEST.json SEED_FILE\n",
+            "    GENERATOR_CONFIG.json OUTPUT.json\n",
+            "  {program} verify-regeneration MANIFEST.json SEED_FILE\n",
+            "    GENERATOR_CONFIG.json TASK_SET.json"
         )
     );
 }
