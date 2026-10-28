@@ -436,7 +436,7 @@ pub fn generate_task_set_bytes(
     }
     let task_set = json!({
         "schema": crate::TASK_SET_SCHEMA,
-        "generation_id": manifest.generation_id,
+        "generation_id": manifest.generation_id.clone(),
         "tasks": tasks
     });
     let mut bytes = serde_json::to_vec_pretty(&task_set)
