@@ -252,6 +252,32 @@ class CompositionalBakeoffTests(unittest.TestCase):
             small["fidelity_evaluations"], large["fidelity_evaluations"]
         )
 
+
+    def test_scorer_marks_optimizer_trace_risk_bound_as_descriptive_only(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("low_screen",),
+            design_count=75,
+        )
+        receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
+        risk = receipt["run_metrics"][0]["false_feasible_risk_gate"]
+        self.assertFalse(risk["certified"])
+        self.assertEqual(risk["decision"], "abstain")
+        self.assertEqual(
+            risk["validation_source"], "optimization_trace_not_independent_validation"
+        )
+        self.assertIn(
+            risk["reason"],
+            {
+                "no_validated_predicted_feasible_promotions",
+                "validation_not_independent_or_exchangeable",
+            },
+        )
+
     def test_zero_severity_trace_replay_rejects_any_mismatch(self) -> None:
         document = run_sweep(
             objective_families=("warped_coordinates",),
