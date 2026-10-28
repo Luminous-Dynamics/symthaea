@@ -375,7 +375,7 @@ mod tests {
 
     #[test]
     fn frozen_self_checks_bind_input_bytes_to_expected_digest() {
-        assert!(run(&vec!["audit".into(), "--self-check-supported".into()]).unwrap().contains(&format!("SUMMARY\\tinput_sha256\\t{SUPPORTED_FIXTURE_SHA256}")));
+        assert!(run(&vec!["audit".into(), "--self-check-supported".into()]).unwrap().contains(&format!("SUMMARY\tinput_sha256\t{SUPPORTED_FIXTURE_SHA256}")));
         assert!(verify_digest(SUPPORTED_FIXTURE.as_bytes(), Some(SUPPORTED_FIXTURE_SHA256)).is_ok());
         assert!(verify_digest(ZERO_SUPPORT_FIXTURE.as_bytes(), Some(ZERO_SUPPORT_FIXTURE_SHA256)).is_ok());
     }
