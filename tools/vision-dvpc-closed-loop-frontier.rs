@@ -896,7 +896,7 @@ fn score_fixture() -> Result<String, String> {
             let r = simulate(campaign_id, policy, candidates, &oracle);
             let _ = writeln!(
                 output,
-                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 r.campaign_id, r.family, r.policy.label(), r.selected_ids.join(","),
                 r.activated, r.gate.status.as_str(), r.false_authorization, r.false_safe_authorization, r.budget_overrun,
                 r.actual_cost_units, r.gross_value_milli, r.net_value_milli,
@@ -965,6 +965,13 @@ mod tests {
         assert_eq!(oracle.len(), 52);
         let campaigns: BTreeSet<&str> = actions.iter().map(|a| a.campaign_id.as_str()).collect();
         assert_eq!(campaigns.len(), 13);
+    }
+
+    #[test]
+    fn oracle_raw_stream_tampering_is_rejected_by_aggregate_cross_checks() {
+        let actions = parse_actions(ACTIONS).unwrap();
+        let tampered = ORACLE.replacen("0".repeat(72).as_str(), "1".repeat(72).as_str(), 1);
+        assert!(parse_oracle(&tampered, &actions).is_err());
     }
 
     #[test]
@@ -1093,7 +1100,7 @@ mod tests {
         let a = score_fixture().unwrap();
         let b = score_fixture().unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.matches("RESULT\t").count(), 13 * 9);
+        assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t") && !line.starts_with("RESULT\tcampaign_id\t")).count(), 13 * 9);
         assert_eq!(a.matches("SUMMARY\t").count(), 9);
         assert!(a.contains("\tuncertified_activations="));
         assert!(a.contains("\tbudget_overruns="));
