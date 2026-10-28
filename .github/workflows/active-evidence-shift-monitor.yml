@@ -58,12 +58,17 @@ jobs:
           cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --eprocess-family-csv > "$artifact_dir/eprocess-family-results.csv"
           cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --eprocess-family-csv > "$temp_dir/eprocess-family-second.csv"
           cmp "$artifact_dir/eprocess-family-results.csv" "$temp_dir/eprocess-family-second.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --cusum-baseline-csv > "$artifact_dir/cusum-baseline-results.csv"
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --cusum-baseline-csv > "$temp_dir/cusum-baseline-second.csv"
+          cmp "$artifact_dir/cusum-baseline-results.csv" "$temp_dir/cusum-baseline-second.csv"
           python3 tools/active-evidence-shift-monitor/reference_check.py --self-test
           python3 tools/active-evidence-shift-monitor/reference_check.py "$artifact_dir/shift-monitor-results.csv"
           python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget-self-test
           python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget "$artifact_dir/sentinel-budget-results.csv"
           python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family-self-test
           python3 tools/active-evidence-shift-monitor/reference_check.py --eprocess-family "$artifact_dir/eprocess-family-results.csv"
+          python3 tools/active-evidence-shift-monitor/reference_check.py --cusum-self-test
+          python3 tools/active-evidence-shift-monitor/reference_check.py --cusum "$artifact_dir/cusum-baseline-results.csv"
 
           {
             echo "source_commit=$(git rev-parse HEAD)"
@@ -73,7 +78,7 @@ jobs:
             echo "rustc_version=$(rustc --version)"
             echo "cargo_version=$(cargo --version)"
             echo "runner_os=$(uname -a)"
-            (cd "$artifact_dir" && sha256sum shift-monitor-results.csv sentinel-budget-results.csv eprocess-family-results.csv)
+            (cd "$artifact_dir" && sha256sum shift-monitor-results.csv sentinel-budget-results.csv eprocess-family-results.csv cusum-baseline-results.csv)
           } > "$artifact_dir/provenance-receipt.txt"
 
       - name: Reject mutated outputs
@@ -117,6 +122,25 @@ jobs:
           PY
           if python3 tools/active-evidence-shift-monitor/reference_check.py --sentinel-budget "$temp_dir/sentinel-mutated.csv"; then
             echo "sentinel-budget checker accepted a mutated post-shift detection probability" >&2
+            exit 1
+          fi
+
+          cargo run --locked --quiet --manifest-path tools/active-evidence-shift-monitor/Cargo.toml -- --cusum-baseline-csv > "$temp_dir/cusum-original.csv"
+          python3 - "$temp_dir/cusum-original.csv" "$temp_dir/cusum-mutated.csv" <<'PY'
+          import csv
+          import sys
+
+          source, target = sys.argv[1:]
+          with open(source, newline="", encoding="utf-8") as stream:
+              rows = list(csv.DictReader(stream))
+          rows[4]["post_shift_detection_probability"] = "0.12345"
+          with open(target, "w", newline="", encoding="utf-8") as stream:
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+          if python3 tools/active-evidence-shift-monitor/reference_check.py --cusum "$temp_dir/cusum-mutated.csv"; then
+            echo "CUSUM checker accepted a mutated post-shift detection probability" >&2
             exit 1
           fi
 
