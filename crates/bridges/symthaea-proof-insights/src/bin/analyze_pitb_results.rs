@@ -292,6 +292,11 @@ struct PowerScenario {
     bootstrap_replicates_per_simulated_study: usize,
     utility_gate_passes: usize,
     degenerate_interval_trials: usize,
+    informative_interval_trials: usize,
+    interval_availability_probability: Option<f64>,
+    conditional_utility_gate_power: Option<f64>,
+    conditional_power_lower_95: Option<f64>,
+    conditional_power_upper_95: Option<f64>,
     estimated_utility_gate_power: Option<f64>,
     monte_carlo_standard_error: Option<f64>,
     estimated_power_lower_95: Option<f64>,
@@ -313,7 +318,12 @@ struct WeakNullScenario {
     bootstrap_replicates_per_simulated_study: usize,
     false_claims: usize,
     degenerate_interval_trials: usize,
+    informative_interval_trials: usize,
+    interval_availability_probability: Option<f64>,
     estimated_false_claim_probability: Option<f64>,
+    conditional_false_claim_probability: Option<f64>,
+    conditional_false_claim_probability_lower_95: Option<f64>,
+    conditional_false_claim_probability_upper_95: Option<f64>,
     monte_carlo_standard_error: Option<f64>,
     false_claim_probability_lower_95: Option<f64>,
     false_claim_probability_upper_95: Option<f64>,
@@ -784,7 +794,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 
     let design_digest = run_design_sha256(&config)?;
     let report = PowerReport {
-        schema_version: "pitb.power-report.v2".to_string(),
+        schema_version: "pitb.power-report.v3".to_string(),
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_design_sha256: design_digest,
@@ -953,6 +963,11 @@ fn simulate_power_scenario(
             bootstrap_replicates_per_simulated_study: bootstrap_replicates,
             utility_gate_passes: 0,
             degenerate_interval_trials: 0,
+            informative_interval_trials: 0,
+            interval_availability_probability: None,
+            conditional_utility_gate_power: None,
+            conditional_power_lower_95: None,
+            conditional_power_upper_95: None,
             estimated_utility_gate_power: None,
             monte_carlo_standard_error: None,
             estimated_power_lower_95: None,
@@ -972,6 +987,7 @@ fn simulate_power_scenario(
     let mut rng = SplitMix64 { state: seed };
     let mut passes = 0_usize;
     let mut degenerate_interval_trials = 0_usize;
+    let mut informative_interval_trials = 0_usize;
     let mut sum_effect = 0.0;
     let mut sum_lower = 0.0;
     for _ in 0..simulations {
@@ -994,7 +1010,9 @@ fn simulate_power_scenario(
             &mut rng,
         );
         let interval_informative = upper - lower > f64::EPSILON;
-        if !interval_informative {
+        if interval_informative {
+            informative_interval_trials += 1;
+        } else {
             degenerate_interval_trials += 1;
         }
         sum_effect += observed_effect;
@@ -1004,6 +1022,20 @@ fn simulate_power_scenario(
         }
     }
     let power = passes as f64 / simulations as f64;
+    let interval_availability_probability =
+        Some(informative_interval_trials as f64 / simulations as f64);
+    let conditional_utility_gate_power = if informative_interval_trials > 0 {
+        Some(passes as f64 / informative_interval_trials as f64)
+    } else {
+        None
+    };
+    let (conditional_power_lower_95, conditional_power_upper_95) =
+        if informative_interval_trials > 0 {
+            let (lower, upper) = wilson_interval(passes, informative_interval_trials);
+            (Some(lower), Some(upper))
+        } else {
+            (None, None)
+        };
     Ok(PowerScenario {
         status: "estimated".to_string(),
         true_treatment_effect_percentage_points: true_effect * 100.0,
@@ -1013,6 +1045,11 @@ fn simulate_power_scenario(
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
         utility_gate_passes: passes,
         degenerate_interval_trials,
+        informative_interval_trials,
+        interval_availability_probability,
+        conditional_utility_gate_power,
+        conditional_power_lower_95,
+        conditional_power_upper_95,
         estimated_utility_gate_power: Some(power),
         monte_carlo_standard_error: Some((power * (1.0 - power) / simulations as f64).sqrt()),
         estimated_power_lower_95: Some(wilson_interval(passes, simulations).0),
@@ -1078,6 +1115,7 @@ fn simulate_weak_null_scenario(
     let mut rng = SplitMix64 { state: seed };
     let mut false_claims = 0_usize;
     let mut degenerate_interval_trials = 0_usize;
+    let mut informative_interval_trials = 0_usize;
     let mut sum_effect = 0.0;
     let mut sum_realized_effect_sd = 0.0;
     for _ in 0..simulations {
@@ -1099,7 +1137,9 @@ fn simulate_weak_null_scenario(
             bootstrap_replicates,
             &mut rng,
         );
-        if upper - lower <= f64::EPSILON {
+        if upper - lower > f64::EPSILON {
+            informative_interval_trials += 1;
+        } else {
             degenerate_interval_trials += 1;
         }
         sum_effect += observed_effect;
@@ -1118,6 +1158,18 @@ fn simulate_weak_null_scenario(
 
     let false_claim_probability = false_claims as f64 / simulations as f64;
     let (false_claim_lower, false_claim_upper) = wilson_interval(false_claims, simulations);
+    let conditional_false_claim_probability = if informative_interval_trials > 0 {
+        Some(false_claims as f64 / informative_interval_trials as f64)
+    } else {
+        None
+    };
+    let (conditional_false_claim_probability_lower_95, conditional_false_claim_probability_upper_95) =
+        if informative_interval_trials > 0 {
+            let (lower, upper) = wilson_interval(false_claims, informative_interval_trials);
+            (Some(lower), Some(upper))
+        } else {
+            (None, None)
+        };
     Ok(WeakNullScenario {
         status: "estimated".to_string(),
         true_target_weighted_mean_effect_percentage_points: 0.0,
@@ -1128,7 +1180,12 @@ fn simulate_weak_null_scenario(
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
         false_claims,
         degenerate_interval_trials,
+        informative_interval_trials,
+        interval_availability_probability: Some(informative_interval_trials as f64 / simulations as f64),
         estimated_false_claim_probability: Some(false_claim_probability),
+        conditional_false_claim_probability,
+        conditional_false_claim_probability_lower_95,
+        conditional_false_claim_probability_upper_95,
         monte_carlo_standard_error: Some(
             (false_claim_probability * (1.0 - false_claim_probability) / simulations as f64)
                 .sqrt(),
@@ -1888,7 +1945,7 @@ fn validate_power_report(
     eligible_validation: &[&TargetOutcome],
     validation_scores: &BTreeMap<String, f64>,
 ) -> Result<()> {
-    if report.schema_version != "pitb.power-report.v2" {
+    if report.schema_version != "pitb.power-report.v3" {
         bail!("unsupported power report schema {}", report.schema_version);
     }
     if report.protocol_id != EXPECTED_PROTOCOL_ID
@@ -2040,6 +2097,26 @@ fn validate_power_report(
                 let standard_error = scenario
                     .monte_carlo_standard_error
                     .context("estimated power scenario has no Monte Carlo standard error")?;
+                let informative_trials = report.study_simulations
+                    .saturating_sub(scenario.degenerate_interval_trials);
+                let expected_availability = Some(
+                    informative_trials as f64 / report.study_simulations as f64,
+                );
+                let expected_conditional_power = if informative_trials > 0 {
+                    Some(scenario.utility_gate_passes as f64 / informative_trials as f64)
+                } else {
+                    None
+                };
+                let (expected_conditional_lower, expected_conditional_upper) =
+                    if informative_trials > 0 {
+                        let (lower, upper) = wilson_interval(
+                            scenario.utility_gate_passes,
+                            informative_trials,
+                        );
+                        (Some(lower), Some(upper))
+                    } else {
+                        (None, None)
+                    };
                 let expected_simultaneous_null_upper = if
                     scenario.true_treatment_effect_percentage_points.abs() <= 1e-12
                 {
@@ -2057,8 +2134,26 @@ fn validate_power_report(
                     || power > upper + 1e-12
                     || scenario.utility_gate_passes > report.study_simulations
                     || scenario.degenerate_interval_trials > report.study_simulations
-                    || scenario.utility_gate_passes
-                        > report.study_simulations - scenario.degenerate_interval_trials
+                    || scenario.informative_interval_trials != informative_trials
+                    || scenario.informative_interval_trials + scenario.degenerate_interval_trials
+                        != report.study_simulations
+                    || scenario.utility_gate_passes > informative_trials
+                    || !same_optional_probability(
+                        scenario.interval_availability_probability,
+                        expected_availability,
+                    )
+                    || !same_optional_probability(
+                        scenario.conditional_utility_gate_power,
+                        expected_conditional_power,
+                    )
+                    || !same_optional_probability(
+                        scenario.conditional_power_lower_95,
+                        expected_conditional_lower,
+                    )
+                    || !same_optional_probability(
+                        scenario.conditional_power_upper_95,
+                        expected_conditional_upper,
+                    )
                     || !same_optional_probability(
                         scenario.null_effect_false_claim_probability_upper_simultaneous_95,
                         expected_simultaneous_null_upper,
@@ -2072,8 +2167,13 @@ fn validate_power_report(
                     || scenario.estimated_power_lower_95.is_some()
                     || scenario.estimated_power_upper_95.is_some()
                     || scenario.null_effect_false_claim_probability_upper_simultaneous_95.is_some()
+                    || scenario.informative_interval_trials != 0
+                    || scenario.interval_availability_probability.is_some()
+                    || scenario.conditional_utility_gate_power.is_some()
+                    || scenario.conditional_power_lower_95.is_some()
+                    || scenario.conditional_power_upper_95.is_some()
                 {
-                    bail!("infeasible power scenario must not report power or null-calibration bounds");
+                    bail!("infeasible power scenario must not report power or interval-availability diagnostics");
                 }
             }
             other => bail!("unknown power scenario status {other}"),
@@ -2114,6 +2214,23 @@ fn validate_power_report(
                 if observed.status != expected.status
                     || observed.utility_gate_passes != expected.utility_gate_passes
                     || observed.degenerate_interval_trials != expected.degenerate_interval_trials
+                    || observed.informative_interval_trials != expected.informative_interval_trials
+                    || !same_optional_probability(
+                        observed.interval_availability_probability,
+                        expected.interval_availability_probability,
+                    )
+                    || !same_optional_probability(
+                        observed.conditional_utility_gate_power,
+                        expected.conditional_utility_gate_power,
+                    )
+                    || !same_optional_probability(
+                        observed.conditional_power_lower_95,
+                        expected.conditional_power_lower_95,
+                    )
+                    || !same_optional_probability(
+                        observed.conditional_power_upper_95,
+                        expected.conditional_power_upper_95,
+                    )
                     || !same_optional_probability(
                         observed.estimated_utility_gate_power,
                         expected.estimated_utility_gate_power,
@@ -2196,6 +2313,22 @@ fn validate_power_report(
         let realized_sd = scenario
             .mean_realized_family_effect_heterogeneity_sd_percentage_points
             .context("weak-null scenario lacks its realized heterogeneity diagnostic")?;
+        let informative_trials = report.study_simulations
+            .saturating_sub(scenario.degenerate_interval_trials);
+        let expected_availability =
+            Some(informative_trials as f64 / report.study_simulations as f64);
+        let expected_conditional_false_claim = if informative_trials > 0 {
+            Some(scenario.false_claims as f64 / informative_trials as f64)
+        } else {
+            None
+        };
+        let (expected_conditional_lower, expected_conditional_upper) =
+            if informative_trials > 0 {
+                let (lower, upper) = wilson_interval(scenario.false_claims, informative_trials);
+                (Some(lower), Some(upper))
+            } else {
+                (None, None)
+            };
         if scenario.status != "estimated"
             || scenario.true_target_weighted_mean_effect_percentage_points.abs() > 1e-12
             || scenario.study_simulations != report.study_simulations
@@ -2219,8 +2352,26 @@ fn validate_power_report(
             ))
             || scenario.false_claims > report.study_simulations
             || scenario.degenerate_interval_trials > report.study_simulations
-            || scenario.false_claims
-                > report.study_simulations - scenario.degenerate_interval_trials
+            || scenario.informative_interval_trials != informative_trials
+            || scenario.informative_interval_trials + scenario.degenerate_interval_trials
+                != report.study_simulations
+            || scenario.false_claims > informative_trials
+            || !same_optional_probability(
+                scenario.interval_availability_probability,
+                expected_availability,
+            )
+            || !same_optional_probability(
+                scenario.conditional_false_claim_probability,
+                expected_conditional_false_claim,
+            )
+            || !same_optional_probability(
+                scenario.conditional_false_claim_probability_lower_95,
+                expected_conditional_lower,
+            )
+            || !same_optional_probability(
+                scenario.conditional_false_claim_probability_upper_95,
+                expected_conditional_upper,
+            )
             || [probability, lower, upper, simultaneous_upper, standard_error]
                 .iter()
                 .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
@@ -2280,6 +2431,23 @@ fn validate_power_report(
                 )?;
                 if observed.false_claims != expected.false_claims
                     || observed.degenerate_interval_trials != expected.degenerate_interval_trials
+                    || observed.informative_interval_trials != expected.informative_interval_trials
+                    || !same_optional_probability(
+                        observed.interval_availability_probability,
+                        expected.interval_availability_probability,
+                    )
+                    || !same_optional_probability(
+                        observed.conditional_false_claim_probability,
+                        expected.conditional_false_claim_probability,
+                    )
+                    || !same_optional_probability(
+                        observed.conditional_false_claim_probability_lower_95,
+                        expected.conditional_false_claim_probability_lower_95,
+                    )
+                    || !same_optional_probability(
+                        observed.conditional_false_claim_probability_upper_95,
+                        expected.conditional_false_claim_probability_upper_95,
+                    )
                     || !same_optional_probability(
                         observed.estimated_false_claim_probability,
                         expected.estimated_false_claim_probability,
@@ -3548,6 +3716,28 @@ mod tests {
         assert_eq!(left.true_target_weighted_mean_effect_percentage_points, 0.0);
         assert_eq!(left.false_claims, right.false_claims);
         assert_eq!(left.degenerate_interval_trials, right.degenerate_interval_trials);
+        assert_eq!(left.informative_interval_trials, 64 - left.degenerate_interval_trials);
+        assert_eq!(
+            left.interval_availability_probability,
+            Some(left.informative_interval_trials as f64 / 64.0)
+        );
+        assert_eq!(
+            left.conditional_false_claim_probability,
+            (left.informative_interval_trials > 0)
+                .then_some(left.false_claims as f64 / left.informative_interval_trials.max(1) as f64)
+        );
+        assert_eq!(
+            left.conditional_false_claim_probability,
+            right.conditional_false_claim_probability
+        );
+        assert_eq!(
+            left.conditional_false_claim_probability_lower_95,
+            right.conditional_false_claim_probability_lower_95
+        );
+        assert_eq!(
+            left.conditional_false_claim_probability_upper_95,
+            right.conditional_false_claim_probability_upper_95
+        );
         assert_eq!(
             left.estimated_false_claim_probability,
             right.estimated_false_claim_probability
@@ -3609,6 +3799,18 @@ mod tests {
             assert_eq!(scenario.pair_association_fraction, association);
             assert_eq!(scenario.status, "estimated");
             assert!(scenario.null_effect_false_claim_probability_upper_simultaneous_95.is_some());
+            assert_eq!(scenario.informative_interval_trials + scenario.degenerate_interval_trials, 64);
+            assert_eq!(
+                scenario.interval_availability_probability,
+                Some(scenario.informative_interval_trials as f64 / 64.0)
+            );
+            assert_eq!(
+                scenario.conditional_utility_gate_power,
+                (scenario.informative_interval_trials > 0).then_some(
+                    scenario.utility_gate_passes as f64
+                        / scenario.informative_interval_trials.max(1) as f64
+                )
+            );
         }
     }
 

@@ -157,11 +157,11 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
-      - name: Validate primary analyzer power-report v2 schema contract
+      - name: Validate primary analyzer power-report v3 schema contract
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v2.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/primary-power-report-v2.schema.synthetic.json" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v3.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/primary-power-report-v3.schema.synthetic.json" <<'PY'
           import copy
           import json
           import sys
@@ -175,8 +175,8 @@ jobs:
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
           validator.validate(fixture)
 
-          if fixture["schema_version"] != "pitb.power-report.v2":
-              raise SystemExit("primary power fixture must use schema v2")
+          if fixture["schema_version"] != "pitb.power-report.v3":
+              raise SystemExit("primary power fixture must use schema v3")
           if "012" not in fixture["known_exposed_validation_family_ids"]:
               raise SystemExit("primary power fixture must quarantine exposed validation family 012")
           if "089" not in fixture["known_exposed_test_family_ids"]:
@@ -198,12 +198,42 @@ jobs:
           if weak_keys != {(sd, icc, association) for sd in (5.0, 10.0, 20.0) for icc in iccs for association in associations}:
               raise SystemExit("fixture weak-null grid has missing or duplicate heterogeneity/ICC/association cells")
           for row in fixture["scenarios"]:
+              expected_informative = row["study_simulations"] - row["degenerate_interval_trials"]
+              if row["informative_interval_trials"] != expected_informative:
+                  raise SystemExit("power row informative/degenerate counts must reconcile to all simulated studies")
+              expected_availability = None if row["status"] != "estimated" else expected_informative / row["study_simulations"]
+              actual_availability = row["interval_availability_probability"]
+              if expected_availability is None:
+                  if actual_availability is not None:
+                      raise SystemExit("infeasible row must not report interval availability")
+              elif abs(actual_availability - expected_availability) > 1e-12:
+                  raise SystemExit("power row interval availability must use all simulated studies as denominator")
+              if expected_informative > 0 and row["status"] == "estimated":
+                  expected_conditional = row["utility_gate_passes"] / expected_informative
+                  if abs(row["conditional_utility_gate_power"] - expected_conditional) > 1e-12:
+                      raise SystemExit("conditional power must use only informative intervals")
+              elif row["conditional_utility_gate_power"] is not None:
+                  raise SystemExit("conditional power must be null when no informative interval is available")
               if row["true_treatment_effect_percentage_points"] == 0.0:
                   if row["null_effect_false_claim_probability_upper_simultaneous_95"] < row["estimated_power_upper_95"]:
                       raise SystemExit("strict-null simultaneous upper bound must dominate the per-cell Wilson upper bound")
               elif row["null_effect_false_claim_probability_upper_simultaneous_95"] is not None:
                   raise SystemExit("non-null power scenarios must not publish a null-risk upper bound")
           for row in fixture["weak_null_scenarios"]:
+              expected_informative = row["study_simulations"] - row["degenerate_interval_trials"]
+              if row["informative_interval_trials"] != expected_informative:
+                  raise SystemExit("weak-null informative/degenerate counts must reconcile to all simulated studies")
+              expected_availability = expected_informative / row["study_simulations"]
+              if abs(row["interval_availability_probability"] - expected_availability) > 1e-12:
+                  raise SystemExit("weak-null interval availability must use all studies as denominator")
+              if expected_informative > 0:
+                  expected_conditional = row["false_claims"] / expected_informative
+                  if abs(row["conditional_false_claim_probability"] - expected_conditional) > 1e-12:
+                      raise SystemExit("conditional false-claim probability must use informative intervals only")
+                  if row["conditional_false_claim_probability_lower_95"] > expected_conditional or row["conditional_false_claim_probability_upper_95"] < expected_conditional:
+                      raise SystemExit("conditional weak-null Wilson bounds must bracket the conditional rate")
+              elif any(row[key] is not None for key in ("conditional_false_claim_probability","conditional_false_claim_probability_lower_95","conditional_false_claim_probability_upper_95")):
+                  raise SystemExit("conditional weak-null rates must be null when no interval is informative")
               if row["false_claim_probability_upper_simultaneous_95"] < row["false_claim_probability_upper_95"]:
                   raise SystemExit("weak-null simultaneous upper bound must dominate the per-cell Wilson upper bound")
           if not fixture["power_gate_passed"]:
@@ -296,14 +326,14 @@ jobs:
               raise SystemExit("schema must require the validation exposure quarantine")
 
           bad = copy.deepcopy(fixture)
-          bad["schema_version"] = "pitb.power-report.v1"
+          bad["schema_version"] = "pitb.power-report.v2"
           try:
               validator.validate(bad)
           except ValidationError:
               pass
           else:
-              raise SystemExit("schema must reject the incomplete v1 power report")
-          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v2 schema, validation/test exposure quarantine, 48-cell effect/ICC/association grid, 36-cell weak-null grid, 48-cell null multiplicity check, simultaneous worst-association power bound, denominator reconciliation and negative controls; fixture is synthetic and not a power result")
+              raise SystemExit("schema must reject a stale v2 power report under the v3 contract")
+          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v3 schema; informative/degenerate denominators; conditional and unconditional power/false-claim rates; 48-cell strict/power grid; 36-cell weak-null grid; simultaneous bounds and negative controls; fixture is synthetic, not a power result")
           PY
       - name: Validate run-config v1 schema and split-aware exposure quarantine
         shell: bash

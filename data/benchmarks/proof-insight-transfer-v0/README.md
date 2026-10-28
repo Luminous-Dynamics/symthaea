@@ -173,3 +173,10 @@ See [the 24 October sensitivity illustration](../../../docs/research/pitb-power-
 
 
 The planner's decision gate now uses a paired, component-percentile-bootstrap interval rather than the earlier t-interval approximation. Its bootstrap replicate count is an explicit CLI parameter, is recorded in the report, and is checked by the report schema. This aligns the interval method with the benchmark's paired frontier analysis; the planning model remains approximate because the generative assumptions are unestimated and the finite number of bootstrap replicates adds Monte Carlo variability.
+
+
+### Primary power-report v3: interval availability is an outcome
+
+The current report contract is `primary-power-report-v3.schema.json`; v2 remains archived for historical comparison. Every simulated study is accounted for as either informative-interval or degenerate-interval, with both counts summing exactly to the study count. The report emits the all-study interval-availability probability and, where at least one interval is informative, conditional gate power / conditional false-claim probability with Wilson bounds.
+
+The preregistered decision continues to use **unconditional** pass and false-claim rates over all simulated studies. Degenerate intervals remain no-claims, never successes. Conditional rates are diagnostics only: they show behavior among studies where the interval exists and must not replace the unconditional gate or hide low interval availability. If no informative intervals occur, the conditional metrics are explicitly `null`, not zero.

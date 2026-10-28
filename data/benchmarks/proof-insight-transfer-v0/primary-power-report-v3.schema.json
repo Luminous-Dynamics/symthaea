@@ -1,0 +1,904 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v3.schema.json",
+  "title": "PITB Primary Analyzer Power Report v3",
+  "description": "Version 3 adds explicit informative-interval counts and availability probability to all power cells, conditional power among informative intervals, and conditional weak-null false-claim rates with Wilson intervals. The unconditional full-study false-claim probability remains the decision-gate quantity; the conditional rate is diagnostic only. Grid and simultaneous calibration requirements are unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "protocol_sha256",
+    "run_design_sha256",
+    "validation_results_sha256",
+    "baseline_selection_receipt_sha256",
+    "split_manifest_sha256",
+    "partition_digest_sha256",
+    "analyzer_source_sha256",
+    "upstream_commit",
+    "selected_baseline_arm",
+    "known_exposed_test_family_ids",
+    "known_exposed_validation_family_ids",
+    "eligible_validation_target_count",
+    "eligible_validation_family_count",
+    "validation_baseline_semantic_success_rate",
+    "family_target_counts",
+    "assumed_family_icc_grid",
+    "pair_association_fraction_grid",
+    "true_effect_grid_percentage_points",
+    "study_simulations",
+    "bootstrap_replicates_per_simulated_study",
+    "simulation_seed",
+    "confirmatory_minimum_family_count",
+    "utility_effect_threshold_percentage_points",
+    "required_power_at_20pp_and_icc_020",
+    "maximum_false_claim_probability_at_zero_effect",
+    "null_effect_false_claim_probability_max",
+    "null_effect_false_claim_probability_upper_simultaneous_95_max",
+    "weak_null_family_effect_heterogeneity_sd_grid_percentage_points",
+    "weak_null_scenarios",
+    "weak_null_false_claim_probability_max",
+    "weak_null_false_claim_probability_upper_simultaneous_95_max",
+    "estimated_power_at_20pp_and_icc_020",
+    "estimated_power_at_20pp_and_icc_020_lower_95",
+    "estimated_power_at_20pp_and_icc_020_lower_simultaneous_95",
+    "power_gate_passed",
+    "scenarios",
+    "model_assumptions",
+    "interpretation",
+    "weak_null_pair_association_fraction_grid"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.power-report.v3"
+    },
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_design_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "validation_results_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "baseline_selection_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "split_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "partition_digest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "analyzer_source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "upstream_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "selected_baseline_arm": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "I"
+      ]
+    },
+    "known_exposed_validation_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "012"
+      },
+      "minContains": 1,
+      "description": "Known-exposed validation families excluded from baseline selection and threshold tuning; must include family 012."
+    },
+    "known_exposed_test_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "089"
+      },
+      "minContains": 1,
+      "description": "Known-exposed test families excluded from confirmatory denominators; must include family 089."
+    },
+    "eligible_validation_target_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "eligible_validation_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "validation_baseline_semantic_success_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "family_target_counts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "eligible_target_count"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "eligible_target_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "assumed_family_icc_grid": {
+      "const": [
+        0,
+        0.05,
+        0.1,
+        0.2
+      ]
+    },
+    "true_effect_grid_percentage_points": {
+      "const": [
+        0,
+        10,
+        15,
+        20
+      ]
+    },
+    "study_simulations": {
+      "type": "integer",
+      "minimum": 1000
+    },
+    "bootstrap_replicates_per_simulated_study": {
+      "type": "integer",
+      "minimum": 500
+    },
+    "simulation_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confirmatory_minimum_family_count": {
+      "const": 20
+    },
+    "utility_effect_threshold_percentage_points": {
+      "const": 10
+    },
+    "required_power_at_20pp_and_icc_020": {
+      "const": 0.8
+    },
+    "maximum_false_claim_probability_at_zero_effect": {
+      "const": 0.05
+    },
+    "null_effect_false_claim_probability_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "null_effect_false_claim_probability_upper_simultaneous_95_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "weak_null_family_effect_heterogeneity_sd_grid_percentage_points": {
+      "const": [
+        5,
+        10,
+        20
+      ]
+    },
+    "weak_null_scenarios": {
+      "type": "array",
+      "minItems": 36,
+      "maxItems": 36,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "true_target_weighted_mean_effect_percentage_points",
+          "assumed_family_icc",
+          "pair_association_fraction",
+          "requested_family_effect_heterogeneity_sd_percentage_points",
+          "study_simulations",
+          "bootstrap_replicates_per_simulated_study",
+          "false_claims",
+          "degenerate_interval_trials",
+          "informative_interval_trials",
+          "interval_availability_probability",
+          "estimated_false_claim_probability",
+          "conditional_false_claim_probability",
+          "conditional_false_claim_probability_lower_95",
+          "conditional_false_claim_probability_upper_95",
+          "monte_carlo_standard_error",
+          "false_claim_probability_lower_95",
+          "false_claim_probability_upper_95",
+          "false_claim_probability_upper_simultaneous_95",
+          "mean_observed_effect_percentage_points",
+          "mean_realized_family_effect_heterogeneity_sd_percentage_points",
+          "interpretation"
+        ],
+        "properties": {
+          "status": {
+            "const": "estimated"
+          },
+          "true_target_weighted_mean_effect_percentage_points": {
+            "type": "number",
+            "const": 0
+          },
+          "assumed_family_icc": {
+            "enum": [
+              0,
+              0.05,
+              0.1,
+              0.2
+            ]
+          },
+          "requested_family_effect_heterogeneity_sd_percentage_points": {
+            "enum": [
+              5,
+              10,
+              20
+            ]
+          },
+          "study_simulations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bootstrap_replicates_per_simulated_study": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "false_claims": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "degenerate_interval_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimated_false_claim_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "monte_carlo_standard_error": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "false_claim_probability_lower_95": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "false_claim_probability_upper_95": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "false_claim_probability_upper_simultaneous_95": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_observed_effect_percentage_points": {
+            "type": "number"
+          },
+          "mean_realized_family_effect_heterogeneity_sd_percentage_points": {
+            "type": "number",
+            "minimum": 0
+          },
+          "interpretation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pair_association_fraction": {
+            "enum": [
+              0,
+              0.5,
+              0.9
+            ]
+          },
+          "informative_interval_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "interval_availability_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "conditional_false_claim_probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_false_claim_probability_lower_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_false_claim_probability_upper_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "description": "Three family-effect heterogeneity SDs × four ICCs × three paired-outcome association fractions; 36 unique cells."
+    },
+    "weak_null_false_claim_probability_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "weak_null_false_claim_probability_upper_simultaneous_95_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "estimated_power_at_20pp_and_icc_020": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Minimum estimated utility-gate power across pair-association fractions 0, 0.5 and 0.9 at +20pp true effect and ICC 0.20; null if any registered scenario is infeasible/unestimated."
+    },
+    "estimated_power_at_20pp_and_icc_020_lower_95": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Minimum per-scenario 95% Wilson lower bound across pair-association fractions 0, 0.5 and 0.9 at +20pp true effect and ICC 0.20; null if any registered scenario is infeasible/unestimated."
+    },
+    "estimated_power_at_20pp_and_icc_020_lower_simultaneous_95": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Minimum two-sided 95% Bonferroni-adjusted Wilson lower bound (z=2.394) across the three registered paired-outcome association fractions at +20pp true effect and ICC 0.20; null if any registered scenario is infeasible/unestimated."
+    },
+    "power_gate_passed": {
+      "type": "boolean"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 48,
+      "maxItems": 48,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "true_treatment_effect_percentage_points",
+          "assumed_family_icc",
+          "pair_association_fraction",
+          "study_simulations",
+          "bootstrap_replicates_per_simulated_study",
+          "utility_gate_passes",
+          "degenerate_interval_trials",
+          "informative_interval_trials",
+          "interval_availability_probability",
+          "conditional_utility_gate_power",
+          "conditional_power_lower_95",
+          "conditional_power_upper_95",
+          "estimated_utility_gate_power",
+          "monte_carlo_standard_error",
+          "estimated_power_lower_95",
+          "estimated_power_upper_95",
+          "null_effect_false_claim_probability_upper_simultaneous_95",
+          "mean_observed_effect_percentage_points",
+          "mean_lower_95ci_percentage_points",
+          "interpretation"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "estimated",
+              "infeasible_effect_above_ceiling"
+            ]
+          },
+          "true_treatment_effect_percentage_points": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "assumed_family_icc": {
+            "enum": [
+              0,
+              0.05,
+              0.1,
+              0.2
+            ]
+          },
+          "study_simulations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bootstrap_replicates_per_simulated_study": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "utility_gate_passes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "degenerate_interval_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimated_utility_gate_power": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "monte_carlo_standard_error": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimated_power_lower_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimated_power_upper_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "null_effect_false_claim_probability_upper_simultaneous_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mean_observed_effect_percentage_points": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mean_lower_95ci_percentage_points": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interpretation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pair_association_fraction": {
+            "enum": [
+              0,
+              0.5,
+              0.9
+            ]
+          },
+          "informative_interval_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "interval_availability_probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_utility_gate_power": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_power_lower_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditional_power_upper_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "estimated"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "estimated_utility_gate_power": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "monte_carlo_standard_error": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "estimated_power_lower_95": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "estimated_power_upper_95": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "mean_observed_effect_percentage_points": {
+                  "type": "number"
+                },
+                "mean_lower_95ci_percentage_points": {
+                  "type": "number"
+                },
+                "informative_interval_trials": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "interval_availability_probability": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conditional_utility_gate_power": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conditional_power_lower_95": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conditional_power_upper_95": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "infeasible_effect_above_ceiling"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "utility_gate_passes": {
+                  "type": "integer",
+                  "const": 0
+                },
+                "estimated_utility_gate_power": {
+                  "type": "null"
+                },
+                "monte_carlo_standard_error": {
+                  "type": "null"
+                },
+                "estimated_power_lower_95": {
+                  "type": "null"
+                },
+                "estimated_power_upper_95": {
+                  "type": "null"
+                },
+                "null_effect_false_claim_probability_upper_simultaneous_95": {
+                  "type": "null"
+                },
+                "mean_observed_effect_percentage_points": {
+                  "type": "null"
+                },
+                "mean_lower_95ci_percentage_points": {
+                  "type": "null"
+                },
+                "informative_interval_trials": {
+                  "type": "integer",
+                  "const": 0
+                },
+                "interval_availability_probability": {
+                  "type": "null"
+                },
+                "conditional_utility_gate_power": {
+                  "type": "null"
+                },
+                "conditional_power_lower_95": {
+                  "type": "null"
+                },
+                "conditional_power_upper_95": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "true_treatment_effect_percentage_points": {
+                  "const": 0
+                }
+              },
+              "required": [
+                "true_treatment_effect_percentage_points"
+              ]
+            },
+            "then": {
+              "properties": {
+                "null_effect_false_claim_probability_upper_simultaneous_95": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "true_treatment_effect_percentage_points": {
+                  "not": {
+                    "const": 0
+                  }
+                }
+              },
+              "required": [
+                "true_treatment_effect_percentage_points"
+              ]
+            },
+            "then": {
+              "properties": {
+                "null_effect_false_claim_probability_upper_simultaneous_95": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "description": "Four true-effect values × four ICC values × three paired-outcome association fractions; 48 unique cells. The +20pp/ICC 0.20 headline power is the minimum over its three association scenarios."
+    },
+    "model_assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "interpretation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "weak_null_pair_association_fraction_grid": {
+      "const": [
+        0,
+        0.5,
+        0.9
+      ]
+    },
+    "pair_association_fraction_grid": {
+      "const": [
+        0,
+        0.5,
+        0.9
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "power_gate_passed": {
+            "const": true
+          }
+        },
+        "required": [
+          "power_gate_passed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "eligible_validation_family_count": {
+            "type": "integer",
+            "minimum": 20
+          },
+          "estimated_power_at_20pp_and_icc_020_lower_95": {
+            "type": "number",
+            "minimum": 0.8
+          },
+          "null_effect_false_claim_probability_upper_simultaneous_95_max": {
+            "type": "number",
+            "maximum": 0.05
+          },
+          "weak_null_false_claim_probability_upper_simultaneous_95_max": {
+            "type": "number",
+            "maximum": 0.05
+          }
+        }
+      }
+    }
+  ]
+}
