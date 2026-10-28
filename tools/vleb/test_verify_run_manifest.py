@@ -303,7 +303,7 @@ class RunManifestVerifierTests(unittest.TestCase):
             expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
             trusted_claim_verifier_pins={},
         )
-        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["status"], "unresolved")
         self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
 
     def test_claim_audit_rejects_witness_artifact_tampering(self) -> None:
