@@ -1116,6 +1116,55 @@ fn simulate_weak_null_matched_study(
     Ok((families, realized_effect_sd))
 }
 
+fn joint_success_probability_at_association(
+    baseline_probability: f64,
+    treatment_probability: f64,
+    pair_association_fraction: f64,
+) -> Result<f64> {
+    if !baseline_probability.is_finite()
+        || !(0.0..=1.0).contains(&baseline_probability)
+        || !treatment_probability.is_finite()
+        || !(0.0..=1.0).contains(&treatment_probability)
+    {
+        bail!("paired Bernoulli marginals must be finite probabilities");
+    }
+    if !pair_association_fraction.is_finite()
+        || !(0.0..=1.0).contains(&pair_association_fraction)
+    {
+        bail!("pair-association fraction must lie in [0,1]");
+    }
+
+    // Association fraction 0 gives independent potential outcomes. Fraction 1
+    // reaches the Frechet upper bound P(Y0=1,Y1=1)=min(p0,p1). Intermediate
+    // values interpolate joint success probability; this is not a Pearson rho.
+    let independent_joint = baseline_probability * treatment_probability;
+    Ok(independent_joint
+        + pair_association_fraction
+            * (baseline_probability.min(treatment_probability) - independent_joint))
+}
+
+fn sample_paired_bernoulli_from_joint_probability(
+    baseline_probability: f64,
+    treatment_probability: f64,
+    joint_success_probability: f64,
+    rng: &mut SplitMix64,
+) -> (bool, bool) {
+    debug_assert!((0.0..=1.0).contains(&baseline_probability));
+    debug_assert!((0.0..=1.0).contains(&treatment_probability));
+    debug_assert!((0.0..=baseline_probability.min(treatment_probability))
+        .contains(&joint_success_probability));
+    let draw = rng.uniform01();
+    if draw < joint_success_probability {
+        (true, true)
+    } else if draw < baseline_probability {
+        (true, false)
+    } else if draw < baseline_probability + treatment_probability - joint_success_probability {
+        (false, true)
+    } else {
+        (false, false)
+    }
+}
+
 fn sample_centered_weak_null_family_effects(
     family_target_counts: &[FamilyTargetCount],
     baseline_family_rates: &[f64],
