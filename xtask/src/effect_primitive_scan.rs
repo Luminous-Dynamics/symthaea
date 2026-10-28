@@ -175,7 +175,7 @@ pub fn scan(root: &Path, output: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-impl<'ast> Visit<'ast> for CandidateVisitor<'_> {
+impl<'ast, 'source> Visit<'ast> for CandidateVisitor<'source> {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if let Expr::Path(function) = node.func.as_ref() {
             if let Some((class, confidence)) = classify_call(&function.path) {
@@ -215,7 +215,7 @@ fn classify_call(path: &syn::Path) -> Option<(&'static str, &'static str)> {
         .map(|segment| segment.ident.to_string())
         .collect::<Vec<_>>();
     let last = segments.last()?.as_str();
-    let has = |name: &str| segments.iter().any(|segment| segment == name);
+    let has = |name: &str| segments.iter().any(|segment| segment.as_str() == name);
     let previous = segments
         .len()
         .checked_sub(2)
@@ -284,7 +284,7 @@ fn collect_rust_files(directory: &Path, output: &mut Vec<PathBuf>) -> Result<()>
             {
                 collect_rust_files(&path, output)?;
             }
-        } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
+        } else if file_type.is_file() && path.extension().and_then(|extension| extension.to_str()) == Some("rs") {
             output.push(path);
         }
     }
