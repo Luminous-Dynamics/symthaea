@@ -656,6 +656,18 @@
       "implementation_scope": "Order and dispersion PRM portfolio with four fixed-bet components, predictive rank null probabilities, and 1/alpha stopping boundary. Benchmark implementation uses deterministic seed-driven tie randomization; formal guarantee is interpreted over independent benchmark seeds. Not a full ONS implementation or KDD-family reproduction."
     },
     {
+      "id": "predictive-rank-martingale-ons-portfolio",
+      "name": "Predictive rank martingale ONS portfolio",
+      "family": "anytime-valid fixed-reference distribution-shift monitor with online convex-optimization betting",
+      "labels_required": false,
+      "input_contract": "Fixed calibration scores plus online valid-PE scores. Order and dispersion features use the predictive rank null and a predictable ONS betting update; seeded tie randomization is reproducible but does not establish independent randomization conditional on a fixed seed.",
+      "implementation_status": "implemented-rust-reference-baseline-pending-validation",
+      "source": "https://arxiv.org/abs/2609.00536",
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "Two-feature order/dispersion PRM portfolio with predictable ONS update, projection keeping factors positive, and 1/alpha first-crossing boundary. This is not yet an empirical reproduction of the paper results or a measured SOTA claim."
+    },
+    {
       "id": "adwin",
       "name": "ADWIN adaptive-window detector",
       "family": "adaptive-window",
