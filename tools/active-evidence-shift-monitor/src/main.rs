@@ -621,8 +621,12 @@ fn main() -> ExitCode {
             print_sentinel_budget_csv();
             ExitCode::SUCCESS
         }
+        Some(argument) if argument == "--eprocess-family-csv" => {
+            print_eprocess_family_csv();
+            ExitCode::SUCCESS
+        }
         Some(argument) if argument == "--help" || argument == "-h" => {
-            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv]");
+            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv|--eprocess-family-csv]");
             ExitCode::SUCCESS
         }
         Some(argument) => {
@@ -897,6 +901,75 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn eprocess_prior_families_preserve_null_budget_and_portfolio_improves_weak_shift_fixture() {
+        let mut detections = Vec::new();
+        for family in EProcessFamily::ALL {
+            let table = family_alarm_table(family, NOMINAL_P, FAMILY_HORIZON);
+            let null = evaluate_with_alarm(
+                NOMINAL_P,
+                NOMINAL_P,
+                None,
+                0,
+                FAMILY_HORIZON,
+                |n, successes| table[n][successes],
+            );
+            assert!(
+                null.false_alarm_probability <= PER_CELL_ALPHA + EPS,
+                "family {} exceeds the anytime null alarm allocation",
+                family.name()
+            );
+
+            let weak_shift = evaluate_with_alarm(
+                NOMINAL_P,
+                NOMINAL_P,
+                Some(0.55),
+                CHANGE_AFTER,
+                FAMILY_HORIZON,
+                |n, successes| table[n][successes],
+            );
+            assert!(weak_shift.false_alarm_probability <= PER_CELL_ALPHA + EPS);
+            let total = weak_shift.false_alarm_probability
+                + weak_shift.detection_probability
+                + weak_shift.survival_probability;
+            assert!((total - 1.0).abs() <= 1.0e-9);
+            detections.push((family, weak_shift.detection_probability));
+        }
+
+        let jeffreys = detections
+            .iter()
+            .find(|(family, _)| *family == EProcessFamily::Jeffreys)
+            .unwrap()
+            .1;
+        let portfolio = detections
+            .iter()
+            .find(|(family, _)| *family == EProcessFamily::EqualPortfolio)
+            .unwrap()
+            .1;
+        assert!(
+            portfolio > jeffreys + 0.04,
+            "fixed portfolio did not improve weak-shift power in fixture: portfolio={portfolio}, Jeffreys={jeffreys}"
+        );
+
+        let individual_log_values = [
+            beta_mixture_log_e_value_with_prior(2, 1, NOMINAL_P, 0.5, 0.5),
+            beta_mixture_log_e_value_with_prior(2, 1, NOMINAL_P, 1.0, 1.0),
+            beta_mixture_log_e_value_with_prior(2, 1, NOMINAL_P, 5.0, 5.0),
+            beta_mixture_log_e_value_with_prior(2, 1, NOMINAL_P, 20.0, 20.0),
+        ];
+        let expected = individual_log_values
+            .iter()
+            .zip(PORTFOLIO_WEIGHTS)
+            .map(|(value, weight)| weight * value.exp())
+            .sum::<f64>();
+        assert!(
+            (family_log_e_value(EProcessFamily::EqualPortfolio, 2, 1, NOMINAL_P).exp()
+                - expected)
+                .abs()
+                <= 1.0e-10
+        );
     }
 
     #[test]
