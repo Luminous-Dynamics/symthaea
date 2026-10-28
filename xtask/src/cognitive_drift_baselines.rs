@@ -67,7 +67,10 @@ pub enum ScalarDetectorMethod {
     FixedThreshold,
     EwmaControlChart,
     PageHinkley,
+    /// Fixed-bet four-way portfolio; reference control, not the ONS paper implementation.
     PredictiveRankMartingalePortfolio,
+    /// Order/dispersion portfolio with the paper's predictable ONS betting update.
+    PredictiveRankMartingaleOnsPortfolio,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -626,6 +629,229 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 },
             ))
         }
+        ScalarDetectorMethod::PredictiveRankMartingaleOnsPortfolio => run_prm_ons_portfolio(input),
+    }
+}
+
+fn run_prm_ons_portfolio(
+    input: &ScalarDriftRunInput,
+) -> anyhow::Result<(String, Vec<Detection>, DetectorDiagnostics)> {
+    ensure!(
+        input.detector.fixed_threshold.is_none()
+            && input.detector.ewma_alpha.is_none()
+            && input.detector.ewma_threshold_sigma.is_none()
+            && input.detector.calibration_stddev_floor.is_none()
+            && input.detector.page_hinkley_delta.is_none()
+            && input.detector.page_hinkley_threshold.is_none(),
+        "fixed-threshold, EWMA, and Page-Hinkley parameters must be absent for PRM-ONS"
+    );
+    let alpha = input.detector.prm_alpha.context("prm_alpha is required for PRM-ONS")?;
+    ensure!(
+        alpha.is_finite() && alpha > 0.0 && alpha < 1.0,
+        "prm_alpha must be finite and in (0, 1)"
+    );
+    ensure!(
+        input.detector.warmup_valid_observations == 1,
+        "PRM-ONS warmup_valid_observations must be 1; delayed monitoring requires a separate alpha contract"
+    );
+    let wealth_threshold = 1.0 / alpha;
+    ensure!(wealth_threshold.is_finite(), "PRM-ONS 1/alpha threshold overflowed");
+
+    // Faithful implementation of the Order/Dispersion PRM portfolio's adaptive
+    // ONS betting coefficients from Kuang & Xia (2026), Algorithm 1. The online
+    // coefficient is chosen only from prior ranks. Seeded tie-breaking makes runs
+    // reproducible, but is not independent randomization conditional on a fixed seed;
+    // therefore this is a benchmark implementation of the paper's algorithm, not a
+    // claim of conditional validity for a deterministic seed.
+    let n = input.calibration_values.len();
+    ensure!(n >= 2, "PRM-ONS requires at least two calibration values");
+    let mut rng = SplitMix64::new(input.seed ^ 0x72616e6b5f70726d);
+    let mut reference: Vec<RankedCalibrationValue> = input
+        .calibration_values
+        .iter()
+        .map(|value| RankedCalibrationValue {
+            value: *value,
+            tie_key: rng.next_u64(),
+        })
+        .collect();
+    reference.sort_by(|left, right| {
+        left.value
+            .partial_cmp(&right.value)
+            .expect("validated finite calibration values")
+            .then_with(|| left.tie_key.cmp(&right.tie_key))
+    });
+
+    let order_feature: Vec<f64> = (0..=n)
+        .map(|j| j as f64 / n as f64 - 0.5)
+        .collect();
+    let dispersion_feature: Vec<f64> = (0..=n)
+        .map(|j| (2.0 * j as f64 / n as f64 - 1.0).abs() - 0.5)
+        .collect();
+    let base_order_sum = order_feature.iter().sum::<f64>();
+    let base_dispersion_sum = dispersion_feature.iter().sum::<f64>();
+    ensure!(
+        base_order_sum.is_finite() && base_dispersion_sum.is_finite(),
+        "PRM-ONS base feature sums became non-finite"
+    );
+    let mut history_order_sum = 0.0_f64;
+    let mut history_dispersion_sum = 0.0_f64;
+
+    // One adaptively-bet e-process per feature. Their equal-weight mixture remains
+    // an e-process; the mixture stops once it first crosses 1/alpha.
+    let mut lambdas = [0.0_f64; 2];
+    let mut gradient_squares = [1.0_f64; 2];
+    let mut wealth = [1.0_f64; 2];
+    let mut detections = Vec::new();
+    let mut processed = 0usize;
+    let mut final_portfolio_wealth = 1.0_f64;
+    let mut maximum_portfolio_wealth = 1.0_f64;
+
+    for observation in &input.observations {
+        // Consume a tie key on every cycle so missingness does not change the later
+        // deterministic PRNG sequence. Missing evidence does not update rank/bet state.
+        let tie_key = rng.next_u64();
+        if !observation.evidence_valid {
+            continue;
+        }
+        let value = observation.value.expect("validated numeric PE");
+        let rank_index = reference.partition_point(|item| {
+            item.value < value || (item.value == value && item.tie_key < tie_key)
+        });
+        ensure!(rank_index <= n, "PRM-ONS rank index is outside the calibration grid");
+        let tie_collision = (rank_index > 0
+            && reference[rank_index - 1].value == value
+            && reference[rank_index - 1].tie_key == tie_key)
+            || (rank_index < n
+                && reference[rank_index].value == value
+                && reference[rank_index].tie_key == tie_key);
+        ensure!(
+            !tie_collision,
+            "PRM-ONS tie-break collision; rerun with a different independent benchmark seed"
+        );
+
+        let denominator = n
+            .checked_add(processed)
+            .and_then(|count| count.checked_add(1))
+            .context("PRM-ONS predictive denominator overflowed")? as f64;
+        ensure!(denominator.is_finite() && denominator > 0.0, "PRM-ONS denominator invalid");
+        let expected = [
+            (base_order_sum + history_order_sum) / denominator,
+            (base_dispersion_sum + history_dispersion_sum) / denominator,
+        ];
+        ensure!(
+            expected.iter().all(|mean| mean.is_finite()),
+            "PRM-ONS predictive feature expectation became non-finite"
+        );
+        let feature_at_rank = [order_feature[rank_index], dispersion_feature[rank_index]];
+        let z = [
+            feature_at_rank[0] - expected[0],
+            feature_at_rank[1] - expected[1],
+        ];
+        ensure!(
+            z.iter().all(|value| value.is_finite()),
+            "PRM-ONS centered rank feature became non-finite"
+        );
+
+        // The paper defines B_t = max_j |h_j - E_t h| and
+        // b_t = min(1, 3/(4 B_t)); if B_t=0 the feature is uninformative.
+        // The projection keeps every 1 + lambda_t Z_t >= 1/4.
+        let current_radii = [
+            ons_projection_radius(feature_bound(&order_feature, expected[0])),
+            ons_projection_radius(feature_bound(&dispersion_feature, expected[1])),
+        ];
+        for feature in 0..2 {
+            ensure!(
+                lambdas[feature].abs() <= current_radii[feature] + 1e-12,
+                "PRM-ONS coefficient escaped its predictable feasible interval"
+            );
+            let factor = 1.0 + lambdas[feature] * z[feature];
+            ensure!(
+                factor.is_finite() && factor >= 0.25 - 1e-12,
+                "PRM-ONS betting factor violated its positive lower bound"
+            );
+            wealth[feature] *= factor;
+            ensure!(wealth[feature].is_finite(), "PRM-ONS wealth overflowed");
+        }
+        let portfolio_wealth = (wealth[0] + wealth[1]) / 2.0;
+        ensure!(portfolio_wealth.is_finite(), "PRM-ONS portfolio wealth overflowed");
+        final_portfolio_wealth = portfolio_wealth;
+        maximum_portfolio_wealth = maximum_portfolio_wealth.max(portfolio_wealth);
+        processed = processed.checked_add(1).context("PRM-ONS processed count overflowed")?;
+        if portfolio_wealth >= wealth_threshold {
+            detections.push(Detection {
+                cycle_index: observation.cycle_index,
+                evidence_valid: true,
+            });
+            break;
+        }
+
+        // Algorithm 1: use the current gradient, then update the Pólya-urn rank
+        // counts and project the next coefficient using b_{t+1}.
+        let mut gradients = [0.0_f64; 2];
+        for feature in 0..2 {
+            let factor = 1.0 + lambdas[feature] * z[feature];
+            gradients[feature] = z[feature] / factor;
+            ensure!(gradients[feature].is_finite(), "PRM-ONS gradient became non-finite");
+            gradient_squares[feature] += gradients[feature] * gradients[feature];
+            ensure!(
+                gradient_squares[feature].is_finite() && gradient_squares[feature] >= 1.0,
+                "PRM-ONS accumulated gradient square became invalid"
+            );
+        }
+        history_order_sum += order_feature[rank_index];
+        history_dispersion_sum += dispersion_feature[rank_index];
+        ensure!(
+            history_order_sum.is_finite() && history_dispersion_sum.is_finite(),
+            "PRM-ONS rank history became non-finite"
+        );
+
+        let next_denominator = n
+            .checked_add(processed)
+            .and_then(|count| count.checked_add(1))
+            .context("PRM-ONS next predictive denominator overflowed")? as f64;
+        let next_expected = [
+            (base_order_sum + history_order_sum) / next_denominator,
+            (base_dispersion_sum + history_dispersion_sum) / next_denominator,
+        ];
+        let next_radii = [
+            ons_projection_radius(feature_bound(&order_feature, next_expected[0])),
+            ons_projection_radius(feature_bound(&dispersion_feature, next_expected[1])),
+        ];
+        for feature in 0..2 {
+            let update = (4.5 * gradients[feature]) / gradient_squares[feature];
+            ensure!(update.is_finite(), "PRM-ONS coefficient update became non-finite");
+            lambdas[feature] =
+                (lambdas[feature] + update).clamp(-next_radii[feature], next_radii[feature]);
+        }
+    }
+
+    Ok((
+        "predictive-rank-martingale-ons-portfolio".to_owned(),
+        detections.clone(),
+        DetectorDiagnostics {
+            statistic_name: "predictive-rank-martingale-ons-portfolio-wealth".to_owned(),
+            threshold_or_boundary: Some(wealth_threshold),
+            final_statistic: Some(final_portfolio_wealth),
+            maximum_statistic: Some(maximum_portfolio_wealth),
+            stopping_alpha: Some(alpha),
+            stopped_at_first_crossing: !detections.is_empty(),
+            valid_samples_processed: processed,
+        },
+    ))
+}
+
+fn feature_bound(feature: &[f64], expected: f64) -> f64 {
+    feature
+        .iter()
+        .map(|value| (value - expected).abs())
+        .fold(0.0_f64, f64::max)
+}
+
+fn ons_projection_radius(bound: f64) -> f64 {
+    if !bound.is_finite() || bound <= f64::EPSILON {
+        1.0
+    } else {
+        (0.75 / bound).min(1.0)
     }
 }
 
@@ -741,7 +967,8 @@ mod tests {
                 prm_alpha: None,
                 warmup_valid_observations: 1,
             },
-            ScalarDetectorMethod::PredictiveRankMartingalePortfolio => ScalarDetectorConfig {
+            ScalarDetectorMethod::PredictiveRankMartingalePortfolio
+            | ScalarDetectorMethod::PredictiveRankMartingaleOnsPortfolio => ScalarDetectorConfig {
                 method,
                 fixed_threshold: None,
                 ewma_alpha: None,
@@ -813,6 +1040,33 @@ mod tests {
         assert_eq!(result.score.true_positive_events, 2);
         assert_eq!(result.score.false_positive_alarms, 0);
         assert_eq!(result.score.missed_events, 0);
+    }
+
+    #[test]
+    fn predictive_rank_ons_is_online_and_detects_a_sustained_shift() {
+        let result = run_scalar_detector(
+            fixture(ScalarDetectorMethod::PredictiveRankMartingaleOnsPortfolio),
+        )
+        .expect("PRM-ONS should run");
+        assert_eq!(result.detector_id, "predictive-rank-martingale-ons-portfolio");
+        assert_eq!(result.diagnostics.stopping_alpha, Some(0.2));
+        assert_eq!(result.diagnostics.threshold_or_boundary, Some(5.0));
+        assert!(result.diagnostics.maximum_statistic.unwrap() >= 1.0);
+        assert_eq!(result.score.invalid_evidence_alarms, 0);
+        assert!(result.detections.iter().all(|d| d.evidence_valid));
+        assert_eq!(
+            result.diagnostics.stopped_at_first_crossing,
+            !result.detections.is_empty()
+        );
+    }
+
+    #[test]
+    fn predictive_rank_ons_coefficients_keep_factors_positive() {
+        for bound in [0.0, 0.01, 0.25, 0.5, 0.75, 1.0] {
+            let radius = ons_projection_radius(bound);
+            assert!((0.75..=1.0).contains(&radius));
+            assert!(radius * bound <= 0.75 + 1e-12);
+        }
     }
 
     #[test]
