@@ -7,7 +7,7 @@ use std::env;
 use std::fmt::Write as _;
 
 const GRID: &str = include_str!("../tests/fixtures/vision-dvpc-028-scenarios.tsv");
-const SCENARIO_HEADER: &str = "scenario_id\\tn\\ttarget_probability_a\\ttrue_logging_probability_a\\testimated_logging_probability_a\\treward_mean_a\\treward_mean_b\\tqhat_a\\tqhat_b\\tclip_cap";
+const SCENARIO_HEADER: &str = "scenario_id\tn\ttarget_probability_a\ttrue_logging_probability_a\testimated_logging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap";
 const EPS: f64 = 1e-10;
 
 #[derive(Clone, Debug)]
@@ -83,8 +83,7 @@ fn invalid(message: impl Into<String>) -> String {
 
 fn parse_grid(input: &str) -> Result<Vec<Scenario>, String> {
     let mut lines = input.lines();
-    let expected_header = "scenario_id\tn\ttarget_probability_a\ttrue_logging_probability_a\testimated_logging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap";
-    if lines.next() != Some(expected_header) {
+    if lines.next() != Some(SCENARIO_HEADER) {
         return Err(invalid("unexpected scenario header"));
     }
     let mut result = Vec::new();
