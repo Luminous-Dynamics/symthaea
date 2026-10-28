@@ -64,7 +64,8 @@
       "model_system": "vanilla_equation",
       "law_version": "v0",
       "noise_level": 0,
-      "rollouts_per_cell": 2
+      "rollouts_per_cell": 2,
+      "paired_rollout_seeds_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     {
       "model_id": "GPT-4.1",
@@ -88,7 +89,8 @@
       "model_system": "vanilla_equation",
       "law_version": "v0",
       "noise_level": 0,
-      "rollouts_per_cell": 2
+      "rollouts_per_cell": 2,
+      "paired_rollout_seeds_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     }
   ],
   "arms": [
