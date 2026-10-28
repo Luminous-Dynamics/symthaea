@@ -206,8 +206,14 @@ class ReportQualificationTests(unittest.TestCase):
 
     def test_constant_score_does_not_produce_nan_correlation(self):
         report = MODULE.ValidationReport(results=[
-            MODULE.ValidationResult("a", 2, "a" * 64, candidate_phi=1.0, pyphi_phi_s=0.0),
-            MODULE.ValidationResult("b", 2, "b" * 64, candidate_phi=1.0, pyphi_phi_s=2.0),
+            MODULE.ValidationResult(
+                "a", 2, "a" * 64, rust_payload_blake3="c" * 64,
+                candidate_phi=1.0, pyphi_phi_s=0.0, candidate_metric_id=MODULE.RUST_CANDIDATE_METRIC_ID,
+            ),
+            MODULE.ValidationResult(
+                "b", 2, "b" * 64, rust_payload_blake3="d" * 64,
+                candidate_phi=1.0, pyphi_phi_s=2.0, candidate_metric_id=MODULE.RUST_CANDIDATE_METRIC_ID,
+            ),
         ])
         _validator()._compute_report_metrics(report)
         self.assertIsNone(report.correlation)
@@ -220,8 +226,14 @@ class ReportQualificationTests(unittest.TestCase):
             MODULE.TopologySpec("b", 2, [(0, 1)]),
         ]
         results = [
-            MODULE.ValidationResult("a", 2, "a" * 64, candidate_phi=1.0, pyphi_phi_s=1.0),
-            MODULE.ValidationResult("b", 2, "b" * 64, candidate_phi=2.0, pyphi_phi_s=2.0),
+            MODULE.ValidationResult(
+                "a", 2, "a" * 64, rust_payload_blake3="c" * 64,
+                candidate_phi=1.0, pyphi_phi_s=1.0, candidate_metric_id=MODULE.RUST_CANDIDATE_METRIC_ID,
+            ),
+            MODULE.ValidationResult(
+                "b", 2, "b" * 64, rust_payload_blake3="d" * 64,
+                candidate_phi=2.0, pyphi_phi_s=2.0, candidate_metric_id=MODULE.RUST_CANDIDATE_METRIC_ID,
+            ),
         ]
         with patch.object(MODULE, "PYPHI_AVAILABLE", True), patch.object(
             MODULE, "PYPHI_VERSION", MODULE.EXPECTED_PYPHI_VERSION
