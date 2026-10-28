@@ -69,6 +69,8 @@ def empty_summary(expected_count: int | None, issues: list[dict[str, str]]) -> d
         "schema_version": "vleb-admission-cohort-summary-v1",
         "cohort_integrity_valid": False,
         "cohort_complete": False,
+        "pooled_metrics_population": "verified_reports_only",
+        "pooled_metrics_complete": False,
         "analysis_only": True,
         "score_eligible": False,
         "expected_task_count": expected_count,
@@ -252,6 +254,7 @@ def summarize_cohort(
     if manifest["protocol_sha256"] != expected_protocol_sha256:
         issues.append({"code":"cohort_protocol_pin_mismatch","message":"cohort manifest protocol differs from evaluator-supplied pin"})
     rows = manifest["task_results"]
+    expected_task_ids = set(manifest["task_ids"])
     task_row_ids = [row["task_id"] for row in rows]
     if task_row_ids != manifest["task_ids"]:
         issues.append({"code":"task_inventory_mismatch","message":"task_results must match the locked task_ids inventory in order"})
@@ -262,6 +265,9 @@ def summarize_cohort(
     seen_ids: set[str] = set()
     for row in rows:
         task_id = row["task_id"]
+        if task_id not in expected_task_ids:
+            issues.append({"code":"unknown_task_result","message":f"{task_id}: task result is outside the locked task inventory"})
+            continue
         if task_id in seen_ids:
             continue
         seen_ids.add(task_id)
@@ -328,6 +334,8 @@ def summarize_cohort(
         "summarizer_sha256":observed_summarizer_sha,
         "cohort_integrity_valid":complete,
         "cohort_complete":complete,
+        "pooled_metrics_population":"all_locked_tasks" if complete else "verified_reports_only",
+        "pooled_metrics_complete":complete,
         "verified_report_count":valid_report_count,
         "audit_eligible_task_count":audit_eligible_count,
         "audit_eligible_task_pct":_pct(audit_eligible_count,expected_count),

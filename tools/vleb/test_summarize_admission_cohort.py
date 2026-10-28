@@ -186,6 +186,8 @@ class AdmissionCohortTests(unittest.TestCase):
         self.assertEqual(result["expected_task_count"],2)
         self.assertEqual(result["verified_report_count"],1)
         self.assertEqual(result["audit_eligible_task_pct"],50.0)
+        self.assertEqual(result["pooled_metrics_population"],"verified_reports_only")
+        self.assertFalse(result["pooled_metrics_complete"])
 
     def test_task_inventory_order_mismatch_is_rejected(self)->None:
         self.fixture.manifest["task_results"].reverse()
@@ -200,6 +202,17 @@ class AdmissionCohortTests(unittest.TestCase):
         result=self.fixture.summarize()
         self.assertFalse(result["cohort_integrity_valid"])
         self.assertIn("duplicate_task_result",{row["code"] for row in result["issues"]})
+
+    def test_unknown_task_result_cannot_replace_a_locked_task(self)->None:
+        self.fixture.manifest["task_results"][1]["task_id"]="task-foreign"
+        self.fixture.manifest["task_results"][1]["audit_report_sha256"]=sha(self.fixture.reports[1][0].read_bytes())
+        self.fixture.write_manifest()
+        result=self.fixture.summarize()
+        self.assertFalse(result["cohort_integrity_valid"])
+        self.assertEqual(result["verified_report_count"],1)
+        self.assertEqual(result["expected_task_count"],2)
+        self.assertIn("unknown_task_result",{row["code"] for row in result["issues"]})
+        self.assertEqual(result["pooled_metrics_population"],"verified_reports_only")
 
     def test_wrong_trusted_auditor_pin_is_rejected(self)->None:
         result=self.fixture.summarize(expected_auditor_sha256="c"*64)
