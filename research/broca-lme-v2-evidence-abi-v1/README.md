@@ -8,6 +8,16 @@ The official LongMemEval-V2 backend API calls `insert(trajectory)` and requires 
 
 The current `crates/domains/symthaea-broca/src/memory_bridge.rs` queries `HdcStore::scan_similar()` and returns blended `ContinuousHV` vectors. `crates/domains/symthaea-hdc-store/src/store.rs` describes vector entries containing metadata plus a `BinaryHV`. Neither API alone resolves a hit to answer-bearing text or an image path. Therefore a vector hit cannot be passed off as LongMemEval evidence.
 
+## Deterministic lexical baseline added in a stacked research change
+
+The follow-on branch adds `EvidenceIndex::search_bm25`, a model-free lexical retrieval baseline directly over eligible text evidence. It uses deterministic Unicode alphanumeric tokenization, corpus-relative BM25 term weighting, stable tie-breaking by HDC ID, and filters scope/validity/lifecycle before calculating document frequencies. Text digests are checked before a document affects ranking. The result includes a score and provenance metadata for the experiment receipt, while the adapter should send only each hit's `context` to the reader.
+
+This baseline is intentionally not called semantic retrieval or HDC retrieval. It makes a reproducible comparison possible before adding a text embedding model or a separately trained text-to-HDC encoder. It also provides a lower-complexity control for evaluating whether more elaborate memory architecture provides measurable value.
+
+Configuration defaults are `k1=1.2`, `b=0.75`, `max_items=5`. These are conventional baseline starting points, not tuned LongMemEval settings. Tune only on development data, freeze before held-out runs, and report all configs in the run receipt.
+
+The companion tests cover relevance ranking, exact stable ties, scope/lifecycle filtering before scoring, zero-hit query behavior, invalid configuration and corrupted evidence rejection. They are authored but uncompiled in this environment.
+
 ## The query encoder is also an explicit gap
 
 The `crates/domains/symthaea-broca/src/encoder.rs` module exposes `ThoughtLanguageEncoder::encode(&ThoughtChannels)`. `ThoughtChannels` is a structured scalar-channel representation, not arbitrary query or trajectory text. It must not be mistaken for a text embedding model.
