@@ -170,6 +170,7 @@ class ManifestBundle:
                 {"path": self.paths["claim_witness"], "sha256": sha(witness_raw), "role": "artifact"},
                 {"path": self.paths["claim_verdict"], "sha256": sha(verdict_raw), "role": "verdict"},
             ],
+            "input_drift_paths": [],
             "process": {"exit_code": 0, "signal": None, "timed_out": False},
             "observed_result": "supports",
         }
@@ -448,6 +449,21 @@ class RunManifestVerifierTests(unittest.TestCase):
             "witness_receipt_json_invalid",
             {row["code"] for row in issues},
         )
+
+    def test_execution_receipt_rejects_declared_input_drift(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        witness = claim["witnesses"][0]
+        receipt_path = self.bundle.root / witness["execution_receipt_path"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["input_drift_paths"] = [self.bundle.paths["claim_source"]]
+        raw = jbytes(receipt)
+        receipt_path.write_bytes(raw)
+        witness["execution_receipt_sha256"] = sha(raw)
+        claim_path.write_bytes(jbytes(claim))
+
+        issues = self.audit_one_execution_receipt()
+        self.assertIn("witness_receipt_input_drift_declared", {row["code"] for row in issues})
 
     def test_execution_receipt_rejects_mutated_output_bytes(self) -> None:
         (self.bundle.root / self.bundle.paths["claim_witness"]).write_bytes(b'{"copy_references":[]}\\n')
