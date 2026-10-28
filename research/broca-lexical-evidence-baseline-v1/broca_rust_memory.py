@@ -27,6 +27,23 @@ MAX_WORKER_LINE_BYTES = 32 * 1024 * 1024
 WORKER_MANIFEST_NAME = "broca_worker_manifest.json"
 TRAJECTORY_JOURNAL_NAME = "broca_trajectory_journal.jsonl"
 
+def _read_worker_responses(
+    stdout: Any,
+    response_queue: queue.Queue[bytes | BaseException | None],
+    max_line_bytes: int,
+) -> None:
+    """Drain stdout without a bound-method reference that would retain the adapter."""
+    try:
+        while True:
+            line = stdout.readline(max_line_bytes + 1)
+            if not line:
+                response_queue.put(None)
+                return
+            response_queue.put(line)
+    except BaseException as error:
+        response_queue.put(error)
+
+
 def _finalize_worker_resources(process: subprocess.Popen, journal: Any) -> None:
     """Release a worker without retaining its adapter instance until interpreter exit."""
     try:
@@ -138,7 +155,8 @@ class BrocaRustMemory(Memory):
         require(self._process.stdin is not None and self._process.stdout is not None,
                 "failed to create worker standard streams")
         self._reader_thread = threading.Thread(
-            target=self._read_responses,
+            target=_read_worker_responses,
+            args=(self._process.stdout, self._response_queue, self.max_jsonl_line_bytes),
             name="broca-lme-worker-stdout",
             daemon=True,
         )
@@ -357,18 +375,6 @@ class BrocaRustMemory(Memory):
                 self._abort_worker()
                 raise RuntimeError("worker response result must be a JSON object")
             return result
-
-    def _read_responses(self) -> None:
-        assert self._process.stdout is not None
-        try:
-            while True:
-                line = self._process.stdout.readline(self.max_jsonl_line_bytes + 1)
-                if not line:
-                    self._response_queue.put(None)
-                    return
-                self._response_queue.put(line)
-        except BaseException as error:
-            self._response_queue.put(error)
 
     def _abort_worker(self) -> None:
         with self._lock:
