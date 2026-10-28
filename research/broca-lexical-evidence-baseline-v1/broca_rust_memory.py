@@ -228,12 +228,19 @@ class BrocaRustMemory(Memory):
 
             response = self._rpc({"op": "insert", "trajectory": trajectory})
             inserted = response.get("inserted_evidence_items")
-            require(isinstance(inserted, int) and inserted > 0,
-                    "worker insert receipt must report positive inserted_evidence_items")
+            if not (isinstance(inserted, int) and not isinstance(inserted, bool) and inserted > 0):
+                self._abort_worker()
+                raise RuntimeError("worker insert receipt must report positive inserted_evidence_items")
 
             # Only journal a trajectory after the worker atomically accepted it.
-            self._journal.write(serialized + "\n")
-            self._journal.flush()
+            # If persistence fails after in-memory insertion, kill this worker so
+            # the unjournaled trajectory cannot be queried as if it were durable.
+            try:
+                self._journal.write(serialized + "\n")
+                self._journal.flush()
+            except BaseException as error:
+                self._abort_worker()
+                raise RuntimeError(f"failed to persist trajectory journal: {error}") from error
             self._trajectory_ids.add(trajectory_id)
             self._trajectory_count += 1
 
@@ -243,57 +250,83 @@ class BrocaRustMemory(Memory):
         query_image: str | None = None,
     ) -> list[MemoryContextItem]:
         require(isinstance(query, str) and query.strip(), "broca_rust query must be non-empty")
+        require(query_image is None or isinstance(query_image, str),
+                "query_image must be a string or null")
         response = self._rpc({"op": "query", "query": query, "query_image": query_image})
-        context = response.get("context")
-        require(isinstance(context, list), "worker query response context must be a list")
 
-        raw_audit = response.get("audit")
-        require(isinstance(raw_audit, list), "worker query response audit must be a list")
-        require(len(raw_audit) == len(context),
-                "worker context/audit item counts differ; refusing unpaired retrieval output")
+        try:
+            context = response.get("context")
+            require(isinstance(context, list), "worker query response context must be a list")
 
-        checked: list[MemoryContextItem] = []
-        for index, (item, audit_item) in enumerate(zip(context, raw_audit)):
-            require(isinstance(item, dict), f"context item {index} must be an object")
-            require(set(item) == {"type", "value"},
-                    f"context item {index} must contain exactly type and value")
-            kind = item.get("type")
-            value = item.get("value")
-            require(kind == "text",
-                    f"lexical BM25 worker returned unsupported context type {kind!r}")
-            require(isinstance(value, str) and value.strip(),
-                    f"context item {index} value must be a non-empty string")
-            require(isinstance(audit_item, dict), f"audit item {index} must be an object")
-            require(isinstance(audit_item.get("evidence_id"), str) and audit_item["evidence_id"],
-                    f"audit item {index} evidence_id must be non-empty")
-            require(isinstance(audit_item.get("trajectory_id"), str) and audit_item["trajectory_id"],
-                    f"audit item {index} trajectory_id must be non-empty")
-            require(isinstance(audit_item.get("source_pointer"), str) and audit_item["source_pointer"].startswith("/"),
-                    f"audit item {index} source_pointer must be a JSON Pointer")
-            source_digest = audit_item.get("source_sha256")
-            require(
-                isinstance(source_digest, str)
-                and len(source_digest) == 64
-                and all(character in "0123456789abcdef" for character in source_digest),
-                f"audit item {index} source_sha256 is invalid",
-            )
-            content_digest = audit_item.get("content_sha256")
-            require(
-                isinstance(content_digest, str)
-                and len(content_digest) == 64
-                and all(character in "0123456789abcdef" for character in content_digest),
-                f"audit item {index} content_sha256 is invalid",
-            )
-            score = audit_item.get("bm25_score")
-            require(
-                isinstance(score, (int, float)) and not isinstance(score, bool)
-                and math.isfinite(float(score)) and float(score) > 0,
-                f"audit item {index} bm25_score must be finite and positive",
-            )
-            actual_digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
-            require(actual_digest == content_digest,
-                    f"context/audit content digest mismatch at item {index}")
-            checked.append({"type": kind, "value": value})
+            raw_audit = response.get("audit")
+            require(isinstance(raw_audit, list), "worker query response audit must be a list")
+            require(len(raw_audit) == len(context),
+                    "worker context/audit item counts differ; refusing unpaired retrieval output")
+
+            checked: list[MemoryContextItem] = []
+            for index, (item, audit_item) in enumerate(zip(context, raw_audit)):
+                require(isinstance(item, dict), f"context item {index} must be an object")
+                require(set(item) == {"type", "value"},
+                        f"context item {index} must contain exactly type and value")
+                kind = item.get("type")
+                value = item.get("value")
+                require(kind == "text",
+                        f"lexical BM25 worker returned unsupported context type {kind!r}")
+                require(isinstance(value, str) and value.strip(),
+                        f"context item {index} value must be a non-empty string")
+                require(isinstance(audit_item, dict), f"audit item {index} must be an object")
+                evidence_id = audit_item.get("evidence_id")
+                require(
+                    isinstance(evidence_id, str)
+                    and len(evidence_id) == 64
+                    and all(character in "0123456789abcdef" for character in evidence_id),
+                    f"audit item {index} evidence_id must be a SHA-256 hex ID",
+                )
+                require(isinstance(audit_item.get("trajectory_id"), str) and audit_item["trajectory_id"],
+                        f"audit item {index} trajectory_id must be non-empty")
+                source_pointer = audit_item.get("source_pointer")
+                require(
+                    isinstance(source_pointer, str)
+                    and source_pointer.startswith("/")
+                    and source_pointer != "/",
+                    f"audit item {index} source_pointer must be a non-root JSON Pointer",
+                )
+                source_digest = audit_item.get("source_sha256")
+                require(
+                    isinstance(source_digest, str)
+                    and len(source_digest) == 64
+                    and all(character in "0123456789abcdef" for character in source_digest),
+                    f"audit item {index} source_sha256 is invalid",
+                )
+                content_digest = audit_item.get("content_sha256")
+                require(
+                    isinstance(content_digest, str)
+                    and len(content_digest) == 64
+                    and all(character in "0123456789abcdef" for character in content_digest),
+                    f"audit item {index} content_sha256 is invalid",
+                )
+                score = audit_item.get("bm25_score")
+                require(
+                    isinstance(score, (int, float)) and not isinstance(score, bool)
+                    and math.isfinite(float(score)) and float(score) > 0,
+                    f"audit item {index} bm25_score must be finite and positive",
+                )
+                actual_digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+                require(actual_digest == content_digest,
+                        f"context/audit content digest mismatch at item {index}")
+                checked.append({"type": kind, "value": value})
+
+            image_query_ignored = response.get("image_query_received_but_not_used")
+            require(isinstance(image_query_ignored, bool),
+                    "worker must report whether the image query was ignored")
+            expected_image_query_ignored = bool(query_image and query_image.strip())
+            require(image_query_ignored == expected_image_query_ignored,
+                    "worker image-query capability receipt disagrees with the request")
+        except BaseException:
+            # A malformed successful response is a protocol violation; do not
+            # allow subsequent reads from this worker session to continue.
+            self._abort_worker()
+            raise
 
         query_context = self.get_query_context()
         invocation_id = query_context.get("query_invocation_id")
@@ -305,9 +338,7 @@ class BrocaRustMemory(Memory):
                     "retrieval_type": "lexical_bm25",
                     "worker_sha256": self.worker_sha256,
                     "audit": raw_audit,
-                    "image_query_received_but_not_used": bool(
-                        response.get("image_query_received_but_not_used", False)
-                    ),
+                    "image_query_received_but_not_used": image_query_ignored,
                 }
         return checked
 
