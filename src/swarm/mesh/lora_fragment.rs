@@ -435,6 +435,25 @@ impl FragmentAssembler {
         }
 
         let data_count = self.data_count as usize;
+        if data_count == 0 {
+            return None;
+        }
+
+        // A recovered final fragment must fit its fixed-size XOR buffer. The
+        // configured expected size can be stale or inconsistent with the
+        // fragment count (for example, if a compressed envelope is reassembled
+        // using the raw WisdomPacket size). Reject inconsistent metadata before
+        // any slice can panic. This is a safety guard; exact encoded-length
+        // binding belongs in the versioned fragment wire format.
+        let final_chunk_start = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
+        let inferred_final_len = self.expected_payload_size.checked_sub(final_chunk_start)?;
+        if inferred_final_len == 0 || inferred_final_len > PAYLOAD_SIZE {
+            return None;
+        }
+        let max_payload_len = data_count.checked_mul(PAYLOAD_SIZE)?;
+        if self.expected_payload_size > max_payload_len {
+            return None;
+        }
 
         // Find the missing data fragment index (if any)
         let missing_idx = self.received[..data_count].iter().position(|&r| !r);
@@ -475,8 +494,9 @@ impl FragmentAssembler {
                 if i < data_count - 1 {
                     PAYLOAD_SIZE
                 } else {
-                    // Last data fragment — infer from expected payload size
-                    self.expected_payload_size - (data_count - 1) * PAYLOAD_SIZE
+                    // Last data fragment — infer only after validating its
+                    // length against the fixed-size recovery buffer above.
+                    inferred_final_len
                 }
             } else {
                 self.payload_lens[i] as usize
@@ -584,6 +604,30 @@ mod tests {
     }
 
     // -- Single-loss FEC recovery --
+
+    #[test]
+    fn inconsistent_expected_size_fails_closed_without_recovery_slice_panic() {
+        // A compressed/encrypted envelope can use fewer fragments than the raw
+        // WisdomPacket size. The production receiver currently supplies the raw
+        // size; when the final data fragment is missing, that mismatch can infer
+        // a recovered length larger than the 214-byte XOR buffer.
+        let encoded = vec![0x5A; 1800];
+        let frags = fragment(9, &encoded);
+        let last_data_index = frags.len() - 2;
+        let mut assembler = FragmentAssembler::new(9, frags.len() as u8, 2104);
+
+        for frag in &frags {
+            if usize::from(frag.fragment_index) != last_data_index {
+                assembler.feed(frag);
+            }
+        }
+
+        assert!(assembler.is_complete());
+        assert!(
+            assembler.assemble().is_none(),
+            "inconsistent encoded length must fail closed, not slice past the XOR buffer"
+        );
+    }
 
     #[test]
     fn recover_first_fragment() {
