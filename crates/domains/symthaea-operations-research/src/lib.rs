@@ -17,6 +17,8 @@
 //! - [`aviation_data_contract`]: fail-closed feature-availability and claim/evidence gates.
 //! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage,
 //!   chronology checks, and a fail-closed guard against declared test-set tuning.
+//! - [`aviation_probability_calibration`]: conservative finite-sample TV-radius calibration
+//!   from frozen calibration-partition frequencies, with explicit sampling allowance.
 //! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
 //!   over paired candidate/baseline costs, with read-only reports and robust gates.
 //! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
@@ -38,6 +40,7 @@ pub mod aviation_enterprise;
 pub mod aviation_robustness;
 pub mod aviation_network_externalities;
 pub mod aviation_network_robustness;
+pub mod aviation_probability_calibration;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
