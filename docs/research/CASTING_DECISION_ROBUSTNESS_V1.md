@@ -17,7 +17,7 @@ It complements, rather than replaces, the compositional multi-fidelity bake-off 
 2. Freeze a holdout manifest with scenario-family definitions, parameter ranges, seeds, simulator revision, and evaluation budget. Record its SHA-256. Do not use these holdout observations to tune or reselect candidates for the same reported run.
 3. Evaluate **every candidate in the declared pool under every shift**. Missing or duplicate candidate/shift rows fail closed. This makes finite-pool regret comparable and prevents selective omission of bad candidates.
 4. Normalize both minimized objectives into the interval [0, reference_point[i]) using transformations frozen before evaluation. The reference point is shared across policies and shifts; do not tune it per run.
-5. Score raw inputs with tools/casting-benchmark/decision_robustness_eval.py. Archive input bytes, receipt, evaluator revision, environment, and source digests. The receipt hashes the exact input bytes.
+5. Score raw inputs with tools/casting-benchmark/decision_robustness_eval.py. Archive input bytes, receipt, evaluator revision, environment, and source digests. The receipt hashes the exact input bytes and the evaluator source bytes.
 6. Keep one row per task, selection, candidate, and shift in the raw archive. Preserve failed, timed-out, invalid, and refused evaluations as outcomes in the acquisition layer; do not omit failures from the accounting.
 7. Report synthetic stress fixtures, public optimization benchmarks, engineering simulator results, and physical foundry observations as separate evidence classes.
 
