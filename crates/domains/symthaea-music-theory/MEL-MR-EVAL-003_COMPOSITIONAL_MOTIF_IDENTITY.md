@@ -39,7 +39,7 @@ Each axis returns support status, estimate, residual, tolerance and evidence cou
 
 ## Smoke corpus
 
-The adjacent JSONL corpus has 120 deterministic cases from 12 motif families: 60 positives and 60 negatives. Family-level splits are development (6 families / 60 cases), calibration (2 / 20) and test (4 / 40). Each family includes the previous identity, transposition, compound transformation, fragment and negative controls, plus a 20-event corrupted-note case designed to catch a matcher that hides a pitch substitution as one deletion plus one insertion.
+Dataset version `MEL-MR-COMPOSITION-SMOKE-1.1`; the adjacent JSONL corpus has 120 deterministic cases from 12 motif families: 60 positives and 60 negatives. Family-level splits are development (6 families / 60 cases), calibration (2 / 20) and test (4 / 40). Each family includes the previous identity, transposition, compound transformation, fragment and negative controls, plus a 20-event corrupted-note case designed to catch a matcher that hides a pitch substitution as one deletion plus one insertion.
 
 The JSON Schema and corpus are fixtures for a future Rust adapter. Their current QA checks schema, case IDs, split isolation and deterministic oracle consistency only. This smoke corpus is not human annotated and is not a representative generalization result.
 
