@@ -231,6 +231,248 @@ def attestation_output_issues(raw: bytes, manifest: dict[str, Any]) -> list[dict
     return errors
 
 
+
+CLAIM_WITNESS_KINDS = {
+    "source_index",
+    "static_analysis",
+    "compiler",
+    "independent_execution",
+    "independent_expert_review",
+}
+
+
+def audit_claim_evidence_bundle(
+    manifest: dict[str, Any],
+    evidence_root: Path,
+    *,
+    expected_claim_auditor_sha256: str | None,
+    expected_claim_schema_sha256: str | None,
+    trusted_claim_verifier_pins: dict[str, str],
+) -> dict[str, Any]:
+    """Audit every evaluator-pinned claim after attested bundle extraction.
+
+    This verifies claim/source/witness integrity and verifier identity pins.
+    It does not reproduce the semantics of the underlying runtime witness;
+    that is intentionally kept as a separate verifier obligation.
+    """
+    result: dict[str, Any] = {
+        "required": True,
+        "status": "failed",
+        "claim_count": 0,
+        "supported": 0,
+        "contradicted": 0,
+        "unresolved": 0,
+        "claims": [],
+        "issues": [],
+    }
+    claim_gate = manifest.get("claim_audit")
+    if not isinstance(claim_gate, dict):
+        result["status"] = "failed"
+        result["issues"].append({
+            "code": "claim_audit_manifest_missing",
+            "message": "confirmatory run requires a pinned claim-audit section",
+        })
+        return result
+
+    claim_inventory_value = claim_gate.get("claims", [])
+    claim_inventory = claim_inventory_value if isinstance(claim_inventory_value, list) else []
+    result["claim_count"] = len(claim_inventory)
+
+    def mark_unresolved_claims() -> None:
+        result["unresolved"] = len(claim_inventory)
+        result["claims"] = [
+            {"claim_id": item.get("claim_id"), "status": "unresolved"}
+            for item in claim_inventory
+            if isinstance(item, dict)
+        ]
+
+    if (
+        expected_claim_auditor_sha256 is None
+        or expected_claim_schema_sha256 is None
+        or not HEX.fullmatch(expected_claim_auditor_sha256)
+        or not HEX.fullmatch(expected_claim_schema_sha256)
+    ):
+        result["status"] = "unresolved"
+        result["issues"].append({
+            "code": "claim_audit_trust_pins_missing",
+            "message": "claim auditor and schema require evaluator-supplied out-of-band SHA-256 pins",
+        })
+        mark_unresolved_claims()
+        return result
+    if claim_gate["auditor_sha256"] != expected_claim_auditor_sha256:
+        result["issues"].append({
+            "code": "claim_auditor_pin_mismatch",
+            "message": "manifest claim-auditor digest differs from evaluator-supplied pin",
+        })
+    if claim_gate["schema_sha256"] != expected_claim_schema_sha256:
+        result["issues"].append({
+            "code": "claim_schema_pin_mismatch",
+            "message": "manifest claim-schema digest differs from evaluator-supplied pin",
+        })
+    if not trusted_claim_verifier_pins:
+        result["status"] = "unresolved"
+        result["issues"].append({
+            "code": "claim_verifier_pins_missing",
+            "message": "at least one trusted witness-verifier pin must be supplied out of band",
+        })
+    for kind, value in trusted_claim_verifier_pins.items():
+        if kind not in CLAIM_WITNESS_KINDS or not HEX.fullmatch(value):
+            result["issues"].append({
+                "code": "claim_verifier_pin_invalid",
+                "message": f"invalid trusted witness-verifier pin for kind {kind!r}",
+            })
+    if result["issues"]:
+        mark_unresolved_claims()
+        return result
+
+    try:
+        auditor = safe_file(evidence_root, claim_gate["auditor_path"])
+        schema = safe_file(evidence_root, claim_gate["schema_path"])
+        if digest(auditor.read_bytes()) != expected_claim_auditor_sha256:
+            result["issues"].append({
+                "code": "claim_auditor_bundle_digest_mismatch",
+                "message": "claim auditor bytes inside the attested bundle differ from the external pin",
+            })
+        if digest(schema.read_bytes()) != expected_claim_schema_sha256:
+            result["issues"].append({
+                "code": "claim_schema_bundle_digest_mismatch",
+                "message": "claim schema bytes inside the attested bundle differ from the external pin",
+            })
+    except (OSError, ValueError) as exc:
+        result["issues"].append({
+            "code": "claim_audit_tool_path_invalid",
+            "message": str(exc),
+        })
+        return result
+    if result["issues"]:
+        mark_unresolved_claims()
+        return result
+
+    claims = claim_gate["claims"]
+    result["claim_count"] = len(claims)
+    claim_ids = [item["claim_id"] for item in claims]
+    claim_paths = [item["claim_path"] for item in claims]
+    if len(claim_ids) != len(set(claim_ids)) or len(claim_paths) != len(set(claim_paths)):
+        result["issues"].append({
+            "code": "claim_inventory_duplicate",
+            "message": "claim IDs and claim paths must be unique in the evaluator-pinned manifest",
+        })
+        return result
+
+    all_valid = True
+    task_id = manifest["task"]["task_id"]
+    for item in claims:
+        row: dict[str, Any] = {"claim_id": item["claim_id"], "status": "failed"}
+        try:
+            claim_path = safe_file(evidence_root, item["claim_path"])
+            observed_claim_sha = digest(claim_path.read_bytes())
+            if observed_claim_sha != item["claim_sha256"]:
+                raise ValueError("claim file digest differs from evaluator-pinned manifest")
+            claim_data = json.loads(claim_path.read_text(encoding="utf-8"))
+            if not isinstance(claim_data, dict):
+                raise ValueError("claim root must be a JSON object")
+            if claim_data.get("claim_id") != item["claim_id"]:
+                raise ValueError("claim ID differs from evaluator-pinned inventory")
+            if claim_data.get("task_id") != task_id:
+                raise ValueError("claim task ID differs from the evaluated task")
+            source = claim_data.get("source")
+            if not isinstance(source, dict) or source.get("sha256") != item["source_sha256"]:
+                raise ValueError("claim source digest differs from evaluator-pinned source digest")
+            witnesses = claim_data.get("witnesses", [])
+            if not isinstance(witnesses, list):
+                witnesses = []
+            missing_kinds = sorted({
+                kind if isinstance(kind, str) else "<invalid-kind>"
+                for witness in witnesses
+                if isinstance(witness, dict)
+                for kind in [witness.get("kind")]
+                if not isinstance(kind, str) or kind not in trusted_claim_verifier_pins
+            })
+            if missing_kinds:
+                row["status"] = "unresolved"
+                row["issues"] = [{
+                    "code": "claim_verifier_pin_missing",
+                    "message": f"no out-of-band verifier pin for witness kinds: {', '.join(missing_kinds)}",
+                }]
+                result["unresolved"] += 1
+                result["issues"].append({
+                    "code": "claim_verifier_pin_missing",
+                    "message": f"{item['claim_id']}: no out-of-band verifier pin for witness kinds: {', '.join(missing_kinds)}",
+                })
+                result["claims"].append(row)
+                all_valid = False
+                continue
+        except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+            row["issues"] = [{"code": "claim_input_invalid", "message": str(exc)}]
+            result["issues"].append({
+                "code": "claim_input_invalid",
+                "message": f"{item['claim_id']}: {exc}",
+            })
+            result["claims"].append(row)
+            all_valid = False
+            continue
+
+        argv = [
+            sys.executable, str(auditor),
+            "--claim", str(claim_path),
+            "--schema", str(schema),
+            "--source-root", str(evidence_root.resolve()),
+            "--evidence-root", str(evidence_root.resolve()),
+            "--expected-claim-sha256", item["claim_sha256"],
+            "--expected-auditor-sha256", expected_claim_auditor_sha256,
+            "--expected-schema-sha256", expected_claim_schema_sha256,
+            "--expected-source-sha256", item["source_sha256"],
+        ]
+        for kind, sha in sorted(trusted_claim_verifier_pins.items()):
+            argv.extend(["--trusted-verifier", f"{kind}={sha}"])
+        try:
+            completed = subprocess.run(
+                argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                check=False, timeout=120,
+            )
+            row["command_sha256"] = digest("\\0".join(argv).encode())
+            row["output_sha256"] = digest(completed.stdout)
+            try:
+                parsed = json.loads(completed.stdout.decode("utf-8", errors="strict"))
+            except (UnicodeError, json.JSONDecodeError):
+                parsed = None
+            row["claim_verdict"] = parsed.get("claim_verdict") if isinstance(parsed, dict) else None
+            row["issue_count"] = len(parsed.get("issues", [])) if isinstance(parsed, dict) and isinstance(parsed.get("issues"), list) else None
+            valid = (
+                completed.returncode == 0
+                and isinstance(parsed, dict)
+                and parsed.get("evidence_chain_valid") is True
+                and parsed.get("claim_id") == item["claim_id"]
+                and parsed.get("task_id") == task_id
+            )
+            if valid:
+                verdict = parsed["claim_verdict"]
+                if verdict not in ("supported", "contradicted", "unresolved"):
+                    valid = False
+                else:
+                    result[verdict] += 1
+            if valid:
+                row["status"] = "passed"
+            else:
+                row["status"] = "failed"
+                result["issues"].append({
+                    "code": "claim_evidence_audit_failed",
+                    "message": f"{item['claim_id']}: claim auditor did not validate the pinned evidence chain",
+                })
+                all_valid = False
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            row["status"] = "unresolved"
+            row["error"] = str(exc)
+            result["issues"].append({
+                "code": "claim_evidence_audit_unavailable",
+                "message": f"{item['claim_id']}: {exc}",
+            })
+            all_valid = False
+        result["claims"].append(row)
+
+    result["status"] = "passed" if all_valid and not result["issues"] else "failed"
+    return result
+
 def validate_manifest(
     manifest_path: Path,
     schema_path: Path,
@@ -243,6 +485,9 @@ def validate_manifest(
     expected_verifier_binary_sha256: str,
     verify_attestation: bool,
     gh_executable: str = "gh",
+    expected_claim_auditor_sha256: str | None = None,
+    expected_claim_schema_sha256: str | None = None,
+    trusted_claim_verifier_pins: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     issues: list[dict[str, str]] = []
     for pin_name, pin in (
@@ -520,9 +765,35 @@ def validate_manifest(
                 receipt_audit["status"] = "unresolved"
                 issues.append({"code": "independent_receipt_audit_unavailable", "message": str(exc)})
 
+    claim_audit_result: dict[str, Any] = {
+        "required": manifest["run_kind"] == "confirmatory",
+        "status": "not_required",
+        "claim_count": 0,
+        "supported": 0,
+        "contradicted": 0,
+        "unresolved": 0,
+        "claims": [],
+        "issues": [],
+    }
+    if manifest["run_kind"] == "confirmatory":
+        if not issues and attestation_result["verified"]:
+            claim_audit_result = audit_claim_evidence_bundle(
+                manifest,
+                evidence_root,
+                expected_claim_auditor_sha256=expected_claim_auditor_sha256,
+                expected_claim_schema_sha256=expected_claim_schema_sha256,
+                trusted_claim_verifier_pins=trusted_claim_verifier_pins or {},
+            )
+            if claim_audit_result["status"] != "passed":
+                issues.extend(claim_audit_result["issues"])
+        else:
+            claim_audit_result["status"] = "not_run_due_to_prior_failure"
+
     manifest_valid = not issues and (
         manifest["run_kind"] != "confirmatory" or (
-            attestation_result["verified"] and receipt_audit["status"] == "passed"
+            attestation_result["verified"]
+            and receipt_audit["status"] == "passed"
+            and claim_audit_result["status"] == "passed"
         )
     )
     score_eligible = manifest_valid and manifest["run_kind"] == "confirmatory"
@@ -544,8 +815,23 @@ def validate_manifest(
         "evidence_bundle_sha256": bundle["sha256"],
         "attestation": attestation_result,
         "independent_receipt_audit": receipt_audit,
+        "independent_claim_audit": claim_audit_result,
         "issues": issues,
     }
+
+
+def parse_claim_verifier_pins(values: list[str]) -> dict[str, str]:
+    pins: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise SystemExit("--trusted-claim-verifier expects KIND=SHA256")
+        kind, sha = value.split("=", 1)
+        if kind not in CLAIM_WITNESS_KINDS or not HEX.fullmatch(sha):
+            raise SystemExit("--trusted-claim-verifier expects a known kind and lowercase SHA-256")
+        if kind in pins:
+            raise SystemExit(f"duplicate trusted claim verifier pin for {kind!r}")
+        pins[kind] = sha
+    return pins
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -558,6 +844,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-schema-sha256", required=True)
     parser.add_argument("--expected-auditor-sha256", required=True)
     parser.add_argument("--expected-verifier-binary-sha256", required=True)
+    parser.add_argument("--expected-claim-auditor-sha256")
+    parser.add_argument("--expected-claim-schema-sha256")
+    parser.add_argument("--trusted-claim-verifier", action="append", default=[], metavar="KIND=SHA256")
     parser.add_argument("--gh-executable", default="gh")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
@@ -585,6 +874,9 @@ def main(argv: list[str] | None = None) -> int:
         expected_verifier_binary_sha256=args.expected_verifier_binary_sha256,
         verify_attestation=verify_attestation,
         gh_executable=args.gh_executable,
+        expected_claim_auditor_sha256=args.expected_claim_auditor_sha256,
+        expected_claim_schema_sha256=args.expected_claim_schema_sha256,
+        trusted_claim_verifier_pins=parse_claim_verifier_pins(args.trusted_claim_verifier),
     )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:

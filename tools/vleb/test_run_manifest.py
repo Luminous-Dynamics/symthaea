@@ -85,6 +85,18 @@ def valid_manifest() -> dict[str, Any]:
             "receipt_sha256": h("5"),
             "artifact_count": 9,
         },
+        "claim_audit": {
+            "auditor_path": "audit_legacy_claim.py",
+            "auditor_sha256": h("6"),
+            "schema_path": "legacy-claim-evidence.schema.json",
+            "schema_sha256": h("7"),
+            "claims": [{
+                "claim_id": "COPY.BANK.REC",
+                "claim_path": "claims/COPY.BANK.REC.json",
+                "claim_sha256": h("8"),
+                "source_sha256": h("9"),
+            }],
+        },
         "provenance": {
             "attestation_required": True,
             "provider": "github_actions_sigstore",
@@ -134,6 +146,17 @@ def semantic_errors(manifest: dict[str, Any]) -> list[str]:
         errors.append("mutation_compilable_count_inconsistent")
     if manifest.get("evidence_bundle", {}).get("path") != manifest.get("provenance", {}).get("subject_path"):
         errors.append("attested_subject_mismatch")
+    if manifest.get("run_kind") == "confirmatory":
+        claim_audit = manifest.get("claim_audit", {})
+        claims = claim_audit.get("claims", [])
+        if not claims:
+            errors.append("confirmatory_claim_evidence_missing")
+        ids = [claim.get("claim_id") for claim in claims]
+        paths = [claim.get("claim_path") for claim in claims]
+        if len(ids) != len(set(ids)):
+            errors.append("duplicate_claim_id")
+        if len(paths) != len(set(paths)):
+            errors.append("duplicate_claim_path")
     return errors
 
 
@@ -216,6 +239,23 @@ class RunManifestTests(unittest.TestCase):
         m = valid_manifest()
         m["provenance"]["subject_path"] = "other.zip"
         self.assert_invalid(m, "attested_subject_mismatch")
+
+    def test_confirmatory_claim_audit_is_required(self) -> None:
+        manifest = valid_manifest()
+        del manifest["claim_audit"]
+        self.assert_invalid(manifest)
+        empty = valid_manifest()
+        empty["claim_audit"]["claims"] = []
+        self.assert_invalid(empty)
+
+    def test_confirmatory_claim_ids_and_paths_must_be_unique(self) -> None:
+        duplicate_id = valid_manifest()
+        duplicate_id["claim_audit"]["claims"].append(copy.deepcopy(duplicate_id["claim_audit"]["claims"][0]))
+        self.assert_invalid(duplicate_id, "duplicate_claim_id")
+        duplicate_path = valid_manifest()
+        duplicate_path["claim_audit"]["claims"].append(copy.deepcopy(duplicate_path["claim_audit"]["claims"][0]))
+        duplicate_path["claim_audit"]["claims"][1]["claim_id"] = "OTHER.CLAIM"
+        self.assert_invalid(duplicate_path, "duplicate_claim_path")
 
     def test_confirmatory_baseline_and_reference_controls_are_required(self) -> None:
         baseline = valid_manifest()

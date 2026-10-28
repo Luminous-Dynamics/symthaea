@@ -6,6 +6,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -50,6 +51,11 @@ class ManifestBundle:
             "results": "mutation-results.json",
             "bundle": "evidence-bundle.zip",
             "receipt": "receipt.json",
+            "claim_auditor": "audit_legacy_claim.py",
+            "claim_schema": "legacy-claim-evidence.schema.json",
+            "claim_source": "legacy.cbl",
+            "claim_witness": "index.json",
+            "claim": "claims/COPY.BANK.REC.json",
         }
         files = {
             "task": jbytes({"task_id": "vleb-private-task-0001"}),
@@ -62,10 +68,52 @@ class ManifestBundle:
             "results": jbytes({"killed": 4, "survived": 0, "unresolved": 0}),
             "bundle": b"synthetic evidence bundle bytes\n",
             "receipt": jbytes({"outcome": "pass"}),
+            "claim_auditor": b"copied from repository below",
+            "claim_schema": b"copied from repository below",
+            "claim_source": b"       COPY BANK-REC.\n",
+            "claim_witness": b'{"copy_references":["BANK-REC"]}\n',
+            "claim": b"written from fixture below",
         }
         for key, rel in self.paths.items():
             if key != "bundle":
-                (self.root / rel).write_bytes(files[key])
+                target = self.root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(files[key])
+        shutil.copyfile(ROOT / "tools/vleb/audit_legacy_claim.py", self.root / self.paths["claim_auditor"])
+        shutil.copyfile(ROOT / "tools/vleb/legacy-claim-evidence.schema.json", self.root / self.paths["claim_schema"])
+        source_raw = (self.root / self.paths["claim_source"]).read_bytes()
+        witness_raw = (self.root / self.paths["claim_witness"]).read_bytes()
+        claim = {
+            "schema_version": "vleb-legacy-claim-v1",
+            "task_id": "vleb-private-task-0001",
+            "claim_id": "COPY.BANK.REC",
+            "claim_type": "copybook_reference",
+            "claim_text": "The source references copybook BANK-REC.",
+            "claim_scope": "textual_anchor",
+            "source": {
+                "path": self.paths["claim_source"],
+                "sha256": sha(source_raw),
+                "spans": [{
+                    "line_start": 1,
+                    "line_end": 1,
+                    "column_start": 8,
+                    "column_end": 21,
+                    "excerpt_sha256": sha(source_raw.splitlines()[0][7:21]),
+                }],
+            },
+            "verdict": "supported",
+            "witnesses": [{
+                "witness_id": "index-output-1",
+                "kind": "source_index",
+                "artifact_path": self.paths["claim_witness"],
+                "artifact_sha256": sha(witness_raw),
+                "verifier_id": "test-source-indexer",
+                "verifier_sha256": "d" * 64,
+                "observed_result": "supports",
+            }],
+            "unresolved_reason": None,
+        }
+        (self.root / self.paths["claim"]).write_bytes(jbytes(claim))
         self.create_bundle()
         h = {
             key: sha((self.root / rel).read_bytes())
@@ -106,6 +154,19 @@ class ManifestBundle:
             "sha256": h["bundle"],
             "receipt_path": self.paths["receipt"],
             "receipt_sha256": h["receipt"],
+            "artifact_count": len([key for key in self.paths if key != "bundle"]),
+        })
+        self.manifest["claim_audit"].update({
+            "auditor_path": self.paths["claim_auditor"],
+            "auditor_sha256": h["claim_auditor"],
+            "schema_path": self.paths["claim_schema"],
+            "schema_sha256": h["claim_schema"],
+            "claims": [{
+                "claim_id": "COPY.BANK.REC",
+                "claim_path": self.paths["claim"],
+                "claim_sha256": h["claim"],
+                "source_sha256": h["claim_source"],
+            }],
         })
         self.manifest["provenance"].update({
             "attestation_required": False,
@@ -154,6 +215,17 @@ class ManifestBundle:
                 "expected_verifier_binary_sha256", self.trusted_verifier_binary_sha256
             ),
             verify_attestation=kwargs.pop("verify_attestation", False),
+            expected_claim_auditor_sha256=kwargs.pop(
+                "expected_claim_auditor_sha256",
+                sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            ),
+            expected_claim_schema_sha256=kwargs.pop(
+                "expected_claim_schema_sha256",
+                sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            ),
+            trusted_claim_verifier_pins=kwargs.pop(
+                "trusted_claim_verifier_pins", {"source_index": "d" * 64}
+            ),
             **kwargs,
         )
 
@@ -208,6 +280,91 @@ class RunManifestVerifierTests(unittest.TestCase):
     def assert_issue(self, result: dict[str, Any], code: str) -> None:
         self.assertFalse(result["eligible"], result)
         self.assertIn(code, {row["code"] for row in result["issues"]}, result)
+
+    def test_claim_audit_passes_only_with_pinned_source_and_witness(self) -> None:
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(result["claim_count"], 1)
+        self.assertEqual(result["supported"], 1)
+        self.assertEqual(result["contradicted"], 0)
+        self.assertEqual(result["unresolved"], 0)
+
+    def test_claim_audit_missing_out_of_band_verifier_pin_fails_closed(self) -> None:
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={},
+        )
+        self.assertEqual(result["status"], "unresolved")
+        self.assertEqual(result["claim_count"], 1)
+        self.assertEqual(result["unresolved"], 1)
+        self.assertEqual(result["claims"][0]["status"], "unresolved")
+        self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_rejects_witness_artifact_tampering(self) -> None:
+        witness = self.bundle.root / self.bundle.paths["claim_witness"]
+        witness.write_bytes(b'{"copy_references":[]}\\n')
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_rejects_source_revision_mismatch(self) -> None:
+        source = self.bundle.root / self.bundle.paths["claim_source"]
+        source.write_bytes(b"       COPY OTHER-REC.\\n")
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("claim_evidence_audit_failed", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_malformed_witness_kind_fails_closed_without_crashing(self) -> None:
+        claim_path = self.bundle.root / self.bundle.paths["claim"]
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        claim["witnesses"][0]["kind"] = ["source_index"]
+        raw = jbytes(claim)
+        claim_path.write_bytes(raw)
+        self.bundle.manifest["claim_audit"]["claims"][0]["claim_sha256"] = sha(raw)
+
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256=sha((ROOT / "tools/vleb/audit_legacy_claim.py").read_bytes()),
+            expected_claim_schema_sha256=sha((ROOT / "tools/vleb/legacy-claim-evidence.schema.json").read_bytes()),
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed", result)
+        self.assertIn("claim_verifier_pin_missing", {row["code"] for row in result["issues"]})
+
+    def test_claim_audit_rejects_auditor_or_schema_pin_mismatch(self) -> None:
+        result = verifier.audit_claim_evidence_bundle(
+            self.bundle.manifest,
+            self.bundle.root,
+            expected_claim_auditor_sha256="0" * 64,
+            expected_claim_schema_sha256="0" * 64,
+            trusted_claim_verifier_pins={"source_index": "d" * 64},
+        )
+        self.assertEqual(result["status"], "failed")
+        codes = {row["code"] for row in result["issues"]}
+        self.assertIn("claim_auditor_pin_mismatch", codes)
+        self.assertIn("claim_schema_pin_mismatch", codes)
 
     def test_development_manifest_hashes_and_schema_pass(self) -> None:
         result = self.bundle.audit()
@@ -337,15 +494,22 @@ class RunManifestVerifierTests(unittest.TestCase):
         attestation = synthetic_attestation(self.bundle.manifest)
         audit_result = jbytes({"eligible": True, "verdict": "pass", "issues": []})
 
+        real_subprocess_run = verifier.subprocess.run
+
         def fake_run(argv: list[str], **kwargs: Any) -> Mock:
             if argv[0] == "gh":
                 return Mock(returncode=0, stdout=attestation)
-            return Mock(returncode=0, stdout=audit_result)
+            if any(str(arg).endswith("audit_receipt.py") for arg in argv):
+                return Mock(returncode=0, stdout=audit_result)
+            return real_subprocess_run(argv, **kwargs)
 
         with patch.object(verifier.subprocess, "run", side_effect=fake_run) as mocked_run:
             result = self.bundle.audit(verify_attestation=True, repin_for_test=True)
 
         self.assertTrue(result["eligible"], result["issues"])
+        self.assertTrue(result["score_eligible"], result)
+        self.assertEqual(result["independent_claim_audit"]["status"], "passed")
+        self.assertEqual(result["independent_claim_audit"]["supported"], 1)
         attestation_argv = mocked_run.call_args_list[0].args[0]
         for flag in (
             "--cert-identity",
@@ -362,6 +526,35 @@ class RunManifestVerifierTests(unittest.TestCase):
             attestation_argv,
         )
 
+
+    def test_confirmatory_score_is_ineligible_without_claim_verifier_pin(self) -> None:
+        self.bundle.manifest["run_kind"] = "confirmatory"
+        self.bundle.manifest["task"]["exposure"] = "private_confirmatory"
+        self.bundle.manifest["task"]["independent_reviewer_count"] = 1
+        self.bundle.manifest["task"]["baseline_empty_patch_failed"] = True
+        self.bundle.manifest["task"]["reference_solution_passed"] = True
+        self.bundle.manifest["provenance"]["attestation_required"] = True
+        self.bundle.manifest["provenance"]["provider"] = "github_actions_sigstore"
+        attestation = synthetic_attestation(self.bundle.manifest)
+        audit_result = jbytes({"eligible": True, "verdict": "pass", "issues": []})
+
+        def fake_run(argv: list[str], **kwargs: Any) -> Mock:
+            if argv[0] == "gh":
+                return Mock(returncode=0, stdout=attestation)
+            if any(str(arg).endswith("audit_receipt.py") for arg in argv):
+                return Mock(returncode=0, stdout=audit_result)
+            raise AssertionError(f"claim auditor should not run without trusted pins: {argv!r}")
+
+        with patch.object(verifier.subprocess, "run", side_effect=fake_run):
+            result = self.bundle.audit(
+                verify_attestation=True,
+                repin_for_test=True,
+                trusted_claim_verifier_pins={},
+            )
+
+        self.assertFalse(result["score_eligible"], result)
+        self.assertEqual(result["independent_claim_audit"]["status"], "unresolved")
+        self.assertIn("claim_verifier_pins_missing", {row["code"] for row in result["issues"]})
 
     def test_attestation_certificate_and_subject_positive_control(self) -> None:
         raw = synthetic_attestation(self.bundle.manifest)
