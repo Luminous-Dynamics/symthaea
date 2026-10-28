@@ -169,11 +169,10 @@ impl Worker {
             return Err(format!("duplicate trajectory insert attempted: {trajectory_id}"));
         }
 
-        // serde_json's default map representation is sorted; this exact encoding
-        // is the digest contract. Pointer checks bind every emitted text to a
-        // precise source string within these canonical bytes.
-        let source_bytes = serde_json::to_vec(trajectory)
-            .map_err(|error| format!("cannot canonicalize trajectory: {error}"))?;
+        // Use project-defined sorted-key JSON encoding so evidence digests and
+        // pointers are stable even if serde_json's Map implementation is built
+        // with insertion-order preservation enabled.
+        let source_bytes = stable_json_bytes(trajectory)?;
         if source_bytes.len() > MAX_JSONL_LINE_BYTES {
             return Err("canonical trajectory exceeds configured JSONL input bound".into());
         }
@@ -277,6 +276,56 @@ impl Worker {
             Err("worker must receive init before insert/query".into())
         }
     }
+}
+
+
+/// Serialize JSON with recursively sorted object keys and preserved array order.
+/// This is the worker's pinned stable encoding (not a claim of full RFC 8785).
+fn stable_json_bytes(value: &Value) -> Result<Vec<u8>, String> {
+    fn write_value(value: &Value, output: &mut Vec<u8>) -> Result<(), String> {
+        match value {
+            Value::Null => output.extend_from_slice(b"null"),
+            Value::Bool(true) => output.extend_from_slice(b"true"),
+            Value::Bool(false) => output.extend_from_slice(b"false"),
+            Value::Number(number) => output.extend_from_slice(number.to_string().as_bytes()),
+            Value::String(_) => {
+                let escaped = serde_json::to_vec(value)
+                    .map_err(|error| format!("cannot encode JSON string: {error}"))?;
+                output.extend_from_slice(&escaped);
+            }
+            Value::Array(items) => {
+                output.push(b'[');
+                for (index, item) in items.iter().enumerate() {
+                    if index > 0 {
+                        output.push(b',');
+                    }
+                    write_value(item, output)?;
+                }
+                output.push(b']');
+            }
+            Value::Object(object) => {
+                output.push(b'{');
+                let mut entries: Vec<_> = object.iter().collect();
+                entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (index, (key, item)) in entries.into_iter().enumerate() {
+                    if index > 0 {
+                        output.push(b',');
+                    }
+                    let escaped_key = serde_json::to_vec(key)
+                        .map_err(|error| format!("cannot encode JSON object key: {error}"))?;
+                    output.extend_from_slice(&escaped_key);
+                    output.push(b':');
+                    write_value(item, output)?;
+                }
+                output.push(b'}');
+            }
+        }
+        Ok(())
+    }
+
+    let mut output = Vec::new();
+    write_value(value, &mut output)?;
+    Ok(output)
 }
 
 fn collect_trajectory_evidence(
@@ -513,7 +562,7 @@ mod tests {
                 "screenshot": "state-0.png"
             }]
         });
-        let source = serde_json::to_vec(&trajectory).unwrap();
+        let source = stable_json_bytes(&trajectory).unwrap();
         let source_hash = sha256_hex(&source);
         let records = collect_trajectory_evidence(
             &trajectory,
@@ -545,7 +594,7 @@ mod tests {
                 "text": "Invoices heading New Invoice button"
             }]
         });
-        let bytes = serde_json::to_vec(&trajectory).unwrap();
+        let bytes = stable_json_bytes(&trajectory).unwrap();
         let digest = sha256_hex(&bytes);
         let a = collect_trajectory_evidence(&trajectory, "trajectory-18", "web", &digest).unwrap();
         let b = collect_trajectory_evidence(&trajectory, "trajectory-18", "web", &digest).unwrap();
