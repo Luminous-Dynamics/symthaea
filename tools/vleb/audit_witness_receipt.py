@@ -32,6 +32,23 @@ def canonical_digest(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
     return digest(encoded)
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_non_finite(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant {value!r} rejected")
+
+
+def strict_json_loads(source: str) -> Any:
+    """Parse strict JSON: no duplicate object keys and no NaN/Infinity constants."""
+    return json.loads(source, object_pairs_hook=_reject_duplicate_keys, parse_constant=_reject_non_finite)
+
 
 def safe_file(root: Path, relative: Any) -> Path:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
@@ -118,9 +135,9 @@ def validate_receipt(
         observed_schema_sha = digest(schema_bytes)
         if observed_schema_sha != expected_schema_sha256:
             issues.append({"code": "schema_digest_mismatch", "message": "schema bytes differ from the evaluator-pinned schema digest"})
-        schema = json.loads(schema_bytes.decode("utf-8"))
+        schema = strict_json_loads(schema_bytes.decode("utf-8"))
         Draft202012Validator.check_schema(schema)
-        receipt = json.loads(receipt_bytes.decode("utf-8"))
+        receipt = strict_json_loads(receipt_bytes.decode("utf-8"))
         if not isinstance(receipt, dict):
             raise ValueError("receipt JSON root must be an object")
     except Exception as exc:

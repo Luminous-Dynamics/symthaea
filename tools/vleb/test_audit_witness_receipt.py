@@ -88,8 +88,9 @@ class WitnessReceiptAuditTests(unittest.TestCase):
     def write_receipt(self) -> None:
         self.receipt_path.write_text(json.dumps(self.receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    def audit(self, **overrides):
-        self.write_receipt()
+    def audit(self, *, write_receipt: bool = True, **overrides):
+        if write_receipt:
+            self.write_receipt()
         values = {
             "expected_receipt_sha256": sha(self.receipt_path.read_bytes()),
             "expected_schema_sha256": sha(self.schema_path.read_bytes()),
@@ -233,6 +234,13 @@ class WitnessReceiptAuditTests(unittest.TestCase):
         self.receipt["execution"]["stderr_path"] = "missing-stderr.log"
         result = self.audit()
         self.assertIn("execution_log_artifact_missing", {issue["code"] for issue in result["issues"]})
+
+    def test_duplicate_json_keys_fail_closed(self) -> None:
+        raw = self.receipt_path.read_text(encoding="utf-8")
+        raw = raw.replace('"claim_id": "BALANCE.PIC",', '"claim_id": "BALANCE.PIC",\n  "claim_id": "BALANCE.PIC",', 1)
+        self.receipt_path.write_text(raw, encoding="utf-8")
+        result = self.audit(write_receipt=False)
+        self.assertIn("receipt_or_schema_invalid", {issue["code"] for issue in result["issues"]})
 
     def test_unknown_receipt_fields_fail_closed(self) -> None:
         self.receipt["agent_assertion"] = "trust me"
