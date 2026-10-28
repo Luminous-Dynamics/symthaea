@@ -19,14 +19,15 @@ def valid_manifest() -> dict[str, Any]:
     git = lambda char: char * 40
     return {
         "schema_version": "vleb-run-manifest-v1",
-        "run_id": "vleb-confirmatory-0001",
+        "run_id": "90001",
         "run_kind": "confirmatory",
         "repository": {
             "full_name": "Luminous-Dynamics/symthaea",
             "workflow_path": ".github/workflows/vleb-confirmatory.yml",
             "workflow_ref": "refs/heads/main",
             "workflow_sha": git("1"),
-            "run_id": "vleb-confirmatory-0001",
+            "repository_id": 123456789,
+            "run_id": "90001",
             "run_attempt": 1,
             "event": "workflow_dispatch",
             "expected_head_sha": git("2"),
@@ -44,7 +45,7 @@ def valid_manifest() -> dict[str, Any]:
         "candidate": {
             "patch_path": "candidate.patch",
             "patch_sha256": h("c"),
-            "checkout_revision": git("3"),
+            "checkout_revision": git("2"),
             "clean_worktree": True,
         },
         "runtime": {
@@ -97,6 +98,8 @@ def semantic_errors(manifest: dict[str, Any]) -> list[str]:
     repo = manifest.get("repository", {})
     if manifest.get("run_id") != repo.get("run_id"):
         errors.append("run_id_mismatch")
+    if manifest.get("candidate", {}).get("checkout_revision") != repo.get("expected_head_sha"):
+        errors.append("candidate_head_mismatch")
     if manifest.get("run_kind") == "confirmatory":
         if manifest.get("task", {}).get("exposure") not in ("private_holdout", "private_confirmatory"):
             errors.append("confirmatory_task_not_private")
@@ -180,6 +183,11 @@ class RunManifestTests(unittest.TestCase):
         m = valid_manifest()
         m["repository"]["run_id"] = "different-run"
         self.assert_invalid(m, "run_id_mismatch")
+
+    def test_candidate_revision_must_match_trusted_expected_head(self) -> None:
+        m = valid_manifest()
+        m["candidate"]["checkout_revision"] = "4" * 40
+        self.assert_invalid(m, "candidate_head_mismatch")
 
     def test_mutation_counts_must_reconcile(self) -> None:
         m = valid_manifest()
