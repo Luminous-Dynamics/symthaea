@@ -8,6 +8,16 @@ Can the active-evidence selector detect a change in its assumed measurement chan
 
 This fixture fixes a nominal Bernoulli probability p0 = 0.5 and a post-change probability p1 = 0.8 after 100 observations. The monitoring threshold represents one of 12 model-adequacy cells, with per-cell alpha = 0.05/12. The output is exact for this finite Bernoulli process, not Monte Carlo.
 
+## Metric semantics are scenario-typed
+
+Every scenario is assigned a preregistered class: `stationary_null`, `target_shift`, `selection_bias_control`, `baseline_misspecification`, or `within_band_transition_control`. The export schema carries this class explicitly so a statistical alarm is not automatically described as successful environmental-shift detection.
+
+- **Target-shift rows:** `scenario_or_pre_shift_alarm_probability` is first-alarm mass at or before the change point; `post_shift_detection_probability` is first-alarm mass after the change point; `mean_post_shift_detection_delay` is conditional on a post-change alarm.
+- **Stationary, selection-bias, and baseline-misspecification controls:** the first metric is the probability of any alarm by the horizon; post-shift detection and delay are `NA`. A stable selected stream can alarm without any target-environment change, and a stable rate outside a detector's declared null is assumption sensitivity rather than evidence of when a change occurred.
+- **Within-band transition control:** the conditional rate changes from 0.49 to 0.51, but both values remain in the composite null band [0.48, 0.52]. The first metric is the *total* alarm probability over the horizon and the detection/delay fields are `NA`. Counting post-transition alarms as successful detection would reward a monitor for rejecting its own stated null.
+
+The checker independently recomputes this typed schema and rejects mutated results. Probability-mass conservation remains checked internally for target-shift trajectories and the within-band schedule. This classification does not change the underlying alarm process; it corrects what the benchmark claims each alarm means.
+
 ## Compared monitor policies
 
 1. fixed_time_final_only: evaluate a fixed-time Hoeffding interval once at the prespecified horizon. This is valid for one planned look; it cannot stop early.
