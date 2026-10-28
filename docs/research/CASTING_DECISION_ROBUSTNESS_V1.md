@@ -150,3 +150,14 @@ python3 tools/casting-benchmark/test_prepare_synthetic_robustness_manifests.py
 \`\`\`
 
 The generator normalizes raw synthetic objectives using the frozen affine transformation (objective + 1) / 3 and fixes the reference point at [1.2, 1.2]. Out-of-range values fail closed instead of being clipped. A future real simulator adapter must define and preregister units, uncertainty, objective normalization, shift parameter ranges, solver revisions, wall time and true compute costs before mixing its evidence with this synthetic track.
+
+## Fair baseline comparison: stratify by method assumptions
+
+Recent MF-SCBO work is an important comparator, but its current formulation assumes that constraints do not vary by fidelity; the paper identifies fidelity-dependent constraints as future work (https://arxiv.org/abs/2609.29941). Do not turn that assumption into an unfair "benchmark failure" or quietly hide it. Report two tracks separately:
+
+1. **Shared-constraint applicability track:** all policies receive the same constraint function across fidelities; compare performance inside each method's intended domain.
+2. **Fidelity-dependent constraint stress track:** cheap and high-fidelity constraint outputs can disagree; label this as an out-of-assumption robustness test for methods that assume shared constraints, while testing whether Symthaea can detect and control the mismatch.
+
+Cost comparison must include fidelity-specific oracle cost and wall-clock/compute overhead. The MF-SCBO preprint notes cases where fewer high-fidelity calls did not imply lower total evaluation cost because of additional low-fidelity sampling. Therefore, do not rank methods only by high-fidelity call count; freeze all fidelity cost ratios and report total cost and time together.
+
+This assumption-stratified protocol is essential to a credible SOTA claim: win in the shared-assumption track to demonstrate competitive optimization, then report separate robustness performance under constraint mismatch. Never aggregate both tracks into one hidden average.
