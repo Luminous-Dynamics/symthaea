@@ -15,6 +15,8 @@
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
 //! - [`aviation_data_contract`]: fail-closed feature-availability and claim/evidence gates.
+//! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage,
+//!   chronology checks, and a fail-closed guard against declared test-set tuning.
 //! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
 //!   over paired candidate/baseline costs, with read-only reports and robust gates.
 //! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
@@ -29,6 +31,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod aviation_calibration_protocol;
 pub mod aviation_data_contract;
 pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
