@@ -1,0 +1,30 @@
+{
+  "schema": "symthaea.scientific_tool_allocation_manifest.v1",
+  "protocol_id": "sci-tool-alloc-cli-smoke-v1",
+  "model_id": "synthetic-cli-smoke",
+  "model_revision": "1",
+  "prompt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "task_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tool_registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "treatments": [
+    "no_tool",
+    "always_tool"
+  ],
+  "resource_budget": {
+    "max_tool_calls": 3,
+    "max_experiment_queries": 20,
+    "max_tokens": 6000,
+    "max_elapsed_ms": 1000
+  },
+  "task_seeds": [
+    {
+      "task_id": "fixture-world-1",
+      "domain": "mechanics",
+      "law_complexity": "easy",
+      "system_complexity": "simple",
+      "noise_level": 0,
+      "seed": 1,
+      "tool_available": true
+    }
+  ]
+}
