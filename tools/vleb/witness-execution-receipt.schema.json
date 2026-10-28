@@ -279,6 +279,35 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "observed_result": {
+            "const": "supports"
+          }
+        },
+        "required": [
+          "observed_result"
+        ]
+      },
+      "then": {
+        "properties": {
+          "process": {
+            "properties": {
+              "exit_code": {
+                "const": 0
+              },
+              "signal": {
+                "type": "null"
+              },
+              "timed_out": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
