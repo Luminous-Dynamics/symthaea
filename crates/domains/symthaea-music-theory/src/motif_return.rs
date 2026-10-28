@@ -236,9 +236,61 @@ pub fn compare_melodic_sequences(
         ReturnTransformation::Fragmented,
         ReturnTransformation::Restored,
     ];
-    let mut detected_transformation = transformations[0];
-    let mut detected_score = score_for(detected_transformation);
+    // Do not let an inapplicable transformation win merely because its
+    // component similarities are high. For example, a zero-shift transposition
+    // receives perfect pitch similarity on every literal phrase, and would
+    // otherwise outrank genuine augmentation/diminution. Detection must respect
+    // the same identifiability boundaries as threshold verification.
+    let scale_matches = |actual: f32, expected: f32| {
+        actual.is_finite()
+            && actual > f32::EPSILON
+            && (actual / expected).log2().abs() <= 0.25
+    };
+    let candidate_is_identifiable = |kind: ReturnTransformation| match kind {
+        ReturnTransformation::Literal => {
+            source.len() == target.len()
+                && scale_matches(duration_scale, 1.0)
+                && scale_matches(inter_onset_scale, 1.0)
+        }
+        ReturnTransformation::Transposed => {
+            source.len() == target.len() && transposition != 0
+        }
+        ReturnTransformation::Inverted => {
+            source.len() == target.len()
+                && inverted_interval_similarity > interval_similarity
+        }
+        ReturnTransformation::Augmented => {
+            source.len() == target.len()
+                && scale_matches(duration_scale, 2.0)
+                && scale_matches(inter_onset_scale, 2.0)
+                && duration_scale_consistency >= 0.85
+                && inter_onset_scale_consistency >= 0.85
+        }
+        ReturnTransformation::Diminished => {
+            source.len() == target.len()
+                && scale_matches(duration_scale, 0.5)
+                && scale_matches(inter_onset_scale, 0.5)
+                && duration_scale_consistency >= 0.85
+                && inter_onset_scale_consistency >= 0.85
+        }
+        ReturnTransformation::Fragmented => {
+            target.len() >= 3
+                && target.len() < source.len()
+                && fragment_source_start_note.is_some()
+        }
+        // Pairwise comparison does not carry historical lineage evidence.
+        ReturnTransformation::Restored => false,
+    };
+    let mut detected_transformation = ReturnTransformation::Literal;
+    let mut detected_score = if candidate_is_identifiable(ReturnTransformation::Literal) {
+        score_for(ReturnTransformation::Literal)
+    } else {
+        0.0
+    };
     for transformation in transformations.into_iter().skip(1) {
+        if !candidate_is_identifiable(transformation) {
+            continue;
+        }
         let score = score_for(transformation);
         if score > detected_score {
             detected_transformation = transformation;
