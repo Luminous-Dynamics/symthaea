@@ -947,7 +947,7 @@
     },
     {
       "id": "POS-004",
-      "category": "benign_utility",
+      "category": "positive_control",
       "description": "Ordinary valid in-scope action succeeds under the same strict policy as negative cases",
       "fixture": "valid_federated_authorized_operation_v1",
       "setup": {
