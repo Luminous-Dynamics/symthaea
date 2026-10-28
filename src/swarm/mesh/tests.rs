@@ -1594,6 +1594,48 @@ fn test_encrypt_packet_typed_roundtrip() {
     assert_eq!(decrypted, plaintext);
 }
 
+// NEGATIVE CONTROL ONLY: this test intentionally confirms that the legacy
+// packet and fragment nonce layouts can overlap under the same effective key.
+// A green result means the audit oracle caught the known collision; it does
+// NOT mean nonce uniqueness is satisfied. Once the runtime uses separate
+// traffic-key domains and a clone-safe nonce lifecycle, replace this fixture
+// with an integration assertion over the actual effective-key fingerprints.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_packet_fragment_nonce_overlap_negative_control() {
+    let key = [0x42u8; 32];
+    let source_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x02, 0x07];
+    let payload_type = 0x02;
+    let epoch = 0x07;
+    let sequence = 0x0005_1234u32;
+    let thought_id = sequence as u16;
+    let fragment_index = (sequence >> 16) as u8;
+
+    let packet_ct = encrypt_packet_typed(
+        b"packet-domain witness",
+        &key,
+        &source_id,
+        payload_type,
+        epoch,
+        sequence,
+    );
+    let fragment_ct = encrypt_fragment(
+        b"fragment-domain witness",
+        &key,
+        &source_id,
+        thought_id,
+        fragment_index,
+    );
+
+    assert!(packet_ct.len() >= AEAD_NONCE_SIZE);
+    assert!(fragment_ct.len() >= AEAD_NONCE_SIZE);
+    assert_eq!(
+        &packet_ct[..AEAD_NONCE_SIZE],
+        &fragment_ct[..AEAD_NONCE_SIZE],
+        "negative control: legacy packet and fragment builders reuse a nonce"
+    );
+}
+
 // -- XChaCha20-Poly1305 tests --
 
 #[cfg(feature = "mesh-encryption")]
