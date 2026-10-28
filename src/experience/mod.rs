@@ -744,12 +744,14 @@ mod tests {
     fn test_signal_computation() {
         let bus = ExperienceBus::with_defaults();
 
-        // With no experiences, prediction error should be high
+        // With no comparisons, PE is unavailable rather than maximum surprise.
         let hdv = ContinuousHV::random(16384, 42);
         let similar = bus.retrieve_similar_experiences(&hdv);
         let signals = bus.compute_signals(&hdv, &similar);
 
-        assert_eq!(signals.prediction_error, 1.0); // No similar = high surprise
+        assert_eq!(signals.prediction_error, 0.5); // Neutral numeric placeholder only.
+        assert!(!signals.prediction_error_valid);
+        assert_eq!(signals.prediction_error_value(), None);
     }
 
     #[test]
