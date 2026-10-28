@@ -1,0 +1,132 @@
+{
+  "schema": "symthaea-decision-risk-certified-fallback-summary-v1",
+  "status": "SYNTHETIC_FINITE_GAME_ORACLE_ERROR_ENVELOPE_NOT_REAL_DEPLOYMENT",
+  "protocol": {
+    "seed": 20261032,
+    "calibration_per_regime": 100,
+    "test_per_regime": 20,
+    "calibration_total": 600,
+    "test_total": 120,
+    "budget": 120,
+    "nominal_coverage_target": 0.9,
+    "regret_budget_bits": 0.2,
+    "conditions_use_same_episodes": true,
+    "error_envelope": "exact maximum absolute cell error vs simulator truth; oracle-known"
+  },
+  "theorem": "If the estimated-model risk vector lies inside a split-conformal region of radius r and max absolute per-cell risk-model error is bounded by epsilon, true regret is <=2(r+epsilon) for a fixed correctly identified finite policy family, on the calibration inclusion event.",
+  "results": {
+    "correct_model": {
+      "pooled": {
+        "radius": 0.06664248830771191,
+        "epsilon": 0,
+        "certified_bound_bits": 0.13328497661542382,
+        "admitted": true,
+        "planner_mean_regret_bits": 0.0015245793240142524,
+        "gated_mean_regret_bits": 0.0015245793240142524,
+        "bound_violations": 0
+      },
+      "group_max": {
+        "radius": 0.07538360152392043,
+        "epsilon": 0,
+        "certified_bound_bits": 0.15076720304784086,
+        "admitted": true,
+        "planner_mean_regret_bits": 0.0015245793240142524,
+        "gated_mean_regret_bits": 0.0015245793240142524,
+        "bound_violations": 0
+      }
+    },
+    "risk_misspec_5pct": {
+      "epsilon": 0.04778839087663833,
+      "pooled": {
+        "radius": 0.06798462094333724,
+        "certified_bound_bits": 0.23154602363995114,
+        "admitted": false,
+        "fallback_rate": 1,
+        "planner_mean_regret_bits": 0.004512803176155848,
+        "gated_mean_regret_bits": 0.10992132178157678,
+        "bound_violations": 0
+      },
+      "group_max": {
+        "radius": 0.07776762846379492,
+        "certified_bound_bits": 0.2511120386808665,
+        "admitted": false,
+        "fallback_rate": 1,
+        "planner_mean_regret_bits": 0.004512803176155848,
+        "gated_mean_regret_bits": 0.10992132178157678,
+        "bound_violations": 0
+      }
+    },
+    "risk_misspec_20pct": {
+      "epsilon": 0.17887405085810393,
+      "pooled": {
+        "radius": 0.06717267404722493,
+        "certified_bound_bits": 0.4920934498106577,
+        "admitted": false,
+        "fallback_rate": 1,
+        "planner_mean_regret_bits": 0.012738887005808,
+        "gated_mean_regret_bits": 0.10992132178157678,
+        "bound_violations": 0
+      },
+      "group_max": {
+        "radius": 0.07738620775153837,
+        "certified_bound_bits": 0.5125205172192846,
+        "admitted": false,
+        "fallback_rate": 1,
+        "planner_mean_regret_bits": 0.012738887005808,
+        "gated_mean_regret_bits": 0.10992132178157678,
+        "bound_violations": 0
+      }
+    },
+    "policy_row_identity_mismatch": {
+      "epsilon": 0.6369877787704441,
+      "pooled": {
+        "radius": 0.06664248830771191,
+        "certified_bound_bits": 1.407260534156312,
+        "admitted": false,
+        "fallback_rate": 1,
+        "planner_mean_regret_bits": 0.09781163997120773,
+        "gated_mean_regret_bits": 0.10992132178157678,
+        "bound_violations": 0
+      },
+      "group_max": {
+        "radius": 0.07538360152392043,
+        "certified_bound_bits": 1.424742760588729,
+        "admitted": false,
+        "fallback_rate": 1,
+        "planner_mean_regret_bits": 0.09781163997120773,
+        "gated_mean_regret_bits": 0.10992132178157678,
+        "bound_violations": 0
+      }
+    }
+  },
+  "max_lp_certificate_gap_bits": 2.0000014977483715e-9,
+  "validation": {
+    "new_gate_tests_passed": 3,
+    "combined_python_tests_passed": 19,
+    "combined_python_test_runtime_seconds": 16.816,
+    "combined_python_log_sha256": "21e0abde673150f15d48a87f16ce53013b73793f146b629518c76148c2e7d656",
+    "rust_policy_risk_binding_tests_authored": 8,
+    "rust_policy_risk_binding_tests_executed": false,
+    "rust_toolchain_available": false,
+    "remote_ci_claimed": false
+  },
+  "provenance": {
+    "source_path": "validation/decision_risk_certified_fallback.py",
+    "source_git_blob_sha1": "093762836d0b2a238aa9cc8d46c35d57aa70a62d",
+    "source_sha256": "a00411b9e68df4746613557b595939fd2f6839e6aaab64201f97faa240cdc881",
+    "test_path": "validation/test_decision_risk_certified_fallback.py",
+    "test_git_blob_sha1": "d18d5fd0da75c16c253adafba948b266517675f5",
+    "test_sha256": "d1167b41b3c41bcabc957ed557318924668a93a146fc1f14c14469509fdb555d",
+    "raw_result_sha256": "363b3f3e98a077d09caf0b1b3b62e98f6115067b84ad18cb92c4ca7a6eeaf977",
+    "raw_result_committed": false,
+    "bundle_sha256": "c7ce1154d64263a49d1a63c618c6657ea2a9373aaf316d3d1abc59ed404df4a0"
+  },
+  "limitations": [
+    "epsilon is computed against simulator truth and is oracle-known in this experiment",
+    "fallback mixture is computed from simulator truth and is not a real independently qualified baseline",
+    "gate is a certification/admission mechanism, not an automatic average-regret improvement",
+    "coverage is conditional on exchangeability and does not establish arbitrary OOD protection",
+    "no published external baseline has been executed on this same protocol",
+    "no SOTA, production, or certification claim"
+  ]
+}
