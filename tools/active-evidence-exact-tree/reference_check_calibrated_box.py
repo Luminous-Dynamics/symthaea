@@ -48,7 +48,14 @@ def action_risk(belief, action):
 
 
 def best_action(belief):
-    return min(range(3), key=lambda a: (action_risk(belief, a), a))
+    best = 0
+    best_risk = action_risk(belief, 0)
+    for action in range(1, 3):
+        candidate = action_risk(belief, action)
+        if candidate < best_risk - EPS:
+            best = action
+            best_risk = candidate
+    return best
 
 
 def enumerate_trees(belief, mask, rounds):
