@@ -1,0 +1,49 @@
+name: NewtonBench Native Scorecard Importer
+
+on:
+  pull_request:
+    paths:
+      - "research/newtonbench-native-scorecard/**"
+      - ".github/workflows/newtonbench-native-scorecard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: newtonbench-native-scorecard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-scorecard:
+    name: Native scorecard import contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path research/newtonbench-native-scorecard/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/newtonbench-native-scorecard/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path research/newtonbench-native-scorecard/Cargo.toml --all-targets -- -D warnings
+
+      - name: Import fixture twice and verify deterministic native scorecard
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet --manifest-path research/newtonbench-native-scorecard/Cargo.toml -- research/newtonbench-native-scorecard/fixtures/manifest.json research/newtonbench-native-scorecard/fixtures/vanilla research/newtonbench-native-scorecard/fixtures/code_assisted > /tmp/newtonbench-scorecard-1.json
+          cargo run --locked --quiet --manifest-path research/newtonbench-native-scorecard/Cargo.toml -- research/newtonbench-native-scorecard/fixtures/manifest.json research/newtonbench-native-scorecard/fixtures/vanilla research/newtonbench-native-scorecard/fixtures/code_assisted > /tmp/newtonbench-scorecard-2.json
+          cmp /tmp/newtonbench-scorecard-1.json /tmp/newtonbench-scorecard-2.json
+          grep -q '"expected_pair_count": 2' /tmp/newtonbench-scorecard-1.json
+          grep -q '"missing_pairs": 1' /tmp/newtonbench-scorecard-1.json
+          grep -q '"normalized_nonfinite_tokens": 1' /tmp/newtonbench-scorecard-1.json
