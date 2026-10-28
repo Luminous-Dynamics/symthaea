@@ -1,0 +1,92 @@
+{
+  "correct_model": {
+    "bound_violations_group_max": 0,
+    "bound_violations_pooled": 0,
+    "group_max_coverage": 0.9166666666666666,
+    "pooled_coverage": 0.8833333333333333,
+    "pooled_mean_regret_bits": 0.0015245793240142524,
+    "pooled_p95_regret_bits": 0.012669246105034122
+  },
+  "interpretation_boundary": "Correct decision-risk calibration is conditional on correct risk matrix, fixed enumerated policy family and exchangeability. Known-regime calibration undercovered the constructed unseen regime; row identity mismatch invalidated the conditional 2r regret bound. No SOTA/production claim.",
+  "local_unit_tests": "8 passed (4 original decision-sufficient tests + 4 falsification regression tests)",
+  "max_lp_certificate_gap_bits": 2.0000019418375814e-9,
+  "policy_row_identity_mismatch": {
+    "bound_violations_group_max": 26,
+    "bound_violations_pooled": 31,
+    "mean_regret_bits": 0.09781163997120773,
+    "p95_regret_bits": 0.20008813604166972,
+    "paired_bootstrap_95_ci": [
+      0.08475879089107353,
+      0.10808512664163225
+    ],
+    "paired_delta_vs_correct_bits": 0.09628706064719349,
+    "rmse": 0.26847371446730967
+  },
+  "protocol": {
+    "budget": 120,
+    "calibration_total": 600,
+    "coverage_target": 0.9,
+    "known_test_total": 120,
+    "seed": 20261032,
+    "unseen_regime_test_n": 800
+  },
+  "raw_result_sha256": "519da9c0f6b1f05dc8c058c0205e9321616d961b1341c5417bddeb347ce4e9e5",
+  "risk_matrix_misspecification": {
+    "20pct": {
+      "mean_regret_bits": 0.012738887005808,
+      "paired_bootstrap_95_ci": [
+        0.007946237998721307,
+        0.01488298529308761
+      ],
+      "paired_delta_vs_correct_bits": 0.011214307681793748,
+      "rmse": 0.07110149265878808
+    },
+    "5pct": {
+      "mean_regret_bits": 0.004512803176155848,
+      "paired_bootstrap_95_ci": [
+        0.0017510131083380794,
+        0.004465314053712894
+      ],
+      "paired_delta_vs_correct_bits": 0.0029882238521415955,
+      "rmse": 0.01933259130612207
+    }
+  },
+  "schema": "symthaea-decision-sufficient-negative-controls-evidence-v1",
+  "source_git_blob_sha1": "42bbfa04119faa60c9cd5df8a2bf4fe5f59c8649",
+  "source_sha256": "79679c17b6746321912ddba963d161c11c60ab5000057df325b834c9c85c1111",
+  "status": "SYNTHETIC_FALSIFICATION_PILOT_NOT_REAL_SCM_OR_EXTERNAL_SOTA",
+  "test_git_blob_sha1": "542d0afb8fd15f0e39e524f04c71ba7c2a6376f2",
+  "test_sha256": "aef228cd788a83cf5d3a55a9685d786800f8298c9dea832e95e9d22cf3ee96b7",
+  "unseen_regime": {
+    "correct_model": {
+      "group_max_coverage": 0.9,
+      "group_max_mean_regret_bits": 0.003797193459963647,
+      "group_max_wilson_95_ci": [
+        0.8772617146858577,
+        0.9189151843496017
+      ],
+      "pooled_coverage": 0.84625,
+      "pooled_mean_regret_bits": 0.0023494741526957894,
+      "pooled_wilson_95_ci": [
+        0.8196048749680035,
+        0.8695857532595658
+      ]
+    },
+    "definition": "Dirichlet alpha 0.5 at latent hypotheses 9 and 15, 0.002 elsewhere; excluded from six-regime calibration; 9 and 15 have farthest risk vectors",
+    "n": 800,
+    "risk_misspec_20pct": {
+      "group_max_coverage": 0.8975,
+      "group_max_mean_regret_bits": 0.007842898160512106,
+      "group_max_wilson_95_ci": [
+        0.874547244079434,
+        0.9166535493370536
+      ],
+      "pooled_coverage": 0.845,
+      "pooled_mean_regret_bits": 0.007842898160512106,
+      "pooled_wilson_95_ci": [
+        0.818278761644507,
+        0.8684238137735766
+      ]
+    }
+  }
+}
