@@ -34,7 +34,7 @@ It recursively scans Rust files across the repository, excluding generated/cache
 - parse failures (any parse failure makes the command exit nonzero);
 - each candidate's repository-relative source path, line/column, syntactic call path, heuristic class, source-file SHA-256, and site-identity SHA-256.
 
-The first classifier recognizes direct AST call expressions that look like process command construction, direct `fs` reads/writes/mutations, file-handle open/create calls, common socket connect/bind calls, and `libc::system`. It intentionally emits **candidate sites**, not confirmed effects. A `Command::new` call does not prove that a process was spawned, and a path matching `fs` does not prove a particular file was changed.
+The first classifier recognizes direct AST call expressions that look like process command construction, direct `fs` reads/writes/mutations, direct `File::open/create` calls, common socket connect/bind calls, and `libc::system`. It intentionally emits **candidate sites**, not confirmed effects. A `Command::new` call does not prove that a process was spawned, and a path matching `fs` does not prove a particular file was changed.
 
 The scanner is not a sound whole-program effect analysis. It does not resolve aliases, types, control flow or reachability; analyze macro token bodies, FFI internals, generated sources in excluded build directories, scripts, dynamic loading, trait-object dispatch, or arbitrary indirect calls; nor prove the absence of unlisted effect families. It may produce both false positives and false negatives.
 
