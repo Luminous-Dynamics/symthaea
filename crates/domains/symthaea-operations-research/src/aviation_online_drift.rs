@@ -64,7 +64,6 @@ pub enum DriftMonitorError {
     InvalidProbability { owner_id: String, probability_ppm: u32 },
     ProbabilityMassMismatch { owner_id: String, actual_ppm: u64 },
     AlternativeSupportMismatch { alternative_id: String, scenario_id: String },
-    AlternativeMixtureHasZeroSupport { scenario_id: String },
     AlternativeHasZeroProbabilityForNominalSupport { alternative_id: String, scenario_id: String },
     MixtureWeightMassMismatch { actual_ppm: u64 },
     InvalidAlpha { alpha_ppm: u32 },
@@ -619,22 +618,6 @@ mod tests {
         assert!(monitor.report().log_e_value.is_finite());
     }
  
-    #[test]
-    fn positive_nominal_categories_must_have_alternative_mixture_coverage() {
-        assert!(matches!(
-            OnlineDriftMonitor::new(
-                vec![prob("routine", 900_000), prob("disruption", 100_000)],
-                vec![DriftAlternative {
-                    alternative_id: "routine-only".into(),
-                    mixture_weight_ppm: 1_000_000,
-                    probabilities: vec![prob("routine", 1_000_000), prob("disruption", 0)],
-                }],
-                50_000,
-            ),
-            Err(DriftMonitorError::AlternativeMixtureHasZeroSupport { scenario_id }) if scenario_id == "disruption"
-        ));
-    }
-
     #[test]
     fn alternatives_must_assign_positive_mass_to_every_nominally_possible_category() {
         assert!(matches!(
