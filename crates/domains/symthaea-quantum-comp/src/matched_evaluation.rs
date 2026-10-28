@@ -874,6 +874,9 @@ mod tests {
         assert_eq!(result.pair_count, 2);
         assert_eq!(result.baseline_target_hits, 1);
         assert_eq!(result.candidate_target_hits, 2);
+        assert_eq!(result.baseline_target_hit_rate, 0.5);
+        assert_eq!(result.candidate_target_hit_rate, 1.0);
+        assert_eq!(result.target_hit_rate_delta_candidate_minus_baseline, 0.5);
         assert_eq!(result.both_target_hits, 1);
         assert_eq!(result.candidate_only_target_hits, 1);
         assert_eq!(result.baseline_only_target_hits, 0);
