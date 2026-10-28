@@ -8,7 +8,7 @@ from pathlib import Path
 
 from multifidelity_scenario_suite import MultiFidelityScenario, SUPPORTED_SCENARIOS
 from multifidelity_compositional_bakeoff import CompositionalScenarioWorld, run_sweep
-from score_compositional_bakeoff import score_document, loads_no_duplicate_keys
+from score_compositional_bakeoff import score_document, loads_no_duplicate_keys, family_response, design_point
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +30,23 @@ class CompositionalBakeoffTests(unittest.TestCase):
                     self.assertEqual(actual.objectives, expected.objectives, (family, candidate_id, fidelity))
                     self.assertEqual(actual.constraint_margin, expected.constraint_margin, (family, candidate_id, fidelity))
                     self.assertEqual(actual.cost_units, expected.cost_units)
+
+    def test_independent_equation_replay_matches_every_family(self) -> None:
+        for family in SUPPORTED_SCENARIOS:
+            for dimension in (2, 5):
+                for candidate_id in (0, 11, 37):
+                    x = design_point(candidate_id, dimension, 29)
+                    source = MultiFidelityScenario(
+                        family, dimension, 1.25, 29,
+                        {"low": 1, "medium": 5, "high": 25}, design_count=75,
+                    )
+                    source_x = source.design(candidate_id).x
+                    self.assertEqual(x, source_x)
+                    for fidelity in ("low", "medium", "high"):
+                        actual = family_response(family, x, fidelity, 1.25, 29)
+                        expected = source.evaluate(candidate_id, fidelity)
+                        self.assertEqual(actual[0], expected.objectives, (family, dimension, candidate_id, fidelity))
+                        self.assertEqual(actual[1], expected.constraint_margin, (family, dimension, candidate_id, fidelity))
 
     def test_off_diagonal_components_are_separable(self) -> None:
         costs = {"low": 1, "medium": 5, "high": 25}
