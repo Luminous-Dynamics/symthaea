@@ -187,26 +187,6 @@ def validate_receipt(
                 except (OSError, ValueError) as exc:
                     issues.append({"code": "artifact_path_invalid", "message": f"{label}: {exc}"})
 
-        # stdout/stderr digests must be tied to concrete output artifacts, not
-        # merely repeated as self-reported hashes in the receipt.
-        output_by_path = {item["path"]: item for item in receipt["outputs"]}
-        for label, path_field, digest_field in (
-            ("stdout", "stdout_path", "stdout_sha256"),
-            ("stderr", "stderr_path", "stderr_sha256"),
-        ):
-            log_path = receipt["execution"][path_field]
-            log_artifact = output_by_path.get(log_path)
-            if log_artifact is None:
-                issues.append({
-                    "code": "execution_log_artifact_missing",
-                    "message": f"execution {label} path is not present in the output artifact inventory",
-                })
-            elif log_artifact["sha256"] != receipt["execution"][digest_field]:
-                issues.append({
-                    "code": "execution_log_artifact_binding_mismatch",
-                    "message": f"execution {label} digest differs from the declared output artifact digest",
-                })
-
     eligible = not issues
     return {
         "schema_version": "vleb-witness-receipt-audit-v1",

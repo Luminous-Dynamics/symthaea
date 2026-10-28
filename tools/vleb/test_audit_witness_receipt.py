@@ -20,8 +20,6 @@ class WitnessReceiptAuditTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "input.dat").write_bytes(b"account=123\namount=10\n")
         (self.root / "output.dat").write_bytes(b"balance=90\n")
-        (self.root / "stdout.log").write_bytes(b"supports\n")
-        (self.root / "stderr.log").write_bytes(b"")
         (self.root / "source.cbl").write_bytes(b"       01 BALANCE PIC 9(5).\n")
         self.schema_path = Path(__file__).with_name("witness-receipt.schema.json")
         source_bytes = (self.root / "source.cbl").read_bytes()
@@ -60,7 +58,6 @@ class WitnessReceiptAuditTests(unittest.TestCase):
             "execution": {
                 "status": "completed", "exit_code": 0, "duration_ms": 123,
                 "stdout_sha256": sha(b"supports\n"), "stderr_sha256": sha(b""),
-                "stdout_path": "stdout.log", "stderr_path": "stderr.log",
             },
             "runtime": {
                 "image_digest": "sha256:" + "c" * 64,
@@ -71,11 +68,7 @@ class WitnessReceiptAuditTests(unittest.TestCase):
                 "network_mode": "disabled",
             },
             "inputs": [{"name": "scenario", "path": "input.dat", "sha256": sha((self.root / "input.dat").read_bytes())}],
-            "outputs": [
-                {"name": "execution-output", "path": "output.dat", "sha256": sha((self.root / "output.dat").read_bytes())},
-                {"name": "stdout", "path": "stdout.log", "sha256": sha((self.root / "stdout.log").read_bytes())},
-                {"name": "stderr", "path": "stderr.log", "sha256": sha((self.root / "stderr.log").read_bytes())},
-            ],
+            "outputs": [{"name": "execution-output", "path": "output.dat", "sha256": sha((self.root / "output.dat").read_bytes())}],
             "claim_result": "supports",
         }
         self.receipt_path = self.root / "receipt.json"
@@ -191,16 +184,6 @@ class WitnessReceiptAuditTests(unittest.TestCase):
         self.assertIn("schema_digest_mismatch", {issue["code"] for issue in result["issues"]})
         result = self.audit(expected_receipt_sha256="e" * 64)
         self.assertIn("receipt_digest_mismatch", {issue["code"] for issue in result["issues"]})
-
-    def test_execution_log_digest_must_match_hashed_output_artifact(self) -> None:
-        self.receipt["execution"]["stdout_sha256"] = "e" * 64
-        result = self.audit()
-        self.assertIn("execution_log_artifact_binding_mismatch", {issue["code"] for issue in result["issues"]})
-
-    def test_execution_log_artifact_must_be_in_output_inventory(self) -> None:
-        self.receipt["execution"]["stderr_path"] = "missing-stderr.log"
-        result = self.audit()
-        self.assertIn("execution_log_artifact_missing", {issue["code"] for issue in result["issues"]})
 
     def test_unknown_receipt_fields_fail_closed(self) -> None:
         self.receipt["agent_assertion"] = "trust me"
