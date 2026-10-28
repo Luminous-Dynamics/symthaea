@@ -3,7 +3,8 @@
 #![deny(unsafe_code)]
 
 use std::collections::BTreeSet;
-use std::env;\nuse std::fmt::Write as _;
+use std::env;
+use std::fmt::Write as _;
 
 const GRID: &str = include_str!("../tests/fixtures/vision-dvpc-028-scenarios.tsv");
 const EPS: f64 = 1e-10;
@@ -285,7 +286,8 @@ fn enumerate(s: &Scenario) -> Result<SweepResult, String> {
 fn run_sweep(input: &str) -> Result<String, String> {
     let scenarios = parse_grid(input)?;
     let mut out = String::from(
-        "HEADER\trecord_type\tscenario_id\testimator\tverdict\tmetric\tvalue\n",
+        "HEADER\trecord_type\tscenario_id\testimator\tverdict\tmetric\tvalue
+",
     );
     for scenario in scenarios {
         let result = enumerate(&scenario)?;
@@ -337,12 +339,13 @@ fn run_sweep(input: &str) -> Result<String, String> {
             }
         }
     }
-    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tconfidence_intervals\tNOT_COMPUTED\n");
-    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tproduction_authorization\tNOT_CLAIMED\n");
+    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tconfidence_intervals\tNOT_COMPUTED
+");
+    out.push_str("LIMIT\t-\t-\tALL_SCENARIOS\tproduction_authorization\tNOT_CLAIMED
+");
     Ok(out)
 }
 
-use std::fmt::Write as _;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -452,13 +455,19 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.lines().filter(|line| line.starts_with("METRIC\t")).count(), 150);
         assert!(first.contains("SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED"));
-        assert!(first.contains("METRIC\thealthy_correct\tIPS\tSUPPORT_OK_SYNTHETIC_ONLY\texpected\t0.500000000000"));\n        assert!(first.contains("confidence_intervals\tNOT_COMPUTED"));
+        assert!(first.contains("METRIC\thealthy_correct\tIPS\tSUPPORT_OK_SYNTHETIC_ONLY\texpected\t0.500000000000"));
+        assert!(first.contains("confidence_intervals\tNOT_COMPUTED"));
     }
 
     #[test]
     fn malformed_scenarios_fail_closed() {
-        assert!(parse_grid("bad header\n").is_err());
-        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap\nx\t0\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n").is_err());
-        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap\nx\t6\t1.4\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5\n").is_err());
+        assert!(parse_grid("bad header
+").is_err());
+        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap
+x\t0\t0.5\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5
+").is_err());
+        assert!(parse_grid("scenario_id\tn\ttarget_probability_a\tlogging_probability_a\treward_mean_a\treward_mean_b\tqhat_a\tqhat_b\tclip_cap
+x\t6\t1.4\t0.5\t0.2\t0.8\t0.2\t0.8\t2.5
+").is_err());
     }
 }
