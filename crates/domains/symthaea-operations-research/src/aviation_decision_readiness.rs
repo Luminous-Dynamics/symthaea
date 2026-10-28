@@ -566,4 +566,118 @@ mod tests {
         assert_eq!(report.max_monitor_observation_age_seconds, 10);
     }
 
+
+    #[test]
+    fn exhaustive_fault_matrix_never_promotes_any_ineligible_combination() {
+        let features = [
+            feature(AuditStatus::Accept),
+            feature(AuditStatus::Reject),
+            feature(AuditStatus::Indeterminate),
+        ];
+        let splits = [
+            split(SplitAuditStatus::Accept),
+            split(SplitAuditStatus::Reject),
+            split(SplitAuditStatus::Indeterminate),
+        ];
+        let plans = [
+            verification(VerificationStatus::Verified),
+            verification(VerificationStatus::Rejected),
+            verification(VerificationStatus::Indeterminate),
+        ];
+        let drift_statuses = [
+            DriftMonitorStatus::InControl,
+            DriftMonitorStatus::DriftAlarm,
+            DriftMonitorStatus::SupportShiftAlarm,
+        ];
+        let distributional = [distributional(true), distributional(false)];
+        let network_assessments = [network(true), network(false)];
+        let receipts = [
+            ("calibration-v2", "calibration-v2"),
+            ("", "calibration-v2"),
+            ("calibration-v1", "calibration-v2"),
+        ];
+        // created_at, decision_at, maximum age
+        let calibration_freshness = [
+            (190_i64, 200_i64, 100_u64), // fresh
+            (10_i64, 200_i64, 100_u64),  // expired
+            (201_i64, 200_i64, 100_u64), // future
+            (190_i64, 200_i64, 0_u64),   // invalid policy
+        ];
+        // Timestamp, maximum monitor age: fresh, missing, stale, future, invalid TTL.
+        let monitor_freshness = [
+            (Some(195_i64), 30_u64),
+            (None, 30_u64),
+            (Some(100_i64), 30_u64),
+            (Some(201_i64), 30_u64),
+            (Some(195_i64), 0_u64),
+        ];
+        let mut monitor_reports = Vec::new();
+        for status in drift_statuses {
+            for (timestamp, _) in monitor_freshness {
+                let mut report = drift_report_with_timestamp(timestamp);
+                report.status = status;
+                report.evidence = match status {
+                    DriftMonitorStatus::InControl => DriftEvidence::None,
+                    DriftMonitorStatus::DriftAlarm => DriftEvidence::MixtureLikelihoodRatio,
+                    DriftMonitorStatus::SupportShiftAlarm => DriftEvidence::ScenarioOutsideNominalSupport,
+                };
+                monitor_reports.push((status, timestamp, report));
+            }
+        }
+
+        let mut cases = 0_usize;
+        for (feature_index, feature_report) in features.iter().enumerate() {
+            for (split_index, split_report) in splits.iter().enumerate() {
+                for (plan_index, plan_report) in plans.iter().enumerate() {
+                    for (drift_index, (drift_status, _timestamp, monitor_report)) in monitor_reports.iter().enumerate() {
+                        for (distributional_index, distributional_report) in distributional.iter().enumerate() {
+                            for (network_index, network_report) in network_assessments.iter().enumerate() {
+                                for (receipt_index, (candidate_receipt, active_receipt)) in receipts.iter().enumerate() {
+                                    for (calibration_index, (created, decision_time, max_cal_age)) in calibration_freshness.iter().enumerate() {
+                                        for (monitor_index, (_timestamp, max_monitor_age)) in monitor_freshness.iter().enumerate() {
+                                            // Each status is repeated across five monitor freshness modes.
+                                            if drift_index % monitor_freshness.len() != monitor_index {
+                                                continue;
+                                            }
+                                            let report = assess_decision_readiness(DecisionReadinessInput {
+                                                feature_audit: feature_report,
+                                                split_audit: split_report,
+                                                plan_verification: plan_report,
+                                                drift_monitor: monitor_report,
+                                                distributional_assessment: distributional_report,
+                                                network_assessment: network_report,
+                                                candidate_calibration_receipt_id: candidate_receipt,
+                                                active_calibration_receipt_id: active_receipt,
+                                                calibration_created_at_epoch_seconds: *created,
+                                                decision_time_epoch_seconds: *decision_time,
+                                                max_calibration_age_seconds: *max_cal_age,
+                                                max_monitor_observation_age_seconds: *max_monitor_age,
+                                            });
+                                            let should_be_eligible = feature_index == 0
+                                                && split_index == 0
+                                                && plan_index == 0
+                                                && *drift_status == DriftMonitorStatus::InControl
+                                                && distributional_index == 0
+                                                && network_index == 0
+                                                && receipt_index == 0
+                                                && calibration_index == 0
+                                                && monitor_index == 0;
+                                            assert_eq!(
+                                                report.status == DecisionReadinessStatus::EligibleForHumanReview,
+                                                should_be_eligible,
+                                                "unexpected readiness status at feature={feature_index}, split={split_index}, plan={plan_index}, drift={drift_status:?}, distributional={distributional_index}, network={network_index}, receipt={receipt_index}, calibration={calibration_index}, monitor_freshness={monitor_index}",
+                                            );
+                                            cases += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(cases, 19_440);
+    }
+
 }
