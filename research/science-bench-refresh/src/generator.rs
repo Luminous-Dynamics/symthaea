@@ -120,6 +120,38 @@ fn decode_config(bytes: &[u8]) -> Result<GeneratorConfigV1, String> {
                 recipe.family_id
             ));
         }
+        let (expected_family_id, expected_instruction) = match recipe.kind.as_str() {
+            "semantic_invariance" => (
+                "semantic_invariance",
+                "Recover the relationship invariant under the declared coordinate transformation.",
+            ),
+            "sampling_noise_shift" => (
+                "sampling_noise_shift",
+                "Recover the relationship under declared measurement noise and report uncertainty.",
+            ),
+            "confounding_null" => (
+                "confounding_null",
+                "Decide whether the apparent association is a direct effect or explained by a common cause.",
+            ),
+            "identifiability_abstention" => (
+                "identifiability_abstention",
+                "Determine what is identifiable from the narrow observed domain; state an equivalence class or abstain.",
+            ),
+            _ => return Err(format!("unsupported generator recipe kind: {}", recipe.kind)),
+        };
+        if recipe.family_id != expected_family_id {
+            return Err(format!(
+                "recipe kind {} must use family_id {}",
+                recipe.kind, expected_family_id
+            ));
+        }
+        if recipe.instruction != expected_instruction {
+            return Err(format!(
+                "recipe {} instruction differs from the frozen, audited policy-visible template",
+                recipe.family_id
+            ));
+        }
+
         let allowed = match recipe.kind.as_str() {
             "semantic_invariance" => recipe.noise_amplitude == 0.0,
             "sampling_noise_shift" => recipe.noise_amplitude > 0.0,
@@ -791,10 +823,10 @@ mod tests {
             "schema": GENERATOR_CONFIG_SCHEMA,
             "config_version": "fixture-v1",
             "recipes": [
-                {"family_id":"semantic_invariance","kind":"semantic_invariance","instruction":"Recover the relationship invariant under a known coordinate transform.","samples_per_task":5,"x_start":-2.0,"x_step":1.0,"noise_amplitude":0.0},
-                {"family_id":"sampling_noise_shift","kind":"sampling_noise_shift","instruction":"Recover the law despite declared measurement noise.","samples_per_task":6,"x_start":-1.0,"x_step":0.5,"noise_amplitude":0.05},
-                {"family_id":"confounding_null","kind":"confounding_null","instruction":"Decide whether x has a direct effect on y or a common cause explains the association.","samples_per_task":8,"x_start":-2.0,"x_step":0.5,"noise_amplitude":0.02},
-                {"family_id":"identifiability_abstention","kind":"identifiability_abstention","instruction":"State the identifiable equivalence class or abstain.","samples_per_task":5,"x_start":0.0,"x_step":0.25,"noise_amplitude":0.03}
+                {"family_id":"semantic_invariance","kind":"semantic_invariance","instruction":"Recover the relationship invariant under the declared coordinate transformation.","samples_per_task":5,"x_start":-2.0,"x_step":1.0,"noise_amplitude":0.0},
+                {"family_id":"sampling_noise_shift","kind":"sampling_noise_shift","instruction":"Recover the relationship under declared measurement noise and report uncertainty.","samples_per_task":6,"x_start":-1.0,"x_step":0.5,"noise_amplitude":0.05},
+                {"family_id":"confounding_null","kind":"confounding_null","instruction":"Decide whether the apparent association is a direct effect or explained by a common cause.","samples_per_task":8,"x_start":-2.0,"x_step":0.5,"noise_amplitude":0.02},
+                {"family_id":"identifiability_abstention","kind":"identifiability_abstention","instruction":"Determine what is identifiable from the narrow observed domain; state an equivalence class or abstain.","samples_per_task":5,"x_start":0.0,"x_step":0.25,"noise_amplitude":0.03}
             ]
         }))
         .expect("config serializes")
@@ -1168,6 +1200,28 @@ mod tests {
         let error = generate_task_set_bytes(&manifest, &seed, &changed)
             .expect_err("any config-byte mutation must break the pinned digest");
         assert!(error.contains("generator config bytes do not match"));
+    }
+
+    #[test]
+    fn recipe_cannot_smuggle_oracle_answer_through_policy_instruction() {
+        let mut config: Value = serde_json::from_slice(&demo_config()).unwrap();
+        config["recipes"][0]["instruction"] =
+            json!("The true law is y = 3*x + 2; recover it.");
+        let config_bytes = serde_json::to_vec(&config).unwrap();
+        let seed = vec![0x6d; 32];
+        let mut manifest: Value =
+            serde_json::from_slice(&manifest_for_test(&demo_config(), &seed)).unwrap();
+        manifest["generator"]["configuration_sha256"] = json!(sha256_hex(&config_bytes));
+        let first = serde_json::to_vec(&manifest).unwrap();
+        manifest["protocol_commitment_sha256"] =
+            json!(compute_protocol_commitment(&first).unwrap());
+        let second = serde_json::to_vec(&manifest).unwrap();
+        manifest["seed_commitment_sha256"] =
+            json!(compute_artifact_commitment(&second, "seed", &seed).unwrap());
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        let error = generate_task_set_bytes(&manifest_bytes, &seed, &config_bytes)
+            .expect_err("arbitrary prompt text must not leak an oracle target");
+        assert!(error.contains("audited policy-visible template"));
     }
 
     #[test]
