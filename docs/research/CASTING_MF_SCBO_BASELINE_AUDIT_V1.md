@@ -96,3 +96,25 @@ No external baseline execution has been run in this audit. It records source rec
 - Upstream repository and code at the pinned commit: https://github.com/Nemo-Virtual-Lab/MF-SCBO/tree/ca42fd6c5ec8c841e3f1ff9642509e12d104b581
 - Cost-aware stopping (ICML/PMLR 306, 2026): https://proceedings.mlr.press/v306/xie26c.html
 - COCO BBOB-constrained official archive: https://coco-platform.org/data-archive/index.html
+
+
+## 6. Additional 2026 comparator: consequential improvement
+
+A newly reviewed article is directly relevant: Aydogdu et al., *Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization*, published 27 March 2026 and assigned to the September 2026 issue, DOI https://doi.org/10.1007/s11081-026-10078-5. The method jointly selects the sample and fidelity while accounting for whether a low-fidelity improvement is consequential at high fidelity, and addresses evaluation cost/validity differences.
+
+This is a stronger conceptual comparator than generic expected-improvement-per-cost. Consequently, do not claim that Symthaea's joint action/fidelity choice or cost-aware sampling is novel by itself. The candidate differentiation is the combination of multi-objective constrained decision quality, post-selection model-shift robustness, explicit abstention, and auditable end-to-end cost/trace semantics.
+
+The article page says supporting data/code are available upon reasonable request; this audit found no clearly linked public implementation in the retrieved article page. Therefore:
+- record CI acquisition as a **paper comparator / implementation sought**;
+- do not mark it reproduced or beaten until an actual code artifact, revision/license, environment and runnable configuration are obtained;
+- if no runnable artifact is available, report the comparator as unavailable rather than substituting a newly written imitation under the same name.
+
+Source: https://link.springer.com/article/10.1007/s11081-026-10078-5
+
+## 7. VOI-specific predictive-model gate
+
+The exact discrete VOI calculator added to the research branch is mathematically exact only with respect to its supplied prior, loss table and observation likelihoods. This does not establish that these distributions match the actual process.
+
+Before a model-driven VOI policy participates in a primary comparison, archive a calibration study using predictions made before observations are revealed. Include held-out predictive log score or Brier score, reliability diagnostics where applicable, and stratification near the constraint boundary and across shift families. If no suitable calibrated distribution exists, use the deterministic proxy track and label it accordingly. A correct decision-theoretic formula paired with a misspecified model can systematically purchase the wrong evaluations.
+
+No calibrated predictive model or performance improvement is claimed by the current exact-discrete reference calculator.
