@@ -839,15 +839,22 @@ mod tests {
                 .push((executable.to_owned(), args.to_vec()));
             let witness_path = self.witness_path.clone();
             Box::pin(async move {
-                // The file witnesses crossing the effect-adapter boundary;
-                // it does not claim that a real OS mutation took place.
-                std::fs::write(&witness_path, b"authorized-effect-witness")?;
-                use std::os::unix::process::ExitStatusExt;
-                Ok(std::process::Output {
-                    status: std::process::ExitStatus::from_raw(0),
-                    stdout: Vec::new(),
-                    stderr: Vec::new(),
-                })
+                // Spawn a harmless child-process fixture and pass the path as
+                // an argv element, not shell-interpolated command text. It
+                // produces a real temporary-file witness but never launches
+                // nixos-rebuild or mutates host configuration.
+                let output = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg("printf '%s' 'authorized-effect-witness' > \"$1\"")
+                    .arg("effect-witness")
+                    .arg(&witness_path)
+                    .output()?;
+                if !output.status.success() {
+                    return Err(std::io::Error::other(
+                        "temporary child-process witness command failed",
+                    ));
+                }
+                Ok(output)
             })
         }
     }
