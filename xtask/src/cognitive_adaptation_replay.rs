@@ -132,10 +132,12 @@ pub fn run_synthetic(
         score.source_replay_run_kind.as_deref() == Some("synthetic-not-measured"),
         "synthetic replay harness must not emit measured run-kind provenance"
     );
-    Ok(summary(
+    let summary = summary(
         scenario, seed, ticks, &receipt_path, &utility_input_path, &score_path,
         &validation_path, &validation, &score,
-    ))
+    );
+    write_json(&out_dir.join("summary.json"), &summary)?;
+    Ok(summary)
 }
 
 fn build_synthetic_run(scenario: &str, ticks: usize, seed: u64) -> anyhow::Result<GeneratedRun> {
