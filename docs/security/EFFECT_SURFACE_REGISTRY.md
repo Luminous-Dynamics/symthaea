@@ -31,6 +31,30 @@ It does **not** establish that:
 - an authorization was authentic, current, correctly scoped, or durable;
 - the runtime is secure or the repository is free of bypasses.
 
+
+## Research alignment and benchmark boundary
+
+NIST's October 27, 2026 article, [Design Tenets for Agent Identity Management Systems](https://www.nist.gov/blogs/cybersecurity-insights/design-tenets-agent-identity-management-systems), proposes ten design tenets for agent identity, authentication and authorization. They are guidance from an ongoing NCCoE project, not a conformance certificate or endorsement of this repository. The registry should evolve to make each relevant property testable:
+
+| NIST design theme | Registry/qualification consequence |
+| --- | --- |
+| Distinct agent identity tied to workload/configuration | Bind principal, workload, environment, approved configuration and executable identity to the action-intent digest. |
+| Delegation and attenuation | Bind the parent mandate/delegator and ensure downstream scopes cannot widen parent authority. |
+| Least/zero standing privilege | Prefer just-in-time, one-shot scoped permission over ambient or persistent authority. |
+| Short-lived, dynamic and revocable grants | Test expiry, revocation, current state, configuration drift and the exact point-of-use revalidation boundary. |
+| Human-in-the-loop triggers | Include escalation thresholds and measure benign interruption/consent-fatigue costs alongside security. |
+| Mandates and constraints | Bind signed task intent, resource/operation scope, preconditions and required postconditions. |
+| Separation of policy from reasoning | Ensure prompts, retrieved content, model confidence, Phi and planner state cannot mint authority. |
+| Deterministic access decisions | Use pinned, reproducible policy and test exact authority outcomes independently of model behavior. |
+| Continuous monitoring | Test drift detection, anomalous sequences, policy/credential revocation and response latency. |
+| Immutable evidence | Bind source, policy, grant, effect adapter, outcome and postcondition to independently verifiable tamper-evident receipts. |
+
+The current registry has only begun this mapping; the seven entries do not satisfy those ten themes by virtue of being recorded.
+
+Benchmark comparisons must also distinguish **decision-only** security from end-to-end effect enforcement. For example, [Mergen's October 12, 2026 benchmark](https://mergen.app/docs/agent-security-benchmark) runs a fixed 551-case attack/benign corpus through its deterministic gate in decide-only mode and reports gate latency. That is useful evidence for the narrow decision path, but it does not by itself establish how many real downstream side effects occurred. Nixward should report request, decision, adapter invocation, actual side effect, and postcondition as separate denominators and publish missing/error rows. Do not compare a local registry check or ledger lookup to a complete gateway and do not rank systems using attack detection alone.
+
+A stretch research result for Nixward would be an open, reproducible cross-surface conformance suite that combines a versioned effect registry, frozen adversarial and benign controls, actual instrumented effects, exact source/toolchain identity, and independently verified outcome receipts. This could be more useful than chasing a single leaderboard score because it exposes both bypasses and overblocking while making the evidence auditable.
+
 ## Current scope
 
 This is an initial known-surface baseline audited against main commit c6355cc6ffe01843b841f6b9a8a09eabd2556deb on 2026-10-28, informed by #8656 and the linked per-surface issues. The entries are source-review records with explicit limitations. The inventory is intentionally incomplete and all listed surfaces remain unqualified or only partially guarded.
