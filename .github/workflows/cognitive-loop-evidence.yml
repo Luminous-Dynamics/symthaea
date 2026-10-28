@@ -15,6 +15,7 @@ on:
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
+      - "xtask/src/cognitive_adaptation_replay.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
@@ -100,6 +101,9 @@ jobs:
 
       - name: Test independent adaptation panel audit failure modes
         run: cargo test --locked -p xtask cognitive_adaptation_audit
+
+      - name: Test synthetic adaptation replay harness failure modes
+        run: cargo test --locked -p xtask cognitive_adaptation_replay
 
       - name: Test scalar drift baseline failure modes
         run: cargo test --locked -p xtask cognitive_drift_baselines
@@ -368,3 +372,23 @@ jobs:
             (.configuration_digest | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/predictive-rank-martingale-ons.json"
+
+      - name: Generate and validate the end-to-end synthetic adaptation replay
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-adaptation-synthetic-replay --scenario abrupt --ticks 64 --seed 7 --out-dir "$RUNNER_TEMP/cognitive-adaptation-synthetic"
+          cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/cognitive-adaptation-synthetic/receipt.json" --out "$RUNNER_TEMP/cognitive-adaptation-synthetic/receipt-validation-recheck.json"
+          jq -e '
+            .run_kind == "synthetic-not-measured" and
+            .scenario_id == "abrupt" and
+            .ticks == 64 and
+            (.receipt_sha256 | length) == 64 and
+            (.score_sha256 | length) == 64 and
+            (.interpretation_guard | contains("not empirical results"))
+          ' "$RUNNER_TEMP/cognitive-adaptation-synthetic/summary.json"
+          jq -e '
+            .run_kind == "synthetic-not-measured" and
+            .arm_count == 5 and
+            .total_decision_count == 320 and
+            (.canonical_receipt_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/cognitive-adaptation-synthetic/receipt-validation-recheck.json"
