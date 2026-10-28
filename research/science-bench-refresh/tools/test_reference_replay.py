@@ -189,7 +189,11 @@ class ReferenceReplayTests(unittest.TestCase):
         challenge_product = 1.0
         for root in roots:
             challenge_product *= challenge - root
-        self.assertNotEqual(challenge_product, 0.0)
+        self.assertGreater(
+            abs(challenge_product),
+            oracle["noise_amplitude"],
+            "alternative law must differ by more than the declared noise bound",
+        )
 
     def test_task_generation_domain_and_field_separation(self) -> None:
         first = rr.seed_word(SEED_A, "g", "f", 0, "slope")
