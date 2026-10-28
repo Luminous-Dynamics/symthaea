@@ -79,11 +79,20 @@ pub struct AdaptationPanelAuditReport {
     pub interpretation_guard: String,
 }
 
-pub fn evaluate_file(path: &Path) -> anyhow::Result<AdaptationPanelAuditReport> {
+pub fn evaluate_file(
+    path: &Path,
+    expected_bundle_sha256: &str,
+) -> anyhow::Result<AdaptationPanelAuditReport> {
+    validate_sha256(expected_bundle_sha256, "expected_bundle_sha256")?;
     let manifest_path = fs::canonicalize(path)
         .with_context(|| format!("resolving audit bundle {}", path.display()))?;
     let manifest_bytes = fs::read(&manifest_path)
         .with_context(|| format!("reading audit bundle {}", manifest_path.display()))?;
+    let actual_bundle_sha256 = sha256_hex(&manifest_bytes);
+    ensure!(
+        actual_bundle_sha256 == expected_bundle_sha256,
+        "audit bundle digest does not match the independently supplied preregistration digest"
+    );
     let bundle: AuditBundle = serde_json::from_slice(&manifest_bytes)
         .with_context(|| format!("parsing audit bundle {}", manifest_path.display()))?;
     ensure!(bundle.schema_version == 1, "audit bundle schema_version must be 1");
@@ -113,10 +122,36 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<AdaptationPanelAuditReport> 
     );
     let protocol: serde_json::Value = serde_json::from_slice(&protocol_bytes)
         .context("parsing preregistered protocol JSON")?;
+    let metric_contract = protocol
+        .get("counterfactual_metric_schema")
+        .context("protocol is missing counterfactual_metric_schema")?;
     ensure!(
-        protocol.get("counterfactual_metric_schema").is_some()
-            && protocol.get("panel_aggregation").is_some(),
-        "protocol is missing counterfactual metric or panel aggregation contracts"
+        metric_contract.get("command").and_then(serde_json::Value::as_str)
+            == Some("score-counterfactual-adaptation-utility")
+            && metric_contract.get("metric_version").and_then(serde_json::Value::as_str)
+                == Some("counterfactual-adaptation-utility-v3"),
+        "protocol metric contract does not match the v3 utility scorer"
+    );
+    let panel_contract = protocol
+        .get("panel_aggregation")
+        .context("protocol is missing panel_aggregation")?;
+    let grid = panel_contract
+        .get("complete_grid")
+        .context("protocol panel_aggregation is missing complete_grid")?;
+    ensure!(
+        grid.get("dataset_count").and_then(serde_json::Value::as_u64) == Some(7)
+            && grid.get("seeds_per_dataset").and_then(serde_json::Value::as_u64) == Some(50)
+            && grid.get("expected_cell_count").and_then(serde_json::Value::as_u64) == Some(2800),
+        "protocol must declare the registered 7 × 50 × 8 = 2800 panel"
+    );
+    let audit_contract = protocol
+        .get("independent_audit")
+        .context("protocol is missing the independent_audit contract")?;
+    ensure!(
+        audit_contract.get("schema_version").and_then(serde_json::Value::as_u64) == Some(1)
+            && audit_contract.get("command").and_then(serde_json::Value::as_str)
+                == Some("audit-cognitive-adaptation-panel"),
+        "protocol independent_audit contract does not match this verifier"
     );
 
     let panel_input: AdaptationPanelInput = serde_json::from_slice(&panel_bytes)
@@ -268,7 +303,7 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<AdaptationPanelAuditReport> 
 
     let mut report = AdaptationPanelAuditReport {
         result_schema_version: 1,
-        bundle_manifest_sha256: sha256_hex(&manifest_bytes),
+        bundle_manifest_sha256: actual_bundle_sha256,
         protocol_sha256: actual_protocol_sha256,
         panel_input_sha256: actual_panel_sha256,
         audited_cell_count: audited_cells.len(),
@@ -342,5 +377,12 @@ mod tests {
         assert!(validate_sha256("abc", "digest").is_err());
         assert!(validate_sha256(&"A".repeat(64), "digest").is_err());
         assert!(validate_sha256(&"a".repeat(64), "digest").is_ok());
+    }
+
+    #[test]
+    fn requires_an_independently_pinned_bundle_digest() {
+        let expected = "a".repeat(64);
+        assert!(validate_sha256(&expected, "expected_bundle_sha256").is_ok());
+        assert!(validate_sha256("not-pinned", "expected_bundle_sha256").is_err());
     }
 }
