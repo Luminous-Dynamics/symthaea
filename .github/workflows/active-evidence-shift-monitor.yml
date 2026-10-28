@@ -106,7 +106,7 @@ jobs:
               rows = list(csv.DictReader(stream))
           rows[1]["true_shift_detection_probability"] = "0.1"
           with open(target, "w", newline="", encoding="utf-8") as stream:
-              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\\n")
+              writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
               writer.writeheader()
               writer.writerows(rows)
           PY
