@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v1.schema.json",
   "title": "PITB Primary Analyzer Power Report v1",
-  "description": "Strict JSON contract for analyze_pitb_results --mode power. The report is a validation-only design simulation, not an observed proof-transfer result.",
+  "description": "Strict JSON contract for analyze_pitb_results --mode power. Includes a 16-cell strict effect/ICC power grid and a 36-cell zero-average-effect weak-null grid that varies family-effect heterogeneity, ICC, and paired-outcome association. This is validation-only design analysis, not an observed proof-transfer result. The simultaneous null-risk upper bound uses a conservative one-sided Wilson score z=3.03 for Bonferroni control over 40 null cells (4 strict-null plus 36 weak-null).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -41,7 +41,8 @@
     "power_gate_passed",
     "scenarios",
     "model_assumptions",
-    "interpretation"
+    "interpretation",
+    "weak_null_pair_association_fraction_grid"
   ],
   "properties": {
     "schema_version": {
@@ -187,8 +188,8 @@
     },
     "weak_null_scenarios": {
       "type": "array",
-      "minItems": 12,
-      "maxItems": 12,
+      "minItems": 36,
+      "maxItems": 36,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -196,6 +197,7 @@
           "status",
           "true_target_weighted_mean_effect_percentage_points",
           "assumed_family_icc",
+          "pair_association_fraction",
           "requested_family_effect_heterogeneity_sd_percentage_points",
           "study_simulations",
           "bootstrap_replicates_per_simulated_study",
@@ -284,9 +286,17 @@
           "interpretation": {
             "type": "string",
             "minLength": 1
+          },
+          "pair_association_fraction": {
+            "enum": [
+              0,
+              0.5,
+              0.9
+            ]
           }
         }
-      }
+      },
+      "description": "Three family-effect heterogeneity SDs × four ICCs × three paired-outcome association fractions; 36 unique cells."
     },
     "weak_null_false_claim_probability_max": {
       "type": "number",
@@ -610,6 +620,13 @@
     "interpretation": {
       "type": "string",
       "minLength": 1
+    },
+    "weak_null_pair_association_fraction_grid": {
+      "const": [
+        0,
+        0.5,
+        0.9
+      ]
     }
   },
   "allOf": [
