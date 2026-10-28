@@ -79,6 +79,26 @@ After submissions are locked, reveal the seed and generated task/evaluator bytes
 
 A hash proves byte identity, not secrecy, correct execution, scientific validity or freedom from common-mode bugs. Execution provenance and score correctness remain separate gates.
 
+### 5.1 Executable commit–reveal contract
+
+The Rust validator implements a versioned, domain-separated commitment profile:
+
+1. `protocol_commitment_sha256` commits to every frozen non-artifact manifest field: generation/lane/purpose, generator identity and configuration digest, evaluator identity and oracle-separation declaration, family mixture and expected denominator, policy/tool/prompt/configuration identities, resource budget, analysis-plan digest, and reveal policy.
+2. `seed_commitment_sha256` commits to the exact seed-file bytes plus the protocol digest. A seed must contain at least 32 bytes; a real run must use a cryptographically secure generator and keep the bytes outside the policy-visible environment.
+3. `task_set_commitment_sha256` commits to the exact bytes of the complete task-set artifact plus the same protocol digest. Whitespace or ordering changes intentionally change the committed task artifact.
+
+All three use SHA-256 with a fixed protocol prefix, a distinct domain for `protocol`, `seed`, or `task-set`, and explicit unsigned 64-bit big-endian length framing. The protocol context uses a versioned `serde_json` struct projection that excludes the three commitment fields to avoid a circular digest. Artifact commitments bind the protocol digest, so altering a frozen budget, task family, generator/evaluator revision, policy identity, or reveal rule invalidates the context and both artifact commitments.
+
+CLI entry points:
+
+- `protocol-commit MANIFEST.json` computes the frozen non-artifact context commitment.
+- `artifact-commit MANIFEST.json seed SEED.bin` and `artifact-commit MANIFEST.json task-set TASK_SET.json` compute context-bound artifact commitments.
+- `verify-reveal MANIFEST.json SEED.bin TASK_SET.json` recomputes protocol/seed/task commitments against the exact revealed bytes and reports match/mismatch without printing seed contents.
+
+The verification command admits only a structurally valid `qualified_run` manifest in the `sealed_refresh` lane. This gate verifies byte consistency after reveal; it is not a secure enclave, signature, trusted timestamp, or remote-attestation mechanism.
+
+The next required layer is an independently implemented task regeneration check: regenerate the task set using the revealed seed and pinned generator revision, then compare exact task bytes/digests. Byte-level commit–reveal without regeneration cannot establish that the advertised generator created the committed tasks. Runner isolation, task identifiability, duplicate/family leakage checks, evaluator positive/negative controls, and execution receipts remain separate gates.
+
 ## 6. Frozen policy and fair comparison
 
 Freeze before opening the refresh seed:
