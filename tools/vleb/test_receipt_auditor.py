@@ -303,6 +303,11 @@ class ReceiptAuditorTests(unittest.TestCase):
         result = self.bundle.run_audit()
         self.assertTrue(result["eligible"], result["issues"])
         self.assertEqual(result["verdict"], "pass")
+        self.assertTrue(result["requirement_traceability"]["complete"])
+        self.assertEqual(result["requirement_traceability"]["declared_source_item_count"], 7)
+        self.assertEqual(result["requirement_traceability"]["traced_source_item_count"], 7)
+        self.assertEqual(result["requirement_traceability"]["required_test_count"], 5)
+        self.assertEqual(result["requirement_traceability"]["traced_required_test_count"], 5)
 
     def test_task_digest_must_match_out_of_band_pin(self) -> None:
         self.bundle.inputs = replace(self.bundle.inputs, expected_task_sha256="0" * 64)
@@ -361,7 +366,10 @@ class ReceiptAuditorTests(unittest.TestCase):
         ]
         self.bundle.write(self.bundle.task_path, jbytes(task))
         self.bundle.refresh_task_hash()
-        self.assert_issue(self.bundle.run_audit(), "requirement_source_coverage_incomplete")
+        result = self.bundle.run_audit()
+        self.assert_issue(result, "requirement_source_coverage_incomplete")
+        self.assertFalse(result["requirement_traceability"]["complete"])
+        self.assertLess(result["requirement_traceability"]["traced_source_item_count"], result["requirement_traceability"]["declared_source_item_count"])
 
     def test_traceability_cannot_reference_undeclared_test(self) -> None:
         task = json.loads(self.bundle.task_path.read_text())

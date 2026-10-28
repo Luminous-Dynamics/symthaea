@@ -175,6 +175,50 @@ def requirement_traceability_issues(task: dict[str, Any]) -> list[dict[str, str]
     return issues
 
 
+def requirement_traceability_summary(task: dict[str, Any], issues: list[dict[str, str]]) -> dict[str, Any]:
+    """Return coverage counts for reporting without granting eligibility."""
+    behavior = task.get("behavior_contract", {})
+    oracle = task.get("oracle_contract", {})
+    behavior = behavior if isinstance(behavior, dict) else {}
+    oracle = oracle if isinstance(oracle, dict) else {}
+    expected_sources: set[tuple[str, str]] = set()
+    statement = behavior.get("task_statement")
+    if isinstance(statement, str) and statement:
+        expected_sources.add(("task_statement", statement))
+    for source_kind, field in (
+        ("invariant", "invariants"),
+        ("allowed_behavior_change", "allowed_behavior_changes"),
+        ("observable_effect", "observable_effects"),
+    ):
+        values = behavior.get(field, [])
+        if isinstance(values, list):
+            expected_sources.update((source_kind, value) for value in values if isinstance(value, str) and value)
+
+    trace = behavior.get("requirement_traceability", [])
+    trace = trace if isinstance(trace, list) else []
+    seen_sources = {
+        (row.get("source_kind"), row.get("source_text"))
+        for row in trace
+        if isinstance(row, dict) and isinstance(row.get("source_kind"), str) and isinstance(row.get("source_text"), str)
+    }
+    required_value = oracle.get("required_test_ids", [])
+    required_tests = {value for value in required_value if isinstance(value, str) and value} if isinstance(required_value, list) else set()
+    traced_tests = {
+        test_id
+        for row in trace if isinstance(row, dict)
+        for test_id in (row.get("required_test_ids") if isinstance(row.get("required_test_ids"), list) else [])
+        if isinstance(test_id, str) and test_id
+    }
+    trace_failed = any(issue.get("code", "").startswith("requirement_") for issue in issues)
+    return {
+        "declared_source_item_count": len(expected_sources),
+        "traced_source_item_count": len(expected_sources & seen_sources),
+        "required_test_count": len(required_tests),
+        "traced_required_test_count": len(required_tests & traced_tests),
+        "complete": not trace_failed and expected_sources == seen_sources and required_tests == traced_tests,
+    }
+
+
 def evidence_path(root: Path, relative: Any, label: str, issues: list[dict[str, str]]) -> Path | None:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         issues.append({"code": "unsafe_evidence_path", "message": f"{label}: expected a non-empty POSIX relative path"})
@@ -261,6 +305,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
     if any(issue["code"].startswith("schema_") for issue in issues):
         return {"schema_version": "vleb-independent-audit-v1", "eligible": False, "verdict": "fail", "issues": issues}
     issues.extend(requirement_traceability_issues(task))
+    traceability_summary = requirement_traceability_summary(task, issues)
 
     # The receipt cannot choose its own trust roots: the evaluator supplies these pins independently.
     for label, path, claimed, pin in (
@@ -518,6 +563,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
         "expected_revision": inputs.expected_revision,
         "expected_image_id": inputs.expected_image_id,
         "required_test_count": len(required_ids),
+        "requirement_traceability": traceability_summary,
         "observed_test_result_count": len(results),
         "required_mutation_count": len(expected_active),
         "observed_mutation_result_count": len(mutation_rows),
