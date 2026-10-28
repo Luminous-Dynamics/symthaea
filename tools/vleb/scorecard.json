@@ -57,6 +57,34 @@
       "top_listed_security_correctness_pct": 37.4,
       "source_date_for_top_entry": "2026-09-04",
       "comparability_note": "Vendor benchmark results are contextual evidence for separating functional correctness from security correctness, not direct VLEB comparisons."
+    },
+    "dual_gauge": {
+      "source_url": "https://aclanthology.org/2026.findings-emnlp.1335/",
+      "publication": "EMNLP 2026 Findings",
+      "task_count": 307,
+      "languages": [
+        "Python",
+        "C++",
+        "JavaScript"
+      ],
+      "reported_best_joint_functional_security_success_pct_upper_bound": 15,
+      "claim": "The paper reports the strongest evaluated model below 15% joint functional-and-security success in each tested language.",
+      "comparability_note": "Specification-only code-generation benchmark with paired functional/security tests; not directly comparable with Legacy-Bench or VLEB."
+    },
+    "last_secure_code_benchmark": {
+      "source_url": "https://arxiv.org/abs/2610.14766",
+      "publication_date": "2026-10-10",
+      "status": "preprint",
+      "task_count": 450,
+      "source_vulnerabilities": 150,
+      "language_count": 7,
+      "cwe_class_count": 24,
+      "reported_functional_success_range_pct": [
+        73.6,
+        91.3
+      ],
+      "reported_best_joint_functional_security_success_pct": 25.1,
+      "comparability_note": "Preprint benchmark across its own task and agent setup; use as motivation for joint security/functionality measurement, not as a direct VLEB score."
     }
   },
   "proposed_targets": {
@@ -97,6 +125,16 @@
         "matched harness and budget disclosure",
         "include retries in cost accounting",
         "report p50/p90 duration and unresolved rate"
+      ]
+    },
+    "secure_legacy_admission": {
+      "target": "100% of scored secure-legacy tasks have paired functional and security oracles independently reviewed",
+      "status": "target_not_measured",
+      "definition": "Every scored task must have separately identified functional and security tests, a reviewed exploitability/severity rubric, false-positive adjudication, and controls showing both positive and negative cases.",
+      "requirements": [
+        "run a feasibility pilot",
+        "preregister critical/high escape-rate threshold before confirmation",
+        "report joint success separately from functional success"
       ]
     }
   },
@@ -144,6 +182,12 @@
       "eligible": false,
       "status": "not_run",
       "reason": "No matched baseline versus Symthaea confirmatory trial has been run."
+    },
+    "security_joint_functional_success_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_run",
+      "reason": "No independently reviewed secure-legacy cohort has been evaluated."
     }
   }
 }
