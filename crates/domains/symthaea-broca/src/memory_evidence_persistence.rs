@@ -220,6 +220,8 @@ impl EvidenceDiskStore {
             Err(error) => return Err(format!("failed to inspect final generation path: {error}")),
         }
         sync_directory(&generations)?;
+        // Read back and independently verify staged bytes before making them current.
+        self.read_generation(&pointer)?;
         if fault == Some(CommitFaultPoint::AfterGenerationPublish) {
             return Err("simulated interruption after generation publication; CURRENT remains unchanged".into());
         }
@@ -237,7 +239,10 @@ impl EvidenceDiskStore {
         pointer_file.persist(self.root.join(CURRENT_FILE))
             .map_err(|error| format!("failed to atomically publish CURRENT pointer: {error.error}"))?;
         if fault == Some(CommitFaultPoint::AfterCurrentPublish) {
-            return Err("simulated interruption after CURRENT rename but before directory sync; outcome may be ambiguous after power loss".into());
+            // Preserve the lock file to model process death: normal Drop cleanup
+            // would itself fsync the root and invalidate this test boundary.
+            std::mem::forget(_process);
+            return Err("simulated interruption after CURRENT rename but before directory sync; lock remains and durability is ambiguous".into());
         }
         sync_directory(&self.root)?;
         Ok(generation)
