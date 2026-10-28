@@ -2,7 +2,7 @@
 
 **Workstream:** CASTING-0032 ([issue #8789](https://github.com/Luminous-Dynamics/symthaea/issues/8789))  
 **Parent context:** [CASTING-0031 / PR #8777](https://github.com/Luminous-Dynamics/symthaea/pull/8777)  
-**Status:** research contract; no implemented acquisition policy or comparative performance result is claimed  
+**Status:** research contract plus a deterministic non-probabilistic gate; no calibrated VOI policy or comparative performance result is claimed  
 **Evidence classes:** synthetic, public analytic benchmark, engineering simulator, and physical manufacturing remain separate
 
 ## 1. Research question
@@ -204,6 +204,12 @@ Check that a recommendation does not become safer merely by excluding difficult 
 - Metal casting AI/digital twin review (2026), reproducibility/UQ/generalization gaps: https://doi.org/10.1007/s43939-026-00685-5.
 - MAGMASOFT autonomous casting optimization is an existing industrial baseline, including multi-objective optimization and robust process windows: https://www.magmasoft.com/en/solutions/magmasoft/.
 
-## 13. Claim ceiling
+## 13. First executable slice (2026-10-28)
+
+The first deterministic policy gate is implemented in `tools/casting-benchmark/decision_value_gate.py`, with known-answer and hostile-input tests in `tools/casting-benchmark/test_decision_value_gate.py`. The gate ranks permitted actions by caller-supplied decision-loss-reduction proxy divided by explicit marginal cost. When a risk gate is unresolved, it only admits actions meeting a positive predeclared normalized risk-reduction proxy; when none is available within budget, it abstains instead of silently declaring a safe design. It also supports explicit replication and escalation actions, deterministic tie-breaking, and a cost reservation in the returned decision receipt.
+
+This is a small decision gate, **not** a trained optimizer, calibrated probability model, full append-only outcome ledger, or measured value-of-information acquisition policy. A caller must ensure its proxy inputs derive only from information visible at decision time. The configured risk-reduction proxy is not a probability or physical risk bound. The unit test file is wired into the focused CI job; source/test execution results must be tied to the current exact head SHA.
+
+## 14. Claim ceiling
 
 This contract does not establish that a decision-value acquisition rule is novel, that the code is implemented, that a benchmark target has been met, or that a physical casting is safe. Synthetic known-answer success validates tested semantics only. Any physical claim requires independently traceable measurements, quantified uncertainty, simulator-to-physical discrepancy evidence and relevant process qualification.
