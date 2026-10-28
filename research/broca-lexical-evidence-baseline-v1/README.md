@@ -6,10 +6,12 @@ This branch is stacked on [PR #8682](https://github.com/Luminous-Dynamics/symtha
 
 ## What this increment adds
 
-- `EvidenceRecord.source_pointer` binds an item to the exact string in the canonical trajectory JSON, not merely to a digest of the whole source object.
+- `EvidenceRecord.source_pointer` binds an item to the exact string in the canonical trajectory JSON, not merely to a digest of the whole source object. The batch verifier parses source JSON once and validates each pointer before committing any record.
 - `EvidenceIndex::insert_batch_atomic` validates every record and pointer before any mutation, so a malformed final record cannot leave half a trajectory indexed.
 - `EvidenceIndex::search_bm25` provides deterministic, model-free BM25 retrieval over active text evidence, after scope/time/lifecycle and payload-digest checks.
 - The `broca-lme-worker` binary accepts bounded JSONL requests, supports one pinned `web` or `enterprise` scope per process, ingests official-style trajectory objects, and returns reader context plus a separate provenance/score audit.
+- `broca_rust_memory.py` is the thin Python `Memory` adapter for the official harness. It checks request IDs, response shapes, timeouts, line bounds and worker binary SHA-256; the retrieval/ranking remains in Rust. Its save/load journal hashes and replays the exact trajectory set into the pinned worker binary.
+- `install_longmemeval_adapter.py` installs the adapter into a clean, explicitly pinned upstream checkout, with dry-run behavior by default.
 - The worker excludes root-level `outcome`, question IDs, question text, answer fields, screenshots and evaluator metadata from ingestion. It deliberately does not claim visual understanding or semantic embeddings.
 
 ## Build and focused tests
@@ -23,6 +25,33 @@ cargo run --locked -p symthaea-broca --bin broca-lme-worker
 ```
 
 The environment used to author this change has no `cargo` or `rustc`. These commands are the verification gate; test functions present in source are **authored, not passed**.
+
+## Install the official harness adapter
+
+The installer defaults to the current verified LongMemEval-V2 upstream commit `2cc8c540bdb87fe6761629b585e727e1c4704520`. It refuses a different or dirty checkout rather than guessing that upstream APIs are compatible. From the Symthaea repository:
+
+```sh
+python3 research/broca-lexical-evidence-baseline-v1/install_longmemeval_adapter.py \\
+  --upstream /path/to/LongMemEval-V2
+# Inspect the plan, then explicitly apply:
+python3 research/broca-lexical-evidence-baseline-v1/install_longmemeval_adapter.py \\
+  --upstream /path/to/LongMemEval-V2 --apply
+```
+
+The installer adds a `broca_rust` method to upstream `evaluation/run_eval.py`, registers the adapter, and records the worker path/scope/BM25 settings in its generated memory config. It modifies only the selected local checkout; it does not open a PR against the upstream benchmark repository.
+
+After building the worker, run one official domain per invocation, for example:
+
+```sh
+python evaluation/run_eval.py --method broca_rust --data-root "$DATA_ROOT" \\
+  --domain web --tier small --output-dir runs/broca_rust_web_small \\
+  --broca-worker /absolute/path/to/broca-lme-worker
+python evaluation/run_eval.py --method broca_rust --data-root "$DATA_ROOT" \\
+  --domain enterprise --tier small --output-dir runs/broca_rust_enterprise_small \\
+  --broca-worker /absolute/path/to/broca-lme-worker
+```
+
+Use identical reader/evaluator/model parameters across arms. This is still a text-only BM25 baseline, not the future semantic/HDC Broca arm.
 
 ## JSONL protocol
 
