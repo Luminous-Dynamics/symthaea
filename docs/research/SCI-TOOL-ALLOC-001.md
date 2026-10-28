@@ -9,7 +9,7 @@
 
 Does choosing *when and which scientific-reasoning tools to use* improve independently validated law discovery, or can additional tools push a discovery agent into premature exploitation, amplify early mistakes, and consume resources without improving the final scientific result?
 
-The benchmark tests this rather than presuming that tools help or hurt. It specifically separates the effect of a tool being available from the effect of a policy choosing to use it.
+The benchmark tests this rather than presuming that tools help or hurt. It specifically separates the effect of a tool being available from the effect of a policy choosing to use it. It also tests capability-conditioned tool effects: the same strategy may help a capable model and harm a weaker one, so pooled averages alone are insufficient.
 
 ## 2. Why this deserves a distinct track
 
@@ -19,6 +19,7 @@ NewtonBench evaluates interactive scientific law discovery over 324 tasks across
 - NewtonBench public repository: https://github.com/HKUST-KnowComp/NewtonBench
 - CoSR progressive law discovery, accepted 6 October 2026: https://doi.org/10.1103/f2kp-pp4q
 - Science-Gym, data collection + experiment design + equation discovery: https://doi.org/10.1007/s10994-025-06914-x
+- **AgentIdeaBench** (released September 2026) compares active versus static literature access across 33 matched models and 40 subfields. Its reported tool effect varies with baseline capability, with weaker-model groups losing and stronger groups gaining. This is adjacent scientific-ideation evidence—not a law-discovery result or a substitute for NewtonBench: https://github.com/HKUST-KnowComp/AgentIdeaBench
 - 2026 symbolic-regression survey: https://doi.org/10.1007/s11831-026-10681-w
 
 The contribution is not another scientific evaluator or tool-use framework. It is a controlled application of prospective metareasoning to a task where tool effects can be measured against independently known answers.
@@ -58,6 +59,12 @@ The initial panel should include:
 9. a null family in which adaptive scheduling should not outperform a simple static policy.
 
 Stratify and report law complexity, system complexity, observation noise, and early-evidence ambiguity separately. Keep final holdout worlds hidden from candidate ranking, tool selection, policy tuning, and stopping.
+
+### Pre-treatment model-capability blocking factor
+
+Where several models or model versions can be tested, measure each one's capability on a separate **tool-free calibration set** before treatment outcomes are inspected. Freeze the calibration tasks, score and capability-tier cutpoints in advance. Do not define tiers from the same tasks used to estimate tool effects, and do not use post-treatment outcomes to decide which tier a model belongs to.
+
+For each model, pair no-tool and tool-allocation policies on the same held-out task/seed cells. Report effects by preregistered capability tier as well as pooled effects. A pooled positive average must not hide a negative effect for a weaker tier. With only one model, make no cross-model capability-interaction claim.
 
 ## 5. Policy and tool information boundaries
 
@@ -145,6 +152,8 @@ Maintain identical upstream state until the intervention point when deterministi
 - Experiment selection quality, separately from compute/tool allocation.
 - Number of tool calls by type, candidate attempts, context/token use, time, memory and failures.
 - Performance by law complexity × system complexity × noise × early ambiguity.
+- Tool-treatment effect by pre-treatment, tool-free capability tier, with per-tier denominators and paired uncertainty intervals.
+- Model-capability × tool-policy interaction; report treatment-effect heterogeneity rather than assuming a universal benefit.
 - Run-to-run variance, missing outputs, invalid actions, unresolved and not-evaluable rates.
 
 Do not collapse these into one weighted score. Publish per-stratum results and the Pareto frontier for validated recovery, false confidence, unresolved behavior, and total cost.
