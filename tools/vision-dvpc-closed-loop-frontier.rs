@@ -798,7 +798,7 @@ fn simulate(
                 let gate = evaluate_policy_gate(policy, &selected, oracle);
                 false_authorization = gate.status != GateStatus::Authorized;
                 false_safe_authorization = gate.status == GateStatus::Authorized
-                    && (outcome.target_truth_risk_ppm as f64 / PPM >= RISK_CAP
+                    && (outcome.target_truth_risk_ppm as f64 / PPM > RISK_CAP
                         || outcome.target_truth_value_mean_milli as f64 <= VALUE_FLOOR_MILLI);
                 budget_overrun = actual_cost_units > budget;
             }
@@ -843,7 +843,7 @@ fn simulate(
                 let gate_after = evaluate_policy_gate(policy, &selected, oracle);
                 false_authorization = gate_after.status != GateStatus::Authorized;
                 false_safe_authorization = gate_after.status == GateStatus::Authorized
-                    && (outcome.target_truth_risk_ppm as f64 / PPM >= RISK_CAP
+                    && (outcome.target_truth_risk_ppm as f64 / PPM > RISK_CAP
                         || outcome.target_truth_value_mean_milli as f64 <= VALUE_FLOOR_MILLI);
                 budget_overrun = actual_cost_units > budget;
                 break;
@@ -975,7 +975,7 @@ mod tests {
     }
 
     #[test]
-    fn naive_peeking_witness_false_certifies_the_null_boundary() {
+    fn naive_peeking_witness_false_certifies_an_unsafe_risk_rate() {
         let (actions, oracle) = fixture();
         let candidates: Vec<Action> = actions.iter().filter(|a| a.campaign_id == "C13-repeated-look").cloned().collect();
         let safe_control = simulate("C13-repeated-look", Policy::HighestUncertainty, &candidates, &oracle);
