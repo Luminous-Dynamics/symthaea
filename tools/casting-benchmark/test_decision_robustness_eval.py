@@ -4,7 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 import unittest
+from pathlib import Path
 
+import decision_robustness_eval as evaluator
 from decision_robustness_eval import BENCHMARK_ID, score_document, validate_document
 
 
@@ -106,6 +108,13 @@ class DecisionRobustnessTests(unittest.TestCase):
         doc["holdout_shifts"][0]["evaluations"][0]["objectives"] = [1.2, 0.5]
         with self.assertRaisesRegex(ValueError, "reference_point"):
             validate_document(doc)
+
+    def test_receipt_binds_evaluator_source_bytes(self) -> None:
+        receipt = self.score()
+        source_bytes = Path(evaluator.__file__).resolve().read_bytes()
+        self.assertEqual(
+            receipt["evaluator_source_sha256"], hashlib.sha256(source_bytes).hexdigest()
+        )
 
     def test_no_feasible_pool_reference_is_not_misreported_as_zero_regret(self) -> None:
         doc = fixture()
