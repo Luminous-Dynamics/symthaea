@@ -145,12 +145,18 @@ class ReferenceReplayTests(unittest.TestCase):
         )
         self.assertFalse(oracle["identifiability_witness"]["challenge_x_is_observed"])
         self.assertNotEqual(alternative["coefficient"], 0.0)
-        # Product perturbation is exactly zero at every observed root by construction.
+        # Product perturbation is zero at every observed root, but nonzero at
+        # the declared challenge point outside the finite observed domain.
         for row in observations:
             product = 1.0
             for root in roots:
                 product *= row["x"] - root
             self.assertEqual(product, 0.0)
+        challenge = oracle["identifiability_witness"]["challenge_x_outside_observed_range"]
+        challenge_product = 1.0
+        for root in roots:
+            challenge_product *= challenge - root
+        self.assertNotEqual(challenge_product, 0.0)
 
     def test_task_generation_domain_and_field_separation(self) -> None:
         first = rr.seed_word(SEED_A, "g", "f", 0, "slope")
