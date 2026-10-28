@@ -34,6 +34,10 @@ pub enum RadiusCalibrationError {
     CountTotalOverflow,
     ZeroCalibrationEpisodes,
     InvalidFailureProbability { failure_probability_ppm: u32 },
+    EmptyRegimeSet,
+    EmptyRegimeId,
+    DuplicateRegimeId { regime_id: String },
+    FailureProbabilityTooSmallForRegimeCount { failure_probability_ppm: u32, regime_count: usize },
     ArithmeticOverflow,
 }
 
@@ -173,6 +177,109 @@ fn div_ceil_nonnegative(
         .checked_add(denominator - 1)
         .ok_or(RadiusCalibrationError::ArithmeticOverflow)?;
     Ok(adjusted / denominator)
+}
+
+
+/// A regime-specific calibration set, e.g. a weather/airport cohort or season.
+/// Frequencies must count complete event episodes, not duplicated flight rows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegimeCalibration {
+    pub regime_id: String,
+    pub frequencies: Vec<CalibrationFrequency>,
+}
+
+/// Calibration result for one declared regime.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RegimeRadiusCalibration {
+    pub regime_id: String,
+    pub report: TvRadiusCalibrationReport,
+}
+
+/// A simultaneous conservative radius envelope over several regimes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TvRadiusEnvelopeReport {
+    pub regime_count: usize,
+    pub requested_family_failure_probability_ppm: u32,
+    /// Integer Bonferroni allocation; each regime receives this delta, so total
+    /// allocated failure probability is no greater than the requested delta.
+    pub per_regime_failure_probability_ppm: u32,
+    /// Maximum regime-specific radius; use this as a single radius if one global
+    /// ambiguity radius must cover every supplied regime.
+    pub maximum_required_tv_radius_ppm: u32,
+    pub any_regime_capped_at_maximum_radius: bool,
+    /// Sorted by regime ID for deterministic manifests.
+    pub regimes: Vec<RegimeRadiusCalibration>,
+}
+
+/// Calibrate a common TV radius over several heterogeneous calibration regimes.
+///
+/// The overall failure probability is divided by the regime count using integer
+/// floor division (Bonferroni); any remainder is left unused to preserve the
+/// family-wise bound. The returned common radius is the maximum of per-regime
+/// radii. This does not cover arbitrary unseen regimes or omitted categories.
+/// Each regime still requires independent samples from one fixed distribution.
+pub fn calibrate_tv_radius_envelope(
+    regimes: &[RegimeCalibration],
+    family_failure_probability_ppm: u32,
+) -> Result<TvRadiusEnvelopeReport, RadiusCalibrationError> {
+    if regimes.is_empty() {
+        return Err(RadiusCalibrationError::EmptyRegimeSet);
+    }
+    if family_failure_probability_ppm == 0
+        || family_failure_probability_ppm >= PROBABILITY_SCALE_PPM
+    {
+        return Err(RadiusCalibrationError::InvalidFailureProbability {
+            failure_probability_ppm: family_failure_probability_ppm,
+        });
+    }
+
+    let regime_count = regimes.len();
+    let per_regime_delta = family_failure_probability_ppm / regime_count as u32;
+    if per_regime_delta == 0 {
+        return Err(RadiusCalibrationError::FailureProbabilityTooSmallForRegimeCount {
+            failure_probability_ppm: family_failure_probability_ppm,
+            regime_count,
+        });
+    }
+
+    let mut ids = BTreeSet::new();
+    for regime in regimes {
+        if regime.regime_id.trim().is_empty() {
+            return Err(RadiusCalibrationError::EmptyRegimeId);
+        }
+        if !ids.insert(regime.regime_id.as_str()) {
+            return Err(RadiusCalibrationError::DuplicateRegimeId {
+                regime_id: regime.regime_id.clone(),
+            });
+        }
+    }
+
+    let mut ordered: Vec<&RegimeCalibration> = regimes.iter().collect();
+    ordered.sort_by(|a, b| a.regime_id.cmp(&b.regime_id));
+
+    let mut calibrated = Vec::with_capacity(regime_count);
+    let mut maximum_required_tv_radius_ppm = 0;
+    let mut any_regime_capped_at_maximum_radius = false;
+
+    for regime in ordered {
+        let report = calibrate_tv_radius(&regime.frequencies, per_regime_delta)?;
+        maximum_required_tv_radius_ppm =
+            maximum_required_tv_radius_ppm.max(report.required_tv_radius_ppm);
+        any_regime_capped_at_maximum_radius |= report.capped_at_maximum_radius;
+        calibrated.push(RegimeRadiusCalibration {
+            regime_id: regime.regime_id.clone(),
+            report,
+        });
+    }
+
+    Ok(TvRadiusEnvelopeReport {
+        regime_count,
+        requested_family_failure_probability_ppm: family_failure_probability_ppm,
+        per_regime_failure_probability_ppm: per_regime_delta,
+        maximum_required_tv_radius_ppm,
+        any_regime_capped_at_maximum_radius,
+        regimes: calibrated,
+    })
 }
 
 #[cfg(test)]
@@ -330,4 +437,89 @@ mod tests {
         let report = calibrate_tv_radius(&items, 50_000).unwrap();
         assert_eq!(report.empirical_tv_distance_ppm, 1);
     }
+
+    fn regime_fixture(id: &str, counts: [u64; 3]) -> RegimeCalibration {
+        RegimeCalibration {
+            regime_id: id.into(),
+            frequencies: vec![
+                CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: counts[0] },
+                CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: counts[1] },
+                CalibrationFrequency { scenario_id: "weather".into(), nominal_probability_ppm: 100_000, observed_count: counts[2] },
+            ],
+        }
+    }
+
+    #[test]
+    fn regime_envelope_uses_maximum_radius_with_bonferroni_budget() {
+        let regimes = [
+            regime_fixture("calm", [60, 30, 10]),
+            regime_fixture("disrupted", [40, 30, 30]),
+        ];
+        let report = calibrate_tv_radius_envelope(&regimes, 50_000).unwrap();
+        assert_eq!(report.regime_count, 2);
+        assert_eq!(report.per_regime_failure_probability_ppm, 25_000);
+        assert_eq!(report.regimes[0].regime_id, "calm");
+        assert_eq!(report.regimes[1].regime_id, "disrupted");
+        assert_eq!(
+            report.maximum_required_tv_radius_ppm,
+            report.regimes.iter().map(|r| r.report.required_tv_radius_ppm).max().unwrap()
+        );
+        assert!(
+            report.regimes[1].report.empirical_tv_distance_ppm
+                > report.regimes[0].report.empirical_tv_distance_ppm
+        );
+    }
+
+    #[test]
+    fn regime_envelope_is_order_invariant() {
+        let a = vec![regime_fixture("winter", [40, 30, 30]), regime_fixture("summer", [60, 30, 10])];
+        let mut b = a.clone();
+        b.reverse();
+        assert_eq!(
+            calibrate_tv_radius_envelope(&a, 50_000).unwrap(),
+            calibrate_tv_radius_envelope(&b, 50_000).unwrap()
+        );
+    }
+
+    #[test]
+    fn regime_envelope_rejects_empty_duplicate_and_blank_regime_ids() {
+        assert_eq!(
+            calibrate_tv_radius_envelope(&[], 50_000),
+            Err(RadiusCalibrationError::EmptyRegimeSet)
+        );
+        let duplicate = vec![regime_fixture("same", [60, 30, 10]), regime_fixture("same", [60, 30, 10])];
+        assert!(matches!(
+            calibrate_tv_radius_envelope(&duplicate, 50_000),
+            Err(RadiusCalibrationError::DuplicateRegimeId { .. })
+        ));
+        let blank = vec![regime_fixture(" ", [60, 30, 10])];
+        assert_eq!(
+            calibrate_tv_radius_envelope(&blank, 50_000),
+            Err(RadiusCalibrationError::EmptyRegimeId)
+        );
+    }
+
+    #[test]
+    fn regime_envelope_fails_if_family_delta_cannot_be_allocated() {
+        let regimes = vec![
+            regime_fixture("a", [60, 30, 10]),
+            regime_fixture("b", [60, 30, 10]),
+        ];
+        assert!(matches!(
+            calibrate_tv_radius_envelope(&regimes, 1),
+            Err(RadiusCalibrationError::FailureProbabilityTooSmallForRegimeCount { .. })
+        ));
+    }
+
+    #[test]
+    fn envelope_propagates_invalid_regime_frequency_data() {
+        let mut bad = regime_fixture("bad", [60, 30, 10]);
+        bad.frequencies[0].nominal_probability_ppm = 1;
+        assert!(matches!(
+            calibrate_tv_radius_envelope(&[bad], 50_000),
+            Err(RadiusCalibrationError::NominalProbabilityMassMismatch { .. })
+        ));
+    }
+
+
 }
