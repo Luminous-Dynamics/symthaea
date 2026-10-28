@@ -67,9 +67,9 @@ pub struct LongMemEvalTrajectory {
 #[serde(deny_unknown_fields)]
 pub struct LongMemEvalState {
     pub state_index: u64,
-    pub step: Option<Value>,
+    pub step: Option<u64>,
     pub url: String,
-    pub action: Option<Value>,
+    pub action: Option<String>,
     pub thought: Option<String>,
     pub accessibility_tree: String,
     pub screenshot: String,
@@ -202,7 +202,11 @@ fn validate_trajectory(trajectory: &LongMemEvalTrajectory) -> Result<(), String>
         if state.screenshot.trim().is_empty() {
             return Err("state screenshot path must be non-empty".into());
         }
-        if Path::new(&state.screenshot)
+        let screenshot_path = Path::new(&state.screenshot);
+        if screenshot_path.is_absolute() || !screenshot_path.starts_with("screenshots") {
+            return Err("state screenshot path must be relative beneath screenshots/".into());
+        }
+        if screenshot_path
             .components()
             .any(|component| matches!(component, Component::ParentDir))
         {
@@ -321,16 +325,15 @@ fn render_state_evidence(
     output.push_str(&trajectory.start_url);
     output.push_str(&format!("\nState index: {}", state.state_index));
 
-    if let Some(step) = &state.step {
-        output.push_str("\nOriginal step: ");
-        output.push_str(&canonicalize_value(step.clone()).to_string());
+    if let Some(step) = state.step {
+        output.push_str(&format!("\nOriginal step: {step}"));
     }
     output.push_str("\nURL: ");
     output.push_str(&state.url);
     if let Some(action) = &state.action {
-        if !action.is_null() {
+        if !action.trim().is_empty() {
             output.push_str("\nAction: ");
-            output.push_str(&canonicalize_value(action.clone()).to_string());
+            output.push_str(action);
         }
     }
     if let Some(thought) = &state.thought {
@@ -374,7 +377,7 @@ mod tests {
                 "state_index": 0,
                 "step": 1,
                 "url": "https://shop.example/search",
-                "action": {"type": "click", "target": "search"},
+                "action": "click search",
                 "thought": "Search for the exact replacement part",
                 "accessibility_tree": "textbox Search; button Find",
                 "screenshot": "screenshots/traj-001/0.png"
@@ -415,9 +418,9 @@ mod tests {
 
     #[test]
     fn source_digest_and_ids_ignore_json_whitespace_and_object_key_order() {
-        let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":"https://example.test/","states":[{"state_index":0,"step":1,"url":"https://example.test","action":{"type":"click","target":"x"},"thought":"t","accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}]}"#;
+        let first = r#"{"id":"traj-order","domain":"web","environment":"e","goal":"g","outcome":"success","start_url":"https://example.test/","states":[{"state_index":0,"step":1,"url":"https://example.test","action":"click target x","thought":"t","accessibility_tree":"tree","screenshot":"screenshots/traj-order/0.png"}]}"#;
         let second = r#"{
-            "states":[{"screenshot":"screenshots/traj-order/0.png","accessibility_tree":"tree","thought":"t","action":{"target":"x","type":"click"},"url":"https://example.test","step":1,"state_index":0}],
+            "states":[{"screenshot":"screenshots/traj-order/0.png","accessibility_tree":"tree","thought":"t","action":"click target x","url":"https://example.test","step":1,"state_index":0}],
             "outcome":"success","goal":"g","environment":"e","domain":"web","start_url":"https://example.test/","id":"traj-order"
         }"#;
         let resolver = |_: &str, _: &str| Some("scope".to_string());
@@ -478,18 +481,15 @@ mod tests {
     }
 
     #[test]
-    fn action_payload_keys_are_not_misclassified_as_benchmark_metadata() {
+    fn action_text_may_contain_answer_without_being_evaluator_metadata() {
         let mut trajectory: Value = serde_json::from_str(&sample_line()).unwrap();
-        trajectory["states"][0]["action"] = serde_json::json!({
-            "type": "fill",
-            "field_name": "answer",
-            "value": "customer-provided trajectory input"
-        });
+        trajectory["states"][0]["action"] =
+            Value::String("fill a field labelled answer with supplied input".into());
         let records = ingest_longmemeval_v2_jsonl(
             [trajectory.to_string().into_bytes()],
             |_, _| Some("scope".to_string()),
         )
-        .expect("action payload fields are trajectory evidence, not gold metadata");
+        .expect("action text is trajectory data, not an evaluator key");
         assert_eq!(records.len(), 2);
     }
 
