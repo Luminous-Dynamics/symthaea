@@ -693,7 +693,7 @@ mod tests {
                     "sota_coverage_gate": {
                         "minimum_datasets": 7,
                         "minimum_seeds_per_dataset": 50,
-                        "meaning": "Coverage eligibility only, not a performance result or evidence of superiority. Actual comparator runs, uncertainty, and costs are still required."
+                        "meaning": "Coverage eligibility only, not a performance result and not evidence of superiority. Actual comparator runs, uncertainty, and costs are still required."
                     }
                 }
             },
