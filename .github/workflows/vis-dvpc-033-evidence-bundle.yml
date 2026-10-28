@@ -1,0 +1,146 @@
+name: VIS-DVPC-033 compositional evidence bundle
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-evidence-bundle.rs"
+      - "docs/research/VIS_DVPC_033_EVIDENCE_BUNDLE_V1.md"
+      - ".github/workflows/vis-dvpc-033-evidence-bundle.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-evidence-bundle.rs"
+      - "docs/research/VIS_DVPC_033_EVIDENCE_BUNDLE_V1.md"
+      - ".github/workflows/vis-dvpc-033-evidence-bundle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout bundle implementation
+        uses: actions/checkout@v4
+      - name: Checkout pinned VIS-DVPC-032 candidate universe source
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/symthaea
+          ref: 9f19817cf429c53ddac2cab8812aa430130b3f4a
+          path: component/dvpc032
+      - name: Checkout pinned VIS-DVPC-027 support audit source
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/symthaea
+          ref: 02c3458fb75c5fdcdeecb5333f4d8fdd1f8bfbc5
+          path: component/dvpc027
+      - name: Checkout pinned VIS-DVPC-028 exact OPE source
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/symthaea
+          ref: 19a03ae8510b29157a0d0ff5d5f124e88e4e24a8
+          path: component/dvpc028
+      - name: Checkout pinned VIS-DVPC-031 interval gate source
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/symthaea
+          ref: 6778c4818bff34e1cfb48fd1899dfe50b755a8e0
+          path: component/dvpc031
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Assert component snapshots are exactly pinned
+        run: |
+          test "$(git -C component/dvpc032 rev-parse HEAD)" = "9f19817cf429c53ddac2cab8812aa430130b3f4a"
+          test "$(git -C component/dvpc027 rev-parse HEAD)" = "02c3458fb75c5fdcdeecb5333f4d8fdd1f8bfbc5"
+          test "$(git -C component/dvpc028 rev-parse HEAD)" = "19a03ae8510b29157a0d0ff5d5f124e88e4e24a8"
+          test "$(git -C component/dvpc031 rev-parse HEAD)" = "6778c4818bff34e1cfb48fd1899dfe50b755a8e0"
+      - name: Verify pinned component fixture sums
+        run: |
+          (cd component/dvpc032 && sha256sum -c tests/fixtures/vision-dvpc-032.SHA256SUMS)
+          (cd component/dvpc027 && sha256sum -c tests/fixtures/vision-dvpc-027.SHA256SUMS)
+      - name: Build and run each component's tests
+        run: |
+          rustc --edition=2024 --test component/dvpc032/tools/vision-dvpc-universe-audit.rs -o /tmp/vis-dvpc-032-tests
+          /tmp/vis-dvpc-032-tests
+          rustc --edition=2024 --test component/dvpc027/tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027-tests
+          /tmp/vis-dvpc-027-tests
+          rustc --edition=2024 --test component/dvpc028/tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028-tests
+          /tmp/vis-dvpc-028-tests
+          rustc --edition=2024 --test component/dvpc031/tools/vision-dvpc-region-gate.rs -o /tmp/vis-dvpc-031-tests
+          /tmp/vis-dvpc-031-tests
+          rustc --edition=2024 --test tools/vision-dvpc-evidence-bundle.rs -o /tmp/vis-dvpc-033-tests
+          /tmp/vis-dvpc-033-tests
+      - name: Execute the actual component CLIs on frozen controls
+        run: |
+          mkdir -p /tmp/vis-dvpc-033
+          manifest="component/dvpc032/tests/fixtures/vision-dvpc-032-manifest.tsv"
+          trace="component/dvpc032/tests/fixtures/vision-dvpc-032-complete-trace.tsv"
+          manifest_sha="$(sha256sum "$manifest" | cut -d ' ' -f1)"
+          trace_sha="$(sha256sum "$trace" | cut -d ' ' -f1)"
+
+          rustc --edition=2024 -O component/dvpc032/tools/vision-dvpc-universe-audit.rs -o /tmp/vis-dvpc-032
+          /tmp/vis-dvpc-032 --verify "$manifest" "$trace" "$manifest_sha" "$trace_sha" > /tmp/vis-dvpc-033/universe.tsv
+
+          rustc --edition=2024 -O component/dvpc027/tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027
+          /tmp/vis-dvpc-027 --audit "$trace" "$trace_sha" > /tmp/vis-dvpc-033/support.tsv
+
+          rustc --edition=2024 -O component/dvpc028/tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028
+          /tmp/vis-dvpc-028 --sweep > /tmp/vis-dvpc-033/ope.tsv
+          test "$(grep -c '^METRIC[[:space:]]' /tmp/vis-dvpc-033/ope.tsv)" = "210"
+
+          rustc --edition=2024 -O component/dvpc031/tools/vision-dvpc-region-gate.rs -o /tmp/vis-dvpc-031
+          printf '%s\n' '--evaluate 0.1 0.6 0.01 0.03 0.5 0.05' > /tmp/vis-dvpc-033/gate-invocation.txt
+          /tmp/vis-dvpc-031 --evaluate 0.1 0.6 0.01 0.03 0.5 0.05 > /tmp/vis-dvpc-033/gate.tsv
+
+          rustc --edition=2024 -O tools/vision-dvpc-evidence-bundle.rs -o /tmp/vis-dvpc-033
+          /tmp/vis-dvpc-033 --audit /tmp/vis-dvpc-033/universe.tsv /tmp/vis-dvpc-033/support.tsv /tmp/vis-dvpc-033/ope.tsv /tmp/vis-dvpc-033/gate.tsv > /tmp/vis-dvpc-033/bundle.tsv
+
+          grep -Fq $'SUMMARY\tverdict\tCOMPLETE_ACTION_UNIVERSE' /tmp/vis-dvpc-033/universe.tsv
+          grep -Fq $'SUMMARY\tstatus\tSUPPORTED_BUT_WEAK_OVERLAP' /tmp/vis-dvpc-033/support.tsv
+          grep -Fq $'SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED' /tmp/vis-dvpc-033/ope.tsv
+          grep -Fq $'SUMMARY\tdecision\tINSUFFICIENT_EVIDENCE' /tmp/vis-dvpc-033/gate.tsv
+          grep -Fq $'SUMMARY\tstatus\tDIAGNOSTIC_ONLY' /tmp/vis-dvpc-033/bundle.tsv
+          test "$(grep -c '^CHECK[[:space:]]' /tmp/vis-dvpc-033/bundle.tsv)" = "10"
+          grep -Fq $'PROHIBITION\tautomatic_policy_authorization\ttrue' /tmp/vis-dvpc-033/bundle.tsv
+      - name: Create reproducibility and provenance receipt
+        run: |
+          {
+            printf 'VIS_DVPC_033_RECEIPT\tformat\tv1\n'
+            printf 'bundle_source_commit\t%s\n' "$(git rev-parse HEAD)"
+            printf 'workflow_commit\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            printf 'dvpc032_commit\t%s\n' "$(git -C component/dvpc032 rev-parse HEAD)"
+            printf 'dvpc027_commit\t%s\n' "$(git -C component/dvpc027 rev-parse HEAD)"
+            printf 'dvpc028_commit\t%s\n' "$(git -C component/dvpc028 rev-parse HEAD)"
+            printf 'dvpc031_commit\t%s\n' "$(git -C component/dvpc031 rev-parse HEAD)"
+            sha256sum \
+              tools/vision-dvpc-evidence-bundle.rs \
+              docs/research/VIS_DVPC_033_EVIDENCE_BUNDLE_V1.md \
+              component/dvpc032/tools/vision-dvpc-universe-audit.rs \
+              component/dvpc032/tests/fixtures/vision-dvpc-032.SHA256SUMS \
+              component/dvpc032/tests/fixtures/vision-dvpc-032-manifest.tsv \
+              component/dvpc032/tests/fixtures/vision-dvpc-032-complete-trace.tsv \
+              component/dvpc027/tools/vision-dvpc-support-audit.rs \
+              component/dvpc027/tests/fixtures/vision-dvpc-027.SHA256SUMS \
+              component/dvpc028/tools/vision-dvpc-ope-exact.rs \
+              component/dvpc028/tests/fixtures/vision-dvpc-028-scenarios.tsv \
+              component/dvpc031/tools/vision-dvpc-region-gate.rs \
+              /tmp/vis-dvpc-033/gate-invocation.txt \
+              /tmp/vis-dvpc-033/universe.tsv \
+              /tmp/vis-dvpc-033/support.tsv \
+              /tmp/vis-dvpc-033/ope.tsv \
+              /tmp/vis-dvpc-033/gate.tsv \
+              /tmp/vis-dvpc-033/bundle.tsv
+          } > /tmp/vis-dvpc-033-receipt.tsv
+          cat /tmp/vis-dvpc-033-receipt.tsv
+      - name: Publish end-to-end reports and hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-033-evidence-bundle
+          path: |
+            /tmp/vis-dvpc-033/*.tsv
+            /tmp/vis-dvpc-033/gate-invocation.txt
+            /tmp/vis-dvpc-033-receipt.tsv
+          retention-days: 90
