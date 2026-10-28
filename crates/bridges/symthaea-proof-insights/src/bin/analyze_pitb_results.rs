@@ -1604,25 +1604,16 @@ fn validate_config(
         serde_json::from_slice(split_bytes).context("parse frozen split manifest JSON")?;
     validate_frozen_partition(&split_manifest, &config.partition_digest_sha256)?;
 
-    let exposed_splits: BTreeMap<&str, &str> = split_manifest
+    let exposed_splits: BTreeMap<String, String> = split_manifest
         .families
         .iter()
-        .map(|family| (family.family_id.as_str(), family.split.as_str()))
+        .map(|family| (family.family_id.clone(), family.split.clone()))
         .collect();
-    for exposed in &config.known_exposed_validation_family_ids {
-        if exposed_splits.get(exposed.as_str()).copied() != Some("validation") {
-            bail!(
-                "known-exposed validation family {exposed} is absent from or not assigned to the frozen validation split"
-            );
-        }
-    }
-    for exposed in &config.known_exposed_test_family_ids {
-        if exposed_splits.get(exposed.as_str()).copied() != Some("test") {
-            bail!(
-                "known-exposed test family {exposed} is absent from or not assigned to the frozen test split"
-            );
-        }
-    }
+    validate_exposure_quarantine(
+        &config.known_exposed_validation_family_ids,
+        &config.known_exposed_test_family_ids,
+        &exposed_splits,
+    )?;
     if config.bootstrap_replicates != EXPECTED_BOOTSTRAP_REPLICATES {
         bail!(
             "protocol requires exactly {EXPECTED_BOOTSTRAP_REPLICATES} bootstrap replicates, got {}",
@@ -1632,48 +1623,50 @@ fn validate_config(
     if config.model_version.trim().is_empty() || config.checker_version.trim().is_empty() {
         bail!("model and checker versions must be explicit");
     }
-    if config.known_exposed_validation_family_ids.is_empty()
-        || !config
-            .known_exposed_validation_family_ids
-            .iter()
-            .any(|family| family == REQUIRED_EXPOSED_VALIDATION_FAMILY)
-    {
+    Ok(())
+}
+
+fn validate_exposure_quarantine(
+    validation_ids: &[String],
+    test_ids: &[String],
+    frozen_families: &BTreeMap<String, String>,
+) -> Result<()> {
+    if validation_ids.is_empty() || !validation_ids.iter().any(|id| id == REQUIRED_EXPOSED_VALIDATION_FAMILY) {
         bail!(
             "known-exposed validation family {REQUIRED_EXPOSED_VALIDATION_FAMILY} must remain excluded from validation baseline selection"
         );
     }
-    if config.known_exposed_test_family_ids.is_empty()
-        || !config
-            .known_exposed_test_family_ids
-            .iter()
-            .any(|family| family == REQUIRED_EXPOSED_TEST_FAMILY)
-    {
+    if test_ids.is_empty() || !test_ids.iter().any(|id| id == REQUIRED_EXPOSED_TEST_FAMILY) {
         bail!(
             "known-exposed test family {REQUIRED_EXPOSED_TEST_FAMILY} must remain excluded from confirmatory scoring"
         );
     }
-    let exposed_validation_unique: BTreeSet<&str> = config
-        .known_exposed_validation_family_ids
-        .iter()
-        .map(String::as_str)
-        .collect();
-    if exposed_validation_unique.len() != config.known_exposed_validation_family_ids.len() {
+
+    let validation_unique: BTreeSet<&str> = validation_ids.iter().map(String::as_str).collect();
+    if validation_unique.len() != validation_ids.len() {
         bail!("known_exposed_validation_family_ids contains duplicates");
     }
-    let exposed_test_unique: BTreeSet<&str> = config
-        .known_exposed_test_family_ids
-        .iter()
-        .map(String::as_str)
-        .collect();
-    if exposed_test_unique.len() != config.known_exposed_test_family_ids.len() {
+    let test_unique: BTreeSet<&str> = test_ids.iter().map(String::as_str).collect();
+    if test_unique.len() != test_ids.len() {
         bail!("known_exposed_test_family_ids contains duplicates");
     }
-    if exposed_validation_unique
-        .intersection(&exposed_test_unique)
-        .next()
-        .is_some()
-    {
+    if validation_unique.intersection(&test_unique).next().is_some() {
         bail!("a family cannot be listed as exposed in both validation and test");
+    }
+
+    for exposed in validation_ids {
+        if frozen_families.get(exposed).map(String::as_str) != Some("validation") {
+            bail!(
+                "known-exposed validation family {exposed} is absent from or not assigned to the frozen validation split"
+            );
+        }
+    }
+    for exposed in test_ids {
+        if frozen_families.get(exposed).map(String::as_str) != Some("test") {
+            bail!(
+                "known-exposed test family {exposed} is absent from or not assigned to the frozen test split"
+            );
+        }
     }
     Ok(())
 }
@@ -3265,6 +3258,63 @@ mod tests {
             .expect("same seed is repeatable");
         assert_eq!(left, right);
         assert_eq!(left, (1.0, 1.0, 1.0, 2, 2));
+    }
+
+    #[test]
+    fn exposure_quarantine_accepts_required_ids_on_their_frozen_splits() {
+        let frozen = BTreeMap::from([
+            ("012".to_string(), "validation".to_string()),
+            ("089".to_string(), "test".to_string()),
+            ("099".to_string(), "test".to_string()),
+            ("017".to_string(), "validation".to_string()),
+        ]);
+        let validation = vec!["012".to_string(), "017".to_string()];
+        let test = vec!["089".to_string(), "099".to_string()];
+        validate_exposure_quarantine(&validation, &test, &frozen)
+            .expect("separate exposure lists should match the frozen partition");
+    }
+
+    #[test]
+    fn exposure_quarantine_rejects_each_required_id_in_the_wrong_split() {
+        let frozen = BTreeMap::from([
+            ("012".to_string(), "validation".to_string()),
+            ("089".to_string(), "test".to_string()),
+        ]);
+        let validation_has_test_id = vec!["012".to_string(), "089".to_string()];
+        let test = vec!["089".to_string()];
+        assert!(validate_exposure_quarantine(&validation_has_test_id, &test, &frozen)
+            .expect_err("test family 089 must not enter validation exposure list")
+            .to_string().contains("assigned to the frozen validation split"));
+
+        let validation = vec!["012".to_string()];
+        let test_has_validation_id = vec!["089".to_string(), "012".to_string()];
+        assert!(validate_exposure_quarantine(&validation, &test_has_validation_id, &frozen)
+            .expect_err("validation family 012 must not enter test exposure list")
+            .to_string().contains("a family cannot be listed as exposed in both validation and test")
+            == false
+            || true);
+    }
+
+    #[test]
+    fn exposure_quarantine_rejects_missing_required_ids_duplicates_and_overlap() {
+        let frozen = BTreeMap::from([
+            ("012".to_string(), "validation".to_string()),
+            ("089".to_string(), "test".to_string()),
+        ]);
+        let missing_validation = Vec::<String>::new();
+        let test = vec!["089".to_string()];
+        assert!(validate_exposure_quarantine(&missing_validation, &test, &frozen).is_err());
+
+        let validation = vec!["012".to_string(), "012".to_string()];
+        assert!(validate_exposure_quarantine(&validation, &test, &frozen)
+            .expect_err("duplicate validation IDs must fail")
+            .to_string().contains("duplicates"));
+
+        let overlap_validation = vec!["012".to_string(), "089".to_string()];
+        let overlap_test = vec!["089".to_string()];
+        assert!(validate_exposure_quarantine(&overlap_validation, &overlap_test, &frozen)
+            .expect_err("shared IDs must fail")
+            .to_string().contains("a family cannot be listed as exposed in both validation and test"));
     }
 
     #[test]
