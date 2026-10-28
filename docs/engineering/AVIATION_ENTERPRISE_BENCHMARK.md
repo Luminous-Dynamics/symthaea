@@ -331,3 +331,12 @@ The new [ADRG-001 readiness gate](./AVIATION_DECISION_READINESS_GATE.md) compose
 Fifteen unit tests and four additional public-API integration tests are defined for the composition gate, but remain uncompiled. This API trusts the reports it receives; actual integration requires trusted verifier outputs and cryptographically bound run receipts.
 
 Follow-up: [AVIATION-ENTERPRISE-012 #8798](https://github.com/Luminous-Dynamics/symthaea/issues/8798).
+
+
+## Exhaustive readiness fault matrix and report-bound freshness (29 October 2026)
+
+The readiness API no longer accepts a caller-supplied `latest_monitor_observation_epoch_seconds`. It derives observation presence and age from the drift report's own `observations_seen`, `last_event_id` and `last_event_time_epoch_seconds`. This eliminates the specific mismatch where a stale monitor report could be paired with a separate, fresh timestamp. The gate still trusts the provided report object; trusted run-manifest/verifier binding is future work.
+
+A new Cartesian unit test in `aviation_decision_readiness.rs` checks **19,440 combinations** across feature audit state, split state, plan verifier state, three drift states, distributional/network eligibility, calibration receipt current/missing/mismatched, calibration age fresh/expired/future/invalid, and monitor evidence fresh/missing/stale/future/invalid TTL. The single combination with all gates valid is the only case that may return `EligibleForHumanReview`. The test is defined but not compiled or executed here.
+
+The current PR inventory is 150 unit tests, 32 integration-oracle tests and five property tests, all definitions rather than verified passing results in this environment. Latest workflow records for the PR head were skipped.
