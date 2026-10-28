@@ -30,6 +30,8 @@ struct PinnedFile {
     relative_path: String,
     git_blob_sha1: String,
     size_bytes: u64,
+    expected_vertices: usize,
+    expected_edges: usize,
 }
 
 fn main() {
@@ -110,6 +112,17 @@ fn run() -> Result<(), Box<dyn Error>> {
         let canonical = canonicalize_dimacs_graph(&bytes)?;
         let canonical_sha256 = sha256_hex(&canonical);
         let (vertices, edges) = canonical_graph_counts(&canonical)?;
+        if vertices != pinned.expected_vertices || edges != pinned.expected_edges {
+            return Err(format!(
+                "{} graph dimensions mismatch: expected {} vertices / {} edges, got {} vertices / {} edges",
+                pinned.name,
+                pinned.expected_vertices,
+                pinned.expected_edges,
+                vertices,
+                edges
+            )
+            .into());
+        }
         output.push_str(&format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             pinned.name,
@@ -154,8 +167,8 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
         }
 
         let columns: Vec<&str> = line.split('\t').collect();
-        if columns.len() != 4 {
-            return Err(format!("pinned manifest line {} must have four tab-separated columns", line_number + 1).into());
+        if columns.len() != 6 {
+            return Err(format!("pinned manifest line {} must have six tab-separated columns", line_number + 1).into());
         }
         let name = columns[0].to_owned();
         let relative_path = columns[1].to_owned();
@@ -169,6 +182,8 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
         }
         let git_blob_sha1 = columns[2].to_owned();
         let size_bytes = columns[3].parse::<u64>()?;
+        let expected_vertices = columns[4].parse::<usize>()?;
+        let expected_edges = columns[5].parse::<usize>()?;
         if name.is_empty()
             || git_blob_sha1.len() != 40
             || !git_blob_sha1.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -183,6 +198,8 @@ fn parse_pinned_manifest(text: &str) -> Result<(String, Vec<PinnedFile>), Box<dy
             relative_path,
             git_blob_sha1,
             size_bytes,
+            expected_vertices,
+            expected_edges,
         });
     }
 
@@ -274,8 +291,15 @@ mod tests {
     const COMMIT: &str = "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7";
     const BLOB: &str = "433ad3290665909e1ee5c17abfa8c946391938dc";
 
-    fn line(name: &str, path: &str, blob: &str, size: usize) -> String {
-        format!("{name}\\t{path}\\t{blob}\\t{size}\\n")
+    fn line(
+        name: &str,
+        path: &str,
+        blob: &str,
+        size: usize,
+        vertices: usize,
+        edges: usize,
+    ) -> String {
+        format!("{name}\\t{path}\\t{blob}\\t{size}\\t{vertices}\\t{edges}\\n")
     }
 
     #[test]
@@ -286,7 +310,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
                 BLOB,
-                3652
+                3652,
+                52,
+                454
             )
         );
         let (commit, entries) = parse_pinned_manifest(&manifest).unwrap();
@@ -303,7 +329,9 @@ mod tests {
             "aves-sparrow-social",
             "07-independentset/instances/aves-sparrow-social.gph",
             BLOB,
-            3652
+            3652,
+            52,
+            454
         );
         let manifest = format!("# source_commit={COMMIT}\\n{row}{row}");
         assert!(parse_pinned_manifest(&manifest).is_err());
@@ -317,7 +345,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/another-name.gph",
                 BLOB,
-                3652
+                3652,
+                52,
+                454
             )
         );
         assert!(parse_pinned_manifest(&wrong_filename).is_err());
@@ -328,7 +358,9 @@ mod tests {
                 "aves-sparrow-social",
                 "07-independentset/instances/aves-sparrow-social.gph",
                 "deadbeef",
-                3652
+                3652,
+                52,
+                454
             )
         );
         assert!(parse_pinned_manifest(&malformed_blob).is_err());
