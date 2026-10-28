@@ -96,11 +96,11 @@
   },
   "limitations": [
     "synthetic likelihood; not the Symthaea repository SCM evaluator",
-    "only eight deterministic policies at horizon two",
-    "full-simplex guarantee is restricted to prior weights over the fixed 16-hypothesis support",
-    "no external causal discovery benchmark was executed",
+    "only eight deterministic horizon-two policy trees; no scaling claim",
+    "full-simplex guarantee covers prior weights over the fixed 16-hypothesis support only",
+    "no external causal-discovery benchmark was executed",
     "runtime numbers do not establish speedup",
-    "the standalone source, tests and exact result matrix are not committed by this documentation-only change"
+    "the full 22,070-byte risk-matrix result JSON remains local-only; its SHA-256 is recorded in verification.local_result_artifact"
   ],
   "next_gate": "Integrate against the exact Symthaea action/likelihood code, then qualify held-out causal recovery and compare exact frontier, epsilon pruning, column generation and prior/world double oracle at equal certificate tolerances."
 }
