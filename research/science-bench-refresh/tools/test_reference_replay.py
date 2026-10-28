@@ -126,6 +126,39 @@ class ReferenceReplayTests(unittest.TestCase):
             "report_identifiability_or_abstain",
         )
 
+    def test_coordinate_reparameterization_preserves_the_law(self) -> None:
+        manifest = manifest_for()
+        generated = rr.independently_generate(manifest, SEED_A, CONFIG)
+        task = next(row for row in generated["tasks"] if row["family_id"] == "semantic_invariance")
+        oracle = task["evaluator_only"]
+        visible = oracle["visible_coordinate_law"]
+        latent = oracle["latent_law"]
+        transform = oracle["inverse_coordinate_transform"]
+        for row in task["policy_input"]["observations"]:
+            u, y = row["u"], row["y"]
+            recovered_x = (u - transform["offset"]) / transform["scale"]
+            self.assertAlmostEqual(y, visible["slope"] * u + visible["intercept"], places=9)
+            self.assertAlmostEqual(y, latent["slope"] * recovered_x + latent["intercept"], places=9)
+
+    def test_noisy_law_and_common_cause_null_obey_declared_noise_bounds(self) -> None:
+        manifest = manifest_for()
+        generated = rr.independently_generate(manifest, SEED_A, CONFIG)
+        noisy = next(row for row in generated["tasks"] if row["family_id"] == "sampling_noise_shift")
+        noise_amp = noisy["evaluator_only"]["noise_amplitude"]
+        law = noisy["evaluator_only"]["law"]
+        for row in noisy["policy_input"]["observations"]:
+            residual = row["y"] - (law["slope"] * row["x"] + law["intercept"])
+            self.assertLessEqual(abs(residual), noise_amp + 1e-9)
+
+        null = next(row for row in generated["tasks"] if row["family_id"] == "confounding_null")
+        null_oracle = null["evaluator_only"]
+        self.assertEqual(null_oracle["direct_effect"], 0.0)
+        self.assertEqual(null_oracle["common_cause"], "z")
+        null_amp = null_oracle["noise_amplitude"]
+        for row in null["policy_input"]["observations"]:
+            self.assertLessEqual(abs(row["x"] - row["z"]), null_amp + 1e-9)
+            self.assertLessEqual(abs(row["y"] - row["z"]), null_amp + 1e-9)
+
     def test_unidentifiability_witness_agrees_on_samples_but_has_unseen_domain(self) -> None:
         manifest = manifest_for()
         generated = rr.independently_generate(manifest, SEED_A, CONFIG)
