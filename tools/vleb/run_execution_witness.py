@@ -248,6 +248,8 @@ def record_execution(
     if Path(receipt_path).is_absolute():
         raise ValueError("receipt path must be relative to evidence root")
     receipt_rel = safe_relative(receipt_path)
+    if str(receipt_rel) == plan_relative:
+        raise ValueError("receipt path conflicts with execution plan")
     reserved = {str(receipt_rel), str(safe_relative(plan_relative))}
     if str(receipt_rel) in {plan["outputs"]["stdout_path"], plan["outputs"]["stderr_path"]}:
         raise ValueError("receipt path conflicts with a command output")
