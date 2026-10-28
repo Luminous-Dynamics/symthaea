@@ -37,6 +37,23 @@ impl StreamKind {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GateVerdict {
+    Authorized,
+    Denied,
+    InsufficientEvidence,
+}
+
+impl GateVerdict {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Authorized => "AUTHORIZED",
+            Self::Denied => "DENIED",
+            Self::InsufficientEvidence => "INSUFFICIENT_EVIDENCE",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Scenario {
     kind: StreamKind,
@@ -183,15 +200,49 @@ fn value_e_value(n: usize, successes: usize) -> f64 {
     log_mean_exp(&logs).exp()
 }
 
+fn validate_alpha_spending(alpha_risk: f64, alpha_value: f64, alpha_joint: f64) -> Result<(), String> {
+    if !(0.0 < alpha_risk && alpha_risk < 1.0
+        && 0.0 < alpha_value && alpha_value < 1.0
+        && 0.0 < alpha_joint && alpha_joint < 1.0
+        && alpha_risk + alpha_value <= alpha_joint + EPSILON)
+    {
+        return Err(invalid("risk/value alpha spending exceeds or invalidates joint error budget"));
+    }
+    Ok(())
+}
+
+fn validate_risk_alternatives(risk_cap: f64, alternatives: &[f64]) -> Result<(), String> {
+    if !(0.0 < risk_cap && risk_cap < 1.0)
+        || alternatives.is_empty()
+        || alternatives.iter().any(|q| !(*q > 0.0 && *q < risk_cap))
+    {
+        return Err(invalid("risk alternatives must be nonempty, positive and strictly below risk cap"));
+    }
+    Ok(())
+}
+
+fn authorize(
+    risk_crossed: bool,
+    value_crossed: bool,
+    evidence_complete: bool,
+    target_calibrated: bool,
+    cost_within_budget: bool,
+    provenance_valid: bool,
+) -> GateVerdict {
+    if !evidence_complete || !target_calibrated || !cost_within_budget || !provenance_valid {
+        return GateVerdict::Denied;
+    }
+    if !risk_crossed || !value_crossed {
+        return GateVerdict::InsufficientEvidence;
+    }
+    GateVerdict::Authorized
+}
+
 fn validate_contract() -> Result<(), String> {
-    if !(0.0 < RISK_ALPHA && 0.0 < VALUE_ALPHA && RISK_ALPHA + VALUE_ALPHA <= JOINT_ALPHA + EPSILON) {
-        return Err(invalid("risk/value alpha spending exceeds joint error budget"));
-    }
-    if RISK_ALTERNATIVES.iter().any(|q| !(*q > 0.0 && *q < RISK_CAP)) {
-        return Err(invalid("all risk alternatives must be positive and below risk cap"));
-    }
-    if VALUE_LAMBDAS.iter().any(|lambda| !(*lambda >= 0.0 && *lambda <= 1.0)) {
-        return Err(invalid("value betting lambdas must be in [0, 1]"));
+    validate_alpha_spending(RISK_ALPHA, VALUE_ALPHA, JOINT_ALPHA)?;
+    validate_risk_alternatives(RISK_CAP, &RISK_ALTERNATIVES)?;
+    if VALUE_LAMBDAS.is_empty() || VALUE_LAMBDAS.iter().any(|lambda| !(*lambda >= 0.0 && *lambda <= 1.0)) {
+        return Err(invalid("value betting lambdas must be nonempty and in [0, 1]"));
     }
     if !(0.0 < VALUE_FLOOR && VALUE_FLOOR < 1.0) {
         return Err(invalid("value floor must be strictly between 0 and 1"));
@@ -392,8 +443,23 @@ mod tests {
     #[test]
     fn alpha_spending_is_valid_and_predeclared() {
         assert!(validate_contract().is_ok());
+        assert!(validate_alpha_spending(0.025, 0.025, 0.05).is_ok());
+        assert!(validate_alpha_spending(0.03, 0.03, 0.05).is_err());
         assert!(RISK_ALTERNATIVES.iter().all(|q| *q < RISK_CAP));
+        assert!(validate_risk_alternatives(RISK_CAP, &[0.01, 0.04]).is_ok());
+        assert!(validate_risk_alternatives(RISK_CAP, &[0.01, 0.06]).is_err());
         assert!(VALUE_LAMBDAS.iter().all(|lambda| (0.0..=1.0).contains(lambda)));
+    }
+
+    #[test]
+    fn authorization_gate_fails_closed_on_missing_shifted_or_over_budget_evidence() {
+        assert_eq!(authorize(true, true, true, true, true, true), GateVerdict::Authorized);
+        assert_eq!(authorize(true, true, false, true, true, true), GateVerdict::Denied);
+        assert_eq!(authorize(true, true, true, false, true, true), GateVerdict::Denied);
+        assert_eq!(authorize(true, true, true, true, false, true), GateVerdict::Denied);
+        assert_eq!(authorize(true, true, true, true, true, false), GateVerdict::Denied);
+        assert_eq!(authorize(false, false, true, true, true, true), GateVerdict::InsufficientEvidence);
+        assert_ne!(authorize(false, false, true, true, true, true), GateVerdict::Authorized);
     }
 
     #[test]
@@ -453,6 +519,9 @@ mod tests {
         assert_eq!(scenarios.iter().filter(|s| s.kind == StreamKind::Value).count(), 20);
         assert!(parse_grid("stream_kind\thorizon\ttruth_ppm\nrisk\t0\t50000\n").is_err());
         assert!(parse_grid("stream_kind\thorizon\ttruth_ppm\nother\t10\t50000\n").is_err());
+        assert!(risk_crossing_probability(10, -0.01).is_err());
+        assert!(risk_crossing_probability(10, 1.01).is_err());
+        assert!(value_crossing_probability(10, f64::NAN).is_err());
     }
 
     #[test]
