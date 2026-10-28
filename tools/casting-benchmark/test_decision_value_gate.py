@@ -46,6 +46,7 @@ class DecisionValueGateTests(unittest.TestCase):
         self.assertEqual(result.disposition, "evaluate")
         self.assertEqual(result.action_id, "fast")
         self.assertAlmostEqual(result.value_per_cost, 1.5)
+        self.assertEqual(result.normalized_constraint_risk_reduction, 0.0)
         self.assertEqual(result.reserved_cost_units, 2.0)
 
     def test_unresolved_risk_forces_risk_reducing_action(self):
@@ -59,6 +60,7 @@ class DecisionValueGateTests(unittest.TestCase):
         )
         self.assertEqual(result.disposition, "escalate")
         self.assertEqual(result.action_id, "verify-boundary")
+        self.assertEqual(result.normalized_constraint_risk_reduction, 0.5)
 
     def test_abstains_when_risk_is_unresolved_and_no_action_reduces_it(self):
         result = self.choose(
