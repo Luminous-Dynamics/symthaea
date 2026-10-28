@@ -62,6 +62,17 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     security = data.get("industry_comparators", {}).get("agent_security_league", {})
     if security.get("top_listed_functional_pct") != 87.2 or security.get("top_listed_security_correctness_pct") != 37.4:
         errors.append("security_comparator_reference_drift")
+    definitions = data.get("metric_definitions", {})
+    aassr = definitions.get("assurance_adjusted_semantic_success_rate", {})
+    if aassr.get("formula") != "independently_verified_passes / all tasks assigned to the locked confirmatory cohort":
+        errors.append("aassr_formula_drift")
+    if aassr.get("composite_weighted_score") is not False:
+        errors.append("aassr_must_not_hide_failures_in_weighted_score")
+    if not any("failed, unresolved and abstained" in rule for rule in aassr.get("denominator_rules", [])):
+        errors.append("aassr_denominator_drops_unresolved")
+    cost = definitions.get("cost_per_independently_verified_fix", {})
+    if "undefined" not in cost.get("zero_pass_rule", ""):
+        errors.append("cost_zero_pass_semantics_missing")
     dual_gauge = data.get("industry_comparators", {}).get("dual_gauge", {})
     if dual_gauge.get("task_count") != 307 or dual_gauge.get("reported_best_joint_functional_security_success_pct_upper_bound") != 15.0:
         errors.append("dual_gauge_reference_drift")
@@ -78,6 +89,17 @@ class ScorecardTests(unittest.TestCase):
 
     def test_current_scorecard_is_valid(self) -> None:
         self.assertEqual(validate_scorecard(self.scorecard), [])
+
+    def test_aassr_denominator_keeps_unresolved_and_abstentions(self) -> None:
+        definition = self.scorecard["metric_definitions"]["assurance_adjusted_semantic_success_rate"]
+        self.assertFalse(definition["composite_weighted_score"])
+        rules = " ".join(definition["denominator_rules"])
+        self.assertIn("remain non-passes", rules)
+        self.assertIn("before arm assignment", rules)
+
+    def test_zero_verified_passes_never_means_zero_cost(self) -> None:
+        definition = self.scorecard["metric_definitions"]["cost_per_independently_verified_fix"]
+        self.assertIn("undefined", definition["zero_pass_rule"])
 
     def test_cost_frontier_target_is_lower_cost_than_listed_leader(self) -> None:
         target = self.scorecard["proposed_targets"]["legacy_bench_cost_frontier"]
