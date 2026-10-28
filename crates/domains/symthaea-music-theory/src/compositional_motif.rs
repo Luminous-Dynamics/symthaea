@@ -96,17 +96,36 @@ pub enum CompositionalVerificationError {
     UnsupportedTransform(&'static str),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AxisEvidence {
-    pub max_error: f64,
-    pub mean_error: f64,
+    /// None when no events were aligned or a finite residual could not be established.
+    pub max_error: Option<f64>,
+    pub mean_error: Option<f64>,
     pub tolerance: f64,
     pub passed: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// One auditable aligned event pair, with independent residuals for every axis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EventAlignment {
+    /// Index in the original source sequence, not just the selected fragment.
+    pub source_index: usize,
+    pub target_index: usize,
+    pub pitch_error_semitones: f64,
+    pub onset_error_beats: f64,
+    /// Absolute log ratio: |ln(target duration / expected duration)|.
+    pub duration_log_error: f64,
+}
+
+/// Serializable receipt for deterministic replay and independent auditing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompositionalMotifEvidence {
-    pub contract_version: &'static str,
+    pub contract_version: String,
+    pub claim: CompositionalTransform,
+    pub target_start_offset_beats: f64,
+    pub aligned_pairs: Vec<EventAlignment>,
+    pub deleted_source_indices: Vec<usize>,
+    pub inserted_target_indices: Vec<usize>,
     pub matched_events: usize,
     pub deleted_source_events: usize,
     pub inserted_target_events: usize,
@@ -231,33 +250,59 @@ pub fn verify_compositional_transform_with_config(
         }
     }
 
-    let (matches, deleted_source_events, inserted_target_events) =
+    let (matches, deleted_source_indices_local, inserted_target_indices) =
         align_monotonically(selected, target, anchor, claim, target_start_offset_beats, config);
-    let pitch_errors: Vec<f64> = matches
-        .iter()
-        .map(|(i, j)| {
-            let expected = expected_values(selected[*i], anchor, claim, target_start_offset_beats);
-            (target[*j].pitch_midi - expected.0).abs() as f64
-        })
-        .collect();
-    let onset_errors: Vec<f64> = matches
-        .iter()
-        .map(|(i, j)| {
-            let expected = expected_values(selected[*i], anchor, claim, target_start_offset_beats);
-            (target[*j].onset_beats - expected.1).abs()
-        })
-        .collect();
-    let duration_errors: Vec<f64> = matches
-        .iter()
-        .map(|(i, j)| {
-            let expected = expected_values(selected[*i], anchor, claim, target_start_offset_beats);
-            (target[*j].duration_beats / expected.2).ln().abs()
-        })
-        .collect();
+    let mut aligned_pairs = Vec::with_capacity(matches.len());
+    for (source_local_index, target_index) in &matches {
+        let expected = expected_values(
+            selected[*source_local_index],
+            anchor,
+            claim,
+            target_start_offset_beats,
+        );
+        let pitch_error_semitones =
+            (target[*target_index].pitch_midi - expected.0).abs() as f64;
+        let onset_error_beats = (target[*target_index].onset_beats - expected.1).abs();
+        let duration_ratio = target[*target_index].duration_beats / expected.2;
+        if !pitch_error_semitones.is_finite()
+            || !onset_error_beats.is_finite()
+            || !duration_ratio.is_finite()
+            || duration_ratio <= 0.0
+        {
+            return Err(CompositionalVerificationError::InvalidInput(
+                "aligned event residual overflowed the finite numeric contract",
+            ));
+        }
+        let duration_log_error = duration_ratio.ln().abs();
+        if !duration_log_error.is_finite() {
+            return Err(CompositionalVerificationError::InvalidInput(
+                "duration residual is not finite",
+            ));
+        }
+        aligned_pairs.push(EventAlignment {
+            source_index: selection.source_start_index + *source_local_index,
+            target_index: *target_index,
+            pitch_error_semitones,
+            onset_error_beats,
+            duration_log_error,
+        });
+    }
+    let pitch_errors: Vec<f64> =
+        aligned_pairs.iter().map(|pair| pair.pitch_error_semitones).collect();
+    let onset_errors: Vec<f64> =
+        aligned_pairs.iter().map(|pair| pair.onset_error_beats).collect();
+    let duration_errors: Vec<f64> =
+        aligned_pairs.iter().map(|pair| pair.duration_log_error).collect();
 
     let pitch = make_axis_evidence(&pitch_errors, config.pitch_tolerance_semitones);
     let onset = make_axis_evidence(&onset_errors, config.onset_tolerance_beats);
     let duration = make_axis_evidence(&duration_errors, config.duration_log_ratio_tolerance);
+    let deleted_source_indices: Vec<usize> = deleted_source_indices_local
+        .iter()
+        .map(|index| selection.source_start_index + index)
+        .collect();
+    let deleted_source_events = deleted_source_indices.len();
+    let inserted_target_events = inserted_target_indices.len();
     let denominator = (selected.len() + target.len()) as f64;
     let coverage = matches.len() as f64 / selected.len().max(target.len()) as f64;
     let gap_fraction =
@@ -279,7 +324,12 @@ pub fn verify_compositional_transform_with_config(
         failure_reasons.push("insertions/deletions exceed the explicit edit budget".to_owned());
     }
     Ok(CompositionalMotifEvidence {
-        contract_version: COMPOSITIONAL_MOTIF_CONTRACT_VERSION,
+        contract_version: COMPOSITIONAL_MOTIF_CONTRACT_VERSION.to_owned(),
+        claim: *claim,
+        target_start_offset_beats,
+        aligned_pairs,
+        deleted_source_indices,
+        inserted_target_indices,
         matched_events: matches.len(),
         deleted_source_events,
         inserted_target_events,
@@ -390,7 +440,7 @@ fn align_monotonically(
     claim: &CompositionalTransform,
     target_start_offset_beats: f64,
     config: &CompositionalVerificationConfig,
-) -> (Vec<(usize, usize)>, usize, usize) {
+) -> (Vec<(usize, usize)>, Vec<usize>, Vec<usize>) {
     let n = source.len();
     let m = target.len();
     const GAP_COST: f64 = 1.5;
@@ -436,8 +486,8 @@ fn align_monotonically(
     let mut i = n;
     let mut j = m;
     let mut matches = Vec::new();
-    let mut deleted = 0;
-    let mut inserted = 0;
+    let mut deleted = Vec::new();
+    let mut inserted = Vec::new();
     while i > 0 || j > 0 {
         match step[i][j] {
             Step::Match if i > 0 && j > 0 => {
@@ -446,17 +496,19 @@ fn align_monotonically(
                 j -= 1;
             }
             Step::DeleteSource if i > 0 => {
-                deleted += 1;
+                deleted.push(i - 1);
                 i -= 1;
             }
             Step::InsertTarget if j > 0 => {
-                inserted += 1;
+                inserted.push(j - 1);
                 j -= 1;
             }
             _ => break,
         }
     }
     matches.reverse();
+    deleted.reverse();
+    inserted.reverse();
     (matches, deleted, inserted)
 }
 
@@ -484,19 +536,27 @@ fn normalized_cost(error: f64, tolerance: f64) -> f64 {
 fn make_axis_evidence(errors: &[f64], tolerance: f64) -> AxisEvidence {
     if errors.is_empty() {
         return AxisEvidence {
-            max_error: f64::INFINITY,
-            mean_error: f64::INFINITY,
+            max_error: None,
+            mean_error: None,
             tolerance,
             passed: false,
         };
     }
     let max_error = errors.iter().copied().fold(0.0_f64, f64::max);
     let mean_error = errors.iter().sum::<f64>() / errors.len() as f64;
+    if !max_error.is_finite() || !mean_error.is_finite() {
+        return AxisEvidence {
+            max_error: None,
+            mean_error: None,
+            tolerance,
+            passed: false,
+        };
+    }
     AxisEvidence {
-        max_error,
-        mean_error,
+        max_error: Some(max_error),
+        mean_error: Some(mean_error),
         tolerance,
-        passed: max_error.is_finite() && max_error <= tolerance,
+        passed: max_error <= tolerance,
     }
 }
 
@@ -788,6 +848,13 @@ mod tests {
             let evidence =
                 verify_compositional_transform(&source, &target, start, &claim).expect("valid contract");
             let expected = value["expected_verdict"].as_str().expect("expected verdict");
+            let receipt = serde_json::to_string(&evidence).expect("evidence JSON receipt");
+            let replayed: CompositionalMotifEvidence =
+                serde_json::from_str(&receipt).expect("evidence receipt round-trips");
+            assert_eq!(replayed, evidence, "{case_id} receipt must replay losslessly");
+            assert_eq!(evidence.aligned_pairs.len(), evidence.matched_events);
+            assert_eq!(evidence.deleted_source_indices.len(), evidence.deleted_source_events);
+            assert_eq!(evidence.inserted_target_indices.len(), evidence.inserted_target_events);
             match expected {
                 "accept" => {
                     accepted += 1;
