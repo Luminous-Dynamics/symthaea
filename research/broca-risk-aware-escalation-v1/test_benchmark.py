@@ -75,9 +75,14 @@ class RiskAwareTests(unittest.TestCase):
                 self.assertTrue(all(-3 <= o["utility"] <= 2 for o in c["outcomes"].values()))
                 self.assertEqual(c["outcomes"]["escalate"]["harm"] in (True,False),True)
 
-    def test_singular_pivot_fallback_is_finite(self):
+    def test_singular_pivot_uses_free_variable_without_destroying_row(self):
         result=b.solve_linear([[0.0,0.0],[0.0,1.0]],[0.0,1.0])
-        self.assertTrue(all(math.isfinite(v) for v in result))
+        self.assertEqual(result[0],0.0)
         self.assertAlmostEqual(result[1],1.0,places=7)
+        self.assertTrue(all(math.isfinite(v) for v in result))
+
+    def test_inconsistent_singular_system_is_rejected(self):
+        with self.assertRaises(ValueError):
+            b.solve_linear([[0.0,0.0],[0.0,1.0]],[1.0,1.0])
 
 if __name__=="__main__": unittest.main(verbosity=2)
