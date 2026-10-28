@@ -171,7 +171,8 @@ pub fn verify_edit_locality_with_config(
                 &errors,
                 config.pitch_tolerance_semitones,
             );
-            protected.push(pitch_preservation(source, target, config, None));
+            // Pitch is the requested-to-change axis for transposition, not a
+            // protected axis. Only onset and duration must remain invariant.
             protected.push(onset_preservation(source, target, config));
             protected.push(duration_preservation(source, target, config, None));
             let passed = check.passed;
