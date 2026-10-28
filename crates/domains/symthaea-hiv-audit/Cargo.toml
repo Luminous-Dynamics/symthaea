@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-hiv-audit"
+version = "0.1.0"
+edition = "2024"
+description = "Fail-closed provenance and schema auditing for public HIV reservoir research datasets"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+csv = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
