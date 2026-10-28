@@ -3,7 +3,7 @@
 #![deny(unsafe_code)]
 
 use std::collections::BTreeSet;
-use std::env;
+use std::env;\nuse std::fmt::Write as _;
 
 const GRID: &str = include_str!("../tests/fixtures/vision-dvpc-028-scenarios.tsv");
 const EPS: f64 = 1e-10;
