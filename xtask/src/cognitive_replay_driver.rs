@@ -240,17 +240,26 @@ pub fn audit_receipt(receipt: &ReplayRunReceipt) -> anyhow::Result<()> {
         ensure!(event.available_at_tick < receipt.stream_length_ticks, "feature availability is out of range");
     }
 
+    let expected_reveal_count = receipt.stream_length_ticks.saturating_sub(receipt.label_delay_ticks);
+    ensure!(
+        receipt.revealed_outcomes.len() as u64 == expected_reveal_count,
+        "receipt omits one or more outcomes that should have been revealed within the replay horizon"
+    );
     let mut outcome_ids = BTreeSet::new();
-    for outcome in &receipt.revealed_outcomes {
+    for (index, outcome) in receipt.revealed_outcomes.iter().enumerate() {
+        let expected_prediction_tick = index as u64;
         ensure!(!outcome.outcome_id.trim().is_empty(), "outcome_id must not be empty");
         ensure!(outcome_ids.insert(outcome.outcome_id.as_str()), "duplicate outcome ID");
         ensure!(outcome.value.is_finite(), "revealed outcome must be finite");
-        ensure!(outcome.prediction_tick < receipt.stream_length_ticks, "outcome prediction tick is out of range");
         ensure!(
-            outcome.outcome_id == format!("outcome-{:08}", outcome.prediction_tick),
+            outcome.prediction_tick == expected_prediction_tick,
+            "outcome reveal ledger must cover prediction ticks in order without omissions"
+        );
+        ensure!(
+            outcome.outcome_id == format!("outcome-{:08}", expected_prediction_tick),
             "outcome ID does not bind to its prediction tick"
         );
-        let expected_reveal_tick = outcome.prediction_tick.checked_add(receipt.label_delay_ticks)
+        let expected_reveal_tick = expected_prediction_tick.checked_add(receipt.label_delay_ticks)
             .context("outcome reveal tick overflow")?;
         ensure!(
             outcome.available_at_tick == expected_reveal_tick,
@@ -460,6 +469,22 @@ mod tests {
         let second_prefix = serde_json::to_value(&second.decisions[..6]).unwrap();
         assert_eq!(first_prefix, second_prefix);
         assert_ne!(first.decisions[6].prediction, second.decisions[6].prediction);
+    }
+
+    #[test]
+    fn receipt_audit_rejects_omitted_revealed_outcome_even_if_decisions_are_rewritten() {
+        let mut policy = ConsumeDeliveredPolicy;
+        let mut receipt = scenario(vec![0.0; 8]).run(&mut policy).expect("driver run");
+        receipt.revealed_outcomes.retain(|outcome| outcome.outcome_id != "outcome-00000001");
+        // Simulate an internally self-consistent but incomplete receipt: erase the omitted label
+        // from all subsequent decision snapshots and consumption lists too.
+        for decision in &mut receipt.decisions {
+            decision.eligible_outcome_ids.retain(|id| id != "outcome-00000001");
+            decision.delivered_outcome_ids.retain(|id| id != "outcome-00000001");
+            decision.consumed_outcome_ids.retain(|id| id != "outcome-00000001");
+        }
+        let error = audit_receipt(&receipt).expect_err("auditor must detect an omitted due outcome");
+        assert!(error.to_string().contains("omits one or more outcomes"));
     }
 
     #[test]
