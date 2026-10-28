@@ -532,6 +532,51 @@ where
     }
 }
 
+/// Exact DP for a stationary-null classification when the conditional event probability
+/// is a deterministic/predictable schedule rather than a single IID Bernoulli rate.
+fn evaluate_null_schedule<P, A>(
+    horizon: usize,
+    probability_at: P,
+    should_alarm: A,
+) -> AlarmMetrics
+where
+    P: Fn(usize) -> f64,
+    A: Fn(usize, usize) -> bool,
+{
+    let mut active = vec![0.0; horizon + 1];
+    active[0] = 1.0;
+    let mut first_alarm = vec![0.0; horizon + 1];
+
+    for n in 1..=horizon {
+        let probability = probability_at(n);
+        assert!((0.0..=1.0).contains(&probability));
+        let mut next = vec![0.0; horizon + 1];
+        for (successes, mass) in active.iter().copied().take(n).enumerate() {
+            if mass == 0.0 {
+                continue;
+            }
+            for (next_successes, branch_mass) in [
+                (successes, mass * (1.0 - probability)),
+                (successes + 1, mass * probability),
+            ] {
+                if should_alarm(n, next_successes) {
+                    first_alarm[n] += branch_mass;
+                } else {
+                    next[next_successes] += branch_mass;
+                }
+            }
+        }
+        active = next;
+    }
+
+    AlarmMetrics {
+        false_alarm_probability: first_alarm.iter().sum(),
+        detection_probability: 0.0,
+        mean_detection_delay: None,
+        survival_probability: active.iter().sum(),
+    }
+}
+
 fn print_eprocess_family_csv() {
     println!(
         "family,scenario,horizon,change_after,p0,stream_pre_p,p1,false_alarm_probability,detection_probability,mean_detection_delay,per_cell_alpha,survival_probability,log_e_threshold"
@@ -1164,6 +1209,30 @@ mod tests {
                 - expected)
                 .abs()
                 <= 1.0e-10
+        );
+    }
+
+    #[test]
+    fn composite_null_controls_predictable_alternation_between_band_edges() {
+        let table = family_alarm_table(
+            EProcessFamily::CompositeBandBetting,
+            NOMINAL_P,
+            FAMILY_HORIZON,
+        );
+        let metrics = evaluate_null_schedule(
+            FAMILY_HORIZON,
+            |n| if n % 2 == 0 { 0.52 } else { 0.48 },
+            |n, successes| table[n][successes],
+        );
+        assert!(
+            metrics.false_alarm_probability <= PER_CELL_ALPHA + EPS,
+            "composite-null e-process exceeded alpha for alternating in-band probabilities"
+        );
+        assert!(metrics.false_alarm_probability > 0.00015);
+        assert!(metrics.false_alarm_probability < 0.00030);
+        assert!(
+            (metrics.false_alarm_probability + metrics.survival_probability - 1.0).abs()
+                <= 1.0e-9
         );
     }
 
