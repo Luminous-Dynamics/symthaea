@@ -109,8 +109,9 @@ CUSUM_UPPER_INCREMENT = 12
 CUSUM_LOWER_INCREMENT = 13
 CUSUM_SIDE_ALPHA = PER_CELL_ALPHA / 2.0
 CUSUM_FIELDS = (
-    "direction", "scenario", "scenario_class", "horizon", "change_after", "p0", "null_lower",
-    "null_upper", "threshold_scaled", "threshold_score", "scenario_or_pre_shift_alarm_probability",
+    "direction", "scenario", "scenario_class", "horizon", "change_after", "p0", "stream_pre_p", "p1",
+    "null_lower", "null_upper", "threshold_scaled", "threshold_score",
+    "calibration_boundary_alarm_probability", "scenario_or_pre_shift_alarm_probability",
     "post_shift_detection_probability", "mean_post_shift_detection_delay", "per_side_alpha",
     "survival_probability",
 )
@@ -918,6 +919,9 @@ def simulate_cusum_scenario(direction, scenario, threshold):
 
 def cusum_reference_rows():
     threshold = calibrate_cusum_threshold(HORIZONS[-1], CUSUM_SIDE_ALPHA)
+    calibration_alarm = cusum_alarm_probability(
+        HORIZONS[-1], threshold, COMPOSITE_NULL_UPPER
+    )
     rows = []
     for direction in ("upper_cusum", "lower_cusum"):
         for scenario in SCENARIOS:
@@ -930,10 +934,13 @@ def cusum_reference_rows():
                     "horizon": metrics["horizon"],
                     "change_after": str(CHANGE_AFTER) if post_shift_p is not None else "NA",
                     "p0": f"{P0:.12f}",
+                    "stream_pre_p": f"{PRE_SHIFT_PROBABILITIES[scenario]:.12f}",
+                    "p1": f"{post_shift_p:.12f}" if post_shift_p is not None else "NA",
                     "null_lower": f"{COMPOSITE_NULL_LOWER:.12f}",
                     "null_upper": f"{COMPOSITE_NULL_UPPER:.12f}",
                     "threshold_scaled": str(threshold),
                     "threshold_score": f"{threshold / CUSUM_SCALE:.12f}",
+                    "calibration_boundary_alarm_probability": f"{calibration_alarm:.12f}",
                     "scenario_or_pre_shift_alarm_probability": metrics["scenario_or_pre_shift_alarm_probability"],
                     "post_shift_detection_probability": metrics["post_shift_detection_probability"],
                     "mean_post_shift_detection_delay": metrics["mean_post_shift_detection_delay"],
@@ -957,12 +964,13 @@ def check_cusum_csv(path):
         raise ValueError(f"CUSUM row count mismatch: expected {len(expected)}, got {len(actual)}")
     key_fields = ("direction", "scenario", "horizon")
     text_fields = (
-        "direction", "scenario", "scenario_class", "horizon", "change_after", "threshold_scaled",
+        "direction", "scenario", "scenario_class", "horizon", "change_after", "p1", "threshold_scaled",
         "post_shift_detection_probability", "mean_post_shift_detection_delay",
     )
     numeric_fields = (
-        "p0", "null_lower", "null_upper", "threshold_score",
-        "scenario_or_pre_shift_alarm_probability", "per_side_alpha", "survival_probability",
+        "p0", "stream_pre_p", "null_lower", "null_upper", "threshold_score",
+        "calibration_boundary_alarm_probability", "scenario_or_pre_shift_alarm_probability",
+        "per_side_alpha", "survival_probability",
     )
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         if tuple(got[k] for k in key_fields) != tuple(want[k] for k in key_fields):
@@ -978,7 +986,30 @@ def check_cusum_csv(path):
                 raise ValueError(f"invalid CUSUM numeric {field} on line {line}") from exc
             if not math.isfinite(value) or abs(value - target) > 5e-10:
                 raise ValueError(f"CUSUM {field} mismatch on line {line}: {value} != {target}")
-    print(f"PASS: independently recomputed all {len(expected)} exact-DP CUSUM rows")
+
+        is_target_shift = got["scenario_class"] == "target_shift"
+        detection_text = got["post_shift_detection_probability"]
+        delay_text = got["mean_post_shift_detection_delay"]
+        if is_target_shift and detection_text == "NA":
+            raise ValueError(f"CUSUM target-shift row lacks detection metric on line {line}")
+        if not is_target_shift and (detection_text != "NA" or delay_text != "NA"):
+            raise ValueError(f"CUSUM non-target scenario was mislabeled as a target detection on line {line}")
+        alarm = float(got["scenario_or_pre_shift_alarm_probability"])
+        detection = 0.0 if detection_text == "NA" else float(detection_text)
+        survival = float(got["survival_probability"])
+        if abs(alarm + detection + survival - 1.0) > 1e-9:
+            raise ValueError(f"CUSUM probability mass does not conserve on line {line}")
+        stream_p = float(got["stream_pre_p"])
+        class_name = got["scenario_class"]
+        if (
+            class_name in ("stationary_null", "within_band_transition_control")
+            or (class_name == "baseline_misspecification"
+                and COMPOSITE_NULL_LOWER <= stream_p <= COMPOSITE_NULL_UPPER)
+        ) and alarm > CUSUM_SIDE_ALPHA + EPS and not is_target_shift:
+            raise ValueError(f"CUSUM exceeded per-side alpha on an accepted-null scenario on line {line}")
+        if is_target_shift and alarm > CUSUM_SIDE_ALPHA + EPS:
+            raise ValueError(f"CUSUM pre-shift alarm exceeded per-side alpha on line {line}")
+    print(f"PASS: independently recomputed and semantically checked all {len(expected)} exact-DP CUSUM rows")
 
 
 def cusum_self_test():
