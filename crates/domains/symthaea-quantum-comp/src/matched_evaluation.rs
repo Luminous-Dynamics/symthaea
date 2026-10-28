@@ -1305,6 +1305,20 @@ mod tests {
             MisEvidenceVerdict::VerifiedConflict =>
                 (CandidateVerification::VerifiedConflict, Some(evidence.conflict_count())),
         };
+        // Synthetic test fixture only: infer deterministic timing values from the
+        // same stage template. Production trial records must use direct clock readings.
+        let deployment_elapsed_ms = stage_costs
+            .sum_all_stage_costs_ms()
+            .filter(|value| *value > 0.0)
+            .or_else(|| stage_costs.solve_ms.map(|value| value / 0.35))
+            .filter(|value| *value > 0.0)
+            .unwrap_or(100.0);
+        let standardized_algorithm_elapsed_ms = stage_costs
+            .sum_algorithm_stage_costs_ms()
+            .filter(|value| *value > 0.0)
+            .or_else(|| stage_costs.solve_ms.map(|value| (value / 0.35) * 0.85))
+            .filter(|value| *value > 0.0)
+            .unwrap_or(deployment_elapsed_ms * 0.8);
         MatchedTrialRecord {
             trial_id: id.to_owned(),
             pair_id: pair.to_owned(),
@@ -1315,6 +1329,8 @@ mod tests {
             verifier_receipt: Some(evidence),
             verification,
             conflict_count: conflicts,
+            deployment_elapsed_ms: Some(deployment_elapsed_ms),
+            standardized_algorithm_elapsed_ms: Some(standardized_algorithm_elapsed_ms.min(deployment_elapsed_ms)),
             costs: stage_costs,
             energy,
         }
@@ -1342,6 +1358,8 @@ mod tests {
             verifier_receipt: None,
             verification: CandidateVerification::NotReturned,
             conflict_count: None,
+            deployment_elapsed_ms: None,
+            standardized_algorithm_elapsed_ms: None,
             costs: StageCostsMs::default(),
             energy: EnergyRecord::not_measured(),
         }
@@ -1392,6 +1410,8 @@ mod tests {
                     verifier_receipt: None,
                     verification: CandidateVerification::NotReturned,
                     conflict_count: None,
+                    deployment_elapsed_ms: None,
+                    standardized_algorithm_elapsed_ms: None,
                     costs: costs(1_000.0),
                     energy: EnergyRecord::not_measured(),
                 },
@@ -1496,6 +1516,8 @@ mod tests {
                 verifier_receipt: None,
                 verification: CandidateVerification::Unverified,
                 conflict_count: None,
+                deployment_elapsed_ms: Some(1.0),
+                standardized_algorithm_elapsed_ms: Some(0.85),
                 costs: costs(1.0),
                 energy: EnergyRecord::not_measured(),
             }],
@@ -1529,6 +1551,8 @@ mod tests {
                 verifier_receipt: None,
                 verification: CandidateVerification::VerificationFailed,
                 conflict_count: None,
+                deployment_elapsed_ms: Some(50.0),
+                standardized_algorithm_elapsed_ms: Some(42.5),
                 costs: costs(50.0),
                 energy: EnergyRecord::not_measured(),
             }],
