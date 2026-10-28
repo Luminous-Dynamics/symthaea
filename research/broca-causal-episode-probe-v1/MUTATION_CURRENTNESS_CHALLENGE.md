@@ -76,6 +76,16 @@ The ordinary complete-chain metric can reward a retrieval set that contains ever
 
 This distinction mirrors a wider finding in recent memory evaluation: temporal update and forgetting are separate capabilities, not just retrieval recall. Memora/FAMA evaluates reuse of obsolete or invalidated memories; MRAgent evaluates active reconstruction from associative evidence; Mem2ActBench checks whether memory translates into correct tool selection and argument grounding. Use them as distinct comparison lanes rather than combining their scores.
 
+## External benchmark context
+
+Keep the research lanes separate:
+- [LongMemEval-V2](https://github.com/xiaowu0162/LongMemEval-V2): official end-to-end answer accuracy and query-latency comparison.
+- [Memora / FAMA (Findings of ACL 2026)](https://aclanthology.org/2026.findings-acl.1337/): evaluates remembering, reasoning and recommending across extended conversations; FAMA explicitly penalizes reuse of obsolete or invalidated memory. Our stale-aware chain metric is not its official formula.
+- [MRAgent (ICML 2026)](https://proceedings.mlr.press/v306/ji26d.html): tests active associative reconstruction from evolving intermediate evidence rather than static top-k retrieval.
+- [Mem2ActBench (ACL 2026)](https://aclanthology.org/2026.acl-long.370/): evaluates whether memory improves tool choice and argument grounding in task-oriented agents.
+
+A useful field-level hypothesis is that temporal validity should be a hard eligibility predicate before any lexical, dense, or graph-based ranking. Reconstruction can expand only from eligible evidence; a verifier may inspect rejected stale evidence to explain a contradiction, but must not pass it to the answer context as current fact. Test this by holding the retrieval budget and reader fixed and reporting both quality and stale-evidence violation rates.
+
 ## Next architecture implication
 
 Treat memory as a revisioned evidence ledger:
