@@ -82,7 +82,7 @@ def select(policy, b, mask, truth):
     if policy == "random":
         return [(q, 1.0 / len(available)) for q in available]
     matrix = truth if policy == "known_channel_evsi_reference" else NOMINAL
-    scored = []
+    selected = None
     for q in available:
         if policy == "entropy":
             gain = entropy(b) - sum(
@@ -98,9 +98,10 @@ def select(policy, b, mask, truth):
             gain = bayes_risk(b) - expected_risk_after(b, truth, q)
         else:
             raise ValueError(policy)
-        scored.append((gain / COSTS[q], q, gain))
-    scored.sort(key=lambda item: (-item[0], item[1]))
-    _, q, gain = scored[0]
+        score = gain / COSTS[q]
+        if selected is None or score > selected[0] + EPS:
+            selected = (score, q, gain)
+    _, q, gain = selected
     if policy == "robust_evsi" and gain <= EPS:
         return []
     return [(q, 1.0)]
