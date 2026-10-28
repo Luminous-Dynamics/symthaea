@@ -1138,7 +1138,8 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
             // Patch bootloader for BIOS mode
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
-            script.push_str(&format!(r#"
+            script.push_str(&format!(
+                r#"
 # Step 5: Create swap file
 echo "STAGE: Configuring swap..."
 fallocate -l 16G /mnt/swap/swapfile
@@ -1182,7 +1183,9 @@ echo "=== Sovereign Birth Complete ==="
 echo "Reboot the machine: sudo reboot"
 echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
-"#, hostname = hostname));
+"#,
+                hostname = hostname
+            ));
             script
         }
 
@@ -1457,7 +1460,8 @@ nixos-generate-config --root /mnt
             // Patch bootloader for BIOS mode (LUKS layout)
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
-            script.push_str(&format!(r#"
+            script.push_str(&format!(
+                r#"
 # Step 7: Create swap file
 echo "STAGE: Configuring swap..."
 fallocate -l 16G /mnt/swap/swapfile
@@ -1503,7 +1507,9 @@ echo "Reboot the machine: sudo reboot"
 echo "You will be prompted for your encryption passphrase at boot."
 echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
-"#, hostname = hostname));
+"#,
+                hostname = hostname
+            ));
             script
         }
 
@@ -2913,18 +2919,28 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         Err(error) => {
                             let _ = ws_tx
                                 .send(Message::Text(
-                                    RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                                    RelayMessage::error(&format!(
+                                        "Failed to stage password: {}",
+                                        error
+                                    ))
+                                    .to_json(),
                                 ))
                                 .await;
                             continue;
                         }
                     };
-                    if let Err(error) = pw_file_handle.write_all(client_msg.user_password.as_bytes()) {
+                    if let Err(error) =
+                        pw_file_handle.write_all(client_msg.user_password.as_bytes())
+                    {
                         drop(pw_file_handle);
                         let _ = tokio::fs::remove_file(&pw_file).await;
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                                RelayMessage::error(&format!(
+                                    "Failed to stage password: {}",
+                                    error
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         continue;
@@ -2977,20 +2993,36 @@ echo "  User password set."
                         Err(error) => {
                             let _ = ws_tx
                                 .send(Message::Text(
-                                    RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                                    RelayMessage::error(&format!(
+                                        "Failed to stage LUKS2 passphrase: {}",
+                                        error
+                                    ))
+                                    .to_json(),
                                 ))
                                 .await;
-                            let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                            let _ = tokio::fs::remove_file(format!(
+                                "/tmp/sovereign-user-pw-{}",
+                                session_id
+                            ))
+                            .await;
                             continue;
                         }
                     };
                     if let Err(error) = luks_file.write_all(client_msg.luks_passphrase.as_bytes()) {
                         drop(luks_file);
                         let _ = tokio::fs::remove_file(&luks_key_path).await;
-                        let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                        let _ = tokio::fs::remove_file(format!(
+                            "/tmp/sovereign-user-pw-{}",
+                            session_id
+                        ))
+                        .await;
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                                RelayMessage::error(&format!(
+                                    "Failed to stage LUKS2 passphrase: {}",
+                                    error
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         continue;
@@ -2998,10 +3030,18 @@ echo "  User password set."
                     if let Err(error) = luks_file.sync_all() {
                         drop(luks_file);
                         let _ = tokio::fs::remove_file(&luks_key_path).await;
-                        let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                        let _ = tokio::fs::remove_file(format!(
+                            "/tmp/sovereign-user-pw-{}",
+                            session_id
+                        ))
+                        .await;
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to flush LUKS2 passphrase: {}", error)).to_json(),
+                                RelayMessage::error(&format!(
+                                    "Failed to flush LUKS2 passphrase: {}",
+                                    error
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         continue;
@@ -4624,7 +4664,9 @@ echo '}'
                 // Stage browser-supplied configuration through the filesystem API.
                 // Never interpolate it into a shell heredoc: a user-controlled
                 // delimiter must not become a command-injection boundary.
-                if let Err(e) = tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await {
+                if let Err(e) =
+                    tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await
+                {
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!("Config staging failed: {}", e)).to_json(),
@@ -5833,7 +5875,11 @@ mod tests {
         let other = machine_binding_digest_hex_for("machine-b").unwrap();
         assert_eq!(first, second);
         assert_eq!(first.len(), 64);
-        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
+        assert!(
+            first
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        );
         assert_ne!(first, other);
         assert!(machine_binding_digest_hex_for("").is_err());
         assert!(machine_binding_digest_hex_for("x\0y").is_err());
@@ -5848,10 +5894,7 @@ mod tests {
 
     #[test]
     fn cleanup_trap_contains_no_nested_shell_quotes() {
-        let paths = [
-            "/tmp/sovereign-user-pw-42",
-            "/tmp/sovereign-luks-pw-42",
-        ];
+        let paths = ["/tmp/sovereign-user-pw-42", "/tmp/sovereign-luks-pw-42"];
         let cleanup = paths
             .iter()
             .map(|path| format!("rm -f -- {}", path))

@@ -119,9 +119,7 @@ pub fn validate_username(value: &str) -> Result<String, String> {
         return Err("Username cannot be empty".into());
     };
     if !(first.is_ascii_lowercase() || first == '_') {
-        return Err(
-            "Username must start with a lowercase letter or underscore".into(),
-        );
+        return Err("Username must start with a lowercase letter or underscore".into());
     }
     if !chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
         return Err(
