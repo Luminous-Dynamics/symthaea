@@ -445,7 +445,7 @@ mod tests {
         assert!(report.manifest_declares_sealed_generalization_profile);
         assert!(report
             .admission_reason
-            .contains("runner isolation still requires independent evidence"));
+            .contains("cannot establish actual runner isolation"));
     }
 
     #[test]
