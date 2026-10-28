@@ -1042,6 +1042,19 @@ mod tests {
     }
 
     #[test]
+    fn public_task_set_fixture_matches_placeholder_manifest_plan() {
+        let manifest: GenerationManifestV1 = serde_json::from_slice(include_bytes!(
+            "../fixtures/generation-manifest.example.json"
+        ))
+        .expect("placeholder manifest shape");
+        let issues = validate_task_set_contract(
+            &manifest,
+            include_bytes!("../fixtures/task-set.example.json"),
+        );
+        assert!(issues.is_empty(), "{issues:?}");
+    }
+
+    #[test]
     fn task_set_schema_is_valid_and_matches_strict_record_shape() {
         use std::collections::BTreeSet;
 
