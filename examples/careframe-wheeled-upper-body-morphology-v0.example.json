@@ -228,7 +228,7 @@
       "joint_id": "left_drive",
       "parent_link": "base_chassis",
       "child_link": "left_drive_wheel",
-      "joint_type": "revolute",
+      "joint_type": "continuous",
       "origin_m": [
         0,
         0.27,
@@ -239,8 +239,6 @@
         1,
         0
       ],
-      "lower_limit_rad": -12.566,
-      "upper_limit_rad": 12.566,
       "max_effort_nm": 8,
       "max_velocity_rad_s": 2,
       "command_enabled": false,
@@ -250,7 +248,7 @@
       "joint_id": "right_drive",
       "parent_link": "base_chassis",
       "child_link": "right_drive_wheel",
-      "joint_type": "revolute",
+      "joint_type": "continuous",
       "origin_m": [
         0,
         -0.27,
@@ -261,8 +259,6 @@
         1,
         0
       ],
-      "lower_limit_rad": -12.566,
-      "upper_limit_rad": 12.566,
       "max_effort_nm": 8,
       "max_velocity_rad_s": 2,
       "command_enabled": false,
