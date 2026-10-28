@@ -1623,36 +1623,46 @@ mod tests {
     }
     #[test]
     fn cusum_threshold_is_exactly_calibrated_at_the_composite_null_edge() {
-        let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
+        let horizon = HORIZONS[HORIZONS.len() - 1];
+        let matched_reference_alarm_probability =
+            composite_boundary_reference_alarm_probability(horizon);
+        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
         let upper_alarm = cusum_alarm_probability(
-            HORIZONS[HORIZONS.len() - 1],
+            horizon,
             threshold,
             COMPOSITE_NULL_UPPER,
         );
         let lower_alarm = cusum_alarm_probability(
-            HORIZONS[HORIZONS.len() - 1],
+            horizon,
             threshold,
             1.0 - COMPOSITE_NULL_LOWER,
         );
-        assert!(upper_alarm <= CUSUM_SIDE_ALPHA + EPS);
-        assert!(lower_alarm <= CUSUM_SIDE_ALPHA + EPS);
+        assert!(upper_alarm <= matched_reference_alarm_probability + EPS);
+        assert!(lower_alarm <= matched_reference_alarm_probability + EPS);
         assert!((upper_alarm - lower_alarm).abs() <= EPS);
+        assert!(
+            2.0 * upper_alarm <= PER_CELL_ALPHA + EPS,
+            "two-direction CUSUM union bound exceeds the per-cell alpha allocation"
+        );
         if threshold > 1 {
             let previous = cusum_alarm_probability(
-                HORIZONS[HORIZONS.len() - 1],
+                horizon,
                 threshold - 1,
                 COMPOSITE_NULL_UPPER,
             );
             assert!(
-                previous > CUSUM_SIDE_ALPHA - EPS,
-                "calibration did not find the minimum threshold: previous={previous}, target={CUSUM_SIDE_ALPHA}"
+                previous > matched_reference_alarm_probability - EPS,
+                "calibration did not find the minimum threshold: previous={previous}, target={matched_reference_alarm_probability}"
             );
         }
     }
 
     #[test]
     fn cusum_scenario_metrics_preserve_semantics_and_probability_mass() {
-        let threshold = calibrate_cusum_threshold(HORIZONS[HORIZONS.len() - 1], CUSUM_SIDE_ALPHA);
+        let horizon = HORIZONS[HORIZONS.len() - 1];
+        let matched_reference_alarm_probability =
+            composite_boundary_reference_alarm_probability(horizon);
+        let threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm_probability);
         for direction in CusumDirection::ALL {
             for scenario in SCENARIOS {
                 for (horizon, metrics) in evaluate_cusum_scenario(direction, threshold, scenario) {
@@ -1673,8 +1683,8 @@ mod tests {
                                     .contains(&scenario.pre_shift_p));
                     if is_accepted_null_control {
                         assert!(
-                            metrics.scenario_or_pre_shift_alarm_probability <= CUSUM_SIDE_ALPHA + EPS,
-                            "CUSUM violated finite-horizon side allocation on an accepted-null scenario: direction={}, scenario={}, horizon={}, alarm={}",
+                            metrics.scenario_or_pre_shift_alarm_probability <= matched_reference_alarm_probability + EPS,
+                            "CUSUM violated matched-reference boundary on an accepted-null scenario: direction={}, scenario={}, horizon={}, alarm={}",
                             direction.name(),
                             scenario.name,
                             horizon,
