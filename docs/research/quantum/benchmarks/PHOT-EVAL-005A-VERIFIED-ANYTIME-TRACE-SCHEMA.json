@@ -154,13 +154,10 @@
           "type": "string",
           "minLength": 1
         },
-        "verified_cardinality": {
-          "type": "integer",
-          "minimum": 0
-        },
         "reported_cardinality": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Optional caller-reported cardinality for diagnostics only; the evaluator recomputes cardinality from candidate bytes."
         }
       },
       "allOf": [
@@ -178,8 +175,7 @@
           "then": {
             "required": [
               "receipt_sha256",
-              "receipt_artifact_path",
-              "verified_cardinality"
+              "receipt_artifact_path"
             ]
           }
         },
@@ -198,33 +194,7 @@
             "required": [
               "receipt_sha256",
               "receipt_artifact_path"
-            ],
-            "not": {
-              "required": [
-                "verified_cardinality"
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "not": {
-              "properties": {
-                "verifier_disposition": {
-                  "const": "verified_feasible"
-                }
-              },
-              "required": [
-                "verifier_disposition"
-              ]
-            }
-          },
-          "then": {
-            "not": {
-              "required": [
-                "verified_cardinality"
-              ]
-            }
+            ]
           }
         }
       ]
