@@ -549,8 +549,10 @@ fn choose_action<'a>(policy: Policy, pool: Vec<&'a Action>) -> Option<&'a Action
             selection_score(a, false).cmp(&selection_score(b, false)).then_with(|| b.action_id.cmp(&a.action_id))
         }),
         Policy::RiskAwareValue => pool.into_iter().filter(|a| a.predicted_risk_ppm as f64 / PPM <= RISK_CAP)
-            .max_by(|a, b| selection_score(a, true).cmp(&selection_score(b, true)).then_with(|| b.action_id.cmp(&a.action_id)),
-        ),
+            .max_by(|a, b| {
+                selection_score(a, true).cmp(&selection_score(b, true))
+                    .then_with(|| b.action_id.cmp(&a.action_id))
+            }),
     }
 }
 
@@ -683,10 +685,10 @@ fn score_fixture() -> Result<String, String> {
             );
             let s = summaries.get_mut(&policy).expect("policy summary initialized");
             s.campaigns += 1;
-            s.activations += usize::from(r.activated);
-            s.false_authorizations += usize::from(r.false_authorization);
-            s.budget_overruns += usize::from(r.budget_overrun);
-            s.harmful_activations += usize::from(r.activated && r.gross_value_milli < 0);
+            s.activations += if r.activated { 1 } else { 0 };
+            s.false_authorizations += if r.false_authorization { 1 } else { 0 };
+            s.budget_overruns += if r.budget_overrun { 1 } else { 0 };
+            s.harmful_activations += if r.activated && r.gross_value_milli < 0 { 1 } else { 0 };
             s.actual_cost_units = s.actual_cost_units.saturating_add(r.actual_cost_units);
             s.net_value_milli = s.net_value_milli.saturating_add(r.net_value_milli);
         }
