@@ -61,6 +61,9 @@ class ClaimFixture:
                 "invocation_sha256": "f" * 64,
                 "verifier_id": "test-source-indexer",
                 "verifier_sha256": "d" * 64,
+                "verifier_path": "verifier.py",
+                "verifier_argv_index": 0,
+                "verdict_path": "verdict.json",
                 "observed_result": "supports",
             }],
             "unresolved_reason": None,
@@ -152,14 +155,22 @@ class LegacyClaimAuditorTests(unittest.TestCase):
 
     def test_conflicting_witnesses_do_not_pass(self) -> None:
         other = b"independent execution trace: counterexample\n"
+        other_receipt = b'{"schema_version":"vleb-witness-execution-receipt-v1"}\n'
         (self.fx.evidence_root / "run.log").write_bytes(other)
+        (self.fx.evidence_root / "run-receipt.json").write_bytes(other_receipt)
         self.fx.claim["witnesses"].append({
             "witness_id": "execution-counterexample",
             "kind": "independent_execution",
             "artifact_path": "run.log",
             "artifact_sha256": sha(other),
+            "execution_receipt_path": "run-receipt.json",
+            "execution_receipt_sha256": sha(other_receipt),
+            "invocation_sha256": "f" * 64,
             "verifier_id": "test-execution-verifier",
             "verifier_sha256": "e" * 64,
+            "verifier_path": "execution-verifier",
+            "verifier_argv_index": 0,
+            "verdict_path": "run-verdict.json",
             "observed_result": "contradicts",
         })
         # Runtime behavior cannot be verified by the textual witness, and the
