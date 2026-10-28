@@ -130,6 +130,22 @@ The utility scorer's `--receipt` mode revalidates that raw receipt and matches e
 
 These controls establish internal consistency and prevent accidental mixing of scores and receipts; they do not prove that the runner executed honestly, that a sandbox technically prevented oracle access, or that the measured outcome is truthful. The included receipt fixture remains synthetic and marked `synthetic-not-measured`.
 
+### Synthetic end-to-end replay smoke harness (implemented; not measured)
+
+The new `xtask run-cognitive-adaptation-synthetic-replay` command exercises the receipt-bound scorer path without pretending to execute the production Symthaea cognitive loop:
+
+```bash
+cargo run --locked -p xtask -- run-cognitive-adaptation-synthetic-replay \
+  --scenario abrupt --ticks 64 --seed 7 \
+  --out-dir reports/cognitive-adaptation-synthetic
+```
+
+It deterministically builds a synthetic scalar-regression stream and five policy arms (no-adapt, detector-triggered, benefit-gated, staged verification/rollback, and oracle-timed diagnostic). The scenario choices are `abrupt`, `gradual`, `no-impact`, and `recurring`. The harness writes `receipt.json`, `utility-input.json`, `receipt-validation.json`, `utility-score.json`, and `summary.json`. The observed-outcome access track explicitly reflects the controller's one-tick delayed feedback; it is not labelled valid-PE-only.
+
+The runner tags every receipt and summary as `synthetic-not-measured`; its run IDs carry the same classification, and the receipt validator rejects relabelling that synthetic run ID as `run_kind: replay`. The workflow includes a focused unit-test step and an end-to-end CLI smoke check that revalidates the generated receipt. These checks are intended to expose interface/schema bugs early, not establish task improvement, reproduce published detector results, or satisfy the 2,800-cell confirmatory panel.
+
+This harness is deliberately **not** the production replay engine. It uses a simple scalar model, synthetic generated outcomes, and a fixed policy family; it does not run the actual Symthaea cognitive loop, isolate oracle access in a hardened process boundary, ingest pinned public datasets, or establish real-world causal performance. The next scientific milestone remains a driver-owned replay interface with a real policy adapter and immutable exogenous-event delivery. Until the Rust workflow passes on this exact commit, even the synthetic smoke path should be considered implemented but not yet validated.
+
 ## Reference datasets and comparators
 
 Use the seven public datasets and eight drift cells registered by the current benchmark plan as the minimum detector-comparability panel. Pin data sources, licensing, transformations, and per-dataset checksums. Record all exclusions and all missing runs; never silently substitute a dataset.
