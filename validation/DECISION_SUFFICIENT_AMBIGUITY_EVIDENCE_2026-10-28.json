@@ -1,0 +1,38 @@
+{
+  "schema": "symthaea-decision-sufficient-ambiguity-evidence-v1",
+  "status": "SYNTHETIC_FINITE_GAME_NOT_REAL_SCM_OR_EXTERNAL_SOTA_BENCHMARK",
+  "protocol": {
+    "seed": 20261031,
+    "calibration_episodes_per_regime": 50,
+    "test_episodes_per_regime": 12,
+    "calibration_total": 300,
+    "test_total": 72,
+    "budgets": [60, 120, 240],
+    "coverage_targets": [0.9, 0.95],
+    "regimes": 6,
+    "latent_hypotheses": 16,
+    "candidate_policies": 8,
+    "horizon": 2
+  },
+  "mean_joint_regret_bits": [
+    {"target": 0.9, "budget": 60, "feature_pooled": 0.03040044, "feature_group_max": 0.03743542, "risk_pooled": 0.00253024, "risk_group_max": 0.00444320, "full_prior": 0.10660569},
+    {"target": 0.9, "budget": 120, "feature_pooled": 0.01229416, "feature_group_max": 0.01426518, "risk_pooled": 0.00158769, "risk_group_max": 0.00158769, "full_prior": 0.10660569},
+    {"target": 0.9, "budget": 240, "feature_pooled": 0.00868083, "feature_group_max": 0.00902622, "risk_pooled": 0.00063895, "risk_group_max": 0.00063895, "full_prior": 0.10660569},
+    {"target": 0.95, "budget": 60, "feature_pooled": 0.03646382, "feature_group_max": 0.05345301, "risk_pooled": 0.00253024, "risk_group_max": 0.00460524, "full_prior": 0.10660569},
+    {"target": 0.95, "budget": 120, "feature_pooled": 0.01449045, "feature_group_max": 0.03136572, "risk_pooled": 0.00158769, "risk_group_max": 0.00239443, "full_prior": 0.10660569},
+    {"target": 0.95, "budget": 240, "feature_pooled": 0.00940412, "feature_group_max": 0.01054441, "risk_pooled": 0.00063895, "risk_group_max": 0.00063895, "full_prior": 0.10660569}
+  ],
+  "paired_regret_difference_risk_pooled_minus_feature_pooled_95pct_bootstrap_ci": [
+    {"target": 0.9, "budget": 60, "mean": -0.02787020, "ci": [-0.03539240, -0.02077513]},
+    {"target": 0.9, "budget": 120, "mean": -0.01070646, "ci": [-0.01436444, -0.00712298]},
+    {"target": 0.9, "budget": 240, "mean": -0.00804188, "ci": [-0.01100209, -0.00508768]},
+    {"target": 0.95, "budget": 60, "mean": -0.03393358, "ci": [-0.04194784, -0.02645652]},
+    {"target": 0.95, "budget": 120, "mean": -0.01290276, "ci": [-0.01689888, -0.00896852]},
+    {"target": 0.95, "budget": 240, "mean": -0.00876517, "ci": [-0.01192026, -0.00587817]}
+  ],
+  "max_lp_certificate_gap_bits": 2.0000041622836306e-9,
+  "local_unit_tests": "4 passed",
+  "raw_result_sha256": "158eed4c09bedbf9ee8368bad3a960715065ecd7386c30567df23b3c7c64c07e",
+  "compressed_result_sha256": "a01ad8348e0f808c4fbca0233c885f104270e64a8ab2d5cc6517472ee03695b9",
+  "interpretation_boundary": "Regret uses identical paired test episodes. Feature-space coverage and decision-risk-vector coverage are different events, not interchangeable guarantees. Small synthetic pilot; no SOTA claim."
+}
