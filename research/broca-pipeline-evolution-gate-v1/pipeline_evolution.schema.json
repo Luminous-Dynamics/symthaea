@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/broca-pipeline-evolution-v1.json",
+  "title": "Broca Pipeline Evolution Trace V1",
+  "description": "Structural schema for candidate lineage and evaluation receipts. Cross-reference, acyclic graph, held-out leakage and promotion rules are enforced by the Rust validator, not by JSON Schema alone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "root_candidate_id",
+    "candidates",
+    "receipts",
+    "optimizer_visible_receipt_ids"
+  ],
+  "properties": {
+    "schema": {
+      "const": "BROCA-PIPELINE-EVOLUTION-V1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "root_candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "parent_candidate_id",
+          "manifest_sha256",
+          "source_sha256",
+          "retrieval_config_sha256",
+          "lifecycle_policy_sha256",
+          "prompt_sha256",
+          "state",
+          "edit_iteration",
+          "built_from_receipt_ids"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent_candidate_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manifest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "source_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "retrieval_config_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "lifecycle_policy_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "prompt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "development_qualified",
+              "frozen",
+              "promoted",
+              "rejected"
+            ]
+          },
+          "edit_iteration": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "built_from_receipt_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receipt_id",
+          "candidate_id",
+          "candidate_manifest_sha256",
+          "benchmark_id",
+          "split",
+          "status",
+          "dataset_manifest_sha256",
+          "case_set_sha256",
+          "answer_model_sha256",
+          "reader_prompt_sha256",
+          "evaluator_sha256",
+          "harness_sha256",
+          "protocol_sha256",
+          "paired_group_count",
+          "accuracy",
+          "lifecycle_cost_units",
+          "mean_query_latency_ms",
+          "critical_governance_events",
+          "baseline_candidate_id",
+          "paired_lift_pp",
+          "paired_ci95_lower_pp"
+        ],
+        "properties": {
+          "receipt_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_manifest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "benchmark_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split": {
+            "enum": [
+              "development",
+              "calibration",
+              "held_out"
+            ]
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "failed",
+              "invalid",
+              "skipped",
+              "not_run"
+            ]
+          },
+          "dataset_manifest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "case_set_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "answer_model_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "reader_prompt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "evaluator_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "harness_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "protocol_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "paired_group_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "accuracy": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "lifecycle_cost_units": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_query_latency_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "critical_governance_events": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "baseline_candidate_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paired_lift_pp": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "paired_ci95_lower_pp": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "optimizer_visible_receipt_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
