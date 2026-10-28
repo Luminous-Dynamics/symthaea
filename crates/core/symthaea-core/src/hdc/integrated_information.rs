@@ -21,7 +21,10 @@
 //! - **No formal IIT claim**: use a pinned, profile-matched reference suite for any
 //!   comparison with IIT.
 //!
-//! # Scientific Basis
+//! # Theory context
+//!
+//! IIT 3.0 is a motivating reference for the proxy's terminology; the following
+//! citations do not demonstrate formal implementation or empirical validation.
 //!
 //! **Integrated Information Theory (IIT 3.0)**
 //! - Tononi et al. (2016) - "Integrated information theory: from consciousness to its physical substrate"
@@ -41,7 +44,7 @@
 //! a difference under its chosen representation and partition procedure; zero is
 //! not a classification of an unconscious system.
 //!
-//! ## HDC-Adapted IIT
+//! ## HDC proxy details (not a formal IIT adaptation claim)
 //!
 //! A formal IIT calculation requires an explicit causal substrate and version-specific
 //! transition/repertoire and partition operations.
