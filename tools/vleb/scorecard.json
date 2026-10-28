@@ -85,6 +85,45 @@
       ],
       "reported_best_joint_functional_security_success_pct": 25.1,
       "comparability_note": "Preprint benchmark across its own task and agent setup; use as motivation for joint security/functionality measurement, not as a direct VLEB score."
+    },
+    "legacy_code_bench_2026": {
+      "source_url": "https://kalmantic.github.io/legacycodebench/",
+      "publication": "LegacyCodeBench, January 2026",
+      "task_count": 200,
+      "language": "COBOL",
+      "complexity_tiers": 4,
+      "method": "Claim-based generated documentation checked against execution of original programs",
+      "reported_evaluated_model_score_range_pct": [
+        86,
+        92
+      ],
+      "report_status": "benchmark-author-reported",
+      "comparability_note": "Not a VLEB measurement or direct score comparator; different source corpus, model set, harness and scoring policy. Borrow source-anchored behavioral-claim methodology."
+    },
+    "ibm_enterprise_cobol_to_java_icse_2026": {
+      "source_url": "https://research.ibm.com/publications/enterprise-scale-cobol-to-java-translation-llms-augmented-with-program-analysis",
+      "publication_date": "2026-04-12",
+      "publication": "ICSE 2026",
+      "public_programs": 20,
+      "proprietary_customer_applications": 10,
+      "reported_median_structural_quality_pct_lower_bound": 80,
+      "reported_functional_score_pct_lower_bound": 75,
+      "evaluator": "LLM-as-judge",
+      "comparability_note": "Different dataset and scoring rubric; not directly comparable to hidden-test resolution. Borrow hybrid static-analysis and metadata-first pipeline design."
+    },
+    "swe_bench_leaderboard_stability_audit": {
+      "source_url": "https://arxiv.org/abs/2609.17394",
+      "publication_date": "2026-09-15",
+      "audited_submission_count": 254,
+      "findings": {
+        "top_two_swe_bench_verified_resolved_instances_each": 396,
+        "adjacent_top_30_verified_pairs_significant_at_alpha_0_05": 0,
+        "adjacent_pair_count": 29,
+        "max_within_model_scaffold_range_percentage_points": 29.8,
+        "top_30_score_spread_percentage_points": 8.8
+      },
+      "report_status": "paper-reported-observational-audit",
+      "comparability_note": "An observational audit of existing submissions; does not establish equivalence or causal scaffold effects. Motivates paired tests, uncertainty reporting and model-scaffold provenance."
     }
   },
   "proposed_targets": {
@@ -136,6 +175,13 @@
         "preregister critical/high escape-rate threshold before confirmation",
         "report joint success separately from functional success"
       ]
+    },
+    "cobol_source_index_precision_recall_pct": {
+      "target": 99,
+      "status": "target_not_measured",
+      "unit": "percent",
+      "scope": "exact fixed-format source-anchor indexing only",
+      "admission_rule": "Measure on independently annotated authorized/synthetic corpus; report precision, recall and diagnostic recall by anchor family. This is not a full parser or modernization target."
     }
   },
   "current_measurements": {
