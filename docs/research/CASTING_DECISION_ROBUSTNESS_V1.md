@@ -69,3 +69,16 @@ These tests are mechanism checks, not evidence that the optimizer performs well 
 The relevant comparison is not only final nominal hypervolume. Compare cost-normalized anytime performance, true held-out feasibility, false-feasible decisions, shift-wise hypervolume retention, worst-shift regret, wall time, memory, and calibration / validation overhead. Include strong multi-fidelity constrained baselines (including MF-SCBO after code and environment locking), multi-objective multi-fidelity methods, and simple controls. Lock every baseline to an immutable source revision and environment before comparing.
 
 The candidate research hypothesis is that **decision-impact-weighted fidelity allocation plus post-selection robustness auditing** can outperform methods that optimize the nominal surrogate while making robustness failures visible. This is an empirical hypothesis, not a novelty or superiority claim.
+
+## CLI smoke test
+
+From the repository root, run:
+
+```sh
+python3 tools/casting-benchmark/decision_robustness_eval.py \
+  tools/casting-benchmark/fixtures/decision_robustness_toy.json \
+  --output /tmp/casting-decision-robustness-receipt.json
+python3 -m unittest tools/casting-benchmark/test_decision_robustness_eval.py
+```
+
+The toy fixture intentionally selects a candidate that violates a constraint under one of two shifts while a better feasible candidate remains unselected. The receipt should report selected false-feasible count 1 of 2 predicted-feasible candidate/shift pairs, selected feasibility rate 0.5, worst-shift finite-pool retention 0, and worst-shift finite-pool regret 1.0. These are known-answer fixture values, not casting performance results. The fixture's digest strings are placeholders for schema tests only; replace them with verified artifact digests in a real experiment.
