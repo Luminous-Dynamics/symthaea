@@ -176,6 +176,7 @@ impl EvidenceDiskStore {
         self.read_generation(&pointer).map(Some)
     }
 
+    #[cfg(test)]
     fn commit_with_fault(
         &self,
         hdc_index_bytes: &[u8],
