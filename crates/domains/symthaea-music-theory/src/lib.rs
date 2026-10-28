@@ -23,7 +23,7 @@
 //!
 //! Music theory has correct answers. Every rule in this crate ships a test
 //! asserting a known fact. If we can't state the ground-truth property, we
-//! don't ship the rule. This crate is the anti-scaffold.
+//! don't ship the rule. This is the anti-scaffold.
 
 #![deny(unsafe_code)]
 
@@ -62,6 +62,7 @@ pub mod motif_family;
 pub mod motif_foundry;
 pub mod motif_return;
 pub mod edit_locality;
+pub mod edit_locality_attestation;
 pub mod obligation;
 pub mod opera;
 pub mod passacaglia;
@@ -113,6 +114,10 @@ pub use edit_locality::{
     EDIT_LOCALITY_CONTRACT_VERSION, EditLocalityConfig, EditLocalityError, EditLocalityEvidence,
     EditOperation, EditRequest, LocalityEvent, PropertyCheck, MAX_EDIT_LOCALITY_EVENTS,
     verify_edit_locality, verify_edit_locality_with_config,
+};
+pub use edit_locality_attestation::{
+    BoundEditLocalityEvidence, EDIT_LOCALITY_BINDING_VERSION,
+    replay_edit_locality_bound, verify_edit_locality_bound, verify_edit_locality_bound_with_config,
 };
 pub use motif_foundry::{
     FoundryConfig, FoundryDiversityReport, canonical_fingerprint, config_for_dna,
