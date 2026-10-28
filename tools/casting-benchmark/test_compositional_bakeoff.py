@@ -2,6 +2,7 @@
 """Tests for the compositional mismatch runner and independent trace scorer."""
 from __future__ import annotations
 
+import copy
 import json
 import unittest
 from pathlib import Path
@@ -60,7 +61,7 @@ class CompositionalBakeoffTests(unittest.TestCase):
         self.assertEqual(manifest["default_sweep"]["severities"], [0, 0.5, 1, 2])
         self.assertEqual(
             manifest["default_sweep"]["run_count"],
-            6 * 6 * 3 * 4 * 3 * 6,
+            6 * 6 * 3 * 4 * 3 * 7,
         )
         self.assertIn("zero_mismatch", manifest["negative_controls"])
 
@@ -108,7 +109,7 @@ class CompositionalBakeoffTests(unittest.TestCase):
             seeds=(17, 23),
             design_count=75,
         )
-        self.assertEqual(document["run_count"], 2 * 2 * 1 * 2 * 2 * 6)
+        self.assertEqual(document["run_count"], 2 * 2 * 1 * 2 * 2 * 7)
         self.assertEqual(len(document["paired_runs"]), document["run_count"])
         by_key = {
             (r["objective_family"], r["constraint_family"], r["dimension"], r["severity"], r["seed"], r["policy"]): r
@@ -118,8 +119,8 @@ class CompositionalBakeoffTests(unittest.TestCase):
         receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
         self.assertTrue(receipt["valid"])
         self.assertEqual(receipt["run_count"], document["run_count"])
-        self.assertEqual(receipt["cell_summary_count"], 2 * 2 * 1 * 2 * 6)
-        self.assertEqual(receipt["paired_comparison_count"], 2 * 2 * 1 * 2 * 5)
+        self.assertEqual(receipt["cell_summary_count"], 2 * 2 * 1 * 2 * 7)
+        self.assertEqual(receipt["paired_comparison_count"], 2 * 2 * 1 * 2 * 6)
 
     def test_scorer_requires_default_matrix_or_explicit_subset_flag(self) -> None:
         document = run_sweep(
@@ -189,6 +190,67 @@ class CompositionalBakeoffTests(unittest.TestCase):
         trace[0]["candidate_scores"][0]["score"] += 0.01
         with self.assertRaisesRegex(ValueError, "replay rejected"):
             score_document(document, ROOT, allow_diagnostic_subset=True)
+
+
+    def test_joint_action_policy_adapts_and_independently_replays(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("joint_action_cost_aware",),
+            cost_budget=80,
+            design_count=75,
+        )
+        run = document["paired_runs"][0]
+        self.assertEqual(len(run["joint_action_trace"]), run["evaluation_count"])
+        self.assertEqual(
+            run["joint_action_trace"][0]["selection_mode"], "bootstrap_space_filling"
+        )
+        self.assertTrue(all(
+            entry["selected_fidelity"] == "low"
+            for entry in run["joint_action_trace"][:6]
+        ))
+        self.assertLessEqual(run["cost_spent"], 80)
+        self.assertEqual(
+            run["cost_spent"],
+            sum(row["cost_units"] for row in run["evaluations"]),
+        )
+        receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
+        self.assertTrue(receipt["valid"])
+
+        tampered = copy.deepcopy(document)
+        tampered["paired_runs"][0]["joint_action_trace"][0]["selected_candidate_id"] += 1
+        with self.assertRaisesRegex(ValueError, "joint-action replay"):
+            score_document(tampered, ROOT, allow_diagnostic_subset=True)
+
+    def test_joint_action_policy_changes_fidelity_allocation_with_budget(self) -> None:
+        small = run_sweep(
+            objective_families=("warped_coordinates",),
+            constraint_families=("discontinuous_step",),
+            dimensions=(2,),
+            severities=(1.0,),
+            seeds=(23,),
+            policies=("joint_action_cost_aware",),
+            cost_budget=80,
+            design_count=75,
+        )["paired_runs"][0]
+        large = run_sweep(
+            objective_families=("warped_coordinates",),
+            constraint_families=("discontinuous_step",),
+            dimensions=(2,),
+            severities=(1.0,),
+            seeds=(23,),
+            policies=("joint_action_cost_aware",),
+            cost_budget=120,
+            design_count=75,
+        )["paired_runs"][0]
+        self.assertLessEqual(small["cost_spent"], 80)
+        self.assertLessEqual(large["cost_spent"], 120)
+        self.assertNotEqual(
+            small["fidelity_evaluations"], large["fidelity_evaluations"]
+        )
 
     def test_zero_severity_trace_replay_rejects_any_mismatch(self) -> None:
         document = run_sweep(
