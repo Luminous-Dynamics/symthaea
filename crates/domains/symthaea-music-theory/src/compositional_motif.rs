@@ -226,6 +226,14 @@ pub fn verify_compositional_transform_with_config(
     }
 
     let selected = &source[selection.source_start_index..end];
+    let anchor = selected[0];
+    if claim.pitch_orientation == PitchOrientation::Invert
+        && selected.iter().all(|event| event.pitch_midi == anchor.pitch_midi)
+    {
+        return Err(CompositionalVerificationError::UnsupportedTransform(
+            "pitch inversion is unidentifiable for a constant-pitch motif",
+        ));
+    }
     let cells = selected
         .len()
         .checked_add(1)
@@ -746,6 +754,29 @@ mod tests {
         assert!(
             verify_compositional_transform(&source_high, &source_high, 0.0, &out_of_range).is_err()
         );
+    }
+
+    #[test]
+    fn rejects_unidentifiable_inversion_of_constant_pitch_motif() {
+        let source = vec![
+            SymbolicEvent { pitch_midi: 60, onset_beats: 0.0, duration_beats: 0.5 },
+            SymbolicEvent { pitch_midi: 60, onset_beats: 1.0, duration_beats: 0.5 },
+            SymbolicEvent { pitch_midi: 60, onset_beats: 2.0, duration_beats: 0.5 },
+            SymbolicEvent { pitch_midi: 60, onset_beats: 3.0, duration_beats: 0.5 },
+        ];
+        let claim = descriptor(
+            PitchOrientation::Invert,
+            0,
+            1.0,
+            1.0,
+            SelectionMode::Full,
+            0,
+            source.len(),
+        );
+        assert!(matches!(
+            verify_compositional_transform(&source, &source, 0.0, &claim),
+            Err(CompositionalVerificationError::UnsupportedTransform(_))
+        ));
     }
 
     #[test]
