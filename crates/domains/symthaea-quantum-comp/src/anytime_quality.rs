@@ -10,7 +10,11 @@ use super::{
     CandidateVerification, MisEvidenceContext, MisEvidenceVerdict, VerifiedMisCandidate,
     canonical_mis_graph_vertex_count, sha256_hex, verify_mis_candidate_for_trial_with_receipt,
 };
-use std::{collections::HashSet, error::Error, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    fmt,
+};
 
 /// Terminal state for one solver attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,6 +159,8 @@ pub enum VerifiedAnytimeQualityError {
     UnsafeArtifactPath(&'static str, String),
     /// Candidate bytes do not match the declared digest.
     CandidateDigestMismatch(String),
+    /// One artifact path was assigned conflicting digests within the same bundle.
+    ArtifactPathDigestConflict(String),
     /// Receipt bytes do not match the declared digest.
     ReceiptDigestMismatch(String),
     /// Receipt path/digest/bytes are only partially present.
@@ -192,6 +198,7 @@ impl fmt::Display for VerifiedAnytimeQualityError {
             Self::DuplicateEventId(event) => write!(f, "duplicate event ID: {event}"),
             Self::UnsafeArtifactPath(field, path) => write!(f, "unsafe {field} path: {path}"),
             Self::CandidateDigestMismatch(event) => write!(f, "candidate digest mismatch: {event}"),
+            Self::ArtifactPathDigestConflict(path) => write!(f, "artifact path has conflicting digests: {path}"),
             Self::ReceiptDigestMismatch(event) => write!(f, "receipt digest mismatch: {event}"),
             Self::IncompleteReceiptArtifact(event) => write!(f, "incomplete receipt artifact: {event}"),
             Self::UnexpectedNoCandidate(event) => write!(f, "no-candidate disposition in event {event}"),
@@ -249,6 +256,18 @@ fn validate_relative_artifact_path(
     } else {
         Ok(())
     }
+}
+
+fn register_artifact_digest(
+    artifact_digests: &mut HashMap<String, String>,
+    path: &str,
+    digest: &str,
+) -> Result<(), VerifiedAnytimeQualityError> {
+    if artifact_digests.get(path).is_some_and(|existing| existing != digest) {
+        return Err(VerifiedAnytimeQualityError::ArtifactPathDigestConflict(path.to_owned()));
+    }
+    artifact_digests.insert(path.to_owned(), digest.to_owned());
+    Ok(())
 }
 
 /// Recompute an anytime-quality score from canonical graph and exact event artifact bytes.
@@ -309,6 +328,7 @@ pub fn compare_verified_anytime_quality(
     let seed = trace.seed_id.parse::<u64>()
         .map_err(|_| VerifiedAnytimeQualityError::InvalidSeedIdentity)?;
     let mut seen_ids = HashSet::with_capacity(trace.events.len());
+    let mut artifact_digests = HashMap::new();
     let mut previous_time = 0.0f64;
     let mut have_previous_time = false;
     let mut feasible_count = 0usize;
@@ -339,6 +359,11 @@ pub fn compare_verified_anytime_quality(
         if sha256_hex(&event.candidate_bytes) != event.candidate_sha256 {
             return Err(VerifiedAnytimeQualityError::CandidateDigestMismatch(event.event_id.clone()));
         }
+        register_artifact_digest(
+            &mut artifact_digests,
+            &event.candidate_artifact_path,
+            &event.candidate_sha256,
+        )?;
         if event.reported_cardinality.is_some_and(|count| count > trace.graph_vertices) {
             return Err(VerifiedAnytimeQualityError::CardinalityOutOfRange(event.event_id.clone()));
         }
@@ -361,6 +386,7 @@ pub fn compare_verified_anytime_quality(
             if sha256_hex(bytes) != digest {
                 return Err(VerifiedAnytimeQualityError::ReceiptDigestMismatch(event.event_id.clone()));
             }
+            register_artifact_digest(&mut artifact_digests, path, digest)?;
         }
 
         let verified_evidence: Option<VerifiedMisCandidate> = match event.verifier_disposition {
@@ -704,6 +730,20 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn rejects_one_bundle_path_with_conflicting_candidate_bytes() {
+        let first = unverified_event("one", 100.0, &[0, 1]);
+        let mut second = unverified_event("two", 200.0, &[2, 3, 4]);
+        second.candidate_artifact_path = first.candidate_artifact_path.clone();
+        assert!(matches!(
+            compare_verified_anytime_quality(GRAPH, &trace(
+                AnytimeTerminalOutcome::NoFeasibleCandidate, vec![first, second],
+            )),
+            Err(VerifiedAnytimeQualityError::ArtifactPathDigestConflict(_))
+        ));
+    }
 
     #[test]
     fn rejects_unsupported_protocol_id() {
