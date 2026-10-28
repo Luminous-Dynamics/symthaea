@@ -363,11 +363,14 @@ def audit_claim_evidence_bundle(
             if not isinstance(source, dict) or source.get("sha256") != item["source_sha256"]:
                 raise ValueError("claim source digest differs from evaluator-pinned source digest")
             witnesses = claim_data.get("witnesses", [])
+            if not isinstance(witnesses, list):
+                witnesses = []
             missing_kinds = sorted({
-                witness.get("kind")
+                kind if isinstance(kind, str) else "<invalid-kind>"
                 for witness in witnesses
                 if isinstance(witness, dict)
-                and witness.get("kind") not in trusted_claim_verifier_pins
+                for kind in [witness.get("kind")]
+                if not isinstance(kind, str) or kind not in trusted_claim_verifier_pins
             })
             if missing_kinds:
                 row["status"] = "unresolved"
