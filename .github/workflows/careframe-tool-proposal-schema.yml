@@ -65,7 +65,11 @@ jobs:
           ' "$model"
           jq -e '
             ((.joints | length) == 15) and
-            all(.joints[]; .command_enabled == false)
+            ([.joints[] | select(.joint_type == "continuous")] | length == 2) and
+            ([.joints[] | select(.joint_type == "revolute")] | length == 7) and
+            ([.joints[] | select(.joint_type == "fixed")] | length == 6) and
+            all(.joints[]; .command_enabled == false) and
+            all(.joints[] | select(.joint_type == "continuous"); (has("lower_limit_rad") | not) and (has("upper_limit_rad") | not))
           ' "$model"
           jq -e '
             .authority.simulation_only == true and
@@ -102,6 +106,8 @@ jobs:
           reject /tmp/careframe-morph-unknown-field.json "unknown link field"
           jq '.joints[2].axis_xyz = [0,1,0]' "$model" > /tmp/careframe-morph-fixed-axis.json
           reject /tmp/careframe-morph-fixed-axis.json "nonzero axis on fixed joint"
+          jq '.joints[0].lower_limit_rad = 0' "$model" > /tmp/careframe-morph-continuous-limit.json
+          reject /tmp/careframe-morph-continuous-limit.json "position limits on a continuous wheel joint"
 
       - name: Check proposal cross-references and matched task definition
         run: |
