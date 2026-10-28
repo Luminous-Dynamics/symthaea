@@ -501,6 +501,29 @@ class ReceiptAuditorTests(unittest.TestCase):
             row["status"] = "not_applicable"
         self.assert_issue(self.bundle.run_audit(), "differential_effect_coverage_incomplete")
 
+    def test_unknown_concrete_test_in_baseline_expectations_is_rejected(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        row = task["oracle_contract"]["test_execution_map"][0]
+        row["baseline_expectations"][0]["execution_id"] = "not_a_mapped_execution"
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "baseline_expectation_unknown_execution")
+
+    def test_duplicate_baseline_expectation_for_same_execution_is_rejected(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        row = task["oracle_contract"]["test_execution_map"][0]
+        row["baseline_expectations"].append(copy.deepcopy(row["baseline_expectations"][0]))
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "baseline_expectation_duplicate_execution")
+
+    def test_empty_baseline_expectation_list_is_rejected(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["oracle_contract"]["test_execution_map"][0]["baseline_expectations"] = []
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "baseline_expectation_map_invalid")
+
     def test_baseline_must_match_each_frozen_test_expectation(self) -> None:
         raw = self.bundle.baseline_log().decode()
         raw = raw.replace("test control_totals_contract ... FAILED", "test control_totals_contract ... ok")
