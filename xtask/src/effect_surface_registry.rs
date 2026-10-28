@@ -86,6 +86,7 @@ pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Resu
         "registry_baseline={}@{}",
         registry.source_baseline.baseline_ref, registry.source_baseline.baseline_commit
     );
+    println!("working_tree_head={}", working_tree_head(root).unwrap_or_else(|| "UNKNOWN".to_string()));
     println!("registry_integrity=PASS");
     println!(
         "source_anchors_checked={}/{}",
@@ -264,7 +265,6 @@ fn is_sha(value: &str, expected_len: usize) -> bool {
     value.len() == expected_len && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-#[allow(dead_code)]
 fn working_tree_head(root: &Path) -> Option<String> {
     let output = Command::new("git")
         .args(["rev-parse", "HEAD"])
