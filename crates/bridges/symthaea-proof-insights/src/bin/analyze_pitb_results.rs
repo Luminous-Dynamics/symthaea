@@ -1838,8 +1838,9 @@ fn validate_power_report(
                 if scenario.estimated_utility_gate_power.is_some()
                     || scenario.estimated_power_lower_95.is_some()
                     || scenario.estimated_power_upper_95.is_some()
+                    || scenario.null_effect_false_claim_probability_upper_simultaneous_95.is_some()
                 {
-                    bail!("infeasible power scenario must not report a power estimate");
+                    bail!("infeasible power scenario must not report power or null-calibration bounds");
                 }
             }
             other => bail!("unknown power scenario status {other}"),
@@ -1889,6 +1890,10 @@ fn validate_power_report(
                 || !same_optional_probability(
                     observed.estimated_power_upper_95,
                     expected.estimated_power_upper_95,
+                )
+                || !same_optional_probability(
+                    observed.null_effect_false_claim_probability_upper_simultaneous_95,
+                    expected.null_effect_false_claim_probability_upper_simultaneous_95,
                 )
                 || !same_optional_probability(
                     observed.mean_observed_effect_percentage_points,
