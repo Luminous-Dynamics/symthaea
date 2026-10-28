@@ -5,11 +5,11 @@
   "source_git_blob_sha1": "66cccbbf9b6bbe9d04fce05ac998a3fc0e576b27",
   "source_sha256": "c2c709906a91dc6b9c80d313c6d5497be96c2ea55b04977a5ab977951a1b4c4b",
   "test_path": "validation/test_policy_risk_binding.py",
-  "test_git_blob_sha1": "29b8176acd6dae0b6ab674c8f3537fffef786374",
-  "test_sha256": "bb180baed9c4eb4092ed6f9dd10ae523439df90e48ae430ee2560316f96a4241",
-  "new_tests_passed": 7,
-  "combined_tests_passed": 15,
-  "combined_test_runtime_seconds": 11.405,
+  "test_git_blob_sha1": "30a9dcfaf181b2cb4a6c6069ebc5648a09e25168",
+  "test_sha256": "e26b2da17d6057361fd6e63eb3970cb504ffd1f5610b15181a55494643121186",
+  "new_tests_passed": 8,
+  "combined_tests_passed": 16,
+  "combined_test_runtime_seconds": 11.773,
   "negative_control_raw_result_sha256": "519da9c0f6b1f05dc8c058c0205e9321616d961b1341c5417bddeb347ce4e9e5",
   "negative_control_known_regime": {
     "correct_mean_regret_bits": 0.0015245793240142524,
@@ -22,9 +22,15 @@
     "n": 800,
     "target_coverage": 0.9,
     "pooled_coverage": 0.84625,
-    "pooled_wilson_95_ci": [0.8196048749680035, 0.8695857532595658],
+    "pooled_wilson_95_ci": [
+      0.8196048749680035,
+      0.8695857532595658
+    ],
     "group_max_coverage": 0.9,
-    "group_max_wilson_95_ci": [0.8772617146858577, 0.9189151843496017]
+    "group_max_wilson_95_ci": [
+      0.8772617146858577,
+      0.9189151843496017
+    ]
   },
   "limitations": [
     "synthetic finite game, not real SCM or production runtime",
@@ -32,5 +38,9 @@
     "helper is not yet integrated into production Rust decision dispatch",
     "local passing tests are not remote CI evidence",
     "no external benchmark or SOTA comparison has been run"
+  ],
+  "test_cases_added": [
+    "build manifest from the Symthaea finite-game risk tensor and reject a row permutation",
+    "reject reordered policy labels against the same risk tensor"
   ]
 }
