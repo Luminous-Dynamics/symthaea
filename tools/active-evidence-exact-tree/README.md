@@ -131,3 +131,19 @@ Independent Python reference results for selected budgets:
 This provides a more informative frontier than the prior risk-first tie-break, but it still does not establish a win over entropy/diversity/SOTA at matched budgets. The next fair comparison is to take the best baseline result feasible under the same **worst-case expected-cost cap**, report the full risk-cost frontier and its dominated segments, then expand to task/source and shift-family replication.
 
 The robust_tree.rs output schema is now mode,limit,scenario,...; the independent checker also verifies the additional worst_case_ambiguity_cost field and rejects a mutated row.
+
+
+### Matched expected-cost comparison against the implemented greedy arms
+
+Using the same four ambiguity scenarios and selecting each greedy arm's best available query cap subject to its maximum expected cost over those scenarios staying within the budget gives this preliminary frontier:
+
+| Max expected-cost budget | Best implemented greedy arm | Greedy worst-case regret | Exact-tree worst-case regret | Exact-tree max expected cost |
+|---:|---|---:|---:|---:|
+| 1.0 | Entropy / plug-in EVSI / robust greedy | 1.778000 | 1.778000 | 1.000 |
+| 1.5 | Entropy / plug-in EVSI / robust greedy | 1.778000 | 1.735898 | 1.483 |
+| 2.0 | Entropy / plug-in EVSI / robust greedy | 1.778000 | 1.706826 | 1.621 |
+| 2.5 | Entropy / plug-in EVSI / robust greedy | 1.778000 | 1.648986 | 2.457 |
+| 2.632 | Entropy / plug-in EVSI / robust greedy | 1.778000 | 1.609023 | 2.632 |
+| 3.0 | Entropy | 1.735898 | 1.609023 | 2.632 |
+
+This is a **matched worst-case expected-cost comparison only against the small set of implemented arms** (random, entropy, plug-in EVSI, and one-step robust EVSI), over the same four hand-defined ambiguity scenarios. The best greedy arm is chosen among the four based on these same scenarios, so this is exploratory rather than a sealed held-out comparison. It does not include Uncertainty Herding or R-IDeA, does not satisfy a per-trajectory hard cost cap, and does not establish SOTA superiority. The key testable hypothesis is narrower: explicit multi-step planning can improve the worst-case decision-regret/cost frontier versus one-step greedy selection in this toy model.
