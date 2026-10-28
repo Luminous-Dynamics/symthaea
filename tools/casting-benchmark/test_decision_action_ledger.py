@@ -211,6 +211,26 @@ class DecisionActionLedgerTests(unittest.TestCase):
             ).hexdigest()
             verify_ledger_bytes(canonical_json(first) + b"\n" + canonical_json(second) + b"\n")
 
+    def test_append_refuses_corrupt_existing_ledger_without_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trace.jsonl"
+            path.write_bytes(b"not valid json\n")
+            before = path.read_bytes()
+            with self.assertRaises(ValueError):
+                append_record(path, event())
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_rejects_extremely_large_actual_cost(self):
+        with self.assertRaisesRegex(ValueError, "finite"):
+            outcome_event(
+                {"record_type": "decision", **event()},
+                actual_cost_units=10**10000,
+                outcome_status="succeeded",
+                outcome_sha256=OUTCOME,
+                resulting_state_sha256=RESULT_STATE,
+                reason_code="done",
+            )
+
     def test_rejects_nonfinite_actual_cost(self):
         with self.assertRaisesRegex(ValueError, "finite"):
             outcome_event(
