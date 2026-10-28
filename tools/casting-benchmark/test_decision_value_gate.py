@@ -108,6 +108,18 @@ class DecisionValueGateTests(unittest.TestCase):
         result = self.choose([action("z", value=2), action("a", value=2)])
         self.assertEqual(result.action_id, "a")
 
+    def test_replication_is_a_supported_selected_action(self):
+        result = self.choose([
+            action("new-design", kind="evaluate", cost=2, value=1),
+            action("repeat-measurement", kind="replicate", cost=1, value=0.8),
+        ])
+        self.assertEqual(result.disposition, "replicate")
+        self.assertEqual(result.action_id, "repeat-measurement")
+
+    def test_unhashable_action_kind_is_rejected_cleanly(self):
+        with self.assertRaisesRegex(ValueError, "kind must be one of"):
+            self.choose([action("bad-kind", kind=[] )])
+
     def test_serialized_decision_marks_proxy_only(self):
         result = self.choose([action("one", value=2)])
         receipt = result.to_dict()
