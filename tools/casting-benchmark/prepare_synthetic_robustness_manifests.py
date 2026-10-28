@@ -169,10 +169,17 @@ def build_manifests(sweep: Any, sweep_raw: bytes, selector: dict[str, Any], gene
         raise ValueError("generator accepts synthetic compositional sweeps only")
     if not isinstance(sweep["paired_runs"], list) or sweep["run_count"] != len(sweep["paired_runs"]):
         raise ValueError("sweep run_count does not equal paired_runs length")
+    repo_root = Path(__file__).resolve().parents[2]
     for path, digest in sweep["source_sha256"].items():
         if not isinstance(path, str) or not path or path.startswith("/") or ".." in Path(path).parts:
             raise ValueError(f"unsafe source-lock path {path!r}")
-        _sha(digest, f"sweep.source_sha256[{path!r}]")
+        expected_digest = _sha(digest, f"sweep.source_sha256[{path!r}]")
+        source_path = repo_root / path
+        if not source_path.is_file():
+            raise ValueError(f"sweep source-lock path does not exist in this checkout: {path}")
+        actual_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        if actual_digest != expected_digest:
+            raise ValueError(f"sweep source digest mismatch for {path}: expected {expected_digest}, found {actual_digest}")
     expected_selector = _exact(
         selector,
         {"objective_family", "constraint_family", "dimension", "severity", "seed", "policy"},
