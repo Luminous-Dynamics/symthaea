@@ -1027,6 +1027,10 @@ def cusum_self_test():
     controls = (
         ("upper_cusum", "stationary_null"),
         ("lower_cusum", "stationary_null"),
+        ("upper_cusum", "stable_baseline_rate_048"),
+        ("upper_cusum", "stable_baseline_rate_052"),
+        ("lower_cusum", "stable_baseline_rate_048"),
+        ("lower_cusum", "stable_baseline_rate_052"),
         ("upper_cusum", "within_band_transition_049_to_051"),
         ("lower_cusum", "within_band_transition_049_to_051"),
     )
