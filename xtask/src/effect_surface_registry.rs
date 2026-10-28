@@ -79,7 +79,7 @@ pub fn check(root: &Path, registry_path: &Path, require_qualified: bool) -> Resu
         .with_context(|| format!("read effect-surface registry: {}", registry_path.display()))?;
     let registry: Registry =
         serde_json::from_str(&raw).context("parse effect-surface registry JSON")?;
-    let registry_digest = format!("{:x}", Sha256::digest(raw.as_bytes()));
+    let registry_digest = registry_identity_digest(&raw)?;
     let summary = validate(root, &registry, &registry_digest)?;
 
     println!("registry_id={}", registry.registry_id);
@@ -308,6 +308,25 @@ fn validate(root: &Path, registry: &Registry, registry_digest: &str) -> Result<S
     })
 }
 
+// The registry identity excludes the evidence payloads that refer back to it.
+// This avoids a self-referential digest while binding every other registry field.
+fn registry_identity_digest(raw: &str) -> Result<String> {
+    let mut value: serde_json::Value =
+        serde_json::from_str(raw).context("parse registry for identity digest")?;
+    let entries = value
+        .get_mut("entries")
+        .and_then(serde_json::Value::as_array_mut)
+        .context("registry identity requires an entries array")?;
+    for entry in entries {
+        let object = entry
+            .as_object_mut()
+            .context("registry identity entries must be JSON objects")?;
+        object.remove("qualification_evidence");
+    }
+    let canonical = serde_json::to_vec(&value).context("serialize normalized registry identity")?;
+    Ok(format!("{:x}", Sha256::digest(canonical)))
+}
+
 fn is_safe_relative_path(value: &str) -> bool {
     let path = Path::new(value);
     !value.trim().is_empty()
@@ -357,5 +376,15 @@ mod tests {
         assert!(is_sha("a".repeat(64).as_str(), 64));
         assert!(!is_sha("g".repeat(40).as_str(), 40));
         assert!(!is_sha("a".repeat(39).as_str(), 40));
+    }
+
+    #[test]
+    fn registry_identity_excludes_evidence_payload_to_avoid_self_reference() {
+        let first = r#"{"registry_id":"v1","entries":[{"id":"x","qualification_evidence":null}]}"#;
+        let second = r#"{"registry_id":"v1","entries":[{"id":"x","qualification_evidence":{"test_receipt_sha256":"different"}}]}"#;
+        assert_eq!(
+            super::registry_identity_digest(first).unwrap(),
+            super::registry_identity_digest(second).unwrap()
+        );
     }
 }
