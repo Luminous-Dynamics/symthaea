@@ -36,7 +36,7 @@ For the current qualification plan, see [`PHI_QUALIFICATION_V0_1.md`](../../docs
 | `relations_analysis` | Evaluate the declared cause–effect relations/structure, if implemented | Completeness against profile-specific reference fixtures |
 | `irreducibility_test` | Compute the required mechanism/system partition under the selected profile | Known-answer agreement, partition identity, search completeness |
 
-A partial or proxy calculation must be reported as partial/proxy. Current PyPhi docs distinguish `IIT_3_0`, `IIT_4_0_2023`, and `IIT_4_0_2026`; pin the exact profile, package/source revision, preset and partition scheme.
+A partial or proxy calculation must be reported as partial/proxy. Current PyPhi docs distinguish `IIT_3_0`, `IIT_4_0_2023`, and `IIT_4_0_2026`; pin the exact profile, package/source revision, preset and partition scheme. Keep `Analysis.phi` (system integrated information, φ_s), `Analysis.ces` (the Φ-structure), and `Analysis.big_phi` (structure integrated information, Φ) as different quantities. The current docs identify PyPhi 2.0 as a release candidate and say bare `pip install pyphi` installs 1.2, so pin the exact package artifact.
 
 ### 4. GWT Integration
 
