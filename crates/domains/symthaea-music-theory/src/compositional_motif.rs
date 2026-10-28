@@ -17,6 +17,9 @@ use serde::{Deserialize, Serialize};
 /// Versioned contract for compositional motif transformation verification.
 pub const COMPOSITIONAL_MOTIF_CONTRACT_VERSION: &str = "compositional-motif-v1";
 
+/// Hard cap on dynamic-programming cells to bound untrusted-input work and memory.
+pub const MAX_ALIGNMENT_CELLS: usize = 1_000_000;
+
 /// Whether melodic intervals are preserved or sign-inverted around the first
 /// selected pitch, before the declared semitone translation is applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,6 +206,15 @@ pub fn verify_compositional_transform_with_config(
     }
 
     let selected = &source[selection.source_start_index..end];
+    let cells = selected
+        .len()
+        .checked_add(1)
+        .and_then(|rows| target.len().checked_add(1).and_then(|cols| rows.checked_mul(cols)));
+    if cells.is_none_or(|count| count > MAX_ALIGNMENT_CELLS) {
+        return Err(CompositionalVerificationError::UnsupportedTransform(
+            "alignment exceeds the configured computation-cell budget",
+        ));
+    }
     let anchor = selected[0];
     for event in selected {
         let (pitch, onset, duration) =
@@ -671,6 +683,31 @@ mod tests {
         );
         assert!(
             verify_compositional_transform(&source_high, &source_high, 0.0, &out_of_range).is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_alignment_work_above_the_hard_budget() {
+        let source: Vec<_> = (0..1_000)
+            .map(|index| SymbolicEvent {
+                pitch_midi: 60 + (index % 12) as i32,
+                onset_beats: index as f64,
+                duration_beats: 0.5,
+            })
+            .collect();
+        let claim = descriptor(
+            PitchOrientation::Preserve,
+            0,
+            1.0,
+            1.0,
+            SelectionMode::Full,
+            0,
+            source.len(),
+        );
+        assert!(source.len() * source.len() > MAX_ALIGNMENT_CELLS);
+        assert!(
+            verify_compositional_transform(&source, &source, 0.0, &claim).is_err(),
+            "quadratic work must be bounded before allocating DP matrices"
         );
     }
 
