@@ -1064,7 +1064,9 @@ mod tests {
             .unwrap();
         assert_eq!(first_stratum.expected_pairs, 1);
         assert_eq!(first_stratum.rmsle_pair_count, 1);
-        assert_eq!(first_stratum.mean_rmsle_delta_tool_minus_vanilla, Some(-0.3));
+        assert!(
+            (first_stratum.mean_rmsle_delta_tool_minus_vanilla.unwrap() + 0.3).abs() < 1.0e-12
+        );
         let second_stratum = report.body.by_stratum.iter()
             .find(|stratum| stratum.equation_difficulty == "hard")
             .unwrap();
