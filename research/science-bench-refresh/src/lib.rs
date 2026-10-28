@@ -264,35 +264,44 @@ fn scan_policy_input_for_oracle_fields(
     path: &str,
     issues: &mut Vec<String>,
 ) {
+    // Compare a separator-insensitive ASCII canonical form so camelCase,
+    // kebab-case, and snake_case cannot trivially bypass the denylist.
     const FORBIDDEN_KEYS: &[&str] = &[
         "answer",
-        "answer_key",
-        "canonical_equation",
-        "correct_answer",
-        "evaluator_only",
-        "family_id",
-        "task_family",
-        "recipe_kind",
-        "constructor_kind",
-        "expected_equation",
-        "expected_law",
+        "answerkey",
+        "canonicalequation",
+        "correctanswer",
+        "evaluatoronly",
+        "evaluationtarget",
+        "familyid",
+        "taskfamily",
+        "recipekind",
+        "constructorkind",
+        "expectedequation",
+        "expectedlaw",
         "gold",
-        "ground_truth",
-        "ground_truth_law",
-        "hidden_law",
-        "hidden_target",
-        "oracle_answer",
-        "reference_answer",
+        "groundtruth",
+        "groundtruthlaw",
+        "hiddenlaw",
+        "hiddentarget",
+        "oracleanswer",
+        "oracleonly",
+        "referenceanswer",
         "solution",
         "target",
-        "target_equation",
-        "target_law",
-        "true_equation",
+        "targetequation",
+        "targetlaw",
+        "truelaw",
+        "trueequation",
     ];
     match value {
         serde_json::Value::Object(fields) => {
             for (key, nested) in fields {
-                let normalized = key.to_ascii_lowercase();
+                let normalized: String = key
+                    .chars()
+                    .filter(|character| character.is_ascii_alphanumeric())
+                    .map(|character| character.to_ascii_lowercase())
+                    .collect();
                 if FORBIDDEN_KEYS.contains(&normalized.as_str()) {
                     issues.push(format!(
                         "policy_input contains forbidden oracle field at {path}.{key}"
@@ -1305,6 +1314,39 @@ mod tests {
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
         assert!(report.issues.iter().any(|issue| issue.contains("duplicate task_id")));
+    }
+
+    #[test]
+    fn oracle_key_separator_and_case_variants_are_rejected() {
+        for forbidden_key in [
+            "groundTruthLaw",
+            "ground-truth-law",
+            "ground_truth_law",
+            "EVALUATOR-ONLY",
+            "targetEquation",
+        ] {
+            let mut manifest = valid_qualified_manifest("sealed_refresh");
+            let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
+            task_set["tasks"][0]["policy_input"][forbidden_key] = json!("fabricated-answer");
+            let task_bytes = serde_json::to_vec(&task_set).unwrap();
+            let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+            manifest["task_set_commitment_sha256"] = json!(
+                compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes)
+                    .unwrap()
+            );
+            let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+            let report =
+                verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+            assert!(report.task_set_commitment_matches, "{forbidden_key}");
+            assert!(
+                !report.task_set_contract_valid,
+                "oracle key variant should be rejected: {forbidden_key}"
+            );
+            assert!(
+                report.issues.iter().any(|issue| issue.contains("forbidden oracle field")),
+                "missing denylist diagnostic for {forbidden_key}"
+            );
+        }
     }
 
     #[test]
