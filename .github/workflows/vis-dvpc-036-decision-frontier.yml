@@ -1,0 +1,79 @@
+name: VIS-DVPC-036 exact-DP decision frontier
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-decision-frontier.rs"
+      - "tests/fixtures/vision-dvpc-036-decision.tsv"
+      - "tests/fixtures/vision-dvpc-036.SHA256SUMS"
+      - "docs/research/VIS_DVPC_036_DECISION_FRONTIER_V1.md"
+      - ".github/workflows/vis-dvpc-036-decision-frontier.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-decision-frontier.rs"
+      - "tests/fixtures/vision-dvpc-036-decision.tsv"
+      - "tests/fixtures/vision-dvpc-036.SHA256SUMS"
+      - "docs/research/VIS_DVPC_036_DECISION_FRONTIER_V1.md"
+      - ".github/workflows/vis-dvpc-036-decision-frontier.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source and frozen DGPs
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Verify the frozen fixture digest
+        run: sha256sum -c tests/fixtures/vision-dvpc-036.SHA256SUMS
+      - name: Run Rust unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-decision-frontier.rs -o /tmp/vis-dvpc-036-tests
+          /tmp/vis-dvpc-036-tests
+      - name: Execute full exact-DP frontier and assert controls
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-decision-frontier.rs -o /tmp/vis-dvpc-036
+          /tmp/vis-dvpc-036 --sweep > /tmp/vis-dvpc-036-results.tsv
+          test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-036-results.tsv)" = "17990"
+          test "$(grep -c '^DP_LOOK' /tmp/vis-dvpc-036-results.tsv)" = "2576"
+          grep -Fq $'SCENARIO\thealthy_null_h8\t8\tWALD_FIXED_TIME\tNULL_THRESHOLD_EQUALS_TRUTH\tsequence_coverage\t0.437500000000' /tmp/vis-dvpc-036-results.tsv
+          grep -Fq $'SCENARIO\thealthy_null_h8\t8\tWALD_FIXED_TIME\tNULL_THRESHOLD_EQUALS_TRUTH\tever_threshold_crossing_probability\t0.281250000000' /tmp/vis-dvpc-036-results.tsv
+          grep -Fq $'SCENARIO\thealthy_null_h8\t8\tALPHA_SPENDING_HOEFFDING_CS\tNULL_THRESHOLD_EQUALS_TRUTH\tsequence_coverage\t1.000000000000' /tmp/vis-dvpc-036-results.tsv
+          grep -Fq $'SCENARIO\thealthy_null_h8\t8\tALPHA_SPENDING_HOEFFDING_CS\tNULL_THRESHOLD_EQUALS_TRUTH\tever_threshold_crossing_probability\t0.000000000000' /tmp/vis-dvpc-036-results.tsv
+          grep -Fq $'SCENARIO\tweak_null_p099_h256\t256\t-\tNULL_THRESHOLD_EQUALS_TRUTH\tpath_enumeration\tNOT_USED' /tmp/vis-dvpc-036-results.tsv
+          grep -Fq 'POSITIVE_MARGIN_ALTERNATIVE' /tmp/vis-dvpc-036-results.tsv
+          # Independent vectorized exact-DP reference values for horizon 256.
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="WALD_FIXED_TIME" && $6=="sequence_coverage" { d=$7-0.279085312040; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="WALD_FIXED_TIME" && $6=="ever_threshold_crossing_probability" { d=$7-0.391474262622; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="sequence_coverage" { d=$7-0.999988677860; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_null_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="ever_threshold_crossing_probability" { d=$7-0.000005661070; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="healthy_alt_clear_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="ever_threshold_crossing_probability" { d=$7-0.021819334588; if (d<0) d=-d; if (d>0.00000001) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $2=="weak_null_p099_h256" && $4=="ALPHA_SPENDING_HOEFFDING_CS" && $6=="ever_threshold_crossing_probability" { if ($7 < 0.000000003 || $7 > 0.000000006) exit 1; n++ } END { if (n != 1) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          awk -F '\t' '$1=="DP_LOOK" && $6=="probability_mass" { if ($7 < 0.99999999 || $7 > 1.00000001) exit 1; count++ } END { if (count != 1288) exit 1 }' /tmp/vis-dvpc-036-results.tsv
+          grep '^SCENARIO' /tmp/vis-dvpc-036-results.tsv > /tmp/vis-dvpc-036-summaries.tsv
+      - name: Create exact-source and result receipt
+        run: |
+          {
+            printf 'VIS_DVPC_036_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            printf 'fixture_digest\t'
+            sha256sum tests/fixtures/vision-dvpc-036-decision.tsv
+            sha256sum tools/vision-dvpc-decision-frontier.rs tests/fixtures/vision-dvpc-036.SHA256SUMS /tmp/vis-dvpc-036-results.tsv /tmp/vis-dvpc-036-summaries.tsv
+          } > /tmp/vis-dvpc-036-receipt.tsv
+          cat /tmp/vis-dvpc-036-receipt.tsv
+      - name: Publish frontier, summaries and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-036-decision-frontier
+          path: |
+            /tmp/vis-dvpc-036-results.tsv
+            /tmp/vis-dvpc-036-summaries.tsv
+            /tmp/vis-dvpc-036-receipt.tsv
+          retention-days: 90
