@@ -119,7 +119,9 @@ def _validate_report(
 
     required_top = ("task_id","eligible","verdict","receipt_sha256","task_contract_sha256",
                     "protocol_sha256","candidate_patch_sha256","auditor_sha256",
-                    "requirement_traceability","per_test_baseline_oracle_alignment")
+                    "requirement_traceability","per_test_baseline_oracle_alignment",
+                    "run_id","attempt_number","expected_revision","observed_revision",
+                    "expected_image_id","runtime_image_id","network_mode")
     missing = [key for key in required_top if key not in report]
     if missing:
         issues.append({"code":"audit_report_fields_missing","message":f"audit report is missing fields: {missing}"})
@@ -127,6 +129,14 @@ def _validate_report(
 
     if report["task_id"] != row["task_id"]:
         issues.append({"code":"task_identity_mismatch","message":"audit report task_id differs from cohort row"})
+    if report["run_id"] != row["run_id"] or type(report["attempt_number"]) is not int or report["attempt_number"] != row["attempt_number"]:
+        issues.append({"code":"execution_identity_mismatch","message":"audit report run ID/attempt differs from evaluator-pinned cohort row"})
+    if report["expected_revision"] != row["expected_revision"] or report["observed_revision"] != row["expected_revision"]:
+        issues.append({"code":"checkout_revision_mismatch","message":"audit report expected/observed checkout revision differs from evaluator-pinned revision"})
+    if report["expected_image_id"] != row["expected_image_id"] or report["runtime_image_id"] != row["expected_image_id"]:
+        issues.append({"code":"runtime_image_mismatch","message":"audit report expected/observed runtime image differs from evaluator-pinned image"})
+    if report["network_mode"] != row["expected_network_mode"]:
+        issues.append({"code":"runtime_network_mode_mismatch","message":"audit report runtime network mode differs from evaluator-pinned mode"})
     for key in ("receipt_sha256","task_contract_sha256","protocol_sha256","candidate_patch_sha256","auditor_sha256"):
         if report.get(key) != row.get(key):
             issues.append({"code":f"{key}_mismatch","message":f"audit report {key} differs from cohort-row pin"})

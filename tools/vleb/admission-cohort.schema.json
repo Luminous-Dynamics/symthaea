@@ -50,7 +50,12 @@
           "task_contract_sha256",
           "protocol_sha256",
           "candidate_patch_sha256",
-          "auditor_sha256"
+          "auditor_sha256",
+          "run_id",
+          "attempt_number",
+          "expected_revision",
+          "expected_image_id",
+          "expected_network_mode"
         ],
         "properties": {
           "task_id": {
@@ -78,6 +83,31 @@
           },
           "auditor_sha256": {
             "$ref": "#/$defs/sha256"
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "attempt_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expected_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "expected_image_id": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "expected_network_mode": {
+            "enum": [
+              "none",
+              "allowlisted",
+              "enabled",
+              "not_applicable"
+            ]
           }
         }
       }
