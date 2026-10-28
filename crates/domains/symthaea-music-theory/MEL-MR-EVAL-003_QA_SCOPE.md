@@ -1,5 +1,7 @@
 # MEL-MR-EVAL-003 fixture QA scope
 
+- Dataset version: `MEL-MR-COMPOSITION-SMOKE-1.1`
+
 - Dataset: MEL-MR-COMPOSITION-SMOKE-1.0
 - Cases: 120 (60 accept, 60 reject)
 - Motif families: 12; family-held-out splits: development 6 families / 60 cases, calibration 2 / 20, test 4 / 40
