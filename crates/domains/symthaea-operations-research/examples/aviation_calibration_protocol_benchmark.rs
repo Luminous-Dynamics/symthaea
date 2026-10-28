@@ -15,7 +15,7 @@ use symthaea_operations_research::aviation_distributional_robustness::{
     evaluate_tv_robustness_curve, evaluate_tv_robust_cost_delta, ScenarioCostDelta,
 };
 use symthaea_operations_research::aviation_probability_calibration::{
-    calibrate_tv_radius, CalibrationFrequency,
+    calibrate_tv_radius_envelope, CalibrationFrequency, RegimeCalibration,
 };
 
 fn main() {
@@ -63,17 +63,28 @@ fn main() {
         process::exit(1);
     }
 
-    let calibration = match calibrate_tv_radius(
-        &[
-            CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: 60 },
-            CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: 30 },
-            CalibrationFrequency { scenario_id: "compound-weather".into(), nominal_probability_ppm: 100_000, observed_count: 10 },
-        ],
-        50_000,
-    ) {
+    let regimes = [
+        RegimeCalibration {
+            regime_id: "nominal-weather".into(),
+            frequencies: vec![
+                CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: 60 },
+                CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: 30 },
+                CalibrationFrequency { scenario_id: "compound-weather".into(), nominal_probability_ppm: 100_000, observed_count: 10 },
+            ],
+        },
+        RegimeCalibration {
+            regime_id: "disruption-heavy".into(),
+            frequencies: vec![
+                CalibrationFrequency { scenario_id: "routine".into(), nominal_probability_ppm: 600_000, observed_count: 40 },
+                CalibrationFrequency { scenario_id: "capacity".into(), nominal_probability_ppm: 300_000, observed_count: 30 },
+                CalibrationFrequency { scenario_id: "compound-weather".into(), nominal_probability_ppm: 100_000, observed_count: 30 },
+            ],
+        },
+    ];
+    let calibration = match calibrate_tv_radius_envelope(&regimes, 50_000) {
         Ok(value) => value,
         Err(error) => {
-            eprintln!("TV-radius calibration failed: {error:?}");
+            eprintln!("TV-radius regime-envelope calibration failed: {error:?}");
             process::exit(1);
         }
     };
@@ -109,7 +120,7 @@ fn main() {
 
     let calibrated_report = match evaluate_tv_robust_cost_delta(
         &scenarios,
-        calibration.required_tv_radius_ppm,
+        calibration.maximum_required_tv_radius_ppm,
     ) {
         Ok(value) => value,
         Err(error) => {
@@ -139,14 +150,32 @@ fn main() {
     }
     writeln!(
         &mut json,
-        "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"radius_calibration\": {{\"calibration_episodes\": {}, \"failure_probability_ppm\": {}, \"empirical_tv_ppm\": {}, \"sampling_allowance_ppm\": {}, \"required_tv_radius_ppm\": {}, \"capped_at_maximum\": {}}},\n  \"calibrated_radius_evaluation\": {{\"worst_case_expected_delta_units\": {}, \"worst_single_scenario_id\": \"{}\"}},\n  \"robustness_curve\": [",
+        "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"radius_calibration\": {{\"regime_count\": {}, \"family_failure_probability_ppm\": {}, \"per_regime_failure_probability_ppm\": {}, \"maximum_required_tv_radius_ppm\": {}, \"any_regime_capped_at_maximum\": {}, \"regimes\": [",
         tuning.status,
-        calibration.calibration_episode_count,
-        calibration.failure_probability_ppm,
-        calibration.empirical_tv_distance_ppm,
-        calibration.sampling_allowance_ppm,
-        calibration.required_tv_radius_ppm,
-        calibration.capped_at_maximum_radius,
+        calibration.regime_count,
+        calibration.requested_family_failure_probability_ppm,
+        calibration.per_regime_failure_probability_ppm,
+        calibration.maximum_required_tv_radius_ppm,
+        calibration.any_regime_capped_at_maximum_radius
+    ).expect("write to String");
+    for (index, regime) in calibration.regimes.iter().enumerate() {
+        let comma = if index + 1 == calibration.regimes.len() { "" } else { "," };
+        writeln!(
+            &mut json,
+            "    {{\"regime_id\": \"{}\", \"episodes\": {}, \"empirical_tv_ppm\": {}, \"sampling_allowance_ppm\": {}, \"required_tv_radius_ppm\": {}, \"failure_probability_ppm\": {}, \"capped_at_maximum\": {}}}{}",
+            regime.regime_id,
+            regime.report.calibration_episode_count,
+            regime.report.empirical_tv_distance_ppm,
+            regime.report.sampling_allowance_ppm,
+            regime.report.required_tv_radius_ppm,
+            regime.report.failure_probability_ppm,
+            regime.report.capped_at_maximum_radius,
+            comma
+        ).expect("write to String");
+    }
+    writeln!(
+        &mut json,
+        "  ]}},\n  \"calibrated_radius_evaluation\": {{\"worst_case_expected_delta_units\": {}, \"worst_single_scenario_id\": \"{}\"}},\n  \"robustness_curve\": [",
         calibrated_report.worst_case_expected_delta_units(),
         calibrated_report.worst_single_scenario_id()
     ).expect("write to String");
