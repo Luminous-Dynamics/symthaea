@@ -130,6 +130,11 @@ fn assess(
         network_assessment: &network,
         candidate_calibration_receipt_id: candidate_receipt,
         active_calibration_receipt_id: active_receipt,
+        calibration_created_at_epoch_seconds: 100,
+        decision_time_epoch_seconds: 200,
+        max_calibration_age_seconds: 1_000,
+        latest_monitor_observation_epoch_seconds: Some(190),
+        max_monitor_observation_age_seconds: 30,
     })
 }
 
