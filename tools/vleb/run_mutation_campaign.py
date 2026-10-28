@@ -73,43 +73,38 @@ def conflicting_duplicate_accepted(source: str) -> str:
 
 
 def unchecked_overflow(source: str) -> str:
-    # Mutate the complete checked-add expression rather than just the method
-    # name: wrapping_add returns an integer, whereas checked_add returns Option.
+    # Match the checked addition across rustfmt line breaks. Mutate the entire
+    # expression so the invalid Option-to-integer rewrite cannot be a compile-only kill.
     pattern = re.compile(
-        r'(?P<target>[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s*=\s*'
-        r'[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)'
+        r'(?P<lhs>[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)\s*=\s*'
+        r'(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?P<field>[A-Za-z_][A-Za-z0-9_]*)'
         r'\s*\.checked_add\(amount_minor\)'
         r'\s*\.ok_or_else\(\|\| LedgerError::new\("[^"]* overflow"\)\)\?;'
     )
-    mutated, count = pattern.subn(r'\g<target>.wrapping_add(amount_minor);', source)
+    mutated, count = pattern.subn(
+        r'\g<lhs> = \g<receiver>.\g<field>.wrapping_add(amount_minor);',
+        source,
+    )
     if count != 4:
         raise ValueError(f"VLEB-LDG-004 overflow: expected 4 aggregate additions, found {count}")
     return mutated
 
 
 def credit_debit_swap(source: str) -> str:
-    old = '''        match side {
-            Side::Credit => {
-                account.credits_minor = account.credits_minor
-                    .checked_add(amount_minor)
-                    .ok_or_else(|| LedgerError::new("account credit total overflow"))?;
-                totals.credits_minor = totals.credits_minor
-                    .checked_add(amount_minor)
-                    .ok_or_else(|| LedgerError::new("global credit total overflow"))?;
-            }
-            Side::Debit => {
-                account.debits_minor = account.debits_minor
-                    .checked_add(amount_minor)
-                    .ok_or_else(|| LedgerError::new("account debit total overflow"))?;
-                totals.debits_minor = totals.debits_minor
-                    .checked_add(amount_minor)
-                    .ok_or_else(|| LedgerError::new("global debit total overflow"))?;
-            }
-        }'''
-    swapped = old.replace("Side::Credit =>", "Side::__TEMP__ =>", 1)
+    # Swap the branch discriminants in the one side-aggregation match block.
+    # This remains stable when rustfmt changes expression line breaks.
+    pattern = re.compile(r"^        match side \{\n.*?^        \}\n", re.MULTILINE | re.DOTALL)
+    matches = list(pattern.finditer(source))
+    if len(matches) != 1:
+        raise ValueError(f"VLEB-LDG-007 credit/debit swap: expected one side match, found {len(matches)}")
+    match = matches[0]
+    block = match.group(0)
+    if block.count("Side::Credit =>") != 1 or block.count("Side::Debit =>") != 1:
+        raise ValueError("VLEB-LDG-007 credit/debit swap: side branches are not unique")
+    swapped = block.replace("Side::Credit =>", "Side::__TEMP__ =>", 1)
     swapped = swapped.replace("Side::Debit =>", "Side::Credit =>", 1)
     swapped = swapped.replace("Side::__TEMP__ =>", "Side::Debit =>", 1)
-    return replace_exactly_once(source, old, swapped, "VLEB-LDG-007 credit/debit swap")
+    return source[:match.start()] + swapped + source[match.end():]
 
 
 MUTANTS: list[tuple[str, str, Callable[[str], str], str]] = [
