@@ -77,6 +77,8 @@ jobs:
         run: python tools/vleb/test_run_manifest.py
       - name: Test run manifest integrity and provenance checker
         run: python tools/vleb/test_verify_run_manifest.py
+      - name: Test evaluator-observed execution witness receipts
+        run: python tools/vleb/test_execution_witness.py
       - name: Execute preregistered semantic mutation probes
         run: python tools/vleb/run_mutation_campaign.py --output-dir "$RUNNER_TEMP/vleb-mutation-evidence" --expected-head-sha "${{ github.event.pull_request.head.sha || github.sha }}"
       - name: Upload semantic mutation evidence
