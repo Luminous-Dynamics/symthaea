@@ -324,6 +324,19 @@ jobs:
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
           validator.validate(fixture)
 
+          frozen_config_with_receipt = copy.deepcopy(fixture)
+          frozen_config_with_receipt["power_report_sha256"] = "d" * 64
+          validator.validate(frozen_config_with_receipt)
+
+          bad_receipt = copy.deepcopy(frozen_config_with_receipt)
+          bad_receipt["power_report_sha256"] = "not-a-sha256"
+          try:
+              validator.validate(bad_receipt)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("negative control failed: malformed power-report digest was accepted")
+
           assignments = {}
           for family in split_manifest["families"]:
               family_id = family["family_id"]
@@ -422,7 +435,7 @@ jobs:
           else:
               raise SystemExit("negative control failed: duplicate validation quarantine ID was accepted")
 
-          print("PITB_RUN_CONFIG_V1_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and seven malformed-config controls; fixture is synthetic and not a benchmark run")
+          print("PITB_RUN_CONFIG_V1_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and eight malformed-config controls; fixture is synthetic and not a benchmark run")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
