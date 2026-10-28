@@ -764,6 +764,20 @@ mod tests {
     }
 
     #[test]
+    fn provenance_and_sealed_access_controls_deny_activation() {
+        let (actions, mut oracle) = fixture();
+        let selected = selected_measure("C01-positive", "m-high", &actions);
+        let key = ("C01-positive".to_owned(), "m-high".to_owned());
+        oracle.get_mut(&key).unwrap().provenance_ok = false;
+        assert_eq!(evaluate_gate(&selected, &oracle).status, GateStatus::Denied);
+
+        let (actions, mut oracle) = fixture();
+        let selected = selected_measure("C01-positive", "m-high", &actions);
+        oracle.get_mut(&key).unwrap().sealed_touched = true;
+        assert_eq!(evaluate_gate(&selected, &oracle).status, GateStatus::Denied);
+    }
+
+    #[test]
     fn row_counts_and_repeated_fixed_sample_peeking_do_not_masquerade_as_admissible_units() {
         let (actions, oracle) = fixture();
         let clustered = selected_measure("C06-clustered", "m-high", &actions);
