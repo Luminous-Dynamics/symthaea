@@ -362,6 +362,59 @@ fn cluster_risk_e_value(cluster_rates: &[f64]) -> Result<f64, String> {
     Ok(log_mean_exp(&logs).exp())
 }
 
+/// Exact finite-horizon crossing probability for independent clusters with a
+/// two-point cluster-risk distribution. The marginal mean equals risk_cap.
+fn cluster_risk_mixture_crossing_probability(
+    cluster_count: usize,
+    low_rate: f64,
+    high_rate: f64,
+    low_weight: f64,
+) -> Result<f64, String> {
+    if cluster_count == 0
+        || !(0.0..=1.0).contains(&low_rate)
+        || !(0.0..=1.0).contains(&high_rate)
+        || !(0.0..=1.0).contains(&low_weight)
+    {
+        return Err(invalid("invalid cluster mixture parameters"));
+    }
+    let marginal = low_weight * low_rate + (1.0 - low_weight) * high_rate;
+    if (marginal - RISK_CAP).abs() > EPSILON {
+        return Err(invalid("cluster mixture mean must equal the risk null boundary"));
+    }
+    let threshold = 1.0 / RISK_ALPHA;
+    let mut surviving = vec![0.0; cluster_count + 1];
+    surviving[0] = 1.0;
+    for n in 1..=cluster_count {
+        let mut next = vec![0.0; cluster_count + 1];
+        for high_count in 0..n {
+            let mass = surviving[high_count];
+            if mass == 0.0 {
+                continue;
+            }
+            let low_path = {
+                let rates = std::iter::repeat_n(low_rate, n - high_count)
+                    .chain(std::iter::repeat_n(high_rate, high_count))
+                    .collect::<Vec<_>>();
+                cluster_risk_e_value(&rates)? < threshold + EPSILON
+            };
+            if low_path {
+                next[high_count] += mass * low_weight;
+            }
+            let high_path = {
+                let rates = std::iter::repeat_n(low_rate, n - (high_count + 1))
+                    .chain(std::iter::repeat_n(high_rate, high_count + 1))
+                    .collect::<Vec<_>>();
+                cluster_risk_e_value(&rates)? < threshold + EPSILON
+            };
+            if high_path {
+                next[high_count + 1] += mass * (1.0 - low_weight);
+            }
+        }
+        surviving = next;
+    }
+    Ok((1.0 - surviving.iter().sum::<f64>()).clamp(0.0, 1.0))
+}
+
 /// Exact finite-horizon probability of ever crossing the value e-process threshold
 /// under an iid Bernoulli reward stream whose mean is true_mean in [0, 1].
 fn value_crossing_probability(horizon: usize, true_mean: f64) -> Result<f64, String> {
@@ -494,11 +547,13 @@ fn exact_sweep() -> Result<String, String> {
         RISK_ALPHA
     );
     let clustered = clustered_rowwise_crossing_probability(5, 20, 0.0, 0.10, 0.5)?;
+    let cluster_gate_cross = cluster_risk_mixture_crossing_probability(200, 0.0, 0.10, 0.5)?;
     let five_zero_clusters = cluster_risk_e_value(&[0.0; 5])?;
     let _ = writeln!(
         output,
-        "CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross={:.12}\tcluster_gate_all_zero_crossed_5={}\tcluster_gate_all_zero_e_value={:.12}\talpha={:.6}",
+        "CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross={:.12}\tcluster_gate_false_cross_by_200={:.12}\tcluster_gate_all_zero_crossed_5={}\tcluster_gate_all_zero_e_value={:.12}\talpha={:.6}",
         clustered,
+        cluster_gate_cross,
         if five_zero_clusters >= 1.0 / RISK_ALPHA { "YES" } else { "NO" },
         five_zero_clusters,
         RISK_ALPHA
@@ -641,6 +696,10 @@ mod tests {
         assert!(e5 < 1.0 / RISK_ALPHA);
         let e100 = cluster_risk_e_value(&[0.0; 100]).unwrap();
         assert!(e100 >= 1.0 / RISK_ALPHA);
+        let p_cross_200 = cluster_risk_mixture_crossing_probability(200, 0.0, 0.10, 0.5).unwrap();
+        assert!(p_cross_200 <= RISK_ALPHA + 1e-9, "cluster-level false crossing={p_cross_200}");
+        assert!(p_cross_200 < 1e-8, "expected conservative cluster gate, got {p_cross_200}");
+        assert!(cluster_risk_mixture_crossing_probability(5, 0.0, 0.10, 0.4).is_err());
         assert!(cluster_risk_e_value(&[]).is_err());
         assert!(cluster_risk_e_value(&[0.0, 1.01]).is_err());
         for lambda in CLUSTER_RISK_LAMBDAS {
@@ -673,7 +732,7 @@ mod tests {
         assert_eq!(first.lines().filter(|line| line.starts_with("VALUE\t")).count(), 20);
         assert!(first.contains("CONTRACT\talpha_risk=0.025000\talpha_value=0.025000\talpha_joint=0.050000\trisk_cap=0.050000\tvalue_floor=0.500000\trisk_alternatives=0.001,0.01,0.025,0.04\tvalue_lambdas=0.5,1.0\tcluster_risk_lambdas=0.5,1.0\tpeeking_looks=72,120"));
         assert!(first.contains("PEEKING_CONTROL\t120\t50000\t72,120\t0.032937159528\t0.008924249150\t0.025000"));
-        assert!(first.contains("CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross=0.063416077728\tcluster_gate_all_zero_crossed_5=NO"));
+        assert!(first.contains("CLUSTER_DEPENDENCE_CONTROL\tclusters=5\tcluster_size=20\tmarginal_risk_ppm=50000\trowwise_false_cross=0.063416077728\tcluster_gate_false_cross_by_200=0.000000000063\tcluster_gate_all_zero_crossed_5=NO"));
         assert!(first.contains("GATE_CONTROL\tall_clear\tAUTHORIZED"));
         assert!(first.contains("GATE_CONTROL\tmissing_evidence\tDENIED"));
         assert!(first.contains("GATE_CONTROL\ttarget_shift_or_uncalibrated\tDENIED"));
