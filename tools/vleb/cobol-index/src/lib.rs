@@ -98,7 +98,6 @@ struct Token {
 #[derive(Debug, Clone)]
 struct FixedRecord {
     line: usize,
-    indicator: u8,
     text: String,
     text_start_column: usize,
     continuation: bool,
@@ -206,7 +205,6 @@ fn physical_records(input: &str, options: IndexOptions, diagnostics: &mut Vec<Di
         };
         let record = FixedRecord {
             line: line_number,
-            indicator,
             text: source_text.to_owned(),
             text_start_column: 8,
             continuation,
@@ -269,13 +267,16 @@ fn tokenize_record(record: &FixedRecord, diagnostics: &mut Vec<Diagnostic>) -> V
             let content_start = i;
             let mut output = String::new();
             let mut closed = false;
+            let mut segment_start = content_start;
             while i < bytes.len() {
                 if bytes[i] == quote {
                     if bytes.get(i + 1) == Some(&quote) {
+                        output.push_str(&record.text[segment_start..i]);
                         output.push(quote as char);
                         i += 2;
+                        segment_start = i;
                     } else {
-                        output.push_str(&record.text[content_start..i]);
+                        output.push_str(&record.text[segment_start..i]);
                         i += 1;
                         closed = true;
                         break;
@@ -362,26 +363,6 @@ fn statement_end(tokens: &[Token], start: usize) -> usize {
         index += 1;
     }
     tokens.len()
-}
-
-fn joined_tokens(tokens: &[Token]) -> String {
-    let mut result = String::new();
-    for token in tokens {
-        match token.value.as_str() {
-            "(" | ")" | "." | "," | ":" => result.push_str(&token.value),
-            _ => {
-                if !result.is_empty()
-                    && !result.ends_with('(')
-                    && !result.ends_with(':')
-                    && !result.ends_with('.')
-                {
-                    result.push(' ');
-                }
-                result.push_str(&token.value);
-            }
-        }
-    }
-    result
 }
 
 pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
@@ -581,7 +562,12 @@ pub fn index_fixed_format(input: &str, options: IndexOptions) -> CobolIndex {
                             k += 1;
                         }
                         if picture_start < k {
-                            picture = Some(joined_tokens(&entry_tokens[picture_start..k]));
+                            picture = Some(
+                                entry_tokens[picture_start..k]
+                                    .iter()
+                                    .map(|part| part.value.as_str())
+                                    .collect::<String>(),
+                            );
                         }
                         break;
                     }
