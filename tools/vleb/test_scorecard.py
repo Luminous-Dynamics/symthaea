@@ -180,6 +180,29 @@ class ScorecardTests(unittest.TestCase):
         self.assertEqual(audit["findings"]["adjacent_top_30_verified_pairs_significant_at_alpha_0_05"], 0)
         self.assertIn("observational", audit["report_status"])
 
+    def test_claim_outcome_accounting_and_witness_receipts_are_targets(self) -> None:
+        targets = self.scorecard["proposed_targets"]
+        for key in (
+            "claim_outcome_accounting_completeness_pct",
+            "evaluator_reproduced_witness_receipt_coverage_pct",
+        ):
+            self.assertEqual(targets[key]["target"], 100)
+            self.assertEqual(targets[key]["status"], "target_not_measured")
+        gate = self.scorecard["current_measurements"]["claim_evidence_gate"]
+        self.assertIsNone(gate["value"])
+        self.assertFalse(gate["eligible"])
+        self.assertEqual(gate["status"], "draft_not_validated")
+
+    def test_confirmatory_aassr_requires_claim_evidence_gate(self) -> None:
+        requirements = self.scorecard["metric_definitions"]["assurance_adjusted_semantic_success_rate"]["pass_requirements"]
+        self.assertTrue(any("claim inventory" in item and "claim-evidence audit" in item for item in requirements))
+
+    def test_fcv_comparator_is_threat_specific_not_universal(self) -> None:
+        comparator = self.scorecard["industry_comparators"]["google_fcv_patch_study"]
+        self.assertEqual(comparator["evaluated_agent_model_combinations"], 12)
+        self.assertEqual(comparator["example_cwe"], "CWE-538")
+        self.assertIn("not a universal vulnerability rate", comparator["interpretation"])
+
     def test_claim_false_support_is_a_target_not_an_achieved_result(self) -> None:
         measurement = self.scorecard["current_measurements"]["source_claim_false_support_rate_pct"]
         target = self.scorecard["proposed_targets"]["source_claim_false_support_rate_pct"]
