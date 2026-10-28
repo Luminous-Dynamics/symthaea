@@ -73,11 +73,18 @@ def conflicting_duplicate_accepted(source: str) -> str:
 
 
 def unchecked_overflow(source: str) -> str:
-    old = ".checked_add(amount_minor)"
-    count = source.count(old)
+    # Mutate the complete checked-add expression rather than just the method
+    # name: wrapping_add returns an integer, whereas checked_add returns Option.
+    pattern = re.compile(
+        r'(?P<target>[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s*=\s*'
+        r'[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)'
+        r'\s*\.checked_add\(amount_minor\)'
+        r'\s*\.ok_or_else\(\|\| LedgerError::new\("[^"]* overflow"\)\)\?;'
+    )
+    mutated, count = pattern.subn(r'\g<target>.wrapping_add(amount_minor);', source)
     if count != 4:
         raise ValueError(f"VLEB-LDG-004 overflow: expected 4 aggregate additions, found {count}")
-    return source.replace(old, ".wrapping_add(amount_minor)")
+    return mutated
 
 
 def credit_debit_swap(source: str) -> str:
