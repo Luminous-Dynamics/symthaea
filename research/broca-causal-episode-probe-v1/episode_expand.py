@@ -342,7 +342,7 @@ def main() -> int:
         "output_path": str(output),
         "evaluation_k": args.k,
         "candidate_window": args.window,
-        "policy": "BM25 rank-order seeds; expand to same/adjacent steps by fixed role order; de-duplicate; stop at exactly k",
+        "policy": f"BM25 rank-order seeds; expand within step distance <= {args.window} by fixed role order; de-duplicate; stop at exactly k",
         "reads_gold_support_labels": False,
         "claim_ceiling": "retrieval policy ablation only; no causal truth or benchmark result",
     }
