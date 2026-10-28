@@ -194,7 +194,7 @@ def score_dataset(
         })
 
     return {
-        "schema": "broca-causal-episode-probe-score-v1",
+        "schema": "broca-causal-episode-probe-score-v2",
         "k": k,
         "overall": overall,
         "by_category": by_category,
