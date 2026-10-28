@@ -9,8 +9,9 @@
 //! payload contract and process-local resolver that filters scope, validity and
 //! lifecycle and verifies content digests before context reaches a reader.
 //!
-//! This is not yet a persistent payload store, trajectory ingester, query-text
-//! encoder, or complete LongMemEval-V2 backend.
+//! A deterministic BM25 lexical baseline is included for raw-text queries.
+//! It is not a semantic encoder or complete LongMemEval-V2 backend: trajectory
+//! ingestion, multimodal query handling, and benchmark-worker wiring remain open.
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
