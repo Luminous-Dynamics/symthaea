@@ -77,27 +77,26 @@ The alpha-spending method is extremely conservative here; that is a measurable e
 
 A separate `--cusum-baseline-csv` lane adds direction-specific reflected Bernoulli CUSUM arms. Each arm increments the score by 12/25 for an evidence event and subtracts 13/25 for a non-event; for lower shifts, a failure is the evidence event. The 0.52 event-rate edge of the declared null interval therefore has zero expected score increment.
 
-**Calibration is matched to the reference detector’s realized edge rate.** The reference is the composite-band betting e-process already in this benchmark, measured by exact dynamic programming on the stable upper edge p=0.52 over 1,000 observations. The CUSUM threshold is the *smallest integer threshold* whose one-direction exact-DP crossing probability is no greater than that reference probability. The lower arm is its symmetric failure-rate transform at p=0.48. This is an exact matched *constant-edge operating point*, not a claim that the detectors’ worst-case family false-alarm probabilities are identical.
+**The false-alarm operating point is matched at the family level.** The reference is the composite-band betting e-process, measured by exact dynamic programming at the stable upper edge p=0.52 over 1,000 observations. Its two-sided family alarm probability is 0.000891587934. We allocate half of that budget to each one-sided CUSUM, then choose the *smallest integer threshold* whose boundary crossing probability is no greater than the per-direction target 0.000445793967. This avoids the earlier apples-to-oranges comparison that matched each CUSUM arm to the reference detector's entire two-sided false-alarm rate.
 
-The independent prototype gives a reference edge alarm probability of 0.000891588. It selects CUSUM threshold 1,374 (score 54.96); the CUSUM edge crossing probability is 0.000885901, while threshold 1,373 crosses at 0.000894015 and is therefore too liberal for the matched target. Under any predictable Bernoulli conditional rate in [0.48, 0.52], each directional CUSUM alarm probability is bounded by its p=0.52 calibration by monotone coupling. The conservative two-direction union bound is 0.001771803, below the per-cell budget 0.004166667. This is a finite-horizon guarantee through 1,000 observations, not an infinite-horizon or Ville-style guarantee.
+Independent exact-DP calculations give threshold 1,444 (score 57.76) with boundary crossing probability 0.000445549101. Threshold 1,443 crosses at 0.000450088025, so it is too liberal for the frozen target. The conservative two-direction union-bound receipt is 0.000891098203, below both the composite reference's family rate (0.000891587934) and the per-cell budget 0.004166667. For any predictable Bernoulli conditional rate in [0.48, 0.52], each directional event probability is at most 0.52; monotone coupling bounds its alarm probability by the exact boundary calculation. This guarantee is finite-horizon through 1,000 observations, not an infinite-horizon or Ville-style guarantee.
 
-### Matched-edge synthetic pilot
+### Family-matched synthetic power frontier
 
-For an abrupt change after observation 100 and a 1,000-observation horizon, the independent exact-DP prototype yields:
+For an abrupt shift after observation 100 and a 1,000-observation horizon, the independent exact-DP prototype yields:
 
-| Post-change event rate | Composite-band e-process detection | CUSUM detection | Mean delay | Median delay | P90 delay |
+| Post-change event rate | Composite-band e-process detection | CUSUM one-sided detection | Mean delay | Median delay | P90 delay |
 |---:|---:|---:|---:|---:|---:|
-| 0.55 | 1.769% | 7.226% | 773.9 | 796 | 883 |
-| 0.60 | 73.527% | 93.336% | 622.7 | 618 | 799 |
-| 0.70 | about 99.987% | effectively 100% | 290.0 | 287 | 350 |
-| 0.80 | about 99.987% | effectively 100% | 186.7 | 186 | 215 |
+| 0.55 | 1.769% | 4.884% | 784.3 | 806 | 885 |
+| 0.60 | 73.527% | 90.407% | 648.6 | 647 | 819 |
+| 0.70 | about 99.987% | effectively 100% | 305.6 | 302 | 367 |
+| 0.80 | about 99.987% | effectively 100% | 196.7 | 196 | 225 |
 
-These are finite synthetic Bernoulli results from independent local DP calculations, not the result of the current Rust branch’s workflow. Conditional delay quantiles are computed only among runs that alarm after the change. At p1=0.55, detection is rare and the observed conditional delays are therefore a fast-detection subset; detection probability must be read alongside all latency quantiles. The results suggest that this CUSUM score allocation has more horizon-1,000 power for the weak/moderate step alternatives at this specific matched edge operating point, at the cost of long conditional detection delays. They do not establish universal superiority or a worst-case matched-family FPR advantage. The CUSUM reports both directions separately; it does not manufacture a joint two-sided power statistic.
+These are finite synthetic Bernoulli results from independent local DP calculations, not the result of the current Rust branch's workflow. Conditional latency is measured only among post-change detections; it must be read alongside detection probability so the missed detections remain visible. At the family-matched operating point, the CUSUM one-sided arm retains a 3.1 percentage-point power gain at p1=.55 and 16.9 points at p1=.60, with long conditional delays for weak shifts. This is a promising, *narrow benchmark result*, not general superiority.
 
-The output receipts include both the exact reference alarm probability and the calibrated CUSUM boundary rate, plus the conservative family union bound and per-cell alpha. Mean, median and 90th-percentile post-change delays are emitted separately; when no detection mass exists, conditional delay metrics are `NA`. The independent Python reference checks the minimum threshold, matched operating point, scenario semantics, probability-mass conservation, accepted-band schedules and mutation rejection. Use this as a comparison hypothesis pending exact-head Rust qualification. The broader industry lane should still compare version-pinned CUSUM/EWMA/Page–Hinkley/ADWIN and suitable distribution-sensitive detectors, as tracked in [issue #8818](https://github.com/Luminous-Dynamics/symthaea/issues/8818).
+The CSV receipt includes the composite reference family rate, half-rate directional target, actual CUSUM boundary crossing probability, conservative family union bound, per-cell alpha, scenario typing, and mean/median/P90 conditional delays. The independent Python reference checks the minimal threshold, family-level false-alarm bound, scenario semantics, probability-mass conservation, accepted-band schedules, and mutation rejection. Null-control tests include deterministic alternation between 0.48/0.52 and a predictable feedback schedule chosen from the score *before* each observation. Both directions must stay under the matched one-sided target in these exact-DP checks.
 
-The independent Python reference reproduces the exact CUSUM dynamic program and edge-rate calibration. Rust compilation, formatting and exact-head CI status remain separate qualification gates.
-
+The broader industry lane should still compare version-pinned CUSUM/EWMA/Page–Hinkley/ADWIN and suitable distribution-sensitive detectors at matched family-wise false-alarm operating points, as tracked in [issue #8818](https://github.com/Luminous-Dynamics/symthaea/issues/8818). Rust compilation, formatting, and exact-head CI remain separate qualification gates.
 ## Limits
 
 - One Bernoulli cell and one known nominal probability are monitored.
