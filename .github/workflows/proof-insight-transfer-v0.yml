@@ -157,11 +157,11 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
-      - name: Validate primary analyzer power-report v1 schema contract
+      - name: Validate primary analyzer power-report v2 schema contract
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v1.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/primary-power-report-v1.schema.synthetic.json" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v2.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/primary-power-report-v2.schema.synthetic.json" <<'PY'
           import copy
           import json
           import sys
@@ -175,20 +175,22 @@ jobs:
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
           validator.validate(fixture)
 
-          if fixture["schema_version"] != "pitb.power-report.v1":
-              raise SystemExit("primary power fixture must use schema v1")
-          if len(fixture["scenarios"]) != 16 or len(fixture["weak_null_scenarios"]) != 36:
-              raise SystemExit("primary power fixture must contain 16 strict/power rows and 36 weak-null rows")
+          if fixture["schema_version"] != "pitb.power-report.v2":
+              raise SystemExit("primary power fixture must use schema v2")
+          if len(fixture["scenarios"]) != 48 or len(fixture["weak_null_scenarios"]) != 36:
+              raise SystemExit("primary power fixture must contain 48 strict/power rows and 36 weak-null rows")
           if sum(row["eligible_target_count"] for row in fixture["family_target_counts"]) != fixture["eligible_validation_target_count"]:
               raise SystemExit("fixture target denominator must equal the sum of its family sizes")
 
           iccs = {0.0, 0.05, 0.1, 0.2}
           effects = {0.0, 10.0, 15.0, 20.0}
           associations = {0.0, 0.5, 0.9}
-          strict_keys = {(row["true_treatment_effect_percentage_points"], row["assumed_family_icc"]) for row in fixture["scenarios"]}
+          if fixture["pair_association_fraction_grid"] != [0, 0.5, 0.9]:
+              raise SystemExit("strict/power association grid differs from the registered values")
+          strict_keys = {(row["true_treatment_effect_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["scenarios"]}
           weak_keys = {(row["requested_family_effect_heterogeneity_sd_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["weak_null_scenarios"]}
-          if strict_keys != {(effect, icc) for effect in effects for icc in iccs}:
-              raise SystemExit("fixture strict grid has missing or duplicate effect/ICC cells")
+          if strict_keys != {(effect, icc, association) for effect in effects for icc in iccs for association in associations}:
+              raise SystemExit("fixture strict grid has missing or duplicate effect/ICC/association cells")
           if weak_keys != {(sd, icc, association) for sd in (5.0, 10.0, 20.0) for icc in iccs for association in associations}:
               raise SystemExit("fixture weak-null grid has missing or duplicate heterogeneity/ICC/association cells")
           for row in fixture["scenarios"]:
@@ -218,11 +220,16 @@ jobs:
               raise SystemExit("weak-null false-claim summary does not match its grid")
           if abs(fixture["weak_null_false_claim_probability_upper_simultaneous_95_max"] - expected_weak_upper) > 1e-12:
               raise SystemExit("weak-null simultaneous summary does not match its grid")
-          expected_power = next(row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2)
-          if abs(fixture["estimated_power_at_20pp_and_icc_020"] - expected_power["estimated_utility_gate_power"]) > 1e-12:
-              raise SystemExit("headline power estimate does not match the +20pp/ICC .20 cell")
-          if abs(fixture["estimated_power_at_20pp_and_icc_020_lower_95"] - expected_power["estimated_power_lower_95"]) > 1e-12:
-              raise SystemExit("headline power bound does not match the +20pp/ICC .20 cell")
+          worst_power_rows = [row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2]
+          expected_power = min(row["estimated_utility_gate_power"] for row in worst_power_rows)
+          expected_power_lower = min(row["estimated_power_lower_95"] for row in worst_power_rows)
+          if len(worst_power_rows) != 3:
+              raise SystemExit("headline power must summarize all three association levels at +20pp/ICC .20")
+          if abs(fixture["estimated_power_at_20pp_and_icc_020"] - expected_power) > 1e-12:
+              raise SystemExit("headline power estimate must equal the worst association cell at +20pp/ICC .20")
+          if abs(fixture["estimated_power_at_20pp_and_icc_020_lower_95"] - expected_power_lower) > 1e-12:
+              raise SystemExit("headline power bound must equal the worst association cell at +20pp/ICC .20")
+
           bad = copy.deepcopy(fixture)
           bad["weak_null_scenarios"].pop()
           try:
@@ -232,14 +239,22 @@ jobs:
           else:
               raise SystemExit("schema must reject a missing weak-null scenario")
           bad = copy.deepcopy(fixture)
-          bad["schema_version"] = "pitb.power-report.v0"
+          bad["scenarios"].pop()
           try:
               validator.validate(bad)
           except ValidationError:
               pass
           else:
-              raise SystemExit("schema must reject the pre-v1 report version")
-          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v1 schema, 16-cell strict/power grid, 36-cell weak-null heterogeneity/ICC/association grid, denominator reconciliation, 40-cell null multiplicity check and negative controls; fixture is synthetic and not a power result")
+              raise SystemExit("schema must reject a missing strict/power scenario")
+          bad = copy.deepcopy(fixture)
+          bad["schema_version"] = "pitb.power-report.v1"
+          try:
+              validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("schema must reject the incomplete v1 power report")
+          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v2 schema, 48-cell effect/ICC/association grid, 36-cell weak-null grid, 48-cell null multiplicity check, worst-association power summary, denominator reconciliation and negative controls; fixture is synthetic and not a power result")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
