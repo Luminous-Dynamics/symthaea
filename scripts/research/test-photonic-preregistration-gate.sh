@@ -58,6 +58,7 @@ jq \
   | .environment.cpu_model = "synthetic-ci-cpu"
   | .environment.ram_bytes = 1000000000
   | .environment.thread_count = 2
+  | .environment.energy_measurement_boundary = "synthetic-test-not-measured"
   | .environment.container_or_nix_derivation_sha256 = $h
   | .environment.dependency_lock_sha256 = $h
   | .environment.compiler_versions = {"rustc": "1.96.0"}
