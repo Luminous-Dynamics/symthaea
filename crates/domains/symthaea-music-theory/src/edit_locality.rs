@@ -27,12 +27,12 @@ pub struct LocalityEvent {
 
 /// A single requested edit. The changed dimension and protected dimensions are
 /// implied by the operation, avoiding caller-defined masks that hide violations.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct EditRequest {
     pub operation: EditOperation,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EditOperation {
     /// Translate every pitch by a constant number of semitones.
@@ -451,7 +451,7 @@ fn duration_preservation(
         .zip(target)
         .enumerate()
         .filter(|(i, _)| Some(*i) != excluded_index)
-        .filter_map(|(_, (s, t))| duration_log_error(t.duration_beats, s.duration_beats).ok())
+        .map(|(_, (s, t))| duration_log_error(t.duration_beats, s.duration_beats).unwrap_or(f64::INFINITY))
         .collect();
     make_check(
         if excluded_index.is_some() { "non_target_duration_preservation" } else { "duration_preservation" },
