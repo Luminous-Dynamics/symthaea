@@ -39,7 +39,7 @@ jobs:
         run: |
           rustc --edition=2024 -O tools/vision-dvpc-ope-exact.rs -o /tmp/vis-dvpc-028
           /tmp/vis-dvpc-028 --sweep | tee /tmp/vis-dvpc-028-results.tsv
-          test "$(grep -c '^METRIC[[:space:]]' /tmp/vis-dvpc-028-results.tsv)" = "150"
+          test "$(grep -c '^METRIC[[:space:]]' /tmp/vis-dvpc-028-results.tsv)" = "210"
           grep -Fq $'SCENARIO\tzero_support\t-\tNOT_IDENTIFIED\testimator_metrics\tSUPPRESSED' /tmp/vis-dvpc-028-results.tsv
           grep -Fq $'METRIC\thealthy_correct\tIPS\tSUPPORT_OK_SYNTHETIC_ONLY\texpected\t0.500000000000' /tmp/vis-dvpc-028-results.tsv
       - name: Create exact-source reproducibility receipt
