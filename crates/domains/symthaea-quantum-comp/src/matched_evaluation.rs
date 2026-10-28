@@ -143,10 +143,14 @@ impl StageCostsMs {
             }
         }
 
-        if self.is_complete() && self.all_in_total_ms().is_some_and(|total| total <= 0.0) {
-            return Err(MatchedEvaluationError::NonPositiveAllInCost(
-                trial_id.to_owned(),
-            ));
+        if self.is_complete() {
+            let total = self.all_in_total_ms().unwrap_or(f64::NAN);
+            if !total.is_finite() || total <= 0.0 {
+                return Err(MatchedEvaluationError::InvalidAllInCost {
+                    trial_id: trial_id.to_owned(),
+                    value: total,
+                });
+            }
         }
         Ok(())
     }
@@ -447,8 +451,10 @@ pub enum MatchedEvaluationError {
     InconsistentCandidateRecord(String),
     /// A stage cost is negative or non-finite.
     InvalidStageCost { trial_id: String, stage: &'static str, value: f64 },
-    /// Complete measured stage costs sum to zero.
-    NonPositiveAllInCost(String),
+    /// Complete all-in measured cost is non-finite or non-positive.
+    InvalidAllInCost { trial_id: String, value: f64 },
+    /// A derived speed ratio overflowed or was non-finite.
+    InvalidRatio { quantity: &'static str },
     /// Energy is present despite the scope being NotMeasured.
     EnergyValueWithNotMeasuredScope,
     /// A measured energy scope has no joule value.
@@ -497,9 +503,14 @@ impl fmt::Display for MatchedEvaluationError {
             Self::InvalidStageCost { trial_id, stage, value } => {
                 write!(f, "trial {trial_id} has invalid {stage} value {value}")
             }
-            Self::NonPositiveAllInCost(id) => {
-                write!(f, "trial {id} has a complete all-in cost that is not positive")
-            }
+            Self::InvalidAllInCost { trial_id, value } => write!(
+                f,
+                "trial {trial_id} has invalid all-in cost {value}; it must be finite and positive"
+            ),
+            Self::InvalidRatio { quantity } => write!(
+                f,
+                "derived {quantity} ratio was not finite and positive"
+            ),
             Self::EnergyValueWithNotMeasuredScope => {
                 write!(f, "energy value supplied with NotMeasured scope")
             }
@@ -605,8 +616,12 @@ pub fn compare_matched_arms(
 
         let baseline_hit = baseline_trial.verified_target_hit(baseline.target_size);
         let candidate_hit = candidate_trial.verified_target_hit(candidate.target_size);
-        baseline_target_hits += usize::from(baseline_hit);
-        candidate_target_hits += usize::from(candidate_hit);
+        if baseline_hit {
+            baseline_target_hits += 1;
+        }
+        if candidate_hit {
+            candidate_target_hits += 1;
+        }
 
         if baseline_hit && candidate_hit {
             both_target_hits += 1;
@@ -633,6 +648,11 @@ pub fn compare_matched_arms(
                 (Some(base_ms), Some(candidate_ms)) => {
                     both_hit_costed_pairs += 1;
                     let ratio = base_ms / candidate_ms;
+                    if !ratio.is_finite() || ratio <= 0.0 {
+                        return Err(MatchedEvaluationError::InvalidRatio {
+                            quantity: "time-speedup",
+                        });
+                    }
                     time_speedups.push(ratio);
                     let winner = if candidate_ms + time_tie_tolerance_ms < base_ms {
                         Some(TimeWinner::Candidate)
@@ -659,6 +679,11 @@ pub fn compare_matched_arms(
                     (Some(base_j), Some(candidate_j)) => {
                         comparable_energy_pairs += 1;
                         let ratio = base_j / candidate_j;
+                        if !ratio.is_finite() || ratio <= 0.0 {
+                            return Err(MatchedEvaluationError::InvalidRatio {
+                                quantity: "energy-speedup",
+                            });
+                        }
                         energy_speedups.push(ratio);
                         Some(ratio)
                     }
@@ -1002,7 +1027,7 @@ mod tests {
         );
         assert!(matches!(
             bad_zero.validate(),
-            Err(MatchedEvaluationError::NonPositiveAllInCost(_))
+            Err(MatchedEvaluationError::InvalidAllInCost { .. })
         ));
     }
 
