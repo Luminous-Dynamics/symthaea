@@ -778,10 +778,14 @@ mod tests {
 
         let mut corrupt = text_record(2, "corrupt-evidence", "web", "invoice route");
         corrupt.content_sha256 = hash(b"tampered text");
-        index.insert(corrupt, &source_bytes_for_text("invoice route")).unwrap();
         assert!(index
-            .search_bm25("invoice", "web", 150, Path::new("."), Bm25Config::default())
+            .insert(corrupt, &source_bytes_for_text("invoice route"))
             .is_err());
+        let hits = index
+            .search_bm25("invoice", "web", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].hdc_id, 1);
     }
 
 
@@ -809,21 +813,28 @@ mod tests {
     }
 
     #[test]
-    fn batch_ingestion_is_atomic_when_any_source_pointer_is_invalid() {
+    fn batch_ingestion_is_atomic_when_the_final_source_pointer_is_invalid() {
         let mut index = EvidenceIndex::new();
-        let valid = text_record(31, "evidence-valid", "web", "first source string");
-        let invalid = text_record(32, "evidence-invalid", "web", "expected source string");
-        let bad_source = serde_json::to_vec(&serde_json::json!({
-            "evidence": "different source string"
-        })).unwrap();
+        let source_value = serde_json::json!({
+            "evidence": "first source string",
+            "second": "different string"
+        });
+        let source_bytes = serde_json::to_vec(&source_value).unwrap();
+        let source_digest = hash(&source_bytes);
+
+        let mut valid = text_record(31, "evidence-valid", "web", "first source string");
+        valid.source.source_sha256 = source_digest.clone();
+        let mut invalid = text_record(32, "evidence-invalid", "web", "expected source string");
+        invalid.source.source_sha256 = source_digest;
+        invalid.source.source_pointer = "/second".to_string();
 
         assert!(index
-            .insert_batch_atomic(vec![valid.clone(), invalid], &bad_source)
+            .insert_batch_atomic(vec![valid.clone(), invalid], &source_bytes)
             .is_err());
-        // The first item must not have been indexed before the second was checked.
-        assert!(index
-            .insert(valid, &source_bytes_for_text("first source string"))
-            .is_ok());
+        // The valid first item must not be indexed before the second was checked.
+        assert!(index.records.is_empty());
+        assert!(index.lexical_documents.is_empty());
+        assert!(index.insert(valid, &source_bytes).is_ok());
     }
     #[test]
     fn serializes_context_items_to_official_type_value_shape() {
