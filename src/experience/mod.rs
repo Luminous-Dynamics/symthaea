@@ -755,6 +755,16 @@ mod tests {
     }
 
     #[test]
+    fn invalid_numeric_pe_does_not_select_probe() {
+        let mut bus = ExperienceBus::with_defaults();
+        bus.current_signals.prediction_error = 0.99;
+        bus.current_signals.prediction_error_valid = false;
+        bus.current_signals.uncertainty = 0.1;
+        let (primitives, _) = bus.select_primitives_principled();
+        assert!(!primitives.contains(&"PROBE".to_string()));
+    }
+
+    #[test]
     fn test_primitive_selection_high_uncertainty() {
         let mut bus = ExperienceBus::with_defaults();
 
