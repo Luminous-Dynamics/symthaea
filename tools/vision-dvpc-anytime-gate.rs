@@ -406,6 +406,24 @@ fn exact_sweep() -> Result<String, String> {
         sequential,
         RISK_ALPHA
     );
+    for (name, risk_crossed, value_crossed, evidence_complete, target_calibrated, cost_ok, provenance_ok) in [
+        ("all_clear", true, true, true, true, true, true),
+        ("missing_evidence", true, true, false, true, true, true),
+        ("target_shift_or_uncalibrated", true, true, true, false, true, true),
+        ("budget_overrun", true, true, true, true, false, true),
+        ("provenance_mismatch", true, true, true, true, true, false),
+        ("always_deny_control", false, false, true, true, true, true),
+    ] {
+        let verdict = authorize(
+            risk_crossed,
+            value_crossed,
+            evidence_complete,
+            target_calibrated,
+            cost_ok,
+            provenance_ok,
+        );
+        let _ = writeln!(output, "GATE_CONTROL\t{name}\t{}", verdict.as_str());
+    }
     let _ = writeln!(
         output,
         "SUMMARY\trisk_scenarios={}\tvalue_scenarios={}\tmax_horizon=200\talpha_risk={:.6}\talpha_value={:.6}\tjoint_alpha={:.6}",
@@ -532,6 +550,12 @@ mod tests {
         assert_eq!(first.lines().filter(|line| line.starts_with("RISK\t")).count(), 20);
         assert_eq!(first.lines().filter(|line| line.starts_with("VALUE\t")).count(), 20);
         assert!(first.contains("PEEKING_CONTROL\t120\t50000\t72,120\t0.032937159528\t0.008924249150\t0.025000"));
+        assert!(first.contains("GATE_CONTROL\tall_clear\tAUTHORIZED"));
+        assert!(first.contains("GATE_CONTROL\tmissing_evidence\tDENIED"));
+        assert!(first.contains("GATE_CONTROL\ttarget_shift_or_uncalibrated\tDENIED"));
+        assert!(first.contains("GATE_CONTROL\tbudget_overrun\tDENIED"));
+        assert!(first.contains("GATE_CONTROL\tprovenance_mismatch\tDENIED"));
+        assert!(first.contains("GATE_CONTROL\talways_deny_control\tINSUFFICIENT_EVIDENCE"));
         assert!(first.contains("SUMMARY\trisk_scenarios=20\tvalue_scenarios=20\tmax_horizon=200\talpha_risk=0.025000\talpha_value=0.025000\tjoint_alpha=0.050000"));
     }
 }
