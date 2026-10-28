@@ -20,6 +20,11 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # The energy candidate benchmark found a glob-matched legacy path with no
+    # Cargo.toml in this pinned tree. Keep it out of workspace membership.
+    "crates/core/symthaea",
+    # This directory exists in the tree but has no Cargo.toml; exclude it from the glob.
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
@@ -31,6 +36,8 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Legacy evidence-verifier directory has no Cargo.toml; keep it out of the workspace glob.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
