@@ -199,7 +199,8 @@ def audit_trial(trial: dict) -> dict:
         if set(cm) != base_names: errors.append(f"{label}: CONSUMER_SET_CHANGED")
         if run.get("gate_and_outcome_digest") != no_pe.get("gate_and_outcome_digest"):
             errors.append(f"{label}: INDEPENDENT_OUTCOME_CALIBRATION_CHANGED")
-        is_valid = run.get("pe_status") == "valid"
+        # Branch role comes from the paired-trial structure, never from untrusted telemetry.
+        is_valid = label == valid_label
         for cid in base_names & set(cm):
             state, base = cm[cid], base_consumers[cid]
             if state.get("before_state_digest") != base.get("before_state_digest"):
@@ -302,6 +303,8 @@ def self_test(cases: int = 100_000, seed: int = 20261028) -> dict:
     mutations["unclassified_consumer"] = (m, "UNCLASSIFIED_CONSUMER")
     m = json.loads(json.dumps(base)); m["invalid_variants"][0]["branch"] = "invalid_wrong"
     mutations["invalid_branch_label_mismatch"] = (m, "INVALID_BRANCH_LABEL_MISMATCH")
+    m = json.loads(json.dumps(base)); m["invalid_variants"][0]["pe_status"] = "valid"
+    mutations["invalid_status_promotion"] = (m, "INVALID_BRANCH_STATUS_MISMATCH")
     checked = {}
     for name, (mutated, expected) in mutations.items():
         result = audit_trial(mutated)
