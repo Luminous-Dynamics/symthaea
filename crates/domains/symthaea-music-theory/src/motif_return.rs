@@ -18,7 +18,7 @@ use crate::score::{Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 /// Version of the transformation-aware motif-return measurement contract.
-pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v3";
+pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v4";
 
 /// Auditable evidence that one melodic region recalls another.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -29,6 +29,11 @@ pub struct MotifReturnEvidence {
     pub source_note_count: usize,
     pub target_note_count: usize,
     pub aligned_note_count: usize,
+    /// Constant semitone offset from the first source pitch to first target pitch.
+    /// A default of zero keeps legacy records readable but cannot prove a nonzero
+    /// transposition claim; the threshold gate fails those legacy claims closed.
+    #[serde(default)]
+    pub transposition_semitones: i32,
     /// Exact MIDI-pitch matches at aligned positions.
     pub literal_pitch_similarity: f32,
     /// Pitch matches after one constant semitone translation.
@@ -91,6 +96,17 @@ impl MotifReturnEvidence {
                 && (self.duration_scale / expected).log2().abs() <= 0.25
         });
         let uniform_scaling_required = expected_scale.is_some();
+        // A zero-shift transposition is identity, not a transformation.
+        // Inversion is ambiguous when inverting the intervals does not improve
+        // the match (for example, an all-repeated-note motif has only zero intervals).
+        // Fail closed on both cases rather than accept a non-identifiable label.
+        let transformation_compatible = match self.expected_transformation {
+            ReturnTransformation::Transposed => self.transposition_semitones != 0,
+            ReturnTransformation::Inverted => {
+                self.inverted_interval_similarity > self.interval_similarity
+            }
+            _ => true,
+        };
         let length_compatible = match self.expected_transformation {
             ReturnTransformation::Literal
             | ReturnTransformation::Transposed
@@ -109,6 +125,7 @@ impl MotifReturnEvidence {
         self.aligned_note_count >= 2
             && length_compatible
             && self.overall_similarity >= threshold.clamp(0.0, 1.0)
+            && transformation_compatible
             && expected_scale_compatible
             && (!uniform_scaling_required || self.duration_scale_consistency >= 0.85)
     }
@@ -224,6 +241,7 @@ pub fn compare_melodic_sequences(
         source_note_count: source.len(),
         target_note_count: target.len(),
         aligned_note_count: aligned,
+        transposition_semitones: transposition,
         literal_pitch_similarity,
         transposed_pitch_similarity,
         interval_similarity,
@@ -699,6 +717,43 @@ mod tests {
             compare_melodic_sequences(&source, &longer_target, ReturnTransformation::Transposed);
         assert!(evidence.overall_similarity > 0.75);
         assert!(!evidence.meets_threshold(0.75));
+    }
+
+    #[test]
+    fn identity_cannot_satisfy_a_transposition_claim() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::quarter()),
+            note(65, 2, Duration::quarter()),
+            note(64, 3, Duration::quarter()),
+        ];
+        let identity =
+            compare_melodic_sequences(&source, &source, ReturnTransformation::Transposed);
+        assert_eq!(identity.transposition_semitones, 0);
+        assert!(identity.overall_similarity >= 0.99);
+        assert!(!identity.meets_threshold(0.95));
+
+        let shifted: Vec<_> = source.iter().copied().map(|mut event| {
+            event.pitch = event.pitch.transpose(5);
+            event
+        }).collect();
+        let valid = compare_melodic_sequences(&source, &shifted, ReturnTransformation::Transposed);
+        assert_eq!(valid.transposition_semitones, 5);
+        assert!(valid.meets_threshold(0.99));
+    }
+
+    #[test]
+    fn degenerate_repeated_note_motif_cannot_satisfy_inversion_claim() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(60, 1, Duration::quarter()),
+            note(60, 2, Duration::quarter()),
+            note(60, 3, Duration::quarter()),
+        ];
+        let evidence =
+            compare_melodic_sequences(&source, &source, ReturnTransformation::Inverted);
+        assert_eq!(evidence.inverted_interval_similarity, evidence.interval_similarity);
+        assert!(!evidence.meets_threshold(0.85));
     }
 
     #[test]
