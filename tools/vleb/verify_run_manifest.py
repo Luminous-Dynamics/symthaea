@@ -236,6 +236,8 @@ def validate_manifest(
     *,
     expected_verifier_sha256: str,
     expected_schema_sha256: str,
+    expected_auditor_sha256: str,
+    expected_verifier_binary_sha256: str,
     verify_attestation: bool,
     gh_executable: str = "gh",
 ) -> dict[str, Any]:
@@ -244,6 +246,8 @@ def validate_manifest(
         ("manifest", expected_manifest_sha256),
         ("verifier", expected_verifier_sha256),
         ("schema", expected_schema_sha256),
+        ("auditor", expected_auditor_sha256),
+        ("receipt verifier binary", expected_verifier_binary_sha256),
     ):
         if not HEX.fullmatch(pin):
             return {
@@ -301,6 +305,19 @@ def validate_manifest(
         return {"eligible": False, "verdict": "fail", "observed_manifest_sha256": observed_manifest_sha, "issues": issues}
     if not isinstance(manifest, dict):
         return {"eligible": False, "verdict": "fail", "observed_manifest_sha256": observed_manifest_sha, "issues": [{"code": "manifest_root_invalid", "message": "manifest root must be an object"}]}
+
+    if manifest.get("auditor", {}).get("source_sha256") != expected_auditor_sha256:
+        return {
+            "eligible": False, "manifest_valid": False, "score_eligible": False,
+            "verdict": "fail", "observed_manifest_sha256": observed_manifest_sha,
+            "issues": [{"code": "auditor_pin_mismatch", "message": "manifest-selected auditor differs from evaluator-pinned auditor source"}],
+        }
+    if manifest.get("auditor", {}).get("verifier_binary_sha256") != expected_verifier_binary_sha256:
+        return {
+            "eligible": False, "manifest_valid": False, "score_eligible": False,
+            "verdict": "fail", "observed_manifest_sha256": observed_manifest_sha,
+            "issues": [{"code": "receipt_verifier_binary_pin_mismatch", "message": "receipt-verifier binary differs from evaluator-pinned binary digest"}],
+        }
 
     repo = manifest["repository"]
     task = manifest["task"]
@@ -451,8 +468,8 @@ def validate_manifest(
                 "--expected-task-sha256", task["contract_sha256"],
                 "--expected-protocol-sha256", manifest["protocol"]["sha256"],
                 "--expected-patch-sha256", manifest["candidate"]["patch_sha256"],
-                "--expected-auditor-sha256", manifest["auditor"]["source_sha256"],
-                "--expected-verifier-binary-sha256", manifest["auditor"]["verifier_binary_sha256"],
+                "--expected-auditor-sha256", expected_auditor_sha256,
+                "--expected-verifier-binary-sha256", expected_verifier_binary_sha256,
             ]
             try:
                 completed = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, timeout=180)
@@ -511,6 +528,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-manifest-sha256", required=True)
     parser.add_argument("--expected-verifier-sha256", required=True)
     parser.add_argument("--expected-schema-sha256", required=True)
+    parser.add_argument("--expected-auditor-sha256", required=True)
+    parser.add_argument("--expected-verifier-binary-sha256", required=True)
     parser.add_argument("--gh-executable", default="gh")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
@@ -528,6 +547,8 @@ def main(argv: list[str] | None = None) -> int:
         args.expected_manifest_sha256,
         expected_verifier_sha256=args.expected_verifier_sha256,
         expected_schema_sha256=args.expected_schema_sha256,
+        expected_auditor_sha256=args.expected_auditor_sha256,
+        expected_verifier_binary_sha256=args.expected_verifier_binary_sha256,
         verify_attestation=verify_attestation,
         gh_executable=args.gh_executable,
     )
