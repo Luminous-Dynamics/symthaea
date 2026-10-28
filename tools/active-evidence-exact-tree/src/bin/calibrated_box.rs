@@ -39,7 +39,7 @@ const SCENARIOS: [(&str, Matrix); 5] = [
         [0.24, 0.38, 0.88], [0.76, 0.70, 0.18],
     ]),
 ];
-const SAMPLE_SIZES: [usize; 6] = [20, 50, 100, 200, 500, 1000];
+const SAMPLE_SIZES: [usize; 9] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
 const ALPHA: f64 = 0.05;
 const CELLS: f64 = 12.0;
 const EPS: f64 = 1.0e-12;
@@ -136,8 +136,15 @@ fn enumerate_trees(belief: [f64; 3], mask: u8, rounds: usize) -> Vec<Tree> {
     trees
 }
 
-fn hoeffding_intervals(n: usize) -> Intervals {
-    let radius = ((2.0 * CELLS / ALPHA).ln() / (2.0 * n as f64)).sqrt();
+/// Fixed-sample Hoeffding intervals or a time-uniform sequence built by alpha spending.
+///
+/// For anytime=true, per-cell/time failure mass is alpha/[CELLS*n*(n+1)]. Since
+/// sum_{n>=1} 1/(n*(n+1)) = 1, Hoeffding plus the union bound covers all 12 cells
+/// and all sample sizes simultaneously with probability at least 1-alpha, assuming
+/// independent stationary Bernoulli observations per cell. This is conservative but
+/// valid under optional stopping; the fixed-sample interval alone is not.
+fn hoeffding_intervals(n: usize, anytime: bool) -> Intervals {
+    let radius = interval_radius(n, anytime);
     let mut intervals = [[[0.0; 2]; 3]; 4];
     for query in 0..4 {
         for hypothesis in 0..3 {
@@ -152,11 +159,15 @@ fn hoeffding_intervals(n: usize) -> Intervals {
     intervals
 }
 
-fn interval_radius(n: usize) -> f64 {
-    ((2.0 * CELLS / ALPHA).ln() / (2.0 * n as f64)).sqrt()
+fn interval_radius(n: usize, anytime: bool) -> f64 {
+    let log_term = if anytime {
+        (2.0 * CELLS * n as f64 * (n + 1) as f64 / ALPHA).ln()
+    } else {
+        (2.0 * CELLS / ALPHA).ln()
+    };
+    (log_term / (2.0 * n as f64)).sqrt()
 }
 
-#[cfg(test)]
 const COVERAGE_GRID: [f64; 11] = [
     0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0,
 ];
@@ -196,8 +207,8 @@ fn binomial_pmf(n: usize, p: f64) -> Vec<f64> {
     mass
 }
 
-fn cell_coverage(n: usize, true_probability: f64) -> f64 {
-    let radius = interval_radius(n);
+fn cell_coverage(n: usize, true_probability: f64, anytime: bool) -> f64 {
+    let radius = interval_radius(n, anytime);
     binomial_pmf(n, true_probability)
         .into_iter()
         .enumerate()
@@ -264,8 +275,8 @@ fn evaluate_conditional(
 /// on a path, conditional expected loss/cost is multi-affine in those four probabilities, so its
 /// maximum over that row's interval box is attained at one of 2^4 vertices. The rows are independent
 /// box factors, hence max over the full box of E[loss] = sum_h prior[h] * max_row_h E[loss | h].
-fn worst_box_metrics(tree: &Tree, n: usize) -> Metrics {
-    let intervals = hoeffding_intervals(n);
+fn worst_box_metrics(tree: &Tree, n: usize, anytime: bool) -> Metrics {
+    let intervals = hoeffding_intervals(n, anytime);
     let mut worst_loss = 0.0;
     let mut worst_cost = 0.0;
     let mut worst_queries = 0.0;
@@ -298,11 +309,11 @@ fn worst_box_metrics(tree: &Tree, n: usize) -> Metrics {
     }
 }
 
-fn choose_tree(trees: &[Tree], n: usize) -> (Tree, Metrics) {
+fn choose_tree(trees: &[Tree], n: usize, anytime: bool) -> (Tree, Metrics) {
     let mut best_tree = trees[0].clone();
-    let mut best_metrics = worst_box_metrics(&best_tree, n);
+    let mut best_metrics = worst_box_metrics(&best_tree, n, anytime);
     for tree in trees.iter().skip(1) {
-        let metrics = worst_box_metrics(tree, n);
+        let metrics = worst_box_metrics(tree, n, anytime);
         if metrics.loss < best_metrics.loss - EPS
             || ((metrics.loss - best_metrics.loss).abs() <= EPS
                 && metrics.cost < best_metrics.cost - EPS)
@@ -423,43 +434,50 @@ mod tests {
     }
 
     #[test]
-    fn hoeffding_radius_is_finite_nonincreasing_and_contains_nominal_fixture() {
-        let mut previous = f64::INFINITY;
-        for n in SAMPLE_SIZES {
-            let radius = interval_radius(n);
-            assert!(radius.is_finite() && radius > 0.0);
-            assert!(radius < previous);
-            previous = radius;
-            let intervals = hoeffding_intervals(n);
-            for query in 0..4 {
-                for hypothesis in 0..3 {
-                    let low = intervals[query][hypothesis][0];
-                    let high = intervals[query][hypothesis][1];
-                    assert!((0.0..=1.0).contains(&low));
-                    assert!((0.0..=1.0).contains(&high));
-                    assert!(low <= NOMINAL[query][hypothesis]);
-                    assert!(high >= NOMINAL[query][hypothesis]);
+    fn fixed_and_anytime_radii_are_valid_ordered_and_nonincreasing() {
+        for anytime in [false, true] {
+            let mut previous = f64::INFINITY;
+            for n in SAMPLE_SIZES {
+                let radius = interval_radius(n, anytime);
+                assert!(radius.is_finite() && radius > 0.0);
+                assert!(radius < previous);
+                previous = radius;
+                let intervals = hoeffding_intervals(n, anytime);
+                for query in 0..4 {
+                    for hypothesis in 0..3 {
+                        let low = intervals[query][hypothesis][0];
+                        let high = intervals[query][hypothesis][1];
+                        assert!((0.0..=1.0).contains(&low));
+                        assert!((0.0..=1.0).contains(&high));
+                        assert!(low <= NOMINAL[query][hypothesis]);
+                        assert!(high >= NOMINAL[query][hypothesis]);
+                    }
                 }
             }
+        }
+        for n in SAMPLE_SIZES {
+            assert!(interval_radius(n, true) >= interval_radius(n, false));
         }
     }
 
     #[test]
     fn exact_binomial_coverage_grid_respects_the_bonferroni_budget() {
         let per_cell_target = 1.0 - ALPHA / CELLS;
-        for n in SAMPLE_SIZES {
-            let mut minimum = f64::INFINITY;
-            for true_probability in COVERAGE_GRID {
-                let coverage = cell_coverage(n, true_probability);
-                assert!(coverage.is_finite() && (0.0..=1.0 + 1.0e-10).contains(&coverage));
-                minimum = minimum.min(coverage);
+        for anytime in [false, true] {
+            for n in SAMPLE_SIZES {
+                let mut minimum = f64::INFINITY;
+                for true_probability in COVERAGE_GRID {
+                    let coverage = cell_coverage(n, true_probability, anytime);
+                    assert!(coverage.is_finite() && (0.0..=1.0 + 1.0e-10).contains(&coverage));
+                    minimum = minimum.min(coverage);
+                }
+                assert!(
+                    minimum + 1.0e-10 >= per_cell_target,
+                    "anytime={anytime}, n={n}: minimum grid coverage {minimum} below {per_cell_target}"
+                );
+                let simultaneous_union_bound = 1.0 - CELLS * (1.0 - minimum);
+                assert!(simultaneous_union_bound + 1.0e-10 >= 1.0 - ALPHA);
             }
-            assert!(
-                minimum + 1.0e-10 >= per_cell_target,
-                "n={n}: minimum grid coverage {minimum} below {per_cell_target}"
-            );
-            let simultaneous_union_bound = 1.0 - CELLS * (1.0 - minimum);
-            assert!(simultaneous_union_bound + 1.0e-10 >= 1.0 - ALPHA);
         }
     }
 
@@ -470,8 +488,8 @@ mod tests {
             .into_iter()
             .nth(1)
             .expect("one-query tree");
-        let factorized = worst_box_metrics(&tree, n);
-        let intervals = hoeffding_intervals(n);
+        let factorized = worst_box_metrics(&tree, n, false);
+        let intervals = hoeffding_intervals(n, false);
         let mut full_worst_loss = f64::NEG_INFINITY;
         let mut full_worst_cost = f64::NEG_INFINITY;
         for vertex in 0_u16..(1_u16 << 12) {
@@ -494,13 +512,13 @@ mod tests {
     #[test]
     fn insufficient_calibration_abstains_then_more_evidence_expands_tree() {
         let trees = enumerate_trees(PRIOR, 0b1111, 3);
-        let (small, small_worst) = choose_tree(&trees, 20);
+        let (small, small_worst) = choose_tree(&trees, 20, false);
         assert_eq!(small, Tree::Stop);
         assert!(near(small_worst.loss, 2.3, 1.0e-9));
-        let (medium, medium_worst) = choose_tree(&trees, 200);
+        let (medium, medium_worst) = choose_tree(&trees, 200, false);
         assert_eq!(medium.first_query(), Some(0));
         assert!(near(medium_worst.cost, 1.0, 1.0e-9));
-        let (large, large_worst) = choose_tree(&trees, 1000);
+        let (large, large_worst) = choose_tree(&trees, 1000, false);
         assert_eq!(large.first_query(), Some(0));
         assert!(large_worst.cost > 3.0);
         assert!(large_worst.loss < medium_worst.loss);
@@ -510,7 +528,7 @@ mod tests {
     fn held_out_shift_metrics_are_finite_and_queries_stay_within_depth() {
         let trees = enumerate_trees(PRIOR, 0b1111, 3);
         for n in SAMPLE_SIZES {
-            let (tree, worst) = choose_tree(&trees, n);
+            let (tree, worst) = choose_tree(&trees, n, false);
             assert!(worst.loss.is_finite() && worst.cost.is_finite());
             for (_, matrix) in SCENARIOS {
                 let result = evaluate(&tree, matrix);
