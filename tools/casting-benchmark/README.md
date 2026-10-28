@@ -305,7 +305,7 @@ python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_
 
 `CASTING-MF-COMPOSITION-001` crosses the six existing mismatch families independently: one family supplies the low/medium objective values, while another supplies the low/medium constraint margin. At high fidelity, both components resolve to the same analytic truth. Diagonal cells are required to match the existing single-family scenario exactly; off-diagonal cells test combinations in which objective ranking errors and feasibility errors arise from different mechanisms.
 
-This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The preregistered default covers 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs.
+This is a synthetic robustness diagnostic, **not** a casting solver or external SOTA claim. It runs the five existing policies without changing their implementations. The original five-policy compositional matrix covered 6 objective families × 6 constraint families × 3 dimensions × 3 severity values × 3 paired seeds × 5 policies = 4,860 raw policy runs. With the decision-impact challenger below, the current six-policy matrix contains 5,832 runs.
 
 Run a fast crossed subset:
 
@@ -331,3 +331,31 @@ Tests include diagonal parity across all families/fidelities, component separati
 ```
 
 The three-seed default is diagnostic only. Use at least 20 paired seeds (target 30), multiplicity-aware preregistered analysis, pinned external baselines and a separate physical-validation gate before making claims of general superiority or foundry relevance.
+
+
+## Decision-impact-weighted acquisition challenger
+
+The compositional matrix now includes a sixth policy, `decision_value_of_information`, implemented in `tools/casting-benchmark/multifidelity_decision_value_policy.py`. It spends the standard 200-unit budget as 60 low-fidelity screens, 8 medium-fidelity probes, and 4 high-fidelity calls. Two high calls act as discrepancy anchors; the final two confirmations are selected sequentially using a transparent score that combines predicted feasible hypervolume gain, uncertainty around the feasibility boundary, and objective uncertainty near the estimated trade-off frontier.
+
+This is deliberately an **interpretable challenger, not an exact Bayesian expected-value-of-information algorithm**. The uncertainty estimate comes from a small set of paired discrepancies and is not a calibrated posterior. The score weights are frozen in `docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json`. Any weight sensitivity analysis must be reported as a separate preregistered track rather than changing weights after seeing the main results.
+
+Run the single-policy diagnostic and replay it:
+
+```sh
+python3 tools/casting-benchmark/multifidelity_compositional_bakeoff.py \
+  --objective-families local_bias_island,warped_coordinates \
+  --constraint-families constraint_boundary,discontinuous_step \
+  --dimensions 2 --severities 0.5,1 --seeds 17,23 --design-count 75 \
+  --policies decision_value_of_information \
+  > /tmp/casting-diwa-results.json
+
+python3 tools/casting-benchmark/score_compositional_bakeoff.py \
+  /tmp/casting-diwa-results.json --allow-diagnostic-subset \
+  --receipt /tmp/casting-diwa-receipt.json
+```
+
+For the default cost map of low=1, medium=5, high=25, the policy's fixed allocation spends 60 + 40 + 100 = 200 cost units. It must be compared against all five earlier policies on the exact same candidate pool and seed. The compositional full matrix expands from 4,860 to **5,832 policy runs**. A good result would be a paired gain over the strongest baseline across held-out compositions—not a win against high-only alone. External MF-HVKG and MOMF remain required baselines.
+
+Research basis: BoTorch's MF-HVKG selects evaluations for expected value of information about the Pareto set, while MOMF includes fidelity as an additional objective. Recent constrained Bayesian-optimization work also highlights difficulty at active feasibility boundaries. DIWA is therefore not claimed as a new general acquisition principle; its contribution is a transparent, auditable challenger targeted at compositional model-error and decision-risk stress. Sources:
+- https://github.com/meta-pytorch/botorch/blob/v0.18.1/tutorials/Multi_objective_multi_fidelity_BO/Multi_objective_multi_fidelity_BO.ipynb
+- https://link.springer.com/article/10.1007/s10589-026-00826-9

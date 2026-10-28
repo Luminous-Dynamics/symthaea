@@ -15,12 +15,16 @@ from dataclasses import asdict
 from typing import Iterable
 
 from multifidelity_stress import (
-    POLICIES,
+    POLICIES as EXISTING_POLICIES,
     PolicyEvaluator,
     REFERENCE_POINT,
     hypervolume_2d,
     normalize_fidelity_costs,
     required_policy_costs,
+)
+from multifidelity_decision_value_policy import (
+    POLICY_ID as DECISION_VALUE_POLICY_ID,
+    decision_value_of_information_policy,
 )
 from multifidelity_scenario_suite import (
     DEFAULT_DESIGN_COUNT,
@@ -35,8 +39,23 @@ from multifidelity_scenario_suite import (
 )
 
 BENCHMARK_ID = "CASTING-MF-COMPOSITION-001"
+POLICIES = {
+    **EXISTING_POLICIES,
+    DECISION_VALUE_POLICY_ID: decision_value_of_information_policy,
+}
+
+
+def _required_policy_costs(costs: dict[str, int]) -> dict[str, int]:
+    required = required_policy_costs(costs)
+    required[DECISION_VALUE_POLICY_ID] = (
+        60 * costs["low"] + 8 * costs["medium"] + 4 * costs["high"]
+    )
+    return required
+
+
 SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+    "tools/casting-benchmark/multifidelity_decision_value_policy.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
@@ -142,7 +161,7 @@ def run_one(
     if design_count < 75:
         raise ValueError("design_count must be at least 75 for the frozen policy templates")
     costs = normalize_fidelity_costs(fidelity_costs)
-    if cost_budget < required_policy_costs(costs)[policy]:
+    if cost_budget < _required_policy_costs(costs)[policy]:
         raise ValueError(f"cost_budget is below the frozen minimum for {policy}")
 
     world = CompositionalScenarioWorld(
@@ -211,6 +230,7 @@ def run_one(
         "observed_high_fidelity_hypervolume": observed_hv,
         "normalized_hypervolume_fraction": observed_hv / true_hv if true_hv > 0.0 else 0.0,
         "promotion_records": promotions,
+        "decision_value_trace": getattr(evaluator, "decision_value_trace", []),
         "predicted_feasible_promotion_count": predicted_feasible,
         "false_promotion_count": false_promotions,
         "false_promotion_rate": false_promotions / predicted_feasible if predicted_feasible else None,
@@ -259,7 +279,7 @@ def run_sweep(
         raise ValueError("severities must be non-negative")
     if design_count < 75:
         raise ValueError("design_count must be at least 75")
-    required = required_policy_costs(costs)
+    required = _required_policy_costs(costs)
     if cost_budget < max(required[p] for p in policy_values):
         raise ValueError("cost_budget must satisfy every selected policy's frozen minimum")
 

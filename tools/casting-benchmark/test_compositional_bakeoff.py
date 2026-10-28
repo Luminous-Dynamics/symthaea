@@ -75,7 +75,7 @@ class CompositionalBakeoffTests(unittest.TestCase):
             seeds=(17, 23),
             design_count=75,
         )
-        self.assertEqual(document["run_count"], 2 * 2 * 1 * 2 * 2 * 5)
+        self.assertEqual(document["run_count"], 2 * 2 * 1 * 2 * 2 * 6)
         self.assertEqual(len(document["paired_runs"]), document["run_count"])
         by_key = {
             (r["objective_family"], r["constraint_family"], r["dimension"], r["severity"], r["seed"], r["policy"]): r
@@ -85,8 +85,8 @@ class CompositionalBakeoffTests(unittest.TestCase):
         receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
         self.assertTrue(receipt["valid"])
         self.assertEqual(receipt["run_count"], document["run_count"])
-        self.assertEqual(receipt["cell_summary_count"], 2 * 2 * 1 * 2 * 5)
-        self.assertEqual(receipt["paired_comparison_count"], 2 * 2 * 1 * 2 * 4)
+        self.assertEqual(receipt["cell_summary_count"], 2 * 2 * 1 * 2 * 6)
+        self.assertEqual(receipt["paired_comparison_count"], 2 * 2 * 1 * 2 * 5)
 
     def test_scorer_requires_default_matrix_or_explicit_subset_flag(self) -> None:
         document = run_sweep(
@@ -102,6 +102,60 @@ class CompositionalBakeoffTests(unittest.TestCase):
             score_document(document, ROOT)
         receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
         self.assertEqual(receipt["execution_scope"], "diagnostic_subset")
+
+    def test_decision_value_policy_uses_frozen_cost_template(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("decision_value_of_information",),
+            design_count=75,
+        )
+        self.assertEqual(document["run_count"], 1)
+        run = document["paired_runs"][0]
+        self.assertEqual(run["fidelity_evaluations"], {"low": 60, "medium": 8, "high": 4})
+        self.assertEqual(run["cost_spent"], 200)
+        methods = {p["method"] for p in run["promotion_records"]}
+        self.assertEqual(methods, {"decision_impact_anchor", "decision_impact_confirmation"})
+        receipt = score_document(document, ROOT, allow_diagnostic_subset=True)
+        self.assertTrue(receipt["valid"])
+        self.assertEqual(receipt["execution_scope"], "diagnostic_subset")
+
+    def test_decision_value_policy_is_deterministic(self) -> None:
+        kwargs = dict(
+            objective_families=("warped_coordinates",),
+            constraint_families=("discontinuous_step",),
+            dimensions=(2,),
+            severities=(1.0,),
+            seeds=(23,),
+            policies=("decision_value_of_information",),
+            design_count=75,
+        )
+        first = run_sweep(**kwargs)["paired_runs"][0]
+        second = run_sweep(**kwargs)["paired_runs"][0]
+        self.assertEqual(first["fidelity_evaluations"], second["fidelity_evaluations"])
+        self.assertEqual(first["evaluations"], second["evaluations"])
+        self.assertEqual(first["promotion_records"], second["promotion_records"])
+
+    def test_scorer_rejects_tampered_decision_score(self) -> None:
+        document = run_sweep(
+            objective_families=("local_bias_island",),
+            constraint_families=("constraint_boundary",),
+            dimensions=(2,),
+            severities=(0.5,),
+            seeds=(17,),
+            policies=("decision_value_of_information",),
+            design_count=75,
+        )
+        trace = document["paired_runs"][0]["decision_value_trace"]
+        self.assertEqual(len(trace), 2)
+        self.assertEqual(len(trace[0]["candidate_scores"]), 58)
+        self.assertEqual(len(trace[1]["candidate_scores"]), 57)
+        trace[0]["candidate_scores"][0]["score"] += 0.01
+        with self.assertRaisesRegex(ValueError, "replay rejected"):
+            score_document(document, ROOT, allow_diagnostic_subset=True)
 
     def test_scorer_rejects_modified_objective_value(self) -> None:
         document = run_sweep(

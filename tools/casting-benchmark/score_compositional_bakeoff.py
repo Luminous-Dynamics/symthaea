@@ -27,19 +27,24 @@ SUPPORTED_FAMILIES = (
     "heteroscedastic_noise",
 )
 SUPPORTED_DIMENSIONS = (2, 5, 10)
-POLICY_ORDER = ("high_only", "low_screen", "fixed_top_k", "discrepancy_aware", "adaptive_budget")
+POLICY_ORDER = (
+    "high_only", "low_screen", "fixed_top_k", "discrepancy_aware",
+    "adaptive_budget", "decision_value_of_information",
+)
 ALLOWED_PROMOTION_METHODS = {
     "high_only": set(),
     "low_screen": {"low_predicted_margin"},
     "fixed_top_k": {"medium_top_k"},
     "discrepancy_aware": {"discrepancy_anchor", "discrepancy_corrected"},
     "adaptive_budget": {"adaptive_discrepancy_anchor", "adaptive_cost_aware_corrected"},
+    "decision_value_of_information": {"decision_impact_anchor", "decision_impact_confirmation"},
 }
 REFERENCE_POINT = (1.2, 1.2)
 TOL = 1e-9
 PRIMES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53)
 SOURCE_PATHS = (
     "tools/casting-benchmark/multifidelity_compositional_bakeoff.py",
+    "tools/casting-benchmark/multifidelity_decision_value_policy.py",
     "tools/casting-benchmark/score_compositional_bakeoff.py",
     "tools/casting-benchmark/multifidelity_scenario_suite.py",
     "tools/casting-benchmark/multifidelity_stress.py",
@@ -57,7 +62,7 @@ RUN_KEYS = {
     "fidelity_costs", "cost_budget", "cost_spent", "unused_cost", "evaluation_count",
     "fidelity_evaluations", "fidelity_cost_units_by_level", "high_fidelity_call_count",
     "true_finite_pool_hypervolume", "observed_high_fidelity_hypervolume",
-    "normalized_hypervolume_fraction", "promotion_records",
+    "normalized_hypervolume_fraction", "promotion_records", "decision_value_trace",
     "predicted_feasible_promotion_count", "false_promotion_count", "false_promotion_rate",
     "evaluations",
 }
@@ -207,6 +212,7 @@ def expected_call_counts(policy: str, costs: dict[str, int], budget: int, design
         "low_screen": {"low": 75, "medium": 0, "high": 5},
         "fixed_top_k": {"low": 50, "medium": 10, "high": 4},
         "discrepancy_aware": {"low": 55, "medium": 4, "high": 5},
+        "decision_value_of_information": {"low": 60, "medium": 8, "high": 4},
     }
     if policy in fixed:
         return fixed[policy]
@@ -250,6 +256,362 @@ def _require_keys(value: Any, expected: set[str], label: str, errors: list[str])
     return True
 
 
+
+TRACE_KEYS = {
+    "step", "high_fidelity_candidates_before_decision",
+    "candidate_scores", "selected_candidate_id",
+}
+CANDIDATE_SCORE_KEYS = {
+    "candidate_id", "predicted_objectives", "predicted_margin", "sigma",
+    "probability_feasible_proxy", "normalized_expected_hypervolume_gain",
+    "boundary_information", "objective_information", "score",
+}
+DIWA_WEIGHTS = {
+    "expected_hypervolume_gain": 0.70,
+    "constraint_boundary_information": 0.20,
+    "frontier_objective_information": 0.10,
+}
+DIWA_FIXED_PARAMETERS = {
+    "neighborhood_size": 4,
+    "inverse_distance_offset": 0.02,
+    "uncertainty_boundary_scale": 0.08,
+    "objective_uncertainty_scale": 0.20,
+    "frontier_distance_scale": 0.10,
+    "robust_sigma_mad_multiplier": 1.4826,
+    "uncertainty_extrapolation_multiplier": 0.35,
+    "minimum_sigma": 0.000001,
+    "medium_probe_rule": "two closest absolute constraint margins, best observed value for each objective, then diverse scalarization picks to fill eight unique candidates",
+    "anchor_rule": "first medium candidate closest to the feasibility boundary; second maximizes input-space RMS distance from the first",
+    "confirmation_rule": "recompute all remaining low-sample candidate predictions after each high call and choose the maximum independently replayable score; ties break on lowest candidate ID",
+    "audit": "For each of the two confirmation decisions, store all eligible candidate scores and prediction components. The scorer independently recomputes predictions, score components, score ordering and selected candidate from the raw trace.",
+}
+DIWA_POLICY = "decision_value_of_information"
+
+
+def _diwa_distance(candidate_a: int, candidate_b: int, dimension: int, seed: int) -> float:
+    xa, xb = design_point(candidate_a, dimension, seed), design_point(candidate_b, dimension, seed)
+    return math.sqrt(statistics.fmean((a - b) ** 2 for a, b in zip(xa, xb)))
+
+
+def _diwa_robust_sigma(values: list[float]) -> float:
+    if not values:
+        return 1e-6
+    center = statistics.median(values)
+    mad = statistics.median([abs(value - center) for value in values])
+    mean = statistics.fmean(values)
+    variance = statistics.fmean((value - mean) ** 2 for value in values)
+    return max(1e-6, 1.4826 * mad, math.sqrt(max(0.0, variance)) * 0.5)
+
+
+def _diwa_weighted_local(
+    candidate_id: int,
+    references: list[dict],
+    deltas: dict[int, tuple[float, ...]],
+    dimension: int,
+    seed: int,
+) -> tuple[tuple[float, ...], tuple[float, ...], float]:
+    if not references:
+        width = len(next(iter(deltas.values()))) if deltas else 3
+        return tuple(0.0 for _ in range(width)), tuple(0.1 for _ in range(width)), 1.0
+    target = design_point(candidate_id, dimension, seed)
+    ranked = sorted(
+        ((_diwa_distance(candidate_id, int(obs["candidate_id"]), dimension, seed), int(obs["candidate_id"]))
+         for obs in references),
+        key=lambda item: (item[0], item[1]),
+    )
+    nearest = ranked[:min(4, len(ranked))]
+    raw_weights = [1.0 / ((distance + 0.02) ** 2) for distance, _ in nearest]
+    total_weight = sum(raw_weights)
+    weights = [weight / total_weight for weight in raw_weights]
+    width = len(next(iter(deltas.values())))
+    means = tuple(
+        sum(weight * deltas[candidate][j] for weight, (_, candidate) in zip(weights, nearest))
+        for j in range(width)
+    )
+    global_scales = [
+        _diwa_robust_sigma([delta[j] for delta in deltas.values()])
+        for j in range(width)
+    ]
+    local_scales = []
+    nearest_distance = nearest[0][0]
+    for j in range(width):
+        local_var = sum(
+            weight * (deltas[candidate][j] - means[j]) ** 2
+            for weight, (_, candidate) in zip(weights, nearest)
+        )
+        local_scales.append(max(
+            1e-6,
+            math.sqrt(local_var + (0.35 * global_scales[j]) ** 2
+                      + (nearest_distance * global_scales[j]) ** 2),
+        ))
+    return means, tuple(local_scales), nearest_distance
+
+
+def _diwa_predict(
+    candidate_id: int,
+    low_by_id: dict[int, dict],
+    medium: list[dict],
+    anchor_high: list[dict],
+    dimension: int,
+    seed: int,
+) -> tuple[tuple[float, float], float, tuple[float, float, float]]:
+    medium_by_id = {int(obs["candidate_id"]): obs for obs in medium}
+    anchor_ids = {int(obs["candidate_id"]) for obs in anchor_high}
+    paired_low = [obs for obs in medium if int(obs["candidate_id"]) in low_by_id]
+    low_to_medium = {
+        int(obs["candidate_id"]): (
+            obs["objectives"][0] - low_by_id[int(obs["candidate_id"])]["objectives"][0],
+            obs["objectives"][1] - low_by_id[int(obs["candidate_id"])]["objectives"][1],
+            obs["constraint_margin"] - low_by_id[int(obs["candidate_id"])]["constraint_margin"],
+        )
+        for obs in paired_low
+    }
+    high_by_id = {int(obs["candidate_id"]): obs for obs in anchor_high}
+    high_to_medium = {
+        int(obs["candidate_id"]): (
+            high_by_id[int(obs["candidate_id"])]["objectives"][0] - obs["objectives"][0],
+            high_by_id[int(obs["candidate_id"])]["objectives"][1] - obs["objectives"][1],
+            high_by_id[int(obs["candidate_id"])]["constraint_margin"] - obs["constraint_margin"],
+        )
+        for obs in medium if int(obs["candidate_id"]) in anchor_ids
+    }
+    first_mean, first_sigma, _ = _diwa_weighted_local(
+        candidate_id, paired_low, low_to_medium, dimension, seed
+    )
+    anchor_refs = [medium_by_id[cid] for cid in [int(obs["candidate_id"]) for obs in anchor_high]]
+    second_mean, second_sigma, _ = _diwa_weighted_local(
+        candidate_id, anchor_refs, high_to_medium, dimension, seed
+    )
+    low = low_by_id[candidate_id]
+    objectives = (
+        low["objectives"][0] + first_mean[0] + second_mean[0],
+        low["objectives"][1] + first_mean[1] + second_mean[1],
+    )
+    margin = low["constraint_margin"] + first_mean[2] + second_mean[2]
+    sigma = tuple(
+        math.sqrt(first_sigma[j] ** 2 + second_sigma[j] ** 2) for j in range(3)
+    )
+    return objectives, margin, sigma
+
+
+def _diwa_pareto_front(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    unique = sorted(set(points))
+    front = []
+    best_y = math.inf
+    for x, y in unique:
+        if x >= REFERENCE_POINT[0] or y >= REFERENCE_POINT[1]:
+            continue
+        if y < best_y:
+            front.append((x, y))
+            best_y = y
+    return front
+
+
+def _diwa_components(
+    objectives: tuple[float, float],
+    margin: float,
+    sigma: tuple[float, float, float],
+    feasible_archive: list[dict],
+) -> dict[str, float]:
+    sigma_f0, sigma_f1, sigma_margin = sigma
+    probability_feasible = 0.5 * (
+        1.0 + math.erf(margin / (max(sigma_margin, 1e-6) * math.sqrt(2.0)))
+    )
+    archive_points = [
+        tuple(obs["objectives"]) for obs in feasible_archive
+        if obs["constraint_margin"] >= 0.0
+    ]
+    current_hv = hypervolume_2d(archive_points)
+    proposed_hv = hypervolume_2d(archive_points + [objectives])
+    normalized_gain = max(0.0, proposed_hv - current_hv) / (1.2 * 1.2)
+    boundary_information = min(1.0, sigma_margin / 0.08) * math.exp(
+        -abs(margin) / max(sigma_margin, 1e-6)
+    )
+    objective_uncertainty = min(1.0, (sigma_f0 + sigma_f1) / 0.20)
+    front = _diwa_pareto_front(archive_points)
+    frontier_distance = (
+        min(math.sqrt((objectives[0] - x) ** 2 + (objectives[1] - y) ** 2) for x, y in front)
+        if front else 0.0
+    )
+    frontier_proximity = math.exp(-frontier_distance / 0.10)
+    objective_information = objective_uncertainty * frontier_proximity
+    score = (
+        DIWA_WEIGHTS["expected_hypervolume_gain"] * probability_feasible * normalized_gain
+        + DIWA_WEIGHTS["constraint_boundary_information"] * boundary_information
+        + DIWA_WEIGHTS["frontier_objective_information"] * objective_information
+    )
+    return {
+        "probability_feasible_proxy": probability_feasible,
+        "normalized_expected_hypervolume_gain": normalized_gain,
+        "boundary_information": boundary_information,
+        "objective_information": objective_information,
+        "score": score,
+    }
+
+
+def _replay_diwa_run(run: dict, errors: list[str]) -> None:
+    """Re-derive the new policy's prediction/score trace from its raw oracle ledger."""
+    label = f"run[{run.get('policy')}] DIWA replay"
+    trace = run.get("decision_value_trace")
+    if run.get("policy") != DIWA_POLICY:
+        if trace != []:
+            errors.append(f"{label}: non-DIWA policy must have an empty decision_value_trace")
+        return
+    if not isinstance(trace, list) or len(trace) != 2:
+        errors.append(f"{label}: expected two sequential acquisition decisions")
+        return
+    ledger = run.get("evaluations")
+    if not isinstance(ledger, list) or len(ledger) != 72 or any(not isinstance(row, dict) for row in ledger):
+        errors.append(f"{label}: expected 72 ordered evaluation objects")
+        return
+    for index, row in enumerate(ledger):
+        cid, fidelity = row.get("candidate_id"), row.get("fidelity")
+        objectives, margin, cost_units = row.get("objectives"), row.get("constraint_margin"), row.get("cost_units")
+        if (
+            isinstance(cid, bool) or not isinstance(cid, int)
+            or not isinstance(fidelity, str) or fidelity not in {"low", "medium", "high"}
+            or not isinstance(objectives, list) or len(objectives) != 2
+            or any(not _finite(value) for value in objectives)
+            or not _finite(margin) or not _finite(cost_units)
+        ):
+            errors.append(f"{label}: malformed evaluation record at index {index}")
+            return
+    raw_promotions = run.get("promotion_records")
+    if not isinstance(raw_promotions, list) or any(not isinstance(promotion, dict) for promotion in raw_promotions):
+        errors.append(f"{label}: expected a list of promotion objects")
+        return
+    for index, promotion in enumerate(raw_promotions):
+        if (
+            isinstance(promotion.get("candidate_id"), bool)
+            or not isinstance(promotion.get("candidate_id"), int)
+            or not _finite(promotion.get("predicted_margin"))
+            or not _finite(promotion.get("observed_high_margin"))
+            or not isinstance(promotion.get("method"), str)
+        ):
+            errors.append(f"{label}: malformed promotion record at index {index}")
+            return
+    if any(row.get("fidelity") != "low" for row in ledger[:60]):
+        errors.append(f"{label}: first 60 evaluations must be low fidelity")
+        return
+    if any(row.get("fidelity") != "medium" for row in ledger[60:68]):
+        errors.append(f"{label}: evaluations 61-68 must be medium fidelity")
+        return
+    if any(row.get("fidelity") != "high" for row in ledger[68:72]):
+        errors.append(f"{label}: final four evaluations must be high fidelity")
+        return
+    dimension, seed = run["dimension"], run["seed"]
+    low = ledger[:60]
+    medium = ledger[60:68]
+    high = ledger[68:72]
+    low_by_id = {int(obs["candidate_id"]): obs for obs in low}
+    medium_by_id = {int(obs["candidate_id"]): obs for obs in medium}
+    if len(low_by_id) != 60 or len(medium_by_id) != 8:
+        errors.append(f"{label}: duplicate candidate within low or medium sample")
+        return
+    anchor_promotions = [
+        promotion for promotion in raw_promotions
+        if promotion.get("method") == "decision_impact_anchor"
+    ]
+    confirmation_promotions = [
+        promotion for promotion in raw_promotions
+        if promotion.get("method") == "decision_impact_confirmation"
+    ]
+    if len(anchor_promotions) != 2 or len(confirmation_promotions) != 2:
+        errors.append(f"{label}: expected two anchor and two confirmation promotion records")
+        return
+    anchor_ids = [int(p["candidate_id"]) for p in anchor_promotions]
+    actual_anchor_ids = [int(row["candidate_id"]) for row in high[:2]]
+    if anchor_ids != actual_anchor_ids:
+        errors.append(f"{label}: anchor promotion order disagrees with high-fidelity ledger")
+        return
+    expected_anchor_first = min(
+        medium,
+        key=lambda obs: (abs(float(obs["constraint_margin"])), int(obs["candidate_id"])),
+    )
+    second_candidates = [
+        obs for obs in medium if int(obs["candidate_id"]) != int(expected_anchor_first["candidate_id"])
+    ]
+    expected_anchor_second = max(
+        second_candidates,
+        key=lambda obs: (
+            _diwa_distance(int(obs["candidate_id"]), int(expected_anchor_first["candidate_id"]), dimension, seed),
+            int(obs["candidate_id"]),
+        ),
+    )
+    if anchor_ids != [int(expected_anchor_first["candidate_id"]), int(expected_anchor_second["candidate_id"])]:
+        errors.append(f"{label}: anchor selection does not match the frozen anchor rule")
+    anchor_high = high[:2]
+    promotions_by_id = {
+        int(p["candidate_id"]): p for p in raw_promotions
+        if isinstance(p.get("candidate_id"), int) and not isinstance(p.get("candidate_id"), bool)
+    }
+    for high_obs in anchor_high:
+        cid = int(high_obs["candidate_id"])
+        _near(
+            promotions_by_id[cid].get("predicted_margin"),
+            float(medium_by_id[cid]["constraint_margin"]),
+            f"{label} anchor predicted margin for {cid}",
+            errors,
+        )
+
+    for step, entry in enumerate(trace, start=1):
+        if not _require_keys(entry, TRACE_KEYS, f"{label}.trace[{step-1}]", errors):
+            continue
+        if entry["step"] != step:
+            errors.append(f"{label}: trace step ordering mismatch")
+        prior_high = high[:2 + step - 1]
+        prior_high_ids = [int(obs["candidate_id"]) for obs in prior_high]
+        if entry["high_fidelity_candidates_before_decision"] != prior_high_ids:
+            errors.append(f"{label}: prior high-fidelity state does not match step {step}")
+        archive = [obs for obs in prior_high if float(obs["constraint_margin"]) >= 0.0]
+        expected_candidates = set(low_by_id) - set(prior_high_ids)
+        rows = entry["candidate_scores"]
+        if not isinstance(rows, list) or len(rows) != len(expected_candidates):
+            errors.append(f"{label}: candidate score coverage mismatch at step {step}")
+            continue
+        scored = {}
+        for index, row in enumerate(rows):
+            row_label = f"{label}.trace[{step-1}].candidate_scores[{index}]"
+            if not _require_keys(row, CANDIDATE_SCORE_KEYS, row_label, errors):
+                continue
+            cid = row["candidate_id"]
+            if isinstance(cid, bool) or not isinstance(cid, int) or cid not in expected_candidates:
+                errors.append(f"{row_label}: candidate is not an available low-fidelity candidate")
+                continue
+            if cid in scored:
+                errors.append(f"{row_label}: duplicate candidate score")
+                continue
+            predicted, margin, sigma = _diwa_predict(cid, low_by_id, medium, anchor_high, dimension, seed)
+            _near(row["predicted_objectives"][0] if isinstance(row["predicted_objectives"], list) and len(row["predicted_objectives"]) == 2 else None, predicted[0], f"{row_label} predicted objective 0", errors)
+            _near(row["predicted_objectives"][1] if isinstance(row["predicted_objectives"], list) and len(row["predicted_objectives"]) == 2 else None, predicted[1], f"{row_label} predicted objective 1", errors)
+            _near(row["predicted_margin"], margin, f"{row_label} predicted margin", errors)
+            for j in range(3):
+                _near(row["sigma"][j] if isinstance(row["sigma"], list) and len(row["sigma"]) == 3 else None, sigma[j], f"{row_label} sigma {j}", errors)
+            components = _diwa_components(predicted, margin, sigma, archive)
+            for key, value in components.items():
+                _near(row.get(key), value, f"{row_label} {key}", errors)
+            scored[cid] = components["score"]
+        if set(scored) != expected_candidates:
+            errors.append(f"{label}: missing or extra score candidates at step {step}")
+            continue
+        ranked = sorted(scored.items(), key=lambda item: (-item[1], item[0]))
+        expected_winner = ranked[0][0]
+        if entry["selected_candidate_id"] != expected_winner:
+            errors.append(f"{label}: selected candidate is not the independently recomputed maximum at step {step}")
+        if [row.get("candidate_id") for row in rows] != [cid for cid, _ in ranked]:
+            errors.append(f"{label}: candidate score rows are not correctly ordered at step {step}")
+        actual_confirmation = int(high[1 + step]["candidate_id"])
+        if actual_confirmation != expected_winner:
+            errors.append(f"{label}: high-fidelity confirmation does not match independently recomputed winner at step {step}")
+        promotion = promotions_by_id.get(expected_winner)
+        if promotion is None or promotion.get("method") != "decision_impact_confirmation":
+            errors.append(f"{label}: missing confirmation promotion record for selected candidate")
+        else:
+            predicted, margin, _ = _diwa_predict(
+                expected_winner, low_by_id, medium, anchor_high, dimension, seed
+            )
+            _near(promotion.get("predicted_margin"), margin, f"{label} selected promotion margin", errors)
+
 def score_document(
     document: dict,
     repo_root: Path | None = None,
@@ -278,6 +640,7 @@ def score_document(
     # useful for rapid diagnosis, but must be explicitly labelled as such rather
     # than receiving an indistinguishable valid receipt.
     manifest_path = root / "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+    manifest: dict[str, Any] = {}
     try:
         manifest = loads_no_duplicate_keys(manifest_path.read_text(encoding="utf-8"))
         manifest_defaults = {
@@ -300,6 +663,17 @@ def score_document(
             "seeds", "policies", "design_count", "cost_budget", "fidelity_costs"
         )
     }
+    diwa_contract = manifest.get("decision_value_policy", {})
+    if diwa_contract.get("id") != DIWA_POLICY:
+        errors.append("decision-impact policy identifier differs from scorer contract")
+    if diwa_contract.get("fidelity_call_template") != {"low": 60, "medium": 8, "high": 4}:
+        errors.append("decision-impact policy call template differs from scorer contract")
+    if diwa_contract.get("cost_units") != {"low": 1, "medium": 5, "high": 25}:
+        errors.append("decision-impact fidelity costs differ from scorer contract")
+    if diwa_contract.get("frozen_score_weights") != DIWA_WEIGHTS:
+        errors.append("decision-impact policy weights differ from scorer contract")
+    if diwa_contract.get("fixed_parameters") != DIWA_FIXED_PARAMETERS:
+        errors.append("decision-impact policy fixed parameters differ from scorer contract")
     is_preregistered_default = declared_defaults == manifest_defaults
     if not is_preregistered_default and not allow_diagnostic_subset:
         errors.append(
@@ -499,6 +873,8 @@ def score_document(
                 errors.append(f"{label}.false_promotion_rate should be null")
         else:
             _near(run["false_promotion_rate"], rate, f"{label}.false_promotion_rate", errors)
+
+        _replay_diwa_run(run, errors)
 
     expected_keys = {
         (obj, con, dim, float(sev), seed, policy)
