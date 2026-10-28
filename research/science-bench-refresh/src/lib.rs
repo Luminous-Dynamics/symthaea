@@ -189,9 +189,10 @@ fn protocol_commitment_for_manifest(
 }
 
 fn hex_digest(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+
     let mut output = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
-        use std::fmt::Write as _;
         let _ = write!(&mut output, "{byte:02x}");
     }
     output
@@ -253,7 +254,11 @@ pub fn compute_artifact_commitment(
 }
 
 
-fn scan_policy_input_for_oracle_fields(value: &serde_json::Value, path: &str, issues: &mut Vec<String>) {
+fn scan_policy_input_for_oracle_fields(
+    value: &serde_json::Value,
+    path: &str,
+    issues: &mut Vec<String>,
+) {
     const FORBIDDEN_KEYS: &[&str] = &[
         "answer_key",
         "evaluator_only",
@@ -663,7 +668,10 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     if is_qualified || !is_zero_digest(&manifest.protocol_commitment_sha256) {
         match protocol_commitment_for_manifest(&manifest) {
             Ok(computed) if computed != manifest.protocol_commitment_sha256 => {
-                issues.push("protocol_commitment_sha256 does not match the frozen manifest context".to_owned());
+                issues.push(
+                    "protocol_commitment_sha256 does not match the frozen manifest context"
+                        .to_owned(),
+                );
             }
             Ok(_) => {}
             Err(error) => issues.push(format!("cannot recompute protocol commitment: {error}")),
@@ -686,11 +694,23 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     } else if manifest.lane == "public_development" {
         "public development tasks are not confirmatory scoring evidence".to_owned()
     } else if manifest_declares_sealed_generalization_profile {
-        "manifest declares a sealed-refresh profile; this validator cannot establish actual runner isolation".to_owned()
+        concat!(
+            "manifest declares a sealed-refresh profile; ",
+            "this validator cannot establish actual runner isolation"
+        )
+        .to_owned()
     } else if manifest.lane == "reproducible_open" {
-        "scoring may be reported as open/reproducible, but this lane is not sealed generalization evidence".to_owned()
+        concat!(
+            "scoring may be reported as open/reproducible, but this lane is ",
+            "not sealed generalization evidence"
+        )
+        .to_owned()
     } else if manifest.lane == "immutable_anchor" {
-        "eligible for the frozen anchor lane, subject to execution and evaluator evidence".to_owned()
+        concat!(
+            "eligible for the frozen anchor lane, subject to execution ",
+            "and evaluator evidence"
+        )
+        .to_owned()
     } else {
         "lane is not eligible for scoring".to_owned()
     };
@@ -870,7 +890,10 @@ mod tests {
         value["generator"]["revision"] = json!("main");
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("40-character lowercase Git commit SHA")));
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("40-character lowercase Git commit SHA")));
     }
 
     #[test]
