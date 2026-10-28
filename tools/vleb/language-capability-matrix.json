@@ -203,5 +203,44 @@
     "For COBOL, begin with read-only source/copybook/JCL/Db2 analysis before generation or state-changing tasks.",
     "For Assembly/HLASM, require architecture/dialect pinning, assembler evidence and ABI/condition-code tests.",
     "Only mark a language benchmarked after independently reviewed held-out tasks and evidence receipts exist."
+  ],
+  "supplemental_capabilities": [
+    {
+      "component": "VLEB fixed-format COBOL read-only source indexer",
+      "source_file": "tools/vleb/cobol-index/src/lib.rs",
+      "source_sha256_git_blob": "pending_ci_revision",
+      "source_format": "fixed",
+      "status": "authored_ci_pending",
+      "reported_anchors": [
+        "PROGRAM-ID",
+        "divisions",
+        "COPY references and REPLACING presence",
+        "FD/SD names",
+        "data levels",
+        "PIC strings",
+        "selected USAGE forms",
+        "REDEFINES",
+        "EXEC SQL/CICS"
+      ],
+      "tests": [
+        "source span and division indexing",
+        "columns 8-72 and column-73 exclusion",
+        "COPY and REPLACING anchors",
+        "packed-decimal PIC/USAGE and REDEFINES",
+        "FD and embedded SQL/CICS",
+        "literal/comment exclusion",
+        "malformed and non-ASCII fail-closed diagnostics",
+        "CLI format declaration and exit-code contract"
+      ],
+      "limitations": [
+        "not a COBOL parser",
+        "does not expand COPY/REPLACING",
+        "does not decode EBCDIC",
+        "does not compile or execute COBOL",
+        "does not prove decimal or transaction semantics",
+        "does not enable COBOL in central execution dispatch"
+      ],
+      "score_eligible": false
+    }
   ]
 }
