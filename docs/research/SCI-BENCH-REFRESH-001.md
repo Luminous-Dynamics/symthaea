@@ -97,7 +97,7 @@ CLI entry points:
 - `artifact-commit MANIFEST.json seed SEED.bin` and `artifact-commit MANIFEST.json task-set TASK_SET.json` compute context-bound artifact commitments.
 - `verify-reveal MANIFEST.json SEED.bin TASK_SET.json` recomputes protocol/seed/task commitments against the exact revealed bytes and reports match/mismatch without printing seed contents.
 
-The verification command admits only a structurally valid `qualified_run` manifest in the `sealed_refresh` lane. This gate verifies byte consistency after reveal; it is not a secure enclave, signature, trusted timestamp, or remote-attestation mechanism.
+The verification command admits only a structurally valid `qualified_run` manifest in the `sealed_refresh` lane. This gate verifies byte consistency after reveal; it is not a secure enclave, signature, trusted timestamp, or remote-attestation mechanism. The pre-run protocol/manifest commitment must also be independently anchored in an append-only or immutable location before execution; a digest stored only in the final mutable manifest does not prove it existed before the outcome.
 
 The next required layer is an independently implemented task regeneration check: regenerate the task set using the revealed seed and pinned generator revision, then compare exact task bytes/digests. Byte-level commit–reveal without regeneration cannot establish that the advertised generator created the committed tasks. Runner isolation, task identifiability, duplicate/family leakage checks, evaluator positive/negative controls, and execution receipts remain separate gates.
 
