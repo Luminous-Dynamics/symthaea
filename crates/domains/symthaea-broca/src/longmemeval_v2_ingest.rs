@@ -28,10 +28,17 @@ const FORBIDDEN_METADATA_KEYS: &[&str] = &[
     "question",
     "questionid",
     "questiontype",
+    "benchmarkquestionid",
     "answer",
     "goldanswer",
     "referenceanswer",
+    "correctanswer",
+    "expectedanswer",
+    "answerkey",
+    "groundtruth",
     "evalfunction",
+    "evaluationfunction",
+    "evaluator",
 ];
 
 /// Official LongMemEval-V2 trajectory JSONL record.
@@ -114,11 +121,8 @@ where
             let identity_bytes = canonical_identity_bytes(&trajectory, state)?;
             let identity_digest = sha256_hex(&identity_bytes);
             let evidence_id = format!("lme-v2-state:{identity_digest}");
-            let hdc_id = u64::from_be_bytes(
-                hex_prefix_8(&identity_digest)
-                    .try_into()
-                    .map_err(|_| "internal stable-ID digest error")?,
-            );
+            let hdc_id = u64::from_str_radix(&identity_digest[..16], 16)
+                .map_err(|error| format!("invalid stable-ID digest: {error}"))?;
 
             if !evidence_ids.insert(evidence_id.clone()) {
                 return Err(format!("duplicate trajectory-state identity {evidence_id}"));
@@ -323,16 +327,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn hex_prefix_8(hex_digest: &str) -> Vec<u8> {
-    let bytes = hex_digest.as_bytes();
-    let mut output = Vec::with_capacity(8);
-    for pair in bytes[..16].chunks_exact(2) {
-        let hi = (pair[0] as char).to_digit(16).unwrap_or(0) as u8;
-        let lo = (pair[1] as char).to_digit(16).unwrap_or(0) as u8;
-        output.push((hi << 4) | lo);
-    }
-    output
-}
 
 #[cfg(test)]
 mod tests {
