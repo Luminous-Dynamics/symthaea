@@ -24,7 +24,7 @@ The rollup pools counts across tasks:
 - audit eligibility = audit-eligible tasks / all assigned task IDs;
 - full admission pass rate = tasks whose audit, requirement traceability, and per-test baseline alignment all pass / all assigned task IDs.
 
-This tool does **not** average per-task percentages. It reports pooled numerator and denominator counts beside every percentage. Missing or invalid reports remain in the locked task denominator for task-coverage and admission-rate metrics; the cohort is marked incomplete and integrity-invalid rather than silently shrinking. If some report counts cannot be verified, only the diagnostics from individually verified reports are aggregated and the overall cohort remains invalid.
+This tool does **not** average per-task percentages. It reports pooled numerator and denominator counts beside every percentage. Missing or invalid reports remain in the locked task denominator for task-coverage and admission-rate metrics; the cohort is marked incomplete and integrity-invalid rather than silently shrinking. If some report counts cannot be verified, only the diagnostics from individually verified reports are aggregated and the overall cohort remains invalid. The output labels this explicitly with `pooled_metrics_population="verified_reports_only"` and `pooled_metrics_complete=false`; it switches to `all_locked_tasks` only when every expected report is present, valid, and correctly pinned. Task-level admission rates always use the full preregistered task count.
 
 ## Why this is a paradigm shift
 
