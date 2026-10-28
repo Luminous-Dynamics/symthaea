@@ -225,7 +225,14 @@ def record_execution(
     if observed_runner_sha != expected_runner_sha256:
         raise ValueError("execution witness runner differs from externally pinned source")
     root = evidence_root.resolve(strict=True)
-    plan_real = safe_existing_file(root, str(plan_path) if plan_path.is_absolute() else plan_path.as_posix())
+    if plan_path.is_absolute():
+        try:
+            plan_relative = plan_path.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise ValueError("execution plan must be located inside evidence root") from exc
+    else:
+        plan_relative = plan_path.as_posix()
+    plan_real = safe_existing_file(root, plan_relative)
     raw_plan = plan_real.read_bytes()
     if digest(raw_plan) != expected_plan_sha256:
         raise ValueError("execution plan bytes differ from externally pinned digest")
@@ -235,15 +242,13 @@ def record_execution(
     exe = Path(plan["verifier"]["executable_path"]).resolve(strict=True)
     if not exe.is_file() or digest(exe.read_bytes()) != expected_verifier_sha256:
         raise ValueError("actual verifier executable bytes differ from external pin")
-    if expected_identity != expected_identity_from_plan(plan):
-        raise ValueError("execution plan identity does not match evaluator-supplied run identity")
     for field in ("task_id", "claim_id", "repository", "run", "candidate_revision", "source_sha256", "runtime"):
         if trusted_identity.get(field) != plan[field]:
             raise ValueError(f"execution plan {field} differs from externally supplied identity")
     if Path(receipt_path).is_absolute():
         raise ValueError("receipt path must be relative to evidence root")
     receipt_rel = safe_relative(receipt_path)
-    reserved = {str(receipt_rel), str(safe_relative(plan_path.as_posix()))}
+    reserved = {str(receipt_rel), str(safe_relative(plan_relative))}
     if str(receipt_rel) in {plan["outputs"]["stdout_path"], plan["outputs"]["stderr_path"]}:
         raise ValueError("receipt path conflicts with a command output")
     if str(receipt_rel) in {item["path"] for item in plan["inputs"]}:
