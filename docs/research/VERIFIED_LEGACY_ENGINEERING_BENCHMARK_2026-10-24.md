@@ -39,6 +39,41 @@ The receipt schema now makes a `pass` structurally impossible when the record re
 
 JSON Schema cannot by itself prove that the receipt corresponds to real artifacts or that its `required_test_coverage = 1` claim is true. The independent auditor must recompute artifact hashes; reconcile required test IDs against unique observed results; compare the task, protocol, candidate, and environment identities; validate the actual test process; and verify every preregistered mutation. A well-formed receipt is necessary evidence, not sufficient proof.
 
+## Next-wave research agenda (2026-10-28)
+
+### Fresh external comparison
+
+The Legacy-Bench index was updated **October 22, 2026**. Its leader is a tie at **62.0% avg@3** (Claude Opus 5.5 and Muse Spark 1.3). The same listing reports $0.49/task for Opus, $1.98/task for Muse Spark, $0.14/task for DeepSeek V4.1 Flash at 57.7%, and $2.33/task for GPT-6 Astra at 55.7%. Use these as the current legacy-engineering reference, not as pass@1; cost comparison must also disclose harness, model and runtime differences. Source: [Legacy-Bench, updated Oct 22](https://fireworks.ai/specialized-intelligence-index/benchmarks/code-generation/legacy-bench).
+
+SWE-bench Pro V2 is a distinct evaluation with a different task set and turn budget. Its September 22 refresh reduced the public split from 731 to 642 tasks after removing 89 invalid tasks, corrected 69 instruction/test contradictions, disabled browser/web retrieval during agent execution, and regraded submitted diffs on pristine images. The leaderboard currently lists results up to 99.40 under its own protocol; do not compare that percentage directly with Legacy-Bench. Source: [SWE-bench Pro V2 methodology](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full).
+
+SWE-ABS reports that adversarial strengthening rejected **19.78% of previously passing patches** on 500 SWE-bench Verified instances, lowering the top result in its study from 78.80% to 62.20%. This supports using an adversarially strengthened score as a second metric, not replacing the standard public result. Source: [ICML 2026 / PMLR](https://proceedings.mlr.press/v306/yu26b.html).
+
+Security needs a separate axis. Endor Labs' AI Coding Agent Security Benchmark lists a best functional score of 87.2% but a best security-correctness score of 37.4% among the systems it evaluated. The numbers are vendor-benchmark-specific and not interchangeable with VLEB; the disparity nevertheless supports measuring secure behavior independently from functional success. Source: [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark).
+
+### Paradigm shift: three clocks, three claims
+
+1. **Patch clock:** did the agent produce a change that satisfies the locked contract?
+2. **Proof clock:** did an independent verifier reproduce hashes, observe all required tests, and kill the registered semantic mutants?
+3. **Provenance clock:** can a separate trusted evaluator establish that the logs came from the claimed checkout, image and workflow?
+
+A hash-only receipt covers artifact integrity, not execution provenance. A malicious or faulty runner can fabricate logs and hash them consistently. For confirmatory results, package the manifest, receipt, patch, test logs, mutation evidence and differential details into a single evidence bundle and verify signed provenance from a dedicated trusted workflow. GitHub documents `actions/attest@v4` and `gh attestation verify` for signed artifact provenance; that attestation links artifacts to their workflow identity but does not prove semantic correctness. Sources: [actions/attest](https://github.com/actions/attest), [GitHub attestation verification](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations), [gh attestation verify](https://cli.github.com/manual/gh_attestation_verify). Avoid issuing attestations for every routine development CI build; reserve signed evidence bundles for pre-registered, confirmatory benchmark runs.
+
+### Add a secure-legacy lane
+
+Keep semantic repair, migration equivalence and security correctness as separate lanes. The secure-legacy lane should test whether a proposed repair introduces injection, unsafe deserialization, authorization bypass, dependency confusion, secret leakage, insecure temp-file use, unchecked integer boundaries, or supply-chain/cache tampering. Every issue should have a severity, exploitable precondition, reproducible proof, and false-positive adjudication path. Report functional pass rate, security-correctness rate, critical/high escape rate, and security regressions among functionally passing patches separately.
+
+For financial and mainframe migration tasks, add state-transition traces as first-class observables: commit/rollback, restart/replay, duplicate delivery, batch return codes, control totals, field encodings and ordering. Byte-identical output is appropriate when the contract requires it; otherwise use independently specified business-state invariants and exact decimal semantics. Never use approximate floating-point agreement to excuse a mismatch in financial minor units.
+
+### Proposed target additions (not achieved)
+
+- Keep the Legacy-Bench target at **65%+ avg@3** under a matched full-benchmark protocol.
+- Require **100% of scored tasks** to pass two-sided oracle admission and independent review.
+- Maintain **>=90% mutation kill rate** for reviewed non-equivalent compilable mutants, reported by mutation family.
+- Track the gap between ordinary resolution and **Assurance-Adjusted Semantic Success Rate (AASSR)**; the goal is to reduce that gap without sacrificing raw resolution.
+- On the secure-legacy lane, pre-register a maximum critical/high vulnerability escape rate before the confirmatory run; do not choose the threshold after seeing results.
+- Report cost per independently verified fix and p50/p90 duration, alongside abstention and unresolved rates.
+
 ## Research questions
 
 1. Can Symthaea improve verified repair success over a matched baseline agent on previously unseen legacy tasks?
