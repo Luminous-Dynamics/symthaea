@@ -109,7 +109,38 @@ class AuditBundle:
                 "network_mode": "none",
                 "toolchains": [{"name": "rustc", "version": "1.96.0", "identity_sha256": sha(b"rustc-1.96.0-binary")}],
             },
-            "behavior_contract": {"observable_effects": self.EFFECTS},
+            "behavior_contract": {
+                "task_statement": "The evaluator must account for every declared logical behavior.",
+                "invariants": ["Every declared observable is covered by a required executable test."],
+                "allowed_behavior_changes": [],
+                "observable_effects": self.EFFECTS,
+                "requirement_traceability": [
+                    {
+                        "requirement_id": "TRACE.STATEMENT",
+                        "source_kind": "task_statement",
+                        "source_text": "The evaluator must account for every declared logical behavior.",
+                        "required_test_ids": [self.LOGICAL[0][0]],
+                        "observable_effects": self.EFFECTS,
+                    },
+                    {
+                        "requirement_id": "TRACE.INVARIANT.001",
+                        "source_kind": "invariant",
+                        "source_text": "Every declared observable is covered by a required executable test.",
+                        "required_test_ids": [logical for logical, _ in self.LOGICAL],
+                        "observable_effects": self.EFFECTS,
+                    },
+                    *[
+                        {
+                            "requirement_id": "TRACE.EFFECT." + effect.upper(),
+                            "source_kind": "observable_effect",
+                            "source_text": effect,
+                            "required_test_ids": [logical],
+                            "observable_effects": [effect],
+                        }
+                        for effect, (logical, _) in zip(self.EFFECTS, self.LOGICAL)
+                    ],
+                ],
+            },
             "oracle_contract": {
                 "required_test_ids": [logical for logical, _ in self.LOGICAL],
                 "test_execution_map": [{"test_id": logical, "execution_ids": [execution]} for logical, execution in self.LOGICAL],
@@ -314,6 +345,55 @@ class ReceiptAuditorTests(unittest.TestCase):
         self.bundle.write(self.bundle.task_path, jbytes(task))
         self.bundle.refresh_task_hash()
         self.assert_issue(self.bundle.run_audit(), "execution_map_incomplete")
+
+    def test_scored_task_must_trace_every_declared_invariant(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"] = [
+            row for row in task["behavior_contract"]["requirement_traceability"]
+            if row["source_kind"] != "invariant"
+        ]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_source_coverage_incomplete")
+
+    def test_traceability_cannot_reference_undeclared_test(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"][0]["required_test_ids"] = ["logical.not.declared"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_unknown_test_id")
+        self.assert_issue(self.bundle.run_audit(), "requirement_test_inventory_incomplete")
+
+    def test_traceability_must_cover_every_required_test(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        target = self.bundle.LOGICAL[-1][0]
+        for row in task["behavior_contract"]["requirement_traceability"]:
+            row["required_test_ids"] = [value for value in row["required_test_ids"] if value != target]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_test_inventory_incomplete")
+
+    def test_traceability_source_text_must_match_frozen_contract(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"][0]["source_text"] = "a more convenient requirement"
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_source_unmatched")
+
+    def test_traceability_observables_must_be_declared(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        task["behavior_contract"]["requirement_traceability"][0]["observable_effects"] = ["invented_effect"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_observable_mismatch")
+
+    def test_requirement_ids_must_be_unique(self) -> None:
+        task = json.loads(self.bundle.task_path.read_text())
+        trace = task["behavior_contract"]["requirement_traceability"]
+        trace[1]["requirement_id"] = trace[0]["requirement_id"]
+        self.bundle.write(self.bundle.task_path, jbytes(task))
+        self.bundle.refresh_task_hash()
+        self.assert_issue(self.bundle.run_audit(), "requirement_id_duplicate")
 
     def test_wrong_runtime_image_is_rejected(self) -> None:
         self.bundle.receipt["environment"]["runtime_identity"]["immutable_image_id"] = "sha256:" + ("0" * 64)

@@ -81,6 +81,98 @@ def schema_check(value: dict[str, Any], path: Path, label: str, issues: list[dic
         issues.append({"code": "schema_invalid", "message": f"{label} at {place}: {error.message}"})
 
 
+def requirement_traceability_issues(task: dict[str, Any]) -> list[dict[str, str]]:
+    """Require scored contracts to trace every declared requirement/effect to executable tests."""
+    classification = task.get("classification", {})
+    if not isinstance(classification, dict) or classification.get("exposure") not in ("private_holdout", "private_confirmatory"):
+        return []
+
+    behavior = task.get("behavior_contract", {})
+    oracle = task.get("oracle_contract", {})
+    if not isinstance(behavior, dict) or not isinstance(oracle, dict):
+        return [{"code": "requirement_traceability_missing", "message": "scored task requires behavior and oracle contracts"}]
+
+    raw_trace = behavior.get("requirement_traceability")
+    if not isinstance(raw_trace, list) or not raw_trace:
+        return [{"code": "requirement_traceability_missing", "message": "scored task must trace each task statement, invariant, allowed behavior change, and observable effect to executable tests"}]
+
+    expected_sources: set[tuple[str, str]] = set()
+    statement = behavior.get("task_statement")
+    if isinstance(statement, str) and statement:
+        expected_sources.add(("task_statement", statement))
+    for source_kind, field in (
+        ("invariant", "invariants"),
+        ("allowed_behavior_change", "allowed_behavior_changes"),
+        ("observable_effect", "observable_effects"),
+    ):
+        values = behavior.get(field, [])
+        if isinstance(values, list):
+            for value in values:
+                if isinstance(value, str) and value:
+                    expected_sources.add((source_kind, value))
+
+    declared_tests_value = oracle.get("required_test_ids", [])
+    declared_tests = {value for value in declared_tests_value if isinstance(value, str) and value}
+    issues: list[dict[str, str]] = []
+    seen_requirement_ids: set[str] = set()
+    seen_sources: set[tuple[str, str]] = set()
+    traced_tests: set[str] = set()
+    declared_effects_value = behavior.get("observable_effects", [])
+    declared_effects = {value for value in declared_effects_value if isinstance(value, str)}
+
+    for index, row in enumerate(raw_trace):
+        label = f"behavior_contract.requirement_traceability[{index}]"
+        if not isinstance(row, dict):
+            issues.append({"code": "requirement_traceability_invalid", "message": f"{label} must be an object"})
+            continue
+        requirement_id = row.get("requirement_id")
+        if not isinstance(requirement_id, str) or not requirement_id:
+            issues.append({"code": "requirement_traceability_invalid", "message": f"{label} has no requirement_id"})
+        elif requirement_id in seen_requirement_ids:
+            issues.append({"code": "requirement_id_duplicate", "message": f"duplicate requirement ID {requirement_id!r}"})
+        else:
+            seen_requirement_ids.add(requirement_id)
+
+        source_kind = row.get("source_kind")
+        source_text = row.get("source_text")
+        source_key = (source_kind, source_text) if isinstance(source_kind, str) and isinstance(source_text, str) else None
+        if source_key is None or source_key not in expected_sources:
+            issues.append({"code": "requirement_source_unmatched", "message": f"{label} must match a declared task statement, invariant, allowed behavior change, or observable effect"})
+        else:
+            if source_key in seen_sources:
+                issues.append({"code": "requirement_source_duplicate", "message": f"declared source {source_kind!r} is mapped more than once"})
+            seen_sources.add(source_key)
+
+        test_ids = row.get("required_test_ids")
+        if not isinstance(test_ids, list) or not test_ids or any(not isinstance(value, str) or not value for value in test_ids):
+            issues.append({"code": "requirement_test_map_invalid", "message": f"{label} requires one or more concrete logical test IDs"})
+        else:
+            for test_id in test_ids:
+                if test_id not in declared_tests:
+                    issues.append({"code": "requirement_unknown_test_id", "message": f"{label} references undeclared test ID {test_id!r}"})
+                traced_tests.add(test_id)
+
+        effects = row.get("observable_effects")
+        if not isinstance(effects, list) or not effects or any(not isinstance(value, str) or not value for value in effects):
+            issues.append({"code": "requirement_observable_mismatch", "message": f"{label} must declare at least one observable effect"})
+        else:
+            undeclared = sorted(set(effects) - declared_effects)
+            if undeclared:
+                issues.append({"code": "requirement_observable_mismatch", "message": f"{label} references undeclared observable effects: {undeclared}"})
+            if source_kind == "observable_effect" and source_text not in effects:
+                issues.append({"code": "requirement_observable_mismatch", "message": f"{label} must measure its source observable effect"})
+
+    missing_sources = expected_sources - seen_sources
+    if missing_sources:
+        examples = sorted(f"{kind}:{value}" for kind, value in missing_sources)[:5]
+        issues.append({"code": "requirement_source_coverage_incomplete", "message": f"{len(missing_sources)} declared contract item(s) lack a requirement-to-test trace: {examples}"})
+    missing_tests = declared_tests - traced_tests
+    extra_tests = traced_tests - declared_tests
+    if missing_tests or extra_tests:
+        issues.append({"code": "requirement_test_inventory_incomplete", "message": f"traceability must cover every required test exactly within the declared inventory; missing={sorted(missing_tests)}, extra={sorted(extra_tests)}"})
+    return issues
+
+
 def evidence_path(root: Path, relative: Any, label: str, issues: list[dict[str, str]]) -> Path | None:
     if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
         issues.append({"code": "unsafe_evidence_path", "message": f"{label}: expected a non-empty POSIX relative path"})
@@ -166,6 +258,7 @@ def audit_bundle(inputs: AuditInputs) -> dict[str, Any]:
     schema_check(receipt, inputs.receipt_schema, "receipt", issues)
     if any(issue["code"].startswith("schema_") for issue in issues):
         return {"schema_version": "vleb-independent-audit-v1", "eligible": False, "verdict": "fail", "issues": issues}
+    issues.extend(requirement_traceability_issues(task))
 
     # The receipt cannot choose its own trust roots: the evaluator supplies these pins independently.
     for label, path, claimed, pin in (
