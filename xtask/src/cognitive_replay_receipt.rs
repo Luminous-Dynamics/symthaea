@@ -523,7 +523,7 @@ pub(crate) mod tests {
             ("oracle-timed", true),
         ] {
             let mut state = initial.clone();
-            let mut decisions = Vec::new();
+            let mut decisions: Vec<ReplayDecision> = Vec::new();
             for tick in 0..5_u64 {
                 let action = if arm_id == "staged-verify-rollback" {
                     match tick {
