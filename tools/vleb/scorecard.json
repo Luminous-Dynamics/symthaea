@@ -124,6 +124,15 @@
       },
       "report_status": "paper-reported-observational-audit",
       "comparability_note": "An observational audit of existing submissions; does not establish equivalence or causal scaffold effects. Motivates paired tests, uncertainty reporting and model-scaffold provenance."
+    },
+    "google_fcv_patch_study": {
+      "source_url": "https://research.google/pubs/when-correct-is-not-safe-can-we-trust-functionally-correct-patches-generated-by-code-agents-2/",
+      "publication": "ACL 2026",
+      "evaluated_agent_model_combinations": 12,
+      "example_cwe": "CWE-538",
+      "reported_example_attack_success_pct": 40.7,
+      "interpretation": "Paper-reported attack result for one CWE-538 setup, not a universal vulnerability rate.",
+      "comparability_note": "Red-team attacks target functionally passing but vulnerable patches; this is not a direct VLEB score."
     }
   },
   "proposed_targets": {
@@ -189,6 +198,27 @@
       "unit": "percent",
       "scope": "source-anchored legacy claim pilot",
       "definition": "Percentage of claims labeled supported when their locked independent witness contradicts the claim or is inconclusive. Count only after witness artifacts and verifier identities are checked against out-of-band pins."
+    },
+    "claim_outcome_accounting_completeness_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Every evaluator-pinned claim in the locked cohort must be accounted for as supported, contradicted, unresolved or failed; outcome counts must reconcile exactly to the pinned claim inventory.",
+      "requirements": [
+        "freeze claim inventory before evaluation",
+        "retain missing verifier/runtime evidence as unresolved",
+        "never drop invalid claims or shrink denominators after seeing outcomes"
+      ]
+    },
+    "evaluator_reproduced_witness_receipt_coverage_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Every claim used in confirmatory correctness scoring has a witness receipt independently rerun or cryptographically verified by evaluator-controlled infrastructure.",
+      "requirements": [
+        "bind task ID, claim ID and source digest/span",
+        "bind verifier/source digest, exact invocation and input/output digests",
+        "bind exit status, toolchain/runtime identity, run ID and run attempt",
+        "reject cross-task, cross-source and cross-run replay"
+      ]
     }
   },
   "current_measurements": {
@@ -246,7 +276,13 @@
       "value": null,
       "eligible": false,
       "status": "not_run",
-      "reason": "The atomic claim schema and negative controls exist, but no independently adjudicated claim corpus or trusted witness auditor has been evaluated."
+      "reason": "No independently adjudicated claim corpus or evaluator-reproduced witness-receipt lane has been evaluated. The draft claim gate checks evidence integrity/identity, not the truth of a self-declared witness result."
+    },
+    "claim_evidence_gate": {
+      "value": null,
+      "eligible": false,
+      "status": "draft_not_validated",
+      "reason": "The draft run-manifest gate is wired in PR #8707, but its current exact-head CI has not passed and the gate does not yet rerun or cryptographically verify evaluator-bound witness receipts."
     }
   },
   "metric_definitions": {
@@ -258,7 +294,8 @@
         "every declared observable has passing differential evidence",
         "task-level mutation gate meets its preregistered criterion",
         "evidence hashes, checkout, runtime and toolchain identities validate",
-        "trusted manifest, attestation and independent receipt audit pass"
+        "trusted manifest, attestation and independent receipt audit pass",
+        "for confirmatory runs, the evaluator-pinned claim inventory and independent claim-evidence audit pass"
       ],
       "denominator_rules": [
         "freeze task admission before arm assignment and score inspection",
@@ -272,7 +309,10 @@
         "raw candidate-resolution rate minus AASSR",
         "false acceptance on negative controls",
         "unresolved rate by reason",
-        "cost per independently verified pass"
+        "cost per independently verified pass",
+        "claim outcome counts and inventory reconciliation rate",
+        "evaluator-reproduced witness receipt coverage",
+        "source-claim false-support rate with confidence bounds"
       ],
       "composite_weighted_score": false
     },
@@ -291,18 +331,21 @@
         "runtime_behavior": "Requires an independently executed behavioral witness; text or static indexing alone cannot establish numeric, transaction or business-rule behavior."
       },
       "scored_claim_requirements": [
-        "source-file digest matches bytes under the evidence root",
-        "every source span excerpt hash is recomputed",
+        "source-file digest matches bytes under the attested evidence root",
+        "every source-span excerpt hash is recomputed",
         "witness artifact digest matches bytes in the sealed evidence bundle",
-        "verifier implementation digest matches an out-of-band allowlist",
-        "verdict agrees with the independent witness result",
-        "runtime claims have independent execution witnesses"
+        "witness verifier implementation digest matches an out-of-band allowlist",
+        "declared verdict and recorded witness results are internally consistent",
+        "runtime claims have independent execution witnesses",
+        "before semantic scoring, evaluator-controlled infrastructure independently reruns or cryptographically verifies the witness receipt bound to task/source/run-attempt/runtime"
       ],
       "do_not_score_as_supported": [
         "free-form explanation only",
         "self-reported success without witness bytes",
         "unverifiable compiler/runtime claim",
-        "claim whose source span or witness hash mismatches"
+        "claim whose source span or witness hash mismatches",
+        "runtime claim with static-index-only evidence",
+        "claim whose witness receipt is absent, stale or replayed across tasks/runs"
       ]
     }
   }
