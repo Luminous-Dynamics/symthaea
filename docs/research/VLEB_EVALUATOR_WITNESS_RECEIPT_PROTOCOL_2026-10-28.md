@@ -8,7 +8,7 @@ This branch adds a strict receipt schema and a reference auditor for the protoco
 
 ## Receipt contract
 
-Each VLEB evaluator-witness-receipt-v1 records producer identity (immutable repository ID, repository name, workflow path, workflow commit SHA/ref, run ID, run attempt and event); evaluator task ID and atomic claim ID; exact source path/digest and line/column span excerpt digests; verifier kind, ID and SHA-256 identity; normalized argv (never a shell command string), working directory and names plus hashes of allowlisted environment values (not raw secrets); execution status, exit code, duration, stdout/stderr digests, immutable runtime image identity, toolchain identity/digest, OS/architecture and observed network mode; input/output artifact inventories whose bytes are re-hashed from the extracted evidence bundle; and a three-way claim outcome: supports, contradicts or inconclusive.
+Each VLEB evaluator-witness-receipt-v1 records producer identity (immutable repository ID, repository name, workflow path, workflow commit SHA/ref, run ID, run attempt and event); evaluator task ID and atomic claim ID; exact source path/digest and line/column span excerpt digests; verifier kind, ID and SHA-256 identity; normalized argv (never a shell command string), working directory and names plus hashes of allowlisted environment values (not raw secrets); execution status, exit code, duration, stdout/stderr digests explicitly bound to re-hashed log artifacts, immutable runtime image identity, toolchain identity/digest, OS/architecture and observed network mode; input/output artifact inventories whose bytes are re-hashed from the extracted evidence bundle; and a three-way claim outcome: supports, contradicts or inconclusive.
 
 The receipt intentionally does not carry the final evidence-bundle digest: embedding a receipt in a bundle while also embedding that bundle's digest in the receipt creates a self-referential hash cycle. Instead, the outer run manifest pins the bundle digest, Sigstore attestation binds that bundle to the evaluator workflow, and the receipt binds the exact run ID/attempt, task, claim, source, verifier and runtime. The auditor accepts expected values only through evaluator-supplied command-line pins, not by trusting receipt self-description.
 
@@ -44,3 +44,8 @@ The first test corpus rejects receipt SHA mismatch; schema SHA mismatch; old run
 ## Benchmark direction
 
 VLEB should report ordinary task pass rate alongside assurance-adjusted semantic success, false-support, unresolved/coverage, independently reproduced witness rate, mutation kill rate by defect family, security-correctness rate, latency, and fully loaded cost per independently verified fix. No aggregate should hide unresolved tasks. Comparisons to external coding-agent benchmarks must use matched tasks, tools, budgets, network policies, attempts and pristine regrading; cross-benchmark leaderboard ranks are context, not proof of superiority.
+
+
+## Log-digest binding hardening (follow-up)
+
+The receipt auditor now requires stdout and stderr paths, requires each path to appear in the declared output inventory, and requires the inventory digest to equal the execution log digest. The normal artifact audit then re-hashes the actual files. This closes a gap where a receipt could carry a self-reported stdout/stderr hash unrelated to any checked bytes. Two negative controls cover digest mismatch and missing log inventory.
