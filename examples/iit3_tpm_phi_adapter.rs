@@ -39,6 +39,9 @@ fn validate_hex_sha256(value: &str) -> bool {
 fn run() -> Result<(), Box<dyn Error>> {
     let mut bytes = Vec::new();
     io::stdin().read_to_end(&mut bytes)?;
+    // This digest is independently computed by the Rust adapter over the exact
+    // request bytes it parsed; it is not merely an echoed host-supplied value.
+    let request_blake3 = blake3::hash(&bytes).to_hex().to_string();
     let input: Input = serde_json::from_slice(&bytes)?;
 
     if input.schema_version != INPUT_SCHEMA {
@@ -110,6 +113,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         "metric_id": METRIC_ID,
         "formalism_profile": FORMALISM_PROFILE,
         "model_sha256": input.model_sha256,
+        "request_blake3": request_blake3,
         "n_nodes": input.n_nodes,
         "state": input.state,
         "value": value,
