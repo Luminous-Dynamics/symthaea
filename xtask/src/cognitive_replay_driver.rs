@@ -412,21 +412,21 @@ fn validate_outcome_plan(plan: &[OutcomePlanEntry], stream_length_ticks: u64) ->
             entry.outcome_id == format!("outcome-{expected_tick:08}"),
             "outcome ID must bind to its prediction tick"
         );
-        match entry.disposition {
+        match &entry.disposition {
             OutcomeDisposition::RevealAt { available_at_tick } => {
-                ensure!(available_at_tick > expected_tick,
+                ensure!(*available_at_tick > expected_tick,
                     "an outcome cannot be revealed before its prediction decision");
-                ensure!(available_at_tick < stream_length_ticks,
+                ensure!(*available_at_tick < stream_length_ticks,
                     "revealed outcome availability is outside the replay horizon");
             }
             OutcomeDisposition::Missing { declared_at_tick } => {
-                ensure!(declared_at_tick > expected_tick,
+                ensure!(*declared_at_tick > expected_tick,
                     "missing outcome cannot be declared missing before its prediction");
-                ensure!(declared_at_tick < stream_length_ticks,
+                ensure!(*declared_at_tick < stream_length_ticks,
                     "missing outcome declaration is outside the replay horizon");
             }
             OutcomeDisposition::CensoredAt { horizon_tick } => {
-                ensure!(horizon_tick == stream_length_ticks,
+                ensure!(*horizon_tick == stream_length_ticks,
                     "censored outcome must reference the registered replay horizon");
             }
         }
