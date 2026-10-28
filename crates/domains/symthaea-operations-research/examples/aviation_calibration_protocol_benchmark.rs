@@ -317,7 +317,6 @@ fn main() {
         calibration_created_at_epoch_seconds: 1_700_010_199,
         decision_time_epoch_seconds: 1_700_040_002,
         max_calibration_age_seconds: 86_400,
-        latest_monitor_observation_epoch_seconds: Some(1_700_040_002),
         max_monitor_observation_age_seconds: 60,
     });
     let readiness_blockers_json = readiness_report.blockers.iter()
