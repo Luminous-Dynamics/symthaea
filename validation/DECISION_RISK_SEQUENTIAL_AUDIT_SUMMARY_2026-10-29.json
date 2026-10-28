@@ -1,0 +1,28 @@
+{
+  "schema": "symthaea-decision-risk-sequential-audit-summary-v1",
+  "status": "SYNTHETIC_RESEARCH_BENCHMARK_NOT_PRODUCTION_CERTIFICATION",
+  "date": "2026-10-29",
+  "seed": 20261029,
+  "repeats": 1000,
+  "cells": 4,
+  "looks": [4096, 8192, 16384, 32768, 65536],
+  "familywise_delta": 0.1,
+  "maximum_admissible_epsilon_bits": 0.033357511692288094,
+  "correct_model": {
+    "fixed_time_repeated_peek": {"admission_rate": 1.0, "mean_observations_per_cell": 8327.168},
+    "finite_look_alpha_spending": {"admission_rate": 1.0, "mean_observations_per_cell": 9535.488, "overhead_vs_fixed_time_percent": 14.5129},
+    "anytime_alpha_spending": {"admission_rate": 1.0, "mean_observations_per_cell": 32178.176, "multiple_vs_finite_look": 3.3755}
+  },
+  "just_over_budget_error_bits": 0.03336751169228813,
+  "just_over_budget_false_admissions": {
+    "fixed_time_repeated_peek": {"count": 4, "rate": 0.004, "wilson_95": [0.0015565881404084308, 0.010239556277262253]},
+    "finite_look_alpha_spending": {"count": 0, "rate": 0.0, "wilson_95_upper": 0.0038267584855551234},
+    "anytime_alpha_spending": {"count": 0, "rate": 0.0, "wilson_95_upper": 0.0038267584855551234}
+  },
+  "clearly_over_budget_error_bits": 0.043357511692288075,
+  "clearly_over_budget_false_admissions": {"fixed_time_repeated_peek": 0, "finite_look_alpha_spending": 0, "anytime_alpha_spending": 0},
+  "source_sha256": "0de48cfc7d3a710afdf81c0c050d0e5ddaa274fe5970777bf581eb67c7e75e7d",
+  "test_sha256": "66f211a1d17dab4ade3cc9a98ac66e2fed2719a7127f0ed0f70c3f6908a44b1a",
+  "raw_results_sha256": "181f819cb411ed4e18c58fbbdfb3f3880e0c1730c094fbd3e721bc50776b6d56",
+  "local_tests": "3/3 passed"
+}
