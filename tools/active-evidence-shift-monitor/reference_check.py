@@ -48,8 +48,9 @@ EPS = 1e-10
 TOTAL_LABEL_BUDGET = 1000
 SHIFT_AFTER_TOTAL_LABELS = 100
 SENTINEL_FRACTIONS = (0.0, 0.05, 0.10, 0.20, 0.25, 0.50, 1.0)
+BUDGET_SHIFT_PROBABILITIES = (0.55, 0.60, 0.70, 0.80, 0.90)
 BUDGET_FIELDS = (
-    "sentinel_fraction", "total_label_budget", "sentinel_labels", "adaptive_labels",
+    "sentinel_fraction", "post_shift_p", "total_label_budget", "sentinel_labels", "adaptive_labels",
     "change_after_sentinel_labels", "no_target_shift_alarm_probability",
     "pre_change_false_alarm_probability", "true_shift_detection_probability",
     "mean_delay_sentinel_labels", "mean_delay_total_label_equivalent", "per_cell_alpha",
@@ -95,8 +96,8 @@ def should_alarm(boundary, n, successes, horizon):
     return P0 < lower or P0 > upper
 
 
-def simulate(boundary, scenario, horizon, change_after_override=None):
-    post_shift_p = SHIFT_PROBABILITIES[scenario]
+def simulate(boundary, scenario, horizon, change_after_override=None, post_shift_override=None):
+    post_shift_p = post_shift_override if post_shift_override is not None else SHIFT_PROBABILITIES[scenario]
     change_after = CHANGE_AFTER if post_shift_p is not None else 0
     if change_after_override is not None:
         change_after = change_after_override
@@ -211,7 +212,7 @@ def check_csv(path):
 
 
 def sentinel_budget_rows():
-    """Exact frontier at fixed total labels, using scheduled randomized target audits."""
+    """Exact frontier at fixed total labels over sentinel shares and shift sizes."""
     rows = []
     for fraction in SENTINEL_FRACTIONS:
         sentinel_labels = int(round(fraction * TOTAL_LABEL_BUDGET))
@@ -224,6 +225,7 @@ def sentinel_budget_rows():
             )[0]
             rows.append({
                 "sentinel_fraction": f"{fraction:.4f}",
+                "post_shift_p": "NA",
                 "total_label_budget": str(TOTAL_LABEL_BUDGET),
                 "sentinel_labels": "0",
                 "adaptive_labels": str(TOTAL_LABEL_BUDGET),
@@ -241,26 +243,29 @@ def sentinel_budget_rows():
         stable_alarm = simulate(
             "beta_mixture_e_process", "stationary_null", sentinel_labels
         )[0]
-        pre_change_false_alarm, detection, delay, _survival = simulate(
-            "beta_mixture_e_process",
-            "step_up_080",
-            sentinel_labels,
-            change_after_override=change_after,
-        )
-        delay_total = delay / fraction if delay is not None else None
-        rows.append({
-            "sentinel_fraction": f"{fraction:.4f}",
-            "total_label_budget": str(TOTAL_LABEL_BUDGET),
-            "sentinel_labels": str(sentinel_labels),
-            "adaptive_labels": str(adaptive_labels),
-            "change_after_sentinel_labels": str(change_after),
-            "no_target_shift_alarm_probability": f"{stable_alarm:.12f}",
-            "pre_change_false_alarm_probability": f"{pre_change_false_alarm:.12f}",
-            "true_shift_detection_probability": as_text(detection),
-            "mean_delay_sentinel_labels": as_text(delay),
-            "mean_delay_total_label_equivalent": as_text(delay_total),
-            "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
-        })
+        for post_shift_p in BUDGET_SHIFT_PROBABILITIES:
+            pre_change_false_alarm, detection, delay, _survival = simulate(
+                "beta_mixture_e_process",
+                "step_up_080",
+                sentinel_labels,
+                change_after_override=change_after,
+                post_shift_override=post_shift_p,
+            )
+            delay_total = delay / fraction if delay is not None else None
+            rows.append({
+                "sentinel_fraction": f"{fraction:.4f}",
+                "post_shift_p": f"{post_shift_p:.2f}",
+                "total_label_budget": str(TOTAL_LABEL_BUDGET),
+                "sentinel_labels": str(sentinel_labels),
+                "adaptive_labels": str(adaptive_labels),
+                "change_after_sentinel_labels": str(change_after),
+                "no_target_shift_alarm_probability": f"{stable_alarm:.12f}",
+                "pre_change_false_alarm_probability": f"{pre_change_false_alarm:.12f}",
+                "true_shift_detection_probability": as_text(detection),
+                "mean_delay_sentinel_labels": as_text(delay),
+                "mean_delay_total_label_equivalent": as_text(delay_total),
+                "per_cell_alpha": f"{PER_CELL_ALPHA:.12f}",
+            })
     return rows
 
 
@@ -278,7 +283,7 @@ def check_sentinel_budget_csv(path):
         raise ValueError(f"sentinel-budget row count mismatch: expected {len(expected)}, got {len(actual)}")
 
     text_fields = (
-        "sentinel_fraction", "total_label_budget", "sentinel_labels",
+        "sentinel_fraction", "post_shift_p", "total_label_budget", "sentinel_labels",
         "adaptive_labels", "change_after_sentinel_labels",
     )
     numeric_fields = (
@@ -309,24 +314,35 @@ def check_sentinel_budget_csv(path):
 
 def sentinel_budget_self_test():
     rows = sentinel_budget_rows()
-    if len(rows) != len(SENTINEL_FRACTIONS):
-        raise ValueError("sentinel-budget frontier row count mismatch")
-    no_audit = rows[0]
-    five_percent = rows[1]
-    ten_percent = rows[2]
-    twenty_percent = rows[3]
+    expected_count = 1 + (len(SENTINEL_FRACTIONS) - 1) * len(BUDGET_SHIFT_PROBABILITIES)
+    if len(rows) != expected_count:
+        raise ValueError(f"sentinel-budget row count mismatch: expected {expected_count}, got {len(rows)}")
+    by_key = {(row["sentinel_fraction"], row["post_shift_p"]): row for row in rows}
+    no_audit = by_key[("0.0000", "NA")]
+    five_percent = by_key[("0.0500", "0.80")]
+    ten_percent_mild = by_key[("0.1000", "0.60")]
+    ten_percent_moderate = by_key[("0.1000", "0.70")]
+    ten_percent_large = by_key[("0.1000", "0.80")]
+    twenty_percent_moderate = by_key[("0.2000", "0.70")]
+    twenty_percent_large = by_key[("0.2000", "0.80")]
     if float(no_audit["no_target_shift_alarm_probability"]) < 0.99:
         raise ValueError("zero-sentinel negative control did not expose selection-induced alarms")
     if float(five_percent["no_target_shift_alarm_probability"]) > PER_CELL_ALPHA + EPS:
         raise ValueError("5% randomized-sentinel null alarm exceeded alpha")
-    if float(ten_percent["true_shift_detection_probability"]) < 0.95:
-        raise ValueError("10% sentinel budget missed target shift detection gate")
-    if float(twenty_percent["true_shift_detection_probability"]) < 0.99:
-        raise ValueError("20% sentinel budget missed target shift detection gate")
+    if float(ten_percent_mild["true_shift_detection_probability"]) >= 0.05:
+        raise ValueError("10% sentinel budget unexpectedly has strong power for the mild shift")
+    if not 0.40 < float(ten_percent_moderate["true_shift_detection_probability"]) < 0.50:
+        raise ValueError("10% sentinel budget moderate-shift power left expected fixture band")
+    if float(ten_percent_large["true_shift_detection_probability"]) < 0.95:
+        raise ValueError("10% sentinel budget missed large-shift detection gate")
+    if float(twenty_percent_moderate["true_shift_detection_probability"]) < 0.85:
+        raise ValueError("20% sentinel budget missed moderate-shift detection gate")
+    if float(twenty_percent_large["true_shift_detection_probability"]) < 0.99:
+        raise ValueError("20% sentinel budget missed large-shift detection gate")
     for row in rows:
         if int(row["sentinel_labels"]) + int(row["adaptive_labels"]) != TOTAL_LABEL_BUDGET:
             raise ValueError("sentinel budget frontier does not conserve labels")
-    print("PASS: audit-budget conservation, zero-sentinel negative control, sentinel null and shift-power gates")
+    print("PASS: audit-budget conservation, zero-sentinel negative control, sentinel null and shift-magnitude power gates")
 
 
 def self_test():
