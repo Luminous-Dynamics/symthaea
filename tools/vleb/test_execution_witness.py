@@ -200,6 +200,19 @@ class ExecutionWitnessTests(unittest.TestCase):
                 trusted_identity=self.fx.identity,
             )
 
+    def test_receipt_cannot_overwrite_plan_before_execution(self) -> None:
+        with self.assertRaisesRegex(ValueError, "receipt path conflicts with execution plan"):
+            runner.record_execution(
+                plan_path=Path("plan.json"),
+                evidence_root=self.fx.root,
+                receipt_path="plan.json",
+                expected_plan_sha256=self.fx.plan_sha,
+                expected_runner_sha256=self.fx.runner_sha,
+                expected_verifier_sha256=self.fx.executable_sha,
+                trusted_identity=self.fx.identity,
+            )
+        self.assertEqual(self.fx.plan_path.read_bytes(), self.fx.plan_raw)
+
     def test_receipt_path_traversal_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "traversal|canonical relative path"):
             runner.record_execution(
