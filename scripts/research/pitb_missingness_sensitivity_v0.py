@@ -71,6 +71,10 @@ def run_one(sz, name, rng, boot):
                 reject=bool(informative and lo > 0), gate=bool(informative and estimate >= .10 and lo > 0 and c >= 20),
                 fam_effect=float(np.mean(eff)), capability=capability_true)
 
+def clean_centered_pp(x):
+    # Exact weighted centering leaves floating-point residue near zero.
+    return 0.0 if abs(float(x)) < 1e-12 else float(x)
+
 def scenario(name, sz, studies, boot, seed):
     rng=np.random.default_rng(seed); rows=[run_one(sz,name,rng,boot) for _ in range(studies)]
     est=np.array([r["est"] for r in rows]); truth=np.array([r["true"] for r in rows]); bias=est-truth
@@ -80,7 +84,7 @@ def scenario(name, sz, studies, boot, seed):
       "size_min":int(sz.min()),"size_median":float(np.median(sz)),"size_max":int(sz.max()),
       "studies":studies,"bootstrap_replicates_per_study":boot,
       "mean_observed_fraction":float(np.mean([r["observed"] for r in rows])),
-      "mean_true_effect_percentage_points":float(100*truth.mean()),
+      "mean_true_effect_percentage_points":clean_centered_pp(100*truth.mean()),
       "mean_estimated_effect_percentage_points":float(100*np.nanmean(est)),
       "bias_percentage_points":float(100*np.nanmean(bias)),
       "rmse_percentage_points":float(100*np.sqrt(np.nanmean(bias*bias))),
@@ -89,8 +93,8 @@ def scenario(name, sz, studies, boot, seed):
       "lower_bound_rejection_rate_unconditional":float(np.mean([r["reject"] for r in rows])),
       "primary_utility_gate_pass_rate_unconditional":float(np.mean([r["gate"] for r in rows])),
       "mean_interval_width_percentage_points":float(100*np.nanmean([r["hi"]-r["lo"] for r in rows])),
-      "mean_family_average_effect_percentage_points":float(100*np.mean([r["fam_effect"] for r in rows])),
-      "family_minus_capability_target_estimand_pp":float(100*np.mean([r["fam_effect"]-r["capability"] for r in rows])),
+      "mean_family_average_effect_percentage_points":clean_centered_pp(100*np.mean([r["fam_effect"] for r in rows])),
+      "family_minus_capability_target_estimand_pp":clean_centered_pp(100*np.mean([r["fam_effect"]-r["capability"] for r in rows])),
       "interpretation":("explicit outage is an observed non-solve; estimand is operational-system success" if name=="size_informative_runtime_outage" else "adversarial omitted-row complete-case comparator; forbidden as confirmatory PITB analysis" if "omission" in name or "mnar" in name else "synthetic reference only")}
 
 def main():
