@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 20
     env:
       QOBLIB_COMMIT: 1e0e7c523cd9707dd541cc9e5a3086125d4da3c7
-      QOBLIB_ROOT: ${{ runner.temp }}/QOBLIB
+      QOBLIB_ROOT: ${{ github.workspace }}/qoblib-checkout
       MANIFEST_PATH: docs/research/quantum/benchmarks/QOBLIB-MIS-PINNED-FILES-2026-10-28.tsv
       OUTPUT_PATH: ${{ runner.temp }}/qoblib-mis-content-manifest.tsv
     steps:
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: ZIB-AOPT/QOBLIB
           ref: 1e0e7c523cd9707dd541cc9e5a3086125d4da3c7
-          path: ${{ runner.temp }}/QOBLIB
+          path: qoblib-checkout
           fetch-depth: 1
 
       - name: Verify source revision and toolchain
@@ -43,6 +43,15 @@ jobs:
           rustc --version
           git --version
           echo "QOBLIB revision verified: $actual"
+
+      - name: Run verifier and manifest parser tests without Cargo
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test -Awarnings \
+            "$GITHUB_WORKSPACE/crates/domains/symthaea-quantum-comp/examples/qoblib_mis_manifest.rs" \
+            -o "$RUNNER_TEMP/qoblib-mis-contract-tests"
+          "$RUNNER_TEMP/qoblib-mis-contract-tests" --test-threads=1
 
       - name: Compile standalone integrity verifier
         shell: bash
