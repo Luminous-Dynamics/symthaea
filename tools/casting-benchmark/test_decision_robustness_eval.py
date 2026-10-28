@@ -24,6 +24,7 @@ def fixture() -> dict:
         },
         "source_run": {
             "sweep_sha256": "c" * 64,
+            "adapter_sha256": "9" * 64,
             "candidate_pool_sha256": "d" * 64,
             "objective_family": "local_bias_island",
             "constraint_family": "constraint_boundary",
