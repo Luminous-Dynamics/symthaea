@@ -18,6 +18,9 @@ use symthaea_operations_research::aviation_probability_calibration::{
     calibrate_tv_radius_from_episodes, CalibrationEpisode, NominalScenarioProbability,
     RegimeNominalDistribution,
 };
+use symthaea_operations_research::aviation_online_drift::{
+    DriftAlternative, DriftMonitorStatus, DriftScenarioProbability, OnlineDriftMonitor,
+};
 
 fn main() {
     let mut records = Vec::new();
@@ -156,6 +159,51 @@ fn main() {
         }
     };
 
+    let mut drift_monitor = match OnlineDriftMonitor::new(
+        vec![
+            DriftScenarioProbability { scenario_id: "routine".into(), probability_ppm: 600_000 },
+            DriftScenarioProbability { scenario_id: "capacity".into(), probability_ppm: 300_000 },
+            DriftScenarioProbability { scenario_id: "compound-weather".into(), probability_ppm: 100_000 },
+        ],
+        vec![DriftAlternative {
+            alternative_id: "disruption-heavy".into(),
+            mixture_weight_ppm: 1_000_000,
+            probabilities: vec![
+                DriftScenarioProbability { scenario_id: "routine".into(), probability_ppm: 400_000 },
+                DriftScenarioProbability { scenario_id: "capacity".into(), probability_ppm: 300_000 },
+                DriftScenarioProbability { scenario_id: "compound-weather".into(), probability_ppm: 300_000 },
+            ],
+        }],
+        50_000,
+    ) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("online drift monitor initialization failed: {error:?}");
+            process::exit(1);
+        }
+    };
+    let mut drift_report = drift_monitor.report();
+    for (index, scenario_id) in [
+        "compound-weather",
+        "compound-weather",
+        "compound-weather",
+    ].into_iter().enumerate() {
+        drift_report = match drift_monitor.observe(
+            &format!("stream-event-{index}"),
+            1_700_040_000_i64 + index as i64,
+            scenario_id,
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("online drift monitor update failed: {error:?}");
+                process::exit(1);
+            }
+        };
+        if drift_report.status != DriftMonitorStatus::InControl {
+            break;
+        }
+    }
+
     let mut json = String::new();
     writeln!(
         &mut json,
@@ -177,8 +225,12 @@ fn main() {
     }
     writeln!(
         &mut json,
-        "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"radius_calibration\": {{\"regime_count\": {}, \"family_failure_probability_ppm\": {}, \"per_regime_failure_probability_ppm\": {}, \"maximum_required_tv_radius_ppm\": {}, \"any_regime_capped_at_maximum\": {}, \"regimes\": [",
+        "    ]\n  }},\n  \"tuning_audit\": {{\"status\": \"{:?}\", \"tuned_on_test\": false}},\n  \"online_drift_monitor\": {{\"status\": \"{:?}\", \"evidence\": \"{:?}\", \"observations_seen\": {}, \"log_e_value\": {}}},\n  \"radius_calibration\": {{\"regime_count\": {}, \"family_failure_probability_ppm\": {}, \"per_regime_failure_probability_ppm\": {}, \"maximum_required_tv_radius_ppm\": {}, \"any_regime_capped_at_maximum\": {}, \"regimes\": [",
         tuning.status,
+        drift_report.status,
+        drift_report.evidence,
+        drift_report.observations_seen,
+        drift_report.log_e_value,
         calibration.regime_count,
         calibration.requested_family_failure_probability_ppm,
         calibration.per_regime_failure_probability_ppm,
