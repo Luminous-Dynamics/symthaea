@@ -401,6 +401,11 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     if !metrics.contains("native_rmsle") || !metrics.contains("symbolic_accuracy") {
         issues.push("upstream.native_metrics must preserve native_rmsle and symbolic_accuracy".to_owned());
     }
+    if metrics.len() != manifest.upstream.native_metrics.len()
+        || metrics.iter().any(|metric| !matches!(*metric, "native_rmsle" | "symbolic_accuracy"))
+    {
+        issues.push("upstream.native_metrics must contain only unique native_rmsle and symbolic_accuracy entries".to_owned());
+    }
     if qualified {
         check_git_revision("upstream.revision", &manifest.upstream.revision, &mut issues);
         if manifest.upstream.source_snapshot_status != "pinned" {
@@ -467,10 +472,29 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
     if manifest.task_slices.is_empty() {
         issues.push("task_slices must not be empty".to_owned());
     }
+    let mut covered_model_ids = BTreeSet::new();
+    let mut slice_identities = BTreeSet::new();
     for (index, slice) in manifest.task_slices.iter().enumerate() {
         let prefix = format!("task_slices[{index}]");
         if !model_ids.contains(slice.model_id.as_str()) {
             issues.push(format!("{prefix} references unknown model {}", slice.model_id));
+        }
+        covered_model_ids.insert(slice.model_id.as_str());
+        let mut modules_key = slice.modules.clone();
+        modules_key.sort();
+        let mut difficulties_key = slice.difficulties.clone();
+        difficulties_key.sort();
+        let slice_identity = (
+            slice.model_id.clone(),
+            modules_key,
+            difficulties_key,
+            slice.model_system.clone(),
+            slice.law_version.clone(),
+            slice.noise_level.to_bits(),
+            slice.rollouts_per_cell,
+        );
+        if !slice_identities.insert(slice_identity) {
+            issues.push(format!("{prefix} duplicates an existing model/task-slice identity"));
         }
         if slice.modules.is_empty() || slice.difficulties.is_empty() {
             issues.push(format!("{prefix} requires modules and difficulties"));
@@ -501,6 +525,11 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
             qualified,
             &mut issues,
         );
+    }
+    for model_id in &model_ids {
+        if !covered_model_ids.contains(model_id) {
+            issues.push(format!("model {model_id} has no task slice"));
+        }
     }
 
     if manifest.arms.is_empty() {
