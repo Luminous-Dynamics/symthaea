@@ -51,6 +51,14 @@ SWE-ABS reports that adversarial strengthening rejected **19.78% of previously p
 
 Security needs a separate axis. Endor Labs' AI Coding Agent Security Benchmark lists a best functional score of 87.2% but a best security-correctness score of 37.4% among the systems it evaluated. The numbers are vendor-benchmark-specific and not interchangeable with VLEB; the disparity nevertheless supports measuring secure behavior independently from functional success. Source: [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark).
 
+### Operational run manifests
+
+The `tools/vleb/run-manifest.schema.json` contract separates the evaluator's trusted run identity from the agent-produced receipt. `tools/vleb/verify_run_manifest.py` requires an out-of-band SHA-256 pin for the manifest, recomputes each referenced artifact digest, and rejects unsafe artifact paths. For confirmatory runs it requires a GitHub Actions/Sigstore attestation of the complete evidence bundle tied to the expected repository, signer workflow and predicate. After the signature check, it invokes the pinned independent receipt auditor using the manifest's task, protocol, candidate, runtime, schema and verifier pins.
+
+The expected manifest digest must be supplied from a protected evaluator record or other independently verified trust root; deriving the pin from the same untrusted manifest would be circular. A development-smoke manifest may validate its integrity, but it always reports `score_eligible=false`. A confirmatory run becomes eligible only after the manifest hash, artifact hashes, attestation, two-sided task controls and independent receipt audit all pass. See [the run procedure](../../tools/vleb/CONFIRMATORY_RUNS.md).
+
+This is a provenance gate, not a semantics oracle: GitHub attestation ties bytes to a workflow identity but does not prove the workflow's claims are true or the patch is correct. The task-level behavior contract and independent receipt auditor remain separate requirements.
+
 ### Paradigm shift: three clocks, three claims
 
 1. **Patch clock:** did the agent produce a change that satisfies the locked contract?
