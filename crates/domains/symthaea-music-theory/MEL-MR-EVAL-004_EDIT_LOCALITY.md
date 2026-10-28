@@ -29,7 +29,7 @@ Event count changes, reordered events, simultaneous notes, rests, instrumentatio
 
 ## Receipt and numerical rules
 
-Each receipt records the exact edit request and thresholds, requested-property residuals, every protected-property residual summary, event-count status, verdict, and failure reasons. Pitch comparisons use MIDI semitones, onset comparisons use beats, and duration comparisons use the absolute log ratio `|ln(actual / expected)|`. Inputs must be finite; event onsets are strictly increasing; all pitch/duration transforms must remain in range. A fixed event-count and 4,096-event ceiling bound work.
+Each receipt records the exact edit request and thresholds, requested-property residuals, every protected-property residual summary, event-count status, verdict, and failure reasons. Pitch comparisons use MIDI semitones, onset comparisons use beats, and duration comparisons use the absolute log ratio `|ln(actual / expected)|`. Inputs must be finite; event onsets are strictly increasing; all pitch/duration transforms must remain in range. A fixed event-count and 4,096-event ceiling bound work. Requests whose requested change is indistinguishable from a no-op at the configured tolerance are unsupported rather than being allowed to pass vacuously.
 
 ## Smoke dataset
 
@@ -38,7 +38,7 @@ The machine-readable JSONL corpus contains 132 deterministic synthetic cases acr
 - 1 under-edit: the requested transposition does not happen;
 - 5 collateral-change cases: timing damage, pitch damage, onset-scaling duration damage, non-local pitch leak, and non-local duration leak.
 
-Expected verdicts are 60 accepts and 72 rejects. Families are held out by split: development 6 families / 66 cases, calibration 2 / 22, and test 4 / 44. The cases are synthetic and not human annotated. They validate contract mechanics, not generalization or listening preference.
+Expected verdicts are 60 accepts and 72 rejects. Families are held out by split: development 6 families / 66 cases, calibration 2 / 22, and test 4 / 44. The cases are synthetic and not human annotated. An independent reference-equation simulation of all 132 cases reports zero expected-requested/property/verdict mismatches. This is a specification simulation, not execution of the Rust implementation. The first simulation exposed an incorrect protected-pitch assertion in the transpose operation; that was removed so transposition protects timing/duration rather than the pitch dimension it is meant to change. The cases validate contract mechanics, not generalization or listening preference.
 
 ## Benchmark protocol and targets
 
