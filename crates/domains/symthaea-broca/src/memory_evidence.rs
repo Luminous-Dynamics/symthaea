@@ -222,6 +222,82 @@ struct EvidenceIndexSnapshot {
     records_sha256: String,
 }
 
+/// Binds the exact vector-index bytes and evidence snapshot to one generation.
+///
+/// This detects accidentally mixing an old vector index with a newer payload
+/// snapshot (or vice versa). It is an unkeyed consistency manifest, not a
+/// signature: authenticate or externally pin its bytes when storage is hostile.
+pub const EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION: &str = "BROCA-EVIDENCE-COMMIT-MANIFEST-V1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceCommitManifest {
+    schema_version: String,
+    /// Monotonic generation assigned by the persistence coordinator, starting at 1.
+    generation: u64,
+    hdc_index_sha256: String,
+    evidence_snapshot_sha256: String,
+}
+
+impl EvidenceCommitManifest {
+    /// Construct a pair-binding manifest for exact persisted bytes.
+    pub fn new(generation: u64, hdc_index_bytes: &[u8], evidence_snapshot_bytes: &[u8]) -> Result<Self, String> {
+        if generation == 0 {
+            return Err("evidence commit generation must start at 1".into());
+        }
+        // Refuse to bind a manifest to an invalid or corrupt evidence snapshot.
+        EvidenceIndex::restore_snapshot(evidence_snapshot_bytes)?;
+        Ok(Self {
+            schema_version: EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION.to_string(),
+            generation,
+            hdc_index_sha256: sha256_hex(hdc_index_bytes),
+            evidence_snapshot_sha256: sha256_hex(evidence_snapshot_bytes),
+        })
+    }
+
+    fn validate_envelope(&self) -> Result<(), String> {
+        if self.schema_version != EVIDENCE_COMMIT_MANIFEST_SCHEMA_VERSION {
+            return Err("unsupported evidence commit manifest schema version".into());
+        }
+        if self.generation == 0 {
+            return Err("evidence commit generation must start at 1".into());
+        }
+        if !is_sha256(&self.hdc_index_sha256) || !is_sha256(&self.evidence_snapshot_sha256) {
+            return Err("evidence commit manifest contains an invalid SHA-256 digest".into());
+        }
+        Ok(())
+    }
+
+    /// Check both artifact digests and validate the evidence snapshot itself.
+    pub fn verify(&self, hdc_index_bytes: &[u8], evidence_snapshot_bytes: &[u8]) -> Result<(), String> {
+        self.validate_envelope()?;
+        if sha256_hex(hdc_index_bytes) != self.hdc_index_sha256 {
+            return Err("HDC index digest does not match evidence commit manifest".into());
+        }
+        if sha256_hex(evidence_snapshot_bytes) != self.evidence_snapshot_sha256 {
+            return Err("evidence snapshot digest does not match commit manifest".into());
+        }
+        EvidenceIndex::restore_snapshot(evidence_snapshot_bytes)?;
+        Ok(())
+    }
+
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, String> {
+        self.validate_envelope()?;
+        serde_json::to_vec(self).map_err(|error| format!("failed to serialize commit manifest: {error}"))
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let manifest: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("invalid evidence commit manifest: {error}"))?;
+        manifest.validate_envelope()?;
+        Ok(manifest)
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+}
+
 /// Map from HDC candidate IDs to evidence payloads.
 ///
 /// Snapshot/restore preserves lifecycle tombstones across process restarts, but
@@ -544,6 +620,38 @@ mod tests {
         envelope.records_sha256 = hash(&serde_json::to_vec(&envelope.records).unwrap());
         let crafted = serde_json::to_vec(&envelope).unwrap();
         assert!(EvidenceIndex::restore_snapshot(&crafted).is_err());
+    }
+
+    #[test]
+    fn commit_manifest_binds_matching_vector_index_and_evidence_snapshot() {
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-a", "web", "current route"), b"canonical trajectory bytes").unwrap();
+        index.mark_deleted(7).unwrap();
+        let evidence_bytes = index.snapshot_bytes().unwrap();
+        let hdc_bytes = b"canonical HDC index generation 3";
+
+        let manifest = EvidenceCommitManifest::new(3, hdc_bytes, &evidence_bytes).unwrap();
+        assert_eq!(manifest.generation(), 3);
+        manifest.verify(hdc_bytes, &evidence_bytes).unwrap();
+
+        let encoded = manifest.to_json_bytes().unwrap();
+        let restored = EvidenceCommitManifest::from_json_bytes(&encoded).unwrap();
+        restored.verify(hdc_bytes, &evidence_bytes).unwrap();
+        assert!(restored.verify(b"stale HDC index bytes", &evidence_bytes).is_err());
+
+        let mut other_index = EvidenceIndex::new();
+        other_index.insert(text_record(7, "evidence-a", "web", "different route"), b"canonical trajectory bytes").unwrap();
+        let mismatched_evidence = other_index.snapshot_bytes().unwrap();
+        assert!(restored.verify(hdc_bytes, &mismatched_evidence).is_err());
+    }
+
+    #[test]
+    fn commit_manifest_rejects_zero_generation_and_invalid_snapshot() {
+        assert!(EvidenceCommitManifest::new(0, b"index", b"not a snapshot").is_err());
+        let mut index = EvidenceIndex::new();
+        index.insert(text_record(7, "evidence-a", "web", "current route"), b"canonical trajectory bytes").unwrap();
+        let evidence_bytes = index.snapshot_bytes().unwrap();
+        assert!(EvidenceCommitManifest::new(0, b"index", &evidence_bytes).is_err());
     }
 
     #[test]
