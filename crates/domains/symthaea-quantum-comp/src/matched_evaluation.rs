@@ -366,6 +366,9 @@ impl MatchedTrialRecord {
                 }
             }
             CandidateVerification::VerificationFailed => {
+                // A verifier failure may produce no receipt at all. If a failure
+                // receipt exists it is checked below; absence is a recorded failure,
+                // never a successful target hit.
                 if self.candidate_size.is_none() || self.conflict_count.is_some() {
                     return Err(MatchedEvaluationError::InconsistentCandidateRecord(
                         self.trial_id.clone(),
@@ -373,11 +376,6 @@ impl MatchedTrialRecord {
                 }
                 if self.candidate_sha256.is_none() {
                     return Err(MatchedEvaluationError::MissingCandidateDigest(
-                        self.trial_id.clone(),
-                    ));
-                }
-                if self.verifier_receipt.is_none() {
-                    return Err(MatchedEvaluationError::MissingVerifierReceipt(
                         self.trial_id.clone(),
                     ));
                 }
@@ -1246,6 +1244,38 @@ mod tests {
         assert_eq!(result.candidate_target_hits, 0);
         assert_eq!(result.baseline_only_target_hits, 1);
         assert_eq!(result.pairs[0].time_speedup_baseline_over_candidate, None);
+    }
+
+
+    #[test]
+    fn verifier_failure_without_receipt_is_preserved_as_non_hit() {
+        let baseline = report(
+            "baseline",
+            "classical",
+            vec![verified_trial("b", "pair", 1, 5, costs(100.0), EnergyRecord::not_measured())],
+        );
+        let failed = report(
+            "candidate",
+            "trajectory",
+            vec![MatchedTrialRecord {
+                trial_id: "c".into(),
+                pair_id: "pair".into(),
+                seed: 1,
+                termination: TrialTermination::Completed,
+                candidate_size: Some(6),
+                candidate_sha256: Some("9".repeat(64)),
+                verifier_receipt: None,
+                verification: CandidateVerification::VerificationFailed,
+                conflict_count: None,
+                costs: costs(50.0),
+                energy: EnergyRecord::not_measured(),
+            }],
+        );
+        assert!(failed.validate().is_ok());
+        assert!(!failed.trials[0].verified_target_hit(5));
+        let result = compare_matched_arms(&baseline, &failed, 0.0).unwrap();
+        assert_eq!(result.candidate_target_hits, 0);
+        assert_eq!(result.baseline_only_target_hits, 1);
     }
 
     #[test]
