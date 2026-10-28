@@ -29,7 +29,8 @@ Every method gets the same initial labeled set, candidate pool, label oracle, pe
 6. Plug-in EVSI using the same downstream action/loss model as the robust method.
 7. Robust EVSI / predictive-ambiguity acquisition.
 8. Optional R-IDeA-compatible arm only after its representativeness, informativeness, and error-de-amplification terms are implemented faithfully and documented.
-9. Hindsight oracle that knows the true evaluation distribution, labelled **unattainable reference**, never counted as a deployable baseline.
+9. Exploration-exploitation stratified sampling for label shift (EESAS), where its task assumptions match; implement and describe it faithfully before scoring it as a reproduced baseline. Wen et al., *Expert Systems with Applications* 328 (1 October 2026), article 132567, https://doi.org/10.1016/j.eswa.2026.132567, report label-balance problems under iterative uncertainty/diversity sampling and propose a stratified exploration–exploitation approach. This paper motivates the comparison; we have not reproduced it or claimed to beat it.
+10. Hindsight oracle that knows the true evaluation distribution, labelled **unattainable reference**, never counted as a deployable baseline.
 
 No baseline may receive hidden test labels, target-domain prevalence, or true shift parameters unless that information is explicitly part of its deployment contract.
 
@@ -223,3 +224,14 @@ The 10% audit share reaches roughly 97% detection by the total budget for this l
 Acceptance for the next version: sweep audit fraction, shift magnitude and onset; test low-amplitude/gradual shifts, changing stratum prevalence, conditional shift, inclusion-probability errors, rare groups, and support overlap; report false alarms, missed shifts, post-change delay and tail risk jointly. Compare (a) random sentinel audits, (b) design-based estimators with known inclusion probabilities and explicit positivity/overlap checks, and (c) policy-conditioned monitoring. No weighting method may claim to recover unsupported regions where inclusion probability is zero. Always debit audits from the same acquisition budget and keep an oracle non-deployable.
 
 Implementation: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744). Related OOD task and matched baseline matrix: [issue #8749](https://github.com/Luminous-Dynamics/symthaea/issues/8749).
+
+
+## 20. Shift magnitude must be crossed with sentinel share
+
+The sentinel-budget executable now crosses sentinel shares {5%, 10%, 20%, 25%, 50%, 100%} with post-shift event rates {0.55, 0.60, 0.70, 0.80, 0.90}, with p0=0.5, a fixed 1,000-label budget, and the shift beginning after 100 total labels. The 0% sentinel arm is emitted once as a selection-bias negative control; it cannot provide a representative target-population audit channel.
+
+Independent exact-DP Python-reference results show why no universal audit percentage is justified. At 10% audit share, post-shift detection by the total budget is 0.56% for p1=0.55, 3.07% for p1=0.60, 43.60% for p1=0.70, 96.96% for p1=0.80, and effectively 100% for p1=0.90. At 20% audit share, the corresponding probabilities are 0.82%, 10.01%, 89.73%, 99.85%, and 99.85%. Even auditing 100% of labels detects p1=0.60 with 94.28% probability and p1=0.55 with only 11.84% by this horizon. These are exact for this Bernoulli process and mixture-e test, not evidence of real-world power; gradual shifts, dependencies and alternate event models remain to be tested.
+
+The EESAS paper is a timely comparator for label-shift risk during iterative active sampling. Include it where the task supports its assumptions instead of treating sentinel monitoring as the only possible response. Do not claim reproduction or superiority unless its stated method and evaluation semantics are actually implemented. Source: https://doi.org/10.1016/j.eswa.2026.132567.
+
+Tracking implementation: [PR #8744](https://github.com/Luminous-Dynamics/symthaea/pull/8744). Full matched baselines and OOD axes: [issue #8749](https://github.com/Luminous-Dynamics/symthaea/issues/8749).
