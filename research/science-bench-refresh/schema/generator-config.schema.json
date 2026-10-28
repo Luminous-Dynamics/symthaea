@@ -69,7 +69,112 @@
             "minimum": 0,
             "maximum": 1000000000
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "semantic_invariance"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "family_id": {
+                  "const": "semantic_invariance"
+                },
+                "instruction": {
+                  "const": "Recover the relationship invariant under the declared coordinate transformation."
+                },
+                "noise_amplitude": {
+                  "const": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "sampling_noise_shift"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "family_id": {
+                  "const": "sampling_noise_shift"
+                },
+                "instruction": {
+                  "const": "Recover the relationship under declared measurement noise and report uncertainty."
+                },
+                "noise_amplitude": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000000000
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "confounding_null"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "family_id": {
+                  "const": "confounding_null"
+                },
+                "instruction": {
+                  "const": "Decide whether the apparent association is a direct effect or explained by a common cause."
+                },
+                "noise_amplitude": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000000000
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "identifiability_abstention"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "family_id": {
+                  "const": "identifiability_abstention"
+                },
+                "instruction": {
+                  "const": "Determine what is identifiable from the narrow observed domain; state an equivalence class or abstain."
+                },
+                "noise_amplitude": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000000000
+                }
+              }
+            }
+          }
+        ]
       }
     }
   },
