@@ -65,6 +65,24 @@ let official_context = result
 
 Integrity errors propagate through `?`; only an uninitialized store maps to no context. The resolved list retains each emitted item's HDC ID, evidence ID and source trajectory/step. The API uses exact search and is a correctness reference, not a measured latency claim.
 
+For a raw-text correctness baseline, no query encoder is required:
+
+```rust
+let result = store.query_committed_text_context(
+    "Where is the cart checkout button?",
+    32,
+    "web",
+    now_ms,
+    payload_root,
+    8,
+)?;
+let official_context = result
+    .map(|result| result.context_items())
+    .unwrap_or_default();
+```
+
+This uses deterministic BM25 over the committed text evidence only. The current baseline reconstructs eligible document statistics for each query; it is intended to establish retrieval correctness before adding a generation-bound inverted index. It is **not yet a latency-optimized implementation** for 115M-token histories.
+
 The exact API may evolve during review; the example communicates intended use, not a compiled integration result.
 
 - Data is staged in an immutable generation directory. HDC-index and evidence-snapshot bytes are synced; the manifest is written and verified; then `CURRENT` is atomically replaced last.
