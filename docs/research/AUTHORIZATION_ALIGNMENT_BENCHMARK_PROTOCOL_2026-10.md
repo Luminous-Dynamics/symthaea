@@ -94,6 +94,14 @@ The fair comparison rule is: first reproduce the same authorization semantics, p
 
 A reasonable stretch programme is to reproduce a public verifier/gateway baseline on the same host, publish our raw rows and environment digest, and only then set a faster target with identical durability semantics. The benchmark is not allowed to call a faster in-memory decision better than a durable gateway round trip.
 
+## Benchmark self-integrity: mutation sensitivity
+
+The paired corpus and effect harness must demonstrate sensitivity, not just produce a clean run. The companion inventory [authorization-harness-mutations.v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/feat/effect-surface-registry-v1/docs/research/authorization-harness-mutations.v0.json) lists faults to inject into disposable test builds: guard bypass, local-recognition bypass, expired authority acceptance, target substitution, one-shot replay, non-atomic concurrency, automatic retry after unknown outcome, fabricated postcondition success, invalid receipt acceptance, missing event rows, frozen-corpus drift, deny-all, no-op adapter success, non-authority signal granting, and an action-only context-insensitive alignment model.
+
+Report the mutation denominator, attempted/applicable/killed/survived/inconclusive/excluded counts, and raw evidence for each mutant. The proposed release target is to kill 100% of applicable critical mutants. Missing rows, timeouts, inconclusive injection, or a mutation that was never successfully applied cannot count as killed. Exclusions need reviewed reasons and remain visible in the denominator report.
+
+Two orthogonal controls are essential: (1) the deny-all mutant must fail because valid positive controls stop completing, and (2) the no-op adapter mutant must fail because an authorized operation lacks its independently observed effect/postcondition. Together they prevent a benchmark from looking secure by blocking everything or reporting success without doing anything. The context-insensitivity mutant belongs to the alignment lane; it does not test production runtime authority.
+
 ## Implementation sequence
 
 1. Keep #8769 focused on the executable 41-vector effect harness, real test adapter instrumentation, independent witnesses, positive utility controls and fail-closed outcome accounting.
