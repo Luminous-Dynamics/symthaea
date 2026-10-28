@@ -503,6 +503,7 @@ mod tests {
     use serde_json::Value;
 
     const CASES: &str = include_str!("../mel-edit-locality-smoke-cases-v1.jsonl");
+    const ADVERSARIAL_CASES: &str = include_str!("../mel-edit-locality-adversarial-cases-v1.1.jsonl");
 
     #[derive(Debug, Deserialize)]
     struct Fixture {
@@ -609,7 +610,7 @@ mod tests {
         let mut accepted = 0;
         let mut rejected = 0;
         let mut seen = std::collections::HashSet::new();
-        for line in CASES.lines().filter(|line| !line.trim().is_empty()) {
+        for line in CASES.lines().chain(ADVERSARIAL_CASES.lines()).filter(|line| !line.trim().is_empty()) {
             let value: Value = serde_json::from_str(line).expect("valid fixture JSON");
             let fixture: Fixture = serde_json::from_value(value.clone()).expect("fixture schema matches structs");
             assert!(seen.insert(fixture.case_id.clone()), "duplicate {}", fixture.case_id);
@@ -639,8 +640,8 @@ mod tests {
             }
             count += 1;
         }
-        assert_eq!(count, 132);
-        assert_eq!(accepted, 60);
-        assert_eq!(rejected, 72);
+        assert_eq!(count, 216);
+        assert_eq!(accepted, 84);
+        assert_eq!(rejected, 132);
     }
 }
