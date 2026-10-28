@@ -1091,7 +1091,30 @@ def cusum_self_test():
         raise ValueError(f"CUSUM large-shift power controls failed: up={up_power}, down={down_power}")
     if selection_alarm < 0.99:
         raise ValueError("CUSUM failed the selection-induced alarm negative control")
-    print("PASS: exact minimum threshold, symmetric directions, within-band control, mass conservation, large-shift power, and selection-bias negative control")
+
+    cusum_055 = float(
+        simulate_cusum_scenario("upper_cusum", "step_up_055", threshold)[-1]
+        ["post_shift_detection_probability"]
+    )
+    composite_055 = simulate_from_alarm_table(
+        tables[COMPOSITE_FAMILY], "step_up_055", horizon
+    )[1]
+    cusum_060 = float(
+        simulate_cusum_scenario("upper_cusum", "step_up_060", threshold)[-1]
+        ["post_shift_detection_probability"]
+    )
+    composite_060 = simulate_from_alarm_table(
+        tables[COMPOSITE_FAMILY], "step_up_060", horizon
+    )[1]
+    if cusum_055 <= composite_055 + 0.04:
+        raise ValueError(
+            f"matched-edge CUSUM weak-shift power gate failed: CUSUM={cusum_055}, composite={composite_055}"
+        )
+    if cusum_060 <= composite_060 + 0.15:
+        raise ValueError(
+            f"matched-edge CUSUM moderate-shift power gate failed: CUSUM={cusum_060}, composite={composite_060}"
+        )
+    print("PASS: exact matched-edge threshold, both directions, within-band control, mass conservation, selection-bias negative control, and matched-false-alarm power gates")
 
 
 def main(argv):
