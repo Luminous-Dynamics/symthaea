@@ -253,31 +253,34 @@ def self_test():
         actual = len(enumerate_trees(PRIOR, 0b1111, depth))
         if actual != expected:
             raise ValueError(f"tree inventory mismatch at depth {depth}: {actual} != {expected}")
-    previous = math.inf
-    for n in SAMPLE_SIZES:
-        box, radius = intervals(n)
-        if radius >= previous:
-            raise ValueError("Hoeffding radius did not shrink with calibration size")
-        previous = radius
-        for query in range(4):
-            for hypothesis in range(3):
-                low, high = box[query][hypothesis]
-                if not (0 <= low <= NOMINAL[query][hypothesis] <= high <= 1):
-                    raise ValueError("nominal parameter not inside frozen calibration interval")
     target = 1.0 - ALPHA / CELLS
+    for method, anytime in (("fixed_sample", False), ("time_uniform", True)):
+        previous = math.inf
+        for n in SAMPLE_SIZES:
+            box, radius = intervals(n, anytime)
+            if radius >= previous:
+                raise ValueError(f"{method} radius did not shrink with calibration size")
+            previous = radius
+            for query in range(4):
+                for hypothesis in range(3):
+                    low, high = box[query][hypothesis]
+                    if not (0 <= low <= NOMINAL[query][hypothesis] <= high <= 1):
+                        raise ValueError(f"{method} interval does not contain nominal fixture")
+            minimum_coverage = min(cell_coverage(n, p, anytime) for p in COVERAGE_GRID)
+            if minimum_coverage + 1e-10 < target:
+                raise ValueError(
+                    f"{method}, n={n}: grid coverage {minimum_coverage} below {target}"
+                )
+            union_bound = 1.0 - CELLS * (1.0 - minimum_coverage)
+            if union_bound + 1e-10 < 1.0 - ALPHA:
+                raise ValueError(f"{method}, n={n}: grid union-bound below 95%")
     for n in SAMPLE_SIZES:
-        minimum_coverage = min(cell_coverage(n, p) for p in COVERAGE_GRID)
-        if minimum_coverage + 1e-10 < target:
-            raise ValueError(
-                f"n={n}: minimum grid coverage {minimum_coverage} below {target}"
-            )
-        union_bound = 1.0 - CELLS * (1.0 - minimum_coverage)
-        if union_bound + 1e-10 < 1.0 - ALPHA:
-            raise ValueError(f"n={n}: simultaneous union-bound coverage below 95%")
+        if interval_radius(n, True) < interval_radius(n, False):
+            raise ValueError("time-uniform interval is narrower than fixed-time interval")
 
     tree = enumerate_trees(PRIOR, 0b1111, 1)[1]
-    factorized = worst_box(tree, 50)
-    box, _ = intervals(50)
+    factorized = worst_box(tree, 50, False)
+    box, _ = intervals(50, False)
     full_max = (-math.inf, -math.inf)
     for vertex in range(1 << 12):
         matrix = [list(row) for row in NOMINAL]
@@ -289,7 +292,7 @@ def self_test():
         full_max = (max(full_max[0], values[0]), max(full_max[1], values[2]))
     if abs(factorized[0] - full_max[0]) > 1e-9 or abs(factorized[2] - full_max[1]) > 1e-9:
         raise ValueError("factorized 48-row-vertex maximum differs from full 2^12 vertex enumeration")
-    print("PASS: tree counts, interval inclusion/width, exact finite-grid binomial coverage, and factorized-vs-full vertex maximum")
+    print("PASS: tree counts, fixed/anytime interval inclusion and width, finite-grid coverage, and factorized-vs-full vertex maximum")
 
 
 def check(path):
@@ -301,8 +304,8 @@ def check(path):
         actual = list(reader)
     if len(actual) != len(expected):
         raise ValueError(f"row count mismatch: expected {len(expected)}, got {len(actual)}")
-    numeric = FIELDS[1:2] + FIELDS[3:10]
-    categorical = ("n_per_cell", "scenario", "planned_first_query")
+    numeric = FIELDS[2:3] + FIELDS[4:11]
+    categorical = ("interval_method", "n_per_cell", "scenario", "planned_first_query")
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         for field in categorical:
             if got.get(field) != want[field]:
