@@ -929,6 +929,71 @@ impl EvidenceIndex {
         Ok(ranked)
     }
 
+    /// Diversify a previously ranked lexical candidate pool by trajectory.
+    ///
+    /// The caller should oversample the BM25 ranking before applying this policy.
+    /// The selector preserves score order (score descending, HDC ID ascending),
+    /// emits at most `per_trajectory_limit` text records per source trajectory,
+    /// and rechecks scope, lifecycle and time eligibility at selection time.
+    ///
+    /// This is an opt-in retrieval policy, not part of the BM25 score or an
+    /// accuracy claim. It can reduce duplicate sibling-state context, but it may
+    /// also hurt questions that need several states from one trajectory; evaluate
+    /// by memory ability and equal context budget before selecting a default.
+    pub(crate) fn diversify_text_candidates_by_trajectory(
+        &self,
+        ranked_candidates: &[(u64, f32)],
+        scope_id: &str,
+        now_ms: u64,
+        max_candidates: usize,
+        per_trajectory_limit: usize,
+    ) -> Result<Vec<(u64, f32)>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if per_trajectory_limit == 0 {
+            return Err("per_trajectory_limit must be positive".into());
+        }
+        if max_candidates == 0 || ranked_candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut ordered = ranked_candidates.to_vec();
+        if ordered.iter().any(|(_, score)| !score.is_finite() || *score < 0.0) {
+            return Err("candidate scores must be finite and non-negative".into());
+        }
+        ordered.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+
+        let mut seen_ids = BTreeSet::new();
+        let mut trajectory_counts = BTreeMap::<String, usize>::new();
+        let mut selected = Vec::with_capacity(max_candidates.min(ordered.len()));
+        for (hdc_id, score) in ordered {
+            if !seen_ids.insert(hdc_id) {
+                continue;
+            }
+            let record = self.records.get(&hdc_id)
+                .ok_or_else(|| format!("ranked lexical candidate references unknown HDC ID {hdc_id}"))?;
+            if !record.is_eligible_for(scope_id, now_ms)
+                || !matches!(&record.payload, EvidencePayload::Text { .. })
+            {
+                continue;
+            }
+            let trajectory_id = record.source.trajectory_id.clone();
+            let count = trajectory_counts.entry(trajectory_id).or_default();
+            if *count >= per_trajectory_limit {
+                continue;
+            }
+            *count += 1;
+            selected.push((hdc_id, score));
+            if selected.len() == max_candidates {
+                break;
+            }
+        }
+        Ok(selected)
+    }
+
     /// Deterministic BM25 lexical retrieval over eligible text evidence.
     ///
     /// This is a transparent lexical baseline, not a semantic encoder. It reads
@@ -1161,6 +1226,100 @@ mod tests {
         }
     }
 
+    fn text_record_for_trajectory(
+        id: u64,
+        evidence_id: &str,
+        scope: &str,
+        trajectory_id: &str,
+        text: &str,
+    ) -> (EvidenceRecord, Vec<u8>) {
+        let source_bytes = format!("canonical trajectory bytes for {trajectory_id}, state {id}").into_bytes();
+        let mut record = text_record(id, evidence_id, scope, text);
+        record.source.trajectory_id = trajectory_id.to_string();
+        record.source.step_id = Some(format!("step-{id}"));
+        record.source.step_index = Some(id);
+        record.source.source_sha256 = hash(&source_bytes);
+        (record, source_bytes)
+    }
+
+
+    #[test]
+    fn trajectory_diversification_caps_sibling_states_and_preserves_score_order() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, trajectory_id, source) in [
+            (1, "state-a1", "trajectory-a", "goal repeated shared state"),
+            (2, "state-a2", "trajectory-a", "goal repeated second state"),
+            (3, "state-a3", "trajectory-a", "goal repeated third state"),
+            (4, "state-b1", "trajectory-b", "goal separate environment"),
+            (5, "state-c1", "trajectory-c", "goal another environment"),
+        ] {
+            let (record, source_bytes) =
+                text_record_for_trajectory(id, evidence_id, "web", trajectory_id, source);
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+
+        // Deliberately unsorted input and a repeated ID must still produce a
+        // deterministic score/ID order and never duplicate a context candidate.
+        let ranked = [(5, 0.70), (2, 0.95), (1, 0.99), (1, 0.99), (4, 0.80), (3, 0.90)];
+        let selected = evidence
+            .diversify_text_candidates_by_trajectory(&ranked, "web", 150, 3, 1)
+            .unwrap();
+        assert_eq!(selected, vec![(1, 0.99), (4, 0.80), (5, 0.70)]);
+
+        let two_per_trajectory = evidence
+            .diversify_text_candidates_by_trajectory(&ranked, "web", 150, 4, 2)
+            .unwrap();
+        assert_eq!(
+            two_per_trajectory,
+            vec![(1, 0.99), (2, 0.95), (4, 0.80), (5, 0.70)]
+        );
+    }
+
+    #[test]
+    fn trajectory_diversification_rechecks_scope_lifecycle_and_validity() {
+        let mut evidence = EvidenceIndex::new();
+
+        let (active, active_source) =
+            text_record_for_trajectory(1, "active", "web", "trajectory-a", "current active text");
+        evidence.insert(active, &active_source).unwrap();
+
+        let (private, private_source) = text_record_for_trajectory(
+            2, "private", "enterprise", "trajectory-b", "cross scope text",
+        );
+        evidence.insert(private, &private_source).unwrap();
+
+        let (mut expired, expired_source) = text_record_for_trajectory(
+            3, "expired", "web", "trajectory-c", "expired text",
+        );
+        expired.valid_until_unix_ms = Some(150);
+        evidence.insert(expired, &expired_source).unwrap();
+
+        let (revoked, revoked_source) = text_record_for_trajectory(
+            4, "revoked", "web", "trajectory-d", "revoked text",
+        );
+        evidence.insert(revoked, &revoked_source).unwrap();
+        evidence.revoke(4).unwrap();
+
+        let selected = evidence
+            .diversify_text_candidates_by_trajectory(
+                &[(1, 1.0), (2, 0.99), (3, 0.98), (4, 0.97)],
+                "web",
+                150,
+                10,
+                1,
+            )
+            .unwrap();
+        assert_eq!(selected, vec![(1, 1.0)]);
+        assert!(evidence
+            .diversify_text_candidates_by_trajectory(&[(99, 0.5)], "web", 150, 1, 1)
+            .is_err());
+        assert!(evidence
+            .diversify_text_candidates_by_trajectory(&[(1, f32::NAN)], "web", 150, 1, 1)
+            .is_err());
+        assert!(evidence
+            .diversify_text_candidates_by_trajectory(&[(1, 1.0)], "web", 150, 1, 0)
+            .is_err());
+    }
 
     #[test]
     fn lexical_index_round_trip_and_indexed_bm25_match_reference_ranking() {
