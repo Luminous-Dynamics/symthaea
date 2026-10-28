@@ -321,6 +321,7 @@ A proposed, evidence-grounded research program focused on public HIV reservoir a
 - [Falsifiable hypothesis ledger schema](hiv-reservoir-discovery/HYPOTHESIS_LEDGER.schema.json)
 - [Industry and SOTA comparison](hiv-reservoir-discovery/INDUSTRY_AND_SOTA.md)
 - [Initial candidate research questions](hiv-reservoir-discovery/CANDIDATE_HYPOTHESES.md)
+- [Rust data-integrity audit tool](../../crates/domains/symthaea-hiv-audit/README.md)
 
 ## Further Reading
 
