@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn deterministic_metamorphic_motif_return_suite() {
-        // 2,048 frozen seeds × 9 comparisons = 18,432 deterministic
+        // 2,048 frozen seeds × 10 comparisons = 20,480 deterministic
         // transformation and adversarial cases. This qualifies symbolic
         // evidence only; it is not a human-musicality benchmark.
         let mut cases_checked = 0usize;
@@ -1127,7 +1127,23 @@ mod tests {
             );
             cases_checked += 1;
 
-            // Negative 9: a longer target that embeds the source is not a
+            // Negative 9: duration values are doubled but one event's onset
+            // breaks the shared timeline scale.
+            let mut irregular_onsets = augmented.clone();
+            irregular_onsets[corrupted_index].onset =
+                Duration::new(2 * corrupted_index as i64 + 1, 1);
+            let irregular_onset_evidence = compare_melodic_sequences(
+                &source,
+                &irregular_onsets,
+                ReturnTransformation::Augmented,
+            );
+            assert!(
+                !irregular_onset_evidence.meets_threshold(0.85),
+                "non-uniform onset scaling was accepted for seed {seed}: {irregular_onset_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Negative 10: a longer target that embeds the source is not a
             // fragment of the shorter source (wrong direction).
             let mut longer_target = Vec::with_capacity(length + 1);
             longer_target.push(note(50, 0, Duration::quarter()));
@@ -1147,7 +1163,7 @@ mod tests {
             cases_checked += 1;
         }
 
-        assert_eq!(cases_checked, 18_432);
+        assert_eq!(cases_checked, 20_480);
     }
 
     #[test]
