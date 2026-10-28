@@ -106,7 +106,7 @@ class BrocaRustMemory(Memory):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=None,
-            bufsize=0,
+            bufsize=-1,
         )
         require(self._process.stdin is not None and self._process.stdout is not None,
                 "failed to create worker standard streams")
@@ -147,29 +147,31 @@ class BrocaRustMemory(Memory):
         trajectory_id = trajectory.get("id")
         require(isinstance(trajectory_id, str) and trajectory_id.strip(),
                 "trajectory.id must be a non-empty string")
-        require(trajectory_id not in self._trajectory_ids,
-                f"duplicate trajectory insert attempted: {trajectory_id}")
+        with self._lock:
+            require(trajectory_id not in self._trajectory_ids,
+                    f"duplicate trajectory insert attempted: {trajectory_id}")
 
-        response = self._rpc({"op": "insert", "trajectory": trajectory})
-        inserted = response.get("inserted_evidence_items")
-        require(isinstance(inserted, int) and inserted > 0,
-                "worker insert receipt must report positive inserted_evidence_items")
+            serialized = json.dumps(
+                trajectory,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            encoded = (serialized + "\n").encode("utf-8")
+            require(len(encoded) <= self.max_jsonl_line_bytes,
+                    "trajectory exceeds configured JSONL line bound")
 
-        # Only journal a trajectory after the worker atomically accepted it.
-        serialized = json.dumps(
-            trajectory,
-            ensure_ascii=True,
-            sort_keys=True,
-            separators=(",", ":"),
-            allow_nan=False,
-        )
-        encoded = (serialized + "\n").encode("utf-8")
-        require(len(encoded) <= self.max_jsonl_line_bytes,
-                "trajectory exceeds configured JSONL line bound")
-        self._journal.write(serialized + "\n")
-        self._journal.flush()
-        self._trajectory_ids.add(trajectory_id)
-        self._trajectory_count += 1
+            response = self._rpc({"op": "insert", "trajectory": trajectory})
+            inserted = response.get("inserted_evidence_items")
+            require(isinstance(inserted, int) and inserted > 0,
+                    "worker insert receipt must report positive inserted_evidence_items")
+
+            # Only journal a trajectory after the worker atomically accepted it.
+            self._journal.write(serialized + "\n")
+            self._journal.flush()
+            self._trajectory_ids.add(trajectory_id)
+            self._trajectory_count += 1
 
     def query(
         self,
@@ -282,13 +284,24 @@ class BrocaRustMemory(Memory):
             except (json.JSONDecodeError, UnicodeDecodeError) as error:
                 self._abort_worker()
                 raise RuntimeError(f"worker returned malformed JSON: {error}") from error
-            require(isinstance(response, dict), "worker response must be a JSON object")
-            require(response.get("request_id") == request_id,
-                    f"worker response ID mismatch: expected {request_id}, got {response.get('request_id')!r}")
-            require(response.get("ok") is True,
-                    f"worker rejected request {request_id}: {response.get('error', 'unknown error')}")
+            if not isinstance(response, dict):
+                self._abort_worker()
+                raise RuntimeError("worker response must be a JSON object")
+            if response.get("request_id") != request_id:
+                self._abort_worker()
+                raise RuntimeError(
+                    f"worker response ID mismatch: expected {request_id}, "
+                    f"got {response.get('request_id')!r}"
+                )
+            if response.get("ok") is not True:
+                raise RuntimeError(
+                    f"worker rejected request {request_id}: "
+                    f"{response.get('error', 'unknown error')}"
+                )
             result = response.get("result")
-            require(isinstance(result, dict), "worker response result must be a JSON object")
+            if not isinstance(result, dict):
+                self._abort_worker()
+                raise RuntimeError("worker response result must be a JSON object")
             return result
 
     def _read_responses(self) -> None:
