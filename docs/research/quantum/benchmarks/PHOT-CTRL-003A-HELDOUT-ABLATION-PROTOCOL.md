@@ -62,6 +62,12 @@ Record all arms even if a solver is unavailable or ineligible; mark it unavailab
 
 The classical portfolio is selected and tuned only on development families. The frozen portfolio, not the best-performing competitor selected after inspecting confirmation results, is the comparison champion. Report specialist baseline comparisons too.
 
+### Baseline inventory checked 2026-10-28
+
+The public [QOBLIB Maximum Independent Set page](https://zib-aopt.github.io/QOBLIB/problem/07/) currently lists 50 unweighted MIS instances spanning 17–4,000 vertices, with 39 marked optimally solved. It lists classical submissions including **Quicopt** (50 instances), **ParallelILS** (50), **MIP** (50), and **Abs2** (50), alongside quantum-simulator and quantum-hardware submissions. Treat these as concrete candidate baselines to audit—not as proof that any one is the strongest eligible solver.
+
+Before confirmation runs, record for every selected candidate its source revision or executable digest, license/availability, graph representation, preprocessing and postprocessing, hardware, timeout, and configuration. Reproduce results where possible. If a published submission's implementation or settings cannot be recovered, explicitly record the limitation and compare the remaining eligible specialist baselines; do not silently cite its leaderboard score as a matched runtime comparison. QOBLIB reports both total runtime and time-to-solution, and its coverage differs by method/metric, so compare only complete, semantically compatible measurements.
+
 ## 5. Pairing, repetitions, and scheduling
 
 - Use at least **10 independent stochastic runs per arm and instance** where feasible, with all seeds published. This exceeds QOBLIB's minimum of five and follows its recommendation of ten or more.
