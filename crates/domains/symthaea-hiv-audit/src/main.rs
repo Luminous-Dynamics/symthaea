@@ -4,7 +4,9 @@
 
 use std::env;
 use std::path::PathBuf;
-use symthaea_hiv_audit::{capture_receipt, print_receipt_summary, verify_receipt, write_receipt_atomic};
+use symthaea_hiv_audit::{
+    capture_receipt, print_receipt_summary, verify_receipt, write_receipt_atomic,
+};
 
 fn usage() -> &'static str {
     "Symthaea HIV reservoir dataset audit
@@ -18,7 +20,11 @@ and pairwise ID overlap. It does not download source data and does not store par
 verify fails if files, metadata, CSV headers/rows, participant-ID sets, or joins have changed."
 }
 
-fn ensure_outside_data_dir(data_dir: &std::path::Path, path: &std::path::Path, label: &str) -> Result<(), String> {
+fn ensure_outside_data_dir(
+    data_dir: &std::path::Path,
+    path: &std::path::Path,
+    label: &str,
+) -> Result<(), String> {
     let canonical_data_dir = data_dir.canonicalize()
         .map_err(|e| format!("canonicalize data directory {}: {e}", data_dir.display()))?;
     let canonical_path = if path.exists() {
@@ -81,7 +87,13 @@ fn run() -> Result<(), String> {
             ensure_outside_data_dir(&data_dir, &output, "receipt")?;
             ensure_outside_data_dir(&data_dir, &source_archive, "source archive")?;
 
-            let receipt = capture_receipt(&manifest, &dataset_id, &data_dir, &source_commit, &source_archive)?;
+            let receipt = capture_receipt(
+                &manifest,
+                &dataset_id,
+                &data_dir,
+                &source_commit,
+                &source_archive,
+            )?;
             write_receipt_atomic(&output, &receipt)?;
             print_receipt_summary(&receipt);
             println!("receipt_written: {}", output.display());
@@ -90,12 +102,21 @@ fn run() -> Result<(), String> {
         }
         "verify" => {
             if values.contains_key("--output") || values.contains_key("--source-commit") {
-                return Err("verify accepts --receipt and --source-archive, not --output or --source-commit".to_owned());
+                return Err(
+                    "verify accepts --receipt and --source-archive, not --output or --source-commit"
+                        .to_owned(),
+                );
             }
             let receipt_path = PathBuf::from(required("--receipt")?);
             ensure_outside_data_dir(&data_dir, &receipt_path, "receipt")?;
             ensure_outside_data_dir(&data_dir, &source_archive, "source archive")?;
-            let receipt = verify_receipt(&manifest, &dataset_id, &data_dir, &receipt_path, &source_archive)?;
+            let receipt = verify_receipt(
+                &manifest,
+                &dataset_id,
+                &data_dir,
+                &receipt_path,
+                &source_archive,
+            )?;
             print_receipt_summary(&receipt);
             println!("verification: PASS (files match captured local receipt)");
             println!("claim_boundary: file integrity and structural consistency only");
