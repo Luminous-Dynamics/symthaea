@@ -1205,6 +1205,13 @@ mod tests {
         ).unwrap().unwrap();
         assert_eq!(result.generation, 1);
         assert_eq!(result.resolved_context[0].item.value, "legacy cart checkout evidence");
+
+        // The next typed write upgrades rather than mutating the legacy generation.
+        assert_eq!(disk.commit_hdc_store(&mut hdc, &evidence).unwrap(), 2);
+        let upgraded = disk.recover().unwrap().unwrap();
+        assert_eq!(upgraded.generation, 2);
+        assert!(upgraded.manifest.lexical_index_sha256().is_some());
+        assert!(upgraded.lexical_index.is_some());
     }
 
     #[test]
