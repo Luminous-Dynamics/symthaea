@@ -242,7 +242,7 @@ fn audit_csv(path: &Path) -> Result<(CsvAudit, HashSet<String>), String> {
     }
 
     let mut header_names = HashSet::with_capacity(headers.len());
-    for header in &headers {
+    for header in headers.iter() {
         if header.trim().is_empty() {
             return Err(format!("{} has an empty column name", path.display()));
         }
