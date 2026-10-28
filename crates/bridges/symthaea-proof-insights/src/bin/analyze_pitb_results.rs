@@ -1097,7 +1097,7 @@ fn simulate_weak_null_matched_study(
         )?;
         let mut paired_delta_sum = 0_i64;
         for _ in 0..family.eligible_target_count {
-            let (baseline_success, treatment_success) = sample_paired_bernoulli(
+            let (baseline_success, treatment_success) = sample_paired_bernoulli_from_joint_probability(
                 baseline_family_rate,
                 treatment_family_rate,
                 joint_success_probability,
