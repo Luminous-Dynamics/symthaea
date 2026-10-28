@@ -504,6 +504,17 @@ mod tests {
     }
 
     #[test]
+    fn full_logging_support_collapses_structural_region_to_true_value() {
+        for scenario in parse_grid(GRID).unwrap().into_iter().filter(|scenario| unsupported_target_mass(scenario) <= EPS) {
+            let report = enumerate(&scenario).unwrap();
+            assert!((report.identified_lower - report.target_value).abs() < EPS, "lower bound: {}", scenario.id);
+            assert!((report.identified_upper - report.target_value).abs() < EPS, "upper bound: {}", scenario.id);
+            assert!((report.identified_upper - report.identified_lower).abs() < EPS, "region should be singleton: {}", scenario.id);
+            assert_eq!(report.verdict, "SUPPORT_OK_SYNTHETIC_ONLY");
+        }
+    }
+
+    #[test]
     fn zero_support_emits_structural_region_not_a_confidence_interval() {
         let report = enumerate(&scenario("zero_support")).unwrap();
         assert_eq!(report.verdict, "NOT_IDENTIFIED");
