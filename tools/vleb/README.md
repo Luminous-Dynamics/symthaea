@@ -20,7 +20,7 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 
 ## Current validation state
 
-The latest completed VLEB workflow on head `e73227ab2a9f03d0a67261270bb53dbe77fbd078` passed formatting, fixture integrity, receipt-schema conformance, independent auditor tests, 20 Rust unit tests, 4 CLI integration tests, strict Clippy, mutation-generator unit tests, and the executable mutation campaign. Four registered semantic mutants were compiled and rejected by their preregistered target tests (0 survivors, 0 unresolved). The [run and artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40656828668) preserve the CI record and raw mutation evidence.
+The latest completed VLEB workflow on head `b5556a6d457d42d3e155b1785108708e6641e6f0` passed formatting, fixture integrity, receipt-schema conformance, independent auditor tests, 20 Rust unit tests, 4 CLI integration tests, strict Clippy, mutation-generator unit tests, scorecard invariants, and the executable mutation campaign. Four registered semantic mutants were compiled and rejected by their preregistered target tests (0 survivors, 0 unresolved). The [run and artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40657264711) preserve the CI record and raw mutation evidence.
 
 The scorecard deliberately keeps the Legacy-Bench model score, AASSR, security correctness and cost per independently verified fix at **not measured**. The public ledger task is a development fixture only. Its 4/4 mutation result is an oracle smoke test, not the 90% broad mutation target, and is not evidence of production banking or mainframe equivalence.
 
