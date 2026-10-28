@@ -754,7 +754,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             "A separate weak-null grid assigns normally generated family-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points across the preregistered ICC grid; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
             "The weak-null grid tests false-claim probability when positive and negative family effects cancel on average. It is a finite family-size stress model, not proof of nominal coverage under every outcome dependence, missingness, or family-selection process.".to_string(),
             "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
-            "Power estimates and their Monte Carlo standard errors are design simulations only. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
+            "Power estimates and their Monte Carlo standard errors are design simulations only. The report retains per-cell 95% Wilson bounds for diagnostics and uses a conservative one-sided Wilson upper bound with z=2.74 across the 16 registered strict/weak null cells for the simultaneous false-claim gate. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
         interpretation,
     };
