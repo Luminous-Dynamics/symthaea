@@ -12,6 +12,7 @@ INPUT_SHA256="2f976927b50b516fa6d00a55ee5a7237ee5fa0de39fc76965307e9c960125715"
 EXPECTED_SHA256="6b0b77b40e1a152da26f82ba98c7ce7b367f1756948aa8ef950097cf75672f10"
 NEGATIVE_SHA256="ac3f29ecb70c7d242d2d719f323662daddb7bfc26a26f442ffe4a531522a86e7"
 COBOL_FIXTURE_SHA256="98f03e271e4d4347195ee56a17f6158a1f4538cd0ba882ed45cdc6bf001ddc8a"
+COBOL_INDEX_SCHEMA_SHA256="98405cb57bca65b66cf05e76817da4ea18afdaf6a34e2fae6d5399ef2f93b420"
 
 cd "$ROOT"
 
@@ -20,6 +21,7 @@ printf '%s  %s\n' \
   "$EXPECTED_SHA256" "tools/vleb/examples/ledger-reconciliation/expected.json" \
   "$NEGATIVE_SHA256" "tools/vleb/examples/ledger-reconciliation/conflicting-duplicate.csv" \
   "$COBOL_FIXTURE_SHA256" "tools/vleb/cobol-index/fixtures/settlement.cbl" \
+  "$COBOL_INDEX_SCHEMA_SHA256" "tools/vleb/cobol-index/index-output.schema.json" \
   | sha256sum --check --strict -
 
 # Ensure the task contract agrees with the independently pinned digests.
