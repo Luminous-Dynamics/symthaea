@@ -8,7 +8,7 @@ Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8713
 
 In selective-feedback campaigns, an action outcome is observed only when that action was selected. The outcome for an unselected action is counterfactual. Scoring all policies as though the logger had observed every action can silently turn missing counterfactual outcomes into an unjustified policy ranking.
 
-This audit checks structural positivity using declared target-policy and logging-policy probabilities, verifies that reward values appear only on selected rows, and reports overlap diagnostics. It deliberately returns `NOT_IDENTIFIED` whenever target-policy mass lies on an action whose declared logging propensity is zero. Weak but nonzero overlap is reported separately.
+This audit checks structural positivity using declared target-policy and logging-policy probabilities, verifies that reward values appear only on selected rows, and reports overlap diagnostics. File-based runs require an expected SHA-256 digest and emit the digest of the exact bytes audited; the bundled known-answer fixtures are hash-pinned. It deliberately returns `NOT_IDENTIFIED` whenever target-policy mass lies on an action whose declared logging propensity is zero. Weak but nonzero overlap is reported separately.
 
 The tool does **not** verify that logging propensities are true, repair unobserved confounding, derive confidence intervals, adjust for adaptively collected/clustered observations, or establish target transportability. Declared cluster sizes are descriptive only. A supported result is explicitly diagnostic-only.
 
@@ -36,8 +36,8 @@ The reported IPS quantity is a diagnostic point estimate only when there is no s
 rustc --edition=2024 --test tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027-tests
 /tmp/vis-dvpc-027-tests
 rustc --edition=2024 -O tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027
-/tmp/vis-dvpc-027 --audit tests/fixtures/vision-dvpc-027-supported.tsv
-/tmp/vis-dvpc-027 --audit tests/fixtures/vision-dvpc-027-zero-support.tsv
+/tmp/vis-dvpc-027 --audit tests/fixtures/vision-dvpc-027-supported.tsv $(sha256sum tests/fixtures/vision-dvpc-027-supported.tsv | cut -d ' ' -f1)
+/tmp/vis-dvpc-027 --audit tests/fixtures/vision-dvpc-027-zero-support.tsv $(sha256sum tests/fixtures/vision-dvpc-027-zero-support.tsv | cut -d ' ' -f1)
 ```
 
 ## Known-answer controls
@@ -49,4 +49,4 @@ rustc --edition=2024 -O tools/vision-dvpc-support-audit.rs -o /tmp/vis-dvpc-027
 
 ## Evidence boundaries
 
-This is a structural preflight only. Before using it in VIS-DVPC-025, bind trace bytes, target policy, logging-policy revision, propensity provenance, and evaluator version to a receipt. Real-trace policy-superiority claims require adequate overlap and a justified off-policy inference procedure, or prospective controlled confirmation. Do not reinterpret synthetic fixtures as real-world evidence or SOTA results.
+This is a structural preflight only. Before using it in VIS-DVPC-025, bind trace bytes, target policy, logging-policy revision, propensity provenance, and evaluator version to a receipt. The expected digest must come from a trusted upstream manifest or receipt; calculating the expected hash from the same untrusted file immediately before auditing detects intervening changes but does not authenticate the source. Real-trace policy-superiority claims require adequate overlap and a justified off-policy inference procedure, or prospective controlled confirmation. Do not reinterpret synthetic fixtures as real-world evidence or SOTA results.
