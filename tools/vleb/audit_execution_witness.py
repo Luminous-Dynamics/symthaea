@@ -164,8 +164,11 @@ def audit_execution_receipt(
         observed_auditor = digest(Path(__file__).read_bytes())
         raw_schema = schema_path.read_bytes()
         observed_schema = digest(raw_schema)
-        raw_receipt = receipt_path.read_bytes()
-    except OSError as exc:
+        receipt_real = safe_file(evidence_root, receipt_path.as_posix())
+        plan_real = safe_file(evidence_root, plan_path.as_posix())
+        raw_receipt = receipt_real.read_bytes()
+        raw_plan = plan_real.read_bytes()
+    except (OSError, ValueError) as exc:
         return {
             "schema_version": "vleb-execution-witness-audit-v1",
             "evidence_valid": False,
@@ -184,7 +187,6 @@ def audit_execution_receipt(
     try:
         schema = json.loads(raw_schema.decode("utf-8", errors="strict"))
         receipt = json.loads(raw_receipt.decode("utf-8", errors="strict"))
-        raw_plan = plan_path.read_bytes()
         plan_sha = digest(raw_plan)
         plan = validate_plan(json.loads(raw_plan.decode("utf-8", errors="strict")))
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
@@ -209,6 +211,13 @@ def audit_execution_receipt(
     for error in schema_errors:
         loc = ".".join(map(str, error.absolute_path)) or "$"
         issues.append({"code": "receipt_schema_invalid", "message": f"{loc}: {error.message}"})
+    if schema_errors:
+        return {
+            "schema_version": "vleb-execution-witness-audit-v1",
+            "evidence_valid": False,
+            "verdict": "fail",
+            "issues": issues,
+        }
 
     if not isinstance(receipt, dict):
         issues.append({"code": "receipt_root_invalid", "message": "receipt root must be an object"})
