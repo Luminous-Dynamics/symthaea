@@ -65,6 +65,7 @@ pub enum DriftMonitorError {
     ProbabilityMassMismatch { owner_id: String, actual_ppm: u64 },
     AlternativeSupportMismatch { alternative_id: String, scenario_id: String },
     AlternativeMixtureHasZeroSupport { scenario_id: String },
+    AlternativeHasZeroProbabilityForNominalSupport { alternative_id: String, scenario_id: String },
     MixtureWeightMassMismatch { actual_ppm: u64 },
     InvalidAlpha { alpha_ppm: u32 },
     EmptyEventId,
@@ -218,6 +219,9 @@ impl OnlineDriftMonitor {
         }
         if event_id.trim().is_empty() {
             return Err(DriftMonitorError::EmptyEventId);
+        }
+        if self.observations_seen == u64::MAX {
+            return Err(DriftMonitorError::NumericalFailure);
         }
         if self.seen_event_ids.contains(event_id) {
             return Err(DriftMonitorError::DuplicateEventId {
@@ -631,29 +635,19 @@ mod tests {
     }
 
     #[test]
-    fn zero_likelihood_event_is_rejected_before_mutating_monitor_state() {
-        let mut monitor = OnlineDriftMonitor::new(
-            vec![prob("a", 500_000), prob("b", 500_000)],
-            vec![
-                DriftAlternative {
-                    alternative_id: "not-a".into(),
-                    mixture_weight_ppm: 500_000,
+    fn alternatives_must_assign_positive_mass_to_every_nominally_possible_category() {
+        assert!(matches!(
+            OnlineDriftMonitor::new(
+                vec![prob("a", 500_000), prob("b", 500_000)],
+                vec![DriftAlternative {
+                    alternative_id: "misses-a".into(),
+                    mixture_weight_ppm: 1_000_000,
                     probabilities: vec![prob("a", 0), prob("b", 1_000_000)],
-                },
-                DriftAlternative {
-                    alternative_id: "not-b".into(),
-                    mixture_weight_ppm: 500_000,
-                    probabilities: vec![prob("a", 1_000_000), prob("b", 0)],
-                },
-            ],
-            50_000,
-        ).unwrap();
-        // Each observation leaves at least one alternative alive, so the mixture
-        // likelihood ratio remains well-defined rather than collapsing to zero.
-        let before = monitor.report();
-        let after = monitor.observe("e1", 10, "a").unwrap();
-        assert_eq!(after.observations_seen, before.observations_seen + 1);
-        assert!(after.log_e_value.is_finite());
+                }],
+                50_000,
+            ),
+            Err(DriftMonitorError::AlternativeHasZeroProbabilityForNominalSupport { .. })
+        ));
     }
 
 }
