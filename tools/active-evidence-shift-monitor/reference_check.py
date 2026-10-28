@@ -1089,6 +1089,19 @@ def check_cusum_csv(path):
             raise ValueError(f"CUSUM non-target scenario was mislabeled as a target detection on line {line}")
         alarm = float(got["scenario_or_pre_shift_alarm_probability"])
         detection = 0.0 if detection_text == "NA" else float(detection_text)
+        if is_target_shift:
+            delay_values = (delay_text, median_text, p90_text)
+            if detection > 0.0:
+                if any(value == "NA" for value in delay_values):
+                    raise ValueError(f"CUSUM detected target shift without all conditional delay metrics on line {line}")
+                mean_delay, median_delay, p90_delay = (float(value) for value in delay_values)
+                max_delay = int(got["horizon"]) - int(got["change_after"])
+                if not (1.0 <= median_delay <= p90_delay <= max_delay):
+                    raise ValueError(f"CUSUM conditional delay quantiles are inconsistent on line {line}")
+                if not math.isfinite(mean_delay):
+                    raise ValueError(f"CUSUM conditional mean delay is not finite on line {line}")
+            elif any(value != "NA" for value in delay_values):
+                raise ValueError(f"CUSUM reports conditional delay without detected mass on line {line}")
         union_bound = float(got["family_worst_case_union_bound"])
         if union_bound > float(got["per_cell_alpha"]) + EPS:
             raise ValueError(f"CUSUM two-direction union bound exceeds per-cell alpha on line {line}")
@@ -1176,6 +1189,14 @@ def cusum_self_test():
         raise ValueError(
             f"matched-edge CUSUM moderate-shift power gate failed: CUSUM={cusum_060}, composite={composite_060}"
         )
+    delay_row = simulate_cusum_scenario("upper_cusum", "step_up_060", threshold)[-1]
+    mean_delay = float(delay_row["mean_post_shift_detection_delay"])
+    median_delay = float(delay_row["median_post_shift_detection_delay"])
+    p90_delay = float(delay_row["p90_post_shift_detection_delay"])
+    if not (1.0 <= median_delay <= p90_delay <= HORIZONS[-1] - CHANGE_AFTER):
+        raise ValueError("conditional CUSUM delay quantiles are not ordered/in horizon")
+    if not math.isfinite(mean_delay):
+        raise ValueError("conditional CUSUM mean delay is not finite")
     for direction in ("upper_cusum", "lower_cusum"):
         alternating_alarm, alternating_survival = simulate_cusum_null_schedule(
             direction, threshold, horizon,
