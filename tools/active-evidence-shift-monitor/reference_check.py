@@ -1127,7 +1127,11 @@ def cusum_self_test():
     horizon = HORIZONS[-1]
     tables = eprocess_family_alarm_tables(horizon)
     matched_reference_alarm = composite_boundary_reference_alarm_probability(horizon, tables)
+    if abs(matched_reference_alarm - 0.0008915879337992225) > 5e-10:
+        raise ValueError("composite reference edge FPR changed; review the preregistered calibration target")
     threshold = calibrate_cusum_threshold(horizon, matched_reference_alarm)
+    if threshold != 1374:
+        raise ValueError(f"CUSUM threshold changed from preregistered 1374: got {threshold}")
     boundary_alarm = cusum_alarm_probability(horizon, threshold, COMPOSITE_NULL_UPPER)
     previous_alarm = cusum_alarm_probability(horizon, threshold - 1, COMPOSITE_NULL_UPPER)
     if boundary_alarm > matched_reference_alarm + EPS or previous_alarm <= matched_reference_alarm + EPS:
