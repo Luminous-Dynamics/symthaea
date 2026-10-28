@@ -33,6 +33,12 @@ Those papers report their own methods and results. They are not comparable to ea
 
 The module validates receipt structure and consistency and applies the reported paired confidence bound. It does not compute that confidence interval, verify that the runner is honest, or cryptographically attest to the model/evaluator. The external runner must produce the metric and artifact receipts; the top-level run verifier must independently hash/validate those artifacts.
 
+## Machine-readable trace schema
+
+`pipeline_evolution.schema.json` describes the trace structure: candidate nodes, immutable artifact digests, evaluation receipts, development/calibration/held-out splits, and the explicit optimizer-visible receipt allowlist. It rejects malformed field types and digest formats at the JSON-schema layer.
+
+Cross-reference rules, parent cycles, candidate-manifest digest recomputation, held-out leakage, protocol/case matching, confidence-bound and promotion policy are semantic checks enforced by the Rust module. JSON Schema alone is not sufficient.
+
 ## Run focused Rust tests
 
 From the repository root when a Rust toolchain is available:
