@@ -232,6 +232,15 @@ fn lora_time_on_air_us(payload_len: usize, profile: LoRaPhyProfile) -> u64 {
 ///
 /// Retry strategies assume ideal feedback and at most one retry per missing
 /// data frame; ACK bytes/loss are not modelled.
+/// Shared test-only entry point for PHY airtime calculations across mesh models.
+pub(super) fn lora_time_on_air_us_for_sf(payload_len: usize, spreading_factor: u8) -> u64 {
+    let profile = LoRaPhyProfile {
+        spreading_factor,
+        ..DEFAULT_LORA_PHY
+    };
+    lora_time_on_air_us(payload_len, profile)
+}
+
 fn run_benchmark(
     payload: &[u8],
     model: LossModel,
