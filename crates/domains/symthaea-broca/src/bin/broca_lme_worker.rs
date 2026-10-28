@@ -237,10 +237,12 @@ impl Worker {
             })
             .collect();
 
-        let image_query_received = request
-            .get("query_image")
-            .and_then(Value::as_str)
-            .is_some_and(|value| !value.trim().is_empty());
+        let image_query = match request.get("query_image") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(value)) => Some(value.as_str()),
+            Some(_) => return Err("query_image must be a string or null".into()),
+        };
+        let image_query_received = image_query.is_some_and(|value| !value.trim().is_empty());
 
         Ok(json!({
             "context": context,
@@ -654,6 +656,24 @@ mod tests {
             worker.handle(json!({"request_id":"4","op":"init","scope_id":"enterprise"}))["ok"],
             false
         );
+    }
+
+
+    #[test]
+    fn query_image_type_is_validated_even_though_visual_retrieval_is_unsupported() {
+        let mut worker = Worker::new();
+        assert_eq!(
+            worker.handle(json!({"request_id":"1","op":"init","scope_id":"web"}))["ok"],
+            true
+        );
+        let response = worker.handle(json!({
+            "request_id":"2",
+            "op":"query",
+            "query":"billing",
+            "query_image":{"unexpected":"object"}
+        }));
+        assert_eq!(response["ok"], false);
+        assert!(response["error"].as_str().unwrap().contains("query_image"));
     }
 
     #[test]
