@@ -762,6 +762,8 @@ pub enum MatchedEvaluationError {
     PairSeedMismatch(String),
     /// Time tie tolerance is negative or non-finite.
     InvalidTieTolerance,
+    /// Restricted time-to-target horizon must be finite and strictly positive.
+    InvalidRestrictedTtsHorizon,
 }
 
 impl fmt::Display for MatchedEvaluationError {
@@ -825,6 +827,9 @@ impl fmt::Display for MatchedEvaluationError {
             Self::PairSetMismatch => write!(f, "baseline and candidate pair-ID sets differ"),
             Self::PairSeedMismatch(id) => write!(f, "pair {id} uses different seed identities"),
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
+            Self::InvalidRestrictedTtsHorizon => {
+                write!(f, "restricted time-to-target horizon must be finite and positive")
+            }
         }
     }
 }
@@ -1058,6 +1063,141 @@ pub fn compare_matched_arms(
         median_energy_speedup_given_both_hit: median(&mut energy_speedups),
         pairs,
     })
+}
+
+/// Compare matched arms using a failure-inclusive restricted mean time-to-target.
+///
+/// A pair is a within-horizon hit only if the existing report/receipt validation confirms
+/// the target and the complete deployment all-in latency is measured and <= `horizon_ms`.
+/// Every other outcome contributes `horizon_ms` for that arm. This preserves the full
+/// denominator and prevents conditional speedup from hiding target misses.
+pub fn compare_restricted_mean_tts(
+    baseline: &MatchedArmReport,
+    candidate: &MatchedArmReport,
+    horizon_ms: f64,
+) -> Result<RestrictedMeanTtsSummary, MatchedEvaluationError> {
+    if !horizon_ms.is_finite() || horizon_ms <= 0.0 {
+        return Err(MatchedEvaluationError::InvalidRestrictedTtsHorizon);
+    }
+
+    // Reuse the strict paired-report validation: exact instance/protocol/target/budget/
+    // verifier identity, a complete pair-ID set, matching seeds, and validated receipts.
+    let matched = compare_matched_arms(baseline, candidate, 0.0)?;
+    let pair_count = matched.pair_count;
+    if pair_count == 0 {
+        // compare_matched_arms already rejects empty trial sets; keep this invariant explicit.
+        return Err(MatchedEvaluationError::NoTrials(baseline.arm_id.clone()));
+    }
+
+    let mut pairs = Vec::with_capacity(pair_count);
+    let mut baseline_hits_within_horizon = 0usize;
+    let mut candidate_hits_within_horizon = 0usize;
+    let mut baseline_uncosted_target_hits = 0usize;
+    let mut candidate_uncosted_target_hits = 0usize;
+    let mut baseline_hits_after_horizon = 0usize;
+    let mut candidate_hits_after_horizon = 0usize;
+    let mut baseline_mean = 0.0f64;
+    let mut candidate_mean = 0.0f64;
+    let mut paired_difference_mean = 0.0f64;
+    let mut candidate_faster_pairs = 0usize;
+    let mut baseline_faster_pairs = 0usize;
+    let mut tied_pairs = 0usize;
+
+    for (index, pair) in matched.pairs.iter().enumerate() {
+        let (baseline_hit, baseline_time, baseline_uncosted, baseline_after) =
+            restricted_time_observation(
+                pair.baseline_target_hit,
+                pair.baseline_all_in_ms,
+                horizon_ms,
+            );
+        let (candidate_hit, candidate_time, candidate_uncosted, candidate_after) =
+            restricted_time_observation(
+                pair.candidate_target_hit,
+                pair.candidate_all_in_ms,
+                horizon_ms,
+            );
+
+        baseline_hits_within_horizon += usize::from(baseline_hit);
+        candidate_hits_within_horizon += usize::from(candidate_hit);
+        baseline_uncosted_target_hits += usize::from(baseline_uncosted);
+        candidate_uncosted_target_hits += usize::from(candidate_uncosted);
+        baseline_hits_after_horizon += usize::from(baseline_after);
+        candidate_hits_after_horizon += usize::from(candidate_after);
+
+        let n = (index + 1) as f64;
+        baseline_mean += (baseline_time - baseline_mean) / n;
+        candidate_mean += (candidate_time - candidate_mean) / n;
+        let difference = candidate_time - baseline_time;
+        paired_difference_mean += (difference - paired_difference_mean) / n;
+
+        if candidate_time < baseline_time {
+            candidate_faster_pairs += 1;
+        } else if baseline_time < candidate_time {
+            baseline_faster_pairs += 1;
+        } else {
+            tied_pairs += 1;
+        }
+
+        pairs.push(RestrictedTtsPairResult {
+            pair_id: pair.pair_id.clone(),
+            baseline_hit_within_horizon: baseline_hit,
+            candidate_hit_within_horizon: candidate_hit,
+            baseline_restricted_time_ms: baseline_time,
+            candidate_restricted_time_ms: candidate_time,
+        });
+    }
+
+    let any_within_horizon_hit =
+        baseline_hits_within_horizon > 0 || candidate_hits_within_horizon > 0;
+    let baseline_over_candidate_restricted_mean_ratio = if any_within_horizon_hit {
+        let ratio = baseline_mean / candidate_mean;
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return Err(MatchedEvaluationError::InvalidRatio {
+                quantity: "restricted-mean-time-to-target",
+            });
+        }
+        Some(ratio)
+    } else {
+        None
+    };
+
+    Ok(RestrictedMeanTtsSummary {
+        baseline_arm_id: matched.baseline_arm_id,
+        candidate_arm_id: matched.candidate_arm_id,
+        horizon_ms,
+        pair_count,
+        baseline_hits_within_horizon,
+        candidate_hits_within_horizon,
+        baseline_hit_rate_within_horizon: baseline_hits_within_horizon as f64 / pair_count as f64,
+        candidate_hit_rate_within_horizon: candidate_hits_within_horizon as f64 / pair_count as f64,
+        baseline_uncosted_target_hits,
+        candidate_uncosted_target_hits,
+        baseline_hits_after_horizon,
+        candidate_hits_after_horizon,
+        baseline_restricted_mean_ms: baseline_mean,
+        candidate_restricted_mean_ms: candidate_mean,
+        paired_mean_difference_candidate_minus_baseline_ms: paired_difference_mean,
+        baseline_over_candidate_restricted_mean_ratio,
+        candidate_faster_pairs,
+        baseline_faster_pairs,
+        tied_pairs,
+        pairs,
+    })
+}
+
+fn restricted_time_observation(
+    verified_target_hit: bool,
+    all_in_ms: Option<f64>,
+    horizon_ms: f64,
+) -> (bool, f64, bool, bool) {
+    if !verified_target_hit {
+        return (false, horizon_ms, false, false);
+    }
+    match all_in_ms {
+        None => (false, horizon_ms, true, false),
+        Some(time_ms) if time_ms <= horizon_ms => (true, time_ms, false, false),
+        Some(_) => (false, horizon_ms, false, true),
+    }
 }
 
 fn median(values: &mut [f64]) -> Option<f64> {
