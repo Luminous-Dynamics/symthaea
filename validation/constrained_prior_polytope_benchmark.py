@@ -26,19 +26,21 @@ SCHEMA = "symthaea-constrained-prior-polytope-benchmark-v1"
 MARGIN_BITS = 1e-9
 
 
-def ambiguity_polytope(floor: float = 0.005):
+def ambiguity_polytope(floor: float = 0.005, marginal_low: float = 0.10, marginal_high: float = 0.40):
     """Q: simplex plus graph/kernel marginal and association-mass bounds."""
     if not math.isfinite(floor) or floor < 0 or floor * N_HYP >= 1:
         raise ValueError("prior floor must be finite, nonnegative, and < 1/n_hypotheses")
+    if not (math.isfinite(marginal_low) and math.isfinite(marginal_high) and 0 <= marginal_low <= marginal_high <= 1):
+        raise ValueError("invalid marginal bounds")
     rows, lows, highs, names = [], [], [], []
     def add_bound(name, indices, low, high):
         row = np.zeros(N_HYP, dtype=float)
         row[list(indices)] = 1.0
         rows.append(row); lows.append(low); highs.append(high); names.append(name)
     for g in range(N_GRAPH):
-        add_bound(f"graph_marginal_{g}", [g * N_KERNEL + k for k in range(N_KERNEL)], 0.10, 0.40)
+        add_bound(f"graph_marginal_{g}", [g * N_KERNEL + k for k in range(N_KERNEL)], marginal_low, marginal_high)
     for k in range(N_KERNEL):
-        add_bound(f"kernel_marginal_{k}", [g * N_KERNEL + k for g in range(N_GRAPH)], 0.10, 0.40)
+        add_bound(f"kernel_marginal_{k}", [g * N_KERNEL + k for g in range(N_GRAPH)], marginal_low, marginal_high)
     add_bound("graph_kernel_diagonal_mass", [g * N_KERNEL + g for g in range(N_GRAPH)], 0.10, 0.60)
     add_bound("graph_kernel_antidiagonal_mass", [g * N_KERNEL + (N_KERNEL - 1 - g) for g in range(N_GRAPH)], 0.10, 0.60)
     A_ub, b_ub = [], []
@@ -144,53 +146,63 @@ def solve_constrained_minimax(A, polytope, tolerance=TOL):
 def run_benchmark():
     start = time.perf_counter()
     tensor, priors, trees = build_risk_tensor()
-    poly = ambiguity_polytope()
+    polytopes = {
+        "bounded_marginals": ambiguity_polytope(marginal_low=0.10, marginal_high=0.40),
+        "contains_all_legacy_priors": ambiguity_polytope(marginal_low=0.05, marginal_high=0.60),
+    }
     rows = []
     named = list(priors.values())
-    for objective in OBJECTIVES:
-        A = tensor[objective]["risk_by_policy_and_world"]
-        t0 = time.perf_counter()
-        six = solve_zero_sum(prior_risk_matrix(A, named))
-        six_seconds = time.perf_counter() - t0
-        t0 = time.perf_counter()
-        full = solve_zero_sum(A)
-        full_seconds = time.perf_counter() - t0
-        t0 = time.perf_counter()
-        constrained = solve_constrained_minimax(A, poly)
-        constrained_seconds = time.perf_counter() - t0
-        six_mu = np.asarray(six["policy_weights"], dtype=float)
-        t0 = time.perf_counter()
-        legacy_upper = maximize_linear_over_polytope(A.T @ six_mu, poly)
-        legacy_rescore_seconds = time.perf_counter() - t0
-        prior_membership = []
-        for name, q in priors.items():
-            q_arr = np.asarray(q, dtype=float)
-            violations = poly["A_ub"] @ q_arr - poly["b_ub"]
-            prior_membership.append({"name": name,
-                "inside": bool(np.max(violations) <= 1e-9 and q_arr.min() >= poly["floor"] - 1e-9),
-                "max_linear_constraint_violation": float(max(0.0, np.max(violations))),
-                "minimum_atom": float(q_arr.min())})
-        rows.append({
-            "objective": objective,
-            "six_prior_value_bits": six["value_bits"],
-            "six_prior_policy_worst_case_over_Q_bits": legacy_upper["value_bits"],
-            "full_simplex_value_bits": full["value_bits"],
-            "constrained_polytope": constrained,
-            "legacy_six_prior_policy_regret_over_Q_bits": max(0.0, legacy_upper["value_bits"] - constrained["lp_value_bits"]),
-            "legacy_prior_membership": prior_membership,
-            "timing_seconds_local": {
-                "six_prior_master_lp": six_seconds,
-                "full_simplex_master_lp": full_seconds,
-                "constrained_polytope_master_and_certificate": constrained_seconds,
-                "legacy_policy_rescore_over_polytope": legacy_rescore_seconds
-            }
-        })
+    for poly_name, poly in polytopes.items():
+        for objective in OBJECTIVES:
+            A = tensor[objective]["risk_by_policy_and_world"]
+            t0 = time.perf_counter()
+            six = solve_zero_sum(prior_risk_matrix(A, named))
+            six_seconds = time.perf_counter() - t0
+            t0 = time.perf_counter()
+            full = solve_zero_sum(A)
+            full_seconds = time.perf_counter() - t0
+            t0 = time.perf_counter()
+            constrained = solve_constrained_minimax(A, poly)
+            constrained_seconds = time.perf_counter() - t0
+            six_mu = np.asarray(six["policy_weights"], dtype=float)
+            t0 = time.perf_counter()
+            legacy_upper = maximize_linear_over_polytope(A.T @ six_mu, poly)
+            legacy_rescore_seconds = time.perf_counter() - t0
+            prior_membership = []
+            for name, q in priors.items():
+                q_arr = np.asarray(q, dtype=float)
+                violations = poly["A_ub"] @ q_arr - poly["b_ub"]
+                prior_membership.append({"name": name,
+                    "inside": bool(np.max(violations) <= 1e-9 and q_arr.min() >= poly["floor"] - 1e-9),
+                    "max_linear_constraint_violation": float(max(0.0, np.max(violations))),
+                    "minimum_atom": float(q_arr.min())})
+            if poly_name == "contains_all_legacy_priors" and not all(x["inside"] for x in prior_membership):
+                raise AssertionError("the declared coverage-preserving polytope excludes a legacy prior")
+            rows.append({
+                "ambiguity_set": poly_name,
+                "objective": objective,
+                "six_prior_value_bits": six["value_bits"],
+                "six_prior_policy_worst_case_over_Q_bits": legacy_upper["value_bits"],
+                "full_simplex_value_bits": full["value_bits"],
+                "constrained_polytope": constrained,
+                "legacy_six_prior_policy_regret_over_Q_bits": max(0.0, legacy_upper["value_bits"] - constrained["lp_value_bits"]),
+                "legacy_prior_membership": prior_membership,
+                "all_six_legacy_priors_inside_Q": all(x["inside"] for x in prior_membership),
+                "timing_seconds_local": {
+                    "six_prior_master_lp": six_seconds,
+                    "full_simplex_master_lp": full_seconds,
+                    "constrained_polytope_master_and_certificate": constrained_seconds,
+                    "legacy_policy_rescore_over_polytope": legacy_rescore_seconds
+                }
+            })
     return {
         "schema": SCHEMA,
         "status": "CONSTRAINED_PRIOR_POLYTOPE_SYNTHETIC_PILOT_NOT_SCM_INTEGRATION",
         "model": {"latent_hypotheses": N_HYP, "policy_trees": len(trees), "horizon": 2,
-                  "objectives": list(OBJECTIVES), "prior_floor": poly["floor"],
-                  "ambiguity_set": poly["declared_bounds"],
+                  "objectives": list(OBJECTIVES), "prior_floor": 0.005,
+                  "ambiguity_sets": {
+                    "bounded_marginals": {"graph_marginal_each": [0.10, 0.40], "kernel_marginal_each": [0.10, 0.40], "diagonal_mass": [0.10, 0.60], "antidiagonal_mass": [0.10, 0.60]},
+                    "contains_all_legacy_priors": {"graph_marginal_each": [0.05, 0.60], "kernel_marginal_each": [0.05, 0.60], "diagonal_mass": [0.10, 0.60], "antidiagonal_mass": [0.10, 0.60]}},
                   "interpretation": "declared partial prior knowledge over fixed support; not calibrated from external data"},
         "execution": {"python": platform.python_version(), "numpy": np.__version__, "scipy": __import__("scipy").__version__,
                       "total_benchmark_seconds_local": time.perf_counter() - start},
