@@ -12,9 +12,10 @@ P1 = 0.8
 CHANGE_AFTER = 100
 HORIZONS = (100, 250, 500, 1000)
 BOUNDARIES = (
-    ("fixed_time_final_only", "final"),
-    ("fixed_time_reused_each_look", "repeated"),
-    ("time_uniform_alpha_spending", "anytime"),
+    "fixed_time_final_only",
+    "fixed_time_reused_each_look",
+    "time_uniform_alpha_spending",
+    "beta_mixture_e_process",
 )
 SCENARIOS = ("stationary_null", "step_shift")
 FIELDS = (
@@ -23,6 +24,8 @@ FIELDS = (
     "per_cell_alpha", "survival_probability",
 )
 EPS = 1e-10
+BETA_A = 0.5
+BETA_B = 0.5
 
 
 def radius(boundary, n):
@@ -31,6 +34,35 @@ def radius(boundary, n):
     else:
         log_term = math.log(2.0 * CELLS / ALPHA)
     return math.sqrt(log_term / (2.0 * n))
+
+
+def log_beta(a, b):
+    return math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+
+
+def beta_mixture_log_e_value(n, successes, p0):
+    if n <= 0 or not (0 <= successes <= n) or not (0.0 < p0 < 1.0):
+        raise ValueError("invalid Bernoulli e-process parameters")
+    log_marginal = (
+        log_beta(successes + BETA_A, n - successes + BETA_B)
+        - log_beta(BETA_A, BETA_B)
+    )
+    log_null_likelihood = (
+        successes * math.log(p0) + (n - successes) * math.log1p(-p0)
+    )
+    return log_marginal - log_null_likelihood
+
+
+def should_alarm(boundary, n, successes, horizon):
+    if boundary == "fixed_time_final_only" and n != horizon:
+        return False
+    if boundary == "beta_mixture_e_process":
+        return beta_mixture_log_e_value(n, successes, P0) >= math.log(1.0 / PER_CELL_ALPHA)
+    width = radius(boundary, n)
+    estimate = successes / n
+    lower = max(0.0, estimate - width)
+    upper = min(1.0, estimate + width)
+    return P0 < lower or P0 > upper
 
 
 def simulate(boundary, scenario, horizon):
@@ -51,15 +83,7 @@ def simulate(boundary, scenario, horizon):
                 (successes + 1, mass * probability),
             )
             for next_successes, branch_mass in branches:
-                should_check = boundary != "fixed_time_final_only" or n == horizon
-                alarm = False
-                if should_check:
-                    estimate = next_successes / n
-                    width = radius(boundary, n)
-                    lower = max(0.0, estimate - width)
-                    upper = min(1.0, estimate + width)
-                    alarm = P0 < lower or P0 > upper
-                if alarm:
+                if should_alarm(boundary, n, next_successes, horizon):
                     first_alarm[n] += branch_mass
                 else:
                     next_active[next_successes] += branch_mass
@@ -83,14 +107,12 @@ def simulate(boundary, scenario, horizon):
 
 
 def as_text(value):
-    if value is None:
-        return "NA"
-    return f"{value:.12f}"
+    return "NA" if value is None else f"{value:.12f}"
 
 
 def reference_rows():
     rows = []
-    for boundary, _kind in BOUNDARIES:
+    for boundary in BOUNDARIES:
         for horizon in HORIZONS:
             for scenario in SCENARIOS:
                 false_alarm, detection, delay, survival = simulate(boundary, scenario, horizon)
@@ -148,29 +170,40 @@ def check_csv(path):
 
 
 def self_test():
-    # Repeatedly checking a fixed-time interval is a deliberately invalid optional-stopping arm.
     fixed_final = simulate("fixed_time_final_only", "stationary_null", 1000)[0]
     fixed_reused = simulate("fixed_time_reused_each_look", "stationary_null", 1000)[0]
     anytime = simulate("time_uniform_alpha_spending", "stationary_null", 1000)[0]
+    beta_null = simulate("beta_mixture_e_process", "stationary_null", 1000)[0]
     if fixed_final > PER_CELL_ALPHA + EPS:
         raise ValueError(f"single final look exceeds per-cell alpha: {fixed_final}")
     if anytime > PER_CELL_ALPHA + EPS:
         raise ValueError(f"time-uniform false-alarm probability exceeds alpha: {anytime}")
+    if beta_null > PER_CELL_ALPHA + EPS:
+        raise ValueError(f"Beta-mixture e-process false-alarm probability exceeds alpha: {beta_null}")
     if fixed_reused <= PER_CELL_ALPHA:
         raise ValueError(f"negative control failed to expose repeated-look inflation: {fixed_reused}")
 
     shifted = simulate("time_uniform_alpha_spending", "step_shift", 500)
+    beta_shifted = simulate("beta_mixture_e_process", "step_shift", 500)
     if shifted[1] < 0.95 or shifted[2] is None:
         raise ValueError(f"time-uniform shift detection failed expected pilot gate: {shifted}")
+    if beta_shifted[1] < 0.95 or beta_shifted[2] is None:
+        raise ValueError(f"Beta-mixture shift detection failed expected pilot gate: {beta_shifted}")
+    if beta_shifted[2] >= shifted[2]:
+        raise ValueError(
+            f"Beta-mixture sequence should detect earlier in this fixture: beta={beta_shifted}, hoeffding={shifted}"
+        )
+    if abs(math.exp(beta_mixture_log_e_value(2, 1, 0.5)) - 0.5) > 1e-10:
+        raise ValueError("Beta-mixture e-value formula failed its n=2, S=1 reference")
 
-    for boundary, _kind in BOUNDARIES:
+    for boundary in BOUNDARIES:
         for horizon in HORIZONS:
             for scenario in SCENARIOS:
                 false_alarm, detection, _delay, survival = simulate(boundary, scenario, horizon)
                 total = false_alarm + (detection or 0.0) + survival
                 if abs(total - 1.0) > 1e-9:
                     raise ValueError(f"probability mass does not sum to one: {boundary}, {scenario}, {horizon}")
-    print("PASS: fixed-time negative control, anytime null control, shift detection, and probability conservation")
+    print("PASS: fixed-time negative control, time-uniform and Beta-mixture null control, shift detection, formula witness, and mass conservation")
 
 
 def main(argv):
