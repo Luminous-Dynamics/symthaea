@@ -123,6 +123,15 @@ class PairedRunAnalysisTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bootstrap_replicates"):
             analyze_paired_runs(self.baseline, self.candidate, bootstrap_replicates=99)
 
+    def test_zero_cost_bootstrap_group_fails_closed(self) -> None:
+        baseline = [
+            make_row("q1", "zero-cost-session", True, cost=0.0),
+            make_row("q2", "positive-cost-session", False, cost=1.0),
+        ]
+        candidate = copy.deepcopy(baseline)
+        with self.assertRaisesRegex(ValueError, "every bootstrap group must have positive"):
+            analyze_paired_runs(baseline, candidate, bootstrap_replicates=100)
+
 
 if __name__ == "__main__":
     unittest.main()
