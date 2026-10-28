@@ -72,3 +72,8 @@ The local Python fixture and synthetic stress checks for the preceding AVNX arti
 The Rust module now includes `network_pareto_frontier`, which keeps system cost, worst-actor regression, non-cancelled delay, cancellations, and kg CO2e as separate objectives. It returns non-dominated candidate indices and assessments for every candidate; invalid ledgers remain visible with explicit exclusion errors. This avoids inventing a weighted sum to choose among legitimate trade-offs. The frontier is descriptive, not a fairness decision by itself: a downstream policy should apply predeclared hard constraints or a stakeholder-approved choice rule.
 
 Two additional unit tests cover retaining a genuine cost-versus-harm trade-off while removing a dominated candidate, and excluding malformed candidates without hiding the reason. The Rust module now defines 11 tests; no Rust compile/test claim is made because a Rust toolchain is still unavailable in the current execution environment.
+
+
+## Robust ensemble extension
+
+The companion [AVIATION_NETWORK_ROBUSTNESS_BENCHMARK.md](./AVIATION_NETWORK_ROBUSTNESS_BENCHMARK.md) evaluates outcomes over a frozen finite scenario set. It requires identical scenario IDs and actor universes, reports mean and worst-case network benefit, upper-tail regression and worst actor impact, and enforces robust gates on the *entire supplied ensemble*. These are finite-set guarantees only; they do not establish distribution-free robustness to unseen events. The Rust implementation defines twelve tests; compilation/execution remains pending.
