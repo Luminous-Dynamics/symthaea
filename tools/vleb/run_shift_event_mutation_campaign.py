@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-RAN_TESTS = re.compile(r"Ran [1-9]\\d* tests?\\b")
+RAN_TESTS = re.compile(r"Ran [1-9]\d* tests?\b")
 FAILURE_NAMES = re.compile(r"^(?:FAIL|ERROR): (test_[A-Za-z0-9_]+) \\(", re.MULTILINE)
 MUTATIONS: tuple[dict[str, Any], ...] = (
     {
