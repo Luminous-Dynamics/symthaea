@@ -713,11 +713,26 @@ mod tests {
     }
 
     #[test]
-    fn v3_rejects_empty_zero_generation_and_oversized_messages() {
-        assert_eq!(fragment_v3(1, 0, &[]), Err(V3FragmentError::InvalidSessionGeneration));
-        assert_eq!(fragment_v3(1, 0, &[1]), Err(V3FragmentError::InvalidSessionGeneration));
-        assert_eq!(fragment_v3(1, 0, &sample(V3_MAX_PLAIN_ENCODED_LEN + 1, 7)), Err(V3FragmentError::InvalidSessionGeneration));
-        assert!(fragment_v3(1, 1, &[]).is_err());
-        assert!(fragment_v3(1, 1, &sample(V3_MAX_PLAIN_ENCODED_LEN + 1, 7)).is_err());
+    fn v3_rejects_zero_generation_empty_and_oversized_messages() {
+        assert_eq!(
+            fragment_v3(0, 0, &[1]),
+            Err(V3FragmentError::InvalidSessionGeneration)
+        );
+        assert_eq!(
+            fragment_v3(0, 1, &sample(V3_MAX_PLAIN_ENCODED_LEN + 1, 7)),
+            Err(V3FragmentError::InvalidSessionGeneration)
+        );
+        assert_eq!(
+            fragment_v3(1, 0, &[]),
+            Err(V3FragmentError::EmptyPayload)
+        );
+        assert_eq!(
+            fragment_v3(1, 1, &sample(V3_MAX_PLAIN_ENCODED_LEN + 1, 7)),
+            Err(V3FragmentError::PayloadTooLarge)
+        );
+        // Sequence zero is a valid first message sequence; uniqueness and
+        // rollback resistance are enforced by the caller's session lifecycle.
+        let sequence_zero = fragment_v3(1, 0, &[1]).unwrap();
+        assert_eq!(sequence_zero[0].message_sequence(), 0);
     }
 }
