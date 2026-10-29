@@ -48,6 +48,16 @@ The header is a protocol binding, not an identity allocator. It does **not** fix
 - A missing or uncertain generation allocation must fail closed. Do not substitute a random restart label or a process-local counter and call it clone-safe.
 - The AEAD-overhead profile below is only accounting; the codec performs no encryption and does not resolve the production packet/fragment transform-order issue.
 
+## Independent model check and remaining lifecycle falsifier
+
+A standalone Python wire/identity mirror (separate from the unexecuted Rust tests) validates the pinned CRC vector, rejects 1,776 individual wire-bit flips, and shows the identity predicate rejects mixed fragments when the generation, message sequence, or authenticated peer context differs.
+
+The model also contains an explicit negative control: if the **same peer context + same generation + same sequence** is reused for two different 2,048-byte messages, it accepts 12 data fragments across the mixed streams and reports that the data-shard count is complete. This is expected: the framing codec cannot prevent identity reuse on its own. That counterexample is why the upstream generation/key allocator must be clone/rollback resistant under #8534 and must fail closed if uniqueness is uncertain. Python model is not Rust runtime evidence and performs no AEAD.
+
+Local model:
+- `/mnt/data/mesh_v3_stream_identity_model.py`, SHA-256 `dadaaf5f85f0690d680a556ef0c627ddfcb480d31958897115f1cd9a4a042844`
+- `/mnt/data/mesh_v3_stream_identity_model_results.json`, SHA-256 `5c0cac22d84e4348c470178df9df985edf90f524954db0e8c35fc5f5d8012fc2`
+
 ## MTU and analytical airtime
 
 Frozen model assumptions: 222-byte MTU; 28-byte external nonce/tag budget; bandwidth 125 kHz; coding rate 4/5; eight-symbol preamble; explicit header and PHY CRC; one XOR parity frame. Semtech-style time-on-air equations are used. No radios were measured.
