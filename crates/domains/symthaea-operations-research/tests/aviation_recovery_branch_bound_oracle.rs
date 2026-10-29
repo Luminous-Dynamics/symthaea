@@ -7,9 +7,167 @@
 //! Every returned incumbent is also run through the stable-ID plan verifier.
 
 use symthaea_operations_research::aviation_enterprise::{
-    reference_scenario, solve_branch_and_bound, solve_exact, verify_plan,
-    BranchAndBoundOptions, BranchAndBoundStatus, PartSource, VerificationStatus,
+    reference_scenario, solve_branch_and_bound, solve_exact, verify_plan, Aircraft,
+    Flight, PartSource, ProductionOption, Scenario, BranchAndBoundOptions,
+    BranchAndBoundStatus, VerificationStatus,
 };
+
+
+/// Independent small-instance oracle. This deliberately enumerates every source
+/// and assignment from raw scenario fields instead of calling either solver's
+/// feasibility/cost helpers.
+fn oracle_optimum(scenario: &Scenario) -> Option<u64> {
+    let eligible_sources = [PartSource::None, PartSource::QualifiedStock, PartSource::QualifiedProduction]
+        .into_iter()
+        .filter(|source| oracle_source_is_eligible(scenario, *source));
+    let mut best = None;
+    for source in eligible_sources {
+        let mut choices = vec![None; scenario.flights.len()];
+        oracle_enumerate(scenario, source, 0, &mut choices, &mut best);
+    }
+    best
+}
+
+fn oracle_source_is_eligible(scenario: &Scenario, source: PartSource) -> bool {
+    match source {
+        PartSource::None => true,
+        PartSource::QualifiedStock => {
+            scenario.qualified_stock_count > 0
+                && scenario.stock_matches_configuration
+                && scenario.stock_evidence_current
+        }
+        PartSource::QualifiedProduction => {
+            scenario.production.available
+                && scenario.production.qualified_worker
+                && scenario.production.capable_tool
+                && scenario.production.matches_configuration
+                && scenario.production.evidence_current
+                && scenario.production.duration.checked_add(scenario.maintenance_duration).is_some()
+        }
+    }
+}
+
+fn oracle_enumerate(
+    scenario: &Scenario,
+    source: PartSource,
+    flight_index: usize,
+    choices: &mut [Option<usize>],
+    best: &mut Option<u64>,
+) {
+    if flight_index == scenario.flights.len() {
+        let Some(cost) = oracle_evaluate(scenario, source, choices) else {
+            return;
+        };
+        if best.is_none_or(|current| cost < current) {
+            *best = Some(cost);
+        }
+        return;
+    }
+
+    for aircraft_index in 0..scenario.aircraft.len() {
+        choices[flight_index] = Some(aircraft_index);
+        oracle_enumerate(scenario, source, flight_index + 1, choices, best);
+    }
+    choices[flight_index] = None;
+    oracle_enumerate(scenario, source, flight_index + 1, choices, best);
+}
+
+fn oracle_evaluate(scenario: &Scenario, source: PartSource, choices: &[Option<usize>]) -> Option<u64> {
+    if !oracle_source_is_eligible(scenario, source) || choices.len() != scenario.flights.len() {
+        return None;
+    }
+
+    let repair_ready = match source {
+        PartSource::None => None,
+        PartSource::QualifiedStock => Some(scenario.maintenance_duration),
+        PartSource::QualifiedProduction => Some(
+            scenario.production.duration.checked_add(scenario.maintenance_duration)?,
+        ),
+    };
+
+    let mut by_aircraft: Vec<Vec<usize>> = vec![Vec::new(); scenario.aircraft.len()];
+    for (flight_index, choice) in choices.iter().enumerate() {
+        let Some(aircraft_index) = *choice else {
+            continue;
+        };
+        let flight = &scenario.flights[flight_index];
+        let aircraft = scenario.aircraft.get(aircraft_index)?;
+        let release_time = if aircraft.id == scenario.repair_aircraft_id {
+            aircraft.available_at.max(repair_ready?)
+        } else {
+            aircraft.available_at
+        };
+        if flight.start < release_time {
+            return None;
+        }
+        by_aircraft[aircraft_index].push(flight_index);
+    }
+
+    for (aircraft_index, assigned) in by_aircraft.iter_mut().enumerate() {
+        assigned.sort_by_key(|&index| {
+            (scenario.flights[index].start, scenario.flights[index].end, scenario.flights[index].id.as_str())
+        });
+        let turnaround = scenario.aircraft[aircraft_index].turnaround;
+        for pair in assigned.windows(2) {
+            if pair[0].checked_add(0).is_none() {
+                return None;
+            }
+            let earliest_next = scenario.flights[pair[0]].end.checked_add(turnaround)?;
+            if scenario.flights[pair[1]].start < earliest_next {
+                return None;
+            }
+        }
+    }
+
+    let mut cost = match source {
+        PartSource::None => 0,
+        PartSource::QualifiedStock => scenario.maintenance_cost,
+        PartSource::QualifiedProduction => scenario.production.cost.checked_add(scenario.maintenance_cost)?,
+    };
+    for (flight_index, choice) in choices.iter().enumerate() {
+        if choice.is_none() {
+            cost = cost.checked_add(scenario.flights[flight_index].cancellation_cost)?;
+        }
+    }
+    Some(cost)
+}
+
+fn varied_scenarios() -> Vec<Scenario> {
+    let mut scenarios = Vec::new();
+    for seed in 0..16_u32 {
+        let mut scenario = reference_scenario();
+        scenario.id = format!("independent-oracle-{seed}");
+        scenario.configuration_revision = format!("config-{seed}");
+        scenario.input_digest = format!("fixture-{seed}");
+        scenario.flights[0].start = 20 + seed * 5;
+        scenario.flights[0].end = scenario.flights[0].start + 25;
+        scenario.flights[0].cancellation_cost = 40 + u64::from(seed) * 3;
+        scenario.flights[1].start = 35 + (seed % 5) * 7;
+        scenario.flights[1].end = scenario.flights[1].start + 25;
+        scenario.flights[1].cancellation_cost = 55 + u64::from(seed) * 2;
+        scenario.aircraft[0].available_at = seed % 4 * 8;
+        scenario.aircraft[0].turnaround = 5 + seed % 7;
+        scenario.aircraft[1].turnaround = 3 + seed % 9;
+        scenario.production.duration = 3 + seed % 13;
+        scenario.production.cost = 20 + u64::from(seed) * 2;
+        if seed % 3 == 0 {
+            scenario.qualified_stock_count = 1;
+        }
+        if seed % 4 == 0 {
+            scenario.production.evidence_current = false;
+        }
+        if seed % 2 == 0 {
+            scenario.flights.push(Flight {
+                id: "FLIGHT-3".into(),
+                start: 60 + seed * 2,
+                end: 78 + seed * 2,
+                cancellation_cost: 70 + u64::from(seed),
+            });
+        }
+        scenarios.push(scenario);
+    }
+    scenarios
+}
 
 fn exact_options() -> BranchAndBoundOptions {
     BranchAndBoundOptions {
@@ -95,6 +253,27 @@ fn deterministic_inputs_and_options_produce_identical_reports() {
     let first = solve_branch_and_bound(&scenario, exact_options()).unwrap();
     let second = solve_branch_and_bound(&scenario, exact_options()).unwrap();
     assert_eq!(first, second);
+}
+
+#[test]
+fn branch_and_bound_matches_independent_exhaustive_oracle_across_varied_scenarios() {
+    for scenario in varied_scenarios() {
+        let expected = oracle_optimum(&scenario)
+            .expect("cancel-all assignment makes each valid scenario feasible");
+        let report = solve_branch_and_bound(&scenario, exact_options()).unwrap_or_else(|error| {
+            panic!("scenario {} failed: {error}", scenario.id)
+        });
+        assert_eq!(report.best_objective_cost, Some(expected), "scenario {}", scenario.id);
+        assert_eq!(
+            report.status,
+            BranchAndBoundStatus::OptimalWithinTolerance,
+            "scenario {}",
+            scenario.id
+        );
+        let plan = report.best_plan.as_ref().expect("oracle says feasible");
+        assert_eq!(verify_plan(&scenario, plan).status, VerificationStatus::Verified);
+        assert_eq!(report.absolute_optimality_gap, Some(0));
+    }
 }
 
 #[test]
