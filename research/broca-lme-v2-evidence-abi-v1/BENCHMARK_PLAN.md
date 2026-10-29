@@ -215,6 +215,17 @@ Compare score-prefix, ungrounded caller labels, span-verified labels, and an ind
 
 **Hard gates:** zero selected witnesses whose span bytes do not match the digest; zero offsets that cross UTF-8 boundaries; zero selected witnesses tied to the wrong evidence ID; zero eligible payload digest mismatches silently accepted. No span-validity metric may be reported as semantic-support accuracy.
 
+### Cross-benchmark comparison and reproducibility controls (2026-10 research update)
+
+Do not treat an accuracy figure as portable across benchmarks, datasets, readers, judge models, context budgets, or memory-write interfaces. The same-named benchmark/version distinction is especially important:
+
+- The official LongMemEval-V2 page currently reports AgentRunbook-C at 74.9% small-tier accuracy / 108.3 seconds and 70.1% medium-tier accuracy / 139.9 seconds, with official LAFS Gain over a fixed accuracy–latency frontier ([official V2 results](https://xiaowu0162.github.io/longmemeval-v2/)).
+- Redis' September 2026 reproduction report states that its Remis + Instruct approach reaches 86.5% task-averaged accuracy on the original LongMemEval under a common GPT-4o backbone for systems it reproduced. It also reports that its reproduced Vertex Memory Bank setup scores 42.4%, below a roughly 70% result in the publication it was based on ([Redis benchmark report](https://redis.io/resources/agent-memory-benchmark-report/)). These are useful warnings about same-harness reproduction and configuration sensitivity, but the 86.5% original-LongMemEval result must **not** be plotted as if it were an official LongMemEval-V2 score.
+- LongMINT evaluates interference-heavy long-horizon memory with 15.6K QA pairs, contexts averaging 138.8K tokens and reaching 1.8M tokens; its paper reports 27.9% average accuracy across seven representative systems, with multi-target aggregation and revising facts as major pain points ([LongMINT](https://arxiv.org/abs/2605.18565)). Include it as a complementary stress test for query-specific evidence sets and updates, not as a replacement for the official V2 score.
+- QEMem reports LoCoMo-specific results under Claude Opus 4.5 and its own judge/evaluation configuration ([QEMem](https://arxiv.org/abs/2610.22668)). Use it as a method-level comparison for evidence-set construction and refinement, not as a LongMemEval score.
+
+Every result receipt should identify exact benchmark version/split, memory write interface, history/query set digest, reader model and revision, judge/evaluator version, prompt/tokenizer, context budget, inference effort, seeds, hardware, retrieval and reader latency boundaries, and all background consolidation/write costs included. Publish each benchmark separately before any cross-benchmark synthesis. Reproduce a strong baseline on the same harness before comparing only published paper values.
+
 ## Required baseline arms
 
 Freeze and compare these as separate arms. Do not conflate them into one advertised “memory” result.
