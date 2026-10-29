@@ -703,6 +703,20 @@ def run_benchmark(
             "independent_generalization_unit": "held_out_task_family",
         }
 
+    policy_configuration = {
+        "policy_ids": list(POLICY_IDS),
+        "nearest_k": nearest_k,
+        "distance_abstention": {
+            "policy_id": ABSTENTION_POLICY_ID,
+            "nearest_distance_threshold": ABSTENTION_DISTANCE_THRESHOLD,
+            "decision_rule": "abstain when nearest normalized task-descriptor/design distance to source archive exceeds threshold",
+            "calibration_status": "fixed heuristic threshold; not calibrated probability or safety bound",
+        },
+    }
+    policy_config_sha256 = hashlib.sha256(
+        json.dumps(policy_configuration, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
+
     return {
         "schema_version": SCHEMA_VERSION,
         "benchmark_id": BENCHMARK_ID,
@@ -726,13 +740,8 @@ def run_benchmark(
         ).hexdigest(),
         "task_suite_sha256": TASK_SUITE_SHA256,
         "policy_ids": list(POLICY_IDS),
-        "policy_configuration": {
-            ABSTENTION_POLICY_ID: {
-                "nearest_distance_threshold": ABSTENTION_DISTANCE_THRESHOLD,
-                "decision_rule": "abstain when nearest normalized task-descriptor/design distance to source archive exceeds threshold",
-                "calibration_status": "fixed heuristic threshold; not calibrated probability or safety bound",
-            }
-        },
+        "policy_configuration": policy_configuration,
+        "policy_config_sha256": policy_config_sha256,
         "cost_accounting": {
             "low_fidelity_cost_units": LOW_COST_UNITS,
             "high_fidelity_cost_units": HIGH_COST_UNITS,
