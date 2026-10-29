@@ -37,6 +37,29 @@ The Rust unit suite contains 13 tests covering identity preservation, one locali
 6. Add source-aware checks before expanding the detector's claim domain.
 7. Run blinded listening trials to measure whether detector verdicts track audible collateral changes. Keep technical preservation, requested-edit success, naturalness, and preference as separate endpoints.
 
+## Synthetic conformance runner
+
+Run the fixture-only conformance suite with:
+
+\`\`\`bash
+cargo run --locked -p symthaea-muse --example mel_mr_eval_006_conformance
+\`\`\`
+
+The runner emits JSON for eight predeclared cases and exits non-zero if any expected verdict is not reproduced:
+
+- identical protected audio → pass;
+- localized mutation outside the edit mask → fail;
+- mutation only inside the authorized mask → pass;
+- identical transient timing → pass;
+- 512-frame transient delay in protected content → fail;
+- edit mask plus analysis guard hides all onset evidence → abstain;
+- silence contains no measurable onset evidence → abstain;
+- removal of a protected reference burst → fail.
+
+The runner labels its threshold ID as synthetic-only. It is a quick regression/conformance suite, not a production calibration, a human preference study, or a leaderboard result. The JSON reports detector configuration, input digests, per-case measurements, counts, and any unexpected verdicts. It should be run on every code revision before collecting a larger calibration set.
+
+An independent NumPy/FFT reference simulation was executed for the same eight scenarios in the development environment and reproduced all eight predeclared verdicts. This is independent reference evidence—not execution of the Rust runner, whose compile and test status remains unknown until a Rust toolchain is available.
+
 ## Positioning against public benchmarks
 
 Treat the evaluator as one layer in a broader stack, not as a replacement for music or instruction-level benchmarks:
