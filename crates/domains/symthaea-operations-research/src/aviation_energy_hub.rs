@@ -57,6 +57,8 @@ pub struct EnergyHubInterval {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnergyStorageSpec {
     pub capacity_quanta: u32,
+    /// Physically carried state of charge at the start of this planning horizon.
+    pub initial_soc_quanta: u32,
     pub max_charge_input_quanta_per_interval: u32,
     pub max_discharge_output_quanta_per_interval: u32,
     pub charge_efficiency_ppm: u32,
@@ -212,6 +214,7 @@ pub fn canonical_energy_hub_digest(
     put_f64(&mut bytes, scenario.service.available_seat_km);
 
     put_u32(&mut bytes, scenario.storage.capacity_quanta);
+    put_u32(&mut bytes, scenario.storage.initial_soc_quanta);
     put_u32(&mut bytes, scenario.storage.max_charge_input_quanta_per_interval);
     put_u32(&mut bytes, scenario.storage.max_discharge_output_quanta_per_interval);
     put_u32(&mut bytes, scenario.storage.charge_efficiency_ppm);
@@ -276,7 +279,7 @@ pub fn verify_energy_hub_plan(
         return Err(EnergyHubError::ActionCountMismatch);
     }
 
-    let mut soc = 0_u32;
+    let mut soc = scenario.storage.initial_soc_quanta;
     let mut renewable_generation_quanta = 0_u32;
     let mut renewable_direct_quanta = 0_u32;
     let mut renewable_charge_input_quanta = 0_u32;
@@ -473,7 +476,7 @@ pub fn solve_exact_energy_hub_pareto(
         frontier: Vec::new(),
         actions: Vec::with_capacity(scenario.intervals.len()),
     };
-    search.visit(0, 0)?;
+    search.visit(0, scenario.storage.initial_soc_quanta)?;
     if search.exhausted {
         return Err(EnergyHubError::SearchBudgetExceeded {
             nodes_visited: search.nodes_visited,
@@ -498,7 +501,7 @@ pub fn solve_renewable_first_greedy(
 ) -> Result<EvaluatedEnergyHubPlan, EnergyHubError> {
     validate_scenario(scenario)?;
     verify_energy_hub_digest(scenario)?;
-    let mut soc = 0_u32;
+    let mut soc = scenario.storage.initial_soc_quanta;
     let mut actions = Vec::with_capacity(scenario.intervals.len());
 
     for interval in &scenario.intervals {
@@ -723,6 +726,7 @@ fn validate_scenario(
     }
     let storage = &scenario.storage;
     if storage.capacity_quanta > MAX_QUANTA_PER_INTERVAL
+        || storage.initial_soc_quanta > storage.capacity_quanta
         || storage.max_charge_input_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
         || storage.max_discharge_output_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
         || storage.minimum_terminal_soc_quanta > storage.capacity_quanta
