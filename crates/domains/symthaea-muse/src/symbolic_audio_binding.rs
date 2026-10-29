@@ -22,6 +22,7 @@ use symthaea_music_theory::edit_locality::{
 use crate::audio_preservation::{
     AudioAuditInputError, AudioPreservationReport, AudioView, OnsetPreservationReport,
     PreservationVerdict, audio_content_sha256, compose_audio_preservation_evidence,
+    verify_audio_preservation_against_buffers, verify_onset_preservation_against_buffers,
 };
 
 /// Version for the symbolic/audio render-binding envelope.
@@ -209,8 +210,16 @@ pub fn create_symbolic_audio_render_binding(
             "symbolic receipt or source/target score binding did not verify",
         ));
     }
-    // Re-compose from the individual reports so both child receipt digests
-    // are verified here; do not trust a standalone composite claim.
+    // Recompute both child reports against the exact buffers, using the
+    // recorded authorization masks/configs. A sealed but fabricated metric is
+    // not sufficient. Only then compose the child receipts.
+    if !verify_audio_preservation_against_buffers(source_audio, target_audio, acoustic_evidence)?
+        || !verify_onset_preservation_against_buffers(source_audio, target_audio, onset_evidence)?
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "acoustic or onset report did not replay against the exact audio buffers",
+        ));
+    }
     let audio_evidence =
         compose_audio_preservation_evidence(acoustic_evidence, onset_evidence)?;
 
