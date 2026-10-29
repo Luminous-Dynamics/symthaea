@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::process;
 
 const REPORT_SCHEMA: &str = "cmaq-008-sequential-support-drift-v0.1";
@@ -38,11 +39,19 @@ enum Scenario {
     Stationary,
     AbruptSupportShift,
     GradualSupportShift,
+    DelayedAbruptSupportShift,
+    NoisyStationaryFeedback,
 }
 
 impl Scenario {
-    fn all() -> [Self; 3] {
-        [Self::Stationary, Self::AbruptSupportShift, Self::GradualSupportShift]
+    fn all() -> [Self; 5] {
+        [
+            Self::Stationary,
+            Self::AbruptSupportShift,
+            Self::GradualSupportShift,
+            Self::DelayedAbruptSupportShift,
+            Self::NoisyStationaryFeedback,
+        ]
     }
 
     fn name(self) -> &'static str {
@@ -50,6 +59,8 @@ impl Scenario {
             Self::Stationary => "stationary",
             Self::AbruptSupportShift => "abrupt_support_shift",
             Self::GradualSupportShift => "gradual_support_shift",
+            Self::DelayedAbruptSupportShift => "delayed_abrupt_support_shift",
+            Self::NoisyStationaryFeedback => "noisy_stationary_feedback",
         }
     }
 
@@ -58,6 +69,8 @@ impl Scenario {
             Self::Stationary => None,
             Self::AbruptSupportShift => Some(HORIZON / 2),
             Self::GradualSupportShift => Some(HORIZON / 4),
+            Self::DelayedAbruptSupportShift => Some(HORIZON / 2),
+            Self::NoisyStationaryFeedback => None,
         }
     }
 
@@ -71,6 +84,14 @@ impl Scenario {
                     SHIFTED_UNSUPPORTED_RATE
                 }
             }
+            Self::DelayedAbruptSupportShift => {
+                if step < HORIZON / 2 {
+                    NULL_UNSUPPORTED_RATE
+                } else {
+                    SHIFTED_UNSUPPORTED_RATE
+                }
+            }
+            Self::NoisyStationaryFeedback => NULL_UNSUPPORTED_RATE,
             Self::GradualSupportShift => {
                 let start = HORIZON / 4;
                 let end = (3 * HORIZON) / 4;
@@ -86,6 +107,14 @@ impl Scenario {
             }
         }
     }
+
+    fn feedback_delay_steps(self) -> usize {
+        if self == Self::DelayedAbruptSupportShift { 8 } else { 0 }
+    }
+
+    fn feedback_flip_probability(self) -> f64 {
+        if self == Self::NoisyStationaryFeedback { 0.05 } else { 0.0 }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,16 +123,18 @@ enum Policy {
     FixedGate,
     RevokeOnFirstUnsupported,
     CusumRevocableGate,
+    IntegrityWitnessedCusum,
     OracleChangepoint,
 }
 
 impl Policy {
-    fn all() -> [Self; 5] {
+    fn all() -> [Self; 6] {
         [
             Self::DirectFallback,
             Self::FixedGate,
             Self::RevokeOnFirstUnsupported,
             Self::CusumRevocableGate,
+            Self::IntegrityWitnessedCusum,
             Self::OracleChangepoint,
         ]
     }
@@ -114,12 +145,13 @@ impl Policy {
             Self::FixedGate => "fixed_gate",
             Self::RevokeOnFirstUnsupported => "first_unsupported_revoke",
             Self::CusumRevocableGate => "cusum_revocable_gate",
+            Self::IntegrityWitnessedCusum => "integrity_witnessed_cusum",
             Self::OracleChangepoint => "oracle_changepoint",
         }
     }
 
     fn is_online_monitor(self) -> bool {
-        matches!(self, Self::RevokeOnFirstUnsupported | Self::CusumRevocableGate)
+        matches!(self, Self::RevokeOnFirstUnsupported | Self::CusumRevocableGate | Self::IntegrityWitnessedCusum)
     }
 }
 
@@ -128,6 +160,8 @@ struct EpisodeOutcome {
     cumulative_utility: f64,
     model_action_count: usize,
     unsupported_count: usize,
+    feedback_record_count: usize,
+    feedback_mismatch_count: usize,
     revocation_step: Option<usize>,
 }
 
@@ -141,15 +175,51 @@ fn likelihood_ratio_increment(unsupported_observed: bool) -> f64 {
 
 fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOutcome {
     let mut rng = SplitMix64::new(seed);
+    let mut feedback_rng = SplitMix64::new(seed ^ 0xFEED_BACC_2026_1030);
     let onset = scenario.shift_onset();
     let mut outcome = EpisodeOutcome::default();
     let mut cusum = 0.0_f64;
     let mut revoked = false;
+    let mut pending_feedback: VecDeque<(usize, bool, bool)> = VecDeque::new();
 
     for step in 0..HORIZON {
-        // Consume the same random tape for every paired policy, even after
-        // fallback, so an intervention never changes exogenous randomness.
-        let draw = rng.unit();
+        // Consume paired exogenous and feedback-noise tapes even after fallback.
+        let outcome_draw = rng.unit();
+        let feedback_noise_draw = feedback_rng.unit();
+
+        // Feedback becomes actionable only when its delivery step arrives.
+        while let Some((delivery_step, primary_label, witness_label)) = pending_feedback.front().copied() {
+            if delivery_step > step {
+                break;
+            }
+            pending_feedback.pop_front();
+            if revoked {
+                continue;
+            }
+            let observed_label = if policy == Policy::IntegrityWitnessedCusum {
+                witness_label
+            } else {
+                primary_label
+            };
+            match policy {
+                Policy::RevokeOnFirstUnsupported if observed_label => {
+                    revoked = true;
+                    outcome.revocation_step = Some(step);
+                }
+                Policy::CusumRevocableGate | Policy::IntegrityWitnessedCusum => {
+                    // A frozen one-sided likelihood CUSUM contrasts the 1% null
+                    // with a 25% unsupported-outcome shift. The witnessed policy
+                    // uses a second independently delivered, trusted label.
+                    cusum = (cusum + likelihood_ratio_increment(observed_label)).max(0.0);
+                    if cusum >= CHANGE_DETECTION_THRESHOLD {
+                        revoked = true;
+                        outcome.revocation_step = Some(step);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         if policy == Policy::OracleChangepoint && onset == Some(step) {
             outcome.revocation_step = Some(step);
             revoked = true;
@@ -158,7 +228,9 @@ fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOut
         let active = match policy {
             Policy::DirectFallback => false,
             Policy::FixedGate => true,
-            Policy::RevokeOnFirstUnsupported | Policy::CusumRevocableGate => !revoked,
+            Policy::RevokeOnFirstUnsupported
+            | Policy::CusumRevocableGate
+            | Policy::IntegrityWitnessedCusum => !revoked,
             Policy::OracleChangepoint => !revoked,
         };
 
@@ -167,30 +239,21 @@ fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOut
         }
 
         outcome.model_action_count += 1;
-        let unsupported_observed = draw < scenario.unsupported_probability(step);
-        if unsupported_observed {
+        let true_unsupported = outcome_draw < scenario.unsupported_probability(step);
+        if true_unsupported {
             outcome.unsupported_count += 1;
             outcome.cumulative_utility += UNSUPPORTED_UTILITY;
         } else {
             outcome.cumulative_utility += SUPPORTED_UTILITY;
         }
 
-        match policy {
-            Policy::RevokeOnFirstUnsupported if unsupported_observed => {
-                revoked = true;
-                outcome.revocation_step = Some(step);
-            }
-            Policy::CusumRevocableGate => {
-                // A one-sided sequential log-likelihood CUSUM contrasts a
-                // stationary 1% unsupported-feedback null with a 25% shift.
-                // The threshold is frozen before the scenario panel is run.
-                cusum = (cusum + likelihood_ratio_increment(unsupported_observed)).max(0.0);
-                if cusum >= CHANGE_DETECTION_THRESHOLD {
-                    revoked = true;
-                    outcome.revocation_step = Some(step);
-                }
-            }
-            _ => {}
+        let primary_flipped = feedback_noise_draw < scenario.feedback_flip_probability();
+        let primary_label = if primary_flipped { !true_unsupported } else { true_unsupported };
+        let delivery_step = step + 1 + scenario.feedback_delay_steps();
+        pending_feedback.push_back((delivery_step, primary_label, true_unsupported));
+        outcome.feedback_record_count += if policy == Policy::IntegrityWitnessedCusum { 2 } else { 1 };
+        if primary_label != true_unsupported {
+            outcome.feedback_mismatch_count += 1;
         }
     }
 
@@ -209,6 +272,8 @@ struct Summary {
     model_action_coverage: f64,
     unsupported_rate_per_model_action: f64,
     unsupported_actions_per_1000_decisions: f64,
+    feedback_mismatch_rate: f64,
+    feedback_records_per_decision: f64,
     revocation_episode_rate: f64,
     false_revocation_episode_rate: f64,
     shift_detection_coverage: f64,
@@ -271,6 +336,8 @@ fn summarize(
 
     let model_actions: usize = outcomes.iter().map(|outcome| outcome.model_action_count).sum();
     let unsupported: usize = outcomes.iter().map(|outcome| outcome.unsupported_count).sum();
+    let feedback_records: usize = outcomes.iter().map(|outcome| outcome.feedback_record_count).sum();
+    let feedback_mismatches: usize = outcomes.iter().map(|outcome| outcome.feedback_mismatch_count).sum();
     let total_decisions = outcomes.len() * HORIZON;
     let revocations = outcomes.iter().filter(|outcome| outcome.revocation_step.is_some()).count();
 
@@ -322,6 +389,8 @@ fn summarize(
             unsupported as f64 / model_actions as f64
         },
         unsupported_actions_per_1000_decisions: unsupported as f64 / total_decisions as f64 * 1000.0,
+        feedback_mismatch_rate: if feedback_records == 0 { 0.0 } else { feedback_mismatches as f64 / outcomes.iter().map(|outcome| outcome.model_action_count).sum::<usize>() as f64 },
+        feedback_records_per_decision: feedback_records as f64 / total_decisions as f64,
         revocation_episode_rate: revocations as f64 / outcomes.len() as f64,
         false_revocation_episode_rate: false_revocations as f64 / outcomes.len() as f64,
         shift_detection_coverage: if onset.is_some() {
@@ -383,8 +452,8 @@ fn render_report(rows: &[Summary]) -> String {
     output.push_str(&format!("  \"shifted_unsupported_rate\": {SHIFTED_UNSUPPORTED_RATE:.4},\n"));
     output.push_str(&format!("  \"supported_utility\": {SUPPORTED_UTILITY:.4},\n"));
     output.push_str(&format!("  \"unsupported_utility\": {UNSUPPORTED_UTILITY:.4},\n"));
-    output.push_str("  \"scenarios\": [\"stationary\", \"abrupt_support_shift\", \"gradual_support_shift\"],\n");
-    output.push_str("  \"policies\": [\"direct_fallback\", \"fixed_gate\", \"first_unsupported_revoke\", \"cusum_revocable_gate\", \"oracle_changepoint\"],\n");
+    output.push_str("  \"scenarios\": [\"stationary\", \"abrupt_support_shift\", \"gradual_support_shift\", \"delayed_abrupt_support_shift\", \"noisy_stationary_feedback\"],\n");
+    output.push_str("  \"policies\": [\"direct_fallback\", \"fixed_gate\", \"first_unsupported_revoke\", \"cusum_revocable_gate\", \"integrity_witnessed_cusum\", \"oracle_changepoint\"],\n");
     output.push_str("  \"summary\": [\n");
     for (index, row) in rows.iter().enumerate() {
         output.push_str(&format!(
@@ -394,6 +463,7 @@ fn render_report(rows: &[Summary]) -> String {
                 "\"utility_delta_ci95_low\": {:.8}, \"utility_delta_ci95_high\": {:.8}, ",
                 "\"model_action_coverage\": {:.8}, \"unsupported_rate_per_model_action\": {:.8}, ",
                 "\"unsupported_actions_per_1000_decisions\": {:.8}, ",
+                "\"feedback_mismatch_rate\": {:.8}, \"feedback_records_per_decision\": {:.8}, ",
                 "\"revocation_episode_rate\": {:.8}, \"false_revocation_episode_rate\": {:.8}, ",
                 "\"shift_detection_coverage\": {:.8}, \"p90_detection_delay_steps\": {:.4}, ",
                 "\"mean_regret_vs_oracle\": {:.8}, \"cvar95_regret_vs_oracle\": {:.8}, ",
@@ -409,6 +479,8 @@ fn render_report(rows: &[Summary]) -> String {
             row.model_action_coverage,
             row.unsupported_rate_per_model_action,
             row.unsupported_actions_per_1000_decisions,
+            row.feedback_mismatch_rate,
+            row.feedback_records_per_decision,
             row.revocation_episode_rate,
             row.false_revocation_episode_rate,
             row.shift_detection_coverage,
@@ -450,6 +522,8 @@ mod tests {
         assert_eq!(Scenario::AbruptSupportShift.unsupported_probability(64), 0.25);
         assert_eq!(Scenario::GradualSupportShift.unsupported_probability(32), 0.01);
         assert_eq!(Scenario::GradualSupportShift.unsupported_probability(96), 0.25);
+        assert_eq!(Scenario::DelayedAbruptSupportShift.feedback_delay_steps(), 8);
+        assert_eq!(Scenario::NoisyStationaryFeedback.feedback_flip_probability(), 0.05);
     }
 
     #[test]
@@ -474,6 +548,19 @@ mod tests {
         assert_eq!(outcome.model_action_count, 0);
         assert_eq!(outcome.unsupported_count, 0);
         assert_eq!(outcome.cumulative_utility, 0.0);
+    }
+
+    #[test]
+    fn noisy_feedback_exposes_primary_channel_mismatch() {
+        let outcome = simulate_episode(Scenario::NoisyStationaryFeedback, Policy::FixedGate, 42);
+        assert!(outcome.feedback_mismatch_count > 0);
+        assert_eq!(outcome.model_action_count, HORIZON);
+    }
+
+    #[test]
+    fn witnessed_cusum_consumes_two_feedback_records_per_model_action() {
+        let outcome = simulate_episode(Scenario::Stationary, Policy::IntegrityWitnessedCusum, 43);
+        assert_eq!(outcome.feedback_record_count, outcome.model_action_count * 2);
     }
 
     #[test]
