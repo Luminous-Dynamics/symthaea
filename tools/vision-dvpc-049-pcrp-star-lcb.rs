@@ -1,7 +1,7 @@
 //! VIS-DVPC-049: penalized best-CRP lower confidence bound for nonnegative IPS rewards.
 //!
 //! Implements the pCRP-star LCB defined in Section 3.1 of Ryu et al. (COLT 2025).
-//! The bound uses a conservative tangent envelope for the one-dimensional log-wealth
+//! The bound uses a conservative feasible-wealth witness for the one-dimensional log-wealth
 //! maximization. It is a standalone comparator, not the complete COLT experiment suite.
 //!
 //! Evidence contract:
@@ -206,12 +206,12 @@ fn log_wealth_derivative(values: &[f64], candidate_mean: f64, bet: f64) -> f64 {
     total
 }
 
-/// Conservative upper envelope for sup_{b in [0,1]} sum log(1-b+b*y_i/nu).
+/// A conservative feasible-wealth witness for sup_{b in [0,1]} log CRP wealth.
 ///
-/// The log wealth is concave in b. At any interior point b0, the tangent line is
-/// a global upper bound; maximizing that tangent over [0,1] gives a numerical
-/// upper envelope even if the stationary point is found only approximately.
-fn log_sup_crp_wealth_upper(values: &[f64], candidate_mean: f64) -> Result<f64, String> {
+/// Evaluating any feasible bet gives a lower bound on the supremum. Underestimating
+/// the supremum can only lower the inverted LCB; it must never be changed into an
+/// upper envelope, which could make the reported confidence bound anti-conservative.
+fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, String> {
     if values.is_empty() || !candidate_mean.is_finite() || candidate_mean <= 0.0 {
         return Err("need a nonempty stream and a positive finite candidate mean".into());
     }
@@ -235,9 +235,9 @@ fn log_sup_crp_wealth_upper(values: &[f64], candidate_mean: f64) -> Result<f64, 
             .map(|&y| (y - candidate_mean) / y)
             .sum();
         if derivative_at_one >= 0.0 {
-            let exact_endpoint = log_crp_wealth(values, candidate_mean, 1.0);
-            let pad = 32.0 * f64::EPSILON * (1.0 + exact_endpoint.abs() + values.len() as f64);
-            return Ok(exact_endpoint + pad);
+            let endpoint = log_crp_wealth(values, candidate_mean, 1.0);
+            let pad = 64.0 * f64::EPSILON * (1.0 + endpoint.abs() + values.len() as f64);
+            return Ok(endpoint - pad);
         }
     }
 
@@ -247,7 +247,9 @@ fn log_sup_crp_wealth_upper(values: &[f64], candidate_mean: f64) -> Result<f64, 
         let mid = left + (right - left) * 0.5;
         let derivative = log_wealth_derivative(values, candidate_mean, mid);
         if derivative.is_nan() {
-            return Ok(f64::INFINITY);
+            let witness = log_crp_wealth(values, candidate_mean, 0.5);
+            let pad = 64.0 * f64::EPSILON * (1.0 + witness.abs() + values.len() as f64);
+            return Ok(witness - pad);
         }
         if derivative > 0.0 {
             left = mid;
@@ -256,27 +258,22 @@ fn log_sup_crp_wealth_upper(values: &[f64], candidate_mean: f64) -> Result<f64, 
         }
     }
     let bet = left + (right - left) * 0.5;
-    let log_wealth = log_crp_wealth(values, candidate_mean, bet);
-    let derivative = log_wealth_derivative(values, candidate_mean, bet);
-    if !log_wealth.is_finite() || !derivative.is_finite() {
-        return Ok(f64::INFINITY);
+    let witness = log_crp_wealth(values, candidate_mean, bet);
+    if witness == f64::NEG_INFINITY {
+        return Ok(witness);
     }
-
-    // For concave f, f(x) <= f(b) + f'(b)(x-b). Maximize that tangent on [0,1].
-    let tangent_slack = if derivative >= 0.0 {
-        derivative * (1.0 - bet)
-    } else {
-        -derivative * bet
-    };
+    if !witness.is_finite() {
+        return Err("non-finite feasible log-wealth witness".into());
+    }
     let roundoff_pad =
-        64.0 * f64::EPSILON * (1.0 + log_wealth.abs() + values.len() as f64);
-    Ok(log_wealth + tangent_slack.max(0.0) + roundoff_pad)
+        64.0 * f64::EPSILON * (1.0 + witness.abs() + values.len() as f64);
+    Ok(witness - roundoff_pad)
 }
 
 /// pCRP-star lower confidence bound from Ryu et al. (COLT 2025), Eq. (3.3)-(3.5).
 ///
 /// The pCRP-star wealth is (pi*(n+1))^(-1/2) times the best constant-bet CRP wealth.
-/// Using an upper envelope for the wealth maximum makes the inversion conservative.
+/// Using an achieved feasible wealth as a lower bound on the supremum makes the inversion conservative.
 fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
     if values.is_empty() {
         return Err("confidence bound requires at least one observation".into());
@@ -306,7 +303,7 @@ fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
         if probe <= 0.0 {
             break;
         }
-        let log_wealth = log_sup_crp_wealth_upper(values, probe)?;
+        let log_wealth = log_sup_crp_wealth_lower(values, probe)?;
         if log_wealth > log_threshold {
             lo = Some(probe);
             break;
@@ -324,7 +321,7 @@ fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
         if mid == low || mid == hi {
             break;
         }
-        let log_wealth = log_sup_crp_wealth_upper(values, mid)?;
+        let log_wealth = log_sup_crp_wealth_lower(values, mid)?;
         if log_wealth > log_threshold {
             low = mid;
         } else {
@@ -598,28 +595,28 @@ mod tests {
     }
 
     #[test]
-    fn tangent_envelope_dominates_dense_grid_wealth() {
+    fn feasible_wealth_witness_does_not_exceed_dense_grid_supremum() {
         let values = [0.0, 0.2, 0.8, 1.5, 0.7];
         let nu = 0.4;
-        let upper = log_sup_crp_wealth_upper(&values, nu).unwrap();
+        let witness = log_sup_crp_wealth_lower(&values, nu).unwrap();
         let mut grid_best = f64::NEG_INFINITY;
         for i in 0..=10_000 {
             let b = i as f64 / 10_000.0;
             grid_best = grid_best.max(log_crp_wealth(&values, nu, b));
         }
         assert!(
-            upper + 1.0e-9 >= grid_best,
-            "upper envelope {upper} fell below dense-grid value {grid_best}"
+            witness <= grid_best + 1.0e-8,
+            "feasible witness {upper} exceeded dense-grid supremum {grid_best}"
         );
     }
 
     #[test]
-    fn endpoint_optimizer_handles_all_positive_stream() {
+    fn endpoint_witness_is_below_the_best_endpoint_wealth() {
         let values = [0.5, 0.7, 0.9];
         let nu = 0.1;
-        let upper = log_sup_crp_wealth_upper(&values, nu).unwrap();
+        let witness = log_sup_crp_wealth_lower(&values, nu).unwrap();
         let endpoint = values.iter().map(|y| y.ln() - nu.ln()).sum::<f64>();
-        assert!(upper >= endpoint - 1.0e-9);
+        assert!(witness <= endpoint + 1.0e-9);
     }
 
     #[test]
