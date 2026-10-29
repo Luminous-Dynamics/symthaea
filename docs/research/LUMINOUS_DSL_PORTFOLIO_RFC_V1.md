@@ -7,7 +7,7 @@
 
 ## 1. Decision summary
 
-Build a small portfolio of domain-specific specifications around one interoperable evidence envelope. Do **not** build a universal Luminous language.
+Build a small portfolio of domain-specific specifications around an interoperable evidence profile carried by established attestation formats. Do **not** build a universal Luminous language or invent a competing envelope/signature format.
 
 The first implementation should use:
 
@@ -33,9 +33,11 @@ Existing assets include:
 - `api/service-protocol-v1.schema.json`, already using JSON Schema 2020-12.
 - `crates/domains/symthaea-quantum-comp/src/benchmark.rs`, with a typed `BenchmarkManifest`.
 - `crates/bridges/symthaea-proof-audit/src/policy.rs`, which already audits a declared axiom base.
+- `crates/core/symthaea-evidence-plane`, which checks agreement between declared mechanisms and measured counters, and owns a deliberately non-cryptographic `config_hash`.
+- `crates/core/symthaea-communication/src/benchmark.rs`, which already defines benchmark manifests and dataset split-separation checks.
 - Multiple evidence-focused workflows and validation facilities.
 
-**Implication:** Do not create a second benchmark manifest or parallel schema framework. Inventory and harmonize existing formats first. A new experiment DSL should compile to existing benchmark entry points and preserve their semantics.
+**Implication:** Do not create a second benchmark manifest or parallel schema framework. Inventory and harmonize existing formats first. A new experiment DSL should compose the evidence-plane integrity checks and benchmark records rather than replace them. Never promote `config_hash` to a cryptographic digest.
 
 ### Symtropy
 
@@ -66,7 +68,7 @@ Existing assets include:
 
 | Priority | DSL/specification | Home | What it describes | Why it matters |
 | --- | --- | --- | --- | --- |
-| P0 | **Luminous Evidence Envelope (LEE)** — a data contract, not a language | Shared contract package/repository after placement review | Claim status, inputs, code revision, configuration/data digests, environment, validation runs, artifacts, limitations | Prevents incompatible and overstated evidence across projects |
+| P0 | **Luminous Evidence Profile (LEP)** — a data contract, not a language | Shared contract package/repository after placement review | Claim status, inputs, code revision, configuration/data digests, environment, validation runs, artifacts, limitations | Prevents incompatible and overstated evidence across projects |
 | P0 | **Mycelix Policy / Authority DSL** | Authoritative Mycelix governance and integrity code | Principal, action, resource, scope, quorum/approvals, expiry, revocation, appeal, deny rules, explanation | Makes authority explicit and enables adversarial conformance testing |
 | P1 | **Symtropy Scenario / Physical Model DSL** | Symtropy | Model selection, quantities/units, initial and boundary conditions, solver, timestep, tolerances, parameter provenance, validation tier, uncertainty | Makes simulations reproducible and physically checkable |
 | P1 | **Symthaea Experiment DSL** | Symthaea | Hypotheses, tasks, baselines, datasets/splits, seeds, metrics, ablations, budgets, statistical plan | Prevents apples-to-oranges benchmark comparisons |
@@ -74,11 +76,11 @@ Existing assets include:
 | P2 | **Nixward ChangePlan DSL** | Nixward | Proposed system change, allowed capabilities, preconditions, authorization, rollback, health checks, expected diff | Constrains high-impact host changes and makes rollback auditable |
 | P2 | **Manufacturing / Process Recipe DSL** | Symtropy plus domain-owned validation | Materials, process stages, machine envelope, thermal/flow settings, quality checks and traceability | Connects simulation predictions to process constraints without treating predictions as measurements |
 
-This is a portfolio of **seven named artifacts** but only the first three domain languages should be actively built initially. LEE is a shared contract, not a universal DSL.
+This is a portfolio of **seven named artifacts** but only the first three domain languages should be actively built initially. LEP is a shared contract, not a universal DSL.
 
 ## 4. Shared evidence contract: minimum fields
 
-The common envelope should use explicit, versioned fields. Domain-specific metadata can extend it through namespaced extension objects, not arbitrary changes to shared meanings.
+The LEP predicate should use explicit, versioned fields. Domain-specific metadata can extend it through namespaced extension objects, not arbitrary changes to shared meanings.
 
 Required concepts:
 
@@ -109,6 +111,9 @@ Avoid a permissive field like `verified: true`. Verification must be a structure
 Prototype the same small authorization policy set in:
 - Typed Rust policy structures and an explicit evaluator.
 - Cedar policies plus a schema, using the Rust `cedar-policy` crate.
+- A narrow OPA/Rego comparison for policy query expressiveness and operational integration.
+
+Use the same request corpus, policy truth table, mutations, and performance harness for all candidates. Cedar and Rego should not be compared on unrelated features.
 
 Cedar is purpose-built for authorization and supports schema-based validation. It is a strong comparison candidate, not an automatic production choice. Decide based on deployment target/WASM compatibility, explainability, policy migration, latency, and the ability to enforce non-overridable constitutional invariants.
 
@@ -116,7 +121,7 @@ Keep constitutional invariants in mandatory validation/enforcement code so an ed
 
 ### Symtropy: typed model registry plus unit-safe quantities
 
-Use a compact scenario manifest that names registered models and parameter types. Represent units explicitly at the boundary and convert into typed quantities internally. Evaluate Rust's `uom` as a candidate for dimensional analysis rather than inventing unit arithmetic.
+Use a compact scenario manifest that names registered models and parameter types. Represent units explicitly at the boundary and convert into typed quantities internally. Evaluate Rust's `uom` as a candidate for dimensional analysis rather than inventing unit arithmetic. For co-simulation, investigate FMI 3.0.2/FMU interoperability before designing proprietary model-exchange formats; FMI is an interface standard, not a certificate of physical correctness.
 
 Never accept a physically meaningful bare number where a required unit is missing or ambiguous. Distinguish measured, calibrated, assumed, and hypothesized parameters. Each scenario must declare its validation tier; a rendered scene is not validation.
 
@@ -126,7 +131,7 @@ Define an experiment IR and compile it to existing benchmark harnesses. Require 
 
 Do not treat Phi, an internal proxy, or one selected task as a universal measure of cognition. Each metric needs an operational definition and validity limits.
 
-### LEE: stay boring and portable
+### LEP: stay interoperable and portable
 
 Begin with versioned JSON Schema plus Rust types and conformance fixtures. CUE is a candidate for cross-field constraints and configuration generation if schemas become difficult to maintain; measure the extra toolchain burden first. Do not require CUE or Dhall at runtime. Use JSON Schema for structural contracts, typed Rust checks for domain semantics, and a single canonicalization profile for content hashing.
 
@@ -224,7 +229,7 @@ Use mutation/property-based tests and independent hand-authored expected outcome
 1. Inventory all current schemas, evidence records, manifests, and provenance envelopes across the target repositories.
 2. Identify duplicate fields and incompatible definitions before proposing a common version.
 3. Draw the authorization/evidence boundary for Mycelix and mark non-overridable invariants.
-4. Write valid and invalid LEE fixtures, with exact expected errors and claim-status transition rules.
+4. Write valid and invalid LEP fixtures, with exact expected errors and claim-status transition rules.
 5. Select the canonicalization profile and test vectors; do not hash ad hoc serialized structs.
 
 ### P0 — First working vertical slice
@@ -252,6 +257,47 @@ Add Nixward ChangePlan and manufacturing recipes only after the first pilots sho
 - The implementation can be reviewed and tested without waiting for remote runners.
 - No existing enforcement gate is weakened and no unimplemented capability is described as validated.
 
+
+## Amendment 1 — interoperability-first design (2026-10-29)
+
+This amendment sharpens the original proposal after comparing the repository's existing contracts with current standards. The portfolio should reuse standards wherever they already solve the hard interoperability problem.
+
+### A. LEP is a predicate profile, not a new envelope
+
+Use the **in-toto Statement v1** as the outer statement shape: \`_type\`, immutable \`subject\` digest(s), \`predicateType\`, and a versioned \`predicate\`. LEP defines only the predicate semantics that existing projects do not already share. Reuse the established in-toto envelope for signing/authentication rather than inventing a Luminous signature envelope.
+
+Use **SLSA Provenance v1** for software build provenance where it fits. Do not force it to represent a physical simulation result or a governance decision; those require domain-specific predicate types. The evidence profile must distinguish:
+- an authentic statement;
+- a claim about an event;
+- a test or verification outcome against an exact target;
+- measured or simulated support for a claim; and
+- whether that support justifies the claim's stated scope.
+
+Existing \`symthaea-evidence-plane\` and \`symthaea-communication\` records remain domain/runtime interfaces. LEP should map to them through adapters rather than replace them. The evidence-plane crate's \`config_hash\` is explicitly non-cryptographic and unsuitable for signing or adversarial integrity checks.
+
+### B. First schema and fixture prototype
+
+A first draft predicate schema lives at \`docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json\`; examples live in \`docs/research/fixtures/luminous-evidence-v0.1/\`.
+
+The schema enforces required target identity, version and enumerated states, digest shape for common algorithms, and the rule that a verification cannot be marked passed unless execution is completed and passed. A queued or not-run record cannot claim a passed execution. The fixtures include a valid illustrative statement and negative cases for a queued-but-passed result and a missing target.
+
+**Scope and limitations:** these are structural constraints only. The example digests are placeholders; this fixture is not a production run receipt. JSON Schema cannot prove that artifacts exist, that the checked target matches the declared target, that a signature is valid, or that a test genuinely ran. A separate semantic verifier must compare the declared \`target\` with \`verification.checkedTarget\`, resolve and hash evidence artifacts, check signer authority where applicable, and test whether the named checks justify the claim. Local structural validation is not yet CI or cross-implementation conformance.
+
+### C. Physical-model interoperability before a proprietary equation language
+
+For Symtropy, the domain DSL should primarily orchestrate typed registered models, physical quantities, conditions, solver configuration, uncertainty and acceptance tests. FMI 3.0.2 offers established Model Exchange, Co-Simulation and Scheduled Execution interfaces. Evaluate FMU import/export where useful rather than wrapping every model in a new proprietary equation syntax. Keep Symtropy's native Rust APIs for capabilities and performance they already support. The validity tier and error against analytical/independent references remain mandatory regardless of transport format.
+
+### D. Fair industry comparison
+
+Benchmark candidates using the same fixtures and equivalent semantics:
+- **Data constraints:** JSON Schema 2020-12 vs CUE for cross-field validation, diagnostics, migration and runtime/tooling cost.
+- **Authorization:** Cedar vs a typed Rust evaluator, with a narrow OPA/Rego baseline where relevant. Compare correctness, mutation detection, explainability, latency and WASM/deployment constraints.
+- **Provenance:** in-toto Statements and SLSA provenance for software artifacts, plus narrowly scoped domain predicates where their semantics differ.
+- **Simulation integration:** native Symtropy scenario manifests vs FMI/FMU interoperability for exchange and co-simulation. Do not count standards compatibility as physical accuracy.
+- **Scientific work:** extend the existing benchmark-manifest, dataset-split and evidence-plane mechanisms; don't rewrite functioning research harnesses just to fit a new syntax.
+
+No state-of-the-art claim should be made until the baseline tools are run on pinned versions with the same positive/negative corpus and resource limits.
+
 ## References
 
 - Existing Symthaea benchmark guide: https://github.com/Luminous-Dynamics/symthaea/blob/main/benches/BENCHMARK_GUIDE.md
@@ -266,3 +312,8 @@ Add Nixward ChangePlan and manufacturing recipes only after the first pilots sho
 - JSON Schema Rust validator: https://docs.rs/jsonschema/latest/jsonschema/
 - Rust type-safe units: https://docs.rs/uom/latest/uom/
 - RFC 8785 JSON Canonicalization Scheme: https://www.rfc-editor.org/rfc/rfc8785.html
+- in-toto Statement v1: https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md
+- in-toto attestation framework: https://github.com/in-toto/attestation/blob/main/spec/README.md
+- SLSA Provenance v1: https://slsa.dev/spec/v1.0/provenance
+- FMI 3.0.2 specification: https://fmi-standard.org/docs/3.0.2/
+- OPA/Rego policy language: https://www.openpolicyagent.org/docs/policy-language
