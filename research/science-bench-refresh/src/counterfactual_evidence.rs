@@ -5,6 +5,7 @@
 //! plan's pre-run timestamp, or decide whether a claim follows from a source.
 //! The plan commitment must be anchored independently before the first trial.
 
+use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
