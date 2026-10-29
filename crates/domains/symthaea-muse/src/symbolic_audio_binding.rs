@@ -16,8 +16,10 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use symthaea_music_theory::edit_locality::{
-    EditLocalityError, EditLocalityEvidence, LocalityEvent, verify_edit_locality_evidence,
+    EditLocalityError, EditLocalityEvidence, LocalityEvent, MAX_EDIT_LOCALITY_EVENTS,
+    verify_edit_locality_evidence,
 };
+use symthaea_music_theory::Score;
 
 use crate::audio_preservation::{
     AudioAuditInputError, AudioPreservationReport, AudioView, OnsetPreservationReport,
@@ -77,6 +79,7 @@ pub enum SymbolicAudioBindingError {
     Symbolic(EditLocalityError),
     InvalidRendererManifest(&'static str),
     InvalidEvidence(&'static str),
+    UnsupportedScore(&'static str),
     SerializationFailure,
 }
 
@@ -89,6 +92,7 @@ impl std::fmt::Display for SymbolicAudioBindingError {
                 write!(f, "invalid renderer manifest: {reason}")
             }
             Self::InvalidEvidence(reason) => write!(f, "invalid edit evidence: {reason}"),
+            Self::UnsupportedScore(reason) => write!(f, "score cannot be represented by the current locality contract: {reason}"),
             Self::SerializationFailure => write!(f, "could not serialize binding receipt"),
         }
     }
@@ -301,6 +305,214 @@ pub fn create_symbolic_audio_render_binding(
     };
     binding.binding_receipt_sha256 = binding_receipt_sha256(&binding)?;
     Ok(binding)
+}
+
+
+/// Full-Muse-Score wrapper around the narrower symbolic/audio binding.
+///
+/// The inner symbolic verifier intentionally supports only a single,
+/// index-preserving monophonic line. This wrapper binds the entire serialized
+/// Score as well, and rejects score metadata that the current locality
+/// contract does not model instead of silently ignoring it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FullScoreRenderBinding {
+    pub binding_version: String,
+    pub source_score_content_sha256: String,
+    pub target_score_content_sha256: String,
+    pub projected_binding: SymbolicAudioRenderBinding,
+    pub receipt_sha256: String,
+}
+
+fn full_score_sha256(score: &Score) -> Result<String, SymbolicAudioBindingError> {
+    let bytes = serde_json::to_vec(score)
+        .map_err(|_| SymbolicAudioBindingError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-muse-score-content-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn validate_score_projection(score: &Score) -> Result<Vec<LocalityEvent>, SymbolicAudioBindingError> {
+    if score.notes.is_empty() {
+        return Err(SymbolicAudioBindingError::UnsupportedScore("score has no notes"));
+    }
+    if score.notes.len() > MAX_EDIT_LOCALITY_EVENTS {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "score exceeds the monophonic locality event budget",
+        ));
+    }
+    if !score.tempo_bpm.is_finite() || score.tempo_bpm <= 0.0 || score.meter == 0 {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "tempo must be finite and positive and meter must be non-zero",
+        ));
+    }
+
+    let ordered = score.events();
+    let first_part = ordered[0].part;
+    let first_role = ordered[0].role;
+    if ordered.iter().any(|note| note.part != first_part || note.role != first_role) {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "current projection supports one part and one voice role only",
+        ));
+    }
+
+    let mut projected: Vec<LocalityEvent> = Vec::with_capacity(ordered.len());
+    let mut previous_end: Option<f64> = None;
+    let mut maximum_end = 0.0f64;
+    for note in ordered {
+        let onset = note.onset.beats();
+        let duration = note.duration.beats();
+        let end = onset + duration;
+        if !onset.is_finite() || onset < 0.0 || !duration.is_finite() || duration <= 0.0 {
+            return Err(SymbolicAudioBindingError::UnsupportedScore(
+                "onsets must be finite/non-negative and durations finite/positive",
+            ));
+        }
+        if let Some(prior_end) = previous_end {
+            let prior_onset = projected
+                .last()
+                .expect("previous end implies a prior projected event")
+                .onset_beats;
+            if onset <= prior_onset || onset + 1.0e-9 < prior_end {
+                return Err(SymbolicAudioBindingError::UnsupportedScore(
+                    "simultaneous or overlapping notes are outside the monophonic contract",
+                ));
+            }
+        }
+        previous_end = Some(end);
+        maximum_end = maximum_end.max(end);
+        projected.push(LocalityEvent {
+            pitch_midi: note.pitch.midi() as i32,
+            onset_beats: onset,
+            duration_beats: duration,
+        });
+    }
+
+    if (score.total_beats.beats() - maximum_end).abs() > 1.0e-9 {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "score total_beats is inconsistent with the last note end",
+        ));
+    }
+    Ok(projected)
+}
+
+fn require_only_locality_dimensions_changed(
+    source_score: &Score,
+    target_score: &Score,
+) -> Result<(), SymbolicAudioBindingError> {
+    if source_score.key != target_score.key
+        || source_score.tempo_bpm.to_bits() != target_score.tempo_bpm.to_bits()
+        || source_score.meter != target_score.meter
+    {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "key, tempo, and meter edits are not covered by the current locality contract",
+        ));
+    }
+    let source_events = source_score.events();
+    let target_events = target_score.events();
+    if source_events.len() != target_events.len() {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "event insertion/deletion is not covered by the current locality contract",
+        ));
+    }
+    for (source, target) in source_events.iter().zip(&target_events) {
+        if source.part != target.part
+            || source.role != target.role
+            || source.emphasis != target.emphasis
+            || source.velocity.to_bits() != target.velocity.to_bits()
+            || source.section_intensity.to_bits() != target.section_intensity.to_bits()
+        {
+            return Err(SymbolicAudioBindingError::UnsupportedScore(
+                "part, role, velocity, emphasis, or section intensity changed outside the supported edit contract",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn full_score_binding_receipt_sha256(
+    binding: &FullScoreRenderBinding,
+) -> Result<String, SymbolicAudioBindingError> {
+    let mut unsealed = binding.clone();
+    unsealed.receipt_sha256.clear();
+    let bytes = serde_json::to_vec(&unsealed)
+        .map_err(|_| SymbolicAudioBindingError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-full-score-render-binding-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Create a binding directly from Muse's full Score type.
+///
+/// The supported subset is one non-overlapping part/role, identical key/tempo/
+/// meter, and unchanged part/role/velocity/emphasis/section-intensity metadata.
+/// The inner symbolic contract decides which pitch/onset/duration properties
+/// may change. This wrapper hashes every serialized score field.
+pub fn create_full_score_render_binding(
+    source_score: &Score,
+    target_score: &Score,
+    symbolic_evidence: &EditLocalityEvidence,
+    source_audio: AudioView<'_>,
+    target_audio: AudioView<'_>,
+    acoustic_evidence: &AudioPreservationReport,
+    onset_evidence: &OnsetPreservationReport,
+    renderer_manifest: &RendererManifest,
+) -> Result<FullScoreRenderBinding, SymbolicAudioBindingError> {
+    require_only_locality_dimensions_changed(source_score, target_score)?;
+    let source_events = validate_score_projection(source_score)?;
+    let target_events = validate_score_projection(target_score)?;
+    let projected_binding = create_symbolic_audio_render_binding(
+        &source_events,
+        &target_events,
+        symbolic_evidence,
+        source_audio,
+        target_audio,
+        acoustic_evidence,
+        onset_evidence,
+        renderer_manifest,
+    )?;
+
+    let mut binding = FullScoreRenderBinding {
+        binding_version: format!("{SYMBOLIC_AUDIO_BINDING_VERSION}+full-score-v0.1"),
+        source_score_content_sha256: full_score_sha256(source_score)?,
+        target_score_content_sha256: full_score_sha256(target_score)?,
+        projected_binding,
+        receipt_sha256: String::new(),
+    };
+    binding.receipt_sha256 = full_score_binding_receipt_sha256(&binding)?;
+    Ok(binding)
+}
+
+/// Verify a full Score envelope by recomputing the narrow projection and every
+/// child receipt from the supplied source/target Scores and audio buffers.
+pub fn verify_full_score_render_binding(
+    source_score: &Score,
+    target_score: &Score,
+    symbolic_evidence: &EditLocalityEvidence,
+    source_audio: AudioView<'_>,
+    target_audio: AudioView<'_>,
+    acoustic_evidence: &AudioPreservationReport,
+    onset_evidence: &OnsetPreservationReport,
+    renderer_manifest: &RendererManifest,
+    binding: &FullScoreRenderBinding,
+) -> Result<bool, SymbolicAudioBindingError> {
+    if binding.receipt_sha256.is_empty()
+        || full_score_binding_receipt_sha256(binding)? != binding.receipt_sha256
+    {
+        return Ok(false);
+    }
+    let expected = create_full_score_render_binding(
+        source_score,
+        target_score,
+        symbolic_evidence,
+        source_audio,
+        target_audio,
+        acoustic_evidence,
+        onset_evidence,
+        renderer_manifest,
+    )?;
+    Ok(expected == *binding)
 }
 
 /// Recompute the full cross-modal envelope from the original inputs and require
