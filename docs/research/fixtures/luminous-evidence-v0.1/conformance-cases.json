@@ -1,29 +1,32 @@
 {
   "suite": "LEP-CONFORMANCE-0.1",
-  "status": "prototype-fixtures",
+  "status": "prototype-with-rust-semantic-checker-source",
   "cases": [
     {
       "id": "LEP-SCHEMA-001",
       "file": "valid-passed.json",
       "schemaExpected": "accept",
-      "semanticExpected": "not_asserted",
-      "purpose": "Demonstrate a structurally valid in-toto statement with an LEP predicate."
+      "semanticExpected": "accept",
+      "purpose": "Demonstrate a structurally valid in-toto statement with an LEP predicate.",
+      "implementationStatus": "test-added-not-run-locally"
     },
     {
       "id": "LEP-SCHEMA-002",
       "file": "invalid-queued-but-passed.json",
       "schemaExpected": "reject",
-      "semanticExpected": "not_run",
+      "semanticExpected": "reject",
       "expectedFailure": "EXECUTION_STATUS_RESULT_CONFLICT",
-      "purpose": "Queued execution cannot be passed."
+      "purpose": "Queued execution cannot be passed.",
+      "implementationStatus": "test-added-not-run-locally"
     },
     {
       "id": "LEP-SCHEMA-003",
       "file": "invalid-missing-target.json",
       "schemaExpected": "reject",
-      "semanticExpected": "not_run",
+      "semanticExpected": "reject",
       "expectedFailure": "MISSING_TARGET",
-      "purpose": "Evidence claims must identify their source, configuration, and inputs."
+      "purpose": "Evidence claims must identify their source, configuration, and inputs.",
+      "implementationStatus": "test-added-not-run-locally"
     },
     {
       "id": "LEP-SEMANTIC-001",
@@ -31,8 +34,35 @@
       "schemaExpected": "accept",
       "semanticExpected": "reject",
       "expectedFailure": "LEP_TARGET_MISMATCH",
-      "implementationStatus": "Rust-semantic-checker-added; tests-not-run-locally",
+      "implementationStatus": "rust-checker-source-added-test-not-run-locally",
       "purpose": "Structural validation cannot compare target and checkedTarget; exact-target binding is a separate mandatory check."
+    },
+    {
+      "id": "LEP-SEMANTIC-002",
+      "file": "valid-passed.json",
+      "schemaExpected": "accept",
+      "semanticExpected": "accept",
+      "expectedFailure": null,
+      "implementationStatus": "test-added-not-run-locally",
+      "purpose": "A passing verification must name the exact target and have completed passing execution plus at least one recorded all-passing check."
+    },
+    {
+      "id": "LEP-SEMANTIC-003",
+      "file": "invalid-queued-but-passed.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "EXECUTION_STATUS_RESULT_CONFLICT",
+      "implementationStatus": "test-added-not-run-locally",
+      "purpose": "A queued execution cannot be reported as passed."
+    },
+    {
+      "id": "LEP-SEMANTIC-004",
+      "file": "invalid-missing-target.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "MISSING_TARGET",
+      "implementationStatus": "test-added-not-run-locally",
+      "purpose": "A claim without a source/configuration/input target must fail closed."
     }
   ]
 }
