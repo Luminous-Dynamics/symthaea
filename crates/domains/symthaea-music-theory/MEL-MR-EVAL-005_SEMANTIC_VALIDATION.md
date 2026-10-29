@@ -84,7 +84,7 @@ This table is illustrative; the accepted domain must be encoded in schema and co
 
 ## 4. Mutation and metamorphic conformance
 
-Use the JSONL corpus `mel-mr-eval-005-semantic-validation-cases-v0.1.jsonl`. Each row:
+Use the 34-case JSONL corpus `mel-mr-eval-005-semantic-validation-cases-v0.1.jsonl`. It includes cross-track and non-overlapping-region positive controls, so a validator that rejects every edit or treats each same-axis invariant as a conflict cannot pass. Each row:
 1. identifies the immutable base fixture;
 2. applies an ordered JSON-Pointer mutation list;
 3. declares expected structural/semantic verdict and stable diagnostic codes;
