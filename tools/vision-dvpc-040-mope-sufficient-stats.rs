@@ -31,7 +31,7 @@ const TEST_VALUES: [f64; 21] = [
     0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00,
 ];
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct ObservedStats {
     a0: optimizer::Sym2,
     a1: optimizer::Sym2,
@@ -39,6 +39,19 @@ struct ObservedStats {
     b0: optimizer::Vec2,
     b1: optimizer::Vec2,
     count: u64,
+}
+
+impl Default for ObservedStats {
+    fn default() -> Self {
+        Self {
+            a0: optimizer::Sym2 { a00: 0.0, a01: 0.0, a11: 0.0 },
+            a1: optimizer::Sym2 { a00: 0.0, a01: 0.0, a11: 0.0 },
+            a2: optimizer::Sym2 { a00: 0.0, a01: 0.0, a11: 0.0 },
+            b0: optimizer::Vec2::new(0.0, 0.0),
+            b1: optimizer::Vec2::new(0.0, 0.0),
+            count: 0,
+        }
+    }
 }
 
 impl ObservedStats {
@@ -277,7 +290,7 @@ fn direct_polynomial(samples: &[((f64, f64), optimizer::Vec2)], value: f64) -> f
         let d = w * r - value;
         let b = optimizer::Vec2::new(z, d);
         let a = optimizer::Sym2 { a00: z*z, a01: z*d, a11: d*d };
-        lambda.dot(b) + PSI * a.quad(lambda)
+        (lambda.x * b.x + lambda.y * b.y) + PSI * a.quad(lambda)
     }).sum()
 }
 
