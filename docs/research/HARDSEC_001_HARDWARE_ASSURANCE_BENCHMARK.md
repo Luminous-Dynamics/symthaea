@@ -102,6 +102,7 @@ If the dataset has too few independent groups for a meaningful family-holdout co
 - Detection delay in samples/instructions and wall time, throughput, memory, and monitoring overhead.
 - Missing traces, parse failures, abstentions, unsupported input, and verifier rejections as explicit counts; never silently drop them.
 - Precision at a range of deployment base rates, because a small false-positive rate can still overwhelm an operator when true incidents are rare.
+- Report the 1% FPR operating point as a challenge target only when the number of independent benign groups supports a meaningful estimate. If it is not estimable, say so explicitly; a handful of benign programs cannot substantiate a precise 1% false-positive guarantee.
 
 Windows from one program/execution are correlated. Uncertainty estimation should resample at the program/family/device level where possible; never treat every window as an independent experimental unit.
 
@@ -109,7 +110,7 @@ Windows from one program/execution are correlated. Uncertainty estimation should
 
 A result merits a stronger claim only if all of the following are met:
 
-1. On a preregistered held-out-group evaluation, Symthaea improves **macro family-level recall by at least 5 absolute percentage points at a fixed, validation-selected operating FPR**, *or* reaches baseline recall with at least 25% lower measured inference/monitoring cost.
+1. On a preregistered held-out-group evaluation, Symthaea improves **macro family-level recall by at least 5 absolute percentage points at a fixed, validation-selected operating FPR** (target 1% FPR when the independent benign sample supports it), *or* reaches baseline recall with at least 25% lower measured inference/monitoring cost.
 2. The paired, group-level uncertainty interval supports a positive improvement. If too few independent groups exist to estimate that interval credibly, the result remains exploratory rather than passing by default.
 3. The result survives at least three prespecified seeds, exact-data/hash reproduction, the leakage audit, and negative controls.
 4. Gains are not purchased by unacceptable false-positive burden, input exclusions, or materially worse performance on a held-out family.
