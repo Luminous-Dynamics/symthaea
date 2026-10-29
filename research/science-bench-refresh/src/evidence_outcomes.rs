@@ -548,6 +548,16 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
             if !unscored(record) {
                 issues.push(format!("{label} has scored outcomes despite a non-completed terminal status"));
             }
+            if record.terminal_status == OutcomeTerminalStatusV1::NotStarted
+                && (record.resources.wall_clock_ms.is_some()
+                    || record.resources.tool_calls.is_some()
+                    || record.resources.experiment_count.is_some()
+                    || record.resources.input_tokens.is_some()
+                    || record.resources.output_tokens.is_some()
+                    || record.resources.cost_micro_usd.is_some())
+            {
+                issues.push(format!("{label} is not_started but carries resource observations"));
+            }
         }
     }
     issues
@@ -840,7 +850,7 @@ mod tests {
             }
         }).collect::<Vec<_>>();
         let fields = crate::counterfactual_evidence::EvidenceInterventionPlanFieldsV1 {
-            schema: EVIDENCE_INTERVENTION_PLAN_SCHEMA.to_owned(),
+            schema: crate::counterfactual_evidence::EVIDENCE_INTERVENTION_PLAN_SCHEMA.to_owned(),
             generation_id: "generation-test".to_owned(),
             plan_id: "plan-test".to_owned(),
             policy_revision_sha256: digest('1'),
