@@ -172,7 +172,9 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
         || doc["source_v0_partition_digest_sha256"].as_str() != Some(V0_PARTITION)
         || doc["qualified_for_confirmatory_use"].as_bool() != Some(false)
     {
-        bail!("split input must be the pinned, explicitly unqualified component-first candidate format");
+        bail!(
+            "split input must be the pinned, explicitly unqualified component-first candidate format"
+        );
     }
     for field in [
         "source_split_manifest_sha256",
@@ -362,7 +364,9 @@ fn validate_component_manifest(bytes: &[u8], split: &CandidateSplit) -> Result<(
         || doc["relationship_inventory_sha256"].as_str()
             != Some(split.relationship_inventory_sha256.as_str())
     {
-        bail!("source component manifest is not bound to the pinned upstream and relationship inventory");
+        bail!(
+            "source component manifest is not bound to the pinned upstream and relationship inventory"
+        );
     }
     if split.dataset_kind == "synthetic_fixture"
         && doc["dataset_kind"].as_str() != Some("synthetic_fixture")
@@ -478,7 +482,9 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
         || !census.sealed_before_evaluation
         || census.outcomes_used
     {
-        bail!("census schema, source, dataset kind, or outcome-blind freeze conditions are invalid");
+        bail!(
+            "census schema, source, dataset kind, or outcome-blind freeze conditions are invalid"
+        );
     }
     validate_sha(&census.family_universe_sha256, "census family universe digest")?;
     validate_sha(&census.eligibility_policy_sha256, "eligibility policy digest")?;
@@ -491,7 +497,9 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
         .map(|family| family.family_id.clone())
         .collect();
     if census_families.len() != census.families.len() || census_families != candidate_families {
-        bail!("census family inventory must exactly cover the candidate family universe, without duplicates");
+        bail!(
+            "census family inventory must exactly cover the candidate family universe, without duplicates"
+        );
     }
     if family_universe_digest(&census_families) != census.family_universe_sha256 {
         bail!("census family-universe digest does not match its exact sorted family IDs");
@@ -671,16 +679,29 @@ fn execute() -> Result<()> {
 
     let mut blockers = vec![
         "This audit is structural and never authorizes confirmatory analysis.".to_owned(),
-        "Receipt digests are validated as identifiers but this tool does not authenticate reviewer signatures.".to_owned(),
-        "Simulation-based power, statement fidelity, graph coverage, and the primary analyzer gates remain separate requirements.".to_owned(),
+        concat!(
+            "Receipt digests are validated as identifiers but this tool does not ",
+            "authenticate reviewer signatures."
+        )
+        .to_owned(),
+        concat!(
+            "Simulation-based power, statement fidelity, graph coverage, and the primary ",
+            "analyzer gates remain separate requirements."
+        )
+        .to_owned(),
     ];
     if !structural_floor_met {
-        blockers.push(format!(
-            "Held-out eligible-component floor failed: validation={validation_eligible_components}, test={test_eligible_components}, minimum={MIN_HELDOUT_COMPONENTS} each."
-        ));
+        blockers.push(format!(concat!(
+            "Held-out eligible-component floor failed: ",
+            "validation={validation_eligible_components}, ",
+            "test={test_eligible_components}, minimum={MIN_HELDOUT_COMPONENTS} each."
+        )));
     }
     if !no_unknown_targets {
-        blockers.push(format!("Eligibility census contains unknown target/family status; unknown families/target-bearing families counted={unknown_family_count}."));
+        blockers.push(format!(concat!(
+            "Eligibility census contains unknown target/family status; ",
+            "unknown families/target-bearing families counted={unknown_family_count}."
+        )));
     }
     if census.dataset_kind != "reviewed_census" {
         blockers.push("Synthetic fixture is not an eligible benchmark census.".to_owned());
@@ -838,7 +859,7 @@ mod tests {
             .expect("candidate's self-described tables remain structurally consistent");
         assert!(
             validate_component_manifest(SYNTHETIC_COMPONENT_MANIFEST, &false_split).is_err(),
-            "the candidate must not redefine graph components independently of source manifest bytes"
+            "candidate must not redefine source component membership"
         );
     }
 
