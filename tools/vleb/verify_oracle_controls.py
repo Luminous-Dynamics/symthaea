@@ -248,11 +248,14 @@ def extract_test_bundle(bundle_raw: bytes, workspace: Path) -> list[dict[str, An
                     raise ControlError(f"test bundle file exceeds the 16 MiB per-file limit: {name!r}")
                 destination = workspace.joinpath(*rel.parts)
                 if info.is_dir():
-                    if destination.is_symlink():
-                        raise ControlError(f"test bundle directory conflicts with symlink: {name!r}")
-                    if destination.exists() and not destination.is_dir():
-                        raise ControlError(f"test bundle directory conflicts with existing file: {name!r}")
-                    destination.mkdir(parents=True, exist_ok=True)
+                    cursor = workspace
+                    for component in rel.parts:
+                        cursor = cursor / component
+                        if cursor.is_symlink():
+                            raise ControlError(f"symlink directory in test bundle path rejected: {name!r}")
+                        if cursor.exists() and not cursor.is_dir():
+                            raise ControlError(f"test bundle directory conflicts with existing file: {name!r}")
+                        cursor.mkdir(exist_ok=True)
                     continue
                 if destination.exists() or destination.is_symlink():
                     raise ControlError(f"test bundle must not overwrite source files: {name!r}")
