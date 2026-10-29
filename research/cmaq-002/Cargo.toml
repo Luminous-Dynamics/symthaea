@@ -7,3 +7,5 @@ license = "AGPL-3.0-or-later"
 description = "Finite-hypothesis active causal learning benchmark prototype"
 
 [dependencies]
+
+[workspace]
