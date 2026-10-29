@@ -41,7 +41,7 @@ jobs:
           grep -Fq $'LEGACY_WITNESS\tactual_minimum_factor\t0.455000000000' /tmp/vis-dvpc-044-results.tsv
           grep -Fq $'LEGACY_WITNESS\tviolates_half_wealth_floor\ttrue' /tmp/vis-dvpc-044-results.tsv
           grep -Fq $'SAFE_REGION\twitness_rejected\ttrue' /tmp/vis-dvpc-044-results.tsv
-          awk -F '\t' '$1=="PREDICTOR_CASE" && $3=="adjusted_mean" { value=$4; next } $1=="PREDICTOR_CASE" && $3=="true_value" { if (($4-value)>0.00000001 || (value-$4)>0.00000001) exit 1; n++ } END { if (n != 5) exit 1 }' /tmp/vis-dvpc-044-results.tsv
+          awk -F '\t' '$1=="PREDICTOR_CASE" && $3=="true_value" { truth[$2]=$4 } $1=="PREDICTOR_CASE" && $3=="adjusted_mean" { if (($4-truth[$2])>0.00000001 || (truth[$2]-$4)>0.00000001) exit 1; n++ } END { if (n != 5) exit 1 }' /tmp/vis-dvpc-044-results.tsv
       - name: Create exact source and output receipt
         run: |
           {
