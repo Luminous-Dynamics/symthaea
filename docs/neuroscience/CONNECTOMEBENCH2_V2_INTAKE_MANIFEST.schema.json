@@ -21,7 +21,8 @@
     "input_mode",
     "model_input_columns",
     "input_files",
-    "mapping_reviewed"
+    "mapping_reviewed",
+    "reviewed_by"
   ],
   "properties": {
     "schema_version": {
@@ -149,6 +150,14 @@
     "mapping_reviewed": {
       "const": true,
       "description": "Explicit operator attestation that task routing, label column, and true/false semantics were checked against the exact pinned upstream revision. This is not independent proof; retain the evidence path."
+    },
+    "em_preprocessing_profile": {
+      "enum": [
+        "not_applicable",
+        "single_segment_fuse_ab_zero_b",
+        "dual_segment_native"
+      ],
+      "description": "Required by the executable auditor whenever an EM input column is selected. Single-segment tasks merge A/B channels and zero B; dual-segment tasks retain both masks."
     }
   },
   "allOf": [
@@ -194,6 +203,126 @@
                 "const": "geometry_single"
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task": {
+            "const": "merge_correction_false_split"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task_route_value": {
+            "const": "false_split_correction"
+          },
+          "label_column": {
+            "const": "false_split_correction_label"
+          },
+          "label_true_semantics": {
+            "const": "same_neuron"
+          },
+          "input_mode": {
+            "const": "dual_segment"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task": {
+            "const": "split_correction_false_merge"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task_route_value": {
+            "const": "false_merge_identification"
+          },
+          "label_column": {
+            "const": "false_merge_identification_label"
+          },
+          "label_true_semantics": {
+            "const": "different_neuron"
+          },
+          "input_mode": {
+            "const": "single_segment"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "single_segment"
+          },
+          "model_input_columns": {
+            "contains": {
+              "enum": [
+                "em_xy",
+                "em_xz",
+                "em_yz"
+              ]
+            }
+          }
+        },
+        "required": [
+          "input_mode",
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "em_preprocessing_profile"
+        ],
+        "properties": {
+          "em_preprocessing_profile": {
+            "const": "single_segment_fuse_ab_zero_b"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "dual_segment"
+          },
+          "model_input_columns": {
+            "contains": {
+              "enum": [
+                "em_xy",
+                "em_xz",
+                "em_yz"
+              ]
+            }
+          }
+        },
+        "required": [
+          "input_mode",
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "em_preprocessing_profile"
+        ],
+        "properties": {
+          "em_preprocessing_profile": {
+            "const": "dual_segment_native"
           }
         }
       }
