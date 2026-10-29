@@ -224,7 +224,7 @@ class EligibilityFilterTests(unittest.TestCase):
         )
 
     def test_keyword_classifier_abstains_when_no_rule_matches(self) -> None:
-        self.assertEqual(infer_retrieval_intent("Tell me something interesting." )[0], None)
+        self.assertEqual(infer_retrieval_intent("Tell me something interesting.")[0], None)
         self.assertEqual(infer_retrieval_intent("   ")[0], None)
 
     def test_heuristic_mode_uses_prediction_not_annotated_intent(self) -> None:
@@ -235,7 +235,7 @@ class EligibilityFilterTests(unittest.TestCase):
             "audit": [candidate("/current"), candidate("/old")],
         }]
         policy = [ledger("/current", "current"), ledger("/old", "historical")]
-        result, metrics = filter_dataset(q_list := [q], predictions, policy, 2, intent_source="heuristic")
+        result, metrics = filter_dataset([q], predictions, policy, 2, intent_source="heuristic")
         self.assertEqual([row["source_pointer"] for row in result[0]["audit"]], ["/old"])
         self.assertEqual(metrics["intent_source"], "heuristic")
         self.assertEqual(metrics["intent_evaluation"]["accuracy"], 0.0)
