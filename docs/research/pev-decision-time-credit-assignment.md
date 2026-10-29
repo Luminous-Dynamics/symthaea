@@ -216,3 +216,16 @@ The causal-replay estimator now has a separate calibration script. Across 1,000 
 The next research increment should test **interaction attribution** rather than assume a single average PE effect generalizes to every cognitive context. Use a preregistered 2×2 factorial design: no PE/no context, PE only, context only, and PE+context. Estimate the PE main effect, context main effect, factorial interaction contrast, and Shapley credit split; compare with single-factor attribution under a fixed replay-call budget. Include planted synergistic and antagonistic cases so that a method that always attributes to PE, or ignores interactions, fails controls.
 
 This direction is motivated by *Causal Agent Replay*, which describes budget-bounded Monte Carlo Shapley attribution for interacting steps (https://arxiv.org/abs/2606.08275), and *Localizing Emergent Failures in Agentic AI: Recovering Minimal Repair Families via Counterfactual Replay*, which studies jointly necessary interventions and shows why single-event repair searches can miss interactions (https://arxiv.org/abs/2608.29228). These results motivate the benchmark design; they are not performance claims about Symthaea.
+
+## 15. Transportability, cluster dependence, subgroup reversal, and replay-order drift
+
+The v3 synthetic robustness harness adds three failure modes to the 2×2 PE/context factorial benchmark: clustered observations, opposite interaction signs across subgroups, and arm-order confounding under nonlinear drift. Exact implementation, output, and artifact identity audit are in `pev_factorial_transportability_v3.py`, `pev_factorial_transportability_v3_results.json`, and `pev_factorial_transportability_v3_source_audit.json`.
+
+On 1,000 synthetic seeds, a row-IID interval covered the planted +0.12 population interaction in 57.6% of replicates, while a cluster-mean interval covered it in 94.3%. This demonstrates pseudoreplication risk in the declared random-intercept data generator; it is not a universal coverage claim.
+
+In a balanced sign-reversal fixture, subgroup interactions +0.12 and −0.12 produced a pooled estimate around +0.00006. Both subgroup signs were recovered in 100% of 1,000 seeds, and the pooled estimate passed a ±0.02 practical-equivalence test in 100%. This illustrates why a pooled null/equivalence conclusion must not be interpreted as homogeneous treatment effect.
+
+With zero true interaction and quadratic order drift coefficient 0.02, fixed order produced mean estimated interaction +0.08016 with 0% nominal 95% CI coverage of zero; randomized arm order reduced the mean estimate to +0.00026 and achieved 94.7% coverage. Randomization addresses this planted arm/order confound but does not prove robustness to every form of real replay nonstationarity.
+
+All six v3 gates pass. These are synthetic reference tests only; no production Rust execution, real trace authenticity, task-utility improvement, or direct SOTA win is claimed. The next comparison should place this method alongside CAR (https://arxiv.org/abs/2606.08275), REFLECT (https://arxiv.org/abs/2606.09071), GCJR/MRFR (https://arxiv.org/abs/2608.29228), DCFA (https://aclanthology.org/2026.emnlp-main.1887/), and TraceTrial-Bench (https://github.com/TraceLite-AI/TraceTrial-Bench) on identical held-out traces with equal replay/model-call budgets and shared outcome adjudication.
+
