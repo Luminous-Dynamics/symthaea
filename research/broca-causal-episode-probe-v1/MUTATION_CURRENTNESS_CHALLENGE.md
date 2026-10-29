@@ -22,7 +22,7 @@ The ABA case matters: if an office address changes A → B → A, an old A recor
 - `run_probe.py`: accepts optional fixture paths while preserving the original defaults.
 - `score_probe.py`: scores required-support recall, ordinary complete-chain rate, **stale-aware complete-chain rate**, forbidden/stale hits, and distractor retrieval at the same fixed top-k budget.
 - `fixtures/mutations/eligibility-ledger.jsonl`: explicit status policy for every string source pointer (current, historical, revoked, tentative, not-applied, causal, or contextual).
-- `eligibility_filter.py`: provenance-bound eligibility-first ablation. It filters BM25 candidate pools before applying the final top-k budget and refuses unknown policy pointers. It uses manually annotated **oracle retrieval intent** to isolate the eligibility policy; it does not implement or evaluate a production query-intent classifier.
+- `eligibility_filter.py`: provenance-bound eligibility-first ablation, with `--intent-source annotated` (oracle upper bound) and `--intent-source heuristic` (transparent keyword baseline). Both filter a BM25 candidate pool before final top-k selection; unknown policy pointers fail closed and unknown heuristic intent produces an empty context.
 
 From the repository root, after compiling the Rust worker:
 
@@ -46,12 +46,25 @@ python3 research/broca-causal-episode-probe-v1/eligibility_filter.py \
   --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
   --trajectories research/broca-causal-episode-probe-v1/fixtures/mutations/trajectories.jsonl \
   --ledger research/broca-causal-episode-probe-v1/fixtures/mutations/eligibility-ledger.jsonl \
-  --k 5 --output /tmp/broca-mutation-eligible.jsonl
+  --intent-source annotated --k 5 --output /tmp/broca-mutation-eligible.jsonl
+
+# Compare the transparent keyword-intent baseline against the annotated upper bound.
+python3 research/broca-causal-episode-probe-v1/eligibility_filter.py \
+  --predictions /tmp/broca-mutation-candidates.jsonl \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --trajectories research/broca-causal-episode-probe-v1/fixtures/mutations/trajectories.jsonl \
+  --ledger research/broca-causal-episode-probe-v1/fixtures/mutations/eligibility-ledger.jsonl \
+  --intent-source heuristic --k 5 --output /tmp/broca-mutation-heuristic.jsonl
 
 python3 research/broca-causal-episode-probe-v1/score_probe.py \
   --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
   --predictions /tmp/broca-mutation-eligible.jsonl --k 5 \
   --output /tmp/broca-mutation-eligible-score.json
+
+python3 research/broca-causal-episode-probe-v1/score_probe.py \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --predictions /tmp/broca-mutation-heuristic.jsonl --k 5 \
+  --output /tmp/broca-mutation-heuristic-score.json
 
 python3 research/broca-causal-episode-probe-v1/test_eligibility_filter.py
 python3 research/broca-causal-episode-probe-v1/test_mutation_fixtures.py
@@ -67,7 +80,9 @@ This suite measures retrieval support selection against manually authored synthe
 
 The eligibility arm uses the same BM25 candidate pool as the baseline, then filters before truncating to the same final top-k. The ledger contains policy metadata for every string-valued source pointer; missing entries are rejected rather than passed through. Its receipt binds the original candidate receipt, worker hash, source fixture hashes, eligibility-ledger digest, policy version, and output digest.
 
-Question `retrieval_intent` is manually annotated and therefore an **oracle input**. This isolates whether a correct temporal/epistemic eligibility policy can prevent stale evidence from consuming the answer budget; it is an upper bound, not evidence that Broca can infer intent correctly. Do not compare its result to the baseline as a production-system win. The next experiment must replace the oracle intent with a separately evaluated classifier and report intent precision/recall, abstention, policy coverage, retained candidate count, and downstream safe-chain quality.
+Question `retrieval_intent` is manually annotated and therefore an **oracle input** in annotated mode. This isolates whether a correct temporal/epistemic eligibility policy can prevent stale evidence from consuming the answer budget; it is an upper bound, not evidence that Broca can infer intent correctly. Do not compare its result to BM25 as a production-system win.
+
+Heuristic mode applies fixed, transparent keyword rules and logs the predicted intent, matched rule, and comparison with the annotated intent in the receipt. It is a cheap control, not a learned classifier; the rules are hand-authored against this tiny fixture. Its current 12 prompts are not held out, so any apparent perfect intent accuracy here is only a fixture smoke check, not evidence of generalization. Unknown intent abstains with an empty context. A production version must be evaluated on an independently authored, held-out intent set, reporting per-class precision/recall, confusion matrix, abstention, policy coverage, retained candidate count, and downstream stale-aware answer quality.
 
 For `current_state`, old records are filtered; for `historical_state`, the system must preserve access to historical evidence; revocation questions retrieve the revocation event, not the prior active claim; proposal-history questions may retrieve tentative/not-applied events; causal-chain questions can retain failed interventions needed to interpret an outcome. This explicitly separates lifecycle state from the question's intent.
 
