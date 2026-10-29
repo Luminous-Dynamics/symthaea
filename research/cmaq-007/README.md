@@ -151,4 +151,21 @@ A negative answer is still useful. The benchmark must report where no method dom
 - No process isolation, cryptographic provenance, real-world robot interface, or hardware latency/energy measurement.
 - The search-pressure panel is a falsification smoke test, not an industry ranking and not a claim that the current construction beats any SOTA method.
 
-Next steps: add correlated and horizon-amplified model error; adversarial policy-search intensity; distribution shift after policy selection; support-score corruption and delayed/noisy-label controls; expand held-out mechanism families; and then compare Symthaea's model-based policy with direct and robust baselines on a matched task and compute budget.
+The new v0.5 companion begins the next step: a separate deterministic Rust panel crosses search sizes 8/32/128/512 with rollout depths 1/4/16 and two persistent-error growth settings. It reports prediction MAE, selected-action optimism, regret, unsupported-action selection, coverage, and paired regret-reduction intervals for fallback, greedy, uncertainty-penalized, support-gated and oracle policies.
+
+## Rollout-depth stress panel (v0.5 companion)
+
+Run from this directory:
+
+\`\`\`sh
+cargo test --locked
+cargo run --quiet --locked --bin horizon_stress
+\`\`\`
+
+The companion emits JSON with schema \`cmaq-007-horizon-stress-v0.1\` and 144 policy/search/depth/error-growth rows. It uses 128 paired episode seeds. The candidate catalog and evaluator truths remain identical across policies for each seed; search sizes are nested prefixes of a fixed 512-action catalog. The output includes raw prediction MAE and decision-facing metrics separately, plus paired 95% normal-approximation intervals for regret reduction against predicted-greedy.
+
+**New falsification axis:** action-specific model error persists across the rollout and is geometrically amplified by the declared \`rollout_growth\` factor. At zero growth, per-step error remains fixed with depth. At growth 0.20, the error is deliberately compounded across the horizon. This is a stress parameter for a hypothesized failure mode—not an estimate fitted to Symthaea, robotics, or a physical plant.
+
+The focused workflow tests three distinct claims rather than collapsing them into one score: (1) increasing search breadth can increase unsupported selection; (2) deeper rollouts under persistent error can increase selected optimism; and (3) the growth condition increases prediction MAE relative to the zero-growth control. It also checks oracle regret, fallback coverage, threshold coverage ordering, finite metrics and stable output schema.
+
+This panel still does **not** implement transition-state simulation, train a model, or establish a real-world horizon law. Because the synthetic generator intentionally chooses the error structure, passing establishes that this mechanism is observable and reproducibly scored—not that every world model exhibits it or that one baseline is universally superior. The next evidence step is to evaluate the same metrics on frozen, action-coupled environments with separately held dynamics and at least one independently implemented comparator. The support gate must retain the full coverage/risk frontier, including regimes where it abstains completely or does worse than fallback.
