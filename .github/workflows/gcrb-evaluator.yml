@@ -1,0 +1,85 @@
+name: GCRB Isolated Evaluator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/gcrb-evaluator/**"
+      - "docs/research/GOVERNANCE_CAPTURE_RESISTANCE_001.md"
+      - "docs/research/fixtures/governance-capture-resistance-*"
+      - ".github/workflows/gcrb-evaluator.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/gcrb-evaluator/**"
+      - "docs/research/GOVERNANCE_CAPTURE_RESISTANCE_001.md"
+      - "docs/research/fixtures/governance-capture-resistance-*"
+      - ".github/workflows/gcrb-evaluator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gcrb-evaluator-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-evaluator:
+    name: Format, test, clippy, fixture and trace checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format isolated crate
+        run: cargo fmt --manifest-path research/gcrb-evaluator/Cargo.toml -- --check
+
+      - name: Test isolated evaluator and mutation controls
+        run: cargo test --manifest-path research/gcrb-evaluator/Cargo.toml --no-fail-fast
+
+      - name: Clippy isolated evaluator
+        run: cargo clippy --manifest-path research/gcrb-evaluator/Cargo.toml --all-targets -- -D warnings
+
+      - name: Validate public fixture
+        run: cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-fixture docs/research/fixtures/governance-capture-resistance-v0.1.json
+
+      - name: Generate deterministic 1,000-control stress fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls \
+            docs/research/fixtures/governance-capture-resistance-v0.1.json \
+            1000 20261029 "$RUNNER_TEMP/gcrb-stress.json"
+          test -s "$RUNNER_TEMP/gcrb-stress.json"
+          sha256sum "$RUNNER_TEMP/gcrb-stress.json"
+          jq -e '.expected_case_count == 1018 and .expected_attack_count == 18 and .expected_negative_control_count == 1000 and .generator.known_answers_public == true' \
+            "$RUNNER_TEMP/gcrb-stress.json"
+
+      - name: Audit synthetic trace and assert hard-gate known answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- trace-audit \
+            docs/research/fixtures/governance-capture-resistance-v0.1.json \
+            docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json \
+            "$RUNNER_TEMP/gcrb-trace-report.json"
+          jq -e '.event_count == 6 and (.findings | length) == 6 and .complete_capture_cases == 6 and .unknown_capture_cases == 20 and .complete_capture_coverage == false and .qualification_eligible == false and .absence_of_findings_proven == false' \
+            "$RUNNER_TEMP/gcrb-trace-report.json"
+
+      - name: Emit generated dependency lock provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s research/gcrb-evaluator/Cargo.lock
+          sha256sum research/gcrb-evaluator/Cargo.lock
