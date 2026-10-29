@@ -485,7 +485,11 @@ mod tests {
             audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 1);
         assert_eq!(report.near_duplicate_candidate_pair_count, 0);
-        assert_eq!(report.admission, "blocked_exact_policy_input_overlap");
+        assert_eq!(
+            report.admission,
+            "blocked_shared_task_id_or_exact_policy_input_overlap"
+        );
+        assert_eq!(report.shared_task_id_count, 0);
     }
 
     #[test]
