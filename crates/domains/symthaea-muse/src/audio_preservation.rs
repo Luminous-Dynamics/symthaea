@@ -1092,9 +1092,11 @@ mod tests {
             &onset_config(),
         )
         .expect("valid mask");
-        assert_eq!(report.verdict, PreservationVerdict::Pass);
+        assert_eq!(report.verdict, PreservationVerdict::Abstain);
         assert!(report.reference_onsets.is_empty());
         assert!(report.candidate_onsets.is_empty());
+        assert!(report.missing_reference_events.is_empty());
+        assert!(report.extra_candidate_events.is_empty());
     }
 
     #[test]
