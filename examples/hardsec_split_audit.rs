@@ -522,8 +522,15 @@ fn write_receipt(summary: &AuditSummary, path: &Path) -> Result<(), String> {
                 path.display()
             )
         })?;
-    file.write_all(&bytes)
-        .map_err(|error| format!("cannot write receipt {}: {error}", path.display()))
+    if let Err(error) = file.write_all(&bytes) {
+        drop(file);
+        let _ = fs::remove_file(path);
+        return Err(format!(
+            "cannot write receipt {}: {error}; removed the incomplete output where possible",
+            path.display()
+        ));
+    }
+    Ok(())
 }
 
 fn held_out_group(sample: &Sample, protocol: &str, line_number: usize) -> Result<String, String> {
