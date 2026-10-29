@@ -16,6 +16,8 @@ Candidate predictions contain only case ID, predicted outcomes under the two int
 
 The outcomes under both interventions exist only because the current lane is a synthetic simulator. For a real-world intervention, never fabricate unchosen outcomes: evaluate observed interventions with logged propensities/identification assumptions or a validated simulator and label the evidence source.
 
+The committed fixture is a public evaluator smoke test only. It is not a sealed qualification set: anyone can inspect the fixture answer key, so it must never be used to report blind benchmark performance. Real qualification requires separately held, evaluator-controlled mechanisms and keys, with candidate predictions frozen before scoring.
+
 ## Metrics
 
 - Outcome MAE across both intervention conditions.
