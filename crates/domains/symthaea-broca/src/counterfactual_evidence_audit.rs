@@ -899,6 +899,14 @@ mod tests {
                 "case_id": "memory-influence-0001-a",
                 "evidence_id": "retry-config-1",
                 "reader_revision": "synthetic-reader-v1",
+            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+                "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
                 "full_context_tokens": 50,
                 "ablated_context_tokens": 40,
                 "full_fields": full,
@@ -980,7 +988,8 @@ mod tests {
             "claim.retry_limit.scope": "transient_network_errors"
         });
         // Removing a Control atom causes no required claim change: under-use.
-        rows[2]["ablated_fields"] = rows[2]["full_fields"].clone();
+        let unchanged_control = rows[2]["full_fields"].clone();
+        rows[2]["ablated_fields"] = unchanged_control;
         let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
         let result = score_atom_ablation_jsonl(&observations, LABELS)
             .expect("valid but behaviorally faulty synthetic observations still score");
