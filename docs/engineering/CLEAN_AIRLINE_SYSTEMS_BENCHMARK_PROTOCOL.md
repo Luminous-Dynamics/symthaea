@@ -253,3 +253,48 @@ Do not make a broad integration refactor before the manifest, quantity semantics
 ## 10. Nonclaims
 
 This protocol does not show that a clean airline exists, that electric/hydrogen aircraft are currently deployable for the chosen routes, that SMRs or fusion will be available on a specific schedule, that synthetic SAF is price-competitive, or that any policy beats the industry. A future PASS applies only to the exact frozen software contract and fixtures. Operational use requires independently validated models, qualified aircraft and equipment, legal approvals, human operational authority, and measured outcomes.
+
+
+## 11. P2 executable slice — time-indexed airport energy hub (2026-10-29)
+
+The separate aviation_energy_hub module is the first time-indexed extension. It is synthetic-first and intentionally bounded to at most eight ordered intervals and 32 total delivered-energy quanta.
+
+### V1 state and decisions
+
+Per interval the model binds:
+- fixed renewable generation (all generation cost and lifecycle emissions are counted, even if curtailed);
+- charging/service demand and an explicit charger-capacity limit;
+- grid import capacity, cost and declared lifecycle CO2e factor;
+- renewable evidence reference/class and grid evidence reference/class;
+- direct renewable use, grid import, battery discharge, renewable surplus charged, curtailment, and exact state-of-charge before/after.
+
+Storage begins empty in V1. Integer-quantum efficiencies are conservative: charging conversion floors stored energy; discharge conversion rounds up the state of charge required. Simultaneous charge/discharge and grid-to-storage charging are disallowed. The terminal reserve is a hard constraint.
+
+### Independent verification
+
+The plan verifier independently checks:
+- canonical SHA-256 scenario identity and plan identity;
+- exact interval count/order;
+- demand balance, charger/grid/storage power limits and source balance;
+- no simultaneous charge and discharge;
+- curtailment arithmetic and exact storage state transitions;
+- minimum terminal reserve;
+- recomputed source ledger, cost and accounted lifecycle CO2e.
+
+Search returns a Pareto frontier minimizing cost, minimizing the supplied lifecycle CO2e metric, and maximizing final stored energy. It returns no frontier if its node budget is exhausted. A deterministic local renewable-first / grid-second / battery-last policy is included only as a deliberately myopic baseline.
+
+### Explicit omissions
+
+V1 is not an AC/DC power-flow solver and does not model voltage/frequency stability, transmission losses upstream of the declared energy bus, reactive power, grid-forming behavior, hydrogen/e-SAF production, grid-to-battery charging, aircraft-to-grid export, degradation over lifetime, uncertainty distributions, flight schedule recourse, physical aircraft feasibility, certification, or non-CO2 aviation effects. Renewable generation is a fixed input, not a forecast or a measured power series. All test factors are synthetic.
+
+### Proposed P2 gates
+
+- Exact agreement with independently hand-enumerated tiny fixtures.
+- No exact result when a search budget expires.
+- Zero demand, capacity, energy-state or terminal-reserve violations in returned plans.
+- Byte-stable manifest digests under unchanged ordered input; digest changes on any material field change.
+- Report cost, lifecycle CO2e, grid imports, renewable generated/used/curtailed, storage losses and final reserve separately.
+- Demonstrate at least one case where a myopic baseline fails or is dominated by exact time-coupled scheduling.
+- Do not claim a measured cost or CO2e improvement until inputs are calibrated, the model is independently tested and a matched held-out evaluation is available.
+
+This software slice does not establish actual airport resilience, renewable availability, a carbon factor, a physical storage rating, or operational authority.
