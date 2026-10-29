@@ -42,6 +42,7 @@ This is a correctness-first compatibility tradeoff until the versioned length-bo
 - Reject final fragment without FEC with a recomputed valid CRC.
 - Reject conflicting total count and misplaced FEC directly in FragmentAssembler before state advances.
 - Accept a fully received variable-length payload even when the nominal expected size is stale; bound allocation even for usize::MAX nominal size.
+- Exact-size mode rejects payload-size/count mismatches and checked-size overflow before accepting a shard, and verifies reconstructed output equals the declared size.
 - Reject inferred final-tail recovery when the nominal length is inconsistent; return None instead of panicking.
 - Preserve normal full reassembly, middle-shard recovery, last-shard recovery for callers with a truly exact payload size, lost-parity behavior, and legal reordering.
 - Ensure duplicate and CRC-valid but count-mismatched receiver frames do not refresh last_fragment_at or last_fragment_index.
