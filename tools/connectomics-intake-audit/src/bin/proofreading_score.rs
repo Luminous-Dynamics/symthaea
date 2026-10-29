@@ -79,6 +79,10 @@ struct Args {
     #[arg(long, default_value = "0.5,0.7,0.8,0.9,0.95")]
     coverage_targets: String,
 
+    /// Number of deterministic cluster-bootstrap replicates; at least 100 required.
+    #[arg(long, default_value_t = 500)]
+    bootstrap_replicates: usize,
+
     /// Write report to this JSON file (stdout if omitted).
     #[arg(long)]
     output: Option<PathBuf>,
@@ -91,6 +95,8 @@ struct Prediction {
     sample_id: String,
     /// Frozen grouping, preferably species:error_family (e.g. mouse:merge).
     group: String,
+    /// Dependency cluster for uncertainty estimation (e.g. volume/cube/neuron), not the row ID.
+    cluster_id: String,
     /// Independent adjudication: true iff a real reconstruction error requiring correction exists.
     label_is_error: bool,
     /// Frozen model probability that this candidate is a genuine error, calibrated if claimed.
@@ -117,17 +123,39 @@ struct Report {
     prediction_profile_sha256: String,
     evaluation_partition: EvaluationPartition,
     review_time_basis: ReviewTimeBasis,
+    bootstrap_replicates: usize,
     input_sha256: String,
     n_candidates: usize,
     positive_errors: usize,
     negative_controls: usize,
     status: &'static str,
     overall: ClassificationMetrics,
-    per_group: BTreeMap<String, ClassificationMetrics>,
+    overall_cluster_bootstrap_95: ClusterBootstrap,
+    per_group: BTreeMap<String, GroupEvaluation>,
     item_budget_results: Vec<ReviewYield>,
     review_time_budget_results: Vec<ReviewYield>,
     risk_coverage_results: Vec<RiskCoveragePoint>,
     scope_note: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct GroupEvaluation {
+    classification: ClassificationMetrics,
+    balanced_accuracy_cluster_bootstrap_95: ClusterBootstrap,
+}
+
+#[derive(Debug, Serialize)]
+struct ClusterBootstrap {
+    requested_replicates: usize,
+    valid_replicates: usize,
+    minimum_valid_replicates_for_interval: usize,
+    balanced_accuracy_95: Option<Interval>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+struct Interval {
+    lower: f64,
+    upper: f64,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -217,6 +245,9 @@ fn parse_jsonl(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
         }
         if row.group.trim().is_empty() {
             return Err(format!("line {} has an empty group", index + 1));
+        }
+        if row.cluster_id.trim().is_empty() {
+            return Err(format!("line {} has an empty cluster_id; cluster-aware intervals require a dependency unit", index + 1));
         }
         if !ids.insert(row.sample_id.clone()) {
             return Err(format!(
@@ -354,6 +385,84 @@ fn classification(rows: &[&Prediction]) -> ClassificationMetrics {
     }
 }
 
+fn balanced_accuracy_only(rows: &[&Prediction]) -> Option<f64> {
+    let positives = rows.iter().filter(|r| r.label_is_error).count();
+    let negatives = rows.len().saturating_sub(positives);
+    if positives == 0 || negatives == 0 {
+        return None;
+    }
+    let tp = rows.iter().filter(|r| r.label_is_error && r.p_error >= 0.5).count();
+    let tn = rows.iter().filter(|r| !r.label_is_error && r.p_error < 0.5).count();
+    Some((tp as f64 / positives as f64 + tn as f64 / negatives as f64) / 2.0)
+}
+
+fn next_u64(state: &mut u64) -> u64 {
+    if *state == 0 {
+        *state = 0x9e3779b97f4a7c15;
+    }
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    *state
+}
+
+fn percentile(sorted: &[f64], p: f64) -> Option<f64> {
+    if sorted.is_empty() {
+        return None;
+    }
+    let index = (p * (sorted.len() - 1) as f64).floor() as usize;
+    sorted.get(index).copied()
+}
+
+fn cluster_bootstrap(rows: &[&Prediction], replicates: usize, seed_material: &str) -> ClusterBootstrap {
+    let mut clusters: BTreeMap<String, Vec<&Prediction>> = BTreeMap::new();
+    for row in rows {
+        clusters.entry(row.cluster_id.clone()).or_default().push(*row);
+    }
+    let cluster_rows: Vec<Vec<&Prediction>> = clusters.into_values().collect();
+    let minimum_valid = ((replicates as f64) * 0.8).ceil() as usize;
+    if cluster_rows.len() < 2 || replicates == 0 {
+        return ClusterBootstrap {
+            requested_replicates: replicates,
+            valid_replicates: 0,
+            minimum_valid_replicates_for_interval: minimum_valid,
+            balanced_accuracy_95: None,
+        };
+    }
+
+    let digest = sha256(seed_material.as_bytes());
+    let mut state = u64::from_str_radix(&digest[..16], 16).unwrap_or(1);
+    if state == 0 {
+        state = 1;
+    }
+    let mut scores = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut sample = Vec::with_capacity(rows.len());
+        for _ in 0..cluster_rows.len() {
+            let index = (next_u64(&mut state) % cluster_rows.len() as u64) as usize;
+            sample.extend(cluster_rows[index].iter().copied());
+        }
+        if let Some(score) = balanced_accuracy_only(&sample) {
+            scores.push(score);
+        }
+    }
+    scores.sort_by(f64::total_cmp);
+    let interval = if scores.len() >= minimum_valid {
+        Some(Interval {
+            lower: percentile(&scores, 0.025).unwrap_or(0.0),
+            upper: percentile(&scores, 0.975).unwrap_or(1.0),
+        })
+    } else {
+        None
+    };
+    ClusterBootstrap {
+        requested_replicates: replicates,
+        valid_replicates: scores.len(),
+        minimum_valid_replicates_for_interval: minimum_valid,
+        balanced_accuracy_95: interval,
+    }
+}
+
 fn ratio(num: usize, den: usize) -> Option<f64> {
     if den == 0 { None } else { Some(num as f64 / den as f64) }
 }
@@ -461,6 +570,9 @@ fn run() -> Result<i32, String> {
     if args.mapping_reference.trim().is_empty() {
         return Err("--mapping-reference must identify the reviewed label normalization contract".into());
     }
+    if args.bootstrap_replicates < 100 {
+        return Err("--bootstrap-replicates must be at least 100".into());
+    }
     if !is_lower_hex(&args.dataset_revision_commit_sha, 40) {
         return Err("--dataset-revision-commit-sha must be a lowercase 40-character Git SHA".into());
     }
@@ -479,12 +591,27 @@ fn run() -> Result<i32, String> {
     let records = parse_jsonl(&input_bytes)?;
     let refs: Vec<&Prediction> = records.iter().collect();
     let overall = classification(&refs);
+    let overall_cluster_bootstrap_95 = cluster_bootstrap(
+        &refs,
+        args.bootstrap_replicates,
+        &format!("{input_hash}:overall"),
+    );
     let mut by_group: BTreeMap<String, Vec<&Prediction>> = BTreeMap::new();
     for row in &records {
         by_group.entry(row.group.clone()).or_default().push(row);
     }
     let per_group = by_group.iter().map(|(group, rows)| {
-        (group.clone(), classification(rows))
+        (
+            group.clone(),
+            GroupEvaluation {
+                classification: classification(rows),
+                balanced_accuracy_cluster_bootstrap_95: cluster_bootstrap(
+                    rows,
+                    args.bootstrap_replicates,
+                    &format!("{input_hash}:{group}"),
+                ),
+            },
+        )
     }).collect();
     let item_budget_results = item_fractions.iter().map(|fraction| {
         let count = (*fraction * records.len() as f64).ceil().max(1.0);
@@ -508,17 +635,19 @@ fn run() -> Result<i32, String> {
         prediction_profile_sha256: args.prediction_profile_sha256,
         evaluation_partition: args.evaluation_partition,
         review_time_basis: args.review_time_basis,
+        bootstrap_replicates: args.bootstrap_replicates,
         input_sha256: input_hash,
         n_candidates: overall.n,
         positive_errors: overall.positive_errors,
         negative_controls: overall.negative_controls,
         status: "SCORED_NOT_PROMOTED",
         overall,
+        overall_cluster_bootstrap_95,
         per_group,
         item_budget_results,
         review_time_budget_results,
         risk_coverage_results,
-        scope_note: "Metrics describe this frozen prediction file only. This scorer does not validate dataset labels or mapping truth, correct for clustered sampling, prove calibration under shift, or establish prospective review-time savings. Use cluster-aware inference and a locked evaluation protocol before claims.",
+        scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
     };
     let json = serde_json::to_string_pretty(&report)
         .map_err(|e| format!("failed to serialize report: {e}"))? + "\n";
@@ -550,6 +679,7 @@ mod tests {
         Prediction {
             sample_id: id.into(),
             group: group.into(),
+            cluster_id: format!("cluster-{id}"),
             label_is_error: label,
             p_error: p,
             review_priority_score: priority,
@@ -589,13 +719,13 @@ mod tests {
 
     #[test]
     fn invalid_probability_fails_closed() {
-        let line = r#"{"sample_id":"a","group":"mouse:merge","label_is_error":true,"p_error":1.1,"review_priority_score":0.8,"review_minutes":1.0,"impact_weight":1.0}"#;
+        let line = r#"{"sample_id":"a","group":"mouse:merge","cluster_id":"cube-a","label_is_error":true,"p_error":1.1,"review_priority_score":0.8,"review_minutes":1.0,"impact_weight":1.0}"#;
         assert!(parse_jsonl(line.as_bytes()).unwrap_err().contains("p_error"));
     }
 
     #[test]
     fn duplicate_sample_ids_fail_closed() {
-        let line = r#"{"sample_id":"a","group":"mouse:merge","label_is_error":true,"p_error":0.9,"review_priority_score":0.8,"review_minutes":1.0,"impact_weight":1.0}"#;
+        let line = r#"{"sample_id":"a","group":"mouse:merge","cluster_id":"cube-a","label_is_error":true,"p_error":0.9,"review_priority_score":0.8,"review_minutes":1.0,"impact_weight":1.0}"#;
         let input = format!("{line}\n{line}\n");
         assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("duplicate sample_id"));
     }
