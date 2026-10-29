@@ -18151,6 +18151,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-architecture-engineering"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-art-eye"
 version = "0.1.0"
 dependencies = [

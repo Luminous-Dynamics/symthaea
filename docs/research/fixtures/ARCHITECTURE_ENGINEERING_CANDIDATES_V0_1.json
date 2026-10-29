@@ -1,0 +1,355 @@
+{
+  "schema": "symthaea.architecture-engineering.candidate-matrix",
+  "version": "0.1.0",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8888",
+  "protocol": "docs/research/ARCHITECTURE_ENGINEERING_PROGRAM_V0_1.md",
+  "qualification_state": "DESIGN_ONLY_NOT_IMPLEMENTED_NOT_EXECUTED_NOT_QUALIFIED_NOT_PASS",
+  "claim_ceiling": "Candidate definitions only. No measured performance, SOTA, replication, or production readiness is claimed.",
+  "roadmap_boundary": "Isolated parallel research track; does not change the post-Transformer product roadmap.",
+  "evaluation_policy": {
+    "search_reads_final_test": false,
+    "primary_objective": "pre-registered task quality subject to multi-objective resource constraints",
+    "reported_objectives": [
+      "held_out_nll",
+      "held_out_perplexity",
+      "bits_per_byte",
+      "task_quality",
+      "prefill_latency_ms",
+      "ttft_ms",
+      "tpot_ms",
+      "p50_output_tokens_per_second",
+      "p95_output_tokens_per_second",
+      "aggregate_throughput_tokens_per_second",
+      "peak_host_memory_bytes",
+      "peak_accelerator_memory_bytes",
+      "training_tokens",
+      "training_flops_or_declared_estimate",
+      "wall_clock_seconds",
+      "energy_joules_per_output_token_with_measurement_method"
+    ],
+    "screening_seeds_minimum": 3,
+    "promotion_seeds_minimum": 5,
+    "paired_confidence_interval_required_for_promotion": true,
+    "all_measurements_must_bind_to_exact_source_and_config": true,
+    "null_means_not_measured": true
+  },
+  "proposed_promotion_thresholds": {
+    "status": "PROPOSED_NOT_ACHIEVED",
+    "quality_absolute_accuracy_gain_percentage_points": 1.0,
+    "maximum_guardrail_regression_percentage_points": 0.5,
+    "throughput_gain_fraction": 0.2,
+    "energy_per_token_reduction_fraction": 0.15,
+    "accuracy_non_inferiority_margin_percentage_points": 0.5,
+    "relative_nll_non_inferiority_margin": 0.01,
+    "notes": "Thresholds must be pre-registered against the chosen primary task; they are not universal SOTA criteria."
+  },
+  "architecture_candidates": [
+    {
+      "id": "AE-BASE-01",
+      "name": "dense_full_attention_baseline",
+      "family": "dense_transformer",
+      "phase": 0,
+      "priority": "P0",
+      "hypothesis": "A task-valid and reproducible dense decoder baseline is required before architecture effects can be interpreted.",
+      "control_ids": [],
+      "required_controls": [
+        "fixed tokenizer and dataset split",
+        "tiny-subset overfit sanity check",
+        "held-out scoring validity",
+        "baseline prefill/decode/memory profile"
+      ],
+      "prerequisites": [
+        "source-audit training and evaluation path",
+        "freeze exact checkpoint or initialization and training recipe"
+      ],
+      "measurements": {
+        "source_commit": null,
+        "config_digest": null,
+        "dataset_digest": null,
+        "tokenizer_digest": null,
+        "checkpoint_digest": null,
+        "parameter_count": null,
+        "training_tokens": null,
+        "training_flops": null,
+        "held_out_nll": null,
+        "held_out_perplexity": null,
+        "task_quality": null,
+        "prefill_latency_ms": null,
+        "ttft_ms": null,
+        "tpot_ms": null,
+        "output_tokens_per_second": null,
+        "peak_host_memory_bytes": null,
+        "peak_accelerator_memory_bytes": null,
+        "energy_joules_per_output_token": null,
+        "seed_count": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AE-ALLOC-01",
+      "name": "dense_allocation_and_gqa_sweep",
+      "family": "dense_transformer",
+      "phase": 1,
+      "priority": "P1",
+      "hypothesis": "Hidden size, depth/width, MLP-to-attention parameter allocation and grouped-query attention can move the quality-throughput frontier under matched training compute.",
+      "control_ids": ["AE-BASE-01"],
+      "required_controls": [
+        "default/reference allocation",
+        "random-search policy at equal candidate-evaluation budget",
+        "matched training-compute reporting",
+        "parameter-count reporting"
+      ],
+      "prerequisites": [
+        "AE-BASE-01 qualified",
+        "architecture changes and training FLOP estimates validated"
+      ],
+      "measurements": {
+        "source_commit": null,
+        "candidate_configs_evaluated": null,
+        "best_held_out_nll": null,
+        "best_task_quality": null,
+        "best_output_tokens_per_second": null,
+        "search_compute_budget": null,
+        "pareto_hypervolume": null,
+        "time_to_target_seconds": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AE-LG-01",
+      "name": "local_global_attention",
+      "family": "hybrid_attention",
+      "phase": 2,
+      "priority": "P2",
+      "hypothesis": "Local attention plus explicit global-attention layers may reduce long-context cost while preserving cross-sequence composition needed by the task.",
+      "control_ids": ["AE-BASE-01"],
+      "required_controls": [
+        "full-attention baseline",
+        "equal context length and task mix",
+        "score by evidence position and context-length bucket",
+        "long-context realistic tasks plus synthetic diagnostics"
+      ],
+      "prerequisites": [
+        "AE-BASE-01 qualified",
+        "local/global attention implementation and mask semantics verified"
+      ],
+      "measurements": {
+        "source_commit": null,
+        "context_lengths_tested": null,
+        "held_out_nll_by_length": null,
+        "task_quality_by_length": null,
+        "prefill_cost_by_length": null,
+        "decode_cost_by_length": null,
+        "peak_memory_by_length": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AE-SSM-01",
+      "name": "available_recurrent_or_state_space_baseline",
+      "family": "recurrent_state_space",
+      "phase": 1,
+      "priority": "P1",
+      "hypothesis": "A strong feasible recurrent/state-space implementation may offer better streaming or state-tracking efficiency on selected workloads, despite possible kernel and quality trade-offs.",
+      "control_ids": ["AE-BASE-01"],
+      "preferred_reference": "Mamba-3 only if exact compatible weights, license, tokenizer, implementation and target kernels are available; otherwise name the actual reference used.",
+      "required_controls": [
+        "dense baseline on the same workload and target hardware",
+        "explicit checkpoint/recipe difference accounting",
+        "actual kernel/runtime measurements",
+        "state-tracking and retrieval evaluations"
+      ],
+      "prerequisites": [
+        "checkpoint and implementation availability audit",
+        "valid evaluation harness"
+      ],
+      "measurements": {
+        "reference_model_identity": null,
+        "weights_digest": null,
+        "license": null,
+        "implementation_revision": null,
+        "kernel_identity": null,
+        "held_out_nll": null,
+        "task_quality": null,
+        "ttft_ms": null,
+        "tpot_ms": null,
+        "output_tokens_per_second": null,
+        "peak_accelerator_memory_bytes": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AE-HYB-01",
+      "name": "selective_full_attention_state_space_hybrid",
+      "family": "hybrid_attention_state_space",
+      "phase": 2,
+      "priority": "P2",
+      "hypothesis": "Keeping selected full-attention layers while replacing other layers with a recurrent/state-space mechanism may improve a workload-specific Pareto frontier.",
+      "control_ids": ["AE-BASE-01", "AE-SSM-01"],
+      "required_controls": [
+        "dense-only control",
+        "recurrent/state-space-only control where feasible",
+        "factorial layer-placement ablations",
+        "sequential function-composition stress test"
+      ],
+      "prerequisites": [
+        "AE-BASE-01 qualified",
+        "AE-SSM-01 measured or explicitly documented as unavailable"
+      ],
+      "measurements": {
+        "layer_allocation": null,
+        "training_compute": null,
+        "held_out_nll": null,
+        "task_quality": null,
+        "long_context_quality": null,
+        "output_tokens_per_second": null,
+        "peak_accelerator_memory_bytes": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AE-HDC-01",
+      "name": "hdc_retrieval_sidecar",
+      "family": "retrieval_augmented_hybrid",
+      "phase": 2,
+      "priority": "P2",
+      "hypothesis": "An HDC associative-retrieval sidecar may improve evidence retrieval or structured recall without replacing the language backbone.",
+      "control_ids": ["AE-BASE-01"],
+      "required_controls": [
+        "backbone alone",
+        "correct retrieval",
+        "randomized or irrelevant retrieval negative control",
+        "retrieval latency/memory included in total cost",
+        "evidence provenance and distractor robustness"
+      ],
+      "prerequisites": [
+        "retrieval corpus and binding semantics frozen",
+        "task labels and evaluator validated"
+      ],
+      "measurements": {
+        "retrieval_recall_at_k": null,
+        "downstream_task_quality": null,
+        "unsupported_answer_rate": null,
+        "retrieval_latency_ms": null,
+        "added_memory_bytes": null,
+        "total_output_tokens_per_second": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AE-TTT-01",
+      "name": "context_local_adaptation",
+      "family": "test_time_training",
+      "phase": 3,
+      "priority": "P3",
+      "hypothesis": "A bounded context-local update may improve long-context use more efficiently than additional generated thought tokens on selected tasks.",
+      "control_ids": ["AE-BASE-01", "AE-HDC-01"],
+      "required_controls": [
+        "static model",
+        "equal total-compute extra-thought arm",
+        "HDC retrieval arm",
+        "no answer/label leakage into update",
+        "prove per-request adaptation resets and base weights remain unchanged"
+      ],
+      "prerequisites": [
+        "follow issue #8362",
+        "all static baselines qualified",
+        "strict request-local state isolation test"
+      ],
+      "measurements": {
+        "update_compute": null,
+        "extra_thought_compute": null,
+        "downstream_task_quality": null,
+        "long_context_quality": null,
+        "total_latency_ms": null,
+        "temporary_memory_bytes": null,
+        "base_weights_unchanged": null,
+        "request_state_reset_verified": null,
+        "confidence_interval": null,
+        "run_receipt": null
+      },
+      "status": "NOT_RUN"
+    }
+  ],
+  "search_policy_candidates": [
+    {
+      "id": "SEARCH-RANDOM-01",
+      "name": "random_search",
+      "role": "required control",
+      "status": "NOT_RUN",
+      "metrics": {
+        "evaluations_to_target": null,
+        "best_score_by_budget": null,
+        "pareto_hypervolume_by_budget": null,
+        "wall_clock_seconds": null,
+        "compute_used": null
+      }
+    },
+    {
+      "id": "SEARCH-ADAPTIVE-01",
+      "name": "tpe_or_bayesian_optimization",
+      "role": "conventional adaptive-search control; use only if implementation is available and pinned",
+      "status": "NOT_RUN",
+      "metrics": {
+        "evaluations_to_target": null,
+        "best_score_by_budget": null,
+        "pareto_hypervolume_by_budget": null,
+        "wall_clock_seconds": null,
+        "compute_used": null
+      }
+    },
+    {
+      "id": "SEARCH-SYMTHAEA-01",
+      "name": "symthaea_guided_search",
+      "role": "candidate policy; optimize measured task outcomes, not Phi alone",
+      "status": "NOT_RUN",
+      "metrics": {
+        "evaluations_to_target": null,
+        "best_score_by_budget": null,
+        "pareto_hypervolume_by_budget": null,
+        "wall_clock_seconds": null,
+        "compute_used": null
+      }
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "NEG-EVAL-LABEL-SHUFFLE",
+      "purpose": "Search must not discover reliable gains when candidate outcome labels are shuffled.",
+      "expected": "No reproducible signal above chance; otherwise the search-analysis pipeline is invalid.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "NEG-HDC-IRRELEVANT-RETRIEVAL",
+      "purpose": "Measure whether irrelevant/random HDC retrieval creates apparent gains or harms.",
+      "expected": "No claimed retrieval benefit without improvement over backbone-only and relevant-retrieval controls.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "NEG-BROKEN-EVALUATOR",
+      "purpose": "An evaluator deliberately not conditioned on task text must be rejected by validation.",
+      "expected": "Fail closed; no benchmark score promoted.",
+      "status": "NOT_RUN"
+    }
+  ],
+  "research_references": [
+    "https://proceedings.iclr.cc/paper_files/paper/2026/hash/dd2eb5250696753ea37141bbd89bb569-Abstract-Conference.html",
+    "https://proceedings.mlr.press/v306/ye26h.html",
+    "https://proceedings.iclr.cc/paper_files/paper/2026/hash/8abd2043b71a074278d5f687947bff9c-Abstract-Conference.html",
+    "https://proceedings.iclr.cc/paper_files/paper/2025/hash/f5332c8273d02729730a9c24dec2135e-Abstract-Conference.html",
+    "https://aclanthology.org/2025.acl-long.183/",
+    "https://mlcommons.org/benchmarks/client/"
+  ]
+}
