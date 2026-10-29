@@ -126,7 +126,7 @@ pub enum EvidenceCandidateDisposition {
     ScopeMismatch,
     NotYetValid,
     Expired,
-    EligibleBeyondOutputLimit,
+    MetadataEligibleBeyondOutputLimit,
 }
 
 /// Per-input-candidate disposition, retained in the original hit order.
@@ -1507,7 +1507,7 @@ impl EvidenceIndex {
                 } else if record.valid_until_unix_ms.is_some_and(|end| now_ms >= end) {
                     EvidenceCandidateDisposition::Expired
                 } else if items.len() >= max_items {
-                    EvidenceCandidateDisposition::EligibleBeyondOutputLimit
+                    EvidenceCandidateDisposition::MetadataEligibleBeyondOutputLimit
                 } else {
                     // Any payload integrity/path failure must abort rather than
                     // silently lowering the evidence floor.
@@ -2114,7 +2114,7 @@ mod tests {
             EvidenceFloorPolicy { minimum_items: 1, minimum_distinct_trajectories: 1 },
         ).unwrap();
         assert_eq!(result.items.len(), 1);
-        assert_eq!(result.candidate_audit[1].disposition, EvidenceCandidateDisposition::EligibleBeyondOutputLimit);
+        assert_eq!(result.candidate_audit[1].disposition, EvidenceCandidateDisposition::MetadataEligibleBeyondOutputLimit);
         assert!(result.floor.meets_floor);
     }
 
