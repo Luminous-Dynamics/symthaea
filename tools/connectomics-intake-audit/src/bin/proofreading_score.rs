@@ -583,6 +583,34 @@ fn risk_coverage(rows: &[&Prediction], targets: &[f64]) -> Vec<RiskCoveragePoint
     }).collect()
 }
 
+fn evaluate_group(
+    rows: &[&Prediction],
+    item_fractions: &[f64],
+    minute_budgets: &[f64],
+    coverage_targets: &[f64],
+    bootstrap_replicates: usize,
+    seed_material: &str,
+) -> GroupEvaluation {
+    let item_budget_results = item_fractions.iter().map(|fraction| {
+        let count = (*fraction * rows.len() as f64).ceil().max(1.0);
+        review_yield(rows, count, Some(*fraction), "items")
+    }).collect();
+    let review_time_budget_results = minute_budgets.iter().map(|minutes| {
+        review_yield(rows, *minutes, None, "minutes")
+    }).collect();
+    GroupEvaluation {
+        classification: classification(rows),
+        balanced_accuracy_cluster_bootstrap_95: cluster_bootstrap(
+            rows,
+            bootstrap_replicates,
+            seed_material,
+        ),
+        item_budget_results,
+        review_time_budget_results,
+        risk_coverage_results: risk_coverage(rows, coverage_targets),
+    }
+}
+
 fn run() -> Result<i32, String> {
     let args = Args::parse();
     if args.mapping_reference.trim().is_empty() {
@@ -619,26 +647,16 @@ fn run() -> Result<i32, String> {
         by_group.entry(row.group.clone()).or_default().push(row);
     }
     let per_group = by_group.iter().map(|(group, rows)| {
-        let group_item_budget_results = item_fractions.iter().map(|fraction| {
-            let count = (*fraction * rows.len() as f64).ceil().max(1.0);
-            review_yield(rows, count, Some(*fraction), "items")
-        }).collect();
-        let group_review_time_budget_results = minute_budgets.iter().map(|minutes| {
-            review_yield(rows, *minutes, None, "minutes")
-        }).collect();
         (
             group.clone(),
-            GroupEvaluation {
-                classification: classification(rows),
-                balanced_accuracy_cluster_bootstrap_95: cluster_bootstrap(
-                    rows,
-                    args.bootstrap_replicates,
-                    &format!("{input_hash}:{group}"),
-                ),
-                item_budget_results: group_item_budget_results,
-                review_time_budget_results: group_review_time_budget_results,
-                risk_coverage_results: risk_coverage(rows, &coverage_targets),
-            },
+            evaluate_group(
+                rows,
+                &item_fractions,
+                &minute_budgets,
+                &coverage_targets,
+                args.bootstrap_replicates,
+                &format!("{input_hash}:{group}"),
+            ),
         )
     }).collect();
     let item_budget_results = item_fractions.iter().map(|fraction| {
@@ -714,6 +732,31 @@ mod tests {
             review_minutes: mins,
             impact_weight: impact,
         }
+    }
+
+    #[test]
+    fn subgroup_operating_metrics_use_only_rows_in_that_subgroup() {
+        let high_confidence_error = row("a", true, 0.99, 0.99, 1.0, 5.0, "mouse:merge");
+        let lower_confidence_control = row("b", false, 0.20, 0.10, 1.0, 0.0, "mouse:merge");
+        let unrelated_confident_false_alarm = row("c", false, 0.001, 1.0, 1.0, 0.0, "human:merge");
+        let local_rows = [&high_confidence_error, &lower_confidence_control];
+        let _pooled_rows = [&high_confidence_error, &lower_confidence_control, &unrelated_confident_false_alarm];
+
+        let local = evaluate_group(
+            &local_rows,
+            &[0.5],
+            &[1.0],
+            &[0.5],
+            100,
+            "test:mouse:merge",
+        );
+        assert_eq!(local.item_budget_results[0].selected_count, 1);
+        assert_eq!(local.item_budget_results[0].true_errors_found, 1);
+        assert_eq!(local.review_time_budget_results[0].selected_count, 1);
+        assert_eq!(local.risk_coverage_results[0].accepted_count, 1);
+        assert_eq!(local.risk_coverage_results[0].accepted_case_risk, Some(0.0));
+        assert_eq!(local.risk_coverage_results[0].achieved_coverage, 0.5);
+        assert_eq!(local.classification.n, 2);
     }
 
     #[test]
