@@ -115,7 +115,7 @@ impl DirectedSystemPartition {
 }
 
 /// Errors while applying a directed partition to a causal model.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub enum PartitionApplyError {
     #[error(transparent)]
     Model(#[from] ModelError),
@@ -1561,9 +1561,9 @@ mod tests {
     fn directed_partition_cuts_follow_cause_effect_direction() {
         let partitions = enumerate_iit4_system_partitions(&[0, 1], 2, false, 100).unwrap();
         let cuts = partitions.iter().map(|p| p.cut_matrix()).collect::<Vec<_>>();
-        assert!(cuts.iter().any(|m| *m == [false, true, false, false]));
-        assert!(cuts.iter().any(|m| *m == [false, false, true, false]));
-        assert!(cuts.iter().any(|m| *m == [false, true, true, false]));
+        assert!(cuts.iter().any(|m| *m == &[false, true, false, false][..]));
+        assert!(cuts.iter().any(|m| *m == &[false, false, true, false][..]));
+        assert!(cuts.iter().any(|m| *m == &[false, true, true, false][..]));
     }
 
     #[test]
@@ -1680,7 +1680,7 @@ mod tests {
         ).unwrap();
         let partitions = enumerate_iit4_system_partitions(&[0, 1], 2, false, 100).unwrap();
         let a_to_b = partitions.iter().find(|p| {
-            p.cut_matrix() == [false, true, false, false]
+            p.cut_matrix() == &[false, true, false, false][..]
         }).unwrap();
 
         let cut = model.apply_partition(a_to_b).unwrap();
