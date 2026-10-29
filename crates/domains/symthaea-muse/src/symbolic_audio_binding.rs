@@ -1120,8 +1120,7 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
-        ,
-            &fixture_profile()
+            &fixture_profile(),
         ).expect("supported full-score edit should bind");
         assert_eq!(binding.projected_binding.overall_verdict, PreservationVerdict::Pass);
         assert_ne!(
@@ -1131,9 +1130,8 @@ mod tests {
         assert!(verify_full_score_render_binding(
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
-            &acoustic, &onset, &manifest, &binding,
-        ,
-            &fixture_profile()
+            &acoustic, &onset, &manifest,
+            &fixture_profile(), &binding,
         ).expect("full score binding should replay"));
 
         let mut tampered = binding.clone();
@@ -1141,9 +1139,8 @@ mod tests {
         assert!(!verify_full_score_render_binding(
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
-            &acoustic, &onset, &manifest, &tampered,
-        ,
-            &fixture_profile()
+            &acoustic, &onset, &manifest,
+            &fixture_profile(), &tampered,
         ).expect("modified full-score digest should be rejected as a verdict"));
     }
 
@@ -1166,7 +1163,7 @@ mod tests {
                 rms_delta_db_tolerance: 0.5,
                 spectral_distance_tolerance: 0.08,
                 minimum_protected_windows: 4,
-                calibration_id: Some("removed-note-fixture".to_owned()),
+                calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
             },
         ).expect("outside-mask acoustic checks alone can pass");
         let onset = audit_onset_preservation(
@@ -1179,7 +1176,7 @@ mod tests {
                 onset_time_tolerance_ms: 4,
                 boundary_guard_frames: 0,
                 minimum_protected_duration_ms: 100,
-                calibration_id: Some("removed-note-fixture".to_owned()),
+                calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
             },
         ).expect("unmasked onset channel reports the missing attack");
         assert!(
@@ -1192,8 +1189,7 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
-        ,
-            &fixture_profile()
+            &fixture_profile(),
         ).expect("a failed edit result should be represented by a fail verdict");
         assert_eq!(result.projected_binding.overall_verdict, PreservationVerdict::Fail);
         assert!(result.projected_binding.reasons.iter().any(|reason| reason.contains("RMS envelopes")));
@@ -1211,8 +1207,7 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
-        ,
-            &fixture_profile()
+            &fixture_profile(),
         );
         assert!(matches!(
             result,
@@ -1237,8 +1232,7 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
-        ,
-            &fixture_profile()
+            &fixture_profile(),
         );
         assert!(matches!(
             result,
@@ -1261,8 +1255,7 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
-        ,
-            &fixture_profile()
+            &fixture_profile(),
         );
         assert!(matches!(
             result,
@@ -1290,7 +1283,7 @@ mod tests {
                 rms_delta_db_tolerance: 0.5,
                 spectral_distance_tolerance: 0.08,
                 minimum_protected_windows: 4,
-                calibration_id: Some("overbroad-mask-fixture".to_owned()),
+                calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
             },
         ).expect("overbroad acoustic report is internally valid");
         let onset = audit_onset_preservation(
@@ -1303,15 +1296,14 @@ mod tests {
                 onset_time_tolerance_ms: 4,
                 boundary_guard_frames: 0,
                 minimum_protected_duration_ms: 100,
-                calibration_id: Some("overbroad-mask-fixture".to_owned()),
+                calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
             },
         ).expect("overbroad onset report is internally valid");
         let result = create_full_score_render_binding(
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
-        ,
-            &fixture_profile()
+            &fixture_profile(),
         );
         assert!(matches!(
             result,
