@@ -1940,4 +1940,56 @@ mod tests {
         assert!(gid[1] > 0.0);
     }
 
+    #[test]
+    fn optimized_partition_cut_matrices_match_the_block_definition() {
+        for units in 2..=5 {
+            let candidate: Vec<usize> = (0..units).collect();
+            let report = enumerate_iit4_system_partitions_with_stats(
+                &candidate,
+                units,
+                false,
+                match units {
+                    2 => 9,
+                    3 => 54,
+                    4 => 306,
+                    5 => 1_863,
+                    _ => unreachable!(),
+                },
+            ).unwrap();
+
+            for partition in report.partitions {
+                let mut expected = vec![false; units * units];
+                for (global_block, direction) in partition.parts().iter()
+                    .zip(partition.directions().iter().copied())
+                {
+                    let local_block: Vec<usize> = global_block.iter().map(|unit| {
+                        partition.candidate_system().iter().position(|candidate_unit| candidate_unit == unit)
+                            .expect("partition unit belongs to candidate system")
+                    }).collect();
+                    for source in 0..units {
+                        for target in 0..units {
+                            let source_inside = local_block.contains(&source);
+                            let target_inside = local_block.contains(&target);
+                            let cut = match direction {
+                                PartitionDirection::Cause => !source_inside && target_inside,
+                                PartitionDirection::Effect => source_inside && !target_inside,
+                                PartitionDirection::Bidirectional => source_inside != target_inside,
+                            };
+                            if cut {
+                                expected[source * units + target] = true;
+                            }
+                        }
+                    }
+                }
+                assert_eq!(
+                    partition.cut_matrix(),
+                    expected.as_slice(),
+                    "optimized matrix must equal block semantics for n={units}, parts={:?}, directions={:?}",
+                    partition.parts(),
+                    partition.directions(),
+                );
+            }
+        }
+    }
+
 }
