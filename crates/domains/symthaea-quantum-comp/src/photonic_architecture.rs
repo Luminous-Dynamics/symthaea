@@ -56,9 +56,14 @@ pub fn route_fits_minimum_transmission(
             minimum_transmission_probability,
         ));
     }
-    // Do not trust the public transmission field: callers can construct OpticalRoute
-    // directly. Recompute the conservative transmission from the upper-loss bound.
-    let conservative_transmission = transmission_probability(route.total_loss_db.upper_db)?;
+    // Validate the internal loss interval and recompute conservative transmission.
+    // OpticalRoute exposes read-only accessors, not mutable public metadata.
+    let validated_loss = LossIntervalDb::new(
+        route.total_loss_db.lower_db,
+        route.total_loss_db.nominal_db,
+        route.total_loss_db.upper_db,
+    )?;
+    let conservative_transmission = transmission_probability(validated_loss.upper_db)?;
     Ok(conservative_transmission >= minimum_transmission_probability)
 }
 
@@ -537,14 +542,26 @@ pub struct OpticalLink {
 /// Result of routing one photon path under a declared route objective.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpticalRoute {
+    nodes: Vec<usize>,
+    link_ids: Vec<u64>,
+    total_loss_db: LossIntervalDb,
+    transmission_probability: ProbabilityInterval,
+}
+
+impl OpticalRoute {
     /// Node sequence, including source and destination.
-    pub nodes: Vec<usize>,
+    pub fn nodes(&self) -> &[usize] { &self.nodes }
+
     /// Stable physical-link IDs chosen for each consecutive node pair, in route order.
-    pub link_ids: Vec<u64>,
+    pub fn link_ids(&self) -> &[u64] { &self.link_ids }
+
     /// Sum of link losses along the selected route.
-    pub total_loss_db: LossIntervalDb,
-    /// Transmission interval implied by the route loss interval.
-    pub transmission_probability: ProbabilityInterval,
+    pub fn total_loss_db(&self) -> LossIntervalDb { self.total_loss_db }
+
+    /// Transmission interval recomputed from the selected route loss interval.
+    pub fn transmission_probability(&self) -> ProbabilityInterval {
+        self.transmission_probability
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -955,6 +972,18 @@ mod tests {
             },
         };
         assert!(!route_fits_minimum_transmission(&forged, 0.92).unwrap());
+
+        let malformed = OpticalRoute {
+            nodes: vec![0, 1],
+            link_ids: vec![123],
+            total_loss_db: LossIntervalDb { lower_db: -1.0, nominal_db: 0.0, upper_db: 0.0 },
+            transmission_probability: ProbabilityInterval {
+                lower: 1.0,
+                nominal: 1.0,
+                upper: 1.0,
+            },
+        };
+        assert!(route_fits_minimum_transmission(&malformed, 0.92).is_err());
     }
 
     #[test]
