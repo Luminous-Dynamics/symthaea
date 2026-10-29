@@ -498,7 +498,12 @@ mod tests {
         let changed_set = serde_json::to_vec(&parsed).unwrap();
         assert!(audit_lineage_overlap(
             &changed_set, &ledger, &task_set("dev-g1", "dev-1", 1, 2),
-            &ledger_for(&task_set("dev-g1", "dev-1", 1, 2), "development:g1", &sha256_hex(b"world-a"), "public_development")
+            &ledger_for(
+                &task_set("dev-g1", "dev-1", 1, 2),
+                "development:g1",
+                &sha256_hex(b"world-a"),
+                "public_development",
+            )
         ).is_err());
 
         let mut broken: Value = serde_json::from_slice(&ledger).unwrap();
