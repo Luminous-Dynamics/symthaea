@@ -20,7 +20,8 @@
     "zero_silent_commitment_rewrites",
     "zero_simulation_to_observation_upgrades",
     "zero_evaluator_truth_leakage_in_blind_qualification",
-    "appeal_route_must_not_be_controlled_only_by_challenged_authority"
+    "appeal_route_must_not_be_controlled_only_by_challenged_authority",
+    "unbounded_emergency_bypass"
   ],
   "provisional_targets": {
     "deterministic_tamper_detection": 1,
@@ -39,7 +40,9 @@
     "source_coverage_and_missingness",
     "contestability_and_appeal_status",
     "forecast_calibration_when_applicable",
-    "limitations_and_claim_ceiling"
+    "limitations_and_claim_ceiling",
+    "event_trace_digest_and_capture_completeness",
+    "capture_recorder_authentication_status"
   ],
   "cases": [
     {
