@@ -17,6 +17,47 @@ pub fn transmission_probability(loss_db: f64) -> Result<f64, PhotonicEnvelopeErr
     Ok(10.0_f64.powf(-loss_db / 10.0))
 }
 
+/// Maximum total insertion loss in dB consistent with a minimum end-to-end
+/// photon-survival probability.
+///
+/// This is an algebraic conversion, not an architecture-specific loss threshold.
+/// A fault-tolerance paper must supply the applicable minimum survival probability
+/// and explain which physical loss channels are included in that boundary.
+pub fn loss_budget_db_for_minimum_transmission(
+    minimum_transmission_probability: f64,
+) -> Result<f64, PhotonicEnvelopeError> {
+    validate_probability(
+        minimum_transmission_probability,
+        "minimum transmission probability",
+    )?;
+    if minimum_transmission_probability <= 0.0 {
+        return Err(PhotonicEnvelopeError::InvalidMinimumTransmissionProbability(
+            minimum_transmission_probability,
+        ));
+    }
+    Ok(-10.0 * minimum_transmission_probability.log10())
+}
+
+/// Whether a route's conservative upper-loss estimate fits a declared transmission budget.
+///
+/// The threshold must come from the selected architecture/noise model; this function
+/// does not assert that satisfying a path-loss budget alone implies fault tolerance.
+pub fn route_fits_minimum_transmission(
+    route: &OpticalRoute,
+    minimum_transmission_probability: f64,
+) -> Result<bool, PhotonicEnvelopeError> {
+    validate_probability(
+        minimum_transmission_probability,
+        "minimum transmission probability",
+    )?;
+    if minimum_transmission_probability <= 0.0 {
+        return Err(PhotonicEnvelopeError::InvalidMinimumTransmissionProbability(
+            minimum_transmission_probability,
+        ));
+    }
+    Ok(route.transmission_probability.lower >= minimum_transmission_probability)
+}
+
 /// Probability range for a component parameter, ordered lower <= nominal <= upper.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ProbabilityInterval {
@@ -677,6 +718,8 @@ impl fmt::Display for PhotonicEnvelopeError {
                 write!(f, "probability interval must satisfy lower <= nominal <= upper"),
             Self::InvalidOpticalLoss(loss) =>
                 write!(f, "optical loss must be finite and nonnegative, got {loss} dB"),
+            Self::InvalidMinimumTransmissionProbability(probability) =>
+                write!(f, "minimum photon transmission must be in (0, 1], got {probability}"),
             Self::InvalidNodeCount =>
                 write!(f, "optical topology must have at least one node"),
             Self::OpticalNodeOutOfRange(node) =>
@@ -721,6 +764,45 @@ mod tests {
             attempts_per_second: 1_000.0,
             photons_per_attempt: 2,
         }
+    }
+
+    #[test]
+    fn loss_budget_round_trips_and_captures_the_architecture_example() {
+        let budget = loss_budget_db_for_minimum_transmission(0.92).unwrap();
+        near(budget, 0.362);
+        near(transmission_probability(budget).unwrap(), 0.92);
+        near(loss_budget_db_for_minimum_transmission(1.0).unwrap(), 0.0);
+        assert!(loss_budget_db_for_minimum_transmission(0.0).is_err());
+        assert!(loss_budget_db_for_minimum_transmission(-0.1).is_err());
+    }
+
+    #[test]
+    fn robust_route_must_fit_the_declared_end_to_end_transmission_budget() {
+        let route = find_optical_route(
+            3,
+            &[
+                OpticalLink {
+                    from: 0, to: 1,
+                    loss_db: LossIntervalDb::new(0.05, 0.1, 0.15).unwrap(),
+                },
+                OpticalLink {
+                    from: 1, to: 2,
+                    loss_db: LossIntervalDb::new(0.05, 0.1, 0.15).unwrap(),
+                },
+            ],
+            0, 2, OpticalRouteObjective::MinimumWorstCaseLoss,
+        ).unwrap().unwrap();
+        assert!(route_fits_minimum_transmission(&route, 0.92).unwrap());
+        let lossy = find_optical_route(
+            2,
+            &[OpticalLink {
+                from: 0, to: 1,
+                loss_db: LossIntervalDb::new(0.4, 0.4, 0.4).unwrap(),
+            }],
+            0, 1, OpticalRouteObjective::MinimumWorstCaseLoss,
+        ).unwrap().unwrap();
+        assert!(!route_fits_minimum_transmission(&lossy, 0.92).unwrap());
+        assert!(route_fits_minimum_transmission(&route, 0.0).is_err());
     }
 
     #[test]
