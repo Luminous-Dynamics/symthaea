@@ -3712,8 +3712,7 @@ jobs:
           qhalf = next(row for row in report["sensitivity_grid"]
                        if row["assumed_treatment_success_probability_among_unknown"] == 0.5
                        and row["assumed_control_success_probability_among_unknown"] == 0.5)
-          if abs(qhalf["implied_effect"] if "implied_effect" in qhalf else
-                 qhalf["implied_target_weighted_effect"] - 0.0625) > 1e-12:
+          if abs(qhalf["implied_target_weighted_effect"] - 0.0625) > 1e-12:
               raise SystemExit("tipping-grid midpoint assumption changed unexpectedly")
           bad = copy.deepcopy(fixture)
           bad["rows"] = bad["rows"][:-1]
