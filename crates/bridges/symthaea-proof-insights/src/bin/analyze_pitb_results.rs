@@ -4479,7 +4479,10 @@ mod tests {
             qualification_limitations: vec!["synthetic fixture only".to_owned()],
         };
 
-        let root = env::temp_dir().join(format!("pitb-coverage-verification-{}", std::process::id()));
+        let root = env::temp_dir().join(format!(
+            "pitb-coverage-verification-{}",
+            std::process::id()
+        ));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("create temporary test directory");
         let artifacts: [(&str, &[u8]); 4] = [
@@ -4496,10 +4499,12 @@ mod tests {
         ];
         let mut args = BTreeMap::new();
         let mut methodology_path = None;
-        for ((filename, bytes), flag) in artifacts.iter().zip(flag_names) {
+        for index in 0..artifacts.len() {
+            let (filename, bytes) = artifacts[index];
+            let flag = flag_names[index];
             let artifact_path = root.join(filename);
             fs::write(&artifact_path, bytes).expect("write pinned test artifact");
-            if *flag == "--coverage-methodology" {
+            if flag == "--coverage-methodology" {
                 methodology_path = Some(artifact_path.clone());
             }
             args.insert(flag.to_owned(), artifact_path.to_string_lossy().into_owned());
