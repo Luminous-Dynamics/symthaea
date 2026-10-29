@@ -376,6 +376,10 @@ mod tests {
             }
         }
 
+        let pair_by_id: std::collections::BTreeMap<_, _> = pairs
+            .iter()
+            .map(|pair| (pair.pair_id.as_str(), pair))
+            .collect();
         let mut seen_ids = BTreeSet::new();
         let mut label_pair_ids = BTreeSet::new();
         for (line_index, line) in LABELS.lines().enumerate() {
@@ -384,6 +388,14 @@ mod tests {
             assert_eq!(labels.schema_version, COUNTERFACTUAL_LABEL_SCHEMA);
             assert!(label_pair_ids.insert(labels.pair_id.clone()), "duplicate gold pair ID");
             assert_eq!(labels.cases.len(), 2, "each label pair must have two cases");
+            let input_pair = pair_by_id
+                .get(labels.pair_id.as_str())
+                .unwrap_or_else(|| panic!("orphan gold pair label {:?}", labels.pair_id));
+            let expected_pair_case_ids: BTreeSet<_> =
+                input_pair.cases.iter().map(|case| case.case_id.as_str()).collect();
+            let labeled_pair_case_ids: BTreeSet<_> =
+                labels.cases.iter().map(|label| label.case_id.as_str()).collect();
+            assert_eq!(labeled_pair_case_ids, expected_pair_case_ids, "gold case labels must match their own pair");
             for label in &labels.cases {
                 assert!(expected_ids.contains(label.case_id.as_str()), "orphan gold case label");
                 assert!(seen_ids.insert(label.case_id.clone()), "duplicate gold case label");
