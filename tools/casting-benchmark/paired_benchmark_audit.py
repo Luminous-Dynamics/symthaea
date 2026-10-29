@@ -404,6 +404,7 @@ def analyze_manifest(document: Any) -> dict[str, Any]:
             "median_realized_cost_units": statistics.median(row["realized_cost_units"] for row in rows),
             "false_feasible_events": sum(row["false_feasible_count"] for row in rows),
             "audited_decisions": sum(row["audited_decision_count"] for row in rows),
+            "false_feasible_rate_denominator": "audited decisions aggregated across declared units and shift strata; descriptive, not an IID sample count",
             "false_feasible_rate": (
                 sum(row["false_feasible_count"] for row in rows)
                 / sum(row["audited_decision_count"] for row in rows)
@@ -524,6 +525,7 @@ def analyze_manifest(document: Any) -> dict[str, Any]:
         "benchmark_id": BENCHMARK_ID,
         "receipt_label": "PAIRED_MATCHED_COST_COMPARISON_NOT_PHYSICAL_CERTIFICATION",
         "baseline_policy": baseline,
+        "protocol_sha256": manifest["protocol_sha256"],
         "policy_ids": policies,
         "unit_count": len(units),
         "shift_ids": manifest["shift_ids"],
