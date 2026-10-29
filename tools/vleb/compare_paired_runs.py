@@ -492,6 +492,12 @@ def analyze_manifest(
             "non_estimable_policy": "raw p-value is null; use p=1 conservatively for Holm family adjustment",
         }
 
+    warnings = []
+    if len(task_ids) < 30:
+        warnings.append("fewer than 30 independent task clusters; interval may be unstable")
+    if len(seeds) < 2:
+        warnings.append("single declared seed; crossed bootstrap cannot reveal between-seed variability")
+
     return {
         "schema_version": "vleb-paired-comparison-report-v1",
         "valid": True,
@@ -516,10 +522,7 @@ def analyze_manifest(
         },
         "arm_summaries": arm_summary,
         "pairwise_comparisons": pairwise,
-        "warnings": (
-            ["fewer than 30 independent task clusters; interval may be unstable"]
-            if len(task_ids) < 30 else []
-        ),
+        "warnings": warnings,
         "analysis_only": True,
         "score_eligible": False,
         "limitations": [
