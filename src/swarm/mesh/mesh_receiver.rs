@@ -334,9 +334,8 @@ impl MeshReceiver {
             key_fingerprint: None,
         });
 
-        assembly.last_fragment_at = now;
-
-        // Track duplicates before feeding
+        // Track duplicates before feeding. A duplicate does not count as
+        // progress and must not extend the inactivity deadline.
         if assembly.assembler.has_fragment(frag.fragment_index) {
             self.stats.fragments_duplicate += 1;
             return None;
@@ -359,7 +358,6 @@ impl MeshReceiver {
                 return None;
             }
         }
-        assembly.last_fragment_index = Some(frag.fragment_index);
 
         // Item 12: Reject fragments if encryption key changed mid-stream
         #[cfg(feature = "mesh-encryption")]
@@ -377,6 +375,13 @@ impl MeshReceiver {
         }
 
         let is_complete = assembly.assembler.feed(&frag);
+
+        // Only an actually admitted, previously unseen fragment is progress.
+        // Malformed/rejected frames and duplicates must not keep stale state alive.
+        if assembly.assembler.has_fragment(frag.fragment_index) {
+            assembly.last_fragment_at = now;
+            assembly.last_fragment_index = Some(frag.fragment_index);
+        }
 
         if is_complete {
             // Extract the completed assembly
@@ -796,6 +801,38 @@ mod tests {
         // The 11 duplicates from the second pass go to NEW assemblers
         // (old one was removed), but CRC pass so they're not "corrupt".
         // They create a new assembly that never completes.
+    }
+
+    #[test]
+    fn duplicate_fragment_does_not_refresh_assembly_inactivity() {
+        let mut receiver = MeshReceiver::new().with_timeout(Duration::from_secs(60));
+        let packet = test_packet(1, PEER_A, 0x91);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+        receiver.receive_fragment(PEER_A, &wire[0]);
+
+        let key = StreamKey {
+            source: PEER_A,
+            thought_id: packet.thought_id(),
+        };
+        let before = receiver
+            .pending
+            .get(&key)
+            .expect("first fragment creates pending assembly")
+            .last_fragment_at;
+
+        // Make the distinction from the old implementation observable without
+        // relying on timeout timing: the timestamp itself must remain unchanged.
+        std::thread::sleep(Duration::from_millis(2));
+        receiver.receive_fragment(PEER_A, &wire[0]);
+
+        let after = receiver
+            .pending
+            .get(&key)
+            .expect("duplicate must not remove the pending assembly")
+            .last_fragment_at;
+        assert_eq!(after, before);
+        assert_eq!(receiver.stats().fragments_duplicate, 1);
     }
 
     // -- Timeout expiry --
