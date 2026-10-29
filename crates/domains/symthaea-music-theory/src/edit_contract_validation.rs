@@ -804,7 +804,7 @@ mod tests {
             }
             cases += 1;
         }
-        assert_eq!(cases, 24, "the published v0.1 corpus must be complete");
+        assert_eq!(cases, 25, "the published v0.1 corpus must be complete");
     }
 
     #[test]
