@@ -39,10 +39,19 @@ pub struct DerivedFactInput {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum InvalidationTrigger {
+    SourceRetraction { event_id: String },
+    DerivedFactInvalidation { fact_id: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DerivedStatus {
     Current,
     Invalidated {
-        because: DependencyRef,
+        trigger: InvalidationTrigger,
+        /// Immediate invalidated dependency; None for an explicitly invalidated root fact.
+        because: Option<DependencyRef>,
         reason: String,
     },
 }
@@ -92,6 +101,43 @@ fn validate_fact_input(fact: &DerivedFactInput) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn invalidate_dependents(
+    graph: &mut DerivationGraph,
+    root_dependency: DependencyRef,
+    trigger: InvalidationTrigger,
+    reason: &str,
+) -> Result<Vec<String>, String> {
+    let mut queue = VecDeque::new();
+    queue.push_back(root_dependency);
+    let mut affected = BTreeSet::new();
+
+    while let Some(dependency) = queue.pop_front() {
+        let dependents: Vec<String> = graph
+            .reverse_dependencies
+            .get(&dependency)
+            .map(|ids| ids.iter().cloned().collect())
+            .unwrap_or_default();
+
+        for fact_id in dependents {
+            let Some(record) = graph.facts.get_mut(&fact_id) else {
+                return Err(format!("reverse index references missing fact {fact_id:?}"));
+            };
+            if record.status != DerivedStatus::Current {
+                continue;
+            }
+            record.status = DerivedStatus::Invalidated {
+                trigger: trigger.clone(),
+                because: Some(dependency.clone()),
+                reason: reason.to_owned(),
+            };
+            affected.insert(fact_id.clone());
+            queue.push_back(DependencyRef::DerivedFact(fact_id));
+        }
+    }
+
+    Ok(affected.into_iter().collect())
 }
 
 impl DerivationGraph {
@@ -184,33 +230,56 @@ impl DerivationGraph {
 
         let mut candidate = self.clone();
         candidate.retracted_source_events.insert(event_id.to_owned());
-        let mut queue = VecDeque::new();
-        queue.push_back(DependencyRef::SourceEvent(event_id.to_owned()));
-        let mut affected = BTreeSet::new();
+        let affected = invalidate_dependents(
+            &mut candidate,
+            DependencyRef::SourceEvent(event_id.to_owned()),
+            InvalidationTrigger::SourceRetraction {
+                event_id: event_id.to_owned(),
+            },
+            reason,
+        )?;
+        candidate.verify_consistency()?;
+        *self = candidate;
+        Ok(affected)
+    }
 
-        while let Some(dependency) = queue.pop_front() {
-            let dependents: Vec<String> = candidate
-                .reverse_dependencies
-                .get(&dependency)
-                .map(|ids| ids.iter().cloned().collect())
-                .unwrap_or_default();
-
-            for fact_id in dependents {
-                let Some(record) = candidate.facts.get_mut(&fact_id) else {
-                    return Err(format!("reverse index references missing fact {fact_id:?}"));
-                };
-                if record.status != DerivedStatus::Current {
-                    continue;
-                }
-                record.status = DerivedStatus::Invalidated {
-                    because: dependency.clone(),
-                    reason: reason.to_owned(),
-                };
-                affected.insert(fact_id.clone());
-                queue.push_back(DependencyRef::DerivedFact(fact_id));
-            }
+    /// Explicitly invalidate a derived root, for example when its rule version
+    /// is superseded. Every descendant is invalidated as one atomic state change.
+    /// The returned IDs include the root and all transitive descendants.
+    pub fn invalidate_derived_fact(
+        &mut self,
+        fact_id: &str,
+        reason: &str,
+    ) -> Result<Vec<String>, String> {
+        non_empty(reason, "invalidation reason")?;
+        let Some(record) = self.facts.get(fact_id) else {
+            return Err(format!("cannot invalidate unknown derived fact {fact_id:?}"));
+        };
+        self.verify_consistency()?;
+        if record.status != DerivedStatus::Current {
+            return Ok(Vec::new());
         }
 
+        let mut candidate = self.clone();
+        candidate.facts.get_mut(fact_id).expect("validated fact exists").status =
+            DerivedStatus::Invalidated {
+                trigger: InvalidationTrigger::DerivedFactInvalidation {
+                    fact_id: fact_id.to_owned(),
+                },
+                because: None,
+                reason: reason.to_owned(),
+            };
+
+        let mut affected: BTreeSet<String> = [fact_id.to_owned()].into_iter().collect();
+        let descendants = invalidate_dependents(
+            &mut candidate,
+            DependencyRef::DerivedFact(fact_id.to_owned()),
+            InvalidationTrigger::DerivedFactInvalidation {
+                fact_id: fact_id.to_owned(),
+            },
+            reason,
+        )?;
+        affected.extend(descendants);
         candidate.verify_consistency()?;
         *self = candidate;
         Ok(affected.into_iter().collect())
