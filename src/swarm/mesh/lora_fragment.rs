@@ -990,6 +990,12 @@ mod tests {
         let zero_data_count = FragmentAssembler::new(10, 1, 2048);
         assert!(!zero_data_count.is_complete());
         assert!(zero_data_count.assemble().is_none());
+
+        // Checked size arithmetic must reject oversized exact-size metadata
+        // rather than wrapping or allocating based on the caller's size.
+        let overflow_size = FragmentAssembler::new(10, 11, usize::MAX);
+        assert!(!overflow_size.is_complete());
+        assert!(overflow_size.assemble().is_none());
     }
 
     // -- Wrong thought_id rejected --
