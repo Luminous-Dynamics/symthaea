@@ -33,6 +33,7 @@ jobs:
           rustc --edition=2024 -O tools/vision-dvpc-040-mope-sufficient-stats.rs -o /tmp/vis-dvpc-040
           /tmp/vis-dvpc-040 --sweep > /tmp/vis-dvpc-040-results.tsv
           test "$(grep -c '^IDENTITY' /tmp/vis-dvpc-040-results.tsv)" = "378"
+          test "$(grep -c '^WEALTH_BOUND' /tmp/vis-dvpc-040-results.tsv)" = "378"
           test "$(grep -c '^POLYNOMIAL' /tmp/vis-dvpc-040-results.tsv)" = "90"
           if grep -q '^ROOT_DIAGNOSTIC' /tmp/vis-dvpc-040-results.tsv; then grep -Fq 'ROOT_DIAGNOSTIC' /tmp/vis-dvpc-040-results.tsv; fi
           test "$(grep -c '^BET' /tmp/vis-dvpc-040-results.tsv)" = "36"
