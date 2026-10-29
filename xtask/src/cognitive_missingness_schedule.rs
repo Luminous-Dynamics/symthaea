@@ -440,11 +440,13 @@ fn sample_delay(seed: u64, event_id: &str, pattern: &DelayPattern) -> anyhow::Re
     }
 }
 
-fn policy_message_key(message: &PolicyVisibleMessage) -> (u64, &str, u8) {
+fn policy_message_key(message: &PolicyVisibleMessage) -> (u64, u8, &str) {
     match message {
-        PolicyVisibleMessage::OutcomePending { tick, event_id, .. } => (*tick, event_id, 0),
-        PolicyVisibleMessage::OutcomeRevealed { tick, event_id, .. } => (*tick, event_id, 1),
-        PolicyVisibleMessage::MissingDeclared { tick, event_id } => (*tick, event_id, 1),
+        // At a shared logical tick, all decisions/pending notices precede every feedback event.
+        // Event ID is only a stable tie-breaker within one causality phase.
+        PolicyVisibleMessage::OutcomePending { tick, event_id, .. } => (*tick, 0, event_id),
+        PolicyVisibleMessage::OutcomeRevealed { tick, event_id, .. } => (*tick, 1, event_id),
+        PolicyVisibleMessage::MissingDeclared { tick, event_id } => (*tick, 1, event_id),
     }
 }
 
@@ -591,6 +593,25 @@ mod tests {
     }
 
     #[test]
+    fn all_same_tick_decisions_precede_feedback_available_at_that_tick() {
+        let mut input = fixture(MissingnessMechanism::Mcar, MissingnessDeclarationMode::Explicit);
+        input.config.base_missing_probability = 0.0;
+        input.config.delay = DelayPattern::Fixed { ticks: 0 };
+        for event in &mut input.events {
+            event.decision_tick = 0;
+        }
+        let generated = generate(&input, b"same-tick-phase-order").unwrap();
+        let messages = &generated.policy_feed.messages;
+        assert_eq!(messages.len(), input.events.len() * 2);
+        assert!(messages[..input.events.len()]
+            .iter()
+            .all(|message| matches!(message, PolicyVisibleMessage::OutcomePending { tick: 0, .. })));
+        assert!(messages[input.events.len()..]
+            .iter()
+            .all(|message| matches!(message, PolicyVisibleMessage::OutcomeRevealed { tick: 0, .. })));
+    }
+
+    #[test]
     fn every_mechanism_produces_finite_bounded_selection_probabilities() {
         for mechanism in [
             MissingnessMechanism::Mcar,
@@ -639,9 +660,9 @@ mod tests {
         let generated = generate(&input, b"arrival-order").unwrap();
         let messages = &generated.policy_feed.messages;
         for pair in messages.windows(2) {
-            let (left_tick, left_id, left_priority) = policy_message_key(&pair[0]);
-            let (right_tick, right_id, right_priority) = policy_message_key(&pair[1]);
-            assert!((left_tick, left_id, left_priority) <= (right_tick, right_id, right_priority));
+            let (left_tick, left_priority, left_id) = policy_message_key(&pair[0]);
+            let (right_tick, right_priority, right_id) = policy_message_key(&pair[1]);
+            assert!((left_tick, left_priority, left_id) <= (right_tick, right_priority, right_id));
         }
         for message in messages {
             if let PolicyVisibleMessage::OutcomeRevealed { tick, event_id, .. } = message {
