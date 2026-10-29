@@ -525,14 +525,14 @@ fn build(
             if receipt_verified {
                 concat!(
                     "Coverage receipt signatures were verified against caller-pinned methodology ",
-                    "and trust-store digests; this attestation cannot mathematically prove reviewer ",
-                    "competence or exhaustive discovery."
+                    "and trust-store digests; this attestation cannot mathematically ",
+                    "prove reviewer competence or exhaustive discovery."
                 )
                 .into()
             } else {
                 concat!(
-                    "Receipt bytes, reviewer trust-root bytes, and review-methodology bytes were not ",
-                    "supplied and verified; the manifest remains unqualified."
+                    "Receipt bytes, reviewer trust-root bytes, and review-methodology ",
+                    "bytes were not supplied and verified; the manifest remains unqualified."
                 )
                 .into()
             },
