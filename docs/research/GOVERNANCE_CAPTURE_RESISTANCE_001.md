@@ -195,6 +195,8 @@ GCRB should be positioned as a complement to established standards and longitudi
 | International IDEA Global State of Democracy Indices, Version 10 (2026) | Cross-national and longitudinal measures using 155 indicators across 174 countries, with uncertainty estimates for most indices; deliberately no single democracy score | Decision-episode attack tests, correction workflow, and evidence-to-remedy traceability |
 | V-Dem Dataset, Version 16 (March 2026) | Broad country-year and country-date indicators and indices; coder-level data and reliability information | Reproducible system-level experiments under deliberately manipulated evidence and authority |
 | World Justice Project Rule of Law Index | Public-experience and qualified-respondent evidence on rule-of-law dimensions | Technical challenge/appeal-path tests and adversarial correction-latency metrics |
+| World Bank Worldwide Governance Indicators (2025 methodology / 2026 update) | Six governance dimensions across more than 200 economies, using 35 perception-based sources with uncertainty estimates | Test decision-level capture attacks and verified correction without pretending perception scores prove individual facts |
+| Transparency International Corruption Perceptions Index 2025 | Annual public-sector corruption-perception measure from 13 independent sources, with uncertainty reporting | Keep macro perception indicators as context, while testing case-level evidence integrity, false accusations, and remedies |
 | Open Contracting Data Standard (OCDS) | Common data model for procurement stages; immutable release history and records of changes | Active red-team tests for concealment, denominator changes, source correlation, procurement anomalies, and independent remedy |
 | NIST AI Risk Management Framework | Govern, Map, Measure, Manage lifecycle structure for AI risk management | Task-level benchmark cases and outcome-based pass/fail invariants for the combined civic process |
 | OECD AI Principles | Human rights/democratic values, transparency, explainability, robustness, safety, accountability, and information enabling affected people to challenge outputs | Quantified contestability, privacy, capture stress, false escalation, and end-to-end correction behavior |
@@ -204,12 +206,15 @@ Authoritative references:
 - International IDEA, Global State of Democracy Indices Methodology, Version 10 (2026): https://www.idea.int/publications/catalogue/html/global-state-democracy-indices-methodology-version-10-2026
 - V-Dem Dataset, Version 16: https://www.v-dem.net/data/the-v-dem-dataset/
 - World Justice Project, Rule of Law Index methodology FAQ: https://worldjusticeproject.org/news/understanding-wjp-rule-law-index-faq
+- World Bank, Worldwide Governance Indicators methodology (2025 revision): https://www.worldbank.org/content/dam/sites/govindicators/doc/The%20Worldwide%20Governance%20Indicators%202025%20Methodology%20Revision.pdf
+- Transparency International, Corruption Perceptions Index 2025: https://www.transparency.org/en/cpi/2025
+- Transparency International, CPI 2025 technical methodology note: https://www.transparency.de/fileadmin/Redaktion/Aktuelles/2026/CPI_2025/CPI2025_TechnicalMethodology.pdf
 - Open Contracting Data Standard, releases and records: https://standard.open-contracting.org/latest/en/primer/releases_and_records/
 - NIST AI Risk Management Framework: https://www.nist.gov/itl/ai-risk-management-framework
 - OECD AI Principles, transparency and explainability: https://oecd.ai/en/dashboards/ai-principles/P7
 - OECD AI Principles, accountability: https://oecd.ai/en/dashboards/ai-principles/P9
 
-The 2026 International IDEA and V-Dem datasets are particularly useful for contextual validity and longitudinal questions, but neither should be turned into a machine verdict that a particular official or citizen is corrupt. OCDS release history is a strong implementation reference for append-only public-contracting histories. NIST and OECD are lifecycle and normative guidance; they do not on their own supply a controlled, end-to-end civic capture benchmark.
+The 2026 International IDEA and V-Dem datasets, the World Bank WGI, and Transparency International CPI are useful for contextual validity and longitudinal questions, but their macro perception/indicator scores must not be treated as case-level truth or a machine verdict that a particular official or citizen is corrupt. WGI's source-based estimates include uncertainty; CPI draws on expert/business perceptions rather than a complete register of verified corrupt acts. OCDS release history is a strong implementation reference for append-only public-contracting histories. NIST and OECD are lifecycle and normative guidance; they do not on their own supply a controlled, end-to-end civic capture benchmark.
 
 The differentiation claim to test is narrow: **can the integrated stack detect and survive specified adversarial failures while preserving contestability and enabling verified correction better than declared conventional and component baselines?** Until tested, this is a hypothesis—not a demonstrated state-of-the-art improvement.
 
