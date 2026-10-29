@@ -1,11 +1,13 @@
 use symthaea_operations_research::aviation_energy_accounting::{EnergyCarrier, EvidenceClass, TransportService};
 use symthaea_operations_research::aviation_energy_dispatch::{
     solve_cost_greedy, solve_exact_pareto, verify_energy_plan, CleanAirlineEnergyScenario,
-    EnergyAllocation, EnergyDemand, EnergyDispatchError, EnergyPlan, EnergySourceOffer,
+    canonical_scenario_digest, seal_scenario, solve_cost_greedy, solve_exact_pareto,
+    verify_energy_plan, verify_scenario_digest, CleanAirlineEnergyScenario, EnergyAllocation,
+    EnergyDemand, EnergyDispatchError, EnergyPlan, EnergySourceOffer,
 };
 
 fn scenario() -> CleanAirlineEnergyScenario {
-    CleanAirlineEnergyScenario {
+    let mut scenario = CleanAirlineEnergyScenario {
         scenario_id: "airport-synthetic-v1".to_owned(),
         input_digest: "external-manifest-digest-v1".to_owned(),
         currency_code: "USD".to_owned(),
@@ -45,7 +47,9 @@ fn scenario() -> CleanAirlineEnergyScenario {
                 evidence_class: EvidenceClass::Synthetic,
             },
         ],
-    }
+    };
+    seal_scenario(&mut scenario).unwrap();
+    scenario
 }
 
 fn plan(allocations: Vec<EnergyAllocation>) -> EnergyPlan {
@@ -131,6 +135,7 @@ fn underprovisioned_supply_has_no_feasible_plan() {
     let mut case = scenario();
     case.offers[0].capacity_quanta = 2;
     case.offers[1].capacity_quanta = 2;
+    seal_scenario(&mut case).unwrap();
     assert_eq!(
         solve_exact_pareto(&case, 100_000).unwrap_err(),
         EnergyDispatchError::NoFeasiblePlan
@@ -294,5 +299,50 @@ fn empty_manifest_digest_is_rejected() {
     assert_eq!(
         solve_exact_pareto(&case, 100_000).unwrap_err(),
         EnergyDispatchError::MissingIdentifier("input digest")
+    );
+}
+
+#[test]
+fn canonical_digest_is_stable_and_normalizes_input_vector_order() {
+    let original = scenario();
+    let first = canonical_scenario_digest(&original).unwrap();
+    assert_eq!(original.input_digest, first);
+    verify_scenario_digest(&original).unwrap();
+
+    let mut reordered = original.clone();
+    reordered.offers.reverse();
+    reordered.demands.reverse();
+    assert_eq!(canonical_scenario_digest(&reordered).unwrap(), first);
+}
+
+#[test]
+fn canonical_digest_changes_when_a_material_field_changes() {
+    let original = scenario();
+    let original_digest = original.input_digest.clone();
+
+    let mut changed = original.clone();
+    changed.offers[0].cost_per_quantum = 1.25;
+    assert_ne!(canonical_scenario_digest(&changed).unwrap(), original_digest);
+    assert_eq!(
+        solve_exact_pareto(&changed, 100_000).unwrap_err(),
+        EnergyDispatchError::ScenarioDigestMismatch
+    );
+}
+
+#[test]
+fn plan_is_bound_to_verified_canonical_scenario_digest() {
+    let mut case = scenario();
+    case.offers[0].cost_per_quantum = 1.25;
+    let candidate = EnergyPlan {
+        scenario_id: case.scenario_id.clone(),
+        input_digest: case.input_digest.clone(),
+        allocations: vec![EnergyAllocation {
+            offer_id: "grid-offer".to_owned(),
+            quanta: 5,
+        }],
+    };
+    assert_eq!(
+        verify_energy_plan(&case, &candidate).unwrap_err(),
+        EnergyDispatchError::ScenarioDigestMismatch
     );
 }
