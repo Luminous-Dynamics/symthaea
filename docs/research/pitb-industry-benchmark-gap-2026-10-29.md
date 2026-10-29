@@ -82,13 +82,15 @@ Use a pre-registered stopping rule for model comparisons and a sealed stream of 
 
 ## Immediate engineering sequence
 
-1. **Finish the complete component manifest contract.** Validate the builder against the pinned split and synthetic negative controls; keep its qualification status false while inventory coverage is incomplete.
-2. **Wire the manifest into the frozen run config.** The config must pin its exact digest and reject any manifest that is incomplete, malformed or split-crossing.
-3. **Use the same component IDs in power planning and test analysis.** Simulate and resample the same connected units, enforce the 20-component minimum, and keep original family/target counts separately for transparency.
-4. **Add semantic successor tests to the existing outcome receipts.** Never infer semantic correctness from compilation alone.
-5. **Requalify and rerun the registered grid.** Update schemas, fixtures, report replay and negative controls together. No production pass claim until exact-head Rust tests and the workflow actually run.
-6. **Run matched baseline and treatment arms, then external replication.** Publish performance only with a fixed model/tool/checker version, matched budgets, component-aware intervals and the frozen snapshot hash.
+1. **Finish the evidence—not another schema.** The deterministic component builder, signed-receipt verifier, run-config v3 artifact pins, analyzer-side receipt re-verification, and exact component reconstruction are implemented. The latest verifier also rejects untrusted/unsigned edge reviewers and resolved-edge reviewers from the same organization.
+2. **Secure real coverage evidence.** Provision a reviewer trust root independently of the experiment operator, complete the 372-family relationship inventory, and retain the dual-review/search logs. Synthetic keys and schema fixtures do not qualify the real inventory.
+3. **Execute exact-head validation.** The focused workflow now invokes Rust tests for the analyzer and component builder/verifier. The current branch head has no reported status checks or PR-triggered workflow runs, so those tests remain unverified; do not substitute static inspection for a pass.
+4. **Promote only from independently reconciled evidence.** The builder must emit a qualified graph only when signed coverage verifies and no hard component crosses splits. The analyzer separately enforces component membership, the 20-component floor, missing-row accounting and the statistical gates; the floor alone is not power.
+5. **Add semantic successor tests to outcome receipts.** Every accepted target needs exact statement correspondence, a trusted proof check, declared axiom policy and meaningful downstream checks where available. Never infer semantic correctness from compilation alone.
+6. **Run the matched-budget causal experiment, then replicate.** Compare typed insight with the validation-selected strongest baseline (including strong premise retrieval) under fixed model/checker/tool/call/token/time/cost budgets. Publish paired component-clustered intervals, the success–cost frontier and every failure/missingness category. Follow with a temporal or fresh-repository cohort.
 
+The targets above are proposed qualification gates, not achieved results. PITB currently has no measured transfer-utility result and no claim of beating the prover state of the art.
+ 
 ## References
 
 - Goedel-Prover-V2, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html
