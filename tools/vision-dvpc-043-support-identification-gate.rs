@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn every_fixture_emits_explicit_status_and_suppressed_fields_when_required() {
         let out=audit_fixtures().unwrap();
-        assert_eq!(out.matches("CASE\t").count(),6);
+        assert_eq!(out.lines().filter(|line| line.starts_with("CASE\t")).count(),6);
         assert!(out.contains("zero_support\tstatus\tNOT_IDENTIFIED"));
         assert!(out.contains("zero_support\tmax_importance_ratio\tSUPPRESSED"));
         assert!(out.contains("zero_support\tpopulation_ess_fraction\tSUPPRESSED"));
