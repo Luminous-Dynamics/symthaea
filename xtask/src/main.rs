@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod effect_surface_registry;
 mod effect_authorization_conformance;
 mod effect_harness_mutations;
+mod effect_evidence_ledger;
 mod effect_primitive_scan;
 mod manifest;
 mod rhn_sweep;
@@ -87,6 +88,14 @@ enum Commands {
         /// Optional path for a deterministic JSON report; otherwise prints JSON to stdout.
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Validate an evidence ledger's event chain, case completeness and stage invariants.
+    /// This checks integrity/consistency only and does not authenticate event truth.
+    AuthorizationEvidenceLedger {
+        #[arg(long, default_value = "docs/research/authorization-evidence-ledger.smoke.v0.json")]
+        ledger: PathBuf,
+        #[arg(long, default_value = "docs/research/authorization-evidence-ledger.expected-cases.v0.json")]
+        expected_cases: PathBuf,
     },
     /// Validate the frozen effect-authorization conformance contract; does not execute cases.
     EffectAuthorizationConformance {
@@ -199,6 +208,23 @@ fn main() -> anyhow::Result<()> {
                 std::env::current_dir()?.join(root)
             };
             effect_primitive_scan::scan(&root, out.as_deref())?;
+        }
+        Commands::AuthorizationEvidenceLedger { ledger, expected_cases } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let ledger_path = if ledger.is_absolute() {
+                ledger
+            } else {
+                root.join(ledger)
+            };
+            let expected_cases_path = if expected_cases.is_absolute() {
+                expected_cases
+            } else {
+                root.join(expected_cases)
+            };
+            effect_evidence_ledger::check(&ledger_path, &expected_cases_path)?;
         }
         Commands::EffectAuthorizationConformance { corpus } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
