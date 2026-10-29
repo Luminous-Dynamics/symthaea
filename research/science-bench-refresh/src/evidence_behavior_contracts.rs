@@ -914,15 +914,18 @@ pub fn verify_evidence_behavior_contract_report(
         )
         .to_owned(),
     });
+    let expected_plan_sha = hex_digest(&Sha256::digest(plan_bytes));
+    let plan_binding_valid = fields.schema == EVIDENCE_BEHAVIOR_CONTRACT_REPORT_SCHEMA
+        && fields.purpose == plan.purpose
+        && fields.plan_sha256 == expected_plan_sha
+        && fields.plan_commitment_sha256 == plan.plan_commitment_sha256
+        && fields.evaluator_source_revision == plan.evaluator_source_revision
+        && fields.decision_rules_sha256 == plan.decision_rules_sha256;
     Ok(EvidenceBehaviorContractReportVerificationV1 {
         schema: "symthaea.science_bench_refresh_evidence_behavior_contract_report_verification.v1"
             .to_owned(),
         valid,
-        plan_binding_valid: final_issues.iter().all(|issue| {
-            !issue.contains("plan")
-                && !issue.contains("evaluator revision")
-                && !issue.contains("decision-rule")
-        }),
+        plan_binding_valid,
         report_commitment_matches: commitment_matches,
         planned_case_count: plan.items.len() as u64,
         observed_record_count: report.records.len() as u64,
