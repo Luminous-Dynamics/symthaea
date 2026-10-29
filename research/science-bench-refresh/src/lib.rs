@@ -21,6 +21,7 @@ pub mod lineage_audit;
 pub mod search_exposure;
 pub mod search_exposure_match;
 pub mod exact_protected_matcher;
+pub mod counterfactual_evidence;
 pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
 
