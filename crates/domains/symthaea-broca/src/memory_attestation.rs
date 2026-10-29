@@ -511,7 +511,7 @@ impl EvidenceTrustStore {
         if timestamp < signer.valid_from
             || signer.valid_until.as_ref().is_some_and(|until| &timestamp >= until)
         {
-            return Err(format!("signer key {key_id:?} was not valid at signed time"));
+            return Err(format!("signer key {key_id:?} was not valid at the supplied verification time"));
         }
         Ok(signer)
     }
@@ -1065,7 +1065,7 @@ mod tests {
             "policy-root", policy(1, "2026-01-10T00:00:00Z"), &policy_key,
             "2026-02-02T00:00:00Z", &ingest_key,
         );
-        assert!(store.verify_policy(&signed).unwrap_err().contains("not valid at signed time"));
+        assert!(store.verify_policy(&signed).unwrap_err().contains("not valid at the supplied verification time"));
     }
 
     #[test]
@@ -1104,7 +1104,7 @@ mod tests {
             "ops", assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
             &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
         );
-        assert!(store.verify_event(&signed).unwrap_err().contains("not valid at signed time"));
+        assert!(store.verify_event(&signed).unwrap_err().contains("not valid at the supplied verification time"));
     }
 
     #[test]
