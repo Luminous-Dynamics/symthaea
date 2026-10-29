@@ -247,16 +247,49 @@ def extract_test_bundle(bundle_raw: bytes, workspace: Path) -> list[dict[str, An
     return files
 
 
-def _worktree_add(source_repo: Path, revision: str, destination: Path) -> None:
-    subprocess.run(
-        ["git", "-C", str(source_repo), "-c", "core.hooksPath=/dev/null",
-         "worktree", "add", "--detach", "--no-checkout", str(destination), revision],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True,
+def _initialize_isolated_checkout(source_repo: Path, revision: str, destination: Path) -> dict[str, Any]:
+    """Fetch only the pinned commit into a new shallow repo; never share source refs or objects."""
+    init = subprocess.run(
+        ["git", "init", "-q", str(destination)],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        text=True, encoding="utf-8", errors="replace", timeout=60,
+    )
+    if init.returncode != 0:
+        raise ControlError(f"cannot initialize isolated checkout: {init.stdout[-2000:]}")
+    _git(destination, "config", "core.hooksPath", "/dev/null")
+    fetch = subprocess.run(
+        ["git", "-C", str(destination), "-c", "core.hooksPath=/dev/null",
+         "fetch", "--no-tags", "--depth=1", "--no-recurse-submodules",
+         str(source_repo), revision],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
         text=True, encoding="utf-8", errors="replace", timeout=120,
     )
-    _git(destination, "checkout", "--detach", revision)
-    _git(destination, "config", "core.hooksPath", "/dev/null")
-
+    if fetch.returncode != 0:
+        raise ControlError(f"cannot fetch only the pinned source revision into isolated checkout: {fetch.stdout[-2000:]}")
+    _git(destination, "checkout", "--detach", "FETCH_HEAD")
+    observed = _git(destination, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
+    if observed != revision:
+        raise ControlError(f"isolated checkout HEAD {observed} differs from pinned revision {revision}")
+    ref_names = _git(destination, "for-each-ref", "--format=%(refname)").stdout.splitlines()
+    reachable_count_raw = _git(destination, "rev-list", "--count", "HEAD").stdout.strip()
+    try:
+        reachable_count = int(reachable_count_raw)
+    except ValueError as exc:
+        raise ControlError("isolated checkout commit count is not an integer") from exc
+    alternates = destination / ".git" / "objects" / "info" / "alternates"
+    if ref_names:
+        raise ControlError(f"isolated checkout unexpectedly contains refs: {ref_names}")
+    if reachable_count != 1:
+        raise ControlError(f"isolated checkout exposes {reachable_count} reachable commits, expected exactly one")
+    if alternates.exists():
+        raise ControlError("isolated checkout must not use shared Git object alternates")
+    return {
+        "head_sha": observed,
+        "ref_names": ref_names,
+        "reachable_commit_count": reachable_count,
+        "uses_shared_object_alternates": False,
+        "shallow_history": (destination / ".git" / "shallow").exists(),
+    }
 
 def tracked_tree_delta_sha256(workspace: Path) -> str:
     """Hash tracked changes relative to HEAD; source mutations during tests are invalid."""
@@ -416,17 +449,15 @@ def run_two_sided_controls(
     baseline_results: list[dict[str, Any]] = []
     reference_results: list[dict[str, Any]] = []
     bundle_manifest: list[dict[str, Any]] = []
-    git_worktrees: list[Path] = []
+    checkout_metadata: dict[str, Any] = {}
 
     with tempfile.TemporaryDirectory(prefix="vleb-oracle-controls-") as temporary:
         temp_root = Path(temporary)
         baseline = temp_root / "baseline"
         reference = temp_root / "reference"
         try:
-            _worktree_add(source, expected_source_revision, baseline)
-            git_worktrees.append(baseline)
-            _worktree_add(source, expected_source_revision, reference)
-            git_worktrees.append(reference)
+            checkout_metadata["baseline"] = _initialize_isolated_checkout(source, expected_source_revision, baseline)
+            checkout_metadata["reference"] = _initialize_isolated_checkout(source, expected_source_revision, reference)
 
             bundle_manifest.append({"arm": "baseline", "files": extract_test_bundle(test_bundle_raw, baseline)})
             # Extracting the same trusted tests independently ensures both arms use identical test bytes.
@@ -511,6 +542,7 @@ def run_two_sided_controls(
                 "reference_patch_must_pass": True,
                 "source_revision": expected_source_revision,
                 "source_repository_head_checked": True,
+                "isolated_checkout_metadata": checkout_metadata,
                 "manifest_sha256": digest(manifest_raw),
                 "reference_patch_sha256": digest(reference_patch_raw),
                 "test_bundle_sha256": digest(test_bundle_raw),
@@ -547,18 +579,8 @@ def run_two_sided_controls(
                 ],
             }
         finally:
-            for worktree in reversed(git_worktrees):
-                subprocess.run(
-                    ["git", "-C", str(source), "-c", "core.hooksPath=/dev/null",
-                     "worktree", "remove", "--force", str(worktree)],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-                    text=True, encoding="utf-8", errors="replace", timeout=60,
-                )
-            subprocess.run(
-                ["git", "-C", str(source), "-c", "core.hooksPath=/dev/null", "worktree", "prune"],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-                timeout=60,
-            )
+            # TemporaryDirectory removes the two isolated repositories; source repository metadata is untouched.
+            pass
 
 
 def main(argv: list[str] | None = None) -> int:
