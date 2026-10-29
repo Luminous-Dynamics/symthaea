@@ -15,6 +15,7 @@ on:
       - "xtask/src/cognitive_replay_driver.rs"
       - "xtask/src/cognitive_missingness.rs"
       - "xtask/src/cognitive_missingness_schedule.rs"
+      - "xtask/src/cognitive_missingness_audit.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -39,6 +40,7 @@ on:
       - "xtask/src/cognitive_replay_driver.rs"
       - "xtask/src/cognitive_missingness.rs"
       - "xtask/src/cognitive_missingness_schedule.rs"
+      - "xtask/src/cognitive_missingness_audit.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -110,6 +112,8 @@ jobs:
         run: cargo test --locked -p xtask cognitive_missingness
       - name: Test missingness schedule determinism and policy isolation
         run: cargo test --locked -p xtask cognitive_missingness_schedule
+      - name: Test independent missingness artifact audit
+        run: cargo test --locked -p xtask cognitive_missingness_audit
 
       - name: Test adaptation panel coverage and aggregation
         run: cargo test --locked -p xtask cognitive_adaptation_panel
@@ -471,3 +475,19 @@ jobs:
             ([.events[] | select(.state_at_horizon == "declared_missing")] | length) > 0 and
             ([.events[] | select(.state_at_horizon == "observed" and (.expected_reveal_tick > $schedule.evaluation_horizon_tick))] | length) == 0
           ' "$RUNNER_TEMP/missingness-evaluator-schedule.json"
+          cargo run --locked -p xtask -- audit-cognitive-missingness-schedule --input benchmarks/cognitive-loop-evidence/synthetic-missingness-schedule-input.json --policy-tick "$RUNNER_TEMP/missingness-policy-tick.json" --evaluator "$RUNNER_TEMP/missingness-evaluator-schedule.json" --out "$RUNNER_TEMP/missingness-independent-audit.json"
+          jq -e '
+            .audit_version == "cognitive-missingness-independent-audit-v1" and
+            .eligible_event_count == 64 and
+            .policy_tick == 40 and
+            .state_count_conserved == true and
+            .evaluator_records_rederived == true and
+            .policy_tick_rederived == true and
+            .opaque_policy_ids_verified == true and
+            .no_future_tick_messages == true and
+            (.source_input_sha256 | length) == 64 and
+            (.policy_tick_sha256 | length) == 64 and
+            (.evaluator_schedule_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64 and
+            (.interpretation_guard | contains("not evidence of honest execution"))
+          ' "$RUNNER_TEMP/missingness-independent-audit.json"
