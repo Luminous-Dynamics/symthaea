@@ -14,6 +14,8 @@
     "tool_manifest_sha256",
     "budget_sha256",
     "analysis_plan_sha256",
+    "evaluator_revision_sha256",
+    "decision_rules_sha256",
     "randomization_commitment_sha256",
     "required_conditions",
     "pairs"
@@ -48,6 +50,12 @@
       "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
     },
     "analysis_plan_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "evaluator_revision_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "decision_rules_sha256": {
       "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
     },
     "randomization_commitment_sha256": {
