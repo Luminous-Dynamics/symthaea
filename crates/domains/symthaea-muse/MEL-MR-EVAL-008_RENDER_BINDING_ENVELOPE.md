@@ -15,9 +15,9 @@ The theory-feature-gated module `symthaea_muse::symbolic_audio_binding` provides
 - `RendererManifest`: renderer ID/version, render-config digest, optional instrument-bank and effects-config digests, sample rate, channel count, and latency policy.
 - `renderer_manifest_sha256`: versioned, domain-separated manifest digest.
 - `create_symbolic_audio_render_binding`: consumes source/target event sequences, symbolic evidence, source/target audio views, acoustic and onset reports, and renderer metadata.
-- `verify_symbolic_audio_render_binding`: replays symbolic verification, recomposes the audio result from the two child reports, recomputes buffer and manifest digests, then requires exact receipt equality.
+- `verify_symbolic_audio_render_binding`: replays symbolic verification; re-runs each acoustic/onset verifier against the exact supplied buffers using each report's stored edit masks and detector configuration; recomposes the audio result from verified child reports; recomputes buffer/manifest digests; then requires exact receipt equality.
 
-The binder does not accept a standalone composite audio report as authoritative. It recomposes the audio-only result from the two child reports so both child receipt digests are checked before a cross-modal envelope is created.
+The binder does not accept a standalone composite audio report as authoritative. Both acoustic and onset receipts record the exact authorized edit masks. The binder recomputes each report from the supplied audio buffers, stored mask, and stored detector configuration before composing the audio-only result. Re-sealing a fabricated metric with an unkeyed hash is insufficient: its measurements/verdict must match a fresh computation. This does not authenticate that the mask itself was authorized by a trusted edit contract; the contract-to-mask mapping is a distinct next integration step.
 
 The resulting binding commits to source/target symbolic hashes, the symbolic receipt hash, source/target audio hashes, the recomposed audio receipt hash, renderer-manifest hash, audio format, overall verdict, and reasons. The combined rule is non-compensatory: a symbolic failure or audio failure dominates; if symbolic passes but audio abstains, the overall result abstains; pass requires both to pass.
 
@@ -38,7 +38,7 @@ Six Rust unit tests cover:
 5. changing the manifest audio format is rejected;
 6. tampering with an audio child receipt is rejected, and a failed symbolic result dominates passing audio evidence.
 
-The render-binding module has six Rust test functions covering the seven checks listed above (the changed-score and tampered-binding checks share one test). These tests are committed but not executed here. Rust compilation, rustfmt, clippy, and actual rendering validation remain pending.
+The render-binding module has six Rust test functions covering the seven checks listed above (the changed-score and tampered-binding checks share one test). An independent Python/NumPy sanity run over the synthetic source/target fixture found 110 protected acoustic windows, zero violations, and four matching protected onset events after the declared edit mask and onset-analysis guard. This only checks that the synthetic fixture is well-formed; it does not execute Rust or prove a causal render. All Rust tests are committed but not executed here. Compilation, rustfmt, clippy, and actual rendering validation remain pending.
 
 ## Next evidence gates
 
