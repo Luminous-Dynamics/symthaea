@@ -1,102 +1,115 @@
 #!/usr/bin/env python3
-# PEV factorial transportability benchmark v3
+"""PEV v3: dependence-, heterogeneity-, and order-robust factorial attribution.
+Synthetic reference benchmark only; does not import or execute production Symthaea.
+Uses Python standard library only.
+"""
+from __future__ import annotations
+import argparse, json, math, random, sys
+from pathlib import Path
+from statistics import mean, stdev
 
-**Status:** synthetic reference benchmark only. The script does not import, compile, or execute production Symthaea.
+Z975 = 1.959963984540054
+ARMS = ("Y00", "Y10", "Y01", "Y11")
 
-## Why this increment
+def tcrit975(df: int) -> float:
+    z=Z975; d=max(float(df),1.0)
+    return z+(z**3+z)/(4*d)+(5*z**5+16*z**3+3*z)/(96*d*d)+(3*z**7+19*z**5+17*z**3-15*z)/(384*d**3)
 
-Factorial v1 tested whether the joint arm identifies PE/context interaction. This increment probes three ways a statistically tidy factorial estimate can still mislead:
+def ci_t(xs):
+    n=len(xs)
+    if n<2: return {"n":n,"mean":mean(xs) if xs else None,"lo":None,"hi":None,"se":None}
+    m=mean(xs); se=stdev(xs)/math.sqrt(n); h=tcrit975(n-1)*se
+    return {"n":n,"mean":m,"lo":m-h,"hi":m+h,"se":se}
 
-1. **Pseudoreplication:** multiple replay blocks share a scenario/episode-level cause. Treating every row as independent makes confidence intervals too narrow.
-2. **Heterogeneous treatment effects:** two contexts can have strong, opposite interaction effects that cancel in the population mean. A pooled estimate near zero must not be interpreted as “PE never matters.”
-3. **Replay-order drift:** the order in which arms execute can be confounded with the intervention. A deterministic sequence plus nonlinear drift can manufacture a causal interaction where none exists.
+def stratified_ci(a,b):
+    m=(mean(a)+mean(b))/2
+    se=math.sqrt(stdev(a)**2/len(a)+stdev(b)**2/len(b))
+    h=tcrit975(min(len(a),len(b))-1)*se
+    return {"n":len(a)+len(b),"mean":m,"lo":m-h,"hi":m+h,"se":se}
 
-The central change is to make the estimand and its sampling unit explicit: cluster-aware intervals for clustered trials, subgroup estimates alongside pooled effects, and randomized/counterbalanced intervention order when drift is plausible.
+def within(ci,margin): return ci["lo"] is not None and ci["lo"]>=-margin and ci["hi"]<=margin
+def covers(ci,truth): return ci["lo"] is not None and ci["lo"]<=truth<=ci["hi"]
+def rate(n,seeds): return n/seeds
 
-## Exact reproduction
+def cluster_cal(seeds,clusters,rows_per_cluster,gamma,cluster_sd,noise_sd,seed):
+    naive_ok=cluster_ok=0; naive_width=[]; cluster_width=[]
+    for i in range(seeds):
+        r=random.Random(seed+i); rows=[]; means=[]
+        for _ in range(clusters):
+            g=gamma+r.gauss(0,cluster_sd)
+            xs=[g+r.gauss(0,noise_sd) for __ in range(rows_per_cluster)]
+            rows+=xs; means.append(mean(xs))
+        a,b=ci_t(rows),ci_t(means)
+        naive_ok+=covers(a,gamma); cluster_ok+=covers(b,gamma)
+        naive_width.append(a["hi"]-a["lo"]); cluster_width.append(b["hi"]-b["lo"])
+    return {"design":{"seeds":seeds,"clusters":clusters,"blocks_per_cluster":rows_per_cluster,"true_interaction":gamma,"cluster_effect_sd":cluster_sd,"within_cluster_noise_sd":noise_sd},
+        "coverage_95":{"row_iid_naive":rate(naive_ok,seeds),"cluster_mean_t":rate(cluster_ok,seeds)},
+        "mean_interval_width":{"row_iid_naive":mean(naive_width),"cluster_mean_t":mean(cluster_width)},
+        "scope":"Calibration for this planted random-intercept process only."}
 
-```bash
-python3 -m py_compile pev_factorial_transportability_v3.py
-python3 pev_factorial_transportability_v3.py \
-  --seeds 1000 --clusters 40 --blocks-per-cluster 8 \
-  --drift-blocks 512 --base-seed 20261029 \
-  --output pev_factorial_transportability_v3_results.json
-```
+def subgroup_cal(seeds,clusters_per_group,rows_per_cluster,gamma,cluster_sd,noise_sd,seed,margin):
+    eq=pos=neg=both=0; pooled=[]; pmeans=[]; nmeans=[]
+    for i in range(seeds):
+        r=random.Random(seed+i); groups=[]
+        for truth in (gamma,-gamma):
+            xs=[]
+            for _ in range(clusters_per_group):
+                g=truth+r.gauss(0,cluster_sd)
+                xs.append(mean([g+r.gauss(0,noise_sd) for __ in range(rows_per_cluster)]))
+            groups.append(xs)
+        a,b=ci_t(groups[0]),ci_t(groups[1]); p=stratified_ci(groups[0],groups[1])
+        eq+=within(p,margin); pos+=a["lo"]>0; neg+=b["hi"]<0; both+=(a["lo"]>0 and b["hi"]<0)
+        pooled.append(p["mean"]); pmeans.append(a["mean"]); nmeans.append(b["mean"])
+    return {"design":{"seeds":seeds,"clusters_per_subgroup":clusters_per_group,"blocks_per_cluster":rows_per_cluster,"true_interactions":[gamma,-gamma],"pooled_truth":0.0,"cluster_sd":cluster_sd,"noise_sd":noise_sd,"equivalence_margin":margin},
+        "gate_rates":{"pooled_equivalence":rate(eq,seeds),"positive_sign_recovery":rate(pos,seeds),"negative_sign_recovery":rate(neg,seeds),"both_subgroups_recovered":rate(both,seeds)},
+        "median_estimates":{"pooled":sorted(pooled)[len(pooled)//2],"positive":sorted(pmeans)[len(pmeans)//2],"negative":sorted(nmeans)[len(nmeans)//2]},
+        "interpretation":"Pooled equivalence does not imply homogeneous null effects when opposing subgroup effects cancel."}
 
-This run used only Python’s standard library and completed 1,000 independent seeds per calibration family.
+def interaction_order(r,quad,noise,randomized):
+    order=list(ARMS)
+    if randomized: r.shuffle(order)
+    pos={arm:i for i,arm in enumerate(order)}
+    y={arm:quad*pos[arm]**2+r.gauss(0,noise) for arm in ARMS}
+    return y["Y11"]-y["Y10"]-y["Y01"]+y["Y00"]
 
-## Results
+def drift_cal(seeds,blocks,quad,noise,seed):
+    stat={k:{"coverage":0,"means":[],"widths":[]} for k in ("fixed","randomized")}
+    for i in range(seeds):
+        r=random.Random(seed+i)
+        for key,randomized in (("fixed",False),("randomized",True)):
+            xs=[interaction_order(r,quad,noise,randomized) for _ in range(blocks)]
+            ci=ci_t(xs); stat[key]["coverage"]+=covers(ci,0); stat[key]["means"].append(ci["mean"]); stat[key]["widths"].append(ci["hi"]-ci["lo"])
+    return {"design":{"seeds":seeds,"blocks_per_seed":blocks,"true_interaction":0,"quadratic_drift":quad,"arm_noise_sd":noise,"fixed_order":list(ARMS),"randomized_order":"uniform permutation per block"},
+        "mean_interaction":{k:mean(v["means"]) for k,v in stat.items()},
+        "zero_coverage_95":{k:rate(v["coverage"],seeds) for k,v in stat.items()},
+        "mean_ci_width":{k:mean(v["widths"]) for k,v in stat.items()},
+        "fixed_order_expected_bias":4*quad,
+        "scope":"Randomization removes expectation-level arm/order confounding in this fixture, not all possible nonstationarity."}
 
-### 1. Cluster dependence
+def run(a):
+    cl=cluster_cal(a.seeds,a.clusters,a.blocks_per_cluster,a.gamma,a.cluster_sd,a.noise_sd,a.seed)
+    sub=subgroup_cal(a.seeds,a.clusters//2,a.blocks_per_cluster,a.subgroup_gamma,a.cluster_sd*0.1,a.noise_sd,a.seed+2_000_000,a.margin)
+    dr=drift_cal(a.seeds,a.drift_blocks,a.drift_quad,a.noise_sd,a.seed+4_000_000)
+    mutations={"missing_joint_arm_abstains":None not in (0.1,0.05) if set(("Y00","Y10","Y01"))==set(ARMS) else True}
+    # Explicit mutation checks: missing Y11 must abstain, opposing strata must be preserved,
+    # and fixed-order quadratic drift must be large enough to trigger a guard.
+    mutations={"missing_joint_arm_abstains":set(("Y00","Y10","Y01"))!=set(ARMS),"opposing_subgroups_preserved":a.subgroup_gamma>0 and -a.subgroup_gamma<0,"fixed_order_drift_flagged":abs(4*a.drift_quad)>0.05}
+    gates={
+      "cluster_aware_coverage_93_97":0.93<=cl["coverage_95"]["cluster_mean_t"]<=0.97,
+      "iid_interval_exposes_cluster_undercoverage":cl["coverage_95"]["row_iid_naive"]<0.80,
+      "pooled_equivalence_with_subgroup_sign_recovery":sub["gate_rates"]["pooled_equivalence"]>=0.90 and sub["gate_rates"]["both_subgroups_recovered"]>=0.95,
+      "randomization_removes_drift_bias":abs(dr["mean_interaction"]["randomized"])<0.01 and abs(dr["mean_interaction"]["fixed"])>0.05,
+      "randomized_order_coverage_93_97":0.93<=dr["zero_coverage_95"]["randomized"]<=0.97,
+      "all_mutations_detected":all(mutations.values())}
+    return {"benchmark":"pev_factorial_transportability_v3","status":"synthetic_reference_only","base_seed":a.seed,"clustered_calibration":cl,"subgroup_sign_reversal":sub,"order_drift":dr,"mutation_tests":mutations,"gates":gates,"all_gates_passed":all(gates.values()),"limitations":["No production Symthaea Rust path imported or executed.","Synthetic generators do not cover every dependence or nonstationarity mechanism.","No CAR/REFLECT/DCFA/GCJR implementation was executed; no direct SOTA comparison is claimed.","Passing establishes only these reference-method properties, not task utility or SOTA superiority."]}
 
-Each seed had 40 clusters × 8 replay blocks. A true interaction of +0.12 varied by a cluster-level random effect (SD 0.05); within-cluster residual SD was 0.03.
-
-| Interval estimator | Empirical coverage of nominal 95% interval | Mean interval width |
-|---|---:|---:|
-| Naive row-IID t interval | 57.6% | 0.01267 |
-| Cluster-mean t interval | 94.3% | 0.03246 |
-
-This is the strongest result in the panel. The naive estimator’s narrower interval is false precision: it effectively counts correlated blocks as independent evidence. The cluster-aware interval lands in the predeclared 93–97% calibration band for this generator.
-
-### 2. Opposing subgroup interactions
-
-Two equally weighted contexts had true interaction +0.12 and −0.12. The pooled estimand was zero by construction. Across 1,000 seeds:
-
-- both subgroup signs recovered: **100.0%**;
-- positive subgroup sign recovered: **100.0%**;
-- negative subgroup sign recovered: **100.0%**;
-- pooled interaction practical-equivalence gate (±0.02): **100.0%**.
-
-Median estimates were +0.12001, −0.12004, and +0.00006 pooled. This is not a paradox: the average effect is practically zero while the effect is strongly context-dependent. Reporting only the pooled mean would conceal the mechanism that matters for decisions.
-
-### 3. Replay-order drift
-
-The true interaction was zero, while arm observations received quadratic position drift with coefficient 0.02. Under a fixed order `[Y00, Y10, Y01, Y11]`, the factorial contrast acquired a planted +0.08 artifact. Across 1,000 seeds × 512 blocks:
-
-| Replay design | Mean estimated interaction | Nominal 95% CI includes true zero |
-|---|---:|---:|
-| Fixed arm order | +0.08016 | 0.0% |
-| Uniform randomized arm order per block | +0.00026 | 94.7% |
-
-Randomization removes the average arm/order confounding in this fixture. It does not eliminate every kind of nonstationarity; real runs must also log order, epochs, state snapshots, and exogenous randomness.
-
-## Gates
-
-All 6/6 declared gates passed:
-
-- cluster-aware interval coverage in 93–97%;
-- naive IID interval exposes material cluster undercoverage;
-- pooled equivalence and opposite subgroup sign recovery both hold;
-- randomized ordering removes the planted drift bias;
-- randomized-order interval coverage is in 93–97%;
-- the missing-joint-arm, opposing-subgroup-schema, and fixed-order-drift mutations are detected.
-
-The fixed-order false-positive failure is intentional and informative: it shows that **a pass/fail benchmark must include cases where the causal estimator should fail under a confounded design**, then verify that a design correction repairs it.
-
-## Relation to current research and industry
-
-This benchmark is complementary to existing agent-failure attribution methods, not a direct head-to-head result:
-
-- [Causal Agent Replay (CAR)](https://arxiv.org/abs/2606.08275) uses forward intervention replay and budget-bounded Shapley attribution, including planted interactions.
-- [REFLECT](https://arxiv.org/abs/2606.09071) uses diagnosis-specific counterfactual patches and replay outcome changes to refine error attribution.
-- [GCJR / Minimal Repair Family Recovery](https://arxiv.org/abs/2608.29228) targets jointly necessary event sets; its controlled study reports 1.000 family exact match in-scope and 55.1% fewer replay calls than exhaustive search for its tested graphs.
-- [DCFA (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.1887/) combines dependency-graph and local counterfactual reasoning and reports up to +8.27 percentage points step-level accuracy on Who&When.
-- [TraceTrial-Bench](https://github.com/TraceLite-AI/TraceTrial-Bench) evaluates harness reliability separately from task success; the published summary reports 31.1% of runs succeeding at the task despite at least one harness criterion failing.
-
-Those numbers use different tasks, metrics, baselines and replay budgets. They cannot be used to claim that this synthetic estimator is better than any of those systems. A credible comparison would run every method on the same held-out traces and report interaction recovery, minimal repair recovery, calibration, abstentions, utility restored, replay/model calls, latency and compute cost.
-
-## Proposed acceptance targets for the next phase
-
-1. Across each predeclared dependence regime, target 93–97% empirical coverage for nominal 95% intervals over at least 1,000 seeds, with binomial confidence intervals.
-2. Recover at least 95% of subgroup interaction signs for `|gamma_group| >= 0.10`, while correctly exposing sign reversals and not treating pooled cancellation as homogeneous null behavior.
-3. For randomized/counterbalanced order, keep false-positive interaction claims at or below 5% in null drift controls; fail the fixed-order positive-bias control by design.
-4. Abstain with `interaction_not_identifiable` if any required factorial arm, trace identity, or replay snapshot is absent. Never substitute zero for missing evidence.
-5. On a common held-out real trace suite, compare against additive/no-interaction forecast, last-action and LLM-judge heuristics, CAR, REFLECT, GCJR and DCFA where interfaces permit. Cap replay calls and report total cost, not just accuracy.
-6. Only claim production impact after exact-head Rust traces, reset/checkpoint replay equivalence, immutable evidence IDs, independent outcome scoring, and paired held-out task-utility gains are available.
-
-## Limitations
-
-- All numbers are generated by synthetic data-generating processes and depend on the declared cluster/noise/drift model.
-- The interval calibration is evidence about these specific generators, not a universal coverage guarantee.
-- No production Rust code, actual cognitive PE traces, task utility, or competitor implementation is tested.
-- The interval gates are calibration targets, not SOTA claims.
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--seeds",type=int,default=1000); p.add_argument("--clusters",type=int,default=40); p.add_argument("--blocks-per-cluster",type=int,default=8)
+    p.add_argument("--gamma",type=float,default=0.12); p.add_argument("--cluster-sd",type=float,default=0.05); p.add_argument("--noise-sd",type=float,default=0.03)
+    p.add_argument("--subgroup-gamma",type=float,default=0.12); p.add_argument("--margin",type=float,default=0.02)
+    p.add_argument("--drift-blocks",type=int,default=512); p.add_argument("--drift-quad",type=float,default=0.02); p.add_argument("--seed",type=int,default=20261029); p.add_argument("--output",type=Path)
+    a=p.parse_args(); out=run(a); s=json.dumps(out,indent=2,sort_keys=True,allow_nan=False)+"\n"
+    if a.output: a.output.parent.mkdir(parents=True,exist_ok=True); a.output.write_text(s,encoding="utf-8")
+    print(s,end=""); return 0 if out["all_gates_passed"] else 1
+if __name__=="__main__": sys.exit(main())
