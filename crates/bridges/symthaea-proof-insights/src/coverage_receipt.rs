@@ -344,7 +344,7 @@ pub fn verify_receipt(
         bail!("reviewer trust store must contain at least two trusted reviewers");
     }
     let mut trusted_by_id = BTreeMap::new();
-    let mut public_keys = BTreeSet::new();
+    let mut public_keys: BTreeSet<[u8; 32]> = BTreeSet::new();
     let mut trusted_key_ids = BTreeSet::new();
     for reviewer in &trust.reviewers {
         if reviewer.reviewer_id.trim().is_empty()
@@ -355,10 +355,17 @@ pub fn verify_receipt(
             bail!("trusted reviewers require nonblank IDs/org and role coverage_auditor");
         }
         if !is_sha256(&reviewer.public_key_hex)
-            || !public_keys.insert(reviewer.public_key_hex.clone())
             || !trusted_key_ids.insert(reviewer.key_id.as_str())
         {
             bail!("trusted reviewer key IDs and public keys must be valid and unique");
+        }
+        let public_key_bytes =
+            hex::decode(&reviewer.public_key_hex).context("decode trusted reviewer public key")?;
+        let public_key_array: [u8; 32] = public_key_bytes
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Ed25519 public key must contain exactly 32 bytes"))?;
+        if !public_keys.insert(public_key_array) {
+            bail!("trusted reviewer public keys must be unique by decoded bytes");
         }
         if trusted_by_id
             .insert(reviewer.reviewer_id.as_str(), reviewer)
