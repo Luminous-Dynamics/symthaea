@@ -160,7 +160,7 @@ if __name__ == "__main__":
         self.assertIn("OK", (self.evidence / result["reference_results"][0]["combined_output_artifact"]).read_text())
 
     def test_reference_that_does_not_fix_behavior_fails_gate(self) -> None:
-        wrong_patch = self.patch_raw.replace(b"VALUE = 1", b"VALUE = 0")
+        wrong_patch = self.patch_raw.replace(b"VALUE = 1", b"VALUE = 2")
         result = self.run_controls(
             patch_raw=wrong_patch,
             evidence_root=self.root / "wrong-patch-evidence",
