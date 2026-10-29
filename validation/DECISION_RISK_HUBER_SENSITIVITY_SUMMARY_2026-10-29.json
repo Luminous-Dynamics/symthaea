@@ -89,8 +89,7 @@
     "unknown_contamination_bound_fails_closed": true,
     "all_integrity_assumptions_present_pass_preflight": true
   },
-  "raw_results_sha256": "45f0bee8aa8c0625bbe8a87cfc6a2a778c546adf9aa430295463601c784fa6cd",
-  "source_sha256": "f39a0ce38bb2be2ea17664a32447a144afab906e87e40441bc8ed796d6711cbc",
+  "raw_results_sha256": "6b21cc27b26a4fb7eedda721453f3b0e2aa3fbd8f4f9e15be5a2aa70899319c7",
   "literature": [
     "https://proceedings.mlr.press/v206/wang23p.html",
     "https://ojs.aaai.org/index.php/AAAI/article/view/39063",
@@ -102,5 +101,6 @@
     "not a general robust-CS implementation",
     "no production Rust integration",
     "no direct SOTA baseline implementation run"
-  ]
+  ],
+  "reproduction_bundle_source_sha256": "5a2d4430d247a3ba20409e135d1546c2645ffeb87b36c41491aef2e102f303ca"
 }
