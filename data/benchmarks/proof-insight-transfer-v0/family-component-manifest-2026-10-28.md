@@ -1,13 +1,27 @@
 # Complete PITB component manifest
 
-Status: prerequisite implementation and synthetic controls only. This does not claim the actual relationship inventory is complete, that the primary scorer consumes component IDs, or that PITB is statistically qualified.
+Status update: 2026-10-29. The component builder, signed-receipt verifier, and analyzer-side reconciliation are implemented on the research branch. This is infrastructure qualification—not evidence that the actual 372-family inventory has been independently reviewed or that any model-transfer effect exists.
 
-The existing leakage report emits cross-split hard-link components for quarantine. It is not a complete clustering key because same-split groups and isolated families are absent. The builder maps every frozen family ID to a deterministic component ID. Confirmed and unresolved hard relations join components; dismissed hard relations and soft relations such as conceptual similarity do not. Every isolated family becomes a singleton. Component IDs are SHA-256 content addresses of sorted family IDs; the manifest binds the frozen split digest and exact relationship-inventory bytes.
+## Current data path
 
-## Fail-closed qualification
+The deterministic builder assigns every frozen family—including singletons and same-split groups—to a content-addressed component. Confirmed and unresolved hard relationships join components; dismissed hard edges and soft relations do not. The frozen split, family assignments, relationship inventory, receipt, trust-store, and methodology are digest-bound.
 
-The output can be labelled `structurally_eligible_receipt_unverified` when the inventory declares complete coverage, supplies a receipt digest, and has no non-dismissed hard component crossing train/validation/test. That state is **not qualification**: the current builder only receives the digest, not the receipt bytes or an authenticated reviewer attestation. Accordingly, `qualified_for_confirmatory_resampling` remains false in every output from this version. An incomplete inventory or a cross-split hard component also remains unqualified.
+The builder can consume the original inventory, signed receipt, trust-store bytes, methodology bytes, and caller-pinned trust/methodology digests. It verifies the Ed25519 receipt before marking the coverage state verified. The analyzer then independently re-verifies the same raw inputs and reconstructs the expected connected components from the signed inventory; it does not trust a self-consistent manifest alone.
 
-Unresolved hard links are conservatively included. A digest binds bytes; it does not authenticate reviewer identities or establish that the coverage assertion is true. A later verifier must inspect the exact receipt bytes, reviewer evidence, and coverage scope before a new qualification decision can be issued.
+At the receipt boundary, edge-level reviewer IDs must refer to reviewers in the pinned trust store and in the verified receipt signer set. Every resolved edge must be attributed to reviewers from at least two registered organizations. These runtime checks supplement the strict schemas; schemas alone cannot authenticate reviewer identities.
 
-The builder does not yet change the production scorer. The run config, validation power planner, and test bootstrap must bind and consume the same component-manifest digest and component-size vector. Only then can the minimum of 20 independent components be enforced; until receipt verification and scorer integration are complete, no confirmatory PITB result is qualified.
+## Qualification states
+
+- **Incomplete inventory:** remains unqualified and cannot carry a coverage receipt.
+- **Cross-split non-dismissed hard component:** remains unqualified; unresolved hard links are conservatively included.
+- **Complete inventory with no cross-split hard component but no verified receipt:** `structurally_eligible_receipt_unverified`; diagnostic only.
+- **Complete inventory with verified receipt and no cross-split hard component:** the manifest may be marked `qualified_coverage_verified_no_cross_split_hard_relationships`. This qualifies the coverage graph only; it does not, by itself, authorize a benchmark result.
+
+The run config pins the exact component-manifest and coverage-artifact digests. Power planning and test analysis use the same component identifiers and component-level resampling units. Confirmatory use still requires the registered independent-component floor, nondegenerate/informative uncertainty, the weak/strict-null false-claim gate, adequate simulated power, the exact-target semantic gate, and complete target/arm outcome accounting.
+
+## Remaining blockers
+
+1. Provision a trust root outside the experiment author's sole control and obtain endorsements from genuinely independent reviewers in distinct organizations.
+2. Complete and independently audit the relationship inventory and retain the review logs, searches, candidate pairs, dismissed candidates, and unresolved relationships. A valid signature authenticates the attestation; it cannot prove exhaustive discovery or reviewer competence.
+3. Run Rust tests and the exact-head workflow. The latest head has not reported a status check or PR-triggered workflow run; static inspection is not a pass.
+4. Run matched-budget baseline/treatment comparisons only after semantic targets and eligibility are independently qualified. There are currently no measured PITB transfer outcomes, no measured utility gain, and no SOTA win claim.
