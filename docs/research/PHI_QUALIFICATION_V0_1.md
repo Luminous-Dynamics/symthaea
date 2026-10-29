@@ -268,10 +268,16 @@ These are release targets, not observed results. The next best experiment is the
 - Albantakis et al. (2023), “Integrated Information Theory (IIT) 4.0: Formulating the Properties of Phenomenal Existence in Physical Terms”: https://doi.org/10.1371/journal.pcbi.1011465
 - PyPhi configuration reference: distinguishes `IIT_3_0`, `IIT_4_0_2023`, and `IIT_4_0_2026`: https://pyphi.readthedocs.io/en/latest/reference/configuration.html
 - PyPhi API reference: distinguishes `Analysis.phi` (system integrated information), `Analysis.ces` (Φ-structure), and `Analysis.big_phi` (structure integrated information): https://pyphi.readthedocs.io/en/latest/reference/_autosummary/pyphi.html
-- PyPhi installation notes: pin 2.0 exactly; the bare install resolves to 1.2 according to current docs: https://pyphi.readthedocs.io/en/latest/
+- PyPhi release pin: this draft pins `pyphi==2.0.0rc4`, the newest 2.0 prerelease listed on PyPI as of 2026-10-29; PyPI's latest stable release remains 1.2.0. The upstream repository changelog and rendered installation docs disagree on release status, so never infer an installable version from the changelog alone: https://pypi.org/project/pyphi/ and https://pyphi.readthedocs.io/en/latest/
 - PyPhi, “Computational complexity” (IIT 4.0 and IIT 3.0 stage-by-stage limits): https://pyphi.readthedocs.io/en/latest/theory/computational-complexity.html
 - Cogitate Consortium et al. (2025), “Adversarial testing of global neuronal workspace and integrated information theories of consciousness,” Nature: https://doi.org/10.1038/s41586-025-08888-1
 
 ## Claim boundary for this draft
 
 This file is a qualification protocol and source-informed research proposal. It does not add an IIT 4.0 reference implementation, execute the case catalogue, repair existing production behavior, establish a proxy's accuracy, or provide evidence for or against consciousness in Symthaea.
+
+## Follow-on work: pinned upstream reference smoke test
+
+The branch now includes `validation/generate_pyphi_reference_fixtures.py` and a documented anchor manifest for PyPhi's IIT 4.0 (2023) Fig. 1A example. The runner requires the exact PyPI version `2.0.0rc4`, explicitly requests `IIT_4_0_2023`, extracts the TPM and declared connectivity, hashes the canonical model record, and checks six published quantities. It emits a run artifact that is scoped to the upstream reference only; it does not compare against Symthaea's HDC score.
+
+The fixture manifest is marked `documented_reference_anchor_not_locally_reexecuted`. The runner, schema, and tests have not been executed in this environment. Keep the result unqualified until the pinned package runs successfully and the resulting artifact is independently inspected.
