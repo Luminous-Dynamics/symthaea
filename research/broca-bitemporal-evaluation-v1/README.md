@@ -103,3 +103,28 @@ These are proposed internal gates, not existing results:
 ## Competitive boundary
 
 This is a new reference-evaluation artifact, not an SOTA claim. The synthetic fixture is not an external leaderboard score, the resolver is not integrated into Broca, and no official MEME/LongMemEval/COLLABMEM run has been conducted in this package. Compare against industry only after identical harness, data split, reader, budget, and protocol are pinned.
+
+
+## Metamorphic audit extension
+
+metamorphic_temporal_audit.py turns the core semantics into mutation-based invariants rather than relying only on a fixed list of gold answers. It runs a deterministic set of 20 event permutations for each query, then adds controlled mutations:
+
+- **Future-cutoff noninterference:** add a highly authoritative event whose valid interval would match the query but whose recorded time is after known_at. The semantic answer must not change.
+- **Lower-authority noninterference:** add a contradictory event at the winning effective start with strictly lower authority. It must not replace the result or resolve an existing top-authority conflict.
+- **Equal-authority conflict:** add a different value with the same winning effective start and authority. A formerly resolved query must become conflict with a null value.
+- **Redundant witness:** add another same-rank claim supporting the same value. The answer must remain stable and the selected provenance should expand.
+- **Query-order invariance:** reorder the questions and compare outputs by stable query ID.
+
+The audit uses only the Python standard library plus the adjacent reference evaluator. It emits a JSON report with counts per invariant, every pass/fail case, deterministic seed, and hashes of the event fixture, query fixture, resolver and audit code. This is not an official score and does not test production worker/index persistence.
+
+Run from the repository root:
+
+~~~sh
+python3 research/broca-bitemporal-evaluation-v1/metamorphic_temporal_audit.py \
+  --output /tmp/broca-bitemporal-metamorphic-report.json
+python3 research/broca-bitemporal-evaluation-v1/test_metamorphic_temporal_audit.py
+~~~
+
+The regression suite includes a negative control that deliberately injects future-event leakage; the audit must detect it. This control is important: a property suite that always passes even when a target invariant is violated is not a trustworthy guard.
+
+The next architectural milestone remains a Rust feature-gated truth-maintenance implementation with matching semantics, atomic updates, restart/replay/index-rebuild parity, then official MEME, COLLABMEM and LongMemEval-V2/AgentRunbook-C evaluations.
