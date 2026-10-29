@@ -28,6 +28,8 @@ This is not a causal graph and does not solve currentness. The stale-address adv
 - `fixtures/questions.jsonl`: paired queries annotated with required support, stale/forbidden support, and plausible distractors using source JSON Pointers.
 - `run_probe.py`: feeds the fixtures to the actual Rust `broca-lme-worker`, collects its ranked audit records, and writes a worker/config/dataset receipt.
 - `score_probe.py`: strict, dependency-free scoring for required-support recall, ordinary and stale-aware complete chains, first-support reciprocal rank, stale-support hits, and distractor retrieval.
+- `fixtures/mutations/eligibility-ledger.jsonl` and `eligibility_filter.py`: a digest-bound, oracle-intent eligibility-first ablation over the same BM25 candidate pool; unknown source pointers fail closed.
+- `test_eligibility_filter.py`: unit tests for temporal eligibility, intent-specific behavior, fixed-budget selection, fail-closed handling, and receipt integrity.
 - `test_score_probe.py`: offline unit tests for scoring and fail-closed dataset matching.
 
 The worker must be built from the exact Symthaea checkout under test. A probe run is not a substitute for the official LongMemEval-V2 harness.
@@ -85,6 +87,29 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 3. Add an explicit typed transition graph only after the episode-expansion ablation is measured.
 4. Compare the arms on official LongMemEval-V2 and one independent action-oriented benchmark (e.g. AMA-Bench or Mem2ActBench); do not average their scores together.
 5. Run the mutation lane separately: supersede a fact, save/load memory, rebuild the index, and prove the old pointer is no longer eligible. That is a governance test, not a causal-chain score.
+
+## Eligibility-first currentness ablation
+
+After generating the mutation candidate pool with `--candidate-k 20 --k 5`, the filter removes evidence whose explicit ledger status is ineligible for the question's retrieval intent, then truncates the remaining ranked candidates to five. It produces a separate manifest that binds the worker SHA-256, candidate receipt, candidate prediction digest, fixture hashes, policy-ledger digest, eligible-status policy, and output digest.
+
+```sh
+python3 research/broca-causal-episode-probe-v1/eligibility_filter.py \
+  --predictions /tmp/broca-mutation-candidates.jsonl \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --trajectories research/broca-causal-episode-probe-v1/fixtures/mutations/trajectories.jsonl \
+  --ledger research/broca-causal-episode-probe-v1/fixtures/mutations/eligibility-ledger.jsonl \
+  --k 5 --output /tmp/broca-mutation-eligible.jsonl
+
+python3 research/broca-causal-episode-probe-v1/score_probe.py \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --predictions /tmp/broca-mutation-eligible.jsonl --k 5 \
+  --output /tmp/broca-mutation-eligible-score.json
+
+python3 research/broca-causal-episode-probe-v1/test_eligibility_filter.py
+python3 research/broca-causal-episode-probe-v1/test_mutation_fixtures.py
+```
+
+**Critical limitation:** `retrieval_intent` is human-annotated oracle metadata in this experiment. The ablation measures the potential value of applying an explicit eligibility policy before ranking; it does not prove that the query intent classifier or production memory worker implements this policy. The filter never reads the gold required/forbidden support arrays to decide eligibility, but it does use the independent hand-authored policy ledger. Report it as an upper bound, not a production win. Next, evaluate a non-oracle intent classifier separately and report its precision/recall, abstention, policy coverage, retained-candidate count, stale-aware complete-chain rate, latency and total lifecycle cost.
 
 ## Paired official-run decision analysis
 
