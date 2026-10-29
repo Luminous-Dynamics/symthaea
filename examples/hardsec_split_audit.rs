@@ -305,12 +305,19 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     {
         return Err(format!("unsupported split_protocol {split_protocol:?}"));
     }
+    if split_protocol == "counter_set_holdout"
+        && feature_modality_id == "instruction_mnemonics"
+    {
+        return Err(
+            "counter_set_holdout is not applicable to instruction-only telemetry".into(),
+        );
+    }
 
     let mut sample_ids = BTreeSet::new();
     let mut groups: BTreeMap<String, String> = BTreeMap::new();
     let mut artifact_bindings: BTreeMap<String, ArtifactBinding> = BTreeMap::new();
     let mut verified_source_hashes: BTreeMap<String, String> = BTreeMap::new();
-    let mut digest_to_artifact: BTreeMap<String, (String, String)> = BTreeMap::new();
+    let mut digest_to_artifact: BTreeMap<String, (String, String, String, String)> = BTreeMap::new();
     let mut duplicate_content_aliases: BTreeSet<(String, String)> = BTreeSet::new();
     let mut split_counts = BTreeMap::from([
         ("train".to_owned(), 0usize),
@@ -464,25 +471,41 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             artifact_bindings.insert(sample.artifact_id.clone(), binding);
         }
 
-        if let Some((previous_artifact, previous_split)) =
-            digest_to_artifact.get(&sample.source_sha256)
+        if let Some((
+            previous_artifact,
+            previous_split,
+            previous_label,
+            previous_outcome,
+        )) = digest_to_artifact.get(&sample.source_sha256)
         {
+            if previous_split != &sample.split {
+                return Err(format!(
+                    "line {line_number}: identical source bytes appear under distinct splits {:?} and {:?}",
+                    previous_split, sample.split
+                ));
+            }
+            if previous_label != &sample.label
+                || previous_outcome != &sample.security_outcome
+            {
+                return Err(format!(
+                    "line {line_number}: identical source bytes have conflicting workload labels or security outcomes"
+                ));
+            }
             if previous_artifact != &sample.artifact_id {
-                if previous_split != &sample.split {
-                    return Err(format!(
-                        "line {line_number}: identical source bytes appear under distinct artifact IDs across splits {:?} and {:?}",
-                        previous_split, sample.split
-                    ));
-                }
-                // Exact duplicates within a single split are not train/test
-                // leakage, but they are still non-independent source content.
+                // Same-split aliases are not split leakage, but are not
+                // independent source content and must be counted.
                 duplicate_content_aliases
                     .insert((sample.source_sha256.clone(), sample.artifact_id.clone()));
             }
         } else {
             digest_to_artifact.insert(
                 sample.source_sha256.clone(),
-                (sample.artifact_id.clone(), sample.split.clone()),
+                (
+                    sample.artifact_id.clone(),
+                    sample.split.clone(),
+                    sample.label.clone(),
+                    sample.security_outcome.clone(),
+                ),
             );
         }
 
@@ -1257,6 +1280,35 @@ mod tests {
             .audit()
             .unwrap_err()
             .contains("feature modality"));
+    }
+
+    #[test]
+    fn identical_content_aliases_cannot_conflict_on_workload_label_or_outcome() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        let bytes = fs::read(fixture.root.join("a.trace")).unwrap();
+        fs::write(fixture.root.join("b.trace"), &bytes).unwrap();
+        fixture.rows[1][4] = sha256_file(&fixture.root.join("b.trace")).unwrap();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("conflicting workload labels or security outcomes"));
+    }
+
+    #[test]
+    fn instruction_only_telemetry_cannot_use_counter_set_holdout() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        for row in &mut fixture.rows {
+            row[1] = "gem5_sim".into();
+            row[11] = "NA".into();
+            row[12] = "instruction_mnemonics".into();
+            row[14] = "counter_set_holdout".into();
+        }
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("not applicable to instruction-only telemetry"));
     }
 
     #[test]
