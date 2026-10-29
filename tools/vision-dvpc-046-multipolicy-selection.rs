@@ -666,6 +666,10 @@ fn benchmark(reps:usize,looks:&[usize])->Result<String,String>{
     let mut out=String::from("record_type\tscenario\tmethod\tlook\tmetric\testimate\tstandard_error\tci_low\tci_high\n");
     let _=writeln!(out,"SEED_SCHEDULE\tbase_seed\t0x8b8b8b8b04600046\tformula\tBASE xor LOGGER_INDEX*D6E8FEB86659FD93 xor REPLICATE*A0761D6478BD642F");
     let _=writeln!(out,"BENCHMARK_CONFIG\treplicates\t{}\tmax_horizon\t{}",reps,looks.iter().max().unwrap_or(&0));
+    let _=writeln!(out,"BENCHMARK_CONFIG\tpcrp_bet_grid_points\t{}",PCRP_BET_STEPS+1);
+    let _=writeln!(out,"BENCHMARK_CONFIG\tls_lambda_scales\t0.5,1.0,2.0");
+    let _=writeln!(out,"BENCHMARK_CONFIG\tls_safe_grid_size\t{}",LS_LAMBDA_SCALES.len());
+    let _=writeln!(out,"BENCHMARK_CONFIG\tfixed_horizon_tail_budget\tALPHA/(2*M); safe_grid divides each tail by K");
     for s in scenarios{
         let result=simulate(s,reps,looks)?;
         emit(&mut out,&result,looks);
@@ -805,6 +809,15 @@ mod tests{
         assert!(pcrp_star_lcb_profile(&zeros,1.0).is_err());
         assert!(logarithmic_smoothing_lcb_profile(&zeros,0.05,0.0).is_err());
     }
+    #[test]
+    fn benchmark_receipt_config_names_both_numerical_search_spaces() {
+        let output=benchmark(2,&[8,16]).unwrap();
+        assert!(output.contains("pcrp_bet_grid_points\t33"));
+        assert!(output.contains("ls_lambda_scales\t0.5,1.0,2.0"));
+        assert!(output.contains("tls_safe_grid_size\t3"));
+        assert!(output.contains("fixed_horizon_tail_budget"));
+    }
+
     #[test]
     fn fixed_horizon_methods_are_explicitly_not_anytime_valid() {
         let output=benchmark(2,&[8,16]).unwrap();
