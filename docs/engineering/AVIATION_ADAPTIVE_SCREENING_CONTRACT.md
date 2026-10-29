@@ -36,9 +36,9 @@ For a minimization objective, a valid gap statement first requires a **complete 
 
 - `U`: objective cost of the best independently verified feasible candidate.
 - `L_i`: admissible lower bound for each unresolved candidate `i`.
-- (L = \min(U, \min_i L_i)) when a feasible candidate is known.
+- `L = min(U, min_i L_i)` when a feasible candidate is known.
 - Certified absolute gap: `G = U - L`.
-- Acceptable stopping condition: (G \leq \varepsilon), where (arepsilon) is frozen in the run policy.
+- Acceptable stopping condition: `G <= epsilon`, where `epsilon` is frozen in the run policy.
 
 A lower bound greater than a candidate's independently recomputed feasible cost is rejected. That check detects one class of invalid bound but does not prove the bound admissible for unexamined candidates.
 
