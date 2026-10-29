@@ -80,3 +80,29 @@ jobs:
             echo "validator accepted a mismatched output digest" >&2
             exit 1
           fi
+
+          target_manifest="$temp_dir/valid-target-shift.manifest"
+          sed \
+            -e 's/^scenario_class=zero_shift_control$/scenario_class=target_distribution_shift/' \
+            -e 's/^transform_family=none$/transform_family=feature_permutation/' \
+            -e 's/^transform_severity=0.000000$/transform_severity=0.500000/' \
+            -e 's/^rng_algorithm=none$/rng_algorithm=chacha20_v1/' \
+            -e 's/^transition_shape=none$/transition_shape=abrupt/' \
+            -e 's/^change_start=NA$/change_start=100/' \
+            -e 's/^change_end=NA$/change_end=100/' \
+            "$manifest" > "$target_manifest"
+          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$target_manifest"
+
+          selection_mislabeled="$temp_dir/target-as-selection-only.manifest"
+          sed 's/^scenario_class=target_distribution_shift$/scenario_class=selection_only_shift/' "$target_manifest" > "$selection_mislabeled"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$selection_mislabeled"; then
+            echo "validator accepted target-population drift mislabeled as selection-only drift" >&2
+            exit 1
+          fi
+
+          bad_intervention_digest="$temp_dir/bad-intervention-digest.manifest"
+          sed 's/^intervention_config_sha256=.*/intervention_config_sha256=short/' "$target_manifest" > "$bad_intervention_digest"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$bad_intervention_digest"; then
+            echo "validator accepted a malformed intervention configuration digest" >&2
+            exit 1
+          fi
