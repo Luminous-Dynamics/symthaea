@@ -9,6 +9,7 @@ use std::path::Path;
 pub struct ValidationReport {
     pub report_version: u32,
     pub input_digest: String,
+    pub manifest_digest: String,
     pub valid: bool,
     pub counts: Counts,
     pub errors: Vec<ValidationError>,
@@ -47,6 +48,30 @@ struct RunRecord {
     task_records: Vec<TaskRecord>,
     #[serde(default)]
     notes: Option<String>,
+}
+
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SuiteManifest {
+    schema_version: u32,
+    program: String,
+    suite_id: String,
+    version: String,
+    split: String,
+    tasks: Vec<ManifestTask>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManifestTask {
+    task_id: String,
+    family: String,
+    languages: Vec<String>,
+    base_tree_digest: String,
+    spec_digest: String,
+    paired_transform_id: RequiredNullable<String>,
+    quality_audit: QualityAudit,
 }
 
 #[derive(Debug, Deserialize)]
@@ -300,16 +325,19 @@ enum Outcome {
     NotRun,
 }
 
-pub fn validate_file(path: &Path) -> anyhow::Result<ValidationReport> {
-    let bytes = fs::read(path)?;
-    Ok(validate_bytes(&bytes))
+pub fn validate_file(input_path: &Path, manifest_path: &Path) -> anyhow::Result<ValidationReport> {
+    let input_bytes = fs::read(input_path)?;
+    let manifest_bytes = fs::read(manifest_path)?;
+    Ok(validate_bytes(&input_bytes, &manifest_bytes))
 }
 
-fn validate_bytes(bytes: &[u8]) -> ValidationReport {
+fn validate_bytes(bytes: &[u8], manifest_bytes: &[u8]) -> ValidationReport {
     let input_digest = format!("sha256:{}", sha256_hex(bytes));
+    let manifest_digest = format!("sha256:{}", sha256_hex(manifest_bytes));
     let mut report = ValidationReport {
         report_version: 1,
         input_digest,
+        manifest_digest,
         valid: false,
         counts: Counts::default(),
         errors: Vec::new(),
@@ -327,13 +355,26 @@ fn validate_bytes(bytes: &[u8]) -> ValidationReport {
             return report;
         }
     };
+    let manifest: SuiteManifest = match serde_json::from_slice(manifest_bytes) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            push_error(
+                &mut report.errors,
+                "E_MANIFEST_PARSE",
+                "manifest",
+                format!("invalid suite manifest, unknown field, duplicate field, or missing required field: {error}"),
+            );
+            return report;
+        }
+    };
 
-    validate_run(&run, &mut report);
+    validate_run(&run, &manifest, manifest_bytes, &mut report);
     report.valid = report.errors.is_empty();
     report
 }
 
-fn validate_run(run: &RunRecord, report: &mut ValidationReport) {
+fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8], report: &mut ValidationReport) {
+    validate_manifest_binding(run, manifest, manifest_bytes, report);
     if run.schema_version != 1 {
         error(report, "E_SCHEMA_VERSION", "schema_version", "only schema_version=1 is supported");
     }
@@ -565,6 +606,72 @@ fn validate_run(run: &RunRecord, report: &mut ValidationReport) {
     if let Some(note) = &run.notes {
         if note.len() > 16_384 {
             error(report, "E_NOTES_LIMIT", "notes", "notes exceed 16384 bytes");
+        }
+    }
+}
+
+
+fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8], report: &mut ValidationReport) {
+    if manifest.schema_version != 1 {
+        error(report, "E_MANIFEST_VERSION", "manifest.schema_version", "only suite-manifest schema_version=1 is supported");
+    }
+    if manifest.program != "BASALT" {
+        error(report, "E_MANIFEST_PROGRAM", "manifest.program", "manifest program must be BASALT");
+    }
+    if run.source.manifest_digest != format!("sha256:{}", sha256_hex(manifest_bytes)) {
+        error(report, "E_MANIFEST_DIGEST_MISMATCH", "source.manifest_digest", "source.manifest_digest must bind the exact bytes supplied with --manifest");
+    }
+    if manifest.suite_id != run.suite.suite_id || manifest.version != run.suite.version || manifest.split != run.suite.split {
+        error(report, "E_MANIFEST_SUITE_MISMATCH", "manifest", "suite_id, version, and split must match the frozen suite manifest");
+    }
+    if manifest.tasks.len() != run.suite.expected_task_count {
+        error(report, "E_MANIFEST_TASK_COUNT", "suite.expected_task_count", "expected_task_count must equal the task count in the frozen suite manifest");
+    }
+
+    let mut manifest_by_id: BTreeMap<String, &ManifestTask> = BTreeMap::new();
+    for (index, task) in manifest.tasks.iter().enumerate() {
+        let task_path = format!("manifest.tasks[{index}]");
+        if task.task_id.trim().is_empty() {
+            error(report, "E_MANIFEST_TASK_ID_EMPTY", format!("{task_path}.task_id"), "manifest task_id must be non-empty");
+        }
+        if manifest_by_id.insert(task.task_id.clone(), task).is_some() {
+            error(report, "E_MANIFEST_DUPLICATE_TASK", format!("{task_path}.task_id"), "manifest task ids must be unique");
+        }
+        if task.family.trim().is_empty() || task.languages.is_empty() || task.languages.iter().any(|language| language.trim().is_empty()) {
+            error(report, "E_MANIFEST_TASK_METADATA", &task_path, "manifest family and language list must be non-empty");
+        }
+        validate_digest(report, &format!("{task_path}.base_tree_digest"), &task.base_tree_digest);
+        validate_digest(report, &format!("{task_path}.spec_digest"), &task.spec_digest);
+        if let Some(transform_id) = &task.paired_transform_id.0 {
+            if transform_id.trim().is_empty() {
+                error(report, "E_MANIFEST_TRANSFORM_ID", format!("{task_path}.paired_transform_id"), "paired_transform_id must be non-empty when present");
+            }
+        }
+        validate_digest(report, &format!("{task_path}.quality_audit.audit_digest"), &task.quality_audit.audit_digest);
+    }
+
+    if manifest.tasks.len() != run.task_records.len() {
+        error(report, "E_TASK_SET_MISMATCH", "task_records", "run record must retain every frozen manifest task and no undeclared task");
+    }
+    for (index, task) in run.task_records.iter().enumerate() {
+        let task_path = format!("task_records[{index}]");
+        match manifest_by_id.get(&task.task_id) {
+            None => error(report, "E_TASK_NOT_IN_MANIFEST", format!("{task_path}.task_id"), "task_id is absent from the frozen suite manifest"),
+            Some(declared) => {
+                let task_match = task.family == declared.family
+                    && task.languages == declared.languages
+                    && task.base_tree_digest == declared.base_tree_digest
+                    && task.spec_digest == declared.spec_digest
+                    && task.paired_transform_id.as_ref() == declared.paired_transform_id.0.as_ref()
+                    && task.quality_audit.status == declared.quality_audit.status
+                    && task.quality_audit.audit_digest == declared.quality_audit.audit_digest
+                    && task.quality_audit.oracle_independent == declared.quality_audit.oracle_independent
+                    && task.quality_audit.ambiguity == declared.quality_audit.ambiguity
+                    && task.quality_audit.notes == declared.quality_audit.notes;
+                if !task_match {
+                    error(report, "E_TASK_MANIFEST_MISMATCH", &task_path, "task specification or quality-audit disposition differs from the frozen manifest");
+                }
+            }
         }
     }
 }
@@ -825,12 +932,13 @@ mod tests {
     use serde_json::Value;
 
     const EXAMPLE: &str = include_str!("../../benchmarks/basalt/examples/run-record.example.json");
+    const MANIFEST: &str = include_str!("../../benchmarks/basalt/examples/suite-manifest.example.json");
 
     fn validate_value(mutator: impl FnOnce(&mut Value)) -> ValidationReport {
         let mut value: Value = serde_json::from_str(EXAMPLE).expect("synthetic fixture parses");
         mutator(&mut value);
         let bytes = serde_json::to_vec(&value).expect("fixture serializes");
-        validate_bytes(&bytes)
+        validate_bytes(&bytes, MANIFEST.as_bytes())
     }
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
@@ -839,7 +947,7 @@ mod tests {
 
     #[test]
     fn synthetic_paired_fixture_passes_structure_and_invariants() {
-        let report = validate_bytes(EXAMPLE.as_bytes());
+        let report = validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes());
         assert!(report.valid, "{:?}", report.errors);
         assert_eq!(report.counts.tasks_total, 1);
         assert_eq!(report.counts.trials_expected, 2);
@@ -943,8 +1051,8 @@ mod tests {
 
     #[test]
     fn report_is_deterministic_for_identical_input_bytes() {
-        let first = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes())).unwrap();
-        let second = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes())).unwrap();
+        let first = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes())).unwrap();
+        let second = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes())).unwrap();
         assert_eq!(first, second);
     }
 
@@ -971,7 +1079,7 @@ mod tests {
         let mut value: Value = serde_json::from_str(EXAMPLE).unwrap();
         value["unexpected_top_level_field"] = Value::Bool(true);
         let bytes = serde_json::to_vec(&value).unwrap();
-        let report = validate_bytes(&bytes);
+        let report = validate_bytes(&bytes, MANIFEST.as_bytes());
         assert!(!report.valid);
         assert!(has_code(&report, "E_JSON_OR_SHAPE"));
     }
@@ -983,7 +1091,7 @@ mod tests {
             "\"schema_version\": 1,\n  \"schema_version\": 1,",
             1,
         );
-        let report = validate_bytes(duplicate.as_bytes());
+        let report = validate_bytes(duplicate.as_bytes(), MANIFEST.as_bytes());
         assert!(!report.valid);
         assert!(has_code(&report, "E_JSON_OR_SHAPE"));
     }
