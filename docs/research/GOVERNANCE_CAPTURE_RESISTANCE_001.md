@@ -257,7 +257,7 @@ Next: formalize the schema; add seeded mutation generators and at least 1,000 pa
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and ten authored unit tests. The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and twelve authored unit tests. The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
 - SHA-256 binds the candidate report to the exact fixture bytes, not a reserialized JSON object;
