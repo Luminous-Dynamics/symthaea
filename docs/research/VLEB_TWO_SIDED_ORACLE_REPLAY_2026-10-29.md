@@ -33,14 +33,14 @@ Example for Python unittest (JSON):
           "argv": ["python3", "-m", "unittest", "test_contract"],
           "working_directory": ".",
           "timeout_seconds": 300,
-          "test_start_pattern": "Ran \\d+ tests?",
+          "test_start_pattern": "Ran [1-9]\\d* tests?",
           "pass_pattern": "^OK$",
           "fail_pattern": "^FAILED(?: \\(|$)"
         }
       ]
     }
 
-Use markers that correspond to actual summary lines for the selected test framework. A tool invocation should pin every input independently:
+Use markers that correspond to actual summary lines for the selected test framework. Start patterns should exclude zero-test runs (for Python unittest, use a nonzero count such as Ran [1-9]\\d* tests? rather than accepting Ran 0 tests). A tool invocation should pin every input independently:
 
     python tools/vleb/verify_oracle_controls.py \
       --source-repo /trusted/source \
