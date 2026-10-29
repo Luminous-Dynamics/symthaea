@@ -17,7 +17,6 @@ import importlib.metadata
 import json
 import math
 import platform
-import struct
 import sys
 from pathlib import Path
 from typing import Any
@@ -43,73 +42,27 @@ def _float_matrix(value: Any) -> list[list[float]]:
     return [[float(cell) for cell in row] for row in value]
 
 
-MODEL_MAGIC = b"SYMTHAEA-IIT-BINARY-TPM\0v0.1\0"
-EVALUATION_MAGIC = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0"
-ANALYSIS_REQUEST_MAGIC = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0"
-
-
-def _canonical_model_bytes(tpm: list[list[float]], connectivity: list[list[int]]) -> bytes:
-    """Match symthaea-iit's v0.1 little-endian binary TPM encoding."""
-    n_units = len(tpm[0]) if tpm else 0
-    if not 1 <= n_units <= 16 or len(tpm) != (1 << n_units):
-        raise RuntimeError("TPM dimensions are outside the Rust v0.1 dense binary model contract")
-    if any(len(row) != n_units for row in tpm):
-        raise RuntimeError("TPM must be state-by-unit with exactly n_units columns")
-    if len(connectivity) != n_units or any(len(row) != n_units for row in connectivity):
-        raise RuntimeError("connectivity matrix shape does not match TPM unit count")
-
-    encoded = bytearray(MODEL_MAGIC)
-    encoded.extend(struct.pack("<I", n_units))
-    for row in tpm:
-        for cell in row:
-            probability = float(cell)
-            if not math.isfinite(probability) or not 0.0 <= probability <= 1.0:
-                raise RuntimeError("TPM contains a non-finite or out-of-range probability")
-            if probability == 0.0:
-                probability = 0.0  # canonicalize negative zero like the Rust model
-            encoded.extend(struct.pack("<d", probability))
-
-    for row in connectivity:
-        for edge in row:
-            bit = int(edge)
-            if bit not in (0, 1):
-                raise RuntimeError("connectivity matrix must contain only binary entries")
-            encoded.append(bit)
-    return bytes(encoded)
-
-
-def _evaluation_digest(model_bytes: bytes, state: tuple[int, ...]) -> str:
-    if any(bit not in (0, 1) for bit in state):
-        raise RuntimeError("evaluation state must contain only binary bits")
-    return hashlib.sha256(EVALUATION_MAGIC + model_bytes + bytes(state)).hexdigest()
-
-
-def _analysis_request_digest(
-    model_bytes: bytes,
-    state: tuple[int, ...],
-    subset: list[int],
-    formalism: str,
-    quantity_id: str,
-) -> str:
-    """Match Rust AnalysisRequest::request_sha256 exactly."""
-    encoded = bytearray(ANALYSIS_REQUEST_MAGIC)
-    encoded.extend(model_bytes)
-    encoded.extend(bytes(state))
-    encoded.extend(struct.pack("<I", len(subset)))
-    for unit in subset:
-        encoded.extend(struct.pack("<I", int(unit)))
-    encoded.extend(b"\0")
-    encoded.extend(formalism.encode("utf-8"))
-    encoded.extend(b"\0")
-    encoded.extend(quantity_id.encode("utf-8"))
-    return hashlib.sha256(encoded).hexdigest()
+try:
+    from .iit_digest_contract import (
+        analysis_request_digest,
+        canonical_model_bytes,
+        evaluation_digest,
+        model_digest,
+    )
+except ImportError:  # Direct execution: python validation/generate_pyphi_reference_fixtures.py
+    from iit_digest_contract import (
+        analysis_request_digest,
+        canonical_model_bytes,
+        evaluation_digest,
+        model_digest,
+    )
 
 
 def _model_digest(
     substrate: Any, state: tuple[int, ...], formalism: str
 ) -> tuple[str, str, str, dict[str, Any], bytes]:
     # PyPhi documents state-by-node TPMs, little-endian rows, and source-to-target
-    # connectivity. The binary digests now match the Rust core contract byte-for-byte.
+    # connectivity. Reuse the shared binary encoder covered by dependency-free tests.
     tpm_frame = substrate.tpm.to_pandas()
     tpm = _float_matrix(tpm_frame.values.tolist())
     connectivity = [[int(cell) for cell in row] for row in substrate.cm.tolist()]
@@ -126,9 +79,9 @@ def _model_digest(
         "connectivity_matrix": connectivity,
         "time_grain": "one PyPhi discrete update",
     }
-    model_bytes = _canonical_model_bytes(tpm, connectivity)
-    model_sha256 = hashlib.sha256(model_bytes).hexdigest()
-    evaluation_sha256 = _evaluation_digest(model_bytes, state)
+    model_bytes = canonical_model_bytes(tpm, connectivity)
+    model_sha256 = model_digest(model_bytes)
+    evaluation_sha256 = evaluation_digest(model_bytes, state)
     reference_manifest_sha256 = hashlib.sha256(_canonical_json(model)).hexdigest()
     return model_sha256, evaluation_sha256, reference_manifest_sha256, model, model_bytes
 
@@ -186,7 +139,7 @@ def run(output_path: Path) -> dict[str, Any]:
             "id": expected["id"],
             "quantity": expected["kind"],
             "quantity_id": expected["quantity_id"],
-            "analysis_request_sha256": _analysis_request_digest(
+            "analysis_request_sha256": analysis_request_digest(
                 model_bytes, state, expected["subset"], formalism, expected["quantity_id"]
             ),
             "subset": expected["subset"],
