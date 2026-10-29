@@ -29,7 +29,9 @@ fn main() -> ExitCode {
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
         Err(error) => {
-            let report = ValidationReport::invalid_json(format!("Unable to read statement file: {error}"));
+            let report = ValidationReport::invalid_json(format!(
+                "Unable to read statement file: {error}"
+            ));
             emit(&report);
             return ExitCode::from(2);
         }
