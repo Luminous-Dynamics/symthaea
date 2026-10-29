@@ -177,10 +177,10 @@ impl DerivationGraph {
         if !self.source_events.contains(event_id) {
             return Err(format!("cannot retract unknown source event {event_id:?}"));
         }
+        self.verify_consistency()?;
         if self.retracted_source_events.contains(event_id) {
             return Ok(Vec::new());
         }
-        self.verify_consistency()?;
 
         let mut candidate = self.clone();
         candidate.retracted_source_events.insert(event_id.to_owned());
@@ -586,6 +586,67 @@ mod tests {
         assert_eq!(left.invalidate_source_event("E1", "retraction").unwrap(),
                    right.invalidate_source_event("E1", "retraction").unwrap());
         assert_eq!(left.state_sha256().unwrap(), right.state_sha256().unwrap());
+    }
+
+    #[test]
+    fn seeded_generated_dags_match_independent_invalidation_closure() {
+        for seed in 1_u64..=12 {
+            let mut graph = DerivationGraph::default();
+            for event_index in 0..6 {
+                graph.register_source_event(format!("E{event_index}")).unwrap();
+            }
+
+            // A tiny fixed LCG keeps the trajectory generator deterministic and
+            // dependency-free. Each generated node may depend only on earlier
+            // nodes, so this generates acyclic graphs with varied fan-out.
+            let mut state = seed;
+            let mut dependency_oracle: BTreeMap<String, BTreeSet<DependencyRef>> = BTreeMap::new();
+            for fact_index in 0..48 {
+                state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                let event_index = ((state >> 32) % 6) as usize;
+                let mut deps = make_dependencies([DependencyRef::SourceEvent(format!("E{event_index}"))]);
+
+                for parent_index in 0..fact_index {
+                    state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                    if state % 23 == 0 {
+                        deps.insert(DependencyRef::DerivedFact(format!("D{parent_index:03}")));
+                    }
+                }
+
+                let fact_id = format!("D{fact_index:03}");
+                graph.derive(fact(&fact_id, deps.iter().cloned())).unwrap();
+                dependency_oracle.insert(fact_id, deps);
+            }
+
+            let target_event = format!("E{}", seed % 6);
+            let target_dependency = DependencyRef::SourceEvent(target_event.clone());
+            let mut expected = BTreeSet::new();
+            loop {
+                let before = expected.len();
+                for (fact_id, deps) in &dependency_oracle {
+                    if expected.contains(fact_id) {
+                        continue;
+                    }
+                    if deps.contains(&target_dependency)
+                        || deps.iter().any(|dependency| match dependency {
+                            DependencyRef::DerivedFact(parent_id) => expected.contains(parent_id),
+                            DependencyRef::SourceEvent(_) => false,
+                        })
+                    {
+                        expected.insert(fact_id.clone());
+                    }
+                }
+                if expected.len() == before {
+                    break;
+                }
+            }
+
+            let actual = graph
+                .invalidate_source_event(&target_event, "generated mutation")
+                .unwrap();
+            assert_eq!(actual, expected.into_iter().collect::<Vec<_>>(), "seed {seed}");
+            graph.verify_consistency().unwrap();
+        }
     }
 
     #[test]
