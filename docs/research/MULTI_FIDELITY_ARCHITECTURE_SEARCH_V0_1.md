@@ -144,7 +144,28 @@ The 2026 paper [MF-NAS](https://doi.org/10.1145/3774940) studies proxy-guided lo
 
 For deployed serving, [MLPerf Endpoints v1.0](https://mlcommons.org/2026/10/open-submissions-endpoints-v1-0/) provides a separate whole-system performance frontier and power-reporting conventions. Pin its evolving rules and keep serving-system claims distinct from search-policy claims.
 
-## 10. Definition of done
+## 10. Authored synthetic pilot harness
+
+The new module `src/multi_fidelity_benchmark.rs` connects the promotion scheduler to an exhaustive 256-candidate objective oracle and defines three controlled fidelity regimes:
+
+- `rank_preserving`: cheap signals closely track the full-fidelity quality.
+- `rank_reversal`: F0 and F1 are intentionally anti-correlated with final quality.
+- `late_emerging_quality`: early scores favor a misleading feature prior, while later fidelities progressively reveal the objective.
+
+The cumulative synthetic cost ladder is 1, 4, 16, 64 units. A deterministic quarter-promotion schedule evaluates all 256 candidates at F0, promotes 64, then 16, then 4 candidates. The total is 832 synthetic cost units: 256 + 64×3 + 16×12 + 4×48. The full-fidelity random baseline uses exactly the same 832-unit budget to run 13 candidates at 64 units each.
+
+The CLI is:
+```text
+cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep rank_preserving 100
+cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep rank_reversal 100
+cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep late_emerging_quality 100
+```
+
+The JSON report contains paired per-seed runs, promotion and random-baseline regret, optimum hit rates, F0-versus-oracle Spearman correlation, cost totals, and an aggregate of paired regret improvements. Seven unit tests are authored for deterministic output, equal cost accounting, rank-reversal controls, and paired aggregation. **The Rust implementation and these tests remain uncompiled and unexecuted.** An independent Python arithmetic mirror (not Rust execution) checked the intended F0 rank-correlation signs at one seed: rank-preserving 0.9909, rank-reversal −0.9896, and late-emerging −0.9875. These are generator sanity checks, not benchmark performance results.
+
+This pilot compares the cost-aware scheduler to full-fidelity random search only. It does not establish an advantage over Hyperband, MF-NAS, TPE/Bayesian optimization, or model-training systems. Those comparisons remain necessary before making general search-policy claims.
+
+## 11. Definition of done
 
 - Promotion primitive tests compile and pass at the exact source revision.
 - Unit/property tests validate fidelity identity, uncertainty handling, deterministic selection, exploration boundaries and exact cost arithmetic.
