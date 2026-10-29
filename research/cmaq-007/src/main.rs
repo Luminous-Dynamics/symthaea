@@ -87,6 +87,7 @@ enum Strategy {
     PredictedGreedy,
     UncertaintyPenalty,
     SupportGate(f64),
+    ShuffledSupportGate(f64),
     Oracle,
 }
 
