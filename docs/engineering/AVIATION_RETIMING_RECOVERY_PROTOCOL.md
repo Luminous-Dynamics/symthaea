@@ -71,14 +71,16 @@ The current test suite defines these categories in a small set of test functions
 
 ## Baselines and scorecard
 
-The first valid baseline is a full Cartesian exhaustive enumerator on tiny instances, independently implemented in test code. Next add a stable greedy repair and a matched full-tree branch-and-bound comparison. All arms must use the same frozen input, discrete delay domain, feasible action space, cost function, and stopping budget.
+The baseline portfolio now includes (1) a full Cartesian exhaustive oracle on tiny instances, independently implemented in test code; (2) a deterministic greedy repair that considers flights in scheduled-time/stable-ID order and selects the lowest-cost locally feasible delay/aircraft action, cancelling when cancellation is cheaper; and (3) the matched full-tree branch-and-bound search. The greedy baseline never revisits earlier assignments, so it is a transparent heuristic rather than a quality claim. All arms must use the same frozen input, discrete delay domain, feasible action space, cost function, and stopping budget.
 
 Report separately:
 
+- exact-oracle best cost, greedy best cost, and branch-and-bound best cost;
 - best feasible total cost, delay minutes and cancellations;
 - global lower bound, absolute gap, and terminal state;
 - expanded/generated nodes, complete assignments examined, partial-feasibility prunes, objective-bound prunes, and peak frontier;
-- time to first independently verified feasible plan;
+- time to first independently verified feasible plan (in the current future runner; node counts are available now);
+- greedy candidate actions considered and how many were feasible;
 - end-to-end latency p50/p95/p99 over repeated runs on a named hardware/toolchain profile;
 - completion/timeout rate and exact-optimum agreement on tiny instances.
 
