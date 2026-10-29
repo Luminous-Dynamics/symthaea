@@ -299,7 +299,7 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     for split_name in family_to_split.values() {
         let index = SPLITS
             .iter()
-            .position(|candidate| candidate == split_name)
+            .position(|candidate| *candidate == split_name.as_str())
             .context("candidate contains an unregistered split")?;
         family_counts[index] += 1;
     }
@@ -307,7 +307,7 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     for component in components.values() {
         let index = SPLITS
             .iter()
-            .position(|candidate| *candidate == component.split)
+            .position(|candidate| *candidate == component.split.as_str())
             .context("candidate component contains an unregistered split")?;
         component_counts[index] += 1;
     }
