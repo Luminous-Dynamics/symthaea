@@ -1,0 +1,57 @@
+name: VIS-DVPC-041 exact-path MOPE endpoint coverage audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-041-mope-endpoint-audit.rs"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-041-mope-endpoint-audit.rs"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact endpoint audit and parent streaming kernel
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run all Rust tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-041-mope-endpoint-audit.rs -o /tmp/vis-dvpc-041-tests
+          /tmp/vis-dvpc-041-tests
+      - name: Enumerate all eight-step paths for both frozen loggers
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-041-mope-endpoint-audit.rs -o /tmp/vis-dvpc-041
+          /tmp/vis-dvpc-041 --audit > /tmp/vis-dvpc-041-results.tsv
+          test "$(grep -c '^SCENARIO' /tmp/vis-dvpc-041-results.tsv)" = "2"
+          test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-041-results.tsv)" = "16"
+          test "$(grep -c '^ROOT_CERTIFICATE' /tmp/vis-dvpc-041-results.tsv)" -gt "0"
+          awk -F '\t' '$1=="LOOK_METRIC" && $4=="probability_mass" { if ($5 < 0.99999999 || $5 > 1.00000001) exit 1; n++ } END { if (n != 16) exit 1 }' /tmp/vis-dvpc-041-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && ($2=="healthy" || $2=="weak_overlap") && $4=="sequence_coverage" { if ($5 < 0.95 || $5 > 1.00000001) exit 1; n++ } END { if (n != 2) exit 1 }' /tmp/vis-dvpc-041-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $4=="root_certificate_failures" { if ($5 != 0) exit 1; n++ } END { if (n != 2) exit 1 }' /tmp/vis-dvpc-041-results.tsv
+          grep '^SCENARIO' /tmp/vis-dvpc-041-results.tsv > /tmp/vis-dvpc-041-summaries.tsv
+      - name: Create exact source and output receipt
+        run: |
+          {
+            printf 'VIS_DVPC_041_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-041-mope-endpoint-audit.rs tools/vision-dvpc-040-mope-sufficient-stats.rs tools/vision-dvpc-039-mope-bet-optimizer.rs /tmp/vis-dvpc-041-results.tsv /tmp/vis-dvpc-041-summaries.tsv
+          } > /tmp/vis-dvpc-041-receipt.tsv
+          cat /tmp/vis-dvpc-041-receipt.tsv
+      - name: Publish endpoint audit and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-041-mope-endpoint-audit
+          path: |
+            /tmp/vis-dvpc-041-results.tsv
+            /tmp/vis-dvpc-041-summaries.tsv
+            /tmp/vis-dvpc-041-receipt.tsv
+          retention-days: 90
