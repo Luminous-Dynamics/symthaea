@@ -21,6 +21,10 @@ Use 2,000 sequences per DGP, horizon 512, with reported snapshots at 32, 128 and
 
 The target policy is P_pi(A=1)=0.5 for all scenarios. Each sample uses known-logger importance ratio w=pi(a)/h(a) and observed IPS reward X=wR. Every method sees the same generated sequence within each replicate.
 
+### MOPE alpha accounting
+
+Use **total alpha = 0.05** in each half-initialized wealth process. Each tail's wealth starts at 1/2 and crosses 1/alpha, so Ville's inequality allocates at most alpha/2 = 0.025 to that tail. The equivalent uninitialized product-log condition is P(v) >= ln(2/alpha) = ln(40); the actual-wealth grid uses log wealth initialized at ln(1/2) and threshold ln(1/alpha) = ln(20). The two tails together therefore use a 0.05 noncoverage budget. Do not pass 0.025 to the stream and also use ln(2/alpha): that would double-count the half-wealth hedge and make the interval unnecessarily conservative.
+
 ## Comparators
 
 - **MOPE analytic root:** two one-sided streaming confidence sequences, overall alpha=0.05. Endpoint advances use an analytic root of the quadratic log-wealth lower bound, gated by direct polynomial and product-wealth certificates.
