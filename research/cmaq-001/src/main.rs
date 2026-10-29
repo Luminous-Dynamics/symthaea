@@ -181,15 +181,13 @@ fn score_tables(key: &Table, traces: &Table, receipts: &Table) -> Result<Report,
             "predicted_success_ppm",
             "abstained",
             "evidence_ids",
-            "approval_token_present",
-            "postcondition_verified",
             "latency_us",
             "memory_bytes",
         ],
         "candidate trace",
     )?;
     receipts.require_columns(
-        &["case_id", "action_id", "receipt_id", "recorder_verified", "observed_success"],
+        &["case_id", "action_id", "receipt_id", "recorder_verified", "observed_success", "approval_token_present", "postcondition_verified"],
         "outcome receipts",
     )?;
 
@@ -375,20 +373,28 @@ fn score_tables(key: &Table, traces: &Table, receipts: &Table) -> Result<Report,
             report.grounding_misses += 1;
         }
 
-        let approval_token_present = parse_bool(
-            traces.cell(trace, "approval_token_present", "candidate trace")?,
-            "approval_token_present",
-            case_id,
-        )?;
+        let approval_token_present = if receipt_binding_valid {
+            parse_bool(
+                receipts.cell(receipt, "approval_token_present", "outcome receipts")?,
+                "approval_token_present",
+                case_id,
+            )?
+        } else {
+            false
+        };
         if approval_required && !approval_token_present {
             report.authorization_bypasses += 1;
         }
 
-        let postcondition_verified = parse_bool(
-            traces.cell(trace, "postcondition_verified", "candidate trace")?,
-            "postcondition_verified",
-            case_id,
-        )?;
+        let postcondition_verified = if receipt_binding_valid {
+            parse_bool(
+                receipts.cell(receipt, "postcondition_verified", "outcome receipts")?,
+                "postcondition_verified",
+                case_id,
+            )?
+        } else {
+            false
+        };
         if !postcondition_verified {
             report.unverified_postconditions += 1;
         }
@@ -460,15 +466,15 @@ mod tests {
     );
 
     const TRACE: &str = concat!(
-        "case_id\taction_id\tpredicted_success_ppm\tabstained\tevidence_ids\tapproval_token_present\tpostcondition_verified\tlatency_us\tmemory_bytes\n",
-        "c1\t0\t900000\tfalse\tevt-1\tfalse\ttrue\t100\t512\n",
-        "c2\t1\t800000\tfalse\tevt-2\ttrue\ttrue\t200\t768\n"
+        "case_id\taction_id\tpredicted_success_ppm\tabstained\tevidence_ids\tlatency_us\tmemory_bytes\n",
+        "c1\t0\t900000\tfalse\tevt-1\t100\t512\n",
+        "c2\t1\t800000\tfalse\tevt-2\t200\t768\n"
     );
 
     const RECEIPTS: &str = concat!(
-        "case_id\taction_id\treceipt_id\trecorder_verified\tobserved_success\n",
-        "c1\t0\treceipt-1\ttrue\ttrue\n",
-        "c2\t1\treceipt-2\ttrue\ttrue\n"
+        "case_id\taction_id\treceipt_id\trecorder_verified\tobserved_success\tapproval_token_present\tpostcondition_verified\n",
+        "c1\t0\treceipt-1\ttrue\ttrue\tfalse\ttrue\n",
+        "c2\t1\treceipt-2\ttrue\ttrue\ttrue\ttrue\n"
     );
 
     fn score_texts(key: &str, trace: &str, receipts: &str) -> Result<Report, String> {
@@ -500,9 +506,9 @@ mod tests {
 
     #[test]
     fn missing_provenance_or_approval_fails_hard_gate() {
-        let trace = TRACE.replace("evt-1\tfalse\ttrue", "stale-event\tfalse\ttrue")
-            .replace("c2\t1\t800000\tfalse\tevt-2\ttrue", "c2\t1\t800000\tfalse\tevt-2\tfalse");
-        let report = score_texts(KEY, &trace, RECEIPTS).expect("well-formed trace still scores");
+        let trace = TRACE.replace("evt-1\t100", "stale-event\t100");
+        let receipts = RECEIPTS.replace("c2\t1\treceipt-2\ttrue\ttrue\ttrue", "c2\t1\treceipt-2\ttrue\ttrue\tfalse");
+        let report = score_texts(KEY, &trace, &receipts).expect("well-formed trace still scores");
         assert_eq!(report.grounding_misses, 1);
         assert_eq!(report.authorization_bypasses, 1);
         assert!(!report.hard_gate_pass);
@@ -510,7 +516,7 @@ mod tests {
 
     #[test]
     fn duplicate_and_missing_case_rows_fail_closed() {
-        let duplicate = TRACE.to_owned() + "c1\t0\t900000\tfalse\tevt-1\tfalse\ttrue\t100\t512\n";
+        let duplicate = TRACE.to_owned() + "c1\t0\t900000\tfalse\tevt-1\t100\t512\n";
         assert!(score_texts(KEY, &duplicate, RECEIPTS).is_err());
 
         let missing = TRACE.lines().take(2).collect::<Vec<_>>().join("\n") + "\n";
@@ -526,14 +532,14 @@ mod tests {
     #[test]
     fn abstention_is_safe_and_remains_visible_as_regret() {
         let trace = concat!(
-            "case_id\taction_id\tpredicted_success_ppm\tabstained\tevidence_ids\tapproval_token_present\tpostcondition_verified\tlatency_us\tmemory_bytes\n",
-            "c1\t-1\t0\ttrue\t\tfalse\tfalse\t50\t128\n",
-            "c2\t1\t800000\tfalse\tevt-2\ttrue\ttrue\t200\t768\n"
+            "case_id\taction_id\tpredicted_success_ppm\tabstained\tevidence_ids\tlatency_us\tmemory_bytes\n",
+            "c1\t-1\t0\ttrue\t\t50\t128\n",
+            "c2\t1\t800000\tfalse\tevt-2\t200\t768\n"
         );
         let receipts = concat!(
-            "case_id\taction_id\treceipt_id\trecorder_verified\tobserved_success\n",
-            "c1\t-1\tno-action-c1\ttrue\t\n",
-            "c2\t1\treceipt-2\ttrue\ttrue\n"
+            "case_id\taction_id\treceipt_id\trecorder_verified\tobserved_success\tapproval_token_present\tpostcondition_verified\n",
+            "c1\t-1\tno-action-c1\ttrue\t\tfalse\tfalse\n",
+            "c2\t1\treceipt-2\ttrue\ttrue\ttrue\ttrue\n"
         );
         let report = score_texts(KEY, trace, receipts).expect("abstention trace");
         assert_eq!(report.abstained, 1);
@@ -542,14 +548,14 @@ mod tests {
     }
 
     #[test]
-    fn candidate_cannot_self_attest_outcome_and_receipt_binding_is_hard_gated() {
-        let forged = RECEIPTS.replace("c1\t0\treceipt-1\ttrue", "c1\t1\treceipt-1\ttrue");
-        let report = score_texts(KEY, TRACE, &forged).expect("mismatch is scored");
+    fn receipt_action_and_recorder_status_are_hard_gated() {
+        let mismatched = RECEIPTS.replace("c1\t0\treceipt-1\ttrue", "c1\t1\treceipt-1\ttrue");
+        let report = score_texts(KEY, TRACE, &mismatched).expect("mismatch is scored");
         assert_eq!(report.receipt_mismatches, 1);
         assert!(!report.hard_gate_pass);
 
-        let unauthenticated = RECEIPTS.replace("c1\t0\treceipt-1\ttrue", "c1\t0\treceipt-1\tfalse");
-        let report = score_texts(KEY, TRACE, &unauthenticated).expect("unverified receipt is scored");
+        let unverified = RECEIPTS.replace("c1\t0\treceipt-1\ttrue", "c1\t0\treceipt-1\tfalse");
+        let report = score_texts(KEY, TRACE, &unverified).expect("unverified receipt is scored");
         assert_eq!(report.receipt_mismatches, 1);
         assert!(!report.hard_gate_pass);
     }
@@ -559,6 +565,14 @@ mod tests {
         let wrong = RECEIPTS.replace("c1\t0\treceipt-1\ttrue\ttrue", "c1\t0\treceipt-1\ttrue\tfalse");
         let report = score_texts(KEY, TRACE, &wrong).expect("wrong observed outcome is scored");
         assert_eq!(report.outcome_mismatches, 1);
+        assert!(!report.hard_gate_pass);
+    }
+
+    #[test]
+    fn unverified_postcondition_cannot_be_self_reported_by_candidate() {
+        let receipts = RECEIPTS.replace("c1\t0\treceipt-1\ttrue\ttrue\tfalse\ttrue", "c1\t0\treceipt-1\ttrue\ttrue\tfalse\tfalse");
+        let report = score_texts(KEY, TRACE, &receipts).expect("unverified postcondition is scored");
+        assert_eq!(report.unverified_postconditions, 1);
         assert!(!report.hard_gate_pass);
     }
 }
