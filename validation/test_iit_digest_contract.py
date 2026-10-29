@@ -146,11 +146,14 @@ class IitDigestContractTests(unittest.TestCase):
     def test_rejects_wrong_state_size_and_out_of_range_subset(self):
         with self.assertRaisesRegex(ValueError, "n_units integer/bool binary bits"):
             evaluation_digest(self.model_bytes, [1])
-        with self.assertRaisesRegex(ValueError, "n_units integer/bool binary bits"):
-            analysis_request_digest(
-                self.model_bytes, [0.5, 1], [0, 1],
-                "IIT_4_0_2023", "iit4_system_phi_s",
-            )
+        for invalid_state in ([0.5, 1], [1.0, 0]):
+            with self.subTest(state=invalid_state), self.assertRaisesRegex(
+                ValueError, "n_units integer/bool binary bits"
+            ):
+                analysis_request_digest(
+                    self.model_bytes, invalid_state, [0, 1],
+                    "IIT_4_0_2023", "iit4_system_phi_s",
+                )
         with self.assertRaisesRegex(ValueError, "model unit range"):
             analysis_request_digest(
                 self.model_bytes, [1, 0], [0, 2],
