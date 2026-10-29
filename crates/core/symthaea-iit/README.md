@@ -6,8 +6,9 @@ research engine.
 ## Current scope: v0.1 causal-model substrate
 
 This crate currently provides a validated dense binary factored TPM, cause/effect
-repertoire primitives, typed formalism/quantity identities, and stable model,
-evaluation, and analysis-request digests. It does not yet compute IIT system
+repertoire primitives, a bounded IIT 4.x directed-system-partition enumerator,
+typed formalism/quantity identities, and stable model, evaluation, and
+analysis-request digests. It does not yet compute IIT system
 integrated information (phi_s), mechanism-level phi, a complete cause-effect
 structure, structure-level Phi, or any consciousness result.
 
@@ -39,11 +40,11 @@ evaluation state, time grain, or formalism.
 
 1. Run the v0.1 model/repertoire unit tests and pin TPM/state/connectivity semantics
    against a documented PyPhi fixture.
-2. Compare cause/effect repertoire distributions against the reference on identical
-   model and state inputs, including deterministic, independent, and zero-likelihood
-   negative controls.
-3. Add IIT 4.0 (2023) system phi_s with a versioned formalism profile and exhaustive
-   partition search for the first tiny systems.
+2. Compare cause/effect repertoire distributions and directed cut matrices against
+   the reference on identical model, state, subsystem, and partition-profile inputs,
+   including deterministic, independent, and zero-likelihood negative controls.
+3. Add IIT 4.0 (2023) system phi_s with a versioned formalism profile, documented
+   MIP repertoire-difference measure, and exhaustive partition search for tiny systems.
 4. Keep IIT 4.0 (2026) as a distinct profile because its intrinsic-information
    requirement changes the system quantity.
 5. Add certified lower/upper bounds only when mathematically valid for the named
@@ -66,7 +67,9 @@ Required fail-closed behavior: invalid model, unsupported quantity/formalism pai
 undefined cause-repertoire mass, timeout, incomplete exact search, missing reference
 output, or mismatched input digest must never produce a qualified scalar result.
 Current cause/effect routines are probability-repertoire primitives under explicit
-uniform-prior/background assumptions; they are not by themselves proof of PyPhi
+uniform-prior/background assumptions; the directed partition enumerator generates
+candidate severance matrices but does not evaluate their repertoire effects or select
+a minimum-information partition. These pieces are not by themselves proof of PyPhi
 conformance.
 
 ## Claim ceiling
@@ -100,3 +103,20 @@ and quantity id. The Python oracle runner must use the same byte encoding, not a
 separately canonicalized JSON hash, before it can be used to verify Rust request
 identity. Golden digest vectors are a release gate before claiming cross-language
 parity.
+
+
+## Directed system-partition enumeration
+
+`enumerate_iit4_system_partitions` now enumerates each non-trivial set partition,
+assigns Cause, Effect, or Bidirectional to each block, builds the directed severance
+matrix, and deduplicates candidates by that matrix. It preserves self-loops for
+ordinary directed partitions; the optional `TotalCut` severs all entries, including
+self-loops. A one-unit system always includes `TotalCut`. The caller supplies a
+maximum count of block-direction assignments to visit; if the budget is exceeded,
+the function returns an error rather than a partial candidate list.
+
+This is a candidate generator only. The next stage is to compare its cut matrices
+with a pinned PyPhi configuration and then implement the corresponding cause/effect
+repertoire comparison and minimum-information-partition selection. Different
+partition schemes must not be represented as a speed-only option when they alter
+the calculated quantity.
