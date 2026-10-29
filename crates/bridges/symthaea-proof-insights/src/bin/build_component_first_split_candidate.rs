@@ -27,6 +27,9 @@ const V0_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest the
 const CANDIDATE_SEED: &str = "pitb-component-first-candidate-2026-10-29";
 const TARGET_SHARES: [f64; 3] = [0.70, 0.15, 0.15];
 const SPLITS: [&str; 3] = ["train", "validation", "test"];
+// This is the current PITB confirmatory floor per held-out design stratum.
+// It is a structural floor only; the power simulation remains authoritative.
+const MIN_HELDOUT_COMPONENTS: usize = 20;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ComponentUnit {
@@ -453,6 +456,14 @@ fn execute() -> Result<()> {
     let family_share = |split: &str| counts(split) as f64 / new_assignments.len() as f64;
     let component_share = |split: &str| component_counts(split) as f64 / units.len() as f64;
     let target_component_counts = component_quotas(units.len());
+    let heldout_component_floor_met =
+        target_component_counts[1] >= MIN_HELDOUT_COMPONENTS
+            && target_component_counts[2] >= MIN_HELDOUT_COMPONENTS;
+    // With the registered floor-based 70/15/15 quotas, 134 components is
+    // the smallest total that yields at least 20 components in both held-out
+    // strata. It does not guarantee adequate power or receipt qualification.
+    let minimum_total_components_for_heldout_floor =
+        (MIN_HELDOUT_COMPONENTS * 100).div_ceil(15);
     let max_absolute_family_share_error = SPLITS
         .iter()
         .enumerate()
@@ -490,6 +501,14 @@ fn execute() -> Result<()> {
             "train": target_component_counts[0],
             "validation": target_component_counts[1],
             "test": target_component_counts[2]
+        },
+        "heldout_component_floor": {
+            "minimum_components_per_validation_and_test": MIN_HELDOUT_COMPONENTS,
+            "minimum_total_components_needed_under_70_15_15_quotas": minimum_total_components_for_heldout_floor,
+            "validation_component_count": target_component_counts[1],
+            "test_component_count": target_component_counts[2],
+            "met": heldout_component_floor_met,
+            "meaning": "structural sample-size floor only; not a power guarantee or confirmatory qualification"
         },
         "allocation_diagnostics": {
             "family_share_by_split": {
@@ -645,6 +664,17 @@ mod tests {
             component_splits.iter().filter(|split| **split == "test").count(),
         ];
         assert_eq!(counts, component_quotas(source.len()));
+    }
+
+    #[test]
+    fn twenty_components_in_each_heldout_split_requires_134_total_components() {
+        let qualifies_133 = component_quotas(133);
+        let qualifies_134 = component_quotas(134);
+        assert_eq!(qualifies_133, [93, 20, 20]);
+        assert!(qualifies_133[1] < MIN_HELDOUT_COMPONENTS || qualifies_133[2] < MIN_HELDOUT_COMPONENTS);
+        assert_eq!(qualifies_134, [93, 20, 21]);
+        assert!(qualifies_134[1] >= MIN_HELDOUT_COMPONENTS);
+        assert!(qualifies_134[2] >= MIN_HELDOUT_COMPONENTS);
     }
 
     #[test]
