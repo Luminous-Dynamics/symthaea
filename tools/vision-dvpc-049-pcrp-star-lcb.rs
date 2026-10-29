@@ -954,6 +954,25 @@ mod tests {
     }
 
     #[test]
+    fn registered_small_margin_and_tie_values_are_exact() {
+        let small = SCENARIOS.iter().find(|s| s.name == "healthy_small_margin").unwrap();
+        let small_values: Vec<f64> = POLICY_P1.iter()
+            .map(|&p| true_value(p, small.reward0, small.reward1))
+            .collect();
+        close(small_values[0], 0.492, 1.0e-12);
+        close(small_values[1], 0.500, 1.0e-12);
+        close(small_values[2], 0.508, 1.0e-12);
+
+        let tied = SCENARIOS.iter().find(|s| s.name == "healthy_policy_tie").unwrap();
+        let tied_values: Vec<f64> = POLICY_P1.iter()
+            .map(|&p| true_value(p, tied.reward0, tied.reward1))
+            .collect();
+        assert!(tied_values.iter().all(|v| (*v - 0.5).abs() <= EPS));
+        let oracle = tied_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        assert!(tied_values.iter().all(|&v| is_best_value(v, oracle)));
+    }
+
+    #[test]
     fn tied_policies_are_all_counted_as_optimal() {
         let tied_values = [0.5_f64, 0.5, 0.5];
         let oracle = tied_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
