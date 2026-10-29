@@ -140,7 +140,6 @@ def _git(source: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def verify_source_repository(source_repo: Path, expected_revision: str) -> Path:
-    require_digest(expected_revision, "unused sha validator placeholder") if False else None
     if not REVISION.fullmatch(expected_revision):
         raise ControlError("expected source revision must be a lowercase 40-character commit SHA")
     root = source_repo.resolve(strict=True)
@@ -213,7 +212,14 @@ def extract_test_bundle(bundle_raw: bytes, workspace: Path) -> list[dict[str, An
                 if destination.exists() or destination.is_symlink():
                     raise ControlError(f"test bundle must not overwrite source files: {name!r}")
                 parent = destination.parent
-                parent.mkdir(parents=True, exist_ok=True)
+                cursor = workspace
+                for component in rel.parts[:-1]:
+                    cursor = cursor / component
+                    if cursor.is_symlink():
+                        raise ControlError(f"symlink directory in test bundle path rejected: {name!r}")
+                    if cursor.exists() and not cursor.is_dir():
+                        raise ControlError(f"test bundle parent is not a directory: {name!r}")
+                    cursor.mkdir(exist_ok=True)
                 resolved_parent = parent.resolve(strict=True)
                 if not resolved_parent.is_relative_to(workspace.resolve(strict=True)):
                     raise ControlError(f"test bundle path escapes workspace: {name!r}")
@@ -308,8 +314,8 @@ def _run_arm(
             "pass_marker_seen": pass_seen,
             "fail_marker_seen": fail_seen,
             "observed_test_outcome": observed,
-            "stdout_artifact": str(stdout_path.relative_to(evidence_root)),
-            "stdout_sha256": digest(output.encode("utf-8")),
+            "combined_output_artifact": str(stdout_path.relative_to(evidence_root)),
+            "combined_output_sha256": digest(output.encode("utf-8")),
         }
         results.append(record)
         if observed == "unresolved":
@@ -350,7 +356,10 @@ def run_two_sided_controls(
     commands = validate_manifest(manifest)
     source = verify_source_repository(source_repo, expected_source_revision)
 
-    if evidence_root.exists() and any(evidence_root.iterdir()):
+    evidence_path = evidence_root.resolve(strict=False)
+    if evidence_path.is_relative_to(source):
+        raise ControlError("evidence output directory must be outside the source repository")
+    if evidence_root.exists() and (not evidence_root.is_dir() or any(evidence_root.iterdir())):
         raise ControlError("evidence output directory must be new or empty")
     evidence_root.mkdir(parents=True, exist_ok=True)
     baseline_results: list[dict[str, Any]] = []
@@ -372,6 +381,7 @@ def run_two_sided_controls(
             # Extracting the same trusted tests independently ensures both arms use identical test bytes.
             # A separate digest per extracted file is emitted for later audit.
             reference_bundle = extract_test_bundle(test_bundle_raw, reference)
+            bundle_manifest.append({"arm": "reference", "files": reference_bundle})
             if reference_bundle != bundle_manifest[0]["files"]:
                 raise ControlError("test bundle extraction differed between baseline and reference worktrees")
 
