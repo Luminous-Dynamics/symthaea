@@ -109,9 +109,18 @@ Implement a positive control and a minimally changed negative/alternate case for
 | Missing requirement | Remove exactly one essential fact, value, relation, or constraint | Missing information remains missing; role labels must not invent it |
 | Ordered transition | Swap or remove an intermediate state/action while leaving endpoints similar | Workflow/transition answer must respect order and cannot infer an unobserved transition |
 | Qualifier truncation | Keep a matching phrase but remove surrounding negation, condition, exception, or attribution | Isolated lexical match must not override semantics carried by the omitted qualifier |
+| Memory influence | Add a high-overlap but non-decisive proposition to an otherwise answerable context | The answer should remain stable; the added atom should receive an Ignore target rather than changing a material conclusion |
 | Integrity/lifecycle | Mutate payload bytes, source mapping, digest, lifecycle or authorization metadata | The responsible integrity/eligibility gate rejects or surfaces the failure; no silent fallback |
 
 Each family should include (a) clear answerable controls, (b) structurally complete but semantically unsupported cases, and (c) cases where abstention is correct. Always-abstain and always-answer policies are mandatory diagnostics so neither abstention nor answering everything can masquerade as robust performance.
+
+### Memory-influence calibration (MemCalib-inspired)
+
+The v1 fixture corpus now includes an explicit memory-influence pair. One case contains the decisive current configuration; its counterfactual twin adds a high-overlap but non-decisive note. The evaluator-only label file assigns each evidence atom a target influence level: **Ignore** (no answer-specific footprint), **Bound** (limited/local support), or **Control** (materially determines a conclusion or constraint). The test checks that all atoms are labelled and that targets reference evidence in the same case; it does not itself measure a language model's actual influence.
+
+This extension is motivated by [MemCalib](https://arxiv.org/abs/2609.24259), which evaluates over-use and under-use of memory propositions and reports directional trade-offs from conventional optimization. The relevant next experiment is an **atom-ablation intervention**: run the same query with the full context and with one atom removed, then measure whether answer claims, constraints, and action arguments change at the level warranted by that atom's target. For an Ignore atom, a material change is suspect; for a Control atom, absence of any expected effect can reveal under-use. Ablation is diagnostic, not proof of causality unless all other prompt/context differences are controlled.
+
+Report over-use and under-use separately. Do not combine them into a single accuracy number before showing both components, and never tune a response policy solely to reduce over-use if that causes the system to ignore required evidence. This complements QEMem's evidence-set sufficiency question with a separate question: once evidence reaches the reader, is each proposition given the appropriate influence?
 
 ## 5. Test levels
 
@@ -201,8 +210,10 @@ If the support gate fails to distinguish the minimal pairs, report the failure m
 ## 9. Reference points and limits
 
 - QEMem, *From Relevant Memories to Sufficient Evidence*: https://arxiv.org/abs/2610.22668
+- MemCalib, *Benchmarking and Optimizing Memory Use in LLM Agents*: https://arxiv.org/abs/2609.24259
 - LongMemEval-V2 official backend contract, evaluation harness and baselines: https://github.com/xiaowu0162/LongMemEval-V2
 - MemoryAgentBench: https://arxiv.org/abs/2507.05257
+- DynamicMem, *A Long-Horizon Memory Benchmark in Real-World Settings*: https://arxiv.org/abs/2606.22877
 - LongMINT: https://arxiv.org/abs/2605.18565
 
 These works motivate the protocol but use different datasets, memory interfaces, readers, evaluators and budgets. Their published accuracies are not target values for this component and must not be placed on the same chart as Symthaea results without a matched protocol.
