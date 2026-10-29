@@ -453,7 +453,8 @@ mod tests {
     fn mask_and_context_dimensions_are_preserved() {
         let cases = generate_cases(77, 64, 8).expect("64 factors are supported");
         assert!(cases.iter().all(|case| case.mask.count_ones() == 8));
-        assert!(cases.iter().all(|case| case.context != 0 || case.context == 0));
+        let top_bit = bit_string(1_u64 << 63, 64);
+        assert_eq!(top_bit, format!("{}1", "0".repeat(63)));
         assert_eq!(bit_string(1, 6), "100000");
         assert_eq!(bit_string(32, 6), "000001");
     }
