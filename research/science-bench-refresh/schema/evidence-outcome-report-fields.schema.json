@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/evidence-outcome-report-fields.schema.json",
+  "title": "Symthaea Counterfactual Evidence Outcome Report Fields v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "evaluator_revision_sha256",
+    "decision_rules_sha256",
+    "records"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_evidence_outcome_report.v1"
+    },
+    "plan_sha256": {
+      "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
+    },
+    "evaluator_revision_sha256": {
+      "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
+    },
+    "decision_rules_sha256": {
+      "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "$ref": "evidence-outcome-report.schema.json#/$defs/record"
+      },
+      "description": "Exactly one ordered record for every trial in the bound intervention plan, including failed, contaminated and not-started trials."
+    }
+  },
+  "description": "Commitment input for the counterfactual evidence outcome report: same exact fields as the full report, without report_commitment_sha256. The Rust CLI also validates terminal/outcome cross-field semantics and exact plan coverage."
+}
