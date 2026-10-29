@@ -936,4 +936,34 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn policy_reports_keep_cost_regret_and_unsupported_mass_separate() {
+        let (models, truth) = fixture_models();
+        let report =
+            run_experiment_policy_bakeoff("heldout-alternative", &truth, &models).unwrap();
+
+        for result in &report.policy_results {
+            assert!(result.expected_decision_utility.is_finite());
+            assert!(result.decision_regret.is_finite());
+            assert!(result.decision_regret >= 0.0);
+            assert!(result.expected_measurement_cost.is_finite());
+            assert!((0.0..=1.0).contains(&result.unsupported_outcome_probability));
+            match result.policy {
+                ExperimentSelectionPolicy::NoMeasurement => {
+                    assert_eq!(result.expected_measurement_cost, 0.0);
+                    assert_eq!(result.selected_experiment_id, None);
+                }
+                ExperimentSelectionPolicy::UniformRandom => {
+                    assert_eq!(result.expected_measurement_cost, 1.0);
+                    assert_eq!(result.selected_experiment_id, None);
+                }
+                _ => {
+                    assert_eq!(result.expected_measurement_cost, 1.0);
+                    assert!(result.selected_experiment_id.is_some());
+                }
+            }
+        }
+    }
+
 }
