@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const ATTESTATION_SCHEMA_V1: &str = "BROCA-ATTESTATION-V1";
 const POLICY_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/AUTHORITY-POLICY/V1";
+const POLICY_INGESTION_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/POLICY-INGESTION-RECEIPT/V1";
 const EVENT_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/LEDGER-EVENT/V1";
 const INGESTION_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/INGESTION-RECEIPT/V1";
 
@@ -29,6 +30,18 @@ pub struct SignedAuthorityPolicy {
     /// Must equal policy.recorded_at after canonical timestamp normalization.
     pub signed_at: String,
     pub policy: AuthorityPolicy,
+    pub signature_hex: String,
+    /// Trusted-ingress receipt; policy timestamps are not trusted without it.
+    pub ingestion_receipt: Option<PolicyIngestionReceipt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicyIngestionReceipt {
+    pub schema_version: String,
+    pub ingester_key_id: String,
+    /// Trusted receiver's transaction time, not supplied by the policy signer.
+    pub accepted_at: String,
     pub signature_hex: String,
 }
 
@@ -134,6 +147,17 @@ struct EventSigningPayload {
     schema_version: &'static str,
     signer_key_id: String,
     event: LedgerEvent,
+}
+
+#[derive(Serialize)]
+struct PolicyIngestionSigningPayload {
+    domain: &'static str,
+    schema_version: &'static str,
+    ingester_key_id: String,
+    accepted_at: String,
+    policy_version: u64,
+    policy_signer_key_id: String,
+    policy_signature_sha256: String,
 }
 
 #[derive(Serialize)]
@@ -293,7 +317,42 @@ impl SignedAuthorityPolicy {
             signed_at,
             policy,
             signature_hex: hex::encode(signature.to_bytes()),
+            ingestion_receipt: None,
         })
+    }
+
+    /// Attach a receipt from a separately provisioned trusted ingress signer.
+    /// The receipt time, not the policy signer's claimed recorded_at, controls
+    /// when this policy becomes part of the trusted policy timeline.
+    pub fn with_ingestion_receipt(
+        mut self,
+        ingester_key_id: impl Into<String>,
+        accepted_at: impl Into<String>,
+        ingestion_signing_key: &SigningKey,
+    ) -> Result<Self, String> {
+        let ingester_key_id = ingester_key_id.into();
+        let accepted_at = normalize_time(&accepted_at.into(), "policy receipt.accepted_at")?;
+        let policy_signature = hex::decode(&self.signature_hex)
+            .map_err(|error| format!("invalid policy signature hex: {error}"))?;
+        let payload = PolicyIngestionSigningPayload {
+            domain: POLICY_INGESTION_DOMAIN,
+            schema_version: ATTESTATION_SCHEMA_V1,
+            ingester_key_id: ingester_key_id.clone(),
+            accepted_at: accepted_at.clone(),
+            policy_version: self.policy.policy_version,
+            policy_signer_key_id: self.signer_key_id.clone(),
+            policy_signature_sha256: format!("{:x}", Sha256::digest(policy_signature)),
+        };
+        let bytes = serde_json::to_vec(&payload)
+            .map_err(|error| format!("cannot canonicalize policy ingestion receipt: {error}"))?;
+        let signature = ingestion_signing_key.sign(&bytes);
+        self.ingestion_receipt = Some(PolicyIngestionReceipt {
+            schema_version: ATTESTATION_SCHEMA_V1.to_owned(),
+            ingester_key_id,
+            accepted_at,
+            signature_hex: hex::encode(signature.to_bytes()),
+        });
+        Ok(self)
     }
 
     fn signing_bytes(&self) -> Result<Vec<u8>, String> {
@@ -399,11 +458,22 @@ impl EvidenceTrustStore {
             if valid_until.is_some_and(|until| until <= valid_from) {
                 return Err(format!("key {} has an empty validity window", config.key_id));
             }
-            if !config.can_sign_policies
-                && !config.can_sign_events
-                && !config.can_sign_ingestion_receipts
-            {
+            let role_count = [
+                config.can_sign_policies,
+                config.can_sign_events,
+                config.can_sign_ingestion_receipts,
+            ]
+            .into_iter()
+            .filter(|enabled| *enabled)
+            .count();
+            if role_count == 0 {
                 return Err(format!("key {} has no signing role", config.key_id));
+            }
+            if role_count != 1 {
+                return Err(format!(
+                    "key {} must have exactly one signing role; ingress keys must be independent",
+                    config.key_id
+                ));
             }
             if config.can_sign_events
                 && config.source.as_deref().is_none_or(str::is_empty)
@@ -456,13 +526,52 @@ impl EvidenceTrustStore {
 
     pub fn verify_policy(&self, envelope: &SignedAuthorityPolicy) -> Result<AuthorityPolicy, String> {
         let bytes = envelope.signing_bytes()?;
-        let signed_at = parse_utc(&envelope.signed_at, "policy signed_at")?;
-        let signer = self.signer_at(&envelope.signer_key_id, signed_at)?;
+        let receipt = envelope
+            .ingestion_receipt
+            .as_ref()
+            .ok_or_else(|| "policy lacks trusted-ingress receipt".to_string())?;
+        if receipt.schema_version != ATTESTATION_SCHEMA_V1 {
+            return Err("unsupported policy ingestion receipt schema".into());
+        }
+        let accepted_at = normalize_time(&receipt.accepted_at, "policy receipt.accepted_at")?;
+        let accepted_time = parse_utc(&accepted_at, "policy receipt.accepted_at")?;
+
+        // A policy author's signed_at is not a trusted clock. Evaluate key
+        // validity at trusted ingress time so a retired policy key cannot
+        // create a policy now and backdate it into its old validity window.
+        let signer = self.signer_at(&envelope.signer_key_id, accepted_time.clone())?;
         if !signer.can_sign_policies {
             return Err(format!("key {:?} lacks policy-signing role", envelope.signer_key_id));
         }
         Self::verify_signature(signer, &envelope.signature_hex, &bytes)?;
-        Ok(policy_for_signing(&envelope.policy)?)
+
+        let ingester = self.signer_at(&receipt.ingester_key_id, accepted_time.clone())?;
+        if !ingester.can_sign_ingestion_receipts {
+            return Err(format!(
+                "key {:?} lacks ingestion-receipt signing role",
+                receipt.ingester_key_id
+            ));
+        }
+        let policy_signature = hex::decode(&envelope.signature_hex)
+            .map_err(|error| format!("invalid policy signature hex: {error}"))?;
+        let receipt_payload = PolicyIngestionSigningPayload {
+            domain: POLICY_INGESTION_DOMAIN,
+            schema_version: ATTESTATION_SCHEMA_V1,
+            ingester_key_id: receipt.ingester_key_id.clone(),
+            accepted_at: accepted_at.clone(),
+            policy_version: envelope.policy.policy_version,
+            policy_signer_key_id: envelope.signer_key_id.clone(),
+            policy_signature_sha256: format!("{:x}", Sha256::digest(policy_signature)),
+        };
+        let receipt_bytes = serde_json::to_vec(&receipt_payload)
+            .map_err(|error| format!("cannot canonicalize policy receipt: {error}"))?;
+        Self::verify_signature(ingester, &receipt.signature_hex, &receipt_bytes)?;
+
+        let mut policy = policy_for_signing(&envelope.policy)?;
+        // The timeline uses the trusted accepted time, never the self-asserted
+        // timestamp from the policy's signed payload.
+        policy.recorded_at = accepted_at;
+        Ok(policy)
     }
 
     pub fn verify_event(&self, envelope: &SignedLedgerEvent) -> Result<LedgerEvent, String> {
@@ -550,6 +659,10 @@ impl EvidenceTrustStore {
         for envelope in &mut canonical_signed_policies {
             envelope.policy = policy_for_signing(&envelope.policy)?;
             envelope.signed_at = normalize_time(&envelope.signed_at, "policy signed_at")?;
+            if let Some(receipt) = envelope.ingestion_receipt.as_mut() {
+                receipt.accepted_at =
+                    normalize_time(&receipt.accepted_at, "policy receipt.accepted_at")?;
+            }
         }
         canonical_signed_policies.sort_by_key(|envelope| envelope.policy.policy_version);
         let policy_bytes = serde_json::to_vec(&canonical_signed_policies)
@@ -668,6 +781,19 @@ mod tests {
         (store, policy_key, ops_key, ingest_key)
     }
 
+    fn sign_policy(
+        signer_key_id: &str,
+        policy: AuthorityPolicy,
+        policy_key: &SigningKey,
+        accepted_at: &str,
+        ingestion_key: &SigningKey,
+    ) -> SignedAuthorityPolicy {
+        SignedAuthorityPolicy::sign(signer_key_id, policy, policy_key)
+            .unwrap()
+            .with_ingestion_receipt("ingest-root", accepted_at, ingestion_key)
+            .unwrap()
+    }
+
     fn sign_event(
         signer_key_id: &str,
         event: LedgerEvent,
@@ -694,9 +820,10 @@ mod tests {
     #[test]
     fn valid_policy_and_event_signatures_verify() {
         let (store, policy_key, ops_key, ingest_key) = store();
-        let signed_policy = SignedAuthorityPolicy::sign(
+        let signed_policy = sign_policy(
             "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
-        ).unwrap();
+            "2026-01-01T00:00:01Z", &ingest_key,
+        );
         assert_eq!(store.verify_policy(&signed_policy).unwrap().policy_version, 1);
         let signed_event = sign_event(
             "ops-key-1",
@@ -711,9 +838,10 @@ mod tests {
     #[test]
     fn signed_batches_produce_verified_ledger_constructor_input() {
         let (store, policy_key, ops_key, ingest_key) = store();
-        let signed_policy = SignedAuthorityPolicy::sign(
+        let signed_policy = sign_policy(
             "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
-        ).unwrap();
+            "2026-01-01T00:00:01Z", &ingest_key,
+        );
         let signed_event = sign_event(
             "ops-key-1",
             assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
@@ -732,9 +860,10 @@ mod tests {
     #[test]
     fn trusted_ingress_time_not_source_claim_controls_temporal_visibility() {
         let (store, policy_key, ops_key, ingest_key) = store();
-        let signed_policy = SignedAuthorityPolicy::sign(
+        let signed_policy = sign_policy(
             "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
-        ).unwrap();
+            "2026-01-01T00:00:01Z", &ingest_key,
+        );
         let signed_event = sign_event(
             "ops-key-1",
             assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
@@ -751,9 +880,10 @@ mod tests {
     #[test]
     fn verified_digest_is_order_independent_and_binds_receipts() {
         let (store, policy_key, ops_key, ingest_key) = store();
-        let signed_policy = SignedAuthorityPolicy::sign(
+        let signed_policy = sign_policy(
             "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
-        ).unwrap();
+            "2026-01-01T00:00:01Z", &ingest_key,
+        );
         let e1 = sign_event(
             "ops-key-1",
             assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
@@ -848,33 +978,97 @@ mod tests {
 
     #[test]
     fn policy_payload_tampering_breaks_signature() {
-        let (store, policy_key, _, _) = store();
-        let mut signed = SignedAuthorityPolicy::sign(
+        let (store, policy_key, _, ingest_key) = store();
+        let mut signed = sign_policy(
             "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
-        ).unwrap();
+            "2026-01-01T00:00:01Z", &ingest_key,
+        );
         signed.policy.sources[0].authority_rank += 100;
         assert!(store.verify_policy(&signed).unwrap_err().contains("signature verification failed"));
     }
 
     #[test]
     fn policy_signature_requires_recorded_time_match() {
-        let (store, policy_key, _, _) = store();
-        let mut signed = SignedAuthorityPolicy::sign(
+        let (store, policy_key, _, ingest_key) = store();
+        let mut signed = sign_policy(
             "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
-        ).unwrap();
+            "2026-01-01T00:00:01Z", &ingest_key,
+        );
         signed.signed_at = "2026-01-02T00:00:00Z".into();
         assert!(store.verify_policy(&signed).unwrap_err().contains("must equal policy.recorded_at"));
     }
 
     #[test]
     fn policy_source_order_is_canonicalized_for_signatures() {
-        let (store, policy_key, _, _) = store();
+        let (store, policy_key, _, ingest_key) = store();
         let mut policy = policy(1, "2026-01-01T00:00:00Z");
-        let signed = SignedAuthorityPolicy::sign("policy-root", policy.clone(), &policy_key).unwrap();
+        let signed = sign_policy(
+            "policy-root", policy.clone(), &policy_key, "2026-01-01T00:00:01Z", &ingest_key,
+        );
         policy.sources.reverse();
         let mut reordered = signed.clone();
         reordered.policy = policy;
         assert_eq!(store.verify_policy(&signed).unwrap(), store.verify_policy(&reordered).unwrap());
+    }
+
+    #[test]
+    fn policy_requires_a_trusted_ingress_receipt() {
+        let (store, policy_key, _, _) = store();
+        let signed = SignedAuthorityPolicy::sign(
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
+        ).unwrap();
+        assert!(store.verify_policy(&signed).unwrap_err().contains("lacks trusted-ingress receipt"));
+    }
+
+    #[test]
+    fn policy_transaction_time_comes_from_trusted_ingress() {
+        let (store, policy_key, _, ingest_key) = store();
+        let signed = sign_policy(
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
+            "2026-01-03T12:00:00Z", &ingest_key,
+        );
+        let verified = store.verify_policy(&signed).unwrap();
+        assert_eq!(verified.recorded_at, "2026-01-03T12:00:00Z");
+    }
+
+    #[test]
+    fn policy_receipt_time_tampering_breaks_ingestion_signature() {
+        let (store, policy_key, _, ingest_key) = store();
+        let mut signed = sign_policy(
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
+            "2026-01-03T12:00:00Z", &ingest_key,
+        );
+        signed.ingestion_receipt.as_mut().unwrap().accepted_at = "2026-01-02T00:00:00Z".into();
+        assert!(store.verify_policy(&signed).unwrap_err().contains("signature verification failed"));
+    }
+
+    #[test]
+    fn policy_key_validity_is_checked_at_trusted_ingress_time() {
+        let policy_key = key(7);
+        let ingest_key = key(11);
+        let store = EvidenceTrustStore::new(vec![
+            trust_config("policy-root", None, &policy_key, true, false, false,
+                "2026-01-01T00:00:00Z", Some("2026-02-01T00:00:00Z")),
+            trust_config("ingest-root", None, &ingest_key, false, false, true,
+                "2026-01-01T00:00:00Z", None),
+        ]).unwrap();
+        // The source-authored timestamp is backdated into the key's validity
+        // window, but the independently signed receipt says it arrived later.
+        let signed = sign_policy(
+            "policy-root", policy(1, "2026-01-10T00:00:00Z"), &policy_key,
+            "2026-02-02T00:00:00Z", &ingest_key,
+        );
+        assert!(store.verify_policy(&signed).unwrap_err().contains("not valid at signed time"));
+    }
+
+    #[test]
+    fn ingress_keys_cannot_share_signing_roles() {
+        let policy_key = key(7);
+        let store = EvidenceTrustStore::new(vec![trust_config(
+            "dual-role", None, &policy_key, true, false, true,
+            "2026-01-01T00:00:00Z", None,
+        )]);
+        assert!(store.unwrap_err().contains("exactly one signing role"));
     }
 
     #[test]
