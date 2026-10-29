@@ -12,13 +12,13 @@ const TOL: f64 = 1e-9;
 const WEALTH_FLOOR: f64 = 0.5;
 
 #[derive(Clone, Debug)]
-struct Dgp {
-    name: &'static str,
-    h: Vec<f64>,
-    pi: Vec<f64>,
-    reward_mean: Vec<f64>,
-    predictor: Vec<f64>,
-    max_weight: f64,
+pub(crate) struct Dgp {
+    pub(crate) name: &'static str,
+    pub(crate) h: Vec<f64>,
+    pub(crate) pi: Vec<f64>,
+    pub(crate) reward_mean: Vec<f64>,
+    pub(crate) predictor: Vec<f64>,
+    pub(crate) max_weight: f64,
 }
 
 impl Dgp {
@@ -45,31 +45,31 @@ impl Dgp {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ActionControl {
-    h: f64,
-    pi: f64,
-    w: f64,
-    q: f64,
-    c: f64,
-    residual_min: f64,
-    residual_max: f64,
-    reward_mean: f64,
+pub(crate) struct ActionControl {
+    pub(crate) h: f64,
+    pub(crate) pi: f64,
+    pub(crate) w: f64,
+    pub(crate) q: f64,
+    pub(crate) c: f64,
+    pub(crate) residual_min: f64,
+    pub(crate) residual_max: f64,
+    pub(crate) reward_mean: f64,
 }
 
 #[derive(Clone, Debug)]
-struct Audit {
-    name: &'static str,
-    q_pi: f64,
-    true_value: f64,
-    adjusted_mean: f64,
-    raw_variance: f64,
-    residual_variance: f64,
-    min_residual: f64,
-    max_residual: f64,
-    actions: Vec<ActionControl>,
+pub(crate) struct Audit {
+    pub(crate) name: &'static str,
+    pub(crate) q_pi: f64,
+    pub(crate) true_value: f64,
+    pub(crate) adjusted_mean: f64,
+    pub(crate) raw_variance: f64,
+    pub(crate) residual_variance: f64,
+    pub(crate) min_residual: f64,
+    pub(crate) max_residual: f64,
+    pub(crate) actions: Vec<ActionControl>,
 }
 
-fn close(a: f64, b: f64, tol: f64) -> bool {
+pub(crate) fn close(a: f64, b: f64, tol: f64) -> bool {
     (a-b).abs() <= tol*(1.0+a.abs().max(b.abs()))
 }
 
@@ -78,7 +78,7 @@ fn probability_vector_ok(p: &[f64]) -> bool {
         && close(p.iter().sum(),1.0,1e-10)
 }
 
-fn audit(dgp: &Dgp) -> Result<Audit,String> {
+pub(crate) fn audit(dgp: &Dgp) -> Result<Audit,String> {
     if dgp.h.len()!=dgp.pi.len() || dgp.pi.len()!=dgp.reward_mean.len()
         || dgp.pi.len()!=dgp.predictor.len() || dgp.h.is_empty() {
         return Err(format!("{}: action vector lengths differ",dgp.name));
@@ -138,7 +138,7 @@ fn audit(dgp: &Dgp) -> Result<Audit,String> {
 }
 
 #[derive(Clone,Copy,Debug)]
-struct Bet { x:f64, y:f64 }
+pub(crate) struct Bet { pub(crate) x:f64, pub(crate) y:f64 }
 
 fn upstream_encoded_feasible(bet: Bet, w_max:f64) -> bool {
     // Directly translates the two inequalities in n17s/mope/opebetrp.py::solve2:
@@ -152,25 +152,28 @@ fn actual_factor(action: ActionControl, reward:f64, candidate:f64, bet:Bet)->f64
     1.0+bet.x*(action.w-1.0)+bet.y*(action.w*reward-action.c-candidate)
 }
 
-fn support_aware_feasible(bet:Bet, audit:&Audit)->bool {
+pub(crate) fn support_aware_feasible(bet:Bet, audit:&Audit, reflected:bool)->bool {
     if !bet.x.is_finite() || !bet.y.is_finite() || bet.y < -TOL { return false; }
     audit.actions.iter().all(|a| {
-        // Because bet.y >= 0, the minimum factor for this action occurs at
-        // reward=0 and candidate value=1.
-        bet.x*(a.w-1.0)+bet.y*(a.residual_min-1.0)>=-WEALTH_FLOOR-TOL
+        let min_score=if reflected {1.0-a.residual_max} else {a.residual_min};
+        bet.x*(a.w-1.0)+bet.y*(min_score-1.0)>=-WEALTH_FLOOR-TOL
     })
 }
 
-fn support_aware_minimum_factor(bet:Bet,audit:&Audit)->f64 {
+pub(crate) fn support_aware_minimum_factor(bet:Bet,audit:&Audit,reflected:bool)->f64 {
     audit.actions.iter().map(|a| {
-        1.0+bet.x*(a.w-1.0)+bet.y*(a.residual_min-1.0)
+        let min_score=if reflected {1.0-a.residual_max} else {a.residual_min};
+        1.0+bet.x*(a.w-1.0)+bet.y*(min_score-1.0)
     }).fold(f64::INFINITY,f64::min)
 }
-fn support_aware_corners_hold(bet:Bet,audit:&Audit)->bool{
+pub(crate) fn support_aware_corners_hold(bet:Bet,audit:&Audit,reflected:bool)->bool{
     audit.actions.iter().all(|action|{
         [0.0,1.0].iter().all(|reward|{
             [0.0,1.0].iter().all(|candidate|{
-                actual_factor(*action,*reward,*candidate,bet)>=WEALTH_FLOOR-TOL
+                let raw=action.w*reward-action.c;
+                let score=if reflected {1.0-raw} else {raw};
+                let factor=1.0+bet.x*(action.w-1.0)+bet.y*(score-candidate);
+                factor>=WEALTH_FLOOR-TOL
             })
         })
     })
@@ -192,7 +195,7 @@ fn upstream_counterexample() -> Result<(Audit,Bet,f64),String> {
     }
     let rare_action=a.actions.iter().find(|x|close(x.w,50.0,1e-12)).ok_or("rare action missing")?;
     let factor=actual_factor(*rare_action,0.0,1.0,bet);
-    if support_aware_feasible(bet,&a) {
+    if support_aware_feasible(bet,&a,false) {
         return Err("support-aware constraints unexpectedly accepted legacy witness".into());
     }
     if !close(factor,0.455,1e-8) {
@@ -202,22 +205,21 @@ fn upstream_counterexample() -> Result<(Audit,Bet,f64),String> {
 }
 
 #[derive(Clone,Copy,Debug)]
-struct Constraint { a:f64, b:f64, c:f64 }
+pub(crate) struct Constraint { pub(crate) a:f64, pub(crate) b:f64, pub(crate) c:f64 }
 #[derive(Clone,Copy,Debug,Default)]
-struct QuadraticStats { a00:f64, a01:f64, a11:f64, b0:f64, b1:f64 }
+pub(crate) struct QuadraticStats { pub(crate) a00:f64, pub(crate) a01:f64, pub(crate) a11:f64, pub(crate) b0:f64, pub(crate) b1:f64 }
 #[derive(Clone,Copy,Debug)]
-struct Sample { w:f64, r:f64, c:f64 }
+pub(crate) struct Sample { pub(crate) w:f64, pub(crate) r:f64, pub(crate) c:f64 }
 #[derive(Clone,Copy,Debug)]
-struct Optimum { bet:Bet, objective:f64, candidates:usize }
+pub(crate) struct Optimum { pub(crate) bet:Bet, pub(crate) objective:f64, pub(crate) candidates:usize }
 
-fn action_specific_constraints(audit:&Audit)->Vec<Constraint>{
+pub(crate) fn action_specific_constraints(audit:&Audit,reflected:bool)->Vec<Constraint>{
     let mut out=Vec::with_capacity(audit.actions.len()+3);
     // lambda_2 >= 0.
     out.push(Constraint{a:0.0,b:-1.0,c:0.0});
     for action in &audit.actions{
-        // lambda_1(w-1)+lambda_2(y_min-1) >= -1/2
-        // is equivalent to (1-w)lambda_1+(c+1)lambda_2 <= 1/2.
-        out.push(Constraint{a:1.0-action.w,b:action.c+1.0,c:WEALTH_FLOOR});
+        let min_score=if reflected {1.0-action.residual_max} else {action.residual_min};
+        out.push(Constraint{a:1.0-action.w,b:1.0-min_score,c:WEALTH_FLOOR});
     }
     if audit.actions.iter().all(|a|close(a.w,1.0,1e-10)){
         // lambda_1 has no wealth effect when all importance weights equal one.
@@ -232,11 +234,13 @@ fn feasible_constraints(bet:Bet,constraints:&[Constraint])->bool{
     bet.x.is_finite() && bet.y.is_finite()
         && constraints.iter().all(|c|c.a*bet.x+c.b*bet.y<=c.c+1e-8)
 }
-fn qstats(samples:&[Sample],value:f64)->QuadraticStats{
+pub(crate) fn qstats(samples:&[Sample],value:f64,reflected:bool)->QuadraticStats{
     let mut s=QuadraticStats::default();
     for sample in samples{
         let x=sample.w-1.0;
-        let y=sample.w*sample.r-sample.c-value;
+        let raw=sample.w*sample.r-sample.c;
+        let score=if reflected {1.0-raw} else {raw};
+        let y=score-value;
         s.a00+=x*x; s.a01+=x*y; s.a11+=y*y; s.b0+=x; s.b1+=y;
     }
     s
@@ -264,7 +268,7 @@ fn feasible_vertices(constraints:&[Constraint])->Vec<Bet>{
     }
     vertices
 }
-fn optimize_support_polytope(stats:QuadraticStats,constraints:&[Constraint])->Result<Optimum,String>{
+pub(crate) fn optimize_support_polytope(stats:QuadraticStats,constraints:&[Constraint])->Result<Optimum,String>{
     let vertices=feasible_vertices(constraints);
     if vertices.is_empty(){return Err("support-aware feasible polygon has no enumerated vertices".into());}
     let mut candidates=vertices.clone();
@@ -324,7 +328,7 @@ fn optimize_support_polytope(stats:QuadraticStats,constraints:&[Constraint])->Re
     Ok(Optimum{bet,objective:obj,candidates:candidates.len()})
 }
 
-fn cv_samples(audit:&Audit)->Vec<Sample>{
+pub(crate) fn cv_samples(audit:&Audit)->Vec<Sample>{
     let mut samples=Vec::new();
     for action in &audit.actions{
         for reward in [0.0,1.0]{
@@ -333,7 +337,7 @@ fn cv_samples(audit:&Audit)->Vec<Sample>{
     }
     samples
 }
-fn dense_grid_best(stats:QuadraticStats,constraints:&[Constraint])->f64{
+pub(crate) fn dense_grid_best(stats:QuadraticStats,constraints:&[Constraint])->f64{
     let mut best=f64::NEG_INFINITY;
     for ix in -100..=300{
         let x=ix as f64/200.0; // [-0.5, 1.5] in 0.005 steps.
@@ -381,7 +385,7 @@ fn run()->Result<String,String>{
     let _=writeln!(out,"LEGACY_WITNESS\tviolates_half_wealth_floor\t{}",factor<WEALTH_FLOOR);
     let _=writeln!(out,"SAFE_REGION\twitness_rejected\t{}",!support_aware_feasible(bet,&a));
     let mut checked=0usize;
-    let constraints=action_specific_constraints(&a);
+    let constraints=action_specific_constraints(&a,false);
     for xi in -100..=300 {
         let x=xi as f64/200.0;
         for yi in 0..=200 {
@@ -389,18 +393,18 @@ fn run()->Result<String,String>{
             let bet=Bet{x,y};
             if support_aware_feasible(bet,&a){
                 checked+=1;
-                if support_aware_minimum_factor(bet,&a)<WEALTH_FLOOR-TOL
-                    || !support_aware_corners_hold(bet,&a) {
+                if support_aware_minimum_factor(bet,&a,false)<WEALTH_FLOOR-TOL
+                    || !support_aware_corners_hold(bet,&a,false) {
                     return Err("support-aware feasible-set grid found a factor-floor violation".into());
                 }
             }
         }
     }
     let samples=cv_samples(&a);
-    let stats=qstats(&samples,0.5);
+    let stats=qstats(&samples,0.5,false);
     let optimum=optimize_support_polytope(stats,&constraints)?;
-    if !support_aware_feasible(optimum.bet,&a)
-        || !support_aware_corners_hold(optimum.bet,&a) {
+    if !support_aware_feasible(optimum.bet,&a,false)
+        || !support_aware_corners_hold(optimum.bet,&a,false) {
         return Err("support-aware optimizer returned a bet that violates the factor floor".into());
     }
     let dense=dense_grid_best(stats,&constraints);
@@ -412,7 +416,7 @@ fn run()->Result<String,String>{
     let _=writeln!(out,"SAFE_BET_OPTIMIZER\tlambda2\t{:.12}",optimum.bet.y);
     let _=writeln!(out,"SAFE_BET_OPTIMIZER\tobjective\t{:.12}",optimum.objective);
     let _=writeln!(out,"SAFE_BET_OPTIMIZER\tdense_grid_best\t{:.12}",dense);
-    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tminimum_factor\t{:.12}",support_aware_minimum_factor(optimum.bet,&a));
+    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tminimum_factor\t{:.12}",support_aware_minimum_factor(optimum.bet,&a,false));
     Ok(out)
 }
 
@@ -460,9 +464,9 @@ mod tests{
         for x_i in -100..=300{
             for y_i in 0..=200{
                 let candidate=Bet{x:x_i as f64/200.0,y:y_i as f64/200.0};
-                if support_aware_feasible(candidate,&a){
-                    assert!(support_aware_minimum_factor(candidate,&a)>=WEALTH_FLOOR-TOL);
-                    assert!(support_aware_corners_hold(candidate,&a));
+                if support_aware_feasible(candidate,&a,false){
+                    assert!(support_aware_minimum_factor(candidate,&a,false)>=WEALTH_FLOOR-TOL);
+                    assert!(support_aware_corners_hold(candidate,&a,false));
                 }
             }
         }
