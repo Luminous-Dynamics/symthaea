@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn loss_budget_round_trips_and_captures_the_architecture_example() {
         let budget = loss_budget_db_for_minimum_transmission(0.92).unwrap();
-        near(budget, 0.362);
+        near(budget, -10.0 * 0.92_f64.log10());
         near(transmission_probability(budget).unwrap(), 0.92);
         near(loss_budget_db_for_minimum_transmission(1.0).unwrap(), 0.0);
         assert!(loss_budget_db_for_minimum_transmission(0.0).is_err());
