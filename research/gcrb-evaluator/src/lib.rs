@@ -279,6 +279,9 @@ fn validate_fixture(fixture: &Fixture) -> Result<(), String> {
             fixture.expected_negative_control_count
         ));
     }
+    if attacks == 0 || negative_controls == 0 {
+        return Err("fixture must contain at least one attack and one negative control".to_owned());
+    }
 
     Ok(())
 }
@@ -393,7 +396,9 @@ pub fn evaluate_public_development(
     let mut cases = Vec::with_capacity(fixture.cases.len());
 
     for expected in &fixture.cases {
-        let observed = by_id[expected.case_id.as_str()];
+        let observed = *by_id
+            .get(expected.case_id.as_str())
+            .expect("candidate case-set equality was checked above");
         let exact_match = expected.oracle_expected_disposition == observed.observed_disposition;
         let high_escalation = expected.class == "negative_control"
             && severity_rank(&observed.observed_severity).unwrap_or(0) >= 2;
@@ -587,12 +592,8 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_fixture_case_ids() {
-        let bytes = String::from_utf8(fixture_bytes()).unwrap()
-            .replace("\"expected_case_count\":2", "\"expected_case_count\":3")
-            .replace("\"cases\":[", "\"cases\":[")
-            .replace("]}\n        }", "]}\n        }");
-        let parsed: serde_json::Value = serde_json::from_str(&bytes).unwrap();
-        let mut mutated = parsed;
+        let mut mutated: serde_json::Value =
+            serde_json::from_slice(&fixture_bytes()).unwrap();
         let first_case = mutated["cases"][0].clone();
         mutated["cases"].as_array_mut().unwrap().push(first_case);
         mutated["expected_case_count"] = serde_json::json!(3);
