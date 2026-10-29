@@ -92,6 +92,12 @@ fn homogeneous_errors_produce_independently_expected_paired_differences() {
     assert_eq!(report.mae_delta_ci_lower_seconds, -5.0);
     assert_eq!(report.mae_delta_ci_upper_seconds, -5.0);
     assert_eq!(report.bootstrap_fraction_candidate_rmse_better, 1.0);
+    assert_eq!(report.baseline_prediction_artifact_sha256, baseline_context.prediction_artifact_sha256);
+    assert_eq!(report.candidate_prediction_artifact_sha256, candidate_context.prediction_artifact_sha256);
+    assert_eq!(report.baseline_model_config_sha256, baseline_context.model_config_sha256);
+    assert_eq!(report.candidate_model_config_sha256, candidate_context.model_config_sha256);
+    assert_eq!(report.baseline_feature_schema_sha256, baseline_context.feature_schema_sha256);
+    assert_eq!(report.candidate_feature_schema_sha256, candidate_context.feature_schema_sha256);
 }
 
 #[test]
