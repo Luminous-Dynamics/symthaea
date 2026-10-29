@@ -101,6 +101,16 @@ fn seed_for(logger_index:u64,replicate:usize)->u64{
         ^ (replicate as u64).wrapping_mul(0xA076_1D64_78BD_642F)
 }
 
+#[derive(Clone,Copy,Debug,PartialEq)]
+struct LoggedObservation{context:usize,action:usize,reward:f64}
+fn next_observation(logger:Logger,rng:&mut SplitMix64)->LoggedObservation{
+    let context=if rng.unit()<0.5{0}else{1};
+    let h=logger.h1[context];
+    let action=if rng.unit()<h{1}else{0};
+    let reward=if rng.unit()<reward_mean(context,action){1.0}else{0.0};
+    LoggedObservation{context,action,reward}
+}
+
 fn wald_interval(sum:f64,sum_sq:f64,n:usize)->Interval{
     if n<2{return FULL;}
     let mean=sum/n as f64;
@@ -179,6 +189,7 @@ struct SimResult{
     logger_name:&'static str,
     m:usize,
     values:Vec<f64>,
+    policies:Vec<Policy>,
     aggregates:Vec<Vec<MethodAggregate>>,
     selection:Vec<SelectionAggregate>,
     elapsed_seconds:f64,
@@ -233,10 +244,10 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
         let mut look_index=0usize;
 
         for t in 1..=max_look{
-            let context=if rng.unit()<0.5{0}else{1};
-            let h=s.logger.h1[context];
-            let action=if rng.unit()<h{1}else{0};
-            let reward=if rng.unit()<reward_mean(context,action){1.0}else{0.0};
+            let observation=next_observation(s.logger,&mut rng);
+            let context=observation.context;
+            let action=observation.action;
+            let reward=observation.reward;
             for j in 0..m{
                 let p=policies[j].pi1[context];
                 let ratio=if action==1{p/h}else{(1.0-p)/(1.0-h)};
@@ -291,13 +302,19 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
         }
     }
     Ok(SimResult{
-        name:s.name,logger_name:s.logger.name,m,values,aggregates:agg,selection,
+        name:s.name,logger_name:s.logger.name,m,values,policies,aggregates:agg,selection,
         elapsed_seconds:started.elapsed().as_secs_f64(),observations,
     })
 }
 
 fn emit(out:&mut String,r:&SimResult,looks:&[usize]){
-    let _=writeln!(out,"DGP\t{}\tlogger\t{}\tpolicies\t{}\tbest_value\t{:.8}",r.name,r.logger_name,r.m,r.values.iter().copied().fold(f64::NEG_INFINITY,f64::max));
+    let best_value=r.values.iter().copied().fold(f64::NEG_INFINITY,f64::max);
+    let max_w=r.policies.iter().map(|p|p.w_max).fold(0.0_f64,f64::max);
+    let _=writeln!(out,"DGP\t{}\tlogger\t{}\tpolicies\t{}\tbest_value\t{:.8}\tmax_policy_W\t{:.8}",r.name,r.logger_name,r.m,best_value,max_w);
+    for policy in &r.policies{
+        let _=writeln!(out,"POLICY\t{}\tid\t{}\tpi_action1_context0\t{:.8}\tpi_action1_context1\t{:.8}\ttrue_value\t{:.8}\tW_max\t{:.8}\tis_best\t{}",
+            r.name,policy.id,policy.pi1[0],policy.pi1[1],policy.value,policy.w_max,(policy.value-best_value).abs()<=EPS);
+    }
     let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M"];
     for method in 0..3{
         for (li,look) in looks.iter().copied().enumerate(){
@@ -410,6 +427,16 @@ mod tests{
         assert_eq!(certified_best(&[Interval{lower:0.7,upper:0.8},Interval{lower:0.1,upper:0.6}]),Some(0));
         assert_eq!(certified_best(&[Interval{lower:0.7,upper:0.8},Interval{lower:0.2,upper:0.75}]),None);
         assert_eq!(certified_best(&[Interval{lower:0.8,upper:0.7},Interval{lower:0.1,upper:0.2}]),None);
+    }
+
+    #[test]
+    fn same_logger_and_replicate_produce_identical_sample_prefixes_across_portfolio_sizes(){
+        let logger=Logger::weak();
+        let mut small=SplitMix64::new(seed_for(logger.index,91));
+        let mut large=SplitMix64::new(seed_for(logger.index,91));
+        for _ in 0..4096{
+            assert_eq!(next_observation(logger,&mut small),next_observation(logger,&mut large));
+        }
     }
 
     #[test]
