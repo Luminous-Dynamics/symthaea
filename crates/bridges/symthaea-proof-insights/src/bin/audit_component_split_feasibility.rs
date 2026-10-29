@@ -733,5 +733,23 @@ mod tests {
         bad_quotas["component_count_by_split"]["train"] = json!(3);
         let bytes = serde_json::to_vec(&bad_quotas).expect("serialize fixture");
         assert!(parse_candidate_split(&bytes).is_err());
+
+        let mut bad_universe: Value = serde_json::from_slice(SYNTHETIC_SPLIT)
+            .expect("valid candidate fixture");
+        bad_universe["family_universe_sha256"] = json!("0".repeat(64));
+        let bytes = serde_json::to_vec(&bad_universe).expect("serialize fixture");
+        assert!(parse_candidate_split(&bytes).is_err());
+
+        let mut false_real_candidate: Value =
+            serde_json::from_slice(&candidate_with_correct_digest())
+                .expect("valid synthetic candidate fixture");
+        false_real_candidate["dataset_kind"] = json!("candidate_only");
+        false_real_candidate["family_universe_sha256"] =
+            json!(EXPECTED_FAMILY_UNIVERSE_SHA256);
+        let bytes = serde_json::to_vec(&false_real_candidate).expect("serialize fixture");
+        assert!(
+            parse_candidate_split(&bytes).is_err(),
+            "a synthetic six-family universe must not pass as the real 372-family universe"
+        );
     }
 }
