@@ -111,10 +111,15 @@ enum Commands {
     GenerateCognitiveMissingnessSchedule {
         #[arg(long)]
         input: PathBuf,
+        /// Output contains messages for one tick only; never use a whole future delivery queue as policy input.
         #[arg(long)]
-        policy_out: PathBuf,
+        policy_tick_out: PathBuf,
+        /// Evaluator-only artifact; must remain outside the policy process.
         #[arg(long)]
         evaluator_out: PathBuf,
+        /// Logical decision/feedback tick to deliver to the policy.
+        #[arg(long)]
+        tick: u64,
     },
     /// Score bounded-loss identification bounds and MNAR sensitivity for missing outcomes.
     /// This is a statistical score, not a proof of measurement authenticity or causal identification.
@@ -302,11 +307,12 @@ fn main() -> anyhow::Result<()> {
                 println!("{rendered}");
             }
         }
-        Commands::GenerateCognitiveMissingnessSchedule { input, policy_out, evaluator_out } => {
+        Commands::GenerateCognitiveMissingnessSchedule { input, policy_tick_out, evaluator_out, tick } => {
             let summary = cognitive_missingness_schedule::generate_file(
                 &input,
-                &policy_out,
+                &policy_tick_out,
                 &evaluator_out,
+                tick,
             )?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
