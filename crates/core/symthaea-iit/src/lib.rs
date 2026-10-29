@@ -941,4 +941,28 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn canonical_digest_golden_vectors_are_stable_for_cross_language_replay() {
+        let model = two_unit_model();
+        assert_eq!(
+            model.model_sha256(),
+            "728eb74b44c4aec7896db360919b6efcb0f06e4b7eb487b2974c486c42a80b62"
+        );
+        assert_eq!(
+            model.evaluation_sha256(&[true, false]).unwrap(),
+            "6188b51af953ac133cd3c4af0d628ceba73692ff36c2f37f6e05bdb1531214e2"
+        );
+        let request = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            vec![0, 1],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        ).unwrap();
+        assert_eq!(
+            request.request_sha256(&model),
+            "8b697dce9b5ad3786d4e15f7d5db39c563bce54ea3676976c07efea3f4698db0"
+        );
+    }
+
 }
