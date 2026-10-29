@@ -42,7 +42,7 @@ Never silently drop difficult rows:
 - **Quarantined or invalid task:** exclude from the eligible-task accuracy denominator only under a predeclared, auditable task-quality rule. Keep it in the released record and report its count and reason. Reclassification after seeing system outcomes requires independent review and a sensitivity analysis.
 - **Integrity violation:** the attempt cannot count as a success even if ordinary task tests pass. Publish the violation rate separately.
 
-The task-quality auditor must not use which system won as a reason to retain or reject the task. Keep task specification, hidden oracle, verifier bundle, repository state and scoring rubric frozen and content-addressed before the run.
+The task-quality auditor must not use which system won as a reason to retain or reject the task. Keep task specification, hidden oracle, verifier bundle, repository state and scoring rubric frozen and content-addressed before the run. The frozen suite manifest also declares each task's required verifier obligations by stable check ID and kind; a trial cannot claim success merely because an arbitrary, easier check passed. Every required obligation must be represented in the verifier output as a blocking check, and every required check must pass for an outcome to count as a candidate success.
 
 ## Pairing and record invariants
 
@@ -94,7 +94,7 @@ These are research gates to test—not reported achievements:
 
 ## Research position relative to current leaderboards
 
-Public leaderboards measure different mixtures of task resolution, harness, tools, budget and scoring. As of 2026-10-29, published Terminal-Bench 4.0 results are around 64–65% for leading configurations, while the Artificial Analysis Coding Agent Index v2.0 combines 290 tasks across FrontierCode, Terminal-Bench and repository Q&A and reports cost, tokens, time, and reward-hacking checks. These are version-specific references, not a universal SOTA number.
+Public leaderboards measure different mixtures of task resolution, harness, tools, budget and scoring. As of 2026-10-30, Terminal-Bench 4.0's official leaderboard lists Opus 5.5 + Claude Code at 64.8% ± 3.1%; the Vals AI Terminal-Bench 4.0 table lists Opus 5.5 + Mini-SWE-agent at 65.15% on its setup. These are distinct harnesses, so the results are not a direct head-to-head comparison. Artificial Analysis Coding Agent Index v2.0 equally averages FrontierCode v1.1 (100 tasks), Terminal-Bench 4.0 (66), and SWE-Atlas-QnA-AA (124), while tracking cost, tokens, time, and reward-hacking checks. Treat these as version-specific reference points, not a universal SOTA number. BASALT should report the same per-task, integrity, and efficiency dimensions instead of optimizing one blended score.
 
 BASALT's differentiated aim should be **verified change per unit cost under controlled shift**, with explicit evidence integrity—not a larger composite score obtained by blending incomparable metrics. Compare with public scores only after pinning the benchmark version and matching the executable setup.
 
