@@ -15,11 +15,13 @@ MeshReceiver::receive_fragment previously updated `last_fragment_at` and `last_f
 
 The receiver now refreshes time and progress index only after the assembler confirms the shard index is stored. The tests inspect the timestamp directly after a duplicate, and also after an individually CRC-valid fragment advertises a conflicting total count.
 
+It also applies a configurable encoded-envelope size cap (default `WISDOM_PACKET_SIZE + 92`) and rejects a valid-CRC but implausibly large advertised fragment count before allocating pending state. This prevents a spoofed first frame from requesting 254 shard slots for the default ~2 KB profile. The `fragments_oversize` metric separates these events from CRC corruption.
+
 ### 2. Legacy parser accepted impossible FEC metadata
 
 LoRaFragment::from_bytes previously accepted the FEC flag at any fragment index, allowed a final fragment without FEC, and did not require the parity payload to be full-size. FragmentAssembler::feed did not compare total_fragments against the initial assembly and could mark an index received while leaving its data slot empty. Existing expect calls could panic during assembly.
 
-Parser and assembler now reject unknown flags, total counts below two, FEC/index inconsistencies, zero-length data, short parity, total-count mismatches, checksum failures, and impossible payload lengths before changing assembly state. Assembly uses checked arithmetic and Option paths instead of expect for untrusted reassembly state. Output allocation is bounded by the maximum bytes represented by the configured shard count.
+Parser and assembler now reject unknown flags, impossible wire lengths (including trailing bytes), total counts below two, FEC/index inconsistencies, zero-length data, short parity, total-count mismatches, checksum failures, and impossible payload lengths before changing assembly state. Assembly uses checked arithmetic and Option paths instead of expect for untrusted reassembly state. Output allocation is bounded by the maximum bytes represented by the configured shard count.
 
 ### 3. Exact encoded length is absent from the legacy header
 
@@ -43,6 +45,7 @@ This is a correctness-first compatibility tradeoff until the versioned length-bo
 - Reject inferred final-tail recovery when the nominal length is inconsistent; return None instead of panicking.
 - Preserve normal full reassembly, middle-shard recovery, last-shard recovery for callers with a truly exact payload size, lost-parity behavior, and legal reordering.
 - Ensure duplicate and CRC-valid but count-mismatched receiver frames do not refresh last_fragment_at or last_fragment_index.
+- Ensure a valid-CRC frame advertising 255 fragments is rejected before any pending state is allocated under the default packet-size cap.
 - Ensure MeshReceiver does not claim success when only the legacy final data fragment is missing, and completes if that actual shard later arrives.
 
 ## Validation boundary
