@@ -126,7 +126,7 @@ fn is_token(value: &str) -> bool {
 }
 
 fn is_spdx_token(value: &str) -> bool {
-    is_token(value) || value.starts_with("LicenseRef-") && is_token(value)
+    is_token(value)
 }
 
 fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
