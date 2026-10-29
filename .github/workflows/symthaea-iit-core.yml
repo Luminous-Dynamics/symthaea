@@ -31,6 +31,24 @@ jobs:
       - name: Test locked workspace package
         run: cargo test --locked -p symthaea-iit
 
+      # Keep the locked gate fail-closed, but capture the exact resolver delta
+      # if the submitted lockfile is stale. The generated lock exists only on the
+      # ephemeral runner; contributors must review and commit it explicitly.
+      - name: Diagnose Cargo.lock drift after a locked-test failure
+        if: failure()
+        shell: bash
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          set +e
+          cargo metadata --format-version 1 >/tmp/cargo-metadata.json 2>/tmp/cargo-metadata.stderr
+          metadata_status=$?
+          set -e
+          echo "cargo metadata exit: $metadata_status"
+          cat /tmp/cargo-metadata.stderr
+          echo "----- Cargo.lock delta generated for diagnosis only -----"
+          git diff --no-index -- /tmp/Cargo.lock.before Cargo.lock || true
+          echo "----- End Cargo.lock delta -----"
+
       - name: Exercise deterministic partition sweep
         run: cargo run --locked -p symthaea-iit --example directed_partition_sweep -- --repeats 2
 
