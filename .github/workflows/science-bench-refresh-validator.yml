@@ -454,7 +454,7 @@ jobs:
                   "records": records
               }
               Path(ledger_path).write_text(
-                  json.dumps(ledger, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\\n",
+                  json.dumps(ledger, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
                   encoding="utf-8"
               )
 
