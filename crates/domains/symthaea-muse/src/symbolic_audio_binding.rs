@@ -20,8 +20,8 @@ use symthaea_music_theory::edit_locality::{
 };
 
 use crate::audio_preservation::{
-    AudioAuditInputError, AudioView, CompositeAudioPreservationReport, PreservationVerdict,
-    audio_content_sha256, verify_composite_audio_preservation_receipt,
+    AudioAuditInputError, AudioPreservationReport, AudioView, OnsetPreservationReport,
+    PreservationVerdict, audio_content_sha256, compose_audio_preservation_evidence,
 };
 
 /// Version for the symbolic/audio render-binding envelope.
@@ -200,7 +200,8 @@ pub fn create_symbolic_audio_render_binding(
     symbolic_evidence: &EditLocalityEvidence,
     source_audio: AudioView<'_>,
     target_audio: AudioView<'_>,
-    audio_evidence: &CompositeAudioPreservationReport,
+    acoustic_evidence: &AudioPreservationReport,
+    onset_evidence: &OnsetPreservationReport,
     renderer_manifest: &RendererManifest,
 ) -> Result<SymbolicAudioRenderBinding, SymbolicAudioBindingError> {
     if !verify_edit_locality_evidence(source_score, target_score, symbolic_evidence)? {
@@ -208,11 +209,10 @@ pub fn create_symbolic_audio_render_binding(
             "symbolic receipt or source/target score binding did not verify",
         ));
     }
-    if !verify_composite_audio_preservation_receipt(audio_evidence)? {
-        return Err(SymbolicAudioBindingError::InvalidEvidence(
-            "audio composite receipt did not verify",
-        ));
-    }
+    // Re-compose from the individual reports so both child receipt digests
+    // are verified here; do not trust a standalone composite claim.
+    let audio_evidence =
+        compose_audio_preservation_evidence(acoustic_evidence, onset_evidence)?;
 
     let source_audio_sha256 = audio_content_sha256(source_audio)?;
     let target_audio_sha256 = audio_content_sha256(target_audio)?;
@@ -304,7 +304,8 @@ pub fn verify_symbolic_audio_render_binding(
     symbolic_evidence: &EditLocalityEvidence,
     source_audio: AudioView<'_>,
     target_audio: AudioView<'_>,
-    audio_evidence: &CompositeAudioPreservationReport,
+    acoustic_evidence: &AudioPreservationReport,
+    onset_evidence: &OnsetPreservationReport,
     renderer_manifest: &RendererManifest,
     binding: &SymbolicAudioRenderBinding,
 ) -> Result<bool, SymbolicAudioBindingError> {
@@ -319,7 +320,8 @@ pub fn verify_symbolic_audio_render_binding(
         symbolic_evidence,
         source_audio,
         target_audio,
-        audio_evidence,
+        acoustic_evidence,
+        onset_evidence,
         renderer_manifest,
     )?;
     Ok(expected == *binding)
@@ -392,7 +394,8 @@ mod tests {
         EditLocalityEvidence,
         Vec<f32>,
         Vec<f32>,
-        CompositeAudioPreservationReport,
+        AudioPreservationReport,
+        OnsetPreservationReport,
         RendererManifest,
     ) {
         let source_score = score_source();
@@ -438,22 +441,21 @@ mod tests {
                 calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
             },
         ).expect("synthetic onset report");
-        let audio_evidence = compose_audio_preservation_evidence(&acoustic, &onset)
-            .expect("matching audio receipts should compose");
         (
             source_score,
             target_score,
             symbolic_evidence,
             source_audio,
             target_audio,
-            audio_evidence,
+            acoustic,
+            onset,
             renderer_manifest(),
         )
     }
 
     #[test]
     fn binding_verifies_when_symbolic_audio_and_manifest_inputs_match() {
-        let (source_score, target_score, symbolic, source_audio, target_audio, audio, manifest) =
+        let (source_score, target_score, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let binding = create_symbolic_audio_render_binding(
             &source_score,
@@ -461,63 +463,63 @@ mod tests {
             &symbolic,
             audio_view(&source_audio),
             audio_view(&target_audio),
-            &audio,
+            &acoustic, &onset,
             &manifest,
         ).expect("consistent evidence should bind");
         assert_eq!(binding.overall_verdict, PreservationVerdict::Pass);
         assert!(verify_symbolic_audio_render_binding(
             &source_score, &target_score, &symbolic,
-            audio_view(&source_audio), audio_view(&target_audio), &audio, &manifest, &binding
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest, &binding
         ).expect("binding should replay"));
     }
 
     #[test]
     fn binding_rejects_swapped_target_audio() {
-        let (source_score, target_score, symbolic, source_audio, target_audio, audio, manifest) =
+        let (source_score, target_score, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let binding = create_symbolic_audio_render_binding(
             &source_score, &target_score, &symbolic,
-            audio_view(&source_audio), audio_view(&target_audio), &audio, &manifest
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest
         ).expect("fixture binding");
         let altered = audio_pair().0;
         let result = verify_symbolic_audio_render_binding(
             &source_score, &target_score, &symbolic,
-            audio_view(&source_audio), audio_view(&altered), &audio, &manifest, &binding
+            audio_view(&source_audio), audio_view(&altered), &acoustic, &onset, &manifest, &binding
         );
         assert!(result.is_err(), "audio receipt must not be reused with another output buffer");
     }
 
     #[test]
     fn binding_rejects_modified_score_and_evidence() {
-        let (source_score, target_score, symbolic, source_audio, target_audio, audio, manifest) =
+        let (source_score, target_score, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let binding = create_symbolic_audio_render_binding(
             &source_score, &target_score, &symbolic,
-            audio_view(&source_audio), audio_view(&target_audio), &audio, &manifest
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest
         ).expect("fixture binding");
         let mut altered_target = target_score.clone();
         altered_target[0].pitch_midi += 1;
         let result = verify_symbolic_audio_render_binding(
             &source_score, &altered_target, &symbolic,
-            audio_view(&source_audio), audio_view(&target_audio), &audio, &manifest, &binding
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest, &binding
         );
         assert!(result.is_err(), "changed score must invalidate the symbolic receipt");
         let mut tampered_binding = binding.clone();
         tampered_binding.renderer_manifest.renderer_version = "2.0.0".to_owned();
         assert!(!verify_symbolic_audio_render_binding(
             &source_score, &target_score, &symbolic,
-            audio_view(&source_audio), audio_view(&target_audio), &audio, &manifest, &tampered_binding
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest, &tampered_binding
         ).expect("tampered binding should be rejected as a verdict"));
     }
 
     #[test]
     fn binding_rejects_audio_manifest_format_mismatch() {
-        let (source_score, target_score, symbolic, source_audio, target_audio, audio, mut manifest) =
+        let (source_score, target_score, symbolic, source_audio, target_audio, acoustic, onset, mut manifest) =
             build_fixture();
         manifest.sample_rate_hz = 48_000;
         let result = create_symbolic_audio_render_binding(
             &source_score, &target_score, &symbolic,
-            audio_view(&source_audio), audio_view(&target_audio), &audio, &manifest
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest
         );
         assert!(matches!(result, Err(SymbolicAudioBindingError::InvalidRendererManifest(_))));
     }
