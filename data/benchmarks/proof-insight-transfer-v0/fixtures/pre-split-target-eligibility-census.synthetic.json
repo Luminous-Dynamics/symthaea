@@ -1,0 +1,110 @@
+{
+  "schema_version": "pitb.pre-split-target-eligibility-census.v0",
+  "dataset_kind": "synthetic_fixture",
+  "upstream_commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+  "family_universe_sha256": "c6b39a37aa42bdd454f15806269ca1d0d417cd4823ec7a3db809908d6214f4dc",
+  "eligibility_policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "census_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "sealed_before_evaluation": true,
+  "outcomes_used": false,
+  "families": [
+    {
+      "family_id": "a",
+      "candidate_target_ids": [
+        "t-a"
+      ],
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "family_id": "b",
+      "candidate_target_ids": [
+        "t-b"
+      ],
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "family_id": "c",
+      "candidate_target_ids": [
+        "t-c"
+      ],
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "family_id": "d",
+      "candidate_target_ids": [
+        "t-d"
+      ],
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "family_id": "e",
+      "candidate_target_ids": [
+        "t-e"
+      ],
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "family_id": "f",
+      "candidate_target_ids": [
+        "t-f"
+      ],
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "targets": [
+    {
+      "target_id": "t-a",
+      "family_id": "a",
+      "status": "eligible",
+      "artifact_path": "families/a.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "eligibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "target_id": "t-b",
+      "family_id": "b",
+      "status": "eligible",
+      "artifact_path": "families/b.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "eligibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "target_id": "t-c",
+      "family_id": "c",
+      "status": "eligible",
+      "artifact_path": "families/c.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "eligibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "target_id": "t-d",
+      "family_id": "d",
+      "status": "excluded",
+      "artifact_path": "families/d.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": null,
+      "eligibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "target_id": "t-e",
+      "family_id": "e",
+      "status": "eligible",
+      "artifact_path": "families/e.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "eligibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "target_id": "t-f",
+      "family_id": "f",
+      "status": "unknown",
+      "artifact_path": "families/f.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": null,
+      "eligibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ]
+}
