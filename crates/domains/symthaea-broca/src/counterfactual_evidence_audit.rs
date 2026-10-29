@@ -26,6 +26,7 @@ const ALLOWED_FAMILIES: &[&str] = &[
     "ordered_transition",
     "correction_update",
     "qualifier_context",
+    "memory_influence",
 ];
 
 const ALLOWED_DECISION_RELATIONS: &[&str] = &[
@@ -37,6 +38,7 @@ const ALLOWED_DECISION_RELATIONS: &[&str] = &[
     "must_follow_observed_transition",
     "must_recompute_support_with_context",
     "must_use_latest_applicable_correction",
+    "irrelevant_memory_should_not_change_answer",
 ];
 
 const FORBIDDEN_RUNTIME_KEYS: &[&str] = &[
@@ -244,6 +246,7 @@ fn expected_mutation_kind(family: &str) -> Option<&'static str> {
         "ordered_transition" => Some("terminal_state_flip"),
         "correction_update" => Some("add_later_correction"),
         "qualifier_context" => Some("qualifier_meaning_flip"),
+        "memory_influence" => Some("add_irrelevant_memory_atom"),
         _ => None,
     }
 }
@@ -256,7 +259,7 @@ fn expected_mutation_path(family: &str) -> Option<&'static str> {
         "temporal_validity" => Some("evidence[0].valid_until"),
         "entity_binding" => Some("evidence[0].entity_id"),
         "scope_premise" => Some("evidence[0].scope"),
-        "source_dependence" | "missing_requirement" | "correction_update" => Some("evidence"),
+        "source_dependence" | "missing_requirement" | "correction_update" | "memory_influence" => Some("evidence"),
         _ => None,
     }
 }
@@ -389,6 +392,15 @@ mod tests {
         expected_decision: String,
         expected_claim: String,
         supporting_evidence_ids: Vec<String>,
+        #[serde(default)]
+        atom_use_targets: Vec<GoldAtomUseTarget>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct GoldAtomUseTarget {
+        evidence_id: String,
+        target_level: String,
     }
 
     #[test]
@@ -466,6 +478,20 @@ mod tests {
                     "gold support references evidence absent from case {}",
                     label.case_id
                 );
+                assert!(
+                    label.atom_use_targets.iter().all(|target| {
+                        available_evidence_ids.contains(target.evidence_id.as_str())
+                            && ["ignore", "bound", "control"].contains(&target.target_level.as_str())
+                    }),
+                    "atom-use targets must reference case evidence and use Ignore/Bound/Control"
+                );
+                if input_pair.family == "memory_influence" {
+                    assert_eq!(
+                        label.atom_use_targets.len(),
+                        source_case.evidence.len(),
+                        "memory-influence fixtures must target every evidence atom"
+                    );
+                }
             }
         }
         assert_eq!(seen_ids.len(), expected_ids.len(), "every case must have exactly one gold label");
