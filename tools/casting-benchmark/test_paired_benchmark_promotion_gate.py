@@ -171,10 +171,6 @@ class PairedPromotionGateTests(unittest.TestCase):
         base = next(run for run in doc["runs"] if run["unit_id"] == "unit-000" and run["policy_id"] == "baseline")
         candidate = next(run for run in doc["runs"] if run["unit_id"] == "unit-000" and run["policy_id"] == "candidate")
         candidate["curve"] = [dict(point) for point in base["curve"]]
-        with self.assertRaisesRegex(ValueError, "provenance"):
-            # Candidate's source/config are intentionally distinct, but don't mutate
-            # just one run because the benchmark contract correctly rejects that.
-            pass
         # Use a separate valid paired set where the candidate ties on every unit.
         tied = paired_manifest()
         for row in tied["runs"]:
