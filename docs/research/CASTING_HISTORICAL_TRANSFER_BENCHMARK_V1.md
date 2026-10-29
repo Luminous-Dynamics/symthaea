@@ -51,7 +51,7 @@ For each held-out target task and policy, the receipt reports:
 - worst target-task objective and margin MAE;
 - paired per-target-task objective-MAE improvement over low-fidelity-only.
 
-The receipt reports metrics both macro-averaged over target task variants and macro-averaged over the eight held-out families. Four variants within a family are nested family cases, not independent family replications; candidate points within a task are further nested measurements. The family-level comparison therefore has eight held-out family units, and this synthetic suite still does not justify broad generalization or SOTA claims. Any confidence interval used for cross-family inference must resample at family level rather than count target design points as independent samples.
+The receipt reports metrics both macro-averaged over target task variants and macro-averaged over the eight held-out families. Four variants within a family are nested family cases, not independent family replications; candidate points within a task are further nested measurements. Family-level relative effects also include a deterministic 2,000-replicate percentile bootstrap interval resampled over the eight family effects. The family-level comparison therefore has eight held-out family units, and this synthetic suite still does not justify broad generalization or SOTA claims. The bootstrap interval exposes variation but does not overcome the small number of held-out families.
 
 ## Full-cost treatment
 
