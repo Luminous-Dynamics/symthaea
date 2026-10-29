@@ -260,6 +260,18 @@ fn validate_series(snapshots: &[Snapshot]) -> Vec<String> {
     let mut errors = Vec::new();
     let mut ids = BTreeSet::new();
 
+    if let Some(first) = snapshots.first() {
+        if first.snapshot.sequence_index != 0 {
+            errors.push(format!(
+                "first snapshot sequence_index must be 0, found {}",
+                first.snapshot.sequence_index
+            ));
+        }
+        if first.snapshot.previous_graph_sha256.is_some() {
+            errors.push("first snapshot must not declare previous_graph_sha256".into());
+        }
+    }
+
     for (index, snapshot) in snapshots.iter().enumerate() {
         errors.extend(validate_snapshot(snapshot, index));
         if !ids.insert(snapshot.snapshot.snapshot_id.clone()) {
@@ -542,6 +554,13 @@ mod tests {
         assert_eq!(report.snapshot_count, 3);
         assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
         assert_eq!(report.query_metrics_stable_in_tail, Some(true));
+    }
+
+    #[test]
+    fn series_starting_after_zero_fails_closed() {
+        let later = snapshot(4, 4, &"4".repeat(64), Some(&"3".repeat(64)), 1.0, 4.0);
+        let report = build_report(&jsonl(&[later.clone()]), &[later], &args(2));
+        assert!(report.errors.iter().any(|error| error.contains("first snapshot sequence_index must be 0")));
     }
 
     #[test]
