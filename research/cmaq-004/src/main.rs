@@ -86,7 +86,7 @@ impl Evaluator {
             let max_probes = usizev(&r[3], "max_probes")?;
             let budget = i64v(&r[4], "probe_budget_milli")?;
             if max_probes > MAX_PROBES || budget < 0 { return Err(format!("invalid budget for {id}")); }
-            if cases.insert(id.clone(), Case { group: group.clone(), initial, max_probes, budget }).is_some() {
+            if cases.insert(id.to_string(), Case { group: group.clone(), initial, max_probes, budget }).is_some() {
                 return Err(format!("duplicate case {id}"));
             }
             groups.entry(group).or_default().push(id);
@@ -105,7 +105,7 @@ impl Evaluator {
             if !cases.contains_key(&id) { return Err(format!("unknown action case {id}")); }
             let action = u32v(&r[1], "action_id")?;
             let value = Action { reward: i64v(&r[2], "reward_milli")?, safe: boolv(&r[3], "action safe")? };
-            if actions.insert((id.clone(), action), value).is_some() { return Err(format!("duplicate action {id}/{action}")); }
+            if actions.insert((id.to_string(), action), value).is_some() { return Err(format!("duplicate action {id}/{action}")); }
         }
         for id in cases.keys() {
             if !actions.keys().any(|(cid, _)| cid == id) { return Err(format!("case {id} has no actions")); }
@@ -120,7 +120,7 @@ impl Evaluator {
             let cost = i64v(&r[3], "probe cost")?;
             if cost < 0 { return Err("probe costs cannot be negative".to_owned()); }
             let value = Probe { observation, cost, safe: boolv(&r[4], "probe safe")? };
-            if probes.insert((id.clone(), probe_id.clone()), value).is_some() {
+            if probes.insert((id.to_string(), probe_id.to_string()), value).is_some() {
                 return Err(format!("duplicate probe {id}/{probe_id}"));
             }
         }
@@ -135,7 +135,7 @@ impl Evaluator {
             let observed = token(&r[4], "observed signal")?;
             if !cases.contains_key(&id) { return Err(format!("unknown trace case {id}")); }
             if step == 0 || step > MAX_PROBES { return Err(format!("invalid probe step {step}")); }
-            if !seen_steps.insert((id.clone(), policy.clone(), step)) {
+            if !seen_steps.insert((id.to_string(), policy.clone(), step)) {
                 return Err(format!("duplicate step {id}/{policy}/{step}"));
             }
             events.entry((id, policy)).or_default().push(Event { step, probe, observed });
@@ -154,27 +154,31 @@ impl Evaluator {
             let policy = token(&r[1], "policy_id")?;
             let action = u32v(&r[2], "chosen action")?;
             if !cases.contains_key(&id) { return Err(format!("unknown decision case {id}")); }
-            if !actions.contains_key(&(id.clone(), action)) { return Err(format!("unavailable action {id}/{action}")); }
-            if decisions.insert((id.clone(), policy.clone()), action).is_some() { return Err(format!("duplicate decision {id}/{policy}")); }
+            if !actions.contains_key(&(id.to_string(), action)) { return Err(format!("unavailable action {id}/{action}")); }
+            if decisions.insert((id.to_string(), policy.clone()), action).is_some() { return Err(format!("duplicate decision {id}/{policy}")); }
             policy_set.insert(policy);
         }
         if policy_set.is_empty() { return Err("decision trace cannot be empty".to_owned()); }
         for ((id, policy), es) in &events {
-            if !decisions.contains_key(&(id.clone(), policy.clone())) { return Err(format!("probe trace has no decision {id}/{policy}")); }
+            if !decisions.contains_key(&(id.to_string(), policy.clone())) { return Err(format!("probe trace has no decision {id}/{policy}")); }
             for e in es {
-                if !probes.contains_key(&(id.clone(), e.probe.clone())) { return Err(format!("unknown probe {}/{}/{}", id, policy, e.probe)); }
+                if !probes.contains_key(&(id.to_string(), e.probe.clone())) { return Err(format!("unknown probe {}/{}/{}", id, policy, e.probe)); }
             }
         }
         for policy in &policy_set {
             for id in cases.keys() {
-                if !decisions.contains_key(&(id.clone(), policy.clone())) { return Err(format!("policy {policy} misses case {id}")); }
+                if !decisions.contains_key(&(id.to_string(), policy.clone())) { return Err(format!("policy {policy} misses case {id}")); }
             }
         }
 
         let mut static_baseline = HashMap::new();
         for (group, ids) in &groups {
-            let mut candidates = actions.keys().filter(|(id, _)| cases[id].group == *group)
-                .map(|(_, aid)| *aid).collect::<Vec<_>>();
+            let mut candidates = Vec::new();
+            for case_id in ids {
+                for (candidate_id, action_id) in actions.keys() {
+                    if candidate_id == case_id { candidates.push(*action_id); }
+                }
+            }
             candidates.sort_unstable();
             candidates.dedup();
             let mut best: Option<(u32, i64)> = None;
@@ -182,7 +186,7 @@ impl Evaluator {
                 let mut sum = 0_i128;
                 let mut safe_everywhere = true;
                 for id in ids {
-                    match actions.get(&(id.clone(), aid)) {
+                    match actions.get(&(id.to_string(), aid)) {
                         Some(a) if a.safe => sum += a.reward as i128,
                         _ => { safe_everywhere = false; break; }
                     }
@@ -193,9 +197,9 @@ impl Evaluator {
                 }
             }
             for id in ids {
-                let baseline = best.and_then(|(aid, _)| actions.get(&(id.clone(), aid)))
+                let baseline = best.and_then(|(aid, _)| actions.get(&(id.to_string(), aid)))
                     .map(|a| if a.safe { a.reward } else { 0 }).unwrap_or(0);
-                static_baseline.insert(id.clone(), baseline);
+                static_baseline.insert(id.to_string(), baseline);
             }
         }
 
@@ -212,12 +216,12 @@ impl Evaluator {
         ids.sort();
         for id in ids {
             let case = &self.cases[id];
-            let aid = self.decisions[&(id.clone(), policy.to_owned())];
-            let action = &self.actions[&(id.clone(), aid)];
-            let events = self.events.get(&(id.clone(), policy.to_owned())).map(Vec::as_slice).unwrap_or(&[]);
+            let aid = self.decisions[&(id.to_string(), policy.to_owned())];
+            let action = &self.actions[&(id.to_string(), aid)];
+            let events = self.events.get(&(id.to_string(), policy.to_owned())).map(Vec::as_slice).unwrap_or(&[]);
             let mut cost = 0_i128;
             for e in events {
-                let p = &self.probes[&(id.clone(), e.probe.clone())];
+                let p = &self.probes[&(id.to_string(), e.probe.clone())];
                 cost += p.cost as i128;
                 s.probe_count += 1;
                 if !p.safe { s.unsafe_probes += 1; s.hard_pass = false; }
@@ -228,8 +232,10 @@ impl Evaluator {
             if !action.safe { s.unsafe_actions += 1; s.hard_pass = false; }
             let net = (if action.safe { action.reward as i128 } else { 0 }) - cost;
             let oracle = self.actions.iter()
-                .filter(|((cid, _), a)| cid == id && a.safe)
-                .map(|(_, a)| a.reward).max().unwrap_or(0).max(0);
+                .filter_map(|((cid, _), a)| {
+                    if cid.as_str() == id.as_str() && a.safe { Some(a.reward) } else { None }
+                })
+                .max().unwrap_or(0).max(0);
             s.net += net;
             s.regret += (oracle as i128 - net).max(0) as u128;
             s.cost += cost;
