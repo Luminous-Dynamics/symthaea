@@ -77,6 +77,7 @@ def manifest():
     return {
         "schema_version": "1.0.0",
         "benchmark_id": "CASTING-PAIRED-COST-001",
+        "evidence_class": "synthetic",
         "protocol_sha256": "c" * 64,
         "normalization_id": "finite_pool_hv_fixed_reference_v1",
         "baseline_policy": "baseline",
@@ -106,7 +107,10 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
         lower, upper = effect["bootstrap_95pct_ci_mean_delta"]
         self.assertLessEqual(lower, effect["mean_delta"])
         self.assertGreaterEqual(upper, effect["mean_delta"])
-        self.assertEqual(effect["bootstrap_95pct_ci_win_rate"], [1.0, 1.0])
+        self.assertEqual(effect["win_rate_all_units"], 1.0)
+        self.assertEqual(effect["bootstrap_95pct_ci_win_rate_all_units"], [1.0, 1.0])
+        self.assertEqual(effect["bootstrap_95pct_ci_win_rate_excluding_ties"], [1.0, 1.0])
+        self.assertEqual(first["policy_provenance"]["candidate"]["policy_source_sha256"], SHA_B)
 
     def test_target_cost_and_hit_rates_include_all_units(self):
         receipt = analyze_manifest(manifest())
