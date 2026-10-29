@@ -1,0 +1,71 @@
+name: VIS-DVPC-050 sequential logging OPE falsification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/vision-dvpc-050-sequential-logging-ope.rs"
+      - "docs/research/VIS_DVPC_050_SEQUENTIAL_LOGGING_OPE_V0.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-050-sequential-logging-ope.rs"
+      - "docs/research/VIS_DVPC_050_SEQUENTIAL_LOGGING_OPE_V0.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact VIS-DVPC-050 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run falsification tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-050-sequential-logging-ope.rs -o /tmp/vis-dvpc-050-tests
+          /tmp/vis-dvpc-050-tests
+      - name: Verify deterministic replay and row schema
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-050-sequential-logging-ope.rs -o /tmp/vis-dvpc-050
+          /tmp/vis-dvpc-050 --smoke > /tmp/vis-dvpc-050-smoke-a.tsv
+          /tmp/vis-dvpc-050 --smoke > /tmp/vis-dvpc-050-smoke-b.tsv
+          cmp /tmp/vis-dvpc-050-smoke-a.tsv /tmp/vis-dvpc-050-smoke-b.tsv
+          awk -F '\t' '$1 == "METRIC" { if (NF != 15) bad=1; n++ } END { if (n != 288 || bad) exit 1 }' /tmp/vis-dvpc-050-smoke-a.tsv
+          awk -F '\t' '$1 == "METRIC" && $2 == "structural_zero_support" { if ($7 != "0.000000" || $8 != "1.000000") bad=1; n++ } END { if (n != 72 || bad) exit 1 }' /tmp/vis-dvpc-050-smoke-a.tsv
+          ! grep '^CERTIFICATE\|^CONFIDENCE_INTERVAL\|^SEQUENCE_COVERAGE' /tmp/vis-dvpc-050-smoke-a.tsv
+      - name: Run full paired sequential logging panel
+        run: |
+          /tmp/vis-dvpc-050 > /tmp/vis-dvpc-050-full.tsv
+          awk -F '\t' '$1 == "METRIC" { if (NF != 15) bad=1; n++ } END { if (n != 288 || bad) exit 1 }' /tmp/vis-dvpc-050-full.tsv
+          awk -F '\t' '$1 == "METRIC" && $2 == "structural_zero_support" { if ($7 != "0.000000" || $8 != "1.000000") bad=1; n++ } END { if (n != 72 || bad) exit 1 }' /tmp/vis-dvpc-050-full.tsv
+          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-050-full.tsv)" = "7"
+      - name: Create exact-source and output SHA-256 receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          {
+            printf 'VIS_DVPC_050_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-050-sequential-logging-ope.rs docs/research/VIS_DVPC_050_SEQUENTIAL_LOGGING_OPE_V0.md /tmp/vis-dvpc-050-smoke-a.tsv /tmp/vis-dvpc-050-full.tsv
+          } > /tmp/vis-dvpc-050-receipt.tsv
+          cat /tmp/vis-dvpc-050-receipt.tsv
+      - name: Publish deterministic benchmark outputs and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-050-sequential-logging-ope
+          path: |
+            /tmp/vis-dvpc-050-smoke-a.tsv
+            /tmp/vis-dvpc-050-full.tsv
+            /tmp/vis-dvpc-050-receipt.tsv
+          retention-days: 90
