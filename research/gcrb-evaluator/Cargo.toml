@@ -6,9 +6,9 @@ publish = false
 description = "Isolated research evaluator for the public-development Governance Capture-Resistance Benchmark fixture"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = "0.10"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
 
 [workspace]
 resolver = "2"
