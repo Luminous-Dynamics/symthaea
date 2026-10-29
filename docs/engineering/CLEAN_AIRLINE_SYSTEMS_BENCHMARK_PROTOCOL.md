@@ -346,3 +346,39 @@ The 2026 INFORMS Lufthansa Group/SWISS case documents a deployed production syst
 - **Gate E — climate value:** report lifecycle CO2e per completed passenger-km, total CO2e and non-CO2 indicators separately. A lower cost alone is not a clean-airline result.
 
 If exact parity is impossible because the source material omits essential variables, preserve that limitation and move to a clearly labelled synthetic benchmark. Never reverse-engineer undocumented assumptions solely to reproduce a headline gain.
+
+
+## 14. Next competitive frontier — flexibility portfolio, policy learning and stakeholder fairness
+
+Additional current research (reviewed 2026-10-29) suggests we should benchmark energy flexibility as a portfolio, not merely a stationary battery.
+
+### Landside vehicle-to-grid (V2G)
+
+A 2026 American Control Conference study jointly schedules electric aircraft apron charging with bidirectional charging of landside EVs. Its model combines a linear program with an aggregate PDE-based EV charging representation and real grid prices, but uses synthetic parking-garage occupancy. It reports up to 32% aircraft-charging cost savings versus its no-V2G baseline, conditional on schedule and EV participation. Source: https://ieeexplore.ieee.org/document/11616483/
+
+**Research implication:** a later energy hub should treat landside EVs, fixed storage and parked aircraft as distinct flexibility resources with individual availability windows, user departure requirements, energy reserves, battery wear costs and export constraints. Do not treat all parked batteries as freely dispatchable. The current V1 explicitly does not implement V2G or grid export.
+
+### Physics-constrained reinforcement learning
+
+A September 2026 IEEE Transactions on Smart Grid paper evaluates physics-based reinforcement learning for an airport thermo-electric microgrid, including e-plane charging, against a classical optimization method on an actual Canadian airport microgrid. The abstract reports near-optimal simulation results and improved convergence stability versus conventional reward-based approaches, but does not provide enough detail in its abstract alone for a numerical apples-to-apples claim. Source: https://ieeexplore.ieee.org/abstract/document/11701290/
+
+**Research implication:** Symthaea can test learned forecasts, warm starts or policies, but the exact/independent optimizer and feasibility verifier must remain the ground-truth gate on tractable cases. Compare convergence/sample efficiency, worst-case feasibility, policy drift, tail regret, runtime and transfer across airports. Do not let an RL reward function override hard operational or safety constraints.
+
+### Multi-stakeholder disruption recovery and fairness
+
+A September 2026 study proposes airline/network-manager collaborative irregular-flight recovery with a fairness-protection mechanism and reports experiments using real operational data. Source: https://www.sciencedirect.com/science/article/abs/pii/S1366554526003169
+
+**Research implication:** whole-airline optimization needs separate fairness and burden-distribution axes, such as delay/cancellation burden across passenger cohorts, airports and collaborating operators. A single airline cost score could merely transfer disruptions to another carrier or network manager. Define the fairness measure and protected constraints before tuning; do not conceal them inside a weighted “social benefit” score.
+
+### Additions to the benchmark vector
+
+Alongside cost, CO2e, service completion, grid peak, curtailment and terminal reserve, later phases should separately report:
+- landed/airside/landside battery flexibility available by time and the portion actually dispatchable under user/mission commitments;
+- battery degradation/warranty cost and reserve/SOC violations (the latter must remain zero);
+- grid peak/demand-charge impact, exports, local congestion and value of flexibility;
+- P50/P95/P99 delay, cancellation and recovery regret;
+- distribution of disruption burden across protected cohorts or network stakeholders;
+- robust feasible-scenario weight versus unresolved weight and scenario-support coverage;
+- learned-policy training samples, wall time, seeds, memory, constraint violations and out-of-airport transfer performance.
+
+These are research dimensions to implement, not metrics the current synthetic slice already measures.
