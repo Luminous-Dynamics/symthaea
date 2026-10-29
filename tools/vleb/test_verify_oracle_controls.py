@@ -7,7 +7,6 @@ import hashlib
 import importlib.util
 import io
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -79,7 +78,7 @@ if __name__ == "__main__":
                 "argv": [sys.executable, "-m", "unittest", "test_contract"],
                 "working_directory": ".",
                 "timeout_seconds": 10,
-                "test_start_pattern": r"Ran \d+ tests?",
+                "test_start_pattern": r"Ran [1-9]\d* tests?",
                 "pass_pattern": r"^OK$",
                 "fail_pattern": r"^FAILED(?: \(|$)",
             }],
