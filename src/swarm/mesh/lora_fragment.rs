@@ -343,6 +343,10 @@ pub struct FragmentAssembler {
     fragments: Vec<Option<[u8; PAYLOAD_SIZE]>>,
     payload_lens: Vec<u8>,
     fec: Option<[u8; PAYLOAD_SIZE]>,
+    /// Whether the caller guarantees expected_payload_size is exact enough to
+    /// reconstruct a missing final data fragment. The legacy MeshReceiver
+    /// disables this because compressed/enveloped payload lengths vary.
+    allow_final_fec_recovery: bool,
 }
 
 impl FragmentAssembler {
@@ -362,24 +366,29 @@ impl FragmentAssembler {
             fragments: vec![None; data_count as usize],
             payload_lens: vec![0; data_count as usize],
             fec: None,
+            allow_final_fec_recovery: true,
         }
     }
 
+    /// Create a legacy receiver assembler when the exact encoded message length
+    /// is not carried on the wire. Single-loss recovery still works for a
+    /// missing non-final data fragment, but recovery of the final data fragment
+    /// is disabled because its original length cannot be inferred safely.
+    pub fn new_without_final_fragment_recovery(
+        thought_id: u16,
+        total_fragments: u8,
+        nominal_payload_size: usize,
+    ) -> Self {
+        let mut assembler = Self::new(thought_id, total_fragments, nominal_payload_size);
+        assembler.allow_final_fec_recovery = false;
+        assembler
+    }
+
     fn layout_is_valid(&self) -> bool {
-        if self.total_fragments < 2 || self.expected_payload_size == 0 {
-            return false;
-        }
-        let Some(rounded_size) = self
-            .expected_payload_size
-            .checked_add(PAYLOAD_SIZE - 1)
-        else {
-            return false;
-        };
-        let expected_data_count = rounded_size / PAYLOAD_SIZE;
-        expected_data_count > 0
-            && expected_data_count <= 254
-            && self.data_count as usize == expected_data_count
-            && self.total_fragments as usize == expected_data_count + 1
+        self.total_fragments >= 2
+            && self.data_count > 0
+            && self.data_count <= 254
+            && self.total_fragments as usize == self.data_count as usize + 1
     }
 
     /// Feed a received fragment. Returns true when the payload is reconstructable.
@@ -404,21 +413,11 @@ impl FragmentAssembler {
             return false;
         }
 
-        let expected_len = if frag.is_fec() || idx + 1 < self.data_count as usize {
-            PAYLOAD_SIZE
-        } else {
-            let Some(prefix_len) = (self.data_count as usize - 1).checked_mul(PAYLOAD_SIZE)
-            else {
-                return false;
-            };
-            let Some(last_len) = self.expected_payload_size.checked_sub(prefix_len) else {
-                return false;
-            };
-            last_len
-        };
-        if expected_len == 0
-            || expected_len > PAYLOAD_SIZE
-            || frag.payload_len as usize != expected_len
+        // Non-final data shards and parity are always full-size. The final
+        // data shard can be shorter because legacy frames do not carry the
+        // exact encoded message length.
+        if (frag.is_fec() || idx + 1 < self.data_count as usize)
+            && frag.payload_len as usize != PAYLOAD_SIZE
         {
             return false;
         }
@@ -451,12 +450,38 @@ impl FragmentAssembler {
             .filter(|&&received| received)
             .count();
 
-        // All data fragments present.
+        // All data fragments present; their observed lengths are authoritative.
         if data_received == data_count {
             return true;
         }
-        // Exactly one missing + FEC available -> recoverable.
-        data_received + 1 == data_count && self.fec.is_some()
+        if data_received + 1 != data_count || self.fec.is_none() {
+            return false;
+        }
+
+        // A missing non-final shard has a known full length. A missing final
+        // shard can only be trimmed exactly when the caller guarantees the
+        // expected payload size is authoritative.
+        let Some(missing) = self.received[..data_count]
+            .iter()
+            .position(|&received| !received)
+        else {
+            return false;
+        };
+        if missing + 1 == data_count {
+            if !self.allow_final_fec_recovery {
+                return false;
+            }
+            let Some(prefix_len) = (data_count - 1).checked_mul(PAYLOAD_SIZE) else {
+                return false;
+            };
+            let Some(last_len) = self.expected_payload_size.checked_sub(prefix_len) else {
+                return false;
+            };
+            if last_len == 0 || last_len > PAYLOAD_SIZE {
+                return false;
+            }
+        }
+        true
     }
 
     /// Number of fragments not yet received.
