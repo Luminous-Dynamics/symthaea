@@ -47,7 +47,7 @@ def _run(unit, policy, curve, *, completed=True, spent=10, shifts=None, decision
         "decision": decision,
         "curve": _curve(curve),
         "shift_results": shifts,
-        "run_receipt_sha256": "e" * 64 if policy == "baseline" else "f" * 64,
+        "run_receipt_sha256": hashlib.sha256(f"{unit}:{policy}".encode()).hexdigest(),
         "policy_source_sha256": SHA_A if policy == "baseline" else SHA_B,
         "policy_config_sha256": "d" * 64 if policy == "baseline" else "e" * 64,
         "environment_sha256": "1" * 64,
@@ -174,6 +174,24 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
         doc = manifest()
         doc["runs"][1]["shift_results"].pop()
         with self.assertRaisesRegex(ValueError, "shift coverage mismatch"):
+            analyze_manifest(doc)
+
+    def test_rejects_policy_source_or_config_drift_across_paired_units(self):
+        doc = manifest()
+        for row in doc["runs"]:
+            if row["unit_id"] == "u3" and row["policy_id"] == "candidate":
+                row["policy_source_sha256"] = "9" * 64
+                break
+        with self.assertRaisesRegex(ValueError, "provenance changes across units"):
+            analyze_manifest(doc)
+
+    def test_rejects_different_cost_zero_quality_within_pair(self):
+        doc = manifest()
+        for row in doc["runs"]:
+            if row["unit_id"] == "u1" and row["policy_id"] == "candidate":
+                row["curve"][0]["quality"] = 0.1
+                break
+        with self.assertRaisesRegex(ValueError, "same cost-zero quality"):
             analyze_manifest(doc)
 
     def test_rejects_nonmonotonic_cost_points_or_curve_beyond_budget(self):
