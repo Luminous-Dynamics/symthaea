@@ -82,6 +82,234 @@ pub enum ModelError {
 }
 
 
+/// Direction assigned to a block in an IIT 4.x directed set partition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PartitionDirection {
+    /// Sever connections from the complement into this block.
+    Cause,
+    /// Sever connections from this block into the complement.
+    Effect,
+    /// Sever connections in both directions across this block boundary.
+    Bidirectional,
+}
+
+/// One directed system-partition candidate in candidate-system-local coordinates.
+///
+/// cut_matrix[source * n + target] == true means source -> target is severed.
+/// parts stores the same blocks in global model unit indices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectedSystemPartition {
+    candidate_system: Vec<usize>,
+    parts: Vec<Vec<usize>>,
+    directions: Vec<PartitionDirection>,
+    cut_matrix: Vec<bool>,
+    total_cut: bool,
+}
+
+impl DirectedSystemPartition {
+    pub fn candidate_system(&self) -> &[usize] { &self.candidate_system }
+    pub fn parts(&self) -> &[Vec<usize>] { &self.parts }
+    pub fn directions(&self) -> &[PartitionDirection] { &self.directions }
+    pub fn cut_matrix(&self) -> &[bool] { &self.cut_matrix }
+    pub fn is_total_cut(&self) -> bool { self.total_cut }
+}
+
+/// Failures from directed system-partition enumeration.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum PartitionEnumerationError {
+    #[error("candidate system must contain at least one unit")]
+    EmptyCandidateSystem,
+    #[error("candidate-system unit {unit} is outside 0..{unit_count}")]
+    UnitOutOfRange { unit: usize, unit_count: usize },
+    #[error("candidate system contains duplicate unit {unit}")]
+    DuplicateUnit { unit: usize },
+    #[error("directed partition enumeration exceeded its budget of {max_combinations} block-direction assignments")]
+    BudgetExceeded { max_combinations: usize },
+}
+
+/// Enumerate the IIT 4.x DIRECTED_SET_PARTITION cut family.
+///
+/// For every non-trivial set partition, each block independently receives a
+/// cause, effect, or bidirectional direction. Cause cuts complement -> block;
+/// Effect cuts block -> complement; Bidirectional cuts both. Outputs are
+/// deduplicated by the local cut matrix, as PyPhi's unique_everseen does for
+/// its directed-set-partition candidates.
+///
+/// TotalCut severs every connection, including self-loops. It is always included
+/// for a one-unit system and optional for larger systems. Ordinary directional
+/// partitions preserve self-loops.
+///
+/// max_combinations limits block-direction assignments visited, not just unique
+/// output cuts. Exceeding the budget returns an error and no partial list, so an
+/// incomplete list cannot be mistaken for exact enumeration.
+///
+/// This is a candidate generator, not an IIT phi_s calculator.
+pub fn enumerate_iit4_system_partitions(
+    candidate_system: &[usize],
+    unit_count: usize,
+    include_total_cut: bool,
+    max_combinations: usize,
+) -> Result<Vec<DirectedSystemPartition>, PartitionEnumerationError> {
+    if candidate_system.is_empty() {
+        return Err(PartitionEnumerationError::EmptyCandidateSystem);
+    }
+
+    let mut canonical_system = candidate_system.to_vec();
+    canonical_system.sort_unstable();
+    for (position, unit) in canonical_system.iter().copied().enumerate() {
+        if unit >= unit_count {
+            return Err(PartitionEnumerationError::UnitOutOfRange { unit, unit_count });
+        }
+        if position > 0 && canonical_system[position - 1] == unit {
+            return Err(PartitionEnumerationError::DuplicateUnit { unit });
+        }
+    }
+
+    let n = canonical_system.len();
+    let mut output = Vec::new();
+    let mut seen_cuts: std::collections::HashSet<Vec<bool>> =
+        std::collections::HashSet::new();
+
+    if n == 1 || include_total_cut {
+        let matrix = vec![true; n * n];
+        seen_cuts.insert(matrix.clone());
+        output.push(DirectedSystemPartition {
+            candidate_system: canonical_system.clone(),
+            parts: vec![canonical_system.clone()],
+            directions: vec![PartitionDirection::Bidirectional],
+            cut_matrix: matrix,
+            total_cut: true,
+        });
+    }
+
+    if n == 1 {
+        return Ok(output);
+    }
+
+    let mut blocks = Vec::<Vec<usize>>::new();
+    let mut visited_combinations = 0usize;
+    enumerate_set_partitions_recursive(
+        0,
+        n,
+        &canonical_system,
+        &mut blocks,
+        &mut output,
+        &mut seen_cuts,
+        &mut visited_combinations,
+        max_combinations,
+    )?;
+    Ok(output)
+}
+
+/// Restricted-growth recursion enumerates each unordered set partition once.
+fn enumerate_set_partitions_recursive(
+    position: usize,
+    n: usize,
+    candidate_system: &[usize],
+    blocks: &mut Vec<Vec<usize>>,
+    output: &mut Vec<DirectedSystemPartition>,
+    seen_cuts: &mut std::collections::HashSet<Vec<bool>>,
+    visited_combinations: &mut usize,
+    max_combinations: usize,
+) -> Result<(), PartitionEnumerationError> {
+    if position == n {
+        if blocks.len() <= 1 {
+            return Ok(()); // PyPhi's set-partition path omits the trivial block.
+        }
+        let mut directions = Vec::with_capacity(blocks.len());
+        return enumerate_block_directions_recursive(
+            0, candidate_system, blocks, &mut directions, output, seen_cuts,
+            visited_combinations, max_combinations,
+        );
+    }
+
+    // Assign the next unit to each existing block, then to a new final block.
+    for block_index in 0..=blocks.len() {
+        if block_index == blocks.len() {
+            blocks.push(vec![position]);
+            enumerate_set_partitions_recursive(
+                position + 1, n, candidate_system, blocks, output, seen_cuts,
+                visited_combinations, max_combinations,
+            )?;
+            blocks.pop();
+        } else {
+            blocks[block_index].push(position);
+            enumerate_set_partitions_recursive(
+                position + 1, n, candidate_system, blocks, output, seen_cuts,
+                visited_combinations, max_combinations,
+            )?;
+            blocks[block_index].pop();
+        }
+    }
+    Ok(())
+}
+
+fn enumerate_block_directions_recursive(
+    block_index: usize,
+    candidate_system: &[usize],
+    blocks: &[Vec<usize>],
+    directions: &mut Vec<PartitionDirection>,
+    output: &mut Vec<DirectedSystemPartition>,
+    seen_cuts: &mut std::collections::HashSet<Vec<bool>>,
+    visited_combinations: &mut usize,
+    max_combinations: usize,
+) -> Result<(), PartitionEnumerationError> {
+    if block_index == blocks.len() {
+        if *visited_combinations >= max_combinations {
+            return Err(PartitionEnumerationError::BudgetExceeded { max_combinations });
+        }
+        *visited_combinations += 1;
+
+        let n = candidate_system.len();
+        let mut cut_matrix = vec![false; n * n];
+        for (block, direction) in blocks.iter().zip(directions.iter().copied()) {
+            for source in 0..n {
+                for target in 0..n {
+                    let source_inside = block.contains(&source);
+                    let target_inside = block.contains(&target);
+                    let cut = match direction {
+                        PartitionDirection::Cause => !source_inside && target_inside,
+                        PartitionDirection::Effect => source_inside && !target_inside,
+                        PartitionDirection::Bidirectional => source_inside != target_inside,
+                    };
+                    if cut {
+                        cut_matrix[source * n + target] = true;
+                    }
+                }
+            }
+        }
+
+        if seen_cuts.insert(cut_matrix.clone()) {
+            let parts = blocks.iter().map(|block| {
+                block.iter().map(|local| candidate_system[*local]).collect()
+            }).collect();
+            output.push(DirectedSystemPartition {
+                candidate_system: candidate_system.to_vec(),
+                parts,
+                directions: directions.clone(),
+                cut_matrix,
+                total_cut: false,
+            });
+        }
+        return Ok(());
+    }
+
+    for direction in [
+        PartitionDirection::Cause,
+        PartitionDirection::Effect,
+        PartitionDirection::Bidirectional,
+    ] {
+        directions.push(direction);
+        enumerate_block_directions_recursive(
+            block_index + 1, candidate_system, blocks, directions, output, seen_cuts,
+            visited_combinations, max_combinations,
+        )?;
+        directions.pop();
+    }
+    Ok(())
+}
+
+
 /// Errors in probability-repertoire construction.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum RepertoireError {
@@ -1051,6 +1279,70 @@ mod tests {
         for (left, right) in original_cause.iter().zip(&permuted_cause) {
             assert!((left - right).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn directed_set_partition_for_two_units_matches_three_unique_cross_edge_cuts() {
+        let partitions = enumerate_iit4_system_partitions(&[0, 1], 2, false, 100).unwrap();
+        assert_eq!(partitions.len(), 3);
+        assert!(partitions.iter().all(|p| !p.is_total_cut()));
+        let mut matrices = partitions.iter().map(|p| p.cut_matrix().to_vec()).collect::<Vec<_>>();
+        matrices.sort();
+        matrices.dedup();
+        assert_eq!(matrices.len(), 3);
+        for matrix in matrices {
+            assert!(!matrix[0]);
+            assert!(!matrix[3]); // ordinary cuts preserve self-loops
+        }
+    }
+
+    #[test]
+    fn total_cut_includes_self_loops_and_is_optional_for_larger_systems() {
+        let without = enumerate_iit4_system_partitions(&[0, 1], 2, false, 100).unwrap();
+        let with = enumerate_iit4_system_partitions(&[0, 1], 2, true, 100).unwrap();
+        assert_eq!(with.len(), without.len() + 1);
+        assert!(with[0].is_total_cut());
+        assert_eq!(with[0].cut_matrix(), &[true, true, true, true]);
+
+        let singleton = enumerate_iit4_system_partitions(&[0], 1, false, 0).unwrap();
+        assert_eq!(singleton.len(), 1);
+        assert!(singleton[0].is_total_cut());
+    }
+
+    #[test]
+    fn partition_enumeration_is_invariant_to_candidate_input_order() {
+        let ordered = enumerate_iit4_system_partitions(&[0, 1, 2], 3, false, 10_000).unwrap();
+        let reversed = enumerate_iit4_system_partitions(&[2, 1, 0], 3, false, 10_000).unwrap();
+        assert_eq!(ordered, reversed);
+    }
+
+    #[test]
+    fn partition_enumeration_rejects_invalid_candidates_and_budget_exhaustion() {
+        assert!(matches!(
+            enumerate_iit4_system_partitions(&[], 3, false, 100),
+            Err(PartitionEnumerationError::EmptyCandidateSystem)
+        ));
+        assert!(matches!(
+            enumerate_iit4_system_partitions(&[0, 0], 2, false, 100),
+            Err(PartitionEnumerationError::DuplicateUnit { unit: 0 })
+        ));
+        assert!(matches!(
+            enumerate_iit4_system_partitions(&[2], 2, false, 100),
+            Err(PartitionEnumerationError::UnitOutOfRange { unit: 2, unit_count: 2 })
+        ));
+        assert!(matches!(
+            enumerate_iit4_system_partitions(&[0, 1, 2], 3, false, 1),
+            Err(PartitionEnumerationError::BudgetExceeded { max_combinations: 1 })
+        ));
+    }
+
+    #[test]
+    fn directed_partition_cuts_follow_cause_effect_direction() {
+        let partitions = enumerate_iit4_system_partitions(&[0, 1], 2, false, 100).unwrap();
+        let cuts = partitions.iter().map(|p| p.cut_matrix()).collect::<Vec<_>>();
+        assert!(cuts.iter().any(|m| *m == [false, true, false, false]));
+        assert!(cuts.iter().any(|m| *m == [false, false, true, false]));
+        assert!(cuts.iter().any(|m| *m == [false, true, true, false]));
     }
 
 }
