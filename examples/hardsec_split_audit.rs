@@ -20,9 +20,12 @@ use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-const HEADER: [&str; 17] = [
+const HEADER: [&str; 20] = [
     "dataset_id",
     "domain",
+    "source_corpus_id",
+    "source_corpus_path",
+    "source_corpus_sha256",
     "source_artifact_id",
     "source_path",
     "source_sha256",
@@ -48,6 +51,9 @@ const DOMAINS: [&str; 2] = ["physical_hpc", "gem5_sim"];
 struct Sample {
     dataset_id: String,
     domain: String,
+    source_corpus_id: String,
+    source_corpus_path: String,
+    source_corpus_sha256: String,
     artifact_id: String,
     source_path: String,
     source_sha256: String,
@@ -67,6 +73,9 @@ struct Sample {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ArtifactBinding {
+    source_corpus_id: String,
+    source_corpus_path: String,
+    source_corpus_sha256: String,
     source_path: String,
     source_sha256: String,
     device_config_id: String,
@@ -79,6 +88,12 @@ struct ArtifactBinding {
     split: String,
     label: String,
     security_outcome: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CorpusBinding {
+    source_path: String,
+    source_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -94,6 +109,7 @@ struct AuditSummary {
     samples: usize,
     artifacts: usize,
     duplicate_content_aliases: usize,
+    corpora: usize,
     train: usize,
     validation: usize,
     test: usize,
@@ -110,7 +126,7 @@ fn main() -> ExitCode {
                     }
                 }
                 println!(
-                    "HARDSEC_SPLIT_AUDIT_OK dataset_id={} domain={} feature_modality={} protocol={} manifest_sha256={} samples={} artifacts={} same_split_duplicate_content_aliases={} train={} validation={} test={}",
+                    "HARDSEC_SPLIT_AUDIT_OK dataset_id={} domain={} feature_modality={} protocol={} manifest_sha256={} samples={} artifacts={} same_split_duplicate_content_aliases={} corpora={} train={} validation={} test={}",
                     summary.dataset_id,
                     summary.domain,
                     summary.feature_modality_id,
@@ -119,6 +135,7 @@ fn main() -> ExitCode {
                     summary.samples,
                     summary.artifacts,
                     summary.duplicate_content_aliases,
+                    summary.corpora,
                     summary.train,
                     summary.validation,
                     summary.test
@@ -244,21 +261,24 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         samples.push(Sample {
             dataset_id: values[0].clone(),
             domain: values[1].clone(),
-            artifact_id: values[2].clone(),
-            source_path: values[3].clone(),
-            source_sha256: values[4].clone(),
-            sample_id: values[5].clone(),
-            program_id: values[6].clone(),
-            execution_id: values[7].clone(),
-            attack_family_id: values[8].clone(),
-            device_config_id: values[9].clone(),
-            capture_config_id: values[10].clone(),
-            counter_set_id: values[11].clone(),
-            feature_modality_id: values[12].clone(),
-            security_outcome: values[13].clone(),
-            split_protocol: values[14].clone(),
-            split: values[15].clone(),
-            label: values[16].clone(),
+            source_corpus_id: values[2].clone(),
+            source_corpus_path: values[3].clone(),
+            source_corpus_sha256: values[4].clone(),
+            artifact_id: values[5].clone(),
+            source_path: values[6].clone(),
+            source_sha256: values[7].clone(),
+            sample_id: values[8].clone(),
+            program_id: values[9].clone(),
+            execution_id: values[10].clone(),
+            attack_family_id: values[11].clone(),
+            device_config_id: values[12].clone(),
+            capture_config_id: values[13].clone(),
+            counter_set_id: values[14].clone(),
+            feature_modality_id: values[15].clone(),
+            security_outcome: values[16].clone(),
+            split_protocol: values[17].clone(),
+            split: values[18].clone(),
+            label: values[19].clone(),
         });
     }
 
@@ -447,6 +467,9 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         }
 
         let binding = ArtifactBinding {
+            source_corpus_id: sample.source_corpus_id.clone(),
+            source_corpus_path: sample.source_corpus_path.clone(),
+            source_corpus_sha256: sample.source_corpus_sha256.clone(),
             source_path: sample.source_path.clone(),
             source_sha256: sample.source_sha256.clone(),
             device_config_id: sample.device_config_id.clone(),
@@ -556,6 +579,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         manifest_sha256,
         samples: samples.len(),
         artifacts: artifact_bindings.len(),
+        corpora: corpus_bindings.len(),
         duplicate_content_aliases: duplicate_content_aliases.len(),
         train: split_counts["train"],
         validation: split_counts["validation"],
