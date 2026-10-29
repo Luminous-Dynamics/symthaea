@@ -670,7 +670,7 @@ fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditRepor
     let dataset = snapshots.first().map(|snapshot| snapshot.dataset.clone());
     let query_id = snapshots.first().map(|snapshot| snapshot.query_evidence.query_id.clone());
     AuditReport {
-        schema_version: 1,
+        schema_version: 2,
         tool: "connectome-stopping-audit",
         input_sha256: sha256(bytes),
         snapshot_count: snapshots.len(),
@@ -881,6 +881,7 @@ mod tests {
         let bytes = jsonl(&[a.clone(), b.clone(), c.clone()]);
         let snapshots = parse_jsonl(&bytes).unwrap();
         let report = build_report(&bytes, &snapshots, &args(3));
+        assert_eq!(report.schema_version, 2);
         assert_eq!(report.status, "VALIDATED_NOT_STOPPED");
         assert_eq!(report.recommendation, "CONTINUE_REVIEW");
         assert_eq!(report.snapshot_count, 3);
