@@ -224,14 +224,17 @@ def run_suite(root: Path, *, timeout_seconds: int) -> dict[str, Any]:
             "returncode": None,
             "timed_out": True,
             "tests_started": False,
+            "failure_test_names": [],
             "output_sha256": digest(str(output).encode("utf-8")),
             "output_tail": str(output)[-3000:],
         }
     output = completed.stdout
+    failure_names = sorted(set(re.findall(r"^(?:FAIL|ERROR): (test_[A-Za-z0-9_]+) \\(", output, re.MULTILINE)))
     return {
         "returncode": completed.returncode,
         "timed_out": False,
         "tests_started": RAN_TESTS.search(output) is not None,
+        "failure_test_names": failure_names,
         "output_sha256": digest(output.encode("utf-8")),
         "output_tail": output[-4000:] if completed.returncode != 0 else None,
     }
@@ -331,12 +334,7 @@ def run_mutation_campaign(
 
             suite = run_suite(mutant_root, timeout_seconds=timeout_seconds)
             result["suite"] = suite
-            expected_failure = "FAIL: " + mutation["expected_failure_test"] + " ("
-            expected_error = "ERROR: " + mutation["expected_failure_test"] + " ("
-            targeted_failure_seen = (
-                suite["output_tail"] is not None
-                and (expected_failure in suite["output_tail"] or expected_error in suite["output_tail"])
-            )
+            targeted_failure_seen = mutation["expected_failure_test"] in suite.get("failure_test_names", [])
             if suite["timed_out"] or not suite["tests_started"]:
                 result["status"] = "invalid"
                 result["reason"] = "mutated suite timed out or did not demonstrably start"
