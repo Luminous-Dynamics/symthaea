@@ -96,7 +96,8 @@
       "tolerance": {
         "metric": "feature_distance",
         "max_deviation": 0.05,
-        "unit": "normalized-feature-distance"
+        "unit": "normalized-feature-distance",
+        "calibration_id": "CALIBRATION-PLACEHOLDER-NOT-VALIDATED"
       },
       "critical": true
     }
@@ -128,5 +129,5 @@
     "on_detector_out_of_domain": "abstain",
     "on_measurement_uncertainty": "abstain"
   },
-  "notes": "Illustrative schema fixture only. All hashes, renderer/version strings, and the acoustic threshold are placeholders, not measurements, evidence, or validated defaults. Replace them with real content commitments and calibrated detector thresholds before any benchmark run."
+  "notes": "Illustrative schema fixture only. All hashes, renderer/version strings, calibration ID, and the acoustic threshold are placeholders, not measurements, evidence, or validated defaults. Replace them with real content commitments and calibrated detector thresholds before any benchmark run."
 }
