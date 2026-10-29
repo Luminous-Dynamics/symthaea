@@ -1,0 +1,251 @@
+{
+  "schema": "symthaea-constrained-prior-polytope-summary-v1",
+  "date": "2026-10-28",
+  "status": "LOCAL_SYNTHETIC_RUN_SOURCE_TEST_BLOB_MISMATCH_NOT_EXACT_HEAD_QUALIFICATION",
+  "model": {
+    "latent_hypotheses": 16,
+    "policy_trees": 8,
+    "horizon": 2,
+    "objectives": [
+      "graph",
+      "kernel",
+      "joint"
+    ],
+    "prior_floor": 0.005,
+    "ambiguity_sets": {
+      "bounded_marginals": {
+        "graph_marginal_each": [
+          0.1,
+          0.4
+        ],
+        "kernel_marginal_each": [
+          0.1,
+          0.4
+        ],
+        "diagonal_mass": [
+          0.1,
+          0.6
+        ],
+        "antidiagonal_mass": [
+          0.1,
+          0.6
+        ],
+        "legacy_priors_inside": 3
+      },
+      "contains_all_legacy_priors": {
+        "graph_marginal_each": [
+          0.05,
+          0.6
+        ],
+        "kernel_marginal_each": [
+          0.05,
+          0.6
+        ],
+        "diagonal_mass": [
+          0.1,
+          0.6
+        ],
+        "antidiagonal_mass": [
+          0.1,
+          0.6
+        ],
+        "legacy_priors_inside": 6
+      }
+    }
+  },
+  "rows": [
+    {
+      "ambiguity_set": "bounded_marginals",
+      "objective": "graph",
+      "constrained_value_bits": 1.6900351285540065,
+      "legacy_policy_worst_case_bits": 1.6900351285540063,
+      "legacy_policy_regret_bits": 0,
+      "full_simplex_value_bits": 1.8152633354338663,
+      "certificate_gap_bits": 2.000000165480742e-9
+    },
+    {
+      "ambiguity_set": "bounded_marginals",
+      "objective": "kernel",
+      "constrained_value_bits": 1.7329176193046598,
+      "legacy_policy_worst_case_bits": 1.7329176193046611,
+      "legacy_policy_regret_bits": 1.3322676295501878e-15,
+      "full_simplex_value_bits": 1.8539507491881815,
+      "certificate_gap_bits": 1.999999721391532e-9
+    },
+    {
+      "ambiguity_set": "bounded_marginals",
+      "objective": "joint",
+      "constrained_value_bits": 3.670224151142573,
+      "legacy_policy_worst_case_bits": 3.6864215264784983,
+      "legacy_policy_regret_bits": 0.016197375335925468,
+      "full_simplex_value_bits": 3.794190179806491,
+      "certificate_gap_bits": 1.999999721391532e-9
+    },
+    {
+      "ambiguity_set": "contains_all_legacy_priors",
+      "objective": "graph",
+      "constrained_value_bits": 1.7480789690826999,
+      "legacy_policy_worst_case_bits": 1.7480789690826999,
+      "legacy_policy_regret_bits": 0,
+      "full_simplex_value_bits": 1.8152633354338663,
+      "certificate_gap_bits": 1.999999943436137e-9
+    },
+    {
+      "ambiguity_set": "contains_all_legacy_priors",
+      "objective": "kernel",
+      "constrained_value_bits": 1.7896651076498444,
+      "legacy_policy_worst_case_bits": 1.7896651076498458,
+      "legacy_policy_regret_bits": 1.3322676295501878e-15,
+      "full_simplex_value_bits": 1.8539507491881815,
+      "certificate_gap_bits": 1.999999943436137e-9
+    },
+    {
+      "ambiguity_set": "contains_all_legacy_priors",
+      "objective": "joint",
+      "constrained_value_bits": 3.7273718790559807,
+      "legacy_policy_worst_case_bits": 3.7752659095136814,
+      "legacy_policy_regret_bits": 0.04789403045770069,
+      "full_simplex_value_bits": 3.794190179806491,
+      "certificate_gap_bits": 2.0000014977483715e-9
+    }
+  ],
+  "verification": {
+    "local_combined_tests": "17/17_PASS",
+    "environment": {
+      "python": "3.13.5",
+      "numpy": "2.3.5",
+      "scipy": "1.17.0"
+    },
+    "local_source": {
+      "path": "validation/constrained_prior_polytope_benchmark.py",
+      "sha256": "0744255d0c42760d795a3d8639b8c3c6b001af649ee88e860301065c896c8400",
+      "git_blob": "8c68d2b8d65ef6586dd1234b293176157c17fb3a"
+    },
+    "committed_source_at_write_time": {
+      "path": "validation/constrained_prior_polytope_benchmark.py",
+      "git_blob": "4d6dd29fbdf09de10cdfe7cba0c403a7d5ba640b",
+      "byte_identical_to_local": false
+    },
+    "local_test": {
+      "path": "validation/test_constrained_prior_polytope_benchmark.py",
+      "sha256": "b114dac568eaf1d76bc317011fe530cb5f01346bb7206f509fa3e29e2455c607",
+      "git_blob": "5db477315953f554d7bc0b1c716464d783d73988",
+      "bytes": 2597
+    },
+    "committed_test_at_write_time": {
+      "path": "validation/test_constrained_prior_polytope_benchmark.py",
+      "git_blob": "9d3723d9cbc0c20de182db4de8b8f71a3cfdb4f3",
+      "byte_identical_to_local": false
+    },
+    "result_artifact": {
+      "filename": "CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json",
+      "bytes": 14333,
+      "sha256": "8923e1a7b85d26be97fbfd790686972e8989074af2a691820ed3657255ac1da8",
+      "committed_to_repository": true,
+      "compressed_filename": "CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json.gz",
+      "compressed_bytes": 2453,
+      "compressed_sha256": "267eeede233f4042189f4e481b79b617fbdf7db72ed5c6f2a423952f4c59f4c2",
+      "repository_path": "validation/CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json.gz",
+      "git_blob": "374f5b1217de29d7869f1ee65ddbe390606afe3c"
+    },
+    "numerical_margin_each_side_bits": 1e-9,
+    "margin_is_formal_interval_arithmetic_proof": false,
+    "repository_scm_integration": false,
+    "external_benchmark_run": false,
+    "speedup_claim": false,
+    "remote_ci_pass_claimed": false,
+    "local_result_artifact": {
+      "filename": "CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json",
+      "bytes": 14333,
+      "sha256": "8923e1a7b85d26be97fbfd790686972e8989074af2a691820ed3657255ac1da8",
+      "committed_to_repository": true,
+      "compressed_filename": "CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json.gz",
+      "compressed_bytes": 2453,
+      "compressed_sha256": "267eeede233f4042189f4e481b79b617fbdf7db72ed5c6f2a423952f4c59f4c2",
+      "repository_path": "validation/CONSTRAINED_PRIOR_POLYTOPE_RESULTS_2026-10-28.json.gz",
+      "git_blob": "374f5b1217de29d7869f1ee65ddbe390606afe3c"
+    },
+    "exact_head_execution": false,
+    "ci_status": "current head returned empty combined status and workflow-run lists; a previously checked head had CI and PR Governance skipped; no remote pass claimed",
+    "current_branch_head": "0c5a150f36aff13841683067ec09a89c9ece51ac",
+    "local_combined_test_suite": "17/17_PASS_AFTER_LOCAL_REWRITE_2026-10-28"
+  },
+  "limitations": [
+    "synthetic likelihood, not Symthaea repository SCM implementation",
+    "eight deterministic horizon-two policies only",
+    "ambiguity sets are illustrative and not empirically calibrated",
+    "local source/test do not currently byte-match committed branch copies",
+    "no external causal-discovery benchmark run"
+  ],
+  "next_gate": "Byte-align local/committed source and tests, regenerate exact artifact, then integrate with actual Symthaea action/observation semantics.",
+  "width_sweep": {
+    "status": "LOCAL_SYNTHETIC_EXPLORATORY_SOURCE_TEST_MISMATCH_APPLIES",
+    "rows": 15,
+    "raw_result": {
+      "filename": "CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json",
+      "bytes": 5931,
+      "sha256": "58e85876088d62fb9393551df359b995c58af7ec1d51f7551ba82b4b10ebd2d4"
+    },
+    "compressed_result": {
+      "repository_path": "validation/CONSTRAINED_PRIOR_WIDTH_SWEEP_2026-10-28.json.gz",
+      "bytes": 897,
+      "sha256": "98e4bfa4d824ec7c73bc0743f5a90302045b32b003fc91863c630a44f1e7b318",
+      "git_blob": "02b16e9103a59d5544cc68d12d79f8909dbe296e",
+      "committed": true
+    },
+    "marginal_bounds": [
+      [
+        0.24,
+        0.26
+      ],
+      [
+        0.2,
+        0.3
+      ],
+      [
+        0.15,
+        0.35
+      ],
+      [
+        0.1,
+        0.4
+      ],
+      [
+        0.05,
+        0.6
+      ]
+    ],
+    "robust_values_bits": {
+      "graph": [
+        1.5206470557969263,
+        1.5709998257040612,
+        1.631121590827671,
+        1.6900351285540065,
+        1.7480789690826999
+      ],
+      "kernel": [
+        1.5683213856703722,
+        1.6169812005519844,
+        1.6754535086152063,
+        1.7329176193046598,
+        1.7896651076498444
+      ],
+      "joint": [
+        3.4382452830304557,
+        3.509152781158468,
+        3.5977871538184822,
+        3.670224151142573,
+        3.7273718790559807
+      ]
+    },
+    "legacy_six_prior_policy_joint_regret_bits": [
+      0,
+      0,
+      0,
+      0.016197375335925468,
+      0.04789403045770069
+    ],
+    "interpretation": "robust value monotonically rises with ambiguity width on this fixture; legacy joint policy begins to lose at marginal bounds [0.10,0.40]",
+    "not_calibrated_from_data": true
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "schema": "symthaea-decision-risk-huber-sensitivity-summary-v1",
+  "date": "2026-10-29",
+  "status": "SYNTHETIC_RESEARCH_ONLY_NOT_DIRECT_SOTA_COMPARISON",
+  "primary_finding": "Nominal anytime CS covers the observed mixture mean, not necessarily the clean target mean. A known Huber contamination cap plus sensitivity inversion avoided unsafe admissions in the synthetic trials, at a cost in unresolved safe cases.",
+  "results": {
+    "unsafe_clean_max_error_0_07": {
+      "rho_0_10": {
+        "observed_mean": 0.333,
+        "nominal_unsafe_admissions": 120,
+        "nominal_rate": 0.24,
+        "nominal_wilson95": [
+          0.204637860033381,
+          0.2793267970066262
+        ],
+        "robust_unsafe_admissions": 0,
+        "robust_wilson95_upper": 0.007624340461552241,
+        "nominal_mean_observations": 30573,
+        "robust_mean_observations": 32768
+      },
+      "rho_0_12": {
+        "observed_mean": 0.3256,
+        "nominal_unsafe_admissions": 390,
+        "nominal_rate": 0.78,
+        "nominal_wilson95": [
+          0.7416313019131544,
+          0.8140990674283763
+        ],
+        "robust_unsafe_admissions": 0,
+        "robust_wilson95_upper": 0.007624340461552241,
+        "nominal_mean_observations": 22850,
+        "robust_mean_observations": 32768
+      },
+      "rho_0_18": {
+        "observed_mean": 0.3034,
+        "nominal_unsafe_admissions": 500,
+        "nominal_rate": 1,
+        "nominal_wilson95": [
+          0.9923756595384479,
+          1
+        ],
+        "robust_unsafe_admissions": 0,
+        "robust_wilson95_upper": 0.007624340461552241,
+        "nominal_mean_observations": 10041,
+        "robust_mean_observations": 32768
+      }
+    },
+    "safe_clean_max_error_0_02": {
+      "rho_0_00": {
+        "robust_admissions": 475,
+        "robust_unresolved": 25,
+        "nominal_admissions": 475,
+        "nominal_unresolved": 25
+      },
+      "rho_0_05": {
+        "robust_admissions": 0,
+        "robust_unresolved": 500,
+        "nominal_admissions": 500,
+        "nominal_unresolved": 0
+      },
+      "rho_0_10": {
+        "robust_admissions": 0,
+        "robust_unresolved": 500,
+        "nominal_admissions": 500,
+        "nominal_unresolved": 0
+      },
+      "rho_0_12": {
+        "robust_admissions": 0,
+        "robust_unresolved": 500,
+        "nominal_admissions": 497,
+        "nominal_unresolved": 3
+      },
+      "rho_0_18": {
+        "robust_admissions": 0,
+        "robust_unresolved": 500,
+        "nominal_admissions": 63,
+        "nominal_unresolved": 437
+      }
+    }
+  },
+  "identifiability_frontier": {
+    "equation": "max(0.02, abs(rho/(1-rho)-0.02)) <= 0.05; rho/(1-rho) <= 0.07",
+    "rho_max": 0.06542056074766356,
+    "interpretation": "about 6.54% contamination before sampling uncertainty for the stated safe model if R=0; the 5% robust refusals here are due to finite-sample confidence-sequence width under the current cap"
+  },
+  "preflight_negative_controls": {
+    "missing_support_fails_closed": true,
+    "identity_mismatch_fails_closed": true,
+    "unknown_contamination_bound_fails_closed": true,
+    "all_integrity_assumptions_present_pass_preflight": true
+  },
+  "raw_results_sha256": "6b21cc27b26a4fb7eedda721453f3b0e2aa3fbd8f4f9e15be5a2aa70899319c7",
+  "literature": [
+    "https://proceedings.mlr.press/v206/wang23p.html",
+    "https://ojs.aaai.org/index.php/AAAI/article/view/39063",
+    "https://www.jmlr.org/papers/v27/24-0680.html"
+  ],
+  "limitations": [
+    "iid Bernoulli Huber mixture only",
+    "known defensible contamination upper bound required",
+    "not a general robust-CS implementation",
+    "no production Rust integration",
+    "no direct SOTA baseline implementation run"
+  ],
+  "reproduction_bundle_source_sha256": "5a2d4430d247a3ba20409e135d1546c2645ffeb87b36c41491aef2e102f303ca"
+}

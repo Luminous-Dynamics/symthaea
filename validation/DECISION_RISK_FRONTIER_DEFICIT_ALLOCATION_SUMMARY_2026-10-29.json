@@ -1,0 +1,25 @@
+{
+  "schema": "symthaea-decision-risk-frontier-deficit-summary-v1",
+  "status": "SYNTHETIC_RESEARCH_ONLY_NOT_DIRECT_SOTA_COMPARISON",
+  "date": "2026-10-29",
+  "hypothesis": "A KL-based target-sample deficit heuristic can reduce cost to a valid decision without altering the stopping rule.",
+  "method": "Choose the cheapest projected rejection candidate when an active empirical mean lies outside the admissible error band; otherwise choose the largest projected admission deficit. Use the existing beta-mixture confidence sequence as the sole admit/reject gate.",
+  "primary_100_repeat_results": {
+    "correct_model": {"uniform_mean_observations": 21760.0, "max_error_upper_mean_observations": 9545.0, "frontier_deficit_mean_observations": 9545.0, "frontier_outcomes": {"admit": 100, "reject": 0, "refuse_unresolved": 0}},
+    "safe_offset_0_02": {"uniform_mean_observations": 35706.88, "max_error_upper_mean_observations": 11415.04, "frontier_deficit_mean_observations": 11401.0, "frontier_outcomes": {"admit": 93, "reject": 0, "refuse_unresolved": 7}},
+    "near_violation_0_051": {"uniform_mean_observations": 65536.0, "max_error_upper_mean_observations": 11909.12, "frontier_deficit_mean_observations": 9548.8, "frontier_outcomes": {"admit": 0, "reject": 0, "refuse_unresolved": 100}},
+    "clear_violation_0_07": {"uniform_mean_observations": 59709.44, "max_error_upper_mean_observations": 9918.72, "frontier_deficit_mean_observations": 8547.84, "frontier_outcomes": {"admit": 0, "reject": 28, "refuse_unresolved": 72}}
+  },
+  "paired_500_repeat_unsafe_model_stress": {
+    "near_violation_0_051": {"max_error_upper_mean_observations": 11798.528, "frontier_deficit_mean_observations": 9560.32, "frontier_savings_percent": 18.970230862697456, "both_methods": {"admit": 0, "reject": 0, "refuse_unresolved": 500}},
+    "clear_violation_0_07": {"max_error_upper_mean_observations": 9722.624, "frontier_deficit_mean_observations": 8516.864, "frontier_savings_percent": 12.401590352563263, "both_methods": {"admit": 0, "reject": 163, "refuse_unresolved": 337}}
+  },
+  "unsafe_admissions": {"primary_panel": 0, "stress_panel": 0, "stress_trials_per_method_per_case": 500, "interpretation": "No observed unsafe admissions; this is not zero population risk. Two-sided Wilson 95% upper bound at 0/500 is about 0.76%."},
+  "limitations": ["IID Bernoulli synthetic model, fixed eight-cell support", "KL scheduling proxy is not a confidence bound or proven-optimal allocation", "no direct APGAI, Almost Tracking, DBCARE, or AAAI constrained-BAI implementation comparison", "no dependent-data, systematic-bias, support-shift, or production Rust integration claim"],
+  "literature": [
+    "https://ojs.aaai.org/index.php/AAAI/article/view/39063",
+    "https://www.jmlr.org/papers/v27/24-0680.html",
+    "https://proceedings.mlr.press/v300/komiyama26a.html",
+    "https://papers.nips.cc/paper_files/paper/2025/hash/b0dfe8236981ba84b4d98a7ed0426f0b-Abstract-Conference.html"
+  ]
+}

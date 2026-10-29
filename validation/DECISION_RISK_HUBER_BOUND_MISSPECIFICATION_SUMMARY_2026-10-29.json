@@ -1,0 +1,53 @@
+{
+  "schema": "symthaea-decision-risk-huber-bound-misspecification-summary-v1",
+  "status": "SYNTHETIC_RESEARCH_ONLY_NOT_SOTA_COMPARISON",
+  "date": "2026-10-29",
+  "protocol": {
+    "repeats_per_actual_rho_claimed_rho_pair": 100,
+    "actual_rhos": [0.1, 0.12, 0.18],
+    "claimed_rhos": [0.0, 0.025, 0.05, 0.075, 0.1, 0.12, 0.15, 0.18, 0.2],
+    "total_certifier_calls": 2700,
+    "cells": 4,
+    "familywise_delta": 0.1,
+    "error_tolerance": 0.05,
+    "clean_true_max_model_error": 0.07,
+    "paired_streams_across_claimed_bound_conditions": true
+  },
+  "results": {
+    "actual_rho_0.100": {
+      "claimed_0.000": {"unsafe_admissions": 24, "unresolved": 76, "mean_observations": 30535.68, "false_admission_wilson95": [0.1669132556, 0.3323233635]},
+      "claimed_0.025": {"unsafe_admissions": 1, "unresolved": 99, "mean_observations": 32696.32, "false_admission_wilson95": [0.0017674321, 0.0544861962]},
+      "claimed_0.050": {"unsafe_admissions": 0, "unresolved": 100, "mean_observations": 32768.0, "false_admission_wilson95": [0.0, 0.0369934982]},
+      "claimed_0.100_valid_bound": {"unsafe_admissions": 0, "unresolved": 100, "mean_observations": 32768.0, "false_admission_wilson95": [0.0, 0.0369934982]}
+    },
+    "actual_rho_0.120": {
+      "claimed_0.000": {"unsafe_admissions": 77, "unresolved": 23, "mean_observations": 23500.8, "false_admission_wilson95": [0.6784561698, 0.8415673412]},
+      "claimed_0.025": {"unsafe_admissions": 16, "unresolved": 84, "mean_observations": 31508.48, "false_admission_wilson95": [0.1009528849, 0.2442026939]},
+      "claimed_0.050": {"unsafe_admissions": 0, "unresolved": 100, "mean_observations": 32768.0, "false_admission_wilson95": [0.0, 0.0369934982]},
+      "claimed_0.120_valid_bound": {"unsafe_admissions": 0, "unresolved": 100, "mean_observations": 32768.0, "false_admission_wilson95": [0.0, 0.0369934982]}
+    },
+    "actual_rho_0.180": {
+      "claimed_0.000": {"unsafe_admissions": 100, "unresolved": 0, "mean_observations": 10158.08, "false_admission_wilson95": [0.9630065018, 1.0]},
+      "claimed_0.025": {"unsafe_admissions": 99, "unresolved": 1, "mean_observations": 19875.84, "false_admission_wilson95": [0.9455138038, 0.9982325679]},
+      "claimed_0.050": {"unsafe_admissions": 0, "unresolved": 100, "mean_observations": 32768.0, "false_admission_wilson95": [0.0, 0.0369934982]},
+      "claimed_0.180_valid_bound": {"unsafe_admissions": 0, "unresolved": 100, "mean_observations": 32768.0, "false_admission_wilson95": [0.0, 0.0369934982]}
+    }
+  },
+  "unknown_bound_preflight": {"status": "refuse_unresolved", "observations": 0},
+  "source_sha256": "dfef01a61cc9fc649c3fad1bfb231fa24e53234fb63160433ecb8b565862de38",
+  "test_sha256": "6e1053b4d0377063b511f8fdd1117a282f1640fa1e8eb5885d829b9223613960",
+  "raw_results_sha256": "ca639b6ce2a7509e55bb61b8df56edf3b95ed46ad17672a93dffca980029cdf0",
+  "literature": [
+    "https://proceedings.mlr.press/v206/wang23p.html",
+    "https://github.com/HJ-Wg/catoni-confseq",
+    "https://ojs.aaai.org/index.php/AAAI/article/view/39063",
+    "https://www.jmlr.org/papers/v27/24-0680.html"
+  ],
+  "limitations": [
+    "IID Bernoulli contamination in one cell with R=0",
+    "100 trials per condition; no population safety proof",
+    "sensitivity inversion rather than Wang-Ramdas robust CS",
+    "no production Rust integration",
+    "no direct published baseline run"
+  ]
+}

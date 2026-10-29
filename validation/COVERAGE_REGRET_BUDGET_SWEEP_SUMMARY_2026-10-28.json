@@ -1,0 +1,234 @@
+{
+  "schema": "symthaea-coverage-regret-observation-budget-sweep-summary-v1",
+  "date": "2026-10-28",
+  "status": "LOCAL_SYNTHETIC_EXECUTION_NOT_SYMTHAEA_SCM_INTEGRATION",
+  "protocol": {
+    "n_calibration": 400,
+    "n_test": 120,
+    "seed": 20261030,
+    "targets": [
+      0.8,
+      0.9,
+      0.95,
+      0.99
+    ],
+    "observation_budgets": [
+      30,
+      60,
+      120,
+      240
+    ],
+    "nested_observation_prefixes": true,
+    "pseudocount": 0.5,
+    "regimes": [
+      "diffuse",
+      "sparse",
+      "graph-skewed",
+      "kernel-skewed",
+      "diagonal-correlated",
+      "anti-correlated"
+    ]
+  },
+  "results": [
+    {
+      "n": 30,
+      "target": 0.8,
+      "radius": 0.1677,
+      "covered": 95,
+      "coverage": 0.7917,
+      "worst_group": 0.6522,
+      "joint_regret_mean": 0.04239,
+      "joint_regret_p95": 0.09845,
+      "width_proxy": 3.354
+    },
+    {
+      "n": 30,
+      "target": 0.9,
+      "radius": 0.1863,
+      "covered": 108,
+      "coverage": 0.9,
+      "worst_group": 0.7826,
+      "joint_regret_mean": 0.05342,
+      "joint_regret_p95": 0.10686,
+      "width_proxy": 3.726
+    },
+    {
+      "n": 30,
+      "target": 0.95,
+      "radius": 0.2035,
+      "covered": 110,
+      "coverage": 0.9167,
+      "worst_group": 0.8261,
+      "joint_regret_mean": 0.0601,
+      "joint_regret_p95": 0.12863,
+      "width_proxy": 4.07
+    },
+    {
+      "n": 30,
+      "target": 0.99,
+      "radius": 0.23681,
+      "covered": 117,
+      "coverage": 0.975,
+      "worst_group": 0.9444,
+      "joint_regret_mean": 0.06908,
+      "joint_regret_p95": 0.14767,
+      "width_proxy": 4.736
+    },
+    {
+      "n": 60,
+      "target": 0.8,
+      "radius": 0.11742,
+      "covered": 89,
+      "coverage": 0.7417,
+      "worst_group": 0.5217,
+      "joint_regret_mean": 0.02116,
+      "joint_regret_p95": 0.06631,
+      "width_proxy": 2.348
+    },
+    {
+      "n": 60,
+      "target": 0.9,
+      "radius": 0.13452,
+      "covered": 99,
+      "coverage": 0.825,
+      "worst_group": 0.6522,
+      "joint_regret_mean": 0.02544,
+      "joint_regret_p95": 0.07449,
+      "width_proxy": 2.69
+    },
+    {
+      "n": 60,
+      "target": 0.95,
+      "radius": 0.14552,
+      "covered": 106,
+      "coverage": 0.8833,
+      "worst_group": 0.6957,
+      "joint_regret_mean": 0.02928,
+      "joint_regret_p95": 0.08518,
+      "width_proxy": 2.91
+    },
+    {
+      "n": 60,
+      "target": 0.99,
+      "radius": 0.16817,
+      "covered": 112,
+      "coverage": 0.9333,
+      "worst_group": 0.8889,
+      "joint_regret_mean": 0.03922,
+      "joint_regret_p95": 0.08891,
+      "width_proxy": 3.363
+    },
+    {
+      "n": 120,
+      "target": 0.8,
+      "radius": 0.08487,
+      "covered": 95,
+      "coverage": 0.7917,
+      "worst_group": 0.6842,
+      "joint_regret_mean": 0.01228,
+      "joint_regret_p95": 0.04618,
+      "width_proxy": 1.697
+    },
+    {
+      "n": 120,
+      "target": 0.9,
+      "radius": 0.09828,
+      "covered": 111,
+      "coverage": 0.925,
+      "worst_group": 0.8333,
+      "joint_regret_mean": 0.01507,
+      "joint_regret_p95": 0.05345,
+      "width_proxy": 1.966
+    },
+    {
+      "n": 120,
+      "target": 0.95,
+      "radius": 0.10943,
+      "covered": 118,
+      "coverage": 0.9833,
+      "worst_group": 0.9444,
+      "joint_regret_mean": 0.01856,
+      "joint_regret_p95": 0.06031,
+      "width_proxy": 2.189
+    },
+    {
+      "n": 120,
+      "target": 0.99,
+      "radius": 0.1327,
+      "covered": 119,
+      "coverage": 0.9917,
+      "worst_group": 0.9444,
+      "joint_regret_mean": 0.02466,
+      "joint_regret_p95": 0.07913,
+      "width_proxy": 2.654
+    },
+    {
+      "n": 240,
+      "target": 0.8,
+      "radius": 0.05619,
+      "covered": 89,
+      "coverage": 0.7417,
+      "worst_group": 0.6,
+      "joint_regret_mean": 0.00609,
+      "joint_regret_p95": 0.02776,
+      "width_proxy": 1.124
+    },
+    {
+      "n": 240,
+      "target": 0.9,
+      "radius": 0.06628,
+      "covered": 105,
+      "coverage": 0.875,
+      "worst_group": 0.8,
+      "joint_regret_mean": 0.00724,
+      "joint_regret_p95": 0.03259,
+      "width_proxy": 1.326
+    },
+    {
+      "n": 240,
+      "target": 0.95,
+      "radius": 0.07306,
+      "covered": 118,
+      "coverage": 0.9833,
+      "worst_group": 0.9,
+      "joint_regret_mean": 0.00817,
+      "joint_regret_p95": 0.03559,
+      "width_proxy": 1.461
+    },
+    {
+      "n": 240,
+      "target": 0.99,
+      "radius": 0.09369,
+      "covered": 120,
+      "coverage": 1,
+      "worst_group": 1,
+      "joint_regret_mean": 0.01252,
+      "joint_regret_p95": 0.04613,
+      "width_proxy": 1.874
+    }
+  ],
+  "verification": {
+    "focused_tests": "4/4_PASS",
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "source_sha256": "f630526789a8de71a154d1db5d7e7e1d537927f31baa6a2a43c7fe16d8dcf7a9",
+    "test_sha256": "7aa43a89e6e111899ae38fb6f23c048732499fbadff6b22d20820fcc0626e307",
+    "raw_result_bytes": 1436336,
+    "raw_result_sha256": "c75704734fb5d05764f4585f8ae2ebdc40ceed6fdd9092e57ca4302bb7ee6e40",
+    "compressed_result_bytes": 211083,
+    "compressed_result_sha256": "c3fbd62ca916af360b7c9d57d4c67825043ac8400f033c376f7ab68858f8e3d4",
+    "max_certificate_gap_bits": 2.0000050504620503e-9,
+    "margin_is_formal_interval_arithmetic_proof": false,
+    "repository_scm_integration": false,
+    "external_benchmarks_run": false,
+    "speedup_claim": false
+  },
+  "limitations": [
+    "synthetic likelihood and prior meta-population",
+    "marginal feature coverage, not conditional or real-world coverage",
+    "10-dimensional feature radius does not constrain every direction of the joint prior",
+    "eight policies and horizon two",
+    "test N=120 and 16 paired settings are exploratory"
+  ]
+}

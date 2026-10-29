@@ -1,0 +1,43 @@
+{
+  "schema": "symthaea-decision-risk-constraint-aware-allocation-summary-v1",
+  "status": "SYNTHETIC_RESEARCH_BENCHMARK_NOT_PRODUCTION_CERTIFICATION",
+  "date": "2026-10-29",
+  "protocol": {"seed": 20261029, "repeats": 100, "cells": 8, "familywise_delta": 0.1, "pilot_per_cell": 128, "batch_size": 128, "max_per_cell": 8192, "epsilon_allowance": 0.05},
+  "correct_model": {
+    "uniform": {"admission_rate": 1.0, "mean_total_observations": 21760.0, "p95": 31744.0},
+    "max_error_upper": {"admission_rate": 1.0, "mean_total_observations": 9544.96, "observations_saved_vs_uniform_percent": 56.1353},
+    "widest_active_ci": {"admission_rate": 1.0, "mean_total_observations": 9544.96, "observations_saved_vs_uniform_percent": 56.1353},
+    "marginal_ci_reduction": {"admission_rate": 1.0, "mean_total_observations": 9544.96, "observations_saved_vs_uniform_percent": 56.1353}
+  },
+  "safe_offset_error_0.02": {
+    "uniform": {"admissions": 93, "mean_total_observations": 35706.88},
+    "max_error_upper": {"admissions": 93, "mean_total_observations": 11415.04, "saved_vs_uniform_percent": 68.0},
+    "widest_active_ci": {"admissions": 93, "mean_total_observations": 11472.64},
+    "marginal_ci_reduction": {"admissions": 93, "mean_total_observations": 11472.64}
+  },
+  "near_budget_error_0.051": {
+    "uniform_mean_total": 65536.0,
+    "max_error_upper_mean_total": 11909.12,
+    "widest_active_ci_mean_total": 15284.48,
+    "marginal_ci_reduction_mean_total": 15284.48,
+    "admissions": 0,
+    "unresolved_refusals": 100,
+    "conclusive_rejections": 0
+  },
+  "clear_violation_error_0.07": {
+    "uniform_mean_total": 59709.44,
+    "max_error_upper_mean_total": 9918.72,
+    "widest_active_ci_mean_total": 14487.04,
+    "marginal_ci_reduction_mean_total": 14531.84,
+    "all_methods_conclusive_rejections": 28,
+    "all_methods_unresolved_refusals": 72
+  },
+  "false_admissions": "0/100 in all method/scenario pairs; Wilson 95% upper bound approximately 3.70%, not evidence of zero risk",
+  "source_sha256": "c0cf1be21604318b8781353702f598ab07ef606137dcf8ccd46af3cbbc24b7d9",
+  "source_git_blob": "a23d22cb67d5084726b7022ac0edd0a7077d1f36",
+  "test_sha256": "580198a8f0466acc14b994d0fda0ea30e3f8309ef25da086bba56645d524d9be",
+  "test_git_blob": "cd547fa0694dc6f435d64e5f461fe4f505a0b82a",
+  "raw_results_sha256": "f63627af72409e9b17a91a5a021c00fc6491a9f8670b10be5ddb800dba165728",
+  "local_focused_tests": "3/3 passed",
+  "full_run": "100 repeats in 20.820 seconds"
+}
