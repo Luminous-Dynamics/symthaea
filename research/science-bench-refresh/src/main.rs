@@ -1,7 +1,7 @@
 use science_bench_refresh_validator::{
-    audit_policy_input_overlap, compute_artifact_commitment, compute_protocol_commitment,
-    generate_task_set_bytes, sha256_hex, validate_manifest_bytes, verify_regeneration,
-    verify_reveal,
+    audit_policy_input_overlap, audit_lineage_overlap, compute_artifact_commitment,
+    compute_protocol_commitment, generate_task_set_bytes, sha256_hex, validate_manifest_bytes,
+    verify_regeneration, verify_reveal,
 };
 use serde_json::json;
 use std::env;
@@ -14,6 +14,7 @@ fn usage(program: &str) {
             "usage:\n",
             "  {program} MANIFEST.json [--require-scoring|--require-sealed]\n",
             "  {program} audit-overlap LEFT_LABEL LEFT_TASK_SET.json RIGHT_LABEL RIGHT_TASK_SET.json\n",
+            "  {program} audit-lineage LEFT_TASK_SET.json LEFT_LEDGER.json RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
             "  {program} protocol-commit MANIFEST.json\n",
             "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
             "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
@@ -38,6 +39,53 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "audit-lineage" => {
+            if args.len() != 5 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let left_task_set = match read(&args[1], "left task set") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let left_ledger = match read(&args[2], "left lineage ledger") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let right_task_set = match read(&args[3], "right task set") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let right_ledger = match read(&args[4], "right lineage ledger") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match audit_lineage_overlap(
+                &left_task_set,
+                &left_ledger,
+                &right_task_set,
+                &right_ledger,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("lineage audit report serializes")
+            );
+            if report.shared_lineage_root_count > 0
+                || report.left_exposed_refresh_task_count > 0
+                || report.right_exposed_refresh_task_count > 0
+            {
+                ExitCode::from(8)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
         "audit-overlap" => {
             if args.len() != 5 {
                 usage("science-bench-refresh-validator");
