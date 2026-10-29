@@ -666,6 +666,30 @@ mod tests {
     }
 
     #[test]
+    fn negative_control_reused_exact_identity_can_still_mix_messages() {
+        let original_a = sample(2048, 0xA1);
+        let original_b = sample(2048, 0xB2);
+        let a = fragment_v3(10, 4, &original_a).unwrap();
+        let b = fragment_v3(10, 4, &original_b).unwrap();
+        let peer_context = [0x11; 32];
+        let mut assembler = FragmentAssemblerV3::new(peer_context, &a[0]).unwrap();
+
+        // Deliberate negative control: the exact same peer+generation+sequence
+        // is reused for two different messages. Framing cannot distinguish them.
+        for frame in &a[..6] {
+            assert!(assembler.feed(&peer_context, frame) || !assembler.is_complete());
+        }
+        for frame in &b[6..b.len() - 1] {
+            assembler.feed(&peer_context, frame);
+        }
+
+        assert!(assembler.is_complete());
+        let mixed = assembler.assemble().unwrap();
+        assert_ne!(mixed, original_a);
+        assert_ne!(mixed, original_b);
+    }
+
+    #[test]
     fn same_numeric_stream_identity_from_different_authenticated_peers_is_rejected() {
         let a = fragment_v3(10, 4, &sample(2048, 1)).unwrap();
         let b = fragment_v3(10, 4, &sample(2048, 2)).unwrap();
