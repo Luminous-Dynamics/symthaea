@@ -407,6 +407,51 @@ pub enum RepertoireError {
 /// validates the forward/partitioned entries as finite probabilities and the
 /// selectivity input as a normalized distribution; it does not infer a formal
 /// IIT quantity, choose a partition, or compute system phi_s.
+/// Compute the full pointwise generalized intrinsic difference (GID) vector.
+///
+/// For every state i, the value is selectivity[i] * log2(forward[i] /
+/// partitioned[i]). If either ratio term is zero, its contribution is zero.
+/// Forward and partitioned inputs may be likelihood vectors and need not be
+/// normalized. Selectivity must be a normalized probability distribution.
+///
+/// This returns the vector of pointwise values, including negative entries; it
+/// is not itself a system-level phi_s value or a minimum-information-partition
+/// calculation.
+pub fn generalized_intrinsic_difference(
+    forward_repertoire: &[f64],
+    partitioned_forward_repertoire: &[f64],
+    selectivity_repertoire: &[f64],
+) -> Result<Vec<f64>, RepertoireError> {
+    if forward_repertoire.len() != partitioned_forward_repertoire.len()
+        || forward_repertoire.len() != selectivity_repertoire.len()
+    {
+        return Err(RepertoireError::DistributionLengthMismatch {
+            forward: forward_repertoire.len(),
+            partitioned: partitioned_forward_repertoire.len(),
+            selectivity: selectivity_repertoire.len(),
+        });
+    }
+
+    validate_probability_values(forward_repertoire, "forward")?;
+    validate_probability_values(partitioned_forward_repertoire, "partitioned")?;
+    validate_probability_distribution(selectivity_repertoire, "selectivity")?;
+
+    Ok(forward_repertoire
+        .iter()
+        .copied()
+        .zip(partitioned_forward_repertoire.iter().copied())
+        .zip(selectivity_repertoire.iter().copied())
+        .map(|((forward, partitioned), selectivity)| {
+            if forward == 0.0 || partitioned == 0.0 {
+                0.0
+            } else {
+                selectivity * (forward / partitioned).log2()
+            }
+        })
+        .collect())
+}
+
+/// Evaluate PyPhi's pointwise GID at one specified state.
 pub fn generalized_intrinsic_difference_at_state(
     forward_repertoire: &[f64],
     partitioned_forward_repertoire: &[f64],
@@ -422,26 +467,19 @@ pub fn generalized_intrinsic_difference_at_state(
             selectivity: selectivity_repertoire.len(),
         });
     }
-    let length = forward_repertoire.len();
-    if state_index >= length {
+    if state_index >= forward_repertoire.len() {
         return Err(RepertoireError::DistributionStateOutOfRange {
             index: state_index,
-            length,
+            length: forward_repertoire.len(),
         });
     }
 
-    // Cause-side forward repertoires are likelihood arrays, not normalized
-    // distributions; only selectivity is required to sum to one.
-    validate_probability_values(forward_repertoire, "forward")?;
-    validate_probability_values(partitioned_forward_repertoire, "partitioned")?;
-    validate_probability_distribution(selectivity_repertoire, "selectivity")?;
-
-    let forward = forward_repertoire[state_index];
-    let partitioned = partitioned_forward_repertoire[state_index];
-    if forward == 0.0 || partitioned == 0.0 {
-        return Ok(0.0);
-    }
-    Ok(selectivity_repertoire[state_index] * (forward / partitioned).log2())
+    let gid = generalized_intrinsic_difference(
+        forward_repertoire,
+        partitioned_forward_repertoire,
+        selectivity_repertoire,
+    )?;
+    Ok(gid[state_index])
 }
 
 fn validate_probability_values(
@@ -1841,6 +1879,42 @@ mod tests {
         assert_eq!(report.block_direction_assignments_evaluated, 1_863);
         assert_eq!(report.unique_non_total_cuts, 1_061);
         assert_eq!(report.duplicate_cut_matrices_suppressed, 802);
+    }
+
+    #[test]
+    fn generalized_intrinsic_difference_vector_matches_pointwise_values() {
+        let gid = generalized_intrinsic_difference(
+            &[0.1, 0.4, 0.0, 0.8],
+            &[0.2, 0.2, 0.5, 0.0],
+            &[0.25, 0.5, 0.1, 0.15],
+        ).unwrap();
+        let expected = [
+            0.25 * (0.1_f64 / 0.2).log2(),
+            0.5 * (0.4_f64 / 0.2).log2(),
+            0.0,
+            0.0,
+        ];
+        for (actual, expected) in gid.iter().zip(expected) {
+            assert!((actual - expected).abs() < 1e-12);
+        }
+        let point = generalized_intrinsic_difference_at_state(
+            &[0.1, 0.4, 0.0, 0.8],
+            &[0.2, 0.2, 0.5, 0.0],
+            &[0.25, 0.5, 0.1, 0.15],
+            1,
+        ).unwrap();
+        assert!((point - gid[1]).abs() < 1e-12);
+    }
+
+    #[test]
+    fn generalized_intrinsic_difference_vector_preserves_positive_and_negative_entries() {
+        let gid = generalized_intrinsic_difference(
+            &[0.1, 0.8],
+            &[0.2, 0.4],
+            &[0.5, 0.5],
+        ).unwrap();
+        assert!(gid[0] < 0.0);
+        assert!(gid[1] > 0.0);
     }
 
 }
