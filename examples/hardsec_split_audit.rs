@@ -15,7 +15,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
+use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
@@ -77,8 +78,11 @@ struct ArtifactBinding {
     security_outcome: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct AuditSummary {
+    schema_version: &'static str,
+    result: &'static str,
+    claim_scope: &'static str,
     dataset_id: String,
     domain: String,
     split_protocol: String,
@@ -93,8 +97,14 @@ struct AuditSummary {
 
 fn main() -> ExitCode {
     match parse_args() {
-        Ok(Some((manifest, root))) => match audit_manifest(&manifest, &root) {
+        Ok(Some((manifest, root, receipt_path))) => match audit_manifest(&manifest, &root) {
             Ok(summary) => {
+                if let Some(path) = receipt_path {
+                    if let Err(error) = write_receipt(&summary, &path) {
+                        eprintln!("HARDSEC_SPLIT_AUDIT_ERROR: {error}");
+                        return ExitCode::from(2);
+                    }
+                }
                 println!(
                     "HARDSEC_SPLIT_AUDIT_OK dataset_id={} domain={} protocol={} manifest_sha256={} samples={} artifacts={} same_split_duplicate_content_aliases={} train={} validation={} test={}",
                     summary.dataset_id,
@@ -117,16 +127,17 @@ fn main() -> ExitCode {
         },
         Ok(None) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("HARDSEC_AUDIT_FAIL: {error}");
+            eprintln!("HARDSEC_SPLIT_AUDIT_ERROR: {error}");
             ExitCode::from(2)
         }
     }
 }
 
-fn parse_args() -> Result<Option<(PathBuf, PathBuf)>, String> {
+fn parse_args() -> Result<Option<(PathBuf, PathBuf, Option<PathBuf>)>, String> {
     let mut args = env::args().skip(1);
     let mut manifest = None;
     let mut root = None;
+    let mut receipt = None;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -146,13 +157,18 @@ fn parse_args() -> Result<Option<(PathBuf, PathBuf)>, String> {
             "--root" => {
                 root = Some(PathBuf::from(args.next().ok_or("--root requires a path")?));
             }
+            "--receipt" => {
+                receipt = Some(PathBuf::from(
+                    args.next().ok_or("--receipt requires a new output path")?,
+                ));
+            }
             other => return Err(format!("unknown argument {other:?}; use --help")),
         }
     }
 
     let manifest = manifest.ok_or("--manifest is required")?;
     let root = root.ok_or("--root is required")?;
-    Ok(Some((manifest, root)))
+    Ok(Some((manifest, root, receipt)))
 }
 
 fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSummary, String> {
@@ -472,6 +488,9 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     }
 
     Ok(AuditSummary {
+        schema_version: "hardsec-split-audit-v1",
+        result: "split_manifest_consistent",
+        claim_scope: "metadata_and_split_integrity_only",
         dataset_id,
         domain,
         split_protocol,
@@ -483,6 +502,24 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         validation: split_counts["validation"],
         test: split_counts["test"],
     })
+}
+
+fn write_receipt(summary: &AuditSummary, path: &Path) -> Result<(), String> {
+    let mut bytes = serde_json::to_vec_pretty(summary)
+        .map_err(|error| format!("cannot serialize split audit receipt: {error}"))?;
+    bytes.push(b'\n');
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|error| {
+            format!(
+                "cannot create new receipt {} (existing files are never overwritten): {error}",
+                path.display()
+            )
+        })?;
+    file.write_all(&bytes)
+        .map_err(|error| format!("cannot write receipt {}: {error}", path.display()))
 }
 
 fn held_out_group(sample: &Sample, protocol: &str, line_number: usize) -> Result<String, String> {
@@ -758,6 +795,35 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
         }
+    }
+
+    #[test]
+    fn receipt_is_explicitly_scoped_and_content_bound() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        let summary = fixture.audit().expect("valid manifest");
+        let receipt_path = fixture.root.join("receipt.json");
+        write_receipt(&summary, &receipt_path).expect("write receipt");
+        let receipt: serde_json::Value =
+            serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
+        assert_eq!(receipt["schema_version"], "hardsec-split-audit-v1");
+        assert_eq!(receipt["result"], "split_manifest_consistent");
+        assert_eq!(receipt["claim_scope"], "metadata_and_split_integrity_only");
+        assert_eq!(receipt["manifest_sha256"].as_str().unwrap().len(), 64);
+        assert_eq!(receipt["samples"].as_u64(), Some(6));
+    }
+
+    #[test]
+    fn receipt_writer_never_overwrites_existing_path() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        let summary = fixture.audit().expect("valid manifest");
+        let receipt_path = fixture.root.join("receipt.json");
+        fs::write(&receipt_path, "preexisting").unwrap();
+        assert!(write_receipt(&summary, &receipt_path)
+            .unwrap_err()
+            .contains("existing files are never overwritten"));
+        assert_eq!(fs::read_to_string(receipt_path).unwrap(), "preexisting");
     }
 
     #[test]
