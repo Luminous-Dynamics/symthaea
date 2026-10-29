@@ -369,13 +369,21 @@ enum RetimingChoice {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 struct RetimingSearchNode {
     depth: usize,
     choices: Vec<Option<RetimingChoice>>,
     lower_bound: u64,
     serial: u64,
 }
+
+impl PartialEq for RetimingSearchNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.lower_bound == other.lower_bound && self.serial == other.serial
+    }
+}
+
+impl Eq for RetimingSearchNode {}
 
 impl Ord for RetimingSearchNode {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
