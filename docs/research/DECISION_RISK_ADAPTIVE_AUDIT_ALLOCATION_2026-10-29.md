@@ -8,7 +8,7 @@
 
 This lane compares uniform allocation to a simple adaptive scheduler using the same per-cell beta-mixture confidence sequences, the same random streams, the same predeclared support, and the same stopping categories. After a 128-observation pilot for each of eight cells, uniform allocation adds a batch of 128 observations to every cell. The adaptive heuristic adds its next batch to the cell with the largest current upper bound on absolute model error. It uses per-cell time-uniform confidence sequences with familywise delta = 0.10 divided by eight; selection is based only on past samples from independent cell streams.
 
-Across 200 fixed-seed repeats, adaptive allocation reduced average total observations by **55.5% on the correct model**, while both strategies admitted the model in 200/200 repeats. For a model with a true 0.02 error in the highest-variance cell, both admitted 184/200 and refused the rest unresolved; adaptive allocation used 68.7% fewer observations on average. In the clearly over-budget case, both rejected 61/200 and refused 139/200 unresolved; adaptive allocation used 83.5% fewer observations on average. There were zero observed unsafe admissions in either strategy or scenario.
+Across 200 fixed-seed repeats, adaptive allocation reduced average total observations by **55.5% on the correct model**, while both strategies admitted the model in 200/200 repeats. For a model with a true 0.02 error in the highest-variance cell, uniform admitted 184/200 and adaptive admitted 183/200; the rest were refused unresolved; adaptive allocation used 68.7% fewer observations on average. In the clearly over-budget case, both rejected 61/200 and refused 139/200 unresolved; adaptive allocation used 83.5% fewer observations on average. There were zero observed unsafe admissions in either strategy or scenario.
 
 These outcomes support the hypothesis that sampling where the current certificate is weakest can reduce audit cost. They do **not** establish optimality, industry superiority, or zero real-world risk. The near-threshold corrupted model was refused unresolved, not positively identified as invalid. The allocation heuristic is a prototype and the test uses a small synthetic Bernoulli model.
 
@@ -39,7 +39,7 @@ A lower confidence bound exceeding the error allowance triggers a positive rejec
 | Correct model (error 0) | Uniform | 21,258 | 30,720 | 200/200 | 0 | 0 |
 | Correct model (error 0) | Adaptive | 9,460 | 11,520 | 200/200 | 0 | 0 |
 | Safe offset (error 0.02) | Uniform | 36,925 | 65,536 | 184/200 | 0 | 16 |
-| Safe offset (error 0.02) | Adaptive | 11,557 | 14,854 | 184/200 | 0 | 16 |
+| Safe offset (error 0.02) | Adaptive | 11,555 | 14,854 | 183/200 | 0 | 17 |
 | Near budget violation (error 0.051) | Uniform | 65,536 | 65,536 | 0 | 0 | 200 |
 | Near budget violation (error 0.051) | Adaptive | 11,837 | 13,062 | 0 | 0 | 200 |
 | Clear violation (error 0.07) | Uniform | 59,515 | 65,536 | 0 | 61 | 139 |
