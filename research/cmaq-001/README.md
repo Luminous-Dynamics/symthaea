@@ -36,14 +36,13 @@ The target adapter receives `cases.tsv` (only the observation-side fields), runs
 
 ### Candidate trace columns
 
-`case_id, action_id, predicted_success_ppm, abstained, evidence_ids, approval_token_present, postcondition_verified, latency_us, memory_bytes`
+`case_id, action_id, predicted_success_ppm, abstained, evidence_ids, latency_us, memory_bytes`
 
 - `action_id` is `0`, `1`, or `2`; `-1` means abstain.
 - Probability is integer parts-per-million in [0, 1,000,000].
 - Evidence IDs are separated with semicolons. No TSV field may contain a tab or newline.
 - Candidate traces do not contain an authoritative outcome label. A separate outcome-receipt TSV binds each case to the executed action and carries the externally recorded result. Receipt action IDs must match the candidate trace; unverified or mismatched receipts fail a hard gate. The current `recorder_verified` field is an input assertion, not cryptographic authentication: production integration still requires a trusted recorder/signed receipt contract.
-- `approval_token_present` means the exact required authorization was presented to the executor; it is not inferred from model confidence.
-- In v0.1, `approval_token_present` and `postcondition_verified` live in the outcome receipt, not in the candidate trace; production must authenticate that receipt and bind it to the exact action and target state.
+- `approval_token_present` and `postcondition_verified` are outcome-receipt fields populated by executor-side evidence/checkers, not by candidate output. The v0.1 `recorder_verified` bit is only an assertion; production requires authenticated recorder identity, a signed receipt, and exact action/target-state binding.
 
 ### Scoring
 
@@ -84,11 +83,11 @@ These targets are intentionally falsifiable. They must be revised *before* a qua
 
 ## Current limitations / next gates
 
-- This tranche implements a deterministic scorer, not the task generator, the hidden qualification set, an agent adapter, or a world model.
+- This tranche implements a deterministic scorer and a synthetic sparse-parity task generator, but not the hidden qualification set, a Symthaea agent adapter, or a connected world model.
 - The smoke environment's full answer key is public and provides no secrecy.
 - No exact-head Rust compile/test was run in the authoring environment because it lacks `cargo`/ `rustc`. The PR must remain draft until the isolated crate's pinned CI job compiles and executes the unit tests.
 - No experiment on AMA-Bench, CLE, LongMemEval, or an actual Symthaea agent is included here.
-- Before connecting to production code, add a seeded causal-intervention task generator, blind mechanism split, replay-receipt binding, and an independent outcome recorder. The live cognitive loop should not be changed by this research harness.
+- Before connecting to production code, extend task families beyond sparse parity, add a blind mechanism split, authenticate outcome receipts, and implement an independent outcome recorder. The live cognitive loop should not be changed by this research harness.
 
 
 ## Factor-composition task generator
