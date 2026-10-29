@@ -15,7 +15,7 @@ This tranche instantiates a tiny exact simulator so the research can proceed ind
 - interaction-dominated effects;
 - threshold effects.
 
-An additional evaluator-only parity family is used in a mutation-style unit test to verify that out-of-class observations eventually trigger a model-misspecification signal. The held-out family is not included in the candidate hypothesis library or in the calibration-panel aggregate.
+An additional evaluator-only parity family is used as a model-misspecification control and in a unit test. The held-out family is not included in the candidate hypothesis library or in the decision-value calibration aggregate. The CLI reports its detection coverage separately so the model-misspecification check is observable beyond unit-test output.
 
 Each mechanism yields deterministic reward and safety outcomes for three actions across four contexts. A candidate starts with a uniform belief over the hypothesis library, probes one context/action at a time, and receives only that intervention's outcome. The evaluator knows the true mechanism and scores post-learning decisions.
 
@@ -24,7 +24,7 @@ Each mechanism yields deterministic reward and safety outcomes for three actions
     cargo test --locked
     cargo run --locked -- --seed 4242 --probe-budget 2 --probe-cost 0.25
 
-The CLI prints a deterministic JSON report comparing no probe, fixed probes, seeded random probes, maximum expected information gain, expected value of information (EVoI), and an evaluator-only oracle that knows the true mechanism. A separate Python mirror of the small finite-state equations produced a preliminary calibration-panel result of mean net regret 0.9444 for EVoI versus 1.5833 for maximum information gain and 3.5278 for no probes. This is exploratory validation of the toy design only, not execution of the Rust binary, not statistical evidence, and not an external benchmark score.
+The CLI prints a deterministic JSON report comparing no probe, fixed probes, seeded random probes, maximum expected information gain, expected value of information (EVoI), and an evaluator-only oracle that knows the true mechanism. The report also includes an open-class control: three evaluator-only parity mechanisms that the candidate catalog does not contain, with the number of probes required before the posterior becomes inconsistent with every candidate hypothesis. A separate Python mirror of the small finite-state equations produced a preliminary calibration-panel result of mean net regret 0.9444 for EVoI versus 1.5833 for maximum information gain and 3.5278 for no probes. This is exploratory validation of the toy design only, not execution of the Rust binary, not statistical evidence, and not an external benchmark score.
 
 The oracle is an upper bound, never a deployable baseline. The report scores all nine possible true mechanisms, not a single lucky hidden draw. The seed changes the random-probe policy and is recorded in the report; it does not change mechanism outcomes.
 
