@@ -331,7 +331,8 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
                 let interval=intervals[method];
                 let covers=interval.covers(scenario.true_value);
                 seq_covered[method] &= covers;
-                if promotion_time[method].is_none() && interval.lower > PROMOTION_THRESHOLD {
+                if promotion_time[method].is_none() && !interval.reversed()
+                    && interval.lower > PROMOTION_THRESHOLD {
                     promotion_time[method]=Some(t);
                 }
             }
