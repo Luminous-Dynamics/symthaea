@@ -22,6 +22,8 @@ use sha2::{Digest, Sha256};
 
 const UPSTREAM: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const V0_PARTITION: &str = "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
+const EXPECTED_FAMILY_UNIVERSE_SHA256: &str =
+    "c8ee398840443fb0693e50baa1dfda9982cd8bfebe1f81d9de3050e3b15cb048";
 const V0_SEED: &str = "pitb-v0-openai-math-2026-10-19";
 const V0_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
 const CANDIDATE_SEED: &str = "pitb-component-first-candidate-2026-10-29";
@@ -59,6 +61,15 @@ fn partition_digest(assignments: &BTreeMap<String, String>) -> String {
         canonical.push_str(family_id);
         canonical.push('\t');
         canonical.push_str(split);
+        canonical.push('\n');
+    }
+    sha256(canonical.as_bytes())
+}
+
+fn family_universe_digest(assignments: &BTreeMap<String, String>) -> String {
+    let mut canonical = String::new();
+    for family_id in assignments.keys() {
+        canonical.push_str(family_id);
         canonical.push('\n');
     }
     sha256(canonical.as_bytes())
@@ -428,6 +439,12 @@ fn execute() -> Result<()> {
     let old_assignments = parse_v0_splits(&split_doc)?;
     let units = parse_component_units(&component_doc, &old_assignments)?;
     let new_assignments = assign_components(&units)?;
+    let candidate_family_universe_sha256 = family_universe_digest(&new_assignments);
+    if new_assignments.len() != 372
+        || candidate_family_universe_sha256 != EXPECTED_FAMILY_UNIVERSE_SHA256
+    {
+        bail!("candidate family universe differs from the pinned 372-family PITB universe");
+    }
 
     let mut component_split = BTreeMap::new();
     let mut component_family_rows = Vec::with_capacity(units.len());
@@ -500,6 +517,7 @@ fn execute() -> Result<()> {
         .fold(0.0_f64, f64::max);
     let result = json!({
         "schema_version": "pitb.component-first-split-candidate.v0",
+        "dataset_kind": "candidate_only",
         "status": "candidate_only",
         "upstream_commit": UPSTREAM,
         "candidate_seed": CANDIDATE_SEED,
@@ -551,6 +569,7 @@ fn execute() -> Result<()> {
             "family_balance_optimum": "deterministic one-swap local optimum; not guaranteed globally optimal"
         },
         "source_v0_partition_digest_sha256": V0_PARTITION,
+        "family_universe_sha256": candidate_family_universe_sha256,
         "source_split_manifest_sha256": sha256(&split_bytes),
         "source_component_manifest_sha256": sha256(&component_bytes),
         "relationship_inventory_sha256": required_str(&component_doc, "relationship_inventory_sha256")?,
