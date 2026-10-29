@@ -808,12 +808,13 @@ mod tests{
     #[test]
     fn fixed_horizon_methods_are_explicitly_not_anytime_valid() {
         let output=benchmark(2,&[8,16]).unwrap();
-        assert_eq!(output.lines().filter(|line|line.starts_with("METHOD_STATUS\t")).count(),24);
+        assert_eq!(output.lines().filter(|line|line.starts_with("METHOD_STATUS\t")).count(),36);
         assert!(output.contains("\tFIXED_HORIZON_ONLY"));
         assert!(!output.lines().any(|line|
             line.starts_with("RESULT_METRIC\t")
             && (line.contains("pCRP_star_fixed_horizon_grid33")
-                || line.contains("Logarithmic_Smoothing_fixed_horizon"))
+                || line.contains("Logarithmic_Smoothing_fixed_horizon")
+                || line.contains("Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon"))
             && line.contains("\tfamilywise_sequence_coverage\t")
         ));
     }
