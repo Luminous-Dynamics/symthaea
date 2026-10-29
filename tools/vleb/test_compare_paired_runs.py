@@ -134,6 +134,46 @@ class PairedComparisonTests(unittest.TestCase):
             round(100.0 * candidate["success_count"] / candidate["scheduled_trial_count"], 6),
         )
 
+    def test_pairwise_report_separates_resolved_disagreements_from_unresolved_cells(self) -> None:
+        result = self.fixture.analyze()
+        pair = result["pairwise_comparisons"][0]
+        rows = {
+            (row["task_id"], row["seed"], row["arm_id"]): row
+            for row in self.fixture.manifest["results"]
+        }
+        reference = self.fixture.manifest["reference_arm"]
+        comparison = pair["comparison_arm"]
+        cells = [
+            (rows[(task, seed, reference)]["outcome"], rows[(task, seed, comparison)]["outcome"])
+            for task in self.fixture.task_ids for seed in self.fixture.seeds
+        ]
+        self.assertEqual(pair["paired_trial_cell_count"], len(cells))
+        self.assertEqual(
+            pair["both_success_cells"] + pair["reference_only_success_cells"]
+            + pair["comparison_only_success_cells"] + pair["both_non_success_cells"],
+            len(cells),
+        )
+        self.assertEqual(
+            pair["success_disagreement_cells"],
+            pair["reference_only_success_cells"] + pair["comparison_only_success_cells"],
+        )
+        self.assertEqual(
+            pair["resolved_disagreement_cells"],
+            sum(left != "unresolved" and right != "unresolved" and left != right for left, right in cells),
+        )
+        self.assertEqual(
+            pair["unresolved_pair_cells"],
+            sum(left == "unresolved" or right == "unresolved" for left, right in cells),
+        )
+        self.assertEqual(
+            pair["effective_comparison_task_cluster_count"],
+            pair["task_clusters_won"] + pair["task_clusters_lost"],
+        )
+        self.assertEqual(
+            pair["effective_comparison_task_cluster_fraction_pct"],
+            round(100.0 * pair["effective_comparison_task_cluster_count"] / len(self.fixture.task_ids), 6),
+        )
+
     def test_deterministic_bootstrap_repeats_exactly(self) -> None:
         first = self.fixture.analyze()
         second = self.fixture.analyze()
