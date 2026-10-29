@@ -2,6 +2,9 @@ use science_bench_refresh_validator::{
     compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
     validate_manifest_bytes, verify_regeneration, verify_reveal,
 };
+use science_bench_refresh_validator::counterfactual_evidence::{
+    compute_evidence_intervention_plan_commitment, verify_evidence_intervention_plan,
+};
 use science_bench_refresh_validator::exact_protected_matcher::{
     compute_protected_index_commitment, match_search_exposure_exact,
     verify_search_exposure_exact_match_report, ProtectedSearchArtifactIndexCommitmentInput,
@@ -25,6 +28,8 @@ fn usage(program: &str) {
             "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
             "  {program} verify-search-receipt RECEIPT.json\n",
             "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
+            "  {program} commit-evidence-intervention-plan PLAN_FIELDS.json\n",
+            "  {program} verify-evidence-intervention-plan PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
             "  {program} verify-search-exact-matches RECEIPT.json\n",
@@ -53,6 +58,60 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-evidence-intervention-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "counterfactual evidence plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_evidence_intervention_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_counterfactual_evidence_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("evidence intervention plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-evidence-intervention-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "counterfactual evidence plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_evidence_intervention_plan(&plan_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("evidence intervention plan report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
         "commit-protected-index" => {
             if args.len() != 2 {
                 usage("science-bench-refresh-validator");
