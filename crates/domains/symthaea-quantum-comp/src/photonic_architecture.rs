@@ -1079,6 +1079,15 @@ mod tests {
             find_optical_route(1, &self_loop, 0, 0, OpticalRouteObjective::FewestHops),
             Err(PhotonicEnvelopeError::SelfLoopOpticalLink(0))
         ));
+
+        let duplicate_ids = [
+            OpticalLink { id: 7, from: 0, to: 1, loss_db: LossIntervalDb::new(0.1, 0.2, 0.3).unwrap() },
+            OpticalLink { id: 7, from: 1, to: 2, loss_db: LossIntervalDb::new(0.1, 0.2, 0.3).unwrap() },
+        ];
+        assert!(matches!(
+            find_optical_route(3, &duplicate_ids, 0, 2, OpticalRouteObjective::FewestHops),
+            Err(PhotonicEnvelopeError::DuplicateOpticalLinkId(7))
+        ));
     }
 
     #[test]
