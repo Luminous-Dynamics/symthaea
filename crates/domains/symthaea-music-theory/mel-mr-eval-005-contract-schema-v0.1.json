@@ -365,7 +365,8 @@
         "axis",
         "operation",
         "region_ids",
-        "target"
+        "target",
+        "tolerance"
       ],
       "properties": {
         "axis": {
