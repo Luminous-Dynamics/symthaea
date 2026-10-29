@@ -188,7 +188,7 @@ fn classification_rank(classification: &str) -> u8 {
 /// commitment field itself). The returned commitment still requires an external
 /// preregistration/append-only anchor to authenticate its value.
 pub fn compute_protected_index_commitment(
-    index: &ProtectedSearchArtifactIndexIndexInput,
+    index: &ProtectedSearchArtifactIndexCommitmentInput,
 ) -> Result<String, String> {
     let typed = ProtectedSearchArtifactIndexV1 {
         schema: PROTECTED_INDEX_SCHEMA.to_owned(),
@@ -204,7 +204,7 @@ pub fn compute_protected_index_commitment(
 /// Input helper for generating a protected index commitment.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ProtectedSearchArtifactIndexIndexInput {
+pub struct ProtectedSearchArtifactIndexCommitmentInput {
     pub generation_id: String,
     pub matcher_revision_sha256: String,
     pub decision_rules_sha256: String,
