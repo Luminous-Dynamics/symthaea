@@ -272,5 +272,80 @@
         "minLength": 1
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PASS"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "comparisons": {
+            "items": {
+              "properties": {
+                "matches_anchor": {
+                  "const": true
+                }
+              },
+              "required": [
+                "matches_anchor"
+              ]
+            }
+          },
+          "summary": {
+            "properties": {
+              "passed_anchor_count": {
+                "const": 6
+              },
+              "failed_anchor_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "MISMATCH"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "comparisons": {
+            "contains": {
+              "properties": {
+                "matches_anchor": {
+                  "const": false
+                }
+              },
+              "required": [
+                "matches_anchor"
+              ]
+            }
+          },
+          "summary": {
+            "properties": {
+              "failed_anchor_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
