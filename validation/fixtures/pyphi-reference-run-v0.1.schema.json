@@ -45,7 +45,10 @@
         "model_sha256",
         "model_digest_semantics",
         "source_fixture",
-        "source_url"
+        "source_url",
+        "evaluation_sha256",
+        "reference_manifest_sha256",
+        "analysis_request_digest_semantics"
       ],
       "properties": {
         "distribution": {
@@ -89,6 +92,18 @@
         },
         "source_url": {
           "const": "https://pyphi.readthedocs.io/en/latest/tutorials/worked-example.html"
+        },
+        "evaluation_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reference_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "analysis_request_digest_semantics": {
+          "type": "string",
+          "minLength": 20
         }
       }
     },
@@ -197,7 +212,9 @@
           "actual",
           "absolute_error_to_documented_anchor",
           "absolute_tolerance",
-          "matches_anchor"
+          "matches_anchor",
+          "quantity_id",
+          "analysis_request_sha256"
         ],
         "properties": {
           "id": {
@@ -232,6 +249,19 @@
           },
           "matches_anchor": {
             "type": "boolean"
+          },
+          "quantity_id": {
+            "type": "string",
+            "enum": [
+              "iit4_system_phi_s",
+              "iit4_cause_phi_c",
+              "iit4_effect_phi_e",
+              "iit4_structure_big_phi"
+            ]
+          },
+          "analysis_request_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }
