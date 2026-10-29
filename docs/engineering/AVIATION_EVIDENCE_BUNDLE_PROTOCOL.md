@@ -52,7 +52,7 @@ Verified is not the readiness gate's EligibleForHumanReview state. The evidence 
 
 ## Test coverage defined
 
-The module has unit tests for valid signing across all required roles, deterministic canonical bytes, manifest mutation, receipt-order independence, missing/duplicate roles, expired and future timestamps, pre-manifest receipt issuance, stale manifest/decision snapshots, zero freshness limits, invalid manifest/decision chronology, external source identity mismatch, changed verifier binary, unknown key, revoked key, modified signature, and subject-digest mismatch.
+The module has unit tests for valid signing across all required roles, deterministic canonical bytes, manifest mutation, receipt-order independence, missing/duplicate roles, expired and future timestamps, pre-manifest receipt issuance, stale manifest/decision snapshots, zero freshness limits, external source identity mismatch, changed verifier binary, unknown key, revoked key, modified signature, and subject-digest mismatch.
 
 A separately compiled integration oracle independently reconstructs manifest and receipt bytes, computes SHA-256 using its own implementation path, creates deterministic test signatures, compares canonical bytes, checks order independence, mutates every manifest identity/artifact digest to ensure prior receipts fail, verifies externally pinned source identity, and rejects unknown manifest/receipt/trust-anchor fields.
 

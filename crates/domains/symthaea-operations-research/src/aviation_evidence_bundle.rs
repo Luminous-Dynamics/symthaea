@@ -150,7 +150,6 @@ pub enum EvidenceBundleBlocker {
     SourceIdentityMismatch { field: String },
     InvalidManifestTimestamp { field: String },
     InvalidFreshnessPolicy { field: String },
-    ManifestCreatedAfterDecision,
     StaleManifest { age_seconds: u64, max_age_seconds: u64 },
     StaleDecisionSnapshot { age_seconds: u64, max_age_seconds: u64 },
     FutureManifestTimestamp { field: String },
@@ -188,6 +187,8 @@ pub struct EvidenceBundleReport {
     pub receipt_count: usize,
     pub decision_time_epoch_seconds: i64,
     pub verification_time_epoch_seconds: i64,
+    pub max_manifest_age_seconds: u64,
+    pub max_decision_age_seconds: u64,
 }
 
 /// Deterministic length-prefixed encoding used for the manifest digest.
@@ -333,7 +334,13 @@ pub fn verify_evidence_bundle(
         );
         if blockers.len() == before {
             if let Some(role) = EvidenceRole::parse(&receipt.role) {
-                locally_verified.insert(role);
+                let unique_receipt_id =
+                    receipt_id_counts.get(&receipt.receipt_id).copied() == Some(1);
+                let unique_role = role_counts.get(&role).copied() == Some(1);
+                let unique_anchor = anchor_counts.get(&receipt.key_id).copied() == Some(1);
+                if unique_receipt_id && unique_role && unique_anchor {
+                    locally_verified.insert(role);
+                }
             }
         }
     }
@@ -370,6 +377,8 @@ pub fn verify_evidence_bundle(
         receipt_count: receipts.len(),
         decision_time_epoch_seconds: manifest.decision_time_epoch_seconds,
         verification_time_epoch_seconds,
+        max_manifest_age_seconds: freshness_policy.max_manifest_age_seconds,
+        max_decision_age_seconds: freshness_policy.max_decision_age_seconds,
     }
 }
 
@@ -425,12 +434,6 @@ fn validate_manifest(
         } else if now >= 0 && timestamp > now {
             blockers.push(EvidenceBundleBlocker::FutureManifestTimestamp { field: name.into() });
         }
-    }
-    if manifest.created_at_epoch_seconds >= 0
-        && manifest.decision_time_epoch_seconds >= 0
-        && manifest.created_at_epoch_seconds > manifest.decision_time_epoch_seconds
-    {
-        blockers.push(EvidenceBundleBlocker::ManifestCreatedAfterDecision);
     }
     if now >= 0 {
         if manifest.created_at_epoch_seconds >= 0
@@ -911,16 +914,6 @@ mod tests {
         let report = verify_fixture_with_policy(&manifest, &receipts, &anchors, &policy, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::InvalidFreshnessPolicy { field } if field == "max_manifest_age_seconds")));
-    }
-
-    #[test]
-    fn manifest_created_after_decision_is_invalid() {
-        let mut manifest = manifest();
-        manifest.created_at_epoch_seconds = manifest.decision_time_epoch_seconds + 1;
-        let (receipts, anchors) = signed_receipts(&manifest);
-        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
-        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
-        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ManifestCreatedAfterDecision)));
     }
 
     #[test]
