@@ -685,7 +685,7 @@ mod tests{
             .clamp(0.0,0.4);
         let got=logarithmic_smoothing_lcb_profile(&profile,delta,w_max).unwrap();
         assert!((got-expected).abs()<1e-12,"got={got} expected={expected}");
-        assert!((got..=0.4).contains(&got));
+        assert!(got >= 0.0 && got <= 0.4);
     }
 
     #[test]
