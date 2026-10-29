@@ -546,6 +546,18 @@ fn midi_to_hz(midi: u8) -> f32 {
 /// (same reasoning, seconds/f32 instead of exact rational beats — this
 /// layer runs after humanize, which isn't exact-rational).
 fn deoverlap_performance_notes(notes: &mut Vec<Note>) {
+    let mut source_event_indices = vec![None; notes.len()];
+    deoverlap_performance_notes_with_lineage(notes, &mut source_event_indices);
+}
+
+/// De-overlap while applying every removal to the parallel source-event map.
+/// The note array and lineage array are one logical collection: dropping or
+/// truncating a note must never shift an adjacent note onto its identity.
+fn deoverlap_performance_notes_with_lineage(
+    notes: &mut Vec<Note>,
+    source_event_indices: &mut Vec<Option<usize>>,
+) {
+    debug_assert_eq!(notes.len(), source_event_indices.len());
     let mut order: Vec<usize> = (0..notes.len()).collect();
     order.sort_by(|&a, &b| notes[a].start_time.total_cmp(&notes[b].start_time));
     let mut to_remove = Vec::new();
@@ -566,7 +578,9 @@ fn deoverlap_performance_notes(notes: &mut Vec<Note>) {
     to_remove.dedup();
     for i in to_remove.into_iter().rev() {
         notes.remove(i);
+        source_event_indices.remove(i);
     }
+    debug_assert_eq!(notes.len(), source_event_indices.len());
 }
 
 /// Roll the tones of each block chord low-to-high like a real strum (plucked
@@ -575,7 +589,12 @@ fn deoverlap_performance_notes(notes: &mut Vec<Note>) {
 /// rubato map), so grouping by exact equality is reliable — and this must run
 /// BEFORE humanization, whose jitter breaks that exact equality. Each tone's
 /// duration is shortened by its offset so the chord still releases together.
-fn strum_chords(notes: &mut [(f64, Note)], instrument: Instrument) {
+fn strum_chords(
+    notes: &mut [(f64, Note)],
+    source_event_indices: &mut [Option<usize>],
+    instrument: Instrument,
+) {
+    debug_assert_eq!(notes.len(), source_event_indices.len());
     // A guitar/harp strum is a wider gesture than a piano roll.
     let step = if instrument.uses_karplus_strong() {
         0.012
@@ -590,7 +609,23 @@ fn strum_chords(notes: &mut [(f64, Note)], instrument: Instrument) {
             j += 1;
         }
         if j - i > 1 {
-            notes[i..j].sort_by(|a, b| a.1.frequency.partial_cmp(&b.1.frequency).unwrap());
+            // Sort the notes and their source identities as one operation.
+            let mut order: Vec<usize> = (i..j).collect();
+            order.sort_by(|&a, &b| {
+                notes[a]
+                    .1
+                    .frequency
+                    .partial_cmp(&notes[b].1.frequency)
+                    .unwrap()
+            });
+            let sorted: Vec<((f64, Note), Option<usize>)> = order
+                .iter()
+                .map(|&index| (notes[index], source_event_indices[index]))
+                .collect();
+            for (offset, (note, source_index)) in sorted.into_iter().enumerate() {
+                notes[i + offset] = note;
+                source_event_indices[i + offset] = source_index;
+            }
             for (k, (_, n)) in notes[i..j].iter_mut().enumerate() {
                 let offset = k as f32 * step;
                 n.start_time += offset;
@@ -1056,6 +1091,10 @@ pub struct PerformedVoice {
     pub name: String,
     pub instrument: String,
     pub notes: Vec<Note>,
+    /// Internal source-lineage sidecar used by Studio's evidence bundle.
+    /// Skipped in the legacy JSON payload to keep that wire shape unchanged.
+    #[serde(skip_serializing)]
+    pub source_event_indices: Vec<Option<usize>>,
 }
 
 /// The full performed rendition of a score under a spec: every voice
@@ -1074,6 +1113,7 @@ pub fn perform_with_spec(
             name: pv.name.to_string(),
             instrument: format!("{:?}", pv.instrument),
             notes: pv.notes,
+            source_event_indices: pv.source_event_indices,
         })
         .collect()
 }
@@ -1213,6 +1253,10 @@ pub(crate) struct PerformanceVoice {
     pub(crate) pan: f32,
     pub(crate) instrument: Instrument,
     pub(crate) notes: Vec<Note>,
+    /// Global onset-ordered Score::events() index for each primary note.
+    /// Generated voices and unresolved ancestry use None; this vector is
+    /// kept positionally aligned with notes through every transformation.
+    pub(crate) source_event_indices: Vec<Option<usize>>,
 }
 
 /// Build every performed voice for a score: the four theory roles, the
@@ -1258,6 +1302,7 @@ pub(crate) fn performance_voices_with_dialect(
     // `contrast_counter`) in its tenor register — a wind voice answering
     // the strings — panned between harmony and the lead.
     let mut voices: Vec<PerformanceVoice> = Vec::new();
+    let ordered_score_events = score.events();
     for (theory_role, name, muse_role, volume, instrument, pan) in [
         (
             TheoryRole::Bass,
@@ -1293,6 +1338,14 @@ pub(crate) fn performance_voices_with_dialect(
         ),
     ] {
         let is_melody_role = theory_role == TheoryRole::Melody;
+        // score.voice(role) is the stable role-specific subsequence of
+        // Score::events(); carry global event IDs in exactly that order.
+        let mut source_event_indices: Vec<Option<usize>> = ordered_score_events
+            .iter()
+            .enumerate()
+            .filter_map(|(index, note)| (note.role == theory_role).then_some(index))
+            .map(Some)
+            .collect();
         let mut beat_notes: Vec<(f64, Note)> = score
             .voice(theory_role)
             .iter()
@@ -1355,7 +1408,7 @@ pub(crate) fn performance_voices_with_dialect(
         // (nothing to roll), and it must jitter as its own player, not
         // locked to the chords: hence tags keyed on the THEORY role.
         if theory_role == TheoryRole::Harmony {
-            strum_chords(&mut beat_notes, instrument);
+            strum_chords(&mut beat_notes, &mut source_event_indices, instrument);
         }
         let voice_tag = match theory_role {
             TheoryRole::Bass => 0,
@@ -1389,7 +1442,7 @@ pub(crate) fn performance_voices_with_dialect(
         // notes are legitimately simultaneous chord tones, not a single
         // monophonic line.
         if theory_role != TheoryRole::Harmony {
-            deoverlap_performance_notes(&mut notes);
+            deoverlap_performance_notes_with_lineage(&mut notes, &mut source_event_indices);
         }
         voices.push(PerformanceVoice {
             name,
@@ -1398,6 +1451,7 @@ pub(crate) fn performance_voices_with_dialect(
             pan: pan.unwrap_or_else(|| pan_for_role(muse_role)),
             instrument,
             notes,
+            source_event_indices,
         });
     }
 
@@ -1476,6 +1530,7 @@ pub(crate) fn performance_voices_with_dialect(
                     // the image instead of stacking onto the same position.
                     pan: -0.2,
                     instrument: harmony_instrument,
+                    source_event_indices: vec![None; peak_notes.len()],
                     notes: peak_notes,
                 });
             }
@@ -1545,6 +1600,7 @@ pub(crate) fn performance_voices_with_dialect(
                         } else {
                             Instrument::Kalimba
                         },
+                        source_event_indices: vec![None; notes.len()],
                         notes,
                     })
                 }
