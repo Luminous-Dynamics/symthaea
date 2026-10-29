@@ -36,9 +36,10 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-007-report.json").read_text())
-          assert report["schema_version"] == "cmaq-007-exploitability-report-v0.3"
+          assert report["schema_version"] == "cmaq-007-exploitability-report-v0.4"
           assert report["seed_count"] == 256
           assert report["calibration_seed_root"] != report["qualification_seed_root"]
+          assert report["support_score_shift"].startswith("unsupported scores moved to [0.90, 1.00)")
           assert report["search_sizes"] == [8, 32, 128, 512]
           rows = report["summary"]
           assert len(rows) == 44
@@ -73,6 +74,7 @@ jobs:
               assert row["selected_threshold"] in expected_thresholds
               assert row["calibration_episode_count"] == 2048
               assert row["qualification_episode_count"] == 2048
+              assert row["shifted_qualification_episode_count"] == 2048
               assert row["calibration_unsupported_upper_bound"] <= row["target_unsupported_risk"]
               assert row["calibration_downside_upper_bound"] <= row["target_fallback_downside_risk"]
               assert row["model_gate_certified"] == (row["selected_threshold"] < 1.0)
@@ -114,6 +116,12 @@ jobs:
                       "qualification_coverage": row["qualification_coverage_rate"],
                       "qualification_regret": row["qualification_mean_regret"],
                       "fallback_regret": row["direct_fallback_mean_regret"],
+                      "shifted_qualification_unsupported_rate": row["shifted_qualification_unsupported_rate"],
+                      "shifted_qualification_downside_rate": row["shifted_qualification_downside_rate"],
+                      "shifted_qualification_coverage": row["shifted_qualification_coverage_rate"],
+                      "shifted_qualification_utility_lift": row["shifted_qualification_mean_utility_lift_vs_fallback"],
+                      "shifted_qualification_regret": row["shifted_qualification_mean_regret"],
+                      "shifted_fallback_regret": row["shifted_direct_fallback_mean_regret"],
                   }
                   for size, row in risk_by_size.items()
               }
