@@ -1,6 +1,6 @@
 //! VIS-DVPC-049: penalized best-CRP lower confidence bound for nonnegative IPS rewards.
 //!
-//! Implements the pCRP-star LCB defined in Section 3.1 of Ryu et al. (COLT 2025).
+//! Implements a conservative fixed-grid pCRP-star LCB comparator from Section 3.1 of Ryu et al. (COLT 2025).
 //! The bound uses a conservative feasible-wealth witness for the one-dimensional log-wealth
 //! maximization. It is a standalone comparator, not the complete COLT experiment suite.
 //!
@@ -233,10 +233,11 @@ fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, 
     }
 }
 
-/// pCRP-star lower confidence bound from Ryu et al. (COLT 2025), Eq. (3.3)-(3.5).
+/// Conservative fixed-grid pCRP-star LCB witness based on Ryu et al. (COLT 2025), Eq. (3.3)-(3.5).
 ///
-/// The pCRP-star wealth is (pi*(n+1))^(-1/2) times the best constant-bet CRP wealth.
-/// Using an achieved feasible wealth as a lower bound on the supremum makes the inversion conservative.
+/// The paper's pCRP-star wealth is (pi*(n+1))^(-1/2) times the continuous best-CRP wealth.
+/// This approximation uses a fixed-grid lower witness for that supremum, so its LCB can
+/// only be lower (more conservative) than the exact continuous-supremum LCB.
 fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
     if values.is_empty() {
         return Err("confidence bound requires at least one observation".into());
