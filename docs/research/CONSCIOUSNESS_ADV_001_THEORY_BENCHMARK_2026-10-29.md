@@ -80,6 +80,10 @@ Start with small, interpretable dynamical networks where the generating causal s
 
 The model evaluator must predict the effect of perturbations before the fixture executes. It should not simply read the generator label. Synthetic results qualify the mechanism test and score pipeline only; they do not establish which mechanism exists in the human brain.
 
+## Published prediction-card drafts
+
+Candidate operationalizations of the three theory divergences described in the Nature article are recorded in [CONSCIOUSNESS_ADV_001_PREDICTION_CARDS_DRAFT_V1.md](CONSCIOUSNESS_ADV_001_PREDICTION_CARDS_DRAFT_V1.md). They remain drafts, not frozen preregistrations: the exact OSF registration could not be opened by the research-browser interface during the source audit. No card may be treated as confirmatory until the exact registration version, registered windows/regions, outcome criteria, exclusions and deviations are directly captured and hashed.
+
 ## Public neural-data replication gate
 
 The source-discovery gate has now been audited in [CONSCIOUSNESS_ADV_001_PUBLIC_DATA_AUDIT_2026-10-29.md](CONSCIOUSNESS_ADV_001_PUBLIC_DATA_AUDIT_2026-10-29.md), with a machine-readable companion manifest in [CONSCIOUSNESS_ADV_001_DATASET_MANIFEST_V1.json](CONSCIOUSNESS_ADV_001_DATASET_MANIFEST_V1.json).
