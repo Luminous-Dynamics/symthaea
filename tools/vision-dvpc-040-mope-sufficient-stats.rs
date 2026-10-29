@@ -94,7 +94,7 @@ impl ObservedStats {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct PolynomialStats {
+pub(crate) struct PolynomialStats {
     c: f64,
     s: f64,
     q: f64,
