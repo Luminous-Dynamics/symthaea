@@ -358,6 +358,8 @@ struct Aggregate {
     promotion_times: Vec<usize>,
     root_checks: u64,
     root_failures: u64,
+    endpoint_collisions: u64,
+    grid_endpoint_advances: u64,
     elapsed_seconds_sum: f64,
     elapsed_seconds_sq_sum: f64,
     trials: usize,
@@ -365,8 +367,10 @@ struct Aggregate {
 impl Aggregate {
     fn add(&mut self, interval: Interval, point_cover: bool, sequence_cover: bool,
            promotion_time: Option<usize>, root_checks: u64, root_failures: u64,
-           elapsed_seconds: f64) {
+           endpoint_collisions: u64, grid_endpoint_advances: u64, elapsed_seconds: f64) {
         self.trials += 1;
+        self.endpoint_collisions += endpoint_collisions;
+        self.grid_endpoint_advances += grid_endpoint_advances;
         self.elapsed_seconds_sum += elapsed_seconds;
         self.elapsed_seconds_sq_sum += elapsed_seconds * elapsed_seconds;
         if point_cover { self.point_hits += 1; }
@@ -402,17 +406,18 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
     let max_horizon=*horizons.iter().max().unwrap();
     if max_horizon > MAX_HORIZON || horizons.iter().any(|h| *h==0) { return Err("horizon outside [1,512]".to_owned()); }
     let start=Instant::now();
-    let mut aggregates=vec![vec![Aggregate::default();horizons.len()];4];
+    let mut aggregates=vec![vec![Aggregate::default();horizons.len()];5];
     let mut samples_processed=0usize;
 
     for replicate in 0..replicates {
         let mut rng=SplitMix64::new(seed_for(scenario_index,replicate));
         let mut mope=MopePair::new(scenario.max_weight,max_horizon)?;
+        let mut mope_grid=MopeGridPair::new(scenario.max_weight)?;
         let mut moments=OpeMoments::default();
-        let mut seq_covered=[true;4];
-        let mut promotion_time:[Option<usize>;4]=[None;4];
-        let mut previous_intervals=[Interval{lower:0.0,upper:1.0};4];
-        let mut method_elapsed_seconds=[0.0_f64;4];
+        let mut seq_covered=[true;5];
+        let mut promotion_time:[Option<usize>;5]=[None;5];
+        let mut previous_intervals=[Interval{lower:0.0,upper:1.0};5];
+        let mut method_elapsed_seconds=[0.0_f64;5];
         let mut look_index=0usize;
 
         for t in 1..=max_horizon {
@@ -426,22 +431,26 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
             let mope_start=Instant::now();
             let mope_interval=mope.update(w,reward)?;
             method_elapsed_seconds[0]+=mope_start.elapsed().as_secs_f64();
+            let grid_start=Instant::now();
+            let grid_interval=mope_grid.update(w,reward)?;
+            method_elapsed_seconds[1]+=grid_start.elapsed().as_secs_f64();
             moments.update(w*reward);
-            let mut intervals=[Interval{lower:0.0,upper:1.0};4];
+            let mut intervals=[Interval{lower:0.0,upper:1.0};5];
             intervals[0]=mope_interval;
+            intervals[1]=grid_interval;
             // Reused Wald remains pointwise by design. Time-uniform methods use
             // the running intersection, matching the endpoint semantics of MOPE.
             let wald_start=Instant::now();
-            intervals[1]=baseline_interval(1,moments,scenario.max_weight);
-            method_elapsed_seconds[1]+=wald_start.elapsed().as_secs_f64();
-            for method in 2..4 {
+            intervals[2]=baseline_interval(1,moments,scenario.max_weight);
+            method_elapsed_seconds[2]+=wald_start.elapsed().as_secs_f64();
+            for method in 3..5 {
                 let method_start=Instant::now();
-                let raw=baseline_interval(method,moments,scenario.max_weight);
+                let raw=baseline_interval(method-1,moments,scenario.max_weight);
                 intervals[method]=running_intersection(previous_intervals[method],raw);
                 method_elapsed_seconds[method]+=method_start.elapsed().as_secs_f64();
             }
 
-            for method in 0..4 {
+            for method in 0..5 {
                 let interval=intervals[method];
                 let covers=interval.covers(scenario.true_value);
                 seq_covered[method] &= covers;
@@ -454,9 +463,10 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
                 for method in 0..4 {
                     let interval=intervals[method];
                     let diag=if method==0 {mope.diagnostics} else {MopeDiagnostics::default()};
+                    let grid_advances=if method==1 {mope_grid.diagnostics.endpoint_advances} else {0};
                     aggregates[method][look_index].add(interval,interval.covers(scenario.true_value),
                         seq_covered[method],promotion_time[method],diag.root_checks,diag.root_failures,
-                        method_elapsed_seconds[method]);
+                        diag.endpoint_collisions,grid_advances,method_elapsed_seconds[method]);
                 }
                 look_index+=1;
             }
