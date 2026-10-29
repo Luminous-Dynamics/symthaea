@@ -73,9 +73,10 @@ Under equal **total cumulative evaluation-cost budgets** compare:
 
 1. Full-fidelity random search (the reference baseline).
 2. Successive halving or Hyperband, with exact implementation and settings pinned.
-3. TPE/Bayesian multi-fidelity optimization, only if the version and fidelity inputs are available and reproducibly configured.
-4. Proxy-ranked promotion with a predeclared proxy.
-5. Symthaea-guided promotion using the frozen policy source SHA.
+3. MF-NAS or a faithful reimplementation of the published proxy-guided local-search/multi-fidelity method, when the search space and code are available; document every deviation rather than implying an exact replication.
+4. TPE/Bayesian multi-fidelity optimization, only if the version and fidelity inputs are available and reproducibly configured.
+5. Proxy-ranked promotion with a predeclared proxy.
+6. Symthaea-guided promotion using the frozen policy source SHA.
 
 Where possible, pair methods by the same landscape instance and seed. Count all fidelity evaluations, full candidate retries, invalid outcomes, and hidden restarts; do not charge only successful promotions. Report development/tuning costs separately from challenge-time costs. A system must not receive oracle scores or free proxy labels that are unavailable to the other methods.
 
