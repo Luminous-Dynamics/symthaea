@@ -814,7 +814,7 @@ mod tests {
         let report = build_report(bytes, &snapshots, &args(3));
         assert_eq!(report.status, "VALIDATED_NOT_STOPPED", "{:?}", report.errors);
         assert_eq!(report.walk_forward_forecast_status, "WALK_FORWARD_FORECASTS_RECORDED_NOT_PROMOTED");
-        assert_eq!(report.walk_forward_forecasts.len(), 4);
+        assert_eq!(report.walk_forward_forecasts.len(), 6);
         assert!(report.forecast_summaries.iter().any(|summary| {
             summary.metric_id == "query:path_count"
                 && summary.asymptotic_estimable_count == summary.forecast_count
