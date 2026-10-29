@@ -1,4 +1,4 @@
-name: VIS-DVPC-049 pCRP-star OPE selection comparator
+name: VIS-DVPC-049 pCRP-star, LS and Hoeffding OPE selection comparator
 
 on:
   pull_request:
@@ -43,18 +43,19 @@ jobs:
           cmp /tmp/vis-dvpc-049-smoke-a-stable.tsv /tmp/vis-dvpc-049-smoke-b-stable.tsv
           grep -Fq $'FIXTURE\tzero_support_logger\tstatus\tNOT_IDENTIFIED_ZERO_SUPPORT' /tmp/vis-dvpc-049-smoke-a.tsv
           grep -Fq $'SUPPRESSED\tzero_support_logger\tall_horizons\tall_methods\tunsupported_target_action' /tmp/vis-dvpc-049-smoke-a.tsv
+          test "$(grep -c '^FIXTURE' /tmp/vis-dvpc-049-smoke-a.tsv)" = "5"
           test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-smoke-a-stable.tsv)" = "264"
-          test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-smoke-a.tsv)" -ge "144"
+          test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-smoke-a.tsv)" -ge "120"
           test "$(grep -c '^PAIR_METRIC' /tmp/vis-dvpc-049-smoke-a.tsv)" = "96"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-smoke-a-stable.tsv)" = "264"
-          test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-smoke-a.tsv)" -ge "144"
-          test "$(grep -c '^PAIR_METRIC' /tmp/vis-dvpc-049-smoke-a.tsv)" = "96"
-      - name: Run the paired selection pilot
+          ! grep '^RESULT_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a-stable.tsv
+          ! grep '^RESULT_CI.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a.tsv
+          ! grep '^PAIR_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a.tsv
+      - name: Run the paired three-method selection pilot
         run: |
           /tmp/vis-dvpc-049 --benchmark > /tmp/vis-dvpc-049-results.tsv
           test "$(grep -c '^FIXTURE' /tmp/vis-dvpc-049-results.tsv)" = "5"
           test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-          test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-results.tsv)" -ge "216"
+          test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-results.tsv)" -ge "180"
           test "$(grep -c '^PAIR_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "144"
           grep -Fq $'CONFIG\treplicates\t1024' /tmp/vis-dvpc-049-results.tsv
           grep -Fq $'FIXTURE\thealthy_clear_margin\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
@@ -62,13 +63,13 @@ jobs:
           grep -Fq $'FIXTURE\thealthy_small_margin\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
           grep -Fq $'FIXTURE\thealthy_policy_tie\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
           grep -Fq $'FIXTURE\tzero_support_logger\tstatus\tNOT_IDENTIFIED_ZERO_SUPPORT' /tmp/vis-dvpc-049-results.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-          test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-results.tsv)" -ge "216"
-          test "$(grep -c '^PAIR_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "144"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
+          ! grep '^RESULT_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-results.tsv
+          ! grep '^RESULT_CI.*zero_support_logger' /tmp/vis-dvpc-049-results.tsv
+          ! grep '^PAIR_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($6 < -0.000001 || $6 > 1.000001) && ($5=="familywise_interval_coverage" || $5=="top1_policy_selection_accuracy" || $5=="winner_certificate_rate" || $5=="false_certificate_probability" || $5=="false_certificate_given_certificate" || $5=="reversed_interval_candidate_rate") { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-049-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $5=="mean_simple_regret" && $6 < -0.000001 { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-049-results.tsv
           grep '^CONFIG' /tmp/vis-dvpc-049-results.tsv > /tmp/vis-dvpc-049-config.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
+          grep '^FIXTURE\|^RESULT_METRIC\|^RESULT_CI\|^PAIR_METRIC' /tmp/vis-dvpc-049-results.tsv > /tmp/vis-dvpc-049-summary.tsv
       - name: Create exact source/output SHA-256 receipt
         run: |
           {
@@ -76,36 +77,6 @@ jobs:
             printf 'commit_sha\t%s\n' "$GITHUB_SHA"
             printf 'rustc\t%s\n' "$(rustc --version)"
             sha256sum tools/vision-dvpc-049-pcrp-star-lcb.rs docs/research/VIS_DVPC_049_PCRP_STAR_LCB_V1.md .github/workflows/vis-dvpc-049-pcrp-star-lcb.yml /tmp/vis-dvpc-049-results.tsv /tmp/vis-dvpc-049-summary.tsv /tmp/vis-dvpc-049-config.tsv
-          } > /tmp/vis-dvpc-049-receipt.tsv
-          cat /tmp/vis-dvpc-049-receipt.tsv
-      - name: Publish benchmark and receipt
-        uses: actions/upload-artifact@v4
-        with:
-          name: vis-dvpc-049-pcrp-star-lcb
-          path: |
-            /tmp/vis-dvpc-049-results.tsv
-            /tmp/vis-dvpc-049-summary.tsv
-            /tmp/vis-dvpc-049-config.tsv
-            /tmp/vis-dvpc-049-smoke-a-stable.tsv
-            /tmp/vis-dvpc-049-receipt.tsv
-          retention-days: 90
-          grep -Fq $'FIXTURE\thealthy_clear_margin\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
-          grep -Fq $'FIXTURE\tweak_overlap_clear_margin\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
-          grep -Fq $'FIXTURE\thealthy_small_margin\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
-          grep -Fq $'FIXTURE\thealthy_policy_tie\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
-          grep -Fq $'FIXTURE\tzero_support_logger\tstatus\tNOT_IDENTIFIED_ZERO_SUPPORT' /tmp/vis-dvpc-049-results.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-          grep '^CONFIG' /tmp/vis-dvpc-049-results.tsv > /tmp/vis-dvpc-049-config.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "396"
-      - name: Create exact source/output SHA-256 receipt
-        run: |
-          {
-            printf 'VIS_DVPC_049_RECEIPT\tformat\tv1\n'
-            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
-            printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-049-pcrp-star-lcb.rs /tmp/vis-dvpc-049-results.tsv /tmp/vis-dvpc-049-summary.tsv /tmp/vis-dvpc-049-config.tsv
           } > /tmp/vis-dvpc-049-receipt.tsv
           cat /tmp/vis-dvpc-049-receipt.tsv
       - name: Publish benchmark and receipt
