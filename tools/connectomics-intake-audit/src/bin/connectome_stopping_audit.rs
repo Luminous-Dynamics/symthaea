@@ -537,7 +537,8 @@ mod tests {
     fn broken_parent_digest_fails_closed() {
         let a = snapshot(0, 0, &"1".repeat(64), None, 1.0, 4.0);
         let b = snapshot(1, 1, &"2".repeat(64), Some(&"f".repeat(64)), 1.0, 4.0);
-        let report = build_report(&jsonl(&[a, b.clone()]), &[b.clone()], &args(2));
+        let snapshots = vec![a, b];
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(2));
         assert!(report.errors.iter().any(|error| error.contains("previous_graph_sha256")));
     }
 
@@ -545,7 +546,8 @@ mod tests {
     fn decreasing_edit_count_fails_closed() {
         let a = snapshot(0, 5, &"1".repeat(64), None, 1.0, 4.0);
         let b = snapshot(1, 4, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 4.0);
-        let report = build_report(&jsonl(&[a, b.clone()]), &[b.clone()], &args(2));
+        let snapshots = vec![a, b];
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(2));
         assert!(report.errors.iter().any(|error| error.contains("cumulative_committed decreased")));
     }
 
