@@ -324,11 +324,22 @@ fn validate_snapshot(snapshot: &Snapshot, position: usize) -> Vec<String> {
             errors.push(format!("{prefix}: query metric {name:?} has invalid name, unit, bounds, or value"));
         }
     }
+    if let Some(previous_digest) = snapshot.snapshot.previous_graph_sha256.as_deref() {
+        if !is_lower_hex(previous_digest, 64) {
+            errors.push(format!("{prefix}: previous_graph_sha256 must be 64 lowercase hexadecimal characters"));
+        }
+    }
     if snapshot.snapshot.sequence_index > 0 && snapshot.snapshot.previous_graph_sha256.is_none() {
         errors.push(format!("{prefix}: non-initial snapshot must declare previous_graph_sha256"));
     }
     if snapshot.snapshot.sequence_index == 0 && snapshot.snapshot.previous_graph_sha256.is_some() {
         errors.push(format!("{prefix}: initial snapshot must not declare previous_graph_sha256"));
+    }
+    if snapshot.snapshot.sequence_index > 0 && snapshot.edits.edits_since_previous_snapshot.is_none() {
+        errors.push(format!("{prefix}: non-initial snapshot must declare edits_since_previous_snapshot"));
+    }
+    if snapshot.snapshot.sequence_index == 0 && snapshot.edits.edits_since_previous_snapshot.is_some() {
+        errors.push(format!("{prefix}: initial snapshot must not declare edits_since_previous_snapshot"));
     }
     errors
 }
@@ -872,6 +883,18 @@ mod tests {
         let snapshots = vec![a, b];
         let report = build_report(&jsonl(&snapshots), &snapshots, &args(2));
         assert!(report.errors.iter().any(|error| error.contains("previous_graph_sha256")));
+    }
+
+    #[test]
+    fn missing_edit_delta_and_malformed_parent_digest_fail_closed() {
+        let first = snapshot(0, 0, &"1".repeat(64), None, 1.0, 4.0);
+        let mut second = snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 4.0);
+        second.edits.edits_since_previous_snapshot = None;
+        second.snapshot.previous_graph_sha256 = Some("bad-digest".into());
+        let snapshots = vec![first, second];
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(2));
+        assert!(report.errors.iter().any(|error| error.contains("previous_graph_sha256 must be 64")));
+        assert!(report.errors.iter().any(|error| error.contains("must declare edits_since_previous_snapshot")));
     }
 
     #[test]
