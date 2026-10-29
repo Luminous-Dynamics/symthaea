@@ -9,6 +9,7 @@ on:
       - "data/benchmarks/proof-insight-transfer-v0/**"
       - "docs/research/proof-insight-transfer-2026.md"
       - "scripts/research/pitb_component_allocation_sensitivity_v0.py"
+      - "docs/research/pitb-eligible-target-component-feasibility-2026-10-29.md"
       - ".github/workflows/proof-insight-transfer-v0.yml"
   workflow_dispatch:
 
