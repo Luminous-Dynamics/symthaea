@@ -86,6 +86,42 @@ fn verdict_name(verdict: PreservationVerdict) -> &'static str {
     }
 }
 
+
+/// Wilson score interval for a binomial proportion; returns None for no trials.
+/// The interval is descriptive here, not a substitute for family-aware sampling.
+fn wilson_95_interval(successes: usize, trials: usize) -> Option<(f64, f64)> {
+    if trials == 0 || successes > trials {
+        return None;
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width = z
+        * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
+        / denominator;
+    Some(((center - half_width).max(0.0), (center + half_width).min(1.0)))
+}
+
+fn rate_interval_json(events: usize, trials: usize) -> Value {
+    match wilson_95_interval(events, trials) {
+        Some((lower, upper)) => json!({
+            "events": events,
+            "trials": trials,
+            "rate": events as f64 / trials as f64,
+            "wilson_95_two_sided": { "lower": lower, "upper": upper },
+        }),
+        None => json!({
+            "events": events,
+            "trials": trials,
+            "rate": Value::Null,
+            "wilson_95_two_sided": Value::Null,
+        }),
+    }
+}
+
 fn acoustic_case(
     id: &str,
     mutation_family: &str,
@@ -383,6 +419,8 @@ fn main() -> ExitCode {
     let per_family_summary: Vec<Value> = family_counts
         .into_iter()
         .map(|(mutation_family, (cases_total, reproduced, critical_mutations, critical_false_accepts))| {
+            let critical_false_accept_metrics =
+                rate_interval_json(critical_false_accepts, critical_mutations);
             json!({
                 "mutation_family": mutation_family,
                 "cases_total": cases_total,
@@ -390,9 +428,17 @@ fn main() -> ExitCode {
                 "expected_outcomes_not_reproduced": cases_total - reproduced,
                 "critical_mutations": critical_mutations,
                 "critical_false_accepts": critical_false_accepts,
+                "critical_false_accept_rate": critical_false_accept_metrics,
             })
         })
         .collect();
+
+    let critical_false_accept_metrics =
+        rate_interval_json(critical_false_accepts, critical_mutations_total);
+    let positive_controls_total = cases
+        .iter()
+        .filter(|case| case["expected_verdict"] == Value::String("pass".to_owned()))
+        .count();
 
     let output = json!({
         "benchmark": "MEL-MR-EVAL-006",
@@ -407,7 +453,10 @@ fn main() -> ExitCode {
         "cases_expected_outcome_not_reproduced": failed,
         "critical_mutations_total": critical_mutations_total,
         "critical_false_accepts": critical_false_accepts,
+        "critical_false_accept_metrics": critical_false_accept_metrics,
+        "positive_controls_total": positive_controls_total,
         "false_rejections": false_rejections,
+        "false_rejection_metrics": rate_interval_json(false_rejections, positive_controls_total),
         "abstentions": abstentions,
         "per_family_summary": per_family_summary,
         "status": if failed == 0 { "conformance-fixtures-reproduced" } else { "conformance-fixtures-failed" },
