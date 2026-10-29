@@ -625,12 +625,13 @@ mod tests {
     fn same_generation_fragments_from_different_message_sequences_are_rejected() {
         let a = fragment_v3(10, 4, &sample(2048, 1)).unwrap();
         let b = fragment_v3(10, 5, &sample(2048, 2)).unwrap();
-        let mut assembler = FragmentAssemblerV3::new(&a[0]).unwrap();
+        let peer_context = [0x11; 32];
+        let mut assembler = FragmentAssemblerV3::new(peer_context, &a[0]).unwrap();
         for frame in &a[..6] {
-            assembler.feed(frame);
+            assembler.feed(&peer_context, frame);
         }
         for frame in &b[6..b.len() - 1] {
-            assert!(!assembler.feed(frame));
+            assert!(!assembler.feed(&peer_context, frame));
         }
         assert!(!assembler.is_complete());
     }
