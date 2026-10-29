@@ -539,6 +539,27 @@ fn derive_authorized_audio_mask(
     Ok(merged)
 }
 
+/// Derive the onset-evidence mask independently from the acoustic edit mask.
+/// A pitch or transpose edit changes spectral content, but the edited notes'
+/// attacks are still expected to occur. Do not mask them out. ScaleOnsets is
+/// fail-closed until the onset comparator supports a request-conditioned time
+/// warp rather than a naive source/candidate onset equality check.
+fn derive_authorized_onset_mask(
+    request: symthaea_music_theory::edit_locality::EditRequest,
+) -> Result<Vec<FrameInterval>, SymbolicAudioBindingError> {
+    match request.operation {
+        symthaea_music_theory::edit_locality::EditOperation::ScaleOnsets { .. } => {
+            Err(SymbolicAudioBindingError::UnsupportedScore(
+                "ScaleOnsets requires request-conditioned onset alignment and is not yet supported by this audio gate",
+            ))
+        }
+        symthaea_music_theory::edit_locality::EditOperation::Transpose { .. }
+        | symthaea_music_theory::edit_locality::EditOperation::ScaleDurations { .. }
+        | symthaea_music_theory::edit_locality::EditOperation::PitchAt { .. }
+        | symthaea_music_theory::edit_locality::EditOperation::DurationAt { .. } => Ok(Vec::new()),
+    }
+}
+
 fn full_score_binding_receipt_sha256(
     binding: &FullScoreRenderBinding,
 ) -> Result<String, SymbolicAudioBindingError> {
@@ -589,7 +610,7 @@ pub fn create_full_score_render_binding(
     // Validate the manifest before trusting its latency adjustment.
     renderer_manifest_sha256(renderer_manifest)?;
     let total_frames = source_audio.interleaved_samples.len() / source_audio.channels;
-    let expected_mask = derive_authorized_audio_mask(
+    let expected_acoustic_mask = derive_authorized_audio_mask(
         &source_events,
         &target_events,
         symbolic_evidence.request,
@@ -598,11 +619,15 @@ pub fn create_full_score_render_binding(
         total_frames,
         renderer_manifest.render_latency_frames,
     )?;
-    if acoustic_evidence.authorized_edits != expected_mask
-        || onset_evidence.authorized_edits != expected_mask
-    {
+    let expected_onset_mask = derive_authorized_onset_mask(symbolic_evidence.request)?;
+    if acoustic_evidence.authorized_edits != expected_acoustic_mask {
         return Err(SymbolicAudioBindingError::InvalidEvidence(
-            "audio authorization mask does not match the requested symbolic edit and score timing",
+            "acoustic edit mask does not match the requested symbolic edit and score timing",
+        ));
+    }
+    if onset_evidence.authorized_edits != expected_onset_mask {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "onset mask must preserve edited-note attacks; only request-conditioned operations may authorize onset exclusions",
         ));
     }
     let projected_binding = create_symbolic_audio_render_binding(
@@ -840,7 +865,7 @@ mod tests {
         let onset = audit_onset_preservation(
             audio_view(&source_audio),
             audio_view(&target_audio),
-            &edit_mask,
+            &[],
             &OnsetPreservationConfig {
                 frame_size: 128,
                 hop_size: 32,
