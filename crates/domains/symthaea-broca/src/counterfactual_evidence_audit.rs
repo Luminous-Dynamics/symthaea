@@ -164,6 +164,14 @@ fn validate_pair(pair: &CounterfactualPairFixture) -> Result<(), String> {
     if !ALLOWED_FAMILIES.contains(&pair.family.as_str()) {
         return Err(format!("unsupported mutation family {:?}", pair.family));
     }
+    let expected_kind = expected_mutation_kind(&pair.family)
+        .ok_or_else(|| format!("no pinned mutation kind for family {:?}", pair.family))?;
+    if pair.mutation.kind != expected_kind {
+        return Err(format!(
+            "mutation kind {:?} does not match family {:?}; expected {:?}",
+            pair.mutation.kind, pair.family, expected_kind
+        ));
+    }
     require_trimmed("mutation.kind", &pair.mutation.kind)?;
     if !ALLOWED_DECISION_RELATIONS.contains(&pair.mutation.expected_decision_relation.as_str()) {
         return Err(format!(
@@ -214,7 +222,43 @@ fn validate_pair(pair: &CounterfactualPairFixture) -> Result<(), String> {
             declared_changes, actual_changes
         ));
     }
+    let expected_path = expected_mutation_path(&pair.family)
+        .ok_or_else(|| format!("no pinned changed-field path for family {:?}", pair.family))?;
+    if actual_changes.as_slice() != [expected_path] {
+        return Err(format!(
+            "mutation family {:?} requires changed path {:?}, observed {:?}",
+            pair.family, expected_path, actual_changes
+        ));
+    }
     Ok(())
+}
+
+fn expected_mutation_kind(family: &str) -> Option<&'static str> {
+    match family {
+        "polarity_negation" => Some("polarity_flip"),
+        "temporal_validity" => Some("validity_expiration"),
+        "entity_binding" => Some("entity_swap"),
+        "scope_premise" => Some("scope_swap"),
+        "source_dependence" => Some("duplicate_source_projection"),
+        "missing_requirement" => Some("remove_required_outcome"),
+        "ordered_transition" => Some("terminal_state_flip"),
+        "correction_update" => Some("add_later_correction"),
+        "qualifier_context" => Some("qualifier_meaning_flip"),
+        _ => None,
+    }
+}
+
+fn expected_mutation_path(family: &str) -> Option<&'static str> {
+    match family {
+        "polarity_negation" | "ordered_transition" | "qualifier_context" => {
+            Some("evidence[0].text")
+        }
+        "temporal_validity" => Some("evidence[0].valid_until"),
+        "entity_binding" => Some("evidence[0].entity_id"),
+        "scope_premise" => Some("evidence[0].scope"),
+        "source_dependence" | "missing_requirement" | "correction_update" => Some("evidence"),
+        _ => None,
+    }
 }
 
 fn validate_evidence_set(
@@ -405,6 +449,23 @@ mod tests {
                 assert!(["answer", "abstain", "refine"].contains(&label.expected_decision.as_str()));
                 assert!(!label.expected_claim.trim().is_empty());
                 assert!(!label.supporting_evidence_ids.iter().any(|id| id.trim().is_empty()));
+                let source_case = input_pair
+                    .cases
+                    .iter()
+                    .find(|case| case.case_id == label.case_id)
+                    .expect("gold case belongs to this input pair");
+                let available_evidence_ids: BTreeSet<_> = source_case
+                    .evidence
+                    .iter()
+                    .map(|evidence| evidence.evidence_id.as_str())
+                    .collect();
+                assert!(
+                    label.supporting_evidence_ids
+                        .iter()
+                        .all(|id| available_evidence_ids.contains(id.as_str())),
+                    "gold support references evidence absent from case {}",
+                    label.case_id
+                );
             }
         }
         assert_eq!(seen_ids.len(), expected_ids.len(), "every case must have exactly one gold label");
