@@ -117,3 +117,6 @@ The report separates:
 The report binds the raw input artifacts by SHA-256, reports deterministic digest groups and bounded task-ID samples, and never emits evaluator-only labels or target values. Candidate groups are bounded to a sample of 20 task IDs per side while preserving total pair counts.
 
 This is intentionally a first, limited layer. It does not yet prove lineage independence, detect all semantic/unit-equivalent tasks, establish pretraining contamination status, or prove that a runner physically withheld evaluator-only data. Those remain separate gates in [SCI-BENCH-LEAKAGE-001 / #8842](https://github.com/Luminous-Dynamics/symthaea/issues/8842). Numeric candidate hits must be reviewed rather than silently counted as confirmed leakage.
+
+
+**Ordering requirement:** this command accepts raw task-set JSON bytes and does not itself verify the associated manifest, seed commitment, or regenerated task bytes. First require the existing `verify-reveal` and `verify-regeneration` gates to pass independently for each set; then run `audit-overlap` across the relevant splits. A report saying no overlap is detected is not a standalone scoring authorization.
