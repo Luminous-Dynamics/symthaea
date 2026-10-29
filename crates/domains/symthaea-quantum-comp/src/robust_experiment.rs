@@ -11,7 +11,7 @@
 //! physical likelihoods supplied by the caller.
 
 use crate::active_experiment::{
-    ActiveExperimentProblem, ExperimentDesignError, ExperimentScore,
+    ActiveExperimentProblem, ExperimentDesignError,
 };
 use std::error::Error;
 use std::fmt;
