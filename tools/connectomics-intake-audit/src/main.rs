@@ -15,6 +15,7 @@ use std::process::ExitCode;
 const DATASET_ID: &str = "jeffbbrown2/ConnectomeBench2";
 const DATASET_REVISION: &str = "v2";
 const UPSTREAM_REPO: &str = "https://github.com/timfarkas/ConnectomeBench2";
+const UPSTREAM_COMMIT: &str = "5679b39aa2641d8d0afeed88b441e696f87a66df";
 const ALLOWED_INPUT_COLUMNS: &[&str] =
     &["geometry", "geometry_single", "em_xy", "em_xz", "em_yz"];
 const EM_INPUT_COLUMNS: &[&str] = &["em_xy", "em_xz", "em_yz"];
@@ -162,6 +163,7 @@ fn semantic_checks(manifest: &Manifest) -> Vec<Check> {
         ("dataset_id", manifest.dataset_id.as_str(), DATASET_ID),
         ("dataset_revision", manifest.dataset_revision.as_str(), DATASET_REVISION),
         ("upstream_repo", manifest.upstream_repo.as_str(), UPSTREAM_REPO),
+        ("upstream_commit", manifest.upstream_commit.as_str(), UPSTREAM_COMMIT),
     ] {
         if actual == expected {
             checks.push(Check::pass(&format!("pinned_{name}"), format!("{name} matches the required value")));
@@ -573,7 +575,7 @@ mod tests {
             dataset_revision: DATASET_REVISION.into(),
             dataset_revision_commit_sha: "a".repeat(40),
             upstream_repo: UPSTREAM_REPO.into(),
-            upstream_commit: "b".repeat(40),
+            upstream_commit: UPSTREAM_COMMIT.into(),
             task: "split_correction_false_merge".into(),
             task_route_value: "false_merge_identification".into(),
             label_column: "false_merge_identification_label".into(),
