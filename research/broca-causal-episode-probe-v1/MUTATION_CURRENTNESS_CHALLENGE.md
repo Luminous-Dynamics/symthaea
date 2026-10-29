@@ -21,6 +21,8 @@ The ABA case matters: if an office address changes A → B → A, an old A recor
 - `fixtures/mutations/questions.jsonl`: 12 questions with source-pointer ground truth for required, forbidden/stale, and distractor evidence.
 - `run_probe.py`: accepts optional fixture paths while preserving the original defaults.
 - `score_probe.py`: scores required-support recall, ordinary complete-chain rate, **stale-aware complete-chain rate**, forbidden/stale hits, and distractor retrieval at the same fixed top-k budget.
+- `fixtures/mutations/eligibility-ledger.jsonl`: explicit status policy for every string source pointer (current, historical, revoked, tentative, not-applied, causal, or contextual).
+- `eligibility_filter.py`: provenance-bound eligibility-first ablation. It filters BM25 candidate pools before applying the final top-k budget and refuses unknown policy pointers. It uses manually annotated **oracle retrieval intent** to isolate the eligibility policy; it does not implement or evaluate a production query-intent classifier.
 
 From the repository root, after compiling the Rust worker:
 
@@ -32,10 +34,27 @@ python3 research/broca-causal-episode-probe-v1/run_probe.py \
   --candidate-k 20 --k 5 \
   --output /tmp/broca-mutation-candidates.jsonl
 
+# Baseline: take the first five BM25 candidates.
 python3 research/broca-causal-episode-probe-v1/score_probe.py \
   --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
   --predictions /tmp/broca-mutation-candidates.jsonl --k 5 \
-  --output /tmp/broca-mutation-score.json
+  --output /tmp/broca-mutation-bm25-score.json
+
+# Research upper bound: filter by explicit source eligibility before final top-k.
+python3 research/broca-causal-episode-probe-v1/eligibility_filter.py \
+  --predictions /tmp/broca-mutation-candidates.jsonl \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --trajectories research/broca-causal-episode-probe-v1/fixtures/mutations/trajectories.jsonl \
+  --ledger research/broca-causal-episode-probe-v1/fixtures/mutations/eligibility-ledger.jsonl \
+  --k 5 --output /tmp/broca-mutation-eligible.jsonl
+
+python3 research/broca-causal-episode-probe-v1/score_probe.py \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --predictions /tmp/broca-mutation-eligible.jsonl --k 5 \
+  --output /tmp/broca-mutation-eligible-score.json
+
+python3 research/broca-causal-episode-probe-v1/test_eligibility_filter.py
+python3 research/broca-causal-episode-probe-v1/test_mutation_fixtures.py
 ```
 
 Always preserve the generated manifest. It binds the worker binary hash, fixture hashes, retrieval settings, and prediction digest. Keep top-k fixed when comparing BM25, episode expansion, and any future semantic/HDC/graph arm.
@@ -43,6 +62,14 @@ Always preserve the generated manifest. It binds the worker binary hash, fixture
 ## What this does and does not test
 
 This suite measures retrieval support selection against manually authored synthetic labels. The `revocation` question tests whether a text retriever returns the revocation record; it does **not** test the worker's explicit tombstone API. The existing lifecycle probe remains the separate check for the explicit `supersede` operation. Likewise, the incident fixture tests retrieval of action/observation evidence, not causal identification in an intervention study.
+
+### Eligibility-first ablation and its limits
+
+The eligibility arm uses the same BM25 candidate pool as the baseline, then filters before truncating to the same final top-k. The ledger contains policy metadata for every string-valued source pointer; missing entries are rejected rather than passed through. Its receipt binds the original candidate receipt, worker hash, source fixture hashes, eligibility-ledger digest, policy version, and output digest.
+
+Question `retrieval_intent` is manually annotated and therefore an **oracle input**. This isolates whether a correct temporal/epistemic eligibility policy can prevent stale evidence from consuming the answer budget; it is an upper bound, not evidence that Broca can infer intent correctly. Do not compare its result to the baseline as a production-system win. The next experiment must replace the oracle intent with a separately evaluated classifier and report intent precision/recall, abstention, policy coverage, retained candidate count, and downstream safe-chain quality.
+
+For `current_state`, old records are filtered; for `historical_state`, the system must preserve access to historical evidence; revocation questions retrieve the revocation event, not the prior active claim; proposal-history questions may retrieve tentative/not-applied events; causal-chain questions can retain failed interventions needed to interpret an outcome. This explicitly separates lifecycle state from the question's intent.
 
 The labels are intentionally visible because this is a development diagnostic; it is not a hidden test set and must not be used to claim SOTA. Before publishing a benchmark result, grow the held-out set, have a second reviewer adjudicate every support pointer, add paraphrase variants, and include a blind negative-control partition.
 
