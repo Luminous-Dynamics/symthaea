@@ -85,7 +85,6 @@ fn run() -> Result<(), String> {
         }
 
         let mut samples = Vec::with_capacity(repeats);
-        let mut final_report = warmup;
         for _ in 0..repeats {
             let start = Instant::now();
             let report = enumerate_iit4_system_partitions_with_stats(
@@ -100,22 +99,21 @@ fn run() -> Result<(), String> {
             {
                 return Err(format!("partition counts changed during timed trial for n={}", fixture.units));
             }
-            final_report = report;
         }
 
         let median_ns = median_duration(&mut samples).as_nanos();
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
-        let duplicates = final_report.duplicate_cut_matrices_suppressed;
-        let validated = final_report.block_direction_assignments_evaluated == fixture.expected_assignments
-            && final_report.unique_non_total_cuts == fixture.expected_unique_cuts
+        let duplicates = warmup.duplicate_cut_matrices_suppressed;
+        let validated = warmup.block_direction_assignments_evaluated == fixture.expected_assignments
+            && warmup.unique_non_total_cuts == fixture.expected_unique_cuts
             && duplicates == fixture.expected_assignments - fixture.expected_unique_cuts;
 
         println!(
             "{},{},{},{},{},{},{},{}",
             fixture.units,
             repeats,
-            final_report.block_direction_assignments_evaluated,
-            final_report.unique_non_total_cuts,
+            warmup.block_direction_assignments_evaluated,
+            warmup.unique_non_total_cuts,
             duplicates,
             median_ns,
             min_ns,
