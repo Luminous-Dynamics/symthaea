@@ -50,6 +50,23 @@ All candidates and methods are evaluated at the same search sizes and episode se
 
 The interval is an exploratory normal approximation, not a guarantee of calibration for arbitrary dependence. The independent sampling unit is the seeded episode. Report raw policy-level metrics and the complete risk–coverage frontier; do not choose one threshold after looking at qualification results.
 
+## First exact-head smoke result (Rust)
+
+The initial focused workflow passed on source commit `c1cf6921ee68f02492ebf8e68d98c246a3ddccbd`: **7 Rust tests passed**, and the JSON report/schema and fixed-panel invariants passed ([workflow run 40952051883](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40952051883)). These numbers are the actual Rust workflow output for this commit, not the earlier kind of independent mirror result; this remains a synthetic smoke panel, not external qualification.
+
+| Search candidates | Mean prediction MAE | Greedy regret | Greedy unsupported selections | Uncertainty-penalty regret | Uncertainty-penalty unsupported selections | Strict support gate (0.97) regret | Strict gate unsupported selections / coverage |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.0391 | 0.0422 | 14.5% | 0.0666 | 21.1% | 0.1616 | 1.2% / 43.8% |
+| 32 | 0.0409 | 0.0911 | 29.7% | 0.1511 | 48.0% | 0.1439 | 2.0% / 91.0% |
+| 128 | 0.0411 | 0.1569 | 55.9% | 0.2462 | 85.2% | 0.0731 | 8.2% / 100% |
+| 512 | 0.0414 | 0.2414 | 89.5% | 0.2739 | 100% | 0.0646 | 15.2% / 100% |
+
+The strict 0.97 gate table entry is reported as *unsupported selections / coverage*. For comparison, the direct fallback's regret rises only from 0.1475 at size 8 to 0.1991 at size 512, with zero unsupported selections and zero model-candidate coverage. The 0.55 support gate at size 512 still selects an unsupported candidate in 69.9% of episodes and has regret 0.1924.
+
+**Interpretation:** in this chosen synthetic construction, mean prediction MAE changes only from roughly 0.039 to 0.041, while the greedy planner's unsupported-action selection rises from 14.5% to 89.5% as search size increases. A generic uncertainty penalty is worse here because the structural blind spots are overconfident; at 512 candidates it selects unsupported actions in every episode. A very strict support gate reduces that risk but cannot eliminate it under the deliberately overlapping support scores, and broad search eventually finds high-scored unsupported actions more often. The gate can also perform worse than fallback at low search size because it takes low-coverage risks.
+
+This demonstrates the intended falsification signal for this synthetic setup; it does **not** show that all real planners behave this way, that a support gate universally fixes it, or that Symthaea outperforms an industry baseline. The same result must be challenged with corrupted support signals, correlated/horizon-amplified errors and independently held-out environments before any generalization claim.
+
 ## Falsifiable research questions
 
 1. Does search breadth increase the unsupported-action selection rate or selected-action optimism gap while mean prediction MAE remains comparatively stable?
