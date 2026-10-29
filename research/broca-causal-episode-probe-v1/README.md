@@ -31,6 +31,8 @@ This is not a causal graph and does not solve currentness. The stale-address adv
 - `fixtures/mutations/eligibility-ledger.jsonl` and `eligibility_filter.py`: digest-bound eligibility-first ablation with an annotated-intent upper-bound mode and a transparent keyword baseline; unknown source pointers fail closed.
 - `test_eligibility_filter.py`: tests for eligibility policy, the oracle/heuristic distinction, fixed-budget selection, abstention, fail-closed behavior, and receipt integrity.
 - `test_mutation_fixtures.py`: tests for pointer coverage, currentness negatives, provenance reversions, and the synthetic causal/temporal labels.
+- `fixtures/mutations/dependency_snapshots.jsonl` and `dependency_cascade.py`: four synthetic revisions of a dependency graph and a reference truth-maintenance evaluator that classifies historical, stale-dependent, unknown-dependent, and current claims.
+- `test_dependency_cascade.py`: tests direct and transitive invalidation, partial downstream refresh, stale-value absence, full-chain restoration, historical auditability, and fail-closed graph validation.
 - `test_score_probe.py`: offline unit tests for scoring and fail-closed dataset matching.
 
 The worker must be built from the exact Symthaea checkout under test. A probe run is not a substitute for the official LongMemEval-V2 harness.
@@ -90,6 +92,21 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 3. Add an explicit typed transition graph only after the episode-expansion ablation is measured.
 4. Compare the arms on official LongMemEval-V2 and one independent action-oriented benchmark (e.g. AMA-Bench or Mem2ActBench); do not average their scores together.
 5. Run the mutation lane separately: supersede a fact, save/load memory, rebuild the index, and prove the old pointer is no longer eligible. That is a governance test, not a causal-chain score.
+
+## Dependency cascade and absence probe
+
+MEME: Multi-entity & Evolving Memory Evaluation isolates dependency cascade and absence—capabilities that static fact-recall metrics can miss. Its authors report very low default average accuracy on those tasks in their 100-episode study; the result is benchmark-specific, but it motivates our separate probe: https://arxiv.org/abs/2605.12477
+
+The new reference evaluator checks four snapshots: an initial current dependency chain, an upstream endpoint revision, a partial service-level refresh while the worker connection remains stale, and a complete downstream refresh. It computes a current view only from the latest revisions whose dependency references all point to latest/current dependencies. Stale values remain auditable and are excluded from the current view; missing dependencies become `unknown_dependency`; dependency cycles and duplicate revisions fail closed.
+
+```sh
+python3 research/broca-causal-episode-probe-v1/dependency_cascade.py \
+  --input research/broca-causal-episode-probe-v1/fixtures/mutations/dependency_snapshots.jsonl \
+  --output /tmp/broca-dependency-cascade-report.json
+python3 research/broca-causal-episode-probe-v1/test_dependency_cascade.py
+```
+
+This is a reference semantics and synthetic diagnostic, not a production worker integration or a benchmark score. Next, port the semantics into a Rust truth-maintenance implementation and test update transactions, rollback, persisted event replay, and index rebuilds against these expected transitions.
 
 ## Eligibility-first currentness ablation
 
