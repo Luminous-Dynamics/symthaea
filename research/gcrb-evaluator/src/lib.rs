@@ -399,6 +399,25 @@ pub fn evaluate_public_development(
         let observed = *by_id
             .get(expected.case_id.as_str())
             .expect("candidate case-set equality was checked above");
+        if observed.observed_disposition.trim().is_empty() {
+            return Err(format!("case {} has an empty observed disposition", expected.case_id));
+        }
+        for behavior in &observed.observed_required_behaviors {
+            if !expected.required_behaviors.contains(behavior) {
+                return Err(format!(
+                    "case {} reports unknown required behavior {behavior}",
+                    expected.case_id
+                ));
+            }
+        }
+        for behavior in &observed.observed_forbidden_behaviors {
+            if !expected.forbidden_behaviors.contains(behavior) {
+                return Err(format!(
+                    "case {} reports unknown forbidden behavior {behavior}",
+                    expected.case_id
+                ));
+            }
+        }
         let exact_match = expected.oracle_expected_disposition == observed.observed_disposition;
         let high_escalation = expected.class == "negative_control"
             && severity_rank(&observed.observed_severity).unwrap_or(0) >= 2;
@@ -677,5 +696,24 @@ mod tests {
             report.self_reported_hard_gate_violation_counts.get("prohibited_rights_or_authority_transition"),
             Some(&1)
         );
+    }
+
+
+    #[test]
+    fn rejects_unknown_candidate_behavior_labels() {
+        let fixture = fixture_bytes();
+        let mut value: serde_json::Value = serde_json::from_slice(&candidate_bytes(&fixture, "low", false)).unwrap();
+        value["cases"][0]["observed_required_behaviors"] = serde_json::json!(["unknown_behavior"]);
+        let result = evaluate_public_development(&fixture, &serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("unknown required behavior"));
+    }
+
+    #[test]
+    fn rejects_empty_observed_disposition() {
+        let fixture = fixture_bytes();
+        let mut value: serde_json::Value = serde_json::from_slice(&candidate_bytes(&fixture, "low", false)).unwrap();
+        value["cases"][0]["observed_disposition"] = serde_json::json!("   ");
+        let result = evaluate_public_development(&fixture, &serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("empty observed disposition"));
     }
 }
