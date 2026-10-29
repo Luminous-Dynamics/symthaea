@@ -134,7 +134,7 @@ pub struct EvaluatorSchedule {
     pub events: Vec<EvaluatorOutcomeRecord>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct EvaluatorOutcomeRecord {
     /// Original source ID, evaluator-only.
@@ -634,10 +634,14 @@ mod tests {
         assert!(!policy_json.contains("run_id"));
         assert!(!policy_json.contains("\"seed\""));
         assert!(policy_json.contains("observed_covariate"));
-        // Tick 7 has no outcome reveal in this deterministic fixture. A later tick is
-        // delivered separately and contains the outcome only once its reveal tick arrives.
+        // With immediate outcomes, tick 19 includes the event-19 pending notice and its
+        // same-tick reveal, but never any messages from a different logical tick.
         assert!(!policy_json.contains("outcome_loss"));
-        let reveal_tick = generated.policy_tick_input(19);
+        let mut immediate = fixture(MissingnessMechanism::Mcar, MissingnessDeclarationMode::Explicit);
+        immediate.config.base_missing_probability = 0.0;
+        immediate.config.delay = DelayPattern::Fixed { ticks: 0 };
+        let immediate_generated = generate(&immediate, b"immediate-reveal").unwrap();
+        let reveal_tick = immediate_generated.policy_tick_input(19);
         assert!(reveal_tick.messages.iter().all(|message| policy_message_tick(message) == 19));
         assert!(serde_json::to_string(&reveal_tick).unwrap().contains("outcome_loss"));
     }
