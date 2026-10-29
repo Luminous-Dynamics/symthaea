@@ -126,8 +126,8 @@ def make_fields(plan: dict[str, Any], plan_bytes: bytes) -> dict[str, Any]:
         "schema": SCHEMA,
         "plan_sha256": sha256(plan_bytes),
         "plan_commitment_sha256": plan["plan_commitment_sha256"],
-        "evaluator_revision_sha256": sha256(b"synthetic-frozen-evaluator"),
-        "decision_rules_sha256": sha256(b"synthetic-preregistered-rules"),
+        "evaluator_revision_sha256": plan["evaluator_revision_sha256"],
+        "decision_rules_sha256": plan["decision_rules_sha256"],
         "records": records,
     }
 
