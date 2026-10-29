@@ -228,7 +228,6 @@ fn rank_digest(component_id: &str) -> String {
     sha256(format!("{CANDIDATE_SEED}\0{component_id}").as_bytes())
 }
 
-/// Assign each complete component to one split. Components are visited in a
 /// Exact floor-based 70/15/15 quotas over independent components.
 fn component_quotas(component_count: usize) -> [usize; 3] {
     let train_end = component_count * 70 / 100;
