@@ -171,7 +171,7 @@ fn upstream_counterexample() -> Result<(Audit,Bet,f64),String> {
     let dgp=Dgp{
         name:"legacy_polytope_factor_floor_counterexample",
         h:vec![0.01,0.99],pi:vec![0.5,0.5],
-        reward_mean:vec![0.2,0.8],predictor:vec![1.0,0.0],max_weight:50.0,
+        reward_mean:vec![0.2,0.8],predictor:vec![0.999,0.001],max_weight:50.0,
     };
     let a=audit(&dgp)?;
     let w_max=50.0;
@@ -186,7 +186,7 @@ fn upstream_counterexample() -> Result<(Audit,Bet,f64),String> {
     if support_aware_feasible(bet,&a) {
         return Err("support-aware constraints unexpectedly accepted legacy witness".into());
     }
-    if !close(factor,0.45,1e-8) {
+    if !close(factor,0.455,1e-8) {
         return Err(format!("legacy factor witness changed: {factor}"));
     }
     Ok((a,bet,factor))
@@ -275,7 +275,7 @@ mod tests{
     fn legacy_encoded_feasible_region_has_a_candidate_factor_below_half(){
         let (_audit,bet,factor)=upstream_counterexample().unwrap();
         assert!(upstream_encoded_feasible(bet,50.0));
-        assert!(close(factor,0.45,1e-8));
+        assert!(close(factor,0.455,1e-8));
         assert!(factor<WEALTH_FLOOR);
     }
 
