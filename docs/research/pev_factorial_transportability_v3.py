@@ -31,6 +31,23 @@ def within(ci,margin): return ci["lo"] is not None and ci["lo"]>=-margin and ci[
 def covers(ci,truth): return ci["lo"] is not None and ci["lo"]<=truth<=ci["hi"]
 def rate(n,seeds): return n/seeds
 
+def interaction_contrast(arms):
+    """Return an interaction only when all four finite factorial arms exist."""
+    if set(arms) != set(ARMS):
+        return {"status":"interaction_not_identifiable","interaction":None}
+    if not all(math.isfinite(float(arms[k])) for k in ARMS):
+        return {"status":"invalid_outcome","interaction":None}
+    return {"status":"identified","interaction":arms["Y11"]-arms["Y10"]-arms["Y01"]+arms["Y00"]}
+
+def subgroup_profile(positive, negative):
+    """Keep subgroup effects explicit even when their equal-weight mean cancels."""
+    return {"positive":positive,"negative":negative,"pooled":(positive+negative)/2}
+
+def fixed_order_drift_artifact(quadratic):
+    """Expected contrast from positions 0,1,2,3 under quadratic timing drift."""
+    positions={"Y00":0,"Y10":1,"Y01":2,"Y11":3}
+    return quadratic*(positions["Y11"]**2-positions["Y10"]**2-positions["Y01"]**2+positions["Y00"]**2)
+
 def cluster_cal(seeds,clusters,rows_per_cluster,gamma,cluster_sd,noise_sd,seed):
     naive_ok=cluster_ok=0; naive_width=[]; cluster_width=[]
     for i in range(seeds):
@@ -90,18 +107,21 @@ def run(a):
     cl=cluster_cal(a.seeds,a.clusters,a.blocks_per_cluster,a.gamma,a.cluster_sd,a.noise_sd,a.seed)
     sub=subgroup_cal(a.seeds,a.clusters//2,a.blocks_per_cluster,a.subgroup_gamma,a.cluster_sd*0.1,a.noise_sd,a.seed+2_000_000,a.margin)
     dr=drift_cal(a.seeds,a.drift_blocks,a.drift_quad,a.noise_sd,a.seed+4_000_000)
-    mutations={"missing_joint_arm_abstains":None not in (0.1,0.05) if set(("Y00","Y10","Y01"))==set(ARMS) else True}
-    # Explicit mutation checks: missing Y11 must abstain, opposing strata must be preserved,
-    # and fixed-order quadratic drift must be large enough to trigger a guard.
-    mutations={"missing_joint_arm_abstains":set(("Y00","Y10","Y01"))!=set(ARMS),"opposing_subgroups_preserved":a.subgroup_gamma>0 and -a.subgroup_gamma<0,"fixed_order_drift_flagged":abs(4*a.drift_quad)>0.05}
+    missing_arm=interaction_contrast({"Y00":0.0,"Y10":0.1,"Y01":0.05})
+    profile=subgroup_profile(a.subgroup_gamma,-a.subgroup_gamma)
+    expected_bias=fixed_order_drift_artifact(a.drift_quad)
+    guard_tests={
+      "missing_joint_arm_abstains":missing_arm["status"]=="interaction_not_identifiable" and missing_arm["interaction"] is None,
+      "opposing_subgroups_preserved":profile["positive"]>0 and profile["negative"]<0 and abs(profile["pooled"])<1e-12,
+      "fixed_order_drift_flagged":abs(expected_bias)>0.05 and math.isclose(expected_bias,4*a.drift_quad,rel_tol=0,abs_tol=1e-12)}
     gates={
       "cluster_aware_coverage_93_97":0.93<=cl["coverage_95"]["cluster_mean_t"]<=0.97,
       "iid_interval_exposes_cluster_undercoverage":cl["coverage_95"]["row_iid_naive"]<0.80,
       "pooled_equivalence_with_subgroup_sign_recovery":sub["gate_rates"]["pooled_equivalence"]>=0.90 and sub["gate_rates"]["both_subgroups_recovered"]>=0.95,
       "randomization_removes_drift_bias":abs(dr["mean_interaction"]["randomized"])<0.01 and abs(dr["mean_interaction"]["fixed"])>0.05,
       "randomized_order_coverage_93_97":0.93<=dr["zero_coverage_95"]["randomized"]<=0.97,
-      "all_mutations_detected":all(mutations.values())}
-    return {"benchmark":"pev_factorial_transportability_v3","status":"synthetic_reference_only","base_seed":a.seed,"clustered_calibration":cl,"subgroup_sign_reversal":sub,"order_drift":dr,"mutation_tests":mutations,"gates":gates,"all_gates_passed":all(gates.values()),"limitations":["No production Symthaea Rust path imported or executed.","Synthetic generators do not cover every dependence or nonstationarity mechanism.","No CAR/REFLECT/DCFA/GCJR implementation was executed; no direct SOTA comparison is claimed.","Passing establishes only these reference-method properties, not task utility or SOTA superiority."]}
+      "all_guard_tests_passed":all(guard_tests.values())}
+    return {"benchmark":"pev_factorial_transportability_v3","status":"synthetic_reference_only","base_seed":a.seed,"clustered_calibration":cl,"subgroup_sign_reversal":sub,"order_drift":dr,"guard_tests":guard_tests,"gates":gates,"all_gates_passed":all(gates.values()),"limitations":["No production Symthaea Rust path imported or executed.","Synthetic generators do not cover every dependence or nonstationarity mechanism.","No CAR/REFLECT/DCFA/GCJR implementation was executed; no direct SOTA comparison is claimed.","Passing establishes only these reference-method properties, not task utility or SOTA superiority."]}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
