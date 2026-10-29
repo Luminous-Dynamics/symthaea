@@ -75,7 +75,16 @@ Compare the strongest simple baseline (lexical search / ripgrep or BM25) against
 
 ### E. Geodesic-assisted plan search
 
-Use existing `symthaea-geodesic::ProgramManifold` and HDC geometric operations as candidate retrieval/ranking mechanisms. Distinguish semantic embedding paths from valid discrete code-change paths. If claiming minimum-cost plans, use a qualified admissible heuristic or exact search reference; otherwise label geodesic values as ranking heuristics. Every proposed change transition requires preconditions, postconditions and replayable evidence.
+Use existing `symthaea-geodesic::ProgramManifold` and HDC geometric operations as candidate retrieval/ranking mechanisms. Repository inspection found an existing `scripts/coding_backend_hard_geodesic_ab.sh` lane that compares geodesic-rejection shadow mode with hard rejection and checks aggregate quality/pass-rate deltas, mean attempts, and shadow false positives. Extend and qualify this experiment before creating another A/B harness.
+
+Important current boundaries:
+- `ProgramManifold` is implemented as a discrete set of specification fibers assigned by BinaryHV similarity; it is not, by itself, a general smooth manifold with a graph of executable code-edit transitions.
+- `crates/domains/symthaea-geodesic/src/codebase_bridge.rs` indexes Rust `.rs` files today. Cross-language indexing must be a separate, explicit capability claim.
+- `ast_bridge::pdg_from_entities` currently accepts extracted entities but delegates to the line-level Rust-source parser rather than using those entities to build the graph. Measure this fidelity boundary before relying on the bridge for AST-aware claims.
+- The existing A/B script compares aggregate reports; add exact task-level matched outcomes, frozen task/seed identities, confidence intervals, and change-family/language strata before making broader conclusions.
+- `FiberPoint.quality` is an input score clamped to [0,1], not a certificate. Bind it to verifiable provenance if it influences candidate ranking.
+
+Distinguish semantic embedding paths from valid discrete code-change paths. If claiming minimum-cost plans, use a qualified admissible heuristic or exact search reference; otherwise label geodesic values as ranking heuristics. Every proposed change transition requires preconditions, postconditions and replayable evidence.
 
 ### F. Language and toolchain adapters
 
