@@ -1,4 +1,4 @@
-use lep_conformance::{verify_statement, ValidationReport};
+use lep_conformance::{parse_json_unique_keys, verify_statement, ValidationReport};
 use serde_json::Value;
 use std::env;
 use std::fs;
@@ -37,10 +37,12 @@ fn main() -> ExitCode {
         }
     };
 
-    let statement: Value = match serde_json::from_slice(&bytes) {
+    let statement: Value = match parse_json_unique_keys(&bytes) {
         Ok(value) => value,
         Err(error) => {
-            let report = ValidationReport::invalid_json(format!("Invalid JSON statement: {error}"));
+            let report = ValidationReport::invalid_json(format!(
+                "Invalid JSON statement (including duplicate-key rejection): {error}"
+            ));
             emit(&report);
             return ExitCode::from(2);
         }
