@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,11 @@ if __name__ == "__main__":
             "commands": [{
                 "command_id": "python-contract",
                 "argv": [sys.executable, "-m", "unittest", "test_contract"],
+                "environment": {
+                    "PATH": os.environ.get("PATH", ""),
+                    "HOME": os.environ.get("HOME", str(Path.home())),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
                 "working_directory": ".",
                 "timeout_seconds": 10,
                 "test_start_pattern": r"Ran [1-9]\d* tests?",
@@ -280,6 +286,22 @@ class ContractTest(unittest.TestCase):
         manifest["commands"][0]["pass_pattern"] = "["
         with self.assertRaisesRegex(verifier.ControlError, "invalid regex"):
             verifier.validate_manifest(manifest)
+
+    def test_manifest_rejects_secret_environment_variables(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["commands"][0]["environment"]["API_KEY"] = "must-not-be-present"
+        with self.assertRaisesRegex(verifier.ControlError, "secret-bearing"):
+            verifier.validate_manifest(manifest)
+
+    def test_command_environment_digest_is_recorded_without_environment_values(self) -> None:
+        result = self.run_controls()
+        row = result["baseline_results"][0]
+        self.assertEqual(row["environment_sha256"], sha(json.dumps(
+            self.manifest["commands"][0]["environment"],
+            sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        ).encode("utf-8")))
+        self.assertEqual(row["environment_names"], sorted(self.manifest["commands"][0]["environment"]))
+        self.assertNotIn("environment", row)
 
     def test_zip_rejects_path_traversal(self) -> None:
         with self.assertRaisesRegex(verifier.ControlError, "unsafe test bundle path"):
