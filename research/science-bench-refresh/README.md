@@ -287,7 +287,18 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
   verify-evidence-outcomes plan.json outcome-report.json
 ```
 
-The first command validates the plan and complete outcome coverage, then emits a domain-separated typed SHA-256 commitment. Attach that value as `report_commitment_sha256` in the full report. The verifier requires one ordered record for every exact planned pair/trial/condition, including timeouts, blocked trials, invalid receipts, contaminated trials and trials never started. It fails closed on missing, extra, duplicated or mismatched records.
+The first command validates the plan and complete outcome coverage, then emits a domain-separated typed SHA-256 commitment. Attach that value as `report_commitment_sha256` in the full report:
+
+```sh
+commit="$(cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-evidence-outcomes plan.json outcome-fields.json | jq -r '.report_commitment_sha256')"
+jq --arg commitment "$commit" '. + {report_commitment_sha256: $commitment}' \
+  outcome-fields.json > outcome-report.json
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-evidence-outcomes plan.json outcome-report.json
+```
+
+The verifier requires one ordered record for every exact planned pair/trial/condition, including timeouts, blocked trials, invalid receipts, contaminated trials and trials never started. It fails closed on missing, extra, duplicated or mismatched records.
 
 Keep these axes separate: terminal/execution disposition; answer/abstention status; task correctness; evidence use; claim support; abstention quality; confidence availability/source; and native resource counters. Confidence is probability in millionths, and null means *not recorded*, not zero. Per-condition summaries report category counts, confidence coverage and, for each resource field, both the number of observations and sum of observed values. Missing fields are not imputed as zero. No combined evidence/trust score or generalized-performance confidence interval is emitted.
 
