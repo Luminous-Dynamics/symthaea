@@ -49,6 +49,8 @@ References and scope notes:
 
 The Hugging Face dataset card explicitly warns that `main` points to the initially submitted V1; the revision used by the paper is `v2`. The card's current `main` snapshot describes 401,170 samples, while the paper abstract reports more than 716,485 expert-labeled decisions. These are version-dependent counts, not numbers to reconcile by assumption. Pin the dataset revision and file hashes before reporting counts or metrics.
 
+The upstream code was independently inspected at commit [`5679b39aa2641d8d0afeed88b441e696f87a66df`](https://github.com/timfarkas/ConnectomeBench2/commit/5679b39aa2641d8d0afeed88b441e696f87a66df). In `src/neurips_training/data.py::route_row`, `false_merge_identification` is routed to `false_merge_identification_label = !same_neuron`, while `false_split_correction` is routed to `false_split_correction_label = same_neuron`; that loader selects `geometry_single` for the former and dual `geometry` for the latter. `scripts/data_generation/neurips/postprocess_giga_parquet.py::derive_task_routing` defines the route membership from sample type and mask presence. The Rust intake utility and JSON Schema now pin this exact upstream code commit so a future source change cannot silently inherit the current task contract.
+
 The dataset schema and instructions introduce several high-priority leakage guards:
 
 - `task_routing` defines which tasks a row is valid for. Filter through the verified routing semantics, not just a populated boolean label column.
