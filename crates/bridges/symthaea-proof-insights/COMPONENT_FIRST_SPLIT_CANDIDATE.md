@@ -18,9 +18,24 @@ A successor should make the independent unit consistent across the entire protoc
 
 It verifies that the input split is exactly the pinned v0 family universe and partition; checks that the component manifest is bound to that partition; reconciles every family-to-component row against the component membership lists; rejects duplicate, missing, unknown, or contradictory memberships; and emits a deterministic candidate assignment with every component kept whole.
 
-The candidate allocator uses a fixed seed and a deterministic component order, then assigns each whole component to the split with the largest remaining fraction of its target family capacity. Because components are indivisible, the output reports actual family and component counts; exact 70/15/15 family proportions are not guaranteed. No outcome-derived quantity is used to allocate splits.
+The allocator uses a two-stage design:
+
+1. Sort components by a fixed SHA-256 rank and allocate them to exact floor-based 70/15/15 **component-count quotas**. This makes the independent resampling unit the primary split unit.
+2. Repeatedly apply the best deterministic cross-split component swap that reduces the sum of squared relative errors from the target family counts. Every move swaps one component for another, so component quotas cannot change. The search stops at a deterministic one-swap local optimum; it does not claim a global optimum.
+
+The family-balance objective uses no theorem outcomes. The output reports family and component counts/shares, target component quotas, and the maximum absolute share error for each denominator. Exact 70/15/15 family proportions are not guaranteed, especially when the graph contains giant components. These diagnostics make that trade-off visible rather than concealing it.
 
 The output is always marked `candidate_only` and `qualified_for_confirmatory_use: false`. The command is a design instrument, not a new benchmark result.
+
+### Synthetic allocation screen
+
+`scripts/research/pitb_component_allocation_sensitivity_v0.py` compares the hash-ordered family-deficit heuristic to the component-quota-first swap optimizer on synthetic component-size profiles. It is design-only and uses no PITB relationship inventory or theorem outcomes. Reproduce with:
+
+```bash
+python scripts/research/pitb_component_allocation_sensitivity_v0.py --random-replicates 1000 --output /tmp/pitb-allocation-screen.json
+```
+
+An authoring-session prototype with 1,000 randomized 372-family size profiles found that the component-quota-first swap method had lower maximum family-share error in 906 cases, equal error in 94, and higher error in none; the maximum of family-share and component-share errors improved in 990 cases, was equal in 6, and was worse in 4. Mean candidate-minus-legacy component-share error was approximately -0.0304. These figures are **synthetic screening observations**, not a verified run of the checked-in script and not evidence about the real PITB graph. The checked-in script is the reproducible path; its output should be generated and reviewed before those figures are treated as a published result.
 
 ## Critical trust-boundary blocker
 
