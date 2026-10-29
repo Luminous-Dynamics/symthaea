@@ -302,7 +302,7 @@ pub fn verify_search_exposure_exact_match_report(
 ) -> Result<SearchExposureMatchVerificationReportV1, String> {
     let receipt: SearchExposureReceiptV1 = serde_json::from_slice(receipt_bytes)
         .map_err(|error| format!("receipt does not match strict v1 shape: {error}"))?;
-    let index = validate_protected_index_bytes(protected_index_bytes, &receipt.generation_id)?;
+    let _index = validate_protected_index_bytes(protected_index_bytes, &receipt.generation_id)?;
     let expected = match_search_exposure_exact(receipt_bytes, protected_index_bytes)?;
     let supplied: SearchExposureMatchReportV1 = serde_json::from_slice(match_report_bytes)
         .map_err(|error| format!("match report does not match strict v1 shape: {error}"))?;
@@ -317,9 +317,7 @@ pub fn verify_search_exposure_exact_match_report(
     if supplied.protected_index_sha256 != sha256_hex(protected_index_bytes) {
         return Err("match report does not bind exact protected index bytes".to_owned());
     }
-    let report = verify_search_exposure_match_report(receipt_bytes, match_report_bytes)?;
-    let _ = index;
-    Ok(report)
+    verify_search_exposure_match_report(receipt_bytes, match_report_bytes)
 }
 
 #[cfg(test)]
@@ -328,7 +326,6 @@ mod tests {
     use crate::search_exposure::{
         SEARCH_RECEIPT_SCHEMA, SearchExposureEventV1, event_hash, receipt_hash,
     };
-    use serde_json::json;
 
     const ZERO: &str =
         "0000000000000000000000000000000000000000000000000000000000000000";
