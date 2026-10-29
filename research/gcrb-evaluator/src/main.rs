@@ -1,5 +1,5 @@
 use gcrb_evaluator::trace_audit::audit_trace_bytes;
-use gcrb_evaluator::{evaluate_public_development, generate_parameterized_controls, validate_fixture_bytes};
+use gcrb_evaluator::{evaluate_public_development, generate_parameterized_controls, validate_combined_campaign_bytes, validate_fixture_bytes};
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -9,6 +9,7 @@ fn usage() {
         "GCRB public-development evaluator\n\n\
          Usage:\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-fixture <fixture.json>\n\
+         cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-campaign <source-fixture.json> <campaign.json>\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls <fixture.json> <count> <master-seed> <output.json>\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate <fixture.json> <candidate-report.json> [report-output.json]\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- trace-audit <fixture.json> <trace.json> [audit-report.json]\n\n\
@@ -33,6 +34,13 @@ fn run() -> Result<(), String> {
         [command, fixture_path] if command == "validate-fixture" => {
             let fixture_bytes = read_file(fixture_path)?;
             let summary = validate_fixture_bytes(&fixture_bytes)?;
+            print_json(&summary)
+        }
+
+        [command, fixture_path, campaign_path] if command == "validate-campaign" => {
+            let fixture_bytes = read_file(fixture_path)?;
+            let campaign_bytes = read_file(campaign_path)?;
+            let summary = validate_combined_campaign_bytes(&fixture_bytes, &campaign_bytes)?;
             print_json(&summary)
         }
 
