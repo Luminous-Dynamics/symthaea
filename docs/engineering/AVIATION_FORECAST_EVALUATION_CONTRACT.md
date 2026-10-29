@@ -73,3 +73,18 @@ The module defines unit tests for provenance binding/invalid hashes, point metri
 A separately compiled test oracle recomputes RMSE, MAE, bias, and P90 absolute error from raw fixtures without using production metric helpers. It also checks the prospective timing gate, feature-time leakage rejection, deterministic cohort ordering, and partition separation.
 
 These are test definitions, not passing evidence. The code must be formatted and built with the exact tested commit before any claim that the tests pass. No real-data experiment has been executed as part of this change.
+
+
+## Paired baseline comparison with cluster-bootstrap uncertainty
+
+The companion module \`aviation_forecast_comparison.rs\` compares a baseline and a candidate on the same record IDs, data snapshot, evaluation protocol, evaluator commit, decision times, target windows, labels, cohorts, and event-cluster IDs. Model/configuration and feature-schema digests may differ because those are what a baseline comparison is meant to vary.
+
+It computes paired candidate-minus-baseline RMSE and MAE differences, then estimates percentile confidence intervals by resampling whole event clusters (such as airport-days or disruption episodes) with replacement. A published seed, replicate count, confidence level, data snapshot, and run IDs make the calculation deterministic and auditable. Every replicate preserves all observations within each sampled cluster, rather than pretending correlated flight rows are independent.
+
+The default research target is a 95% interval from at least 1,000 replicates in final evaluations. Small unit fixtures may use fewer replicates to keep tests cheap; they are correctness fixtures, not inferential results. The code refuses fewer than 100 replicates, malformed confidence levels, fewer than two clusters, mismatched snapshots/protocol/evaluator, record-set mismatch, changed labels or target timing, and changed cluster/cohort identities.
+
+Interpretation:
+- A negative RMSE/MAE difference favors the candidate; positive favors the baseline.
+- The fraction of bootstrap replicates with lower candidate RMSE is descriptive, not a p-value.
+- Cluster-bootstrap intervals assume the sampled clusters are reasonably exchangeable for the inference target. They do not protect against arbitrary temporal drift or a shifted future season; retain chronological/airport-held-out tests.
+- An interval below zero supports predictive-error improvement on this locked evaluation partition only. It does not show causal airline savings or improved disruption recovery. Policy value remains a separate event-stream experiment under issue #8603.

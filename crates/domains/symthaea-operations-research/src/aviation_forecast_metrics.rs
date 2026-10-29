@@ -142,6 +142,7 @@ pub struct ForecastEvaluationReport {
 
 #[derive(Debug, Clone)]
 struct ScoredRow {
+    record_id: String,
     event_cluster_id: String,
     cohort_id: String,
     signed_error: f64,
@@ -318,6 +319,7 @@ pub fn evaluate_forecasts(
         });
 
         scored.push(ScoredRow {
+            record_id: observation.record_id.clone(),
             event_cluster_id: observation.event_cluster_id.clone(),
             cohort_id: observation.cohort_id.clone(),
             signed_error,
@@ -330,6 +332,8 @@ pub fn evaluate_forecasts(
         });
     }
 
+    // Stabilize floating-point aggregation across different input row orders.
+    scored.sort_by(|a, b| a.record_id.cmp(&b.record_id));
     let overall_rows: Vec<&ScoredRow> = scored.iter().collect();
     let overall = summarize(&overall_rows)?;
     let mut cohort_rows = BTreeMap::<String, Vec<&ScoredRow>>::new();
