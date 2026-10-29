@@ -103,23 +103,33 @@ The new `anytime_change_mixture.rs` module adds a second detector family alongsi
 
 ### Conditional-null contract
 
-Assume the next Bernoulli event has a predictable conditional rate (p_tin[0.48,0.52]), where the rate may depend on all observations seen so far. For an upward alternative (q>0.52), define a likelihood-ratio increment against the upper edge (u=0.52):
+Assume each Bernoulli event has a predictable conditional probability `p_t` in the closed interval `[0.48, 0.52]`. The probability may depend on the full observed history; the null is not IID.
 
-[
-L_t(q)=egin{cases}q/u,&X_t=1\(1-q)/(1-u),&X_t=0.end{cases}
-]
+For an upward alternative `q > 0.52`, the likelihood-ratio increment against upper edge `u = 0.52` is:
 
-For each accepted-null conditional rate (p_tle u), (mathbb{E}[L_t(q)midmathcal F_{t-1}]le1). For a downward alternative (q<0.48), use the analogous Bernoulli likelihood ratio against the lower edge (l=0.48); its conditional expectation is at most one when (p_tge l). These statements do not require IID observations.
+```text
+L_t(q) = q/u                 if X_t = 1
+         (1-q)/(1-u)         if X_t = 0
+```
 
-For each ((q,h)), the detector mixes all possible change starts using the geometric prior (pi_k=h(1-h)^{k-1}). With active suffix wealth (A_t), its recurrence is
+For every accepted conditional rate `p_t <= u`, the conditional expectation of `L_t(q)` is at most one. For a downward alternative `q < 0.48`, use the analogous Bernoulli likelihood ratio against lower edge `l = 0.48`; its conditional expectation is at most one when `p_t >= l`. Neither result requires IID observations.
 
-[
-A_t=L_t(q)(A_{t-1}+pi_t),qquad E_t=A_t+(1-h)^t.
-]
+For each alternative rate and hazard `h`, the detector mixes all possible change starts with prior weight `pi_k = h * (1-h)^(k-1)`. With active suffix wealth `A_t`, its recurrence is:
 
-The final term is the probability mass of change starts that have not occurred yet. It keeps each component initialized at (E_0=1) and preserves the nonnegative-supermartingale property. A fixed equal-weight portfolio over both directions, five alternative rates per direction, and three hazards remains an e-process. The hazard grid ({0.04,0.01,0.0025}) spans prior mean start times of 25, 100, and 400 observations. Log-space arithmetic avoids overflow; crossing (log E_t ge -log(alpha)) at any time gives the usual Ville bound under this explicit null.
+```text
+A_t = L_t(q) * (A_(t-1) + pi_t)
+E_t = A_t + (1-h)^t
+```
 
-**Claim ceiling:** this guarantee only concerns Bernoulli streams whose predictable conditional event rates stay in [0.48, 0.52]. It does not cover arbitrary feature-distribution shift or remove the need to verify that the null band is scientifically appropriate. The selection-bias control at observed rate 0.74 is intentionally outside the band.
+The final term is the mass of change starts that have not occurred yet. It keeps each component initialized at `E_0 = 1` and preserves the nonnegative-supermartingale property. A fixed equal-weight mixture over both directions, five alternative rates per direction, and three hazards remains an e-process. Crossing `E_t >= 1/alpha` at any time gives the usual Ville bound under this explicit null contract.
+
+The implementation uses 30 components:
+- Upward alternatives: `{0.55, 0.60, 0.70, 0.80, 0.90}`, against upper edge `0.52`.
+- Downward alternatives: `{0.45, 0.40, 0.30, 0.20, 0.10}`, against lower edge `0.48`.
+- Change-time hazards: `{0.04, 0.01, 0.0025}`, with geometric prior mean start times 25, 100, and 400 observations.
+- Log-space recursion; alarm threshold `log(E_t) >= -log(alpha)`, with `alpha = 0.05 / 12`.
+
+**Claim ceiling:** this guarantee only concerns Bernoulli streams whose predictable conditional event probabilities stay within the declared band. It does not cover arbitrary feature-distribution shift or remove the need to verify that the null band is scientifically appropriate. The selection-bias control at observed rate 0.74 is intentionally outside the band.
 
 ### Deterministic qualification and independent reference
 
@@ -131,36 +141,37 @@ python3 tools/active-evidence-shift-monitor/reference_check.py --anytime-mixture
 python3 tools/active-evidence-shift-monitor/reference_check.py --anytime-mixture-probes /tmp/anytime-mixture-probes.csv
 ```
 
-The independent standard-library Python implementation reproduces the 30 components and each probe trajectory. The test suite recursively checks the one-step conditional expectation over every binary history through depth 10 at five null rates, verifies the geometric prior keeps its mass, and checks persistent extreme traces cross the threshold. CI runs the probe generator twice, compares bytes, verifies its 16-column output against the independent implementation, rejects a mutated first-alarm step, and includes its SHA-256 in the provenance receipt.
+The independent standard-library Python implementation reproduces the 30 components and each probe trajectory. The test suite recursively checks the one-step conditional expectation over every binary history through depth 10 at five null rates, verifies that the geometric prior keeps its mass, and checks persistent extreme traces cross the threshold. CI runs the probe generator twice, compares the bytes, verifies its 17-column output against the independent implementation, rejects a mutated first-alarm step, and includes its SHA-256 in the provenance receipt.
 
 ### Exploratory power pilot (Monte Carlo, not the guarantee)
 
-The optional research runner produces the synthetic power frontier with seed and uncertainty intervals:
+The optional research runner exports the synthetic power frontier with the trial count, seed, PRNG, NumPy version and uncertainty intervals:
 
 ```bash
 python3 tools/active-evidence-shift-monitor/anytime_mixture_monte_carlo.py --trials 1000 --seed 100 --output /tmp/anytime-mixture-mc.csv
 ```
 
-A vectorized NumPy prototype with 1,000 trials per scenario observed the following rates for a change after observation 100 and horizon 1,000. Confidence intervals shown below are 95% Wilson intervals over the 1,000 runs.
+A vectorized NumPy prototype with 1,000 trials per scenario observed the following rates for a change after observation 100 and horizon 1,000. Intervals are 95% Wilson intervals over the 1,000 runs.
 
-| Scenario | Post-change detection | 95% interval | Conditional median delay | Conditional P90 delay |
-|---|---:|---:|---:|---:|
-| (p_1=0.55) | 2.7% | 1.9–3.9% | 674 | 854 |
-| (p_1=0.60) | 81.0% | 78.5–83.3% | 510 | 790 |
-| (p_1=0.70) | 99.9% | 99.4–100% | 133 | 225 |
-| (p_1=0.80) | 100% | 99.6–100% | 58 | 89 |
-| (p_1=0.45) | 3.1% | 2.2–4.4% | 666 | 839 |
-| (p_1=0.40) | 81.1% | 78.6–83.4% | 537 | 785 |
+| Post-change rate | Post-change detection | 95% interval | Conditional median delay | Conditional P90 delay |
+|---:|---:|---:|---:|---:|
+| 0.55 | 2.7% | 1.9–3.9% | 674 | 854 |
+| 0.60 | 81.0% | 78.5–83.3% | 510 | 790 |
+| 0.70 | 99.9% | 99.4–100% | 133 | 225 |
+| 0.80 | 100% | 99.6–100% | 58 | 89 |
+| 0.45 | 3.1% | 2.2–4.4% | 666 | 839 |
+| 0.40 | 81.1% | 78.6–83.4% | 537 | 785 |
 
-The p=0.55 and p=0.60 rows improve over the existing never-reset composite-band betting process in the previous exact-DP pilot (1.769% and 73.527% detection respectively), because the new monitor can attribute evidence to a later suffix instead of diluting it with the pre-change segment. The family-wise calibrated finite-horizon CUSUM remains stronger in this pilot (4.884% and 90.407%), but its published comparison is calibrated for a fixed horizon. The trade-off to test is therefore **power versus an anytime-valid guarantee under the conditional null and an explicit mixture over unknown change times**, not blanket superiority.
+The p1=0.55 and p1=0.60 rows improve over the existing never-reset composite-band betting process in the prior exact-DP pilot (1.769% and 73.527% detection respectively), because the new monitor can attribute evidence to a later suffix rather than diluting it with the pre-change segment. The conservatively family-wise-bounded finite-horizon CUSUM reference reported higher one-direction power in the corresponding synthetic setup (4.884% and 90.407%), but its calibration is tied to a fixed horizon. The trade-off to test is **power versus an anytime-valid guarantee under the conditional null and a mixture over unknown change times**, not blanket superiority.
 
-These are exploratory Monte Carlo results, not a Rust workflow artifact or an estimate precise enough to establish stringent false-alarm performance. With zero observed alarms in 1,000 null runs, the empirical estimate is zero but the true probability is not; retain the mathematical e-process argument and exact conditional-expectation tests as the guarantee.
+These Monte Carlo results are exploratory, not a Rust workflow artifact or a precise estimate of stringent false-alarm performance. With zero observed alarms in 1,000 null runs, the observed estimate is zero but the true probability is not; retain the mathematical e-process argument and conditional-expectation tests as the guarantee.
 
 ### Research comparators
 
-The core e-detector concept has prior art: Shin, Ramdas and Rinaldo describe CUSUM/Shiryaev–Roberts-style e-detectors made from sums of e-processes started at consecutive times, with nonasymptotic false-alarm and delay guarantees ([2024 paper, DOI 10.51387/23-NEJSDS51](https://doi.org/10.51387/23-NEJSDS51)). Ward and colleagues' FOCuS work emphasizes efficient online likelihood-ratio detection over unknown change locations in exponential-family models, with average constant-per-iteration computation in their formulation ([2024 paper, DOI 10.1007/s11222-024-10416-6](https://doi.org/10.1007/s11222-024-10416-6)). For distributed mixed-type streams, mixFOCuS explicitly studies the communication-versus-power trade-off ([2025 paper, DOI 10.1111/jtsa.12834](https://doi.org/10.1111/jtsa.12834)).
+The e-detector concept has prior art. Shin, Ramdas and Rinaldo describe CUSUM/Shiryaev–Roberts-style e-detectors made from sums of e-processes started at consecutive times, with nonasymptotic false-alarm and delay guarantees ([2024 paper, DOI 10.51387/23-NEJSDS51](https://doi.org/10.51387/23-NEJSDS51)). Ward and colleagues' FOCuS work emphasizes efficient online likelihood-ratio detection over unknown change locations in exponential-family models, with average constant-per-iteration computation in their formulation ([2024 paper, DOI 10.1007/s11222-024-10416-6](https://doi.org/10.1007/s11222-024-10416-6)). mixFOCuS studies the communication-versus-power trade-off for distributed mixed-type streams ([2025 paper, DOI 10.1111/jtsa.12834](https://doi.org/10.1111/jtsa.12834)).
 
-The next field-level comparison should pair this detector with a faithful e-detector implementation, FOCuS/mixFOCuS where assumptions fit, the current fixed-horizon CUSUM baseline, ADWIN, EWMA and Page–Hinkley. Calibrate/compare using matching family-wise false-alarm contracts; record detection probability, median/P90 delay, runtime, memory, communication/label budget and null violations. A Bernoulli fixture is a qualification lane, not a universal SOTA benchmark.
+The next field-level comparison should pair this detector with a faithful e-detector implementation, FOCuS/mixFOCuS where their assumptions fit, the current finite-horizon CUSUM baseline, ADWIN, EWMA, and Page–Hinkley. Compare at matched false-alarm contracts and report detection probability, conditional median/P90 delay, runtime, memory, communication/label budget, and null violations. A Bernoulli fixture is a qualification lane, not a universal SOTA benchmark.
+
 
 ## Limits
 
