@@ -574,6 +574,21 @@ mod tests {
     }
 
     #[test]
+    fn fixed_grid_witness_is_monotone_in_candidate_mean() {
+        let values = [0.0, 0.2, 0.8, 1.5, 0.7];
+        let mut previous = f64::INFINITY;
+        for i in 1..=1000 {
+            let candidate_mean = i as f64 / 1000.0;
+            let current = log_sup_crp_wealth_lower(&values, candidate_mean).unwrap();
+            assert!(
+                current <= previous + 1.0e-9,
+                "witness increased: previous={previous}, current={current}, nu={candidate_mean}"
+            );
+            previous = current;
+        }
+    }
+
+    #[test]
     fn endpoint_witness_is_below_the_best_endpoint_wealth() {
         let values = [0.5, 0.7, 0.9];
         let nu = 0.1;
