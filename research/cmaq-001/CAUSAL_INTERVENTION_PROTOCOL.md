@@ -1,6 +1,6 @@
 # CMAQ-001 causal-intervention protocol v0.1
 
-**Status:** design specification; qualification generator and agent adapters not yet implemented  
+**Status:** design specification plus first deterministic generator tranche; qualification agent adapters not yet implemented  
 **Date:** 2026-10-29  
 **Repository:** `research/cmaq-001/`  
 **Research claim under test:** provenance-aware episodic memory plus an action-conditioned world model improves safe decisions on held-out causal mechanisms, compared with matched-cost memory and planning baselines.
@@ -127,13 +127,13 @@ If pilot variance suggests these thresholds are inappropriate, revise them befor
 ## Execution order
 
 1. Finish scorer tests and receipt contract in `research/cmaq-001/`.
-2. Implement a deterministic task generator whose public development fixtures are not reused for qualification.
-3. Add an independent outcome/receipt adapter. Candidate output must not authoritatively report its own outcomes.
-4. Run lightweight negative controls and baseline sanity checks.
-5. Compare the full system and ablations on held-out mechanism families.
-6. Map each external benchmark to a claim it supports; run the relevant public baselines under a frozen common protocol.
-7. Keep the PR draft until exact-head tests pass and results are bound to the exact candidate SHA.
+2. Extend `research/cmaq-001/generator/` beyond its current sparse-parity mechanism to observation/intervention confounding, revision invalidation, partial observability, and regime shifts; preserve separate agent/evaluator outputs.
+3. Replace the smoke receipt's caller-supplied verification bit with an authenticated recorder identity/signature and action/outcome digest binding before any production integration.
+4. Add the scorer adapter for generated agent cases and evaluator-only keys.
+5. Run negative controls (shuffled action/outcome labels, stale revisions, altered receipts, missing source IDs) and baseline sanity checks.
+6. Compare all ablations on held-out mechanism families, then run mapped public comparators under frozen common protocols.
+7. Keep the PR draft until exact-head tests pass and the result bundle is bound to the exact candidate SHA.
 
 ## Current evidence state
 
-The standalone scorer and public smoke fixtures have been authored on a draft branch. The CI job was queued at the last status query; this protocol and the tasks above have not been executed as benchmark experiments. No SOTA or production qualification claim is made.
+The standalone scorer, receipt-bound smoke path, protocol/schema, and a deterministic sparse-parity factor-composition generator have been authored on a draft branch. The generator unit tests and CI workflow have not yet produced a verified pass at the time of this update; the generated tasks are not yet scored by an agent baseline. No SOTA or production qualification claim is made.
