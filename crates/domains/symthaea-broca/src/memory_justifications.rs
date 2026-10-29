@@ -547,6 +547,52 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_three_event_truth_table_matches_independent_support_oracle() {
+        // Independent oracle: C is supported iff (A AND B) OR D.
+        // Exercise every possible retraction subset, including all proofs removed.
+        for retracted_mask in 0u8..8 {
+            let mut graph = JustificationGraph::default();
+            for event_id in ["A", "B", "D"] {
+                graph.register_source_event(event_id).unwrap();
+            }
+            graph
+                .derive(conclusion(
+                    "C",
+                    [
+                        justification("A-and-B", [source("A"), source("B")]),
+                        justification("D-alone", [source("D")]),
+                    ],
+                ))
+                .unwrap();
+            graph
+                .derive(conclusion("child", [justification("from-C", [derived("C")])]))
+                .unwrap();
+
+            for (bit, event_id) in ["A", "B", "D"].iter().enumerate() {
+                if (retracted_mask & (1 << bit)) != 0 {
+                    graph.invalidate_source_event(event_id).unwrap();
+                }
+            }
+
+            let a = (retracted_mask & 0b001) == 0;
+            let b = (retracted_mask & 0b010) == 0;
+            let d = (retracted_mask & 0b100) == 0;
+            let expected_c_support = (a && b) || d;
+            assert_eq!(
+                graph.current_fact("C").is_some(),
+                expected_c_support,
+                "wrong C support state for retraction mask {retracted_mask:03b}"
+            );
+            assert_eq!(
+                graph.current_fact("child").is_some(),
+                expected_c_support,
+                "dependent child did not track C for retraction mask {retracted_mask:03b}"
+            );
+            graph.verify_consistency().unwrap();
+        }
+    }
+
+    #[test]
     fn dependencies_inside_one_justification_are_conjunctive() {
         let mut graph = JustificationGraph::default();
         graph.register_source_event("A").unwrap();
