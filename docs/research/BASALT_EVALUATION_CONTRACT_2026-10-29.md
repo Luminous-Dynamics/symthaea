@@ -1,7 +1,7 @@
 # BASALT Evaluation Contract
 ## Version 1 — task-level evidence, pairing, and decision rules
 
-**Status:** Proposed protocol for review; not yet an implemented runner  
+**Status:** Proposed protocol; initial offline Rust validator source is staged, but compilation and tests have not yet been executed  
 **Date:** 2026-10-29  
 **Scope:** Offline evaluation record and analysis rules for repository-level coding agents
 
@@ -10,9 +10,13 @@ This contract turns the BASALT roadmap into a concrete interchange format. It do
 ## Files
 
 - [Run-record JSON Schema](../../benchmarks/basalt/schema/run-record.schema.json)
-- [Synthetic example record](../../benchmarks/basalt/examples/run-record.example.json)
+- [Frozen suite-manifest JSON Schema](../../benchmarks/basalt/schema/suite-manifest.schema.json)
+- [Synthetic run record](../../benchmarks/basalt/examples/run-record.example.json)
+- [Synthetic frozen suite manifest](../../benchmarks/basalt/examples/suite-manifest.example.json)
+- Rust validation command in `xtask`: `cargo run -p xtask -- basalt-validate --input PATH --manifest PATH`
+- Validator implementation and adversarial tests: [`xtask/src/basalt_validate.rs`](../../xtask/src/basalt_validate.rs)
 
-The example is deliberately labelled synthetic. Its revisions, digests, task and outcomes are fabricated fixtures and must never be used as benchmark results.
+The example record and suite manifest are deliberately synthetic. Their revisions, digests, task and outcomes are fabricated fixtures and must never be used as benchmark results. The validator checks exact manifest bytes against `source.manifest_digest` and compares every task specification and quality-audit disposition against the frozen manifest.
 
 ## Primary estimand
 
@@ -42,7 +46,7 @@ The task-quality auditor must not use which system won as a reason to retain or 
 
 ## Pairing and record invariants
 
-The JSON Schema validates record shape. A separate validator/analysis layer must enforce cross-record invariants, because ordinary JSON Schema cannot establish all of them:
+The JSON Schemas validate shape. The initial Rust validator in `xtask/src/basalt_validate.rs` adds cross-record invariants and requires the separately supplied frozen suite manifest. Run it as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json`. It hashes the exact manifest bytes, verifies the pinned digest, checks suite/task identity and quality-audit dispositions, and validates paired trial coverage. Ordinary JSON Schema cannot establish all of these properties:
 
 1. `task_id` is unique in `task_records`; `system_id` is unique in `systems`; and every trial references a declared system.
 2. For each eligible `task_id × attempt_index`, every compared system has exactly one row. A declared `paired_group_id`, seed, task spec, base-tree digest, environment, verifier version, and budget policy must match across the comparison arms.
@@ -52,7 +56,9 @@ The JSON Schema validates record shape. A separate validator/analysis layer must
 6. The same immutable environment, isolation policy, task budgets and retry policy apply across paired systems, or each difference must be explicitly declared as a separate experimental factor.
 7. Token or cost fields unavailable from a provider remain null/omitted where permitted; do not encode unavailable telemetry as zero.
 
-The evaluator should run negative controls that deliberately exercise test tampering, verifier mutation, forbidden out-of-scope changes, stale evidence, task-oracle mismatch, missing pair rows and digest mismatch. The validator must reject those controls. A valid JSON file alone is not evidence that these semantic invariants hold.
+The Rust module now contains 26 unit-test cases, including paired-arm omissions, duplicate cells, manifest-bound reclassification, digest mismatches, budget violations, unknown fields and verifier/integrity contradictions. They are authored but **not executed** in this environment because no Rust toolchain or mounted checkout was available and the draft PR workflows were skipped. Do not treat these tests as passing evidence.
+
+The manifest digest establishes byte identity, not authenticity. An actor who can rewrite both the manifest and run record can recompute the digest. Signed, independently pinned pre-run and post-run receipts are tracked in [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034); confirmatory scoring must remain disabled until that trust boundary is qualified.
 
 ## Analysis plan
 
@@ -74,7 +80,7 @@ For small pilot cohorts, label results exploratory. Thirty base tasks can be a u
 
 These are research gates to test—not reported achievements:
 
-**Gate 0 — record validity:** schema parses; cross-record invariants pass; all rows have immutable task/environment/verifier identities; negative controls fail closed.
+**Gate 0 — record validity:** schema parses; the Rust validator builds and all cross-record invariants pass; the exact suite manifest is pinned; all rows have task/environment/verifier identities; negative controls fail closed. Source currently staged is not a passed gate.
 
 **Gate 1 — verifier/task validity:** independent audit accepts the scored tasks and oracles; hidden reference material is inaccessible during agent execution; verifier and task mutation controls are detected.
 
@@ -99,3 +105,6 @@ BASALT's differentiated aim should be **verified change per unit cost under cont
 - [Vals AI Terminal-Bench 4.0 leaderboard and methodology](https://www.vals-ai.com/benchmarks/terminal-bench-4)
 - [OpenAI: Separating signal from noise in coding evaluations (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/)
 - [Epoch AI: Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review)
+- [in-toto Attestation Framework v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md)
+- [SLSA v1.2 specification](https://slsa.dev/spec/v1.2/)
+- [GitHub artifact attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
