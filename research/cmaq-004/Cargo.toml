@@ -7,3 +7,5 @@ license = "AGPL-3.0-or-later"
 description = "Synthetic benchmark for incremental closed-loop value of world-model predictions"
 
 [dependencies]
+
+[workspace]
