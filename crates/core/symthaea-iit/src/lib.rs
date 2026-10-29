@@ -18,9 +18,9 @@
 //! * The factored transition probability assumes next units are conditionally
 //!   independent given the current state, as in a state-by-node TPM.
 //! * Connectivity is an explicit, directed matrix [source_unit][target_unit].
-//!   It is input metadata, not inferred from the TPM. The caller is responsible
-//!   for ensuring declared connectivity and the transition model describe the
-//!   same system.
+//!   It is supplied explicitly. Construction rejects a graph that omits a
+//!   dependency present in the TPM, while allowing declared extra edges; this
+//!   matches PyPhi's conservative connectivity-validation convention.
 //! * The model digest covers the exact dense TPM and connectivity matrix, not an
 //!   evaluation state or an IIT formalism. The evaluation digest binds model bytes
 //!   to one state. Neither digest proves that the model is scientifically correct.
