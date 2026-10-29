@@ -1163,6 +1163,24 @@ mod tests {
             &serde_json::to_vec(&wrong_condition).unwrap()
         )
         .is_err());
+
+        // Evaluator revision and decision rules cannot be changed after the plan
+        // commitment without invalidating outcome-report admission.
+        let mut changed_evaluator = fields(&plan);
+        changed_evaluator.evaluator_revision_sha256 = digest('1');
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&changed_evaluator).unwrap()
+        )
+        .is_err());
+
+        let mut changed_rules = fields(&plan);
+        changed_rules.decision_rules_sha256 = digest('2');
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&changed_rules).unwrap()
+        )
+        .is_err());
     }
 
     #[test]
