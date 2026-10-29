@@ -55,6 +55,8 @@ def _claim_key(value: dict[str, Any], context: str) -> tuple[str, int]:
 def _validate_and_index(
     snapshot: dict[str, Any],
 ) -> tuple[str, dict[tuple[str, int], dict[str, Any]], dict[str, int]]:
+    if not isinstance(snapshot, dict):
+        raise ValueError("snapshot must be an object")
     snapshot_id = snapshot.get("snapshot_id")
     if not isinstance(snapshot_id, str) or not snapshot_id.strip():
         raise ValueError("snapshot_id must be a non-empty string")
@@ -228,8 +230,10 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 def evaluate_dataset(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
-    if not snapshots:
-        raise ValueError("snapshots must not be empty")
+    if not isinstance(snapshots, list) or not snapshots:
+        raise ValueError("snapshots must be a non-empty array")
+    if any(not isinstance(snapshot, dict) for snapshot in snapshots):
+        raise ValueError("every snapshot must be an object")
     ids = [snapshot.get("snapshot_id") for snapshot in snapshots]
     if any(not isinstance(snapshot_id, str) or not snapshot_id.strip() for snapshot_id in ids):
         raise ValueError("all snapshot IDs must be non-empty strings")
@@ -263,11 +267,13 @@ def main() -> int:
     args = parser.parse_args()
     input_path = args.input.expanduser().resolve()
     output_path = args.output.expanduser().resolve() if args.output else None
-    if output_path is not None and output_path == input_path:
-        raise SystemExit("output path must differ from input")
+    protected_paths = {input_path, Path(__file__).resolve()}
+    if output_path is not None and output_path in protected_paths:
+        raise SystemExit("output path must differ from input and evaluator source")
     snapshots, input_bytes = read_jsonl_bytes(input_path)
     report = evaluate_dataset(snapshots)
     report["input_sha256"] = sha256_bytes(input_bytes)
+    report["evaluator_sha256"] = sha256_bytes(Path(__file__).resolve().read_bytes())
     encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
