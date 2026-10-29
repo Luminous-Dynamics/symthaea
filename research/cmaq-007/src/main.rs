@@ -36,6 +36,7 @@ struct CandidateAction {
     predicted_utility: f64,
     predicted_uncertainty: f64,
     support_score: f64,
+    shuffled_support_score: f64,
     supported: bool,
 }
 
