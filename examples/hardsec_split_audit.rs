@@ -171,7 +171,7 @@ Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT [--receipt NEW_PA
 
 Optional --receipt writes a new deterministic JSON metadata/split-integrity receipt.
 Existing files are not overwritten. The receipt is not a security verdict.
-Requires a strict 17-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."#
+Requires a strict 20-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."#
                 );
                 return Ok(None);
             }
@@ -621,7 +621,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     }
 
     Ok(AuditSummary {
-        schema_version: "hardsec-split-audit-v2",
+        schema_version: "hardsec-split-audit-v3",
         result: "split_manifest_consistent",
         claim_scope: "metadata_and_split_integrity_only",
         dataset_id,
@@ -957,7 +957,7 @@ mod tests {
         write_receipt(&summary, &receipt_path).expect("write receipt");
         let receipt: serde_json::Value =
             serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
-        assert_eq!(receipt["schema_version"], "hardsec-split-audit-v2");
+        assert_eq!(receipt["schema_version"], "hardsec-split-audit-v3");
         assert_eq!(receipt["result"], "split_manifest_consistent");
         assert_eq!(receipt["claim_scope"], "metadata_and_split_integrity_only");
         assert_eq!(receipt["manifest_sha256"].as_str().unwrap().len(), 64);
