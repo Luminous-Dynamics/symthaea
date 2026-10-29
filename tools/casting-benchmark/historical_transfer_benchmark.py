@@ -537,15 +537,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
+        out = args.output.resolve()
+        if out == Path(__file__).resolve():
+            raise ValueError("output must not overwrite the source module")
         receipt = run_benchmark(
             history_points=args.history_points,
             test_points=args.test_points,
             nearest_k=args.nearest_k,
             reuse_count=args.reuse_count,
         )
-        out = args.output.resolve()
-        if out == Path(__file__).resolve():
-            raise ValueError("output must not overwrite the source module")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(
             json.dumps(receipt, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
