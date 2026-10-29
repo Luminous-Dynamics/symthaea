@@ -82,16 +82,13 @@ The model evaluator must predict the effect of perturbations before the fixture 
 
 ## Public neural-data replication gate
 
-For the 2025 IIT/GNWT adversarial collaboration:
-1. audit raw/preprocessed data availability, supplementary materials, rights, subject/session metadata and the original preregistration;
-2. pin all sources, versions, filters, regions/time windows and transformations;
-3. choose one explicit preregistered prediction per candidate theory where data support an exact replication;
-4. reproduce the published analysis before running alternative analyses;
-5. use subject/session-aware splits and hierarchical uncertainty;
-6. label any unreplicable element with a typed reason (missing raw data, unavailable sensor modality, non-reproducible preprocessing, unsupported formalism, etc.);
-7. keep confirmatory reproduction separate from exploratory reanalysis.
+The source-discovery gate has now been audited in [CONSCIOUSNESS_ADV_001_PUBLIC_DATA_AUDIT_2026-10-29.md](CONSCIOUSNESS_ADV_001_PUBLIC_DATA_AUDIT_2026-10-29.md), with a machine-readable companion manifest in [CONSCIOUSNESS_ADV_001_DATASET_MANIFEST_V1.json](CONSCIOUSNESS_ADV_001_DATASET_MANIFEST_V1.json).
 
-Do not imply that public raw data are available until the source audit actually establishes this. Do not combine fMRI, MEG and iEEG into one metric without a declared model.
+The primary article links the OSF preregistration, public raw/BIDS data bundles and XNAT, plus public modality-separated analysis and task code. The article and bundle portal state CC BY 4.0, while the portal also requires accepting its Terms of Use and GDPR requirements. This clears source discovery only: no bundle was downloaded or hashed, and no neural-data analysis has run.
+
+A sample-accounting issue remains unresolved: the paper's analyzed per-modality counts differ from the counts in the data-release overview, despite both reporting 256 overall. Reconcile subject/session manifests, exclusions and analysis inputs before computing inferential statistics. The first resource-bounded step is to use the 9 GB fMRI BIDS sample bundle for a plumbing smoke test only; the full fMRI BIDS bundle is listed as 261 GB. A sample-bundle run is not confirmatory evidence.
+
+For the first confirmatory run, copy one exact theory-specific prediction, contrast, observable, ROI/window, exclusion rule, multiplicity policy and support/contradiction criteria from the preregistration before opening confirmatory outputs. Prefer the consortium's modality-specific analysis code, pin its commit and environment, preserve the official baseline, and report any deviation as a separate exploratory profile. Expand to M-EEG/iEEG only after the first path produces an auditable receipt.
 
 ## DMT and visual-pattern phenomena: separate adjacent benchmark
 
