@@ -1401,14 +1401,24 @@ mod tests {
 
     #[test]
     fn effect_repertoire_factorizes_per_unit_instead_of_mixing_hidden_state_correlations() {
-        // Given A=ON, B is unconstrained. Both next-unit marginals average to 0.5,
-        // so the declared factored repertoire is uniform, not a 50/50 mixture of 00 and 11.
+        // A and B's next states both depend on the unconstrained hidden unit C.
+        // Their individual marginals are 0.5. The factored repertoire therefore
+        // has mass 0.25 on each pair, unlike a joint mixture with mass only on 00/11.
         let model = BinaryCausalModel::new(
-            2,
-            vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
-            vec![false, false, true, true],
+            3,
+            vec![
+                0.0, 0.0, 0.5,  0.0, 0.0, 0.5,
+                0.0, 0.0, 0.5,  0.0, 0.0, 0.5,
+                1.0, 1.0, 0.5,  1.0, 1.0, 0.5,
+                1.0, 1.0, 0.5,  1.0, 1.0, 0.5,
+            ],
+            vec![
+                false, false, false,
+                false, false, false,
+                true, true, true,
+            ],
         ).unwrap();
-        let repertoire = model.effect_repertoire(&[0], &[true, false], &[0, 1]).unwrap();
+        let repertoire = model.effect_repertoire(&[], &[false, false, false], &[0, 1]).unwrap();
         for probability in repertoire {
             assert!((probability - 0.25).abs() < 1e-12);
         }
@@ -1821,18 +1831,13 @@ mod tests {
 
     #[test]
     fn forward_cause_likelihood_is_unnormalized_and_matches_complete_tpm_rows() {
-        let model = two_unit_model();
-        let forward = model.forward_cause_likelihood(
-            &[0, 1],
-            &[true, false],
-            &[0, 1],
-        ).unwrap();
-        let expected = [0.08, 0.72, 0.02, 0.18];
-        for (actual, expected) in forward.iter().zip(expected) {
-            assert!((actual - expected).abs() < 1e-12);
-        }
-        // Its role is a likelihood vector; its entries are not generally normalized.
-        assert!((forward.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        // For this one-unit TPM the likelihoods for observing ON are [0.2, 0.4],
+        // which are not a normalized distribution over previous states.
+        let model = BinaryCausalModel::new(1, vec![0.2, 0.4], vec![true]).unwrap();
+        let forward = model.forward_cause_likelihood(&[0], &[true], &[0]).unwrap();
+        assert!((forward[0] - 0.2).abs() < 1e-12);
+        assert!((forward[1] - 0.4).abs() < 1e-12);
+        assert!((forward.iter().sum::<f64>() - 0.6).abs() < 1e-12);
     }
 
     #[test]
