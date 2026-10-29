@@ -300,9 +300,6 @@ pub fn verify_search_exposure_exact_match_report(
     protected_index_bytes: &[u8],
     match_report_bytes: &[u8],
 ) -> Result<SearchExposureMatchVerificationReportV1, String> {
-    let receipt: SearchExposureReceiptV1 = serde_json::from_slice(receipt_bytes)
-        .map_err(|error| format!("receipt does not match strict v1 shape: {error}"))?;
-    let _index = validate_protected_index_bytes(protected_index_bytes, &receipt.generation_id)?;
     let expected = match_search_exposure_exact(receipt_bytes, protected_index_bytes)?;
     let supplied: SearchExposureMatchReportV1 = serde_json::from_slice(match_report_bytes)
         .map_err(|error| format!("match report does not match strict v1 shape: {error}"))?;
