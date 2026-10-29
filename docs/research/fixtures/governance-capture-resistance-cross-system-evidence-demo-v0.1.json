@@ -1,0 +1,155 @@
+{
+  "schema_version": "gcrb-cross-system-evidence-envelope-v0.1",
+  "benchmark_id": "GOV-CAP-001",
+  "dataset_status": "synthetic_only",
+  "purpose": "Exercise the type boundary between Mycelix records, Symtropy simulation outputs, hypothetical independent measurements, and GCRB-derived claims. No record in this fixture asserts a real-world event or measurement.",
+  "limits": [
+    "Every source_record_ref in this bundle is a synthetic placeholder, not a live Mycelix or Symtropy record.",
+    "Git blob SHAs identify source-code definitions only; they do not authenticate the synthetic example records.",
+    "The simulator build/scenario/config/output digests are placeholder strings, not hashes of executed artifacts.",
+    "The observed-class example describes a hypothetical measurement shape, not an actual observed water-service outcome.",
+    "Schema validity and successful type routing do not establish source truth, legal authority, capture completeness, or production interoperability."
+  ],
+  "records": [
+    {
+      "evidence_id": "MYCELIX-CASE-001",
+      "source_system": "mycelix_justice",
+      "source_record_type": "justice_case",
+      "assertion_class": "reported",
+      "claim": "Synthetic example: a Mycelix Justice Cases record refers to a reviewable governance case. This asserts record presence in the fixture, not the truth of the allegation.",
+      "source_record_ref": "synthetic:justice:case-001",
+      "type_definition_ref": {
+        "owner": "Luminous-Dynamics/mycelix",
+        "path": "mycelix-workspace/mycelix-civic/zomes/justice-cases/integrity/src/lib.rs",
+        "revision": "041b56c7d21ab1cfc92d3a72363c8d3c817ee2f6",
+        "git_blob_sha": "041b56c7d21ab1cfc92d3a72363c8d3c817ee2f6"
+      },
+      "depends_on": [],
+      "limitations": [
+        "Synthetic fixture record only; no real case is being referenced.",
+        "Case existence does not establish the truth of submitted allegations or a legal finding."
+      ]
+    },
+    {
+      "evidence_id": "MYCELIX-EVENT-001",
+      "source_system": "mycelix_desci",
+      "source_record_type": "mycelix_desci_signed_event",
+      "assertion_class": "reported",
+      "claim": "Synthetic example: a domain-specific signed event declares that a metric-definition revision was proposed. This does not establish that the revision was authorized or factually justified.",
+      "source_record_ref": "synthetic:desci:event-001",
+      "type_definition_ref": {
+        "owner": "Luminous-Dynamics/mycelix",
+        "path": "mycelix-workspace/mycelix-desci/src/core/src/scientific_credential_governance.rs",
+        "revision": "ddaa73a037925de327c46063cc36b331d951d22b",
+        "git_blob_sha": "ddaa73a037925de327c46063cc36b331d951d22b"
+      },
+      "depends_on": [],
+      "limitations": [
+        "Credential-governance types are source references only; this synthetic record is not a real DeSci event.",
+        "A valid signature or event-chain position is not proof that the statement is true."
+      ]
+    },
+    {
+      "evidence_id": "SYMTROPY-SIM-001",
+      "source_system": "symtropy_world",
+      "source_record_type": "symtropy_sim_snapshot",
+      "assertion_class": "simulated",
+      "claim": "Synthetic example: the simulator predicts water-service reliability of 0.92 over a declared future scenario window.",
+      "source_record_ref": "synthetic:symtropy:sim-snapshot-001",
+      "type_definition_ref": {
+        "owner": "Luminous-Dynamics/symtropy",
+        "path": "crates/domains/symtropy-world/src/snapshot.rs",
+        "revision": "aff46e12bfcc1a131984b70be87d7916716debf5",
+        "git_blob_sha": "aff46e12bfcc1a131984b70be87d7916716debf5"
+      },
+      "depends_on": [],
+      "simulation_context": {
+        "simulator_id": "symtropy-world-synthetic-adapter-example",
+        "source_revision": "aff46e12bfcc1a131984b70be87d7916716debf5",
+        "build_digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scenario_digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "config_digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "seed": 42,
+        "tick_start": 100,
+        "tick_end": 110,
+        "horizon": "10 synthetic ticks; not a calibrated real-world time conversion",
+        "output_digest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "validity_scope": "A synthetic water-service scenario used to exercise evidence-class routing only.",
+        "limitations": [
+          "All scenario values and digests are illustrative placeholders; no simulator run or build digest was produced.",
+          "Simulation output is not an observed water-service outcome.",
+          "No calibration or external validity is claimed."
+        ]
+      },
+      "limitations": [
+        "Synthetic fixture record only; no actual simulation result is being asserted.",
+        "The current public SimSnapshot type is transient transport data; durable authenticated evidence ingestion is not implemented."
+      ]
+    },
+    {
+      "evidence_id": "OBS-WATER-001",
+      "source_system": "independent_measurement",
+      "source_record_type": "independent_measurement",
+      "assertion_class": "observed",
+      "claim": "Synthetic oracle example: a hypothetical independent measurement records service reliability of 0.84 over the declared synthetic window. This is not an actual municipal measurement.",
+      "source_record_ref": "synthetic:measurement:water-reliability-001",
+      "type_definition_ref": {
+        "owner": "GOV-CAP-001 synthetic fixture",
+        "path": "docs/research/fixtures/governance-capture-resistance-cross-system-evidence-v0.1.json",
+        "revision": "0.1"
+      },
+      "depends_on": [],
+      "observation_basis": {
+        "measurement_ref": "synthetic:water-meter-window-001",
+        "measurement_method": "Hypothetical calibrated meter plus independent sampling protocol; fixture example only.",
+        "measured_at": "synthetic-window-2026-09-01-to-2026-09-07",
+        "location_scope": "synthetic-site-north",
+        "independent_corroboration_ref": "synthetic:independent-auditor-run-001",
+        "quality_limits": [
+          "No physical measurement exists; these values are only a schema example.",
+          "A deployed adapter must resolve the calibration, sampling frame, timestamp, location, and independent corroboration references."
+        ]
+      },
+      "limitations": [
+        "The file is synthetic-only; the word observed describes the intended evidence class in the fixture, not a real-world fact.",
+        "Real observation claims require source authentication, appropriate measurement-quality evidence, and independent review."
+      ]
+    },
+    {
+      "evidence_id": "GCRB-FORECAST-ERROR-001",
+      "source_system": "gcrb_evaluator",
+      "source_record_type": "gcrb_derived_claim",
+      "assertion_class": "inferred",
+      "claim": "Synthetic arithmetic: the simulator forecast (0.92) exceeds the hypothetical measurement (0.84) by 0.08 for this fixture example.",
+      "source_record_ref": "synthetic:gcrb:derived-forecast-error-001",
+      "type_definition_ref": {
+        "owner": "GOV-CAP-001 evaluator prototype",
+        "path": "research/gcrb-evaluator/src/lib.rs",
+        "revision": "0.1"
+      },
+      "depends_on": [
+        "SYMTROPY-SIM-001",
+        "OBS-WATER-001"
+      ],
+      "derivation": {
+        "method_id": "absolute-simulated-versus-measured-difference",
+        "method_version": "0.1",
+        "input_evidence_ids": [
+          "SYMTROPY-SIM-001",
+          "OBS-WATER-001"
+        ],
+        "assumptions": [
+          "The two synthetic values refer to comparable measures, unit, location scope, and time horizon for this example only."
+        ],
+        "limitations": [
+          "The comparison is arithmetic over placeholders, not a validated forecast-error result.",
+          "No policy-effect or causal claim follows from this difference."
+        ]
+      },
+      "limitations": [
+        "Derived claim inherits all limitations and missing external validity of both inputs.",
+        "The derivation must remain classified inferred and cannot be promoted to observed merely because it combines a simulation and a measurement-shaped record."
+      ]
+    }
+  ]
+}
