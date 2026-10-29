@@ -293,6 +293,18 @@ impl FusionProcess {
         {
             return Err(FusionProcessError::InvalidComputedProbabilitySum(outcome_probability_sum));
         }
+        for (field, value) in [
+            ("expected_attempts", result.expected_attempts),
+            ("expected_latency_ms", result.expected_latency_ms),
+            ("expected_photons_consumed", result.expected_photons_consumed),
+            ("successful_attempts_moment", result.successful_attempts_moment),
+            ("successful_latency_moment", result.successful_latency_moment),
+            ("successful_photons_moment", result.successful_photons_moment),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(FusionProcessError::InvalidComputedCost { field, value });
+            }
+        }
 
         let conditional = |moment: f64| {
             (result.success_probability > 0.0)
@@ -381,6 +393,8 @@ pub enum FusionProcessError {
     InvalidTransitionTarget { state_id: String, outcome_id: String, target: usize },
     /// Computed terminal outcome probabilities do not sum to one.
     InvalidComputedProbabilitySum(f64),
+    /// A computed expected cost or success-weighted cost is negative or non-finite.
+    InvalidComputedCost { field: &'static str, value: f64 },
 }
 
 impl fmt::Display for FusionProcessError {
@@ -410,6 +424,8 @@ impl fmt::Display for FusionProcessError {
                 write!(f, "outcome {outcome_id} in state {state_id} targets invalid state {target}"),
             Self::InvalidComputedProbabilitySum(sum) =>
                 write!(f, "computed fusion terminal probabilities sum to {sum}, expected 1"),
+            Self::InvalidComputedCost { field, value } =>
+                write!(f, "computed fusion cost {field} is invalid: {value}"),
         }
     }
 }
@@ -684,6 +700,32 @@ mod tests {
         assert!(matches!(
             process.estimate(),
             Err(FusionProcessError::InvalidTotalLatency { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_overflow_in_aggregated_expected_latency() {
+        let process = FusionProcess {
+            start_state: 0,
+            max_attempts: 3,
+            states: vec![FusionState {
+                id: "zero-yield-loop".to_owned(),
+                attempt_latency_ms: 1.0e308,
+                outcomes: vec![outcome(
+                    "continue",
+                    1.0,
+                    0.0,
+                    1,
+                    FusionTransition::ContinueTo(0),
+                )],
+            }],
+        };
+        assert!(matches!(
+            process.estimate(),
+            Err(FusionProcessError::InvalidComputedCost {
+                field: "expected_latency_ms",
+                ..
+            })
         ));
     }
 
