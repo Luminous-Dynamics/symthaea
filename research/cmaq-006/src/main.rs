@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn parser_rejects_duplicate_case_ids_and_malformed_rows() {
         let header = INPUT_HEADER.join("\t");
-        let good = "episode_001\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t7\t7\tfalse\tPASS\t0.12\t0.02\ttrue\ttrue";
+        let good = "episode_001\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t7\t7\tfalse\tPASS\t0.12\ttrue\ttrue";
         let duplicate = format!("{header}\n{good}\n{good}\n");
         assert!(parse_input(&duplicate).unwrap_err().contains("duplicate case_id"));
         assert!(parse_input(&format!("{header}\ncase_only\n")).unwrap_err().contains("row has"));
