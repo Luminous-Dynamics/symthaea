@@ -376,7 +376,7 @@ def raw_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "robustness_given_clean_success_pct": round(100.0 * both_pass / clean_pass, 6) if clean_pass else None,
         "clean_pass_shifted_fail_count": clean_only_fail,
         "clean_pass_shifted_unresolved_count": clean_only_unresolved,
-        "nonclean_to_shifted_pass_count": shifted_only_pass,
+        "clean_nonpass_shifted_pass_count": shifted_only_pass,
         "unresolved_pair_count": unresolved_pairs,
         "clean_unresolved_count": sum(row["clean_outcome"] == "unresolved" for row in rows),
         "shifted_unresolved_count": sum(row["shifted_outcome"] == "unresolved" for row in rows),
