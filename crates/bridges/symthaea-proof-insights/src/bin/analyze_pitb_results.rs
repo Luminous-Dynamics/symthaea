@@ -548,7 +548,7 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
 
     let (interval_informative, interval_positive, statistical_passed, statistical_reason) =
         confirmatory_utility_gate(effect, lower, upper, clusters);
-    let passed = statistical_passed && component_manifest.qualified_for_confirmatory_resampling;
+    let passed = confirmatory_claim_allowed(statistical_passed, component_manifest.qualified_for_confirmatory_resampling);
     let gate_reason = if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
         statistical_reason
     } else if !component_manifest.qualified_for_confirmatory_resampling {
@@ -865,8 +865,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             .is_some_and(|rate| rate <= 0.05)
         && weak_null_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|rate| rate <= 0.05);
-    let power_gate_passed = statistical_power_gate_passed
-        && component_manifest.qualified_for_confirmatory_resampling;
+    let power_gate_passed = confirmatory_claim_allowed(statistical_power_gate_passed, component_manifest.qualified_for_confirmatory_resampling);
 
     let interpretation = if statistical_power_gate_passed && !component_manifest.qualified_for_confirmatory_resampling {
         "The numerical design simulations meet their thresholds, but confirmatory use is blocked because the component coverage receipt is unverified."
@@ -3353,6 +3352,10 @@ fn compute_component_aggregates(
     Ok(aggregates.into_values().collect())
 }
 
+fn confirmatory_claim_allowed(statistical_gate_passed: bool, component_manifest_qualified: bool) -> bool {
+    statistical_gate_passed && component_manifest_qualified
+}
+
 fn confirmatory_utility_gate(
     effect: f64,
     lower: f64,
@@ -3650,6 +3653,13 @@ mod tests {
         assert!(validate_repo_relative_path("../outside.lean").is_err());
         assert!(validate_repo_relative_path("/absolute/path.lean").is_err());
         assert!(validate_repo_relative_path("lean\\..\\outside.lean").is_err());
+    }
+
+    #[test]
+    fn unqualified_component_manifest_blocks_confirmatory_claims_even_when_statistics_pass() {
+        assert!(!confirmatory_claim_allowed(true, false));
+        assert!(!confirmatory_claim_allowed(false, true));
+        assert!(confirmatory_claim_allowed(true, true));
     }
 
     #[test]
