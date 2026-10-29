@@ -213,6 +213,9 @@ For these corpora, a classifier may learn to recognize an *attack workload or at
 Two opt-in Rust examples are present on the HARDSEC-001 draft branch. First inventory the exact downloaded tree **before** parsing or deciding what the source files contain; then generate materialized shards and a split manifest, and audit the manifest.
 
 ```bash
+# Format only the two new example files.
+rustfmt --edition 2024 --check examples/hardsec_corpus_inventory.rs examples/hardsec_split_audit.rs
+
 # Raw file inventory. The output path must be outside the input root and new.
 cargo test --example hardsec_corpus_inventory --features hardsec-audit
 cargo run --example hardsec_corpus_inventory --features hardsec-audit -- \
@@ -223,7 +226,6 @@ cargo run --example hardsec_corpus_inventory --features hardsec-audit -- \
   --stated-license 'CC0 1.0 (catalogue statement; not independently audited)'
 
 # Split-manifest integrity after deterministic shard extraction.
-cargo fmt --check --package symthaea
 cargo test --example hardsec_split_audit --features hardsec-audit
 cargo run --example hardsec_split_audit --features hardsec-audit -- \
   --manifest /path/to/splits.tsv --root /path/to/dataset \
