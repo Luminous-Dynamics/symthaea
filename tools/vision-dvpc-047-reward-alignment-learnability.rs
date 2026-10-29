@@ -142,6 +142,28 @@ fn ips_interval(sum:f64,sum_sq:f64,n:usize)->(f64,f64,f64,f64){
     let upper=(mean+radius).max(0.0).min(1.0);
     (lower,upper,(upper-lower).max(0.0),mean)
 }
+
+fn update_familywise_ips_cs(
+    observation:LoggedObservation,
+    n:usize,
+    sums:&mut [f64;ARMS*ARMS],
+    bounds:&mut [Interval;ARMS*ARMS],
+){
+    if n==0{return;}
+    let alpha_policy=0.05/(ARMS*ARMS) as f64;
+    let t=n as f64;
+    let delta=alpha_policy/(2.0*t*(t+1.0));
+    let logterm=(1.0/delta).ln();
+    for code in 0..ARMS*ARMS{
+        let target=if observation.context==0{code/ARMS}else{code%ARMS};
+        let score=if observation.action==target{IPS_MAX_WEIGHT*observation.reward}else{0.0};
+        sums[code]+=score;
+        let mean=sums[code]/t;
+        let radius=IPS_MAX_WEIGHT*(logterm/(2.0*t)).sqrt();
+        let raw=Interval{lower:(mean-radius).max(0.0).min(1.0),upper:(mean+radius).max(0.0).min(1.0)};
+        bounds[code]=Interval{lower:bounds[code].lower.max(raw.lower),upper:bounds[code].upper.min(raw.upper)};
+    }
+}
 fn seed_for(replicate:usize)->u64{
     SEED ^ (replicate as u64).wrapping_mul(0xA076_1D64_78BD_642F)
 }
@@ -164,6 +186,8 @@ const METRIC_NAMES:[&str;13]=[
     "batch_ips_pointwise_wald_coverage",
     "batch_ips_wald_interval_width",
     "batch_ips_matured_sample_fraction",
+    "batch_ips_familywise_hoeffding_cs_coverage",
+    "batch_ips_familywise_hoeffding_cs_width",
 ];
 #[derive(Clone,Copy,Debug,Default)]
 struct MetricAgg{sum:f64,sum_sq:f64,n:usize}
@@ -190,7 +214,7 @@ fn snapshot_metrics(f:Fixture, t:usize,
     matured_count:usize,matured_sum:f64,
     ips_sum:&[f64;ARMS*ARMS],
     ips_sq:&[f64;ARMS*ARMS],
-    ips_n:usize) -> [f64;13]
+    ips_n:usize) -> [f64;15]
 {
     let greedy=estimated_greedy_actions(counts,proxy_sums);
     let proxy_best=[best_action(f,0,true),best_action(f,1,true)];
@@ -218,6 +242,8 @@ fn snapshot_metrics(f:Fixture, t:usize,
         ips_covered,
         ips_width,
         ips_n as f64/t as f64,
+        ips_cs_bounds[offset].covers(learned_true) as u8 as f64,
+        ips_cs_bounds[offset].width(),
     ]
 }
 
@@ -243,19 +269,29 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
         let mut maturity_sum=vec![0.0_f64;max_look+513];
         let mut ips_sum=[0.0_f64;ARMS*ARMS];
         let mut ips_sq=[0.0_f64;ARMS*ARMS];
+        let mut ips_cs_sums=[0.0_f64;ARMS*ARMS];
+        let mut ips_cs_bounds=[(Interval{lower:0.0,upper:1.0});ARMS*ARMS];
+        let mut eval_order:Vec<usize>=(0..max_look).collect();
+        eval_order.sort_by_key(|idx|(eval_log[*idx].mature_at,*idx));
+        let mut eval_cursor=0usize;
         let mut ips_n=0usize;
         let mut look_i=0usize;
         for t in 1..=max_look{
-            let obs=eval_log[t-1];
-            if obs.mature_at<=t{
+            // Maturity is outcome-independent in the registered DGP. Process
+            // matured held-out observations in maturity order so the sequential
+            // confidence sequence uses an honest information-time filtration.
+            while eval_cursor<eval_order.len() && eval_log[eval_order[eval_cursor]].mature_at<=t{
+                let matured=eval_log[eval_order[eval_cursor]];
                 ips_n+=1;
                 for code in 0..ARMS*ARMS{
                     let a0=code/ARMS;
                     let a1=code%ARMS;
-                    let target=if obs.context==0{a0}else{a1};
-                    let score=if obs.action==target{IPS_MAX_WEIGHT*obs.reward}else{0.0};
+                    let target=if matured.context==0{a0}else{a1};
+                    let score=if matured.action==target{IPS_MAX_WEIGHT*matured.reward}else{0.0};
                     ips_sum[code]+=score;ips_sq[code]+=score*score;
                 }
+                update_familywise_ips_cs(matured,ips_n,&mut ips_cs_sums,&mut ips_cs_bounds);
+                eval_cursor+=1;
             }
 
             let context=if rng.unit()<0.5{0}else{1};
@@ -283,7 +319,7 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
 
             if t==looks.get(look_i).copied().unwrap_or(usize::MAX){
                 let snapshot=snapshot_metrics(f,t,&counts,&proxy_sums,ns_sum,proxy_sum,ns_regret,proxy_regret,
-                    matured_count,matured_sum,&ips_sum,&ips_sq,ips_n);
+                    matured_count,matured_sum,&ips_sum,&ips_sq,ips_n,&ips_cs_bounds);
                 for i in 0..METRIC_NAMES.len(){metrics[look_i][i].add(snapshot[i]);}
                 look_i+=1;
             }
@@ -380,6 +416,25 @@ mod tests{
             assert!(close(r.headroom,0.0,1e-12));
         }
     }
+    #[test]
+    fn familywise_ips_cs_is_nested_and_bounded_for_all_deterministic_policies(){
+        let f=Fixture::aligned_dense();
+        let mut sums=[0.0_f64;ARMS*ARMS];
+        let mut bounds=[Interval{lower:0.0,upper:1.0};ARMS*ARMS];
+        let mut rng=SplitMix64::new(evaluation_seed_for(9));
+        let mut log:Vec<LoggedObservation>=(0..512).map(|i|logged_observation(&mut rng,f,i+1)).collect();
+        log.sort_by_key(|o|o.mature_at);
+        for (i,obs) in log.iter().enumerate(){
+            let previous=bounds;
+            update_familywise_ips_cs(*obs,i+1,&mut sums,&mut bounds);
+            for code in 0..ARMS*ARMS{
+                assert!(bounds[code].lower>=previous[code].lower-EPS);
+                assert!(bounds[code].upper<=previous[code].upper+EPS);
+                assert!(bounds[code].lower>=0.0&&bounds[code].upper<=1.0);
+            }
+        }
+    }
+
     #[test]
     fn deterministic_seed_replays(){
         let f=Fixture::aligned_sparse();
