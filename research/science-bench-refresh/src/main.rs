@@ -1,7 +1,8 @@
 use science_bench_refresh_validator::{
     audit_policy_input_overlap, audit_lineage_overlap, compute_artifact_commitment,
-    compute_protocol_commitment, generate_task_set_bytes, sha256_hex, validate_manifest_bytes,
-    verify_regeneration, verify_reveal, verify_search_exposure_match_report,
+    compute_protocol_commitment, generate_task_set_bytes, match_search_exposure_exact,
+    sha256_hex, validate_manifest_bytes, verify_regeneration, verify_reveal,
+    verify_search_exposure_exact_match_report, verify_search_exposure_match_report,
     verify_search_exposure_receipt,
 };
 use serde_json::json;
@@ -19,6 +20,9 @@ fn usage(program: &str) {
             "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
             "  {program} verify-search-receipt RECEIPT.json\n",
             "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
+            "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
+            "  {program} verify-search-exact-matches RECEIPT.json\n",
+            "    PROTECTED_INDEX.json MATCH_REPORT.json\n",
             "  {program} protocol-commit MANIFEST.json\n",
             "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
             "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
@@ -43,6 +47,91 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "match-search-exact" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let receipt_bytes = match read(&args[1], "search exposure receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let protected_index_bytes = match read(&args[2], "protected artifact index") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match match_search_exposure_exact(
+                &receipt_bytes,
+                &protected_index_bytes,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            let detected = report.records.iter().any(|record| {
+                matches!(
+                    record.classification.as_str(),
+                    "benchmark_metadata" | "question_context" | "explicit_answer"
+                )
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("exact search match report serializes")
+            );
+            if detected {
+                ExitCode::from(12)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
+        "verify-search-exact-matches" => {
+            if args.len() != 4 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let receipt_bytes = match read(&args[1], "search exposure receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let protected_index_bytes = match read(&args[2], "protected artifact index") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let match_bytes = match read(&args[3], "exact search match report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_search_exposure_exact_match_report(
+                &receipt_bytes,
+                &protected_index_bytes,
+                &match_bytes,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(11);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("exact search match verification report serializes")
+            );
+            if !report.integrity_valid {
+                ExitCode::from(11)
+            } else if report.contaminated_event_count > 0 {
+                ExitCode::from(12)
+            } else if !report.receipt_policy_compliant {
+                ExitCode::from(9)
+            } else if report.review_required_event_count > 0 {
+                ExitCode::from(13)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
         "verify-search-matches" => {
             if args.len() != 3 {
                 usage("science-bench-refresh-validator");
