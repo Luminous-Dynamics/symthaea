@@ -350,6 +350,14 @@ fn validate_verification(
         push(out, "INVALID_VERIFICATION_CHECKS", format!("{path}.checks"), "checks must be an array.");
         return;
     };
+    if entries.is_empty() {
+        push(
+            out,
+            "EXECUTED_VERIFICATION_HAS_NO_CHECKS",
+            format!("{path}.checks"),
+            "Any executed verification must record at least one check; use not_run when no checks were performed.",
+        );
+    }
     let mut ids = BTreeSet::new();
     for (index, check) in entries.iter().enumerate() {
         let check_path = format!("{path}.checks[{index}]");
@@ -373,9 +381,6 @@ fn validate_verification(
     }
 
     if outcome == Some("passed") {
-        if entries.is_empty() {
-            push(out, "PASSED_VERIFICATION_HAS_NO_CHECKS", format!("{path}.checks"), "A passed verification requires at least one recorded check.");
-        }
         let execution_obj = execution.and_then(Value::as_object);
         if execution_obj.and_then(|v| v.get("status")).and_then(Value::as_str) != Some("completed")
             || execution_obj.and_then(|v| v.get("result")).and_then(Value::as_str) != Some("passed")
