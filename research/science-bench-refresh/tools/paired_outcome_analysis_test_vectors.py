@@ -72,6 +72,13 @@ def make_analysis(plan_fields: dict[str, Any], revision: str) -> dict[str, Any]:
             "directional_hypothesis": "no_directional_claim",
         },
         {
+            "contrast_id": "source-contradiction-strict-correctness-vs-natural",
+            "treatment_condition": "source_contradiction",
+            "reference_condition": "natural_retrieval",
+            "endpoint": "strict_correctness",
+            "directional_hypothesis": "no_directional_claim",
+        },
+        {
             "contrast_id": "decoy-cost-vs-natural",
             "treatment_condition": "decoy_noise",
             "reference_condition": "natural_retrieval",
