@@ -225,7 +225,8 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
         .iter()
         .any(|part| matches!(part.as_str(), "nc" | "noncommercial"));
     if intended_use == "commercial_compatible"
-        && (restricts_commercial_use || license.starts_with("LicenseRef-"))
+        && (restricts_commercial_use
+            || license.to_ascii_lowercase().starts_with("licenseref-"))
     {
         return Err(fail("commercial_compatible use is not allowed by a known non-commercial or unreviewed LicenseRef identifier"));
     }
@@ -590,6 +591,8 @@ mod tests {
         set(&mut fields, "source_license_spdx", "CC-BY-NC-4.0");
         assert!(validate_manifest(&fields).unwrap_err().contains("commercial_compatible"));
         set(&mut fields, "source_license_spdx", "LicenseRef-ResearchOnly");
+        assert!(validate_manifest(&fields).unwrap_err().contains("commercial_compatible"));
+        set(&mut fields, "source_license_spdx", "licenseref-researchonly");
         assert!(validate_manifest(&fields).unwrap_err().contains("commercial_compatible"));
         set(&mut fields, "source_license_spdx", "CC-BY-4.0");
         validate_manifest(&fields).unwrap();
