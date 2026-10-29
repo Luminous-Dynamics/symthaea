@@ -74,7 +74,7 @@ fn run_episode(seed: u64, lane: Lane, threshold: Option<f64>) -> Episode {
         let noise = rng.unit_f64();
         let changed = lane.change_at().is_some_and(|change_at| step >= change_at);
         let switched = alarm_at_step.is_some_and(|alarm_at| step > alarm_at);
-        let chosen_action = usize::from(switched);
+        let chosen_action = if switched { 1_usize } else { 0_usize };
 
         // Regime A favours action 0; regime B favours action 1. This is a small
         // decision-proxy environment, not a physical safety or causal-discovery claim.
