@@ -174,6 +174,10 @@ Before adding a second model-confidence or abstention subsystem, review Symtropy
 
 For reproducible execution when shared CI runners are unavailable, coordinate with Symtropy's [QUAL-002 hermetic qualification work](https://github.com/Luminous-Dynamics/symtropy/issues/1280). This is a potential independent execution path, not proof that the current PR has been compiled: the exact code/configuration and retained test output still have to match. Do not register a persistent personal workstation as a general public-PR runner.
 
+### Related design-time lane: HARDSEC-002
+
+[HARDSEC-002 / issue #9038](https://github.com/Luminous-Dynamics/symthaea/issues/9038) separately evaluates closed-loop secure RTL and firmware generation against [HardSecBench (IJCAI 2026)](https://doi.org/10.24963/ijcai.2026/57), which reports 924 Verilog/C tasks spanning 76 hardware-relevant CWEs. Its draft protocol is in [PR #9040](https://github.com/Luminous-Dynamics/symthaea/pull/9040). This complements HARDSEC-001 but must not be pooled into one leaderboard: design-time joint functional/security correctness and runtime telemetry detection have different datasets, ground truth, and metrics.
+
 ## 10. Future lanes (separate qualification)
 
 ### RTL and hardware-Trojan lane
