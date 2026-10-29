@@ -162,7 +162,12 @@ fn validate_subjects(value: Option<&Value>, out: &mut Vec<Violation>) {
             continue;
         };
         if object.get("name").and_then(Value::as_str).is_none_or(str::is_empty) {
-            push(out, "INVALID_SUBJECT_NAME", format!("{path}.name"), "Subject name must be non-empty.");
+            push(
+                out,
+                "INVALID_SUBJECT_NAME",
+                format!("{path}.name"),
+                "Subject name must be non-empty.",
+            );
         }
         validate_digest_set(object.get("digest"), &format!("{path}.digest"), out);
     }
@@ -195,20 +200,40 @@ fn validate_claim(value: Option<&Value>, out: &mut Vec<Violation>) {
         "aspiration",
     ];
     if !claim.get("kind").and_then(Value::as_str).is_some_and(|kind| kinds.contains(&kind)) {
-        push(out, "INVALID_CLAIM_KIND", format!("{path}.kind"), "Unsupported or missing claim kind.");
+        push(
+            out,
+            "INVALID_CLAIM_KIND",
+            format!("{path}.kind"),
+            "Unsupported or missing claim kind.",
+        );
     }
 
     let Some(scope) = claim.get("scope").and_then(Value::as_array) else {
-        push(out, "INVALID_CLAIM_SCOPE", format!("{path}.scope"), "scope must be a non-empty array.");
+        push(
+            out,
+            "INVALID_CLAIM_SCOPE",
+            format!("{path}.scope"),
+            "scope must be a non-empty array.",
+        );
         return;
     };
     if scope.is_empty() || scope.iter().any(|v| v.as_str().is_none_or(str::is_empty)) {
-        push(out, "INVALID_CLAIM_SCOPE", format!("{path}.scope"), "scope must contain non-empty strings.");
+        push(
+            out,
+            "INVALID_CLAIM_SCOPE",
+            format!("{path}.scope"),
+            "scope must contain non-empty strings.",
+        );
     }
     let mut seen = BTreeSet::new();
     for entry in scope.iter().filter_map(Value::as_str) {
         if !seen.insert(entry) {
-            push(out, "DUPLICATE_CLAIM_SCOPE", format!("{path}.scope"), "scope entries must be unique.");
+            push(
+                out,
+                "DUPLICATE_CLAIM_SCOPE",
+                format!("{path}.scope"),
+                "scope entries must be unique.",
+            );
             break;
         }
     }
@@ -221,7 +246,12 @@ fn validate_target(value: &Value, path: &str, out: &mut Vec<Violation>) {
     };
 
     let Some(source) = target.get("source").and_then(Value::as_object) else {
-        push(out, "INVALID_SOURCE_IDENTITY", format!("{path}.source"), "Source identity is required.");
+        push(
+            out,
+            "INVALID_SOURCE_IDENTITY",
+            format!("{path}.source"),
+            "Source identity is required.",
+        );
         return;
     };
     let repository = source.get("repository").and_then(Value::as_str);
@@ -244,7 +274,11 @@ fn validate_target(value: &Value, path: &str, out: &mut Vec<Violation>) {
         );
     }
 
-    validate_digest_set(target.get("configurationDigest"), &format!("{path}.configurationDigest"), out);
+    validate_digest_set(
+        target.get("configurationDigest"),
+        &format!("{path}.configurationDigest"),
+        out,
+    );
     validate_artifacts(target.get("inputs"), &format!("{path}.inputs"), false, out);
 }
 
@@ -263,7 +297,12 @@ fn validate_execution(value: Option<&Value>, out: &mut Vec<Violation>) {
     let result = execution.get("result").and_then(Value::as_str);
 
     if execution.get("runId").is_none() {
-        push(out, "MISSING_RUN_ID", format!("{path}.runId"), "runId is required; use null when no run occurred.");
+        push(
+            out,
+            "MISSING_RUN_ID",
+            format!("{path}.runId"),
+            "runId is required; use null when no run occurred.",
+        );
     } else if execution.get("runId").is_some_and(|v| !v.is_null() && v.as_str().is_none()) {
         push(out, "INVALID_RUN_ID", format!("{path}.runId"), "runId must be a string or null.");
     }
@@ -280,11 +319,26 @@ fn validate_execution(value: Option<&Value>, out: &mut Vec<Violation>) {
         ),
     }
 
-    if status == Some("completed") && execution.get("runId").and_then(Value::as_str).is_none_or(str::is_empty) {
-        push(out, "COMPLETED_RUN_ID_REQUIRED", format!("{path}.runId"), "Completed execution requires a non-empty runId.");
+    if status == Some("completed")
+        && execution
+            .get("runId")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+    {
+        push(
+            out,
+            "COMPLETED_RUN_ID_REQUIRED",
+            format!("{path}.runId"),
+            "Completed execution requires a non-empty runId.",
+        );
     }
     if status == Some("not_run") && !execution.get("runId").is_some_and(Value::is_null) {
-        push(out, "RUN_ID_FOR_UNRUN_EXECUTION", format!("{path}.runId"), "An execution marked not_run must use a null runId.");
+        push(
+            out,
+            "RUN_ID_FOR_UNRUN_EXECUTION",
+            format!("{path}.runId"),
+            "An execution marked not_run must use a null runId.",
+        );
     }
 }
 
@@ -306,38 +360,78 @@ fn validate_verification(
     let checks = verification.get("checks").and_then(Value::as_array);
 
     if !matches!(outcome, Some("not_run" | "passed" | "failed" | "inconclusive")) {
-        push(out, "INVALID_VERIFICATION_OUTCOME", format!("{path}.outcome"), "Unsupported or missing verification outcome.");
+        push(
+            out,
+            "INVALID_VERIFICATION_OUTCOME",
+            format!("{path}.outcome"),
+            "Unsupported or missing verification outcome.",
+        );
     }
 
     if outcome == Some("not_run") {
         if !verifier.is_some_and(Value::is_null) {
-            push(out, "UNRUN_VERIFICATION_HAS_VERIFIER", format!("{path}.verifier"), "An unrun verification must have a null verifier.");
+            push(
+                out,
+                "UNRUN_VERIFICATION_HAS_VERIFIER",
+                format!("{path}.verifier"),
+                "An unrun verification must have a null verifier.",
+            );
         }
         if !checked_target.is_some_and(Value::is_null) {
-            push(out, "UNRUN_VERIFICATION_HAS_TARGET", format!("{path}.checkedTarget"), "An unrun verification must have a null checkedTarget.");
+            push(
+                out,
+                "UNRUN_VERIFICATION_HAS_TARGET",
+                format!("{path}.checkedTarget"),
+                "An unrun verification must have a null checkedTarget.",
+            );
         }
         if checks.is_none_or(|entries| !entries.is_empty()) {
-            push(out, "UNRUN_VERIFICATION_HAS_CHECKS", format!("{path}.checks"), "An unrun verification cannot claim checks.");
+            push(
+                out,
+                "UNRUN_VERIFICATION_HAS_CHECKS",
+                format!("{path}.checks"),
+                "An unrun verification cannot claim checks.",
+            );
         }
         return;
     }
 
     let Some(verifier_obj) = verifier.and_then(Value::as_object) else {
-        push(out, "VERIFIER_IDENTITY_REQUIRED", format!("{path}.verifier"), "Executed verification requires verifier identity.");
+        push(
+            out,
+            "VERIFIER_IDENTITY_REQUIRED",
+            format!("{path}.verifier"),
+            "Executed verification requires verifier identity.",
+        );
         return;
     };
     for field in ["id", "version"] {
         if verifier_obj.get(field).and_then(Value::as_str).is_none_or(str::is_empty) {
-            push(out, "VERIFIER_IDENTITY_REQUIRED", format!("{path}.verifier.{field}"), "Verifier id and version must be non-empty.");
+            push(
+                out,
+                "VERIFIER_IDENTITY_REQUIRED",
+                format!("{path}.verifier.{field}"),
+                "Verifier id and version must be non-empty.",
+            );
         }
     }
 
     let Some(expected_target) = target.filter(|v| v.is_object()) else {
-        push(out, "LEP_TARGET_MISMATCH", format!("{path}.checkedTarget"), "Cannot verify a claim without a valid declared target.");
+        push(
+            out,
+            "LEP_TARGET_MISMATCH",
+            format!("{path}.checkedTarget"),
+            "Cannot verify a claim without a valid declared target.",
+        );
         return;
     };
     let Some(actual_target) = checked_target.filter(|v| v.is_object()) else {
-        push(out, "LEP_TARGET_MISMATCH", format!("{path}.checkedTarget"), "An executed verification must identify the target it checked.");
+        push(
+            out,
+            "LEP_TARGET_MISMATCH",
+            format!("{path}.checkedTarget"),
+            "An executed verification must identify the target it checked.",
+        );
         return;
     };
     if expected_target != actual_target {
@@ -350,7 +444,12 @@ fn validate_verification(
     }
 
     let Some(entries) = checks else {
-        push(out, "INVALID_VERIFICATION_CHECKS", format!("{path}.checks"), "checks must be an array.");
+        push(
+            out,
+            "INVALID_VERIFICATION_CHECKS",
+            format!("{path}.checks"),
+            "checks must be an array.",
+        );
         return;
     };
     if entries.is_empty() {
@@ -370,16 +469,36 @@ fn validate_verification(
         };
         let id = check_obj.get("id").and_then(Value::as_str);
         if id.is_none_or(str::is_empty) {
-            push(out, "INVALID_CHECK_ID", format!("{check_path}.id"), "Check id must be non-empty.");
+            push(
+                out,
+                "INVALID_CHECK_ID",
+                format!("{check_path}.id"),
+                "Check id must be non-empty.",
+            );
         } else if !ids.insert(id.unwrap_or_default()) {
-            push(out, "DUPLICATE_CHECK_ID", format!("{check_path}.id"), "Check ids must be unique within one verification.");
+            push(
+                out,
+                "DUPLICATE_CHECK_ID",
+                format!("{check_path}.id"),
+                "Check ids must be unique within one verification.",
+            );
         }
         let check_outcome = check_obj.get("outcome").and_then(Value::as_str);
         if !matches!(check_outcome, Some("passed" | "failed" | "inconclusive" | "not_run")) {
-            push(out, "INVALID_CHECK_OUTCOME", format!("{check_path}.outcome"), "Unsupported or missing check outcome.");
+            push(
+                out,
+                "INVALID_CHECK_OUTCOME",
+                format!("{check_path}.outcome"),
+                "Unsupported or missing check outcome.",
+            );
         }
         if outcome == Some("passed") && check_outcome != Some("passed") {
-            push(out, "PASSED_VERIFICATION_HAS_NONPASSING_CHECK", format!("{check_path}.outcome"), "A passed verification may contain only passing checks.");
+            push(
+                out,
+                "PASSED_VERIFICATION_HAS_NONPASSING_CHECK",
+                format!("{check_path}.outcome"),
+                "A passed verification may contain only passing checks.",
+            );
         }
     }
 
@@ -447,7 +566,12 @@ fn validate_artifacts(
             continue;
         };
         if object.get("name").and_then(Value::as_str).is_none_or(str::is_empty) {
-            push(out, "INVALID_ARTIFACT_NAME", format!("{artifact_path}.name"), "Artifact name must be non-empty.");
+            push(
+                out,
+                "INVALID_ARTIFACT_NAME",
+                format!("{artifact_path}.name"),
+                "Artifact name must be non-empty.",
+            );
         }
         let kinds = [
             "source",
@@ -462,7 +586,12 @@ fn validate_artifacts(
             "other",
         ];
         if !object.get("kind").and_then(Value::as_str).is_some_and(|kind| kinds.contains(&kind)) {
-            push(out, "INVALID_ARTIFACT_KIND", format!("{artifact_path}.kind"), "Unsupported or missing artifact kind.");
+            push(
+                out,
+                "INVALID_ARTIFACT_KIND",
+                format!("{artifact_path}.kind"),
+                "Unsupported or missing artifact kind.",
+            );
         }
         validate_digest_set(object.get("digest"), &format!("{artifact_path}.digest"), out);
     }
@@ -483,15 +612,29 @@ fn validate_digest_set(value: Option<&Value>, path: &str, out: &mut Vec<Violatio
             "sha256" | "blake3" => 64,
             "sha512" => 128,
             _ => {
-                push(out, "UNSUPPORTED_DIGEST_ALGORITHM", format!("{path}.{algorithm}"), "LEP v0.1 supports only sha256, sha512, and blake3.");
+                push(
+                    out,
+                    "UNSUPPORTED_DIGEST_ALGORITHM",
+                    format!("{path}.{algorithm}"),
+                    "LEP v0.1 supports only sha256, sha512, and blake3.",
+                );
                 continue;
             }
         };
         let Some(hex) = digest.as_str() else {
-            push(out, "INVALID_DIGEST_VALUE", format!("{path}.{algorithm}"), "Digest value must be a lowercase hexadecimal string.");
+            push(
+                out,
+                "INVALID_DIGEST_VALUE",
+                format!("{path}.{algorithm}"),
+                "Digest value must be a lowercase hexadecimal string.",
+            );
             continue;
         };
-        if hex.len() != expected_length || !hex.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        if hex.len() != expected_length
+        || !hex
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
             push(
                 out,
                 "INVALID_DIGEST_VALUE",
@@ -606,7 +749,8 @@ mod tests {
     #[test]
     fn stale_checked_target_is_rejected() {
         let mut statement = minimal_statement();
-        statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] = json!("deadbeef1234567");
+        statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
+            json!("deadbeef1234567");
         let report = verify_statement(&statement);
         assert!(!report.valid);
         assert!(has_code(&report, "LEP_TARGET_MISMATCH"));
@@ -616,7 +760,8 @@ mod tests {
     fn incomplete_hash_is_rejected() {
         let mut statement = minimal_statement();
         statement["predicate"]["target"]["configurationDigest"]["sha256"] = json!("deadbeef");
-        statement["predicate"]["verification"]["checkedTarget"]["configurationDigest"]["sha256"] = json!("deadbeef");
+        statement["predicate"]["verification"]["checkedTarget"]["configurationDigest"]["sha256"] =
+            json!("deadbeef");
         let report = verify_statement(&statement);
         assert!(!report.valid);
         assert!(has_code(&report, "INVALID_DIGEST_VALUE"));
@@ -693,7 +838,8 @@ mod tests {
     fn mutable_branch_name_is_not_a_pinned_revision() {
         let mut statement = minimal_statement();
         statement["predicate"]["target"]["source"]["revision"] = json!("main");
-        statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] = json!("main");
+        statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
+            json!("main");
         let report = verify_statement(&statement);
         assert!(!report.valid);
         assert!(has_code(&report, "SOURCE_REVISION_NOT_IMMUTABLE"));
