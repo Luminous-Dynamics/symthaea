@@ -391,6 +391,10 @@ enum RetimingChoice {
 struct RetimingSearchNode {
     depth: usize,
     choices: Vec<Option<RetimingChoice>>,
+    /// Exact cost of the actions already committed in this search prefix.
+    committed_cost: u64,
+    /// Admissible lower bound: committed cost plus an availability-only
+    /// relaxation for each unresolved flight.
     lower_bound: u64,
     serial: u64,
 }
@@ -421,11 +425,14 @@ impl PartialOrd for RetimingSearchNode {
 /// Best-first branch-and-bound over every allowed aircraft/delay decision and
 /// the explicit cancellation decision for every flight.
 ///
-/// The admissible lower bound is the cost of already-fixed actions; unresolved
-/// flights contribute zero. A finite generated-node cap prevents the frontier
-/// from growing without bound. If an expansion would exceed that cap, its parent
-/// remains on the frontier so the reported global bound still covers its entire
-/// unexplored subtree.
+/// The admissible lower bound is the cost of already-fixed actions plus, for
+/// every unresolved flight, the cheapest of (a) its minimum delay needed to meet
+/// any aircraft's individual availability or (b) cancellation. The relaxation
+/// ignores conflicts among unresolved flights and between unresolved and
+/// committed flights, so it can underestimate but cannot overestimate the true
+/// completion cost. A finite generated-node cap prevents frontier growth without
+/// bound. If an expansion would exceed that cap, its parent remains on the
+/// frontier so the reported global bound still covers its unexplored subtree.
 pub fn solve_retiming_branch_and_bound(
     scenario: &RetimingScenario,
     options: RetimingSearchOptions,
@@ -436,10 +443,13 @@ pub fn solve_retiming_branch_and_bound(
     }
 
     let mut frontier = std::collections::BinaryHeap::<RetimingSearchNode>::new();
+    let root_lower_bound = retiming_optimistic_lower_bound(scenario, 0, 0)
+        .ok_or_else(|| "root recovery lower bound overflows u64".to_string())?;
     frontier.push(RetimingSearchNode {
         depth: 0,
         choices: vec![None; scenario.flights.len()],
-        lower_bound: 0,
+        committed_cost: 0,
+        lower_bound: root_lower_bound,
         serial: 0,
     });
     let mut serial = 1_u64;
@@ -496,11 +506,11 @@ pub fn solve_retiming_branch_and_bound(
                 configuration_revision: scenario.configuration_revision.clone(),
                 input_digest: scenario.input_digest.clone(),
                 assignments,
-                total_cost: node.lower_bound,
+                total_cost: node.committed_cost,
             };
             let verification = verify_retiming_plan(scenario, &plan);
             if verification.status != RetimingVerificationStatus::Verified
-                || verification.recomputed_cost != Some(node.lower_bound)
+                || verification.recomputed_cost != Some(node.committed_cost)
             {
                 return Err(format!(
                     "search/verifier disagreement on complete assignment: {:?}",
@@ -529,8 +539,8 @@ pub fn solve_retiming_branch_and_bound(
                     .delay_cost_per_minute
                     .checked_mul(u64::from(delay_minutes))
                     .ok_or_else(|| format!("flight {} delay cost overflows", flight.id))?;
-                let lower_bound = node
-                    .lower_bound
+                let committed_cost = node
+                    .committed_cost
                     .checked_add(delay_cost)
                     .ok_or_else(|| "partial delay objective overflows u64".to_string())?;
                 let mut choices = node.choices.clone();
@@ -546,24 +556,38 @@ pub fn solve_retiming_branch_and_bound(
                     partial_prunes = partial_prunes.saturating_add(1);
                     continue;
                 }
+                let lower_bound = retiming_optimistic_lower_bound(
+                    scenario,
+                    flight_index + 1,
+                    committed_cost,
+                )
+                .ok_or_else(|| "partial recovery lower bound overflows u64".to_string())?;
                 children.push(RetimingSearchNode {
                     depth: flight_index + 1,
                     choices,
+                    committed_cost,
                     lower_bound,
                     serial: 0,
                 });
             }
         }
 
-        let cancellation_bound = node
-            .lower_bound
+        let cancellation_cost = node
+            .committed_cost
             .checked_add(flight.cancellation_cost)
             .ok_or_else(|| "partial cancellation objective overflows u64".to_string())?;
         let mut cancelled_choices = node.choices.clone();
         cancelled_choices[flight_index] = Some(RetimingChoice::Cancel);
+        let cancellation_bound = retiming_optimistic_lower_bound(
+            scenario,
+            flight_index + 1,
+            cancellation_cost,
+        )
+        .ok_or_else(|| "partial cancellation lower bound overflows u64".to_string())?;
         children.push(RetimingSearchNode {
             depth: flight_index + 1,
             choices: cancelled_choices,
+            committed_cost: cancellation_cost,
             lower_bound: cancellation_bound,
             serial: 0,
         });
@@ -637,6 +661,38 @@ pub fn solve_retiming_branch_and_bound(
         accepted_absolute_gap: options.max_absolute_optimality_gap,
         stats,
     })
+}
+
+/// Admissible lower bound for a fixed decision prefix. For every unresolved
+/// flight, relax conflicts and choose the cheapest action that independently
+/// satisfies some aircraft's availability, or cancellation if cheaper. Every
+/// feasible completion pays at least that much for each unresolved flight.
+fn retiming_optimistic_lower_bound(
+    scenario: &RetimingScenario,
+    first_unresolved_flight: usize,
+    committed_cost: u64,
+) -> Option<u64> {
+    if first_unresolved_flight > scenario.flights.len() {
+        return None;
+    }
+    let mut lower_bound = committed_cost;
+    for flight in &scenario.flights[first_unresolved_flight..] {
+        let mut minimum_action_cost = flight.cancellation_cost;
+        for aircraft in &scenario.aircraft {
+            let minimum_delay = aircraft
+                .available_at_minutes
+                .saturating_sub(flight.scheduled_start_minutes);
+            if minimum_delay > flight.max_delay_minutes {
+                continue;
+            }
+            let delay_cost = flight
+                .delay_cost_per_minute
+                .checked_mul(u64::from(minimum_delay))?;
+            minimum_action_cost = minimum_action_cost.min(delay_cost);
+        }
+        lower_bound = lower_bound.checked_add(minimum_action_cost)?;
+    }
+    Some(lower_bound)
 }
 
 /// Deterministic, feasibility-preserving greedy baseline. Flights are considered
