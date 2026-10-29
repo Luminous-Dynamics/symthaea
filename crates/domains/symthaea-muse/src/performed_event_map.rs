@@ -46,7 +46,8 @@ pub struct PerformedEventLineage {
     /// Onset and end in rounded microseconds, with a half-open interval.
     pub onset_micros: u64,
     pub end_micros: u64,
-    /// Half-open PCM frame interval derived with nearest-frame, half-up rounding.
+    /// Projected half-open PCM schedule interval, rounded from MIDI time.
+    /// This is not a measured acoustic onset and excludes renderer-specific latency.
     pub onset_frame: u64,
     pub end_frame: u64,
 }
