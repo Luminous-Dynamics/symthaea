@@ -959,3 +959,390 @@ mod tests {
         assert!(json.contains("\\n"));
     }
 }
+
+
+/// Deterministic node budget and accepted absolute objective gap for the
+/// best-first branch-and-bound solver. Objective costs and the gap use the
+/// scenario's integer cost units.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchAndBoundOptions {
+    pub max_expanded_nodes: u64,
+    pub max_absolute_optimality_gap: u64,
+}
+
+/// Honest terminal status of a bounded branch-and-bound run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BranchAndBoundStatus {
+    /// The incumbent is within the declared absolute gap of the frontier bound.
+    OptimalWithinTolerance,
+    /// A verified feasible incumbent exists, but the requested gap is not proved.
+    FeasibleUncertified,
+    /// The complete search space was exhausted without a feasible plan.
+    NoFeasiblePlan,
+    /// The node budget ended before a feasible plan was established.
+    NoFeasiblePlanWithinBudget,
+}
+
+/// Counts useful for matched, machine-readable comparisons against the exhaustive
+/// baseline. Node counts are deterministic for frozen input and options.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BranchAndBoundStats {
+    pub expanded_nodes: u64,
+    pub generated_nodes: u64,
+    pub complete_assignments_examined: u64,
+    pub infeasible_complete_assignments: u64,
+    pub partial_feasibility_prunes: u64,
+    pub objective_bound_prunes: u64,
+    pub peak_frontier_nodes: usize,
+}
+
+/// Report from an exact/anytime bounded search. A reported lower bound is over
+/// the remaining frontier together with the incumbent. Without a feasible
+/// incumbent, the lower bound alone does not imply existence of a feasible plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BranchAndBoundReport {
+    pub scenario_id: String,
+    pub configuration_revision: String,
+    pub input_digest: String,
+    pub status: BranchAndBoundStatus,
+    pub best_plan: Option<Plan>,
+    pub best_objective_cost: Option<u64>,
+    pub global_lower_bound_cost: Option<u64>,
+    pub absolute_optimality_gap: Option<u64>,
+    pub accepted_absolute_gap: u64,
+    pub stats: BranchAndBoundStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RecoverySearchNode {
+    source: PartSource,
+    depth: usize,
+    /// None = not yet decided; Some(None) = cancelled; Some(Some(i)) = aircraft i.
+    choices: Vec<Option<Option<usize>>>,
+    /// Admissible bound: fixed source cost + cancellation costs already committed.
+    lower_bound: u64,
+    serial: u64,
+}
+
+impl Ord for RecoverySearchNode {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // BinaryHeap is a max-heap; reverse bound and serial to pop the smallest
+        // lower bound first, with stable FIFO order for equal bounds.
+        other
+            .lower_bound
+            .cmp(&self.lower_bound)
+            .then_with(|| other.serial.cmp(&self.serial))
+    }
+}
+
+impl PartialOrd for RecoverySearchNode {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Search the complete finite assignment space with best-first branch and bound.
+///
+/// Each flight is assigned to one declared aircraft or explicitly cancelled;
+/// each eligible component source gets its own root. The objective lower bound
+/// includes fixed repair/source costs and cancellation costs already committed.
+/// Unassigned flights contribute zero, so the bound is admissible for this
+/// synthetic model's non-negative objective. Partial constraint checks prune
+/// impossible prefixes. Candidate leaves are checked with the planner path, and
+/// every new incumbent is independently rechecked through `verify_plan`.
+///
+/// This is a bounded research solver for `Scenario`, not a production airline
+/// optimizer. The node budget is deterministic work accounting, not wall-clock
+/// time. A feasible incumbent is never labeled optimal unless the minimum
+/// frontier bound proves the requested gap. The model's bounded exact limits
+/// are intentionally retained by `Scenario::validate`.
+pub fn solve_branch_and_bound(
+    scenario: &Scenario,
+    options: BranchAndBoundOptions,
+) -> Result<BranchAndBoundReport, String> {
+    scenario.validate()?;
+    if options.max_expanded_nodes == 0 {
+        return Err("max_expanded_nodes must be greater than zero".into());
+    }
+
+    let mut frontier = std::collections::BinaryHeap::<RecoverySearchNode>::new();
+    let mut serial = 0_u64;
+    let mut stats = BranchAndBoundStats::default();
+
+    for source in scenario.source_options() {
+        let lower_bound = source_base_cost(scenario, source)
+            .ok_or_else(|| "source base cost overflows u64".to_string())?;
+        frontier.push(RecoverySearchNode {
+            source,
+            depth: 0,
+            choices: vec![None; scenario.flights.len()],
+            lower_bound,
+            serial,
+        });
+        serial = serial.saturating_add(1);
+        stats.generated_nodes = stats.generated_nodes.saturating_add(1);
+    }
+    stats.peak_frontier_nodes = frontier.len();
+
+    let mut best_plan: Option<Plan> = None;
+
+    while let Some(frontier_best) = frontier.peek() {
+        if let Some(incumbent) = &best_plan {
+            let bound = frontier_best.lower_bound.min(incumbent.total_cost);
+            let gap = incumbent.total_cost - bound;
+            if gap <= options.max_absolute_optimality_gap {
+                break;
+            }
+        }
+        if stats.expanded_nodes >= options.max_expanded_nodes {
+            break;
+        }
+
+        let node = frontier.pop().expect("frontier was non-empty");
+        stats.expanded_nodes = stats.expanded_nodes.saturating_add(1);
+
+        if node.depth == scenario.flights.len() {
+            stats.complete_assignments_examined =
+                stats.complete_assignments_examined.saturating_add(1);
+            let complete_choices: Vec<Option<usize>> = node
+                .choices
+                .iter()
+                .map(|choice| {
+                    choice
+                        .expect("every leaf choice must be decided before expansion")
+                })
+                .collect();
+
+            if !candidate_is_feasible(scenario, node.source, &complete_choices) {
+                stats.infeasible_complete_assignments =
+                    stats.infeasible_complete_assignments.saturating_add(1);
+                continue;
+            }
+            let Some(cost) = candidate_cost(scenario, node.source, &complete_choices) else {
+                return Err("objective cost overflowed on a feasible assignment".into());
+            };
+            if best_plan
+                .as_ref()
+                .is_some_and(|incumbent| incumbent.total_cost <= cost)
+            {
+                continue;
+            }
+
+            let plan = Plan {
+                scenario_id: scenario.id.clone(),
+                configuration_revision: scenario.configuration_revision.clone(),
+                input_digest: scenario.input_digest.clone(),
+                part_source: node.source,
+                assignments: scenario
+                    .flights
+                    .iter()
+                    .zip(complete_choices.iter())
+                    .map(|(flight, aircraft_index)| FlightAssignment {
+                        flight_id: flight.id.clone(),
+                        aircraft_id: aircraft_index.map(|index| scenario.aircraft[index].id.clone()),
+                    })
+                    .collect(),
+                total_cost: cost,
+            };
+            let verification = verify_plan(scenario, &plan);
+            if verification.status != VerificationStatus::Verified
+                || verification.recomputed_cost != Some(cost)
+            {
+                return Err(format!(
+                    "planner/verifier disagreement for branch-and-bound incumbent: {:?}",
+                    verification.violations
+                ));
+            }
+            best_plan = Some(plan);
+            continue;
+        }
+
+        let flight_index = node.depth;
+        for aircraft_index in 0..scenario.aircraft.len() {
+            let mut choices = node.choices.clone();
+            choices[flight_index] = Some(Some(aircraft_index));
+            if !partial_assignment_is_feasible(
+                scenario,
+                node.source,
+                &choices,
+                flight_index + 1,
+            ) {
+                stats.partial_feasibility_prunes =
+                    stats.partial_feasibility_prunes.saturating_add(1);
+                continue;
+            }
+            push_recovery_child(
+                &mut frontier,
+                &mut stats,
+                &mut serial,
+                &mut best_plan,
+                RecoverySearchNode {
+                    source: node.source,
+                    depth: flight_index + 1,
+                    choices,
+                    lower_bound: node.lower_bound,
+                    serial,
+                },
+            );
+            serial = serial.saturating_add(1);
+        }
+
+        let mut cancelled_choices = node.choices.clone();
+        cancelled_choices[flight_index] = Some(None);
+        let cancellation_bound = node
+            .lower_bound
+            .checked_add(scenario.flights[flight_index].cancellation_cost)
+            .ok_or_else(|| "partial cancellation bound overflows u64".to_string())?;
+        push_recovery_child(
+            &mut frontier,
+            &mut stats,
+            &mut serial,
+            &mut best_plan,
+            RecoverySearchNode {
+                source: node.source,
+                depth: flight_index + 1,
+                choices: cancelled_choices,
+                lower_bound: cancellation_bound,
+                serial,
+            },
+        );
+        serial = serial.saturating_add(1);
+        stats.peak_frontier_nodes = stats.peak_frontier_nodes.max(frontier.len());
+    }
+
+    let frontier_bound = frontier.peek().map(|node| node.lower_bound);
+    let best_cost = best_plan.as_ref().map(|plan| plan.total_cost);
+    let global_lower_bound_cost = match (best_cost, frontier_bound) {
+        (Some(best), Some(bound)) => Some(best.min(bound)),
+        (Some(best), None) => Some(best),
+        (None, Some(bound)) => Some(bound),
+        (None, None) => None,
+    };
+    let absolute_optimality_gap = best_cost.zip(global_lower_bound_cost).map(|(best, lower)| best - lower);
+
+    let status = match (best_cost, absolute_optimality_gap, frontier.is_empty()) {
+        (Some(_), Some(gap), _) if gap <= options.max_absolute_optimality_gap => {
+            BranchAndBoundStatus::OptimalWithinTolerance
+        }
+        (Some(_), _, _) => BranchAndBoundStatus::FeasibleUncertified,
+        (None, _, true) => BranchAndBoundStatus::NoFeasiblePlan,
+        (None, _, false) => BranchAndBoundStatus::NoFeasiblePlanWithinBudget,
+    };
+
+    Ok(BranchAndBoundReport {
+        scenario_id: scenario.id.clone(),
+        configuration_revision: scenario.configuration_revision.clone(),
+        input_digest: scenario.input_digest.clone(),
+        status,
+        best_plan,
+        best_objective_cost: best_cost,
+        global_lower_bound_cost,
+        absolute_optimality_gap,
+        accepted_absolute_gap: options.max_absolute_optimality_gap,
+        stats,
+    })
+}
+
+fn push_recovery_child(
+    frontier: &mut std::collections::BinaryHeap<RecoverySearchNode>,
+    stats: &mut BranchAndBoundStats,
+    serial: &mut u64,
+    best_plan: &mut Option<Plan>,
+    mut node: RecoverySearchNode,
+) {
+    if best_plan
+        .as_ref()
+        .is_some_and(|incumbent| node.lower_bound >= incumbent.total_cost)
+    {
+        stats.objective_bound_prunes = stats.objective_bound_prunes.saturating_add(1);
+        return;
+    }
+    node.serial = *serial;
+    frontier.push(node);
+    *serial = serial.saturating_add(1);
+    stats.generated_nodes = stats.generated_nodes.saturating_add(1);
+    stats.peak_frontier_nodes = stats.peak_frontier_nodes.max(frontier.len());
+}
+
+fn source_base_cost(scenario: &Scenario, source: PartSource) -> Option<u64> {
+    match source {
+        PartSource::None => Some(0),
+        PartSource::QualifiedStock => Some(scenario.maintenance_cost),
+        PartSource::QualifiedProduction => scenario
+            .production
+            .cost
+            .checked_add(scenario.maintenance_cost),
+    }
+}
+
+/// Check only already-decided assignments. A false result proves no completion
+/// of this prefix can satisfy the declared aircraft availability/turnaround
+/// constraints; undecided flights are deliberately ignored.
+fn partial_assignment_is_feasible(
+    scenario: &Scenario,
+    source: PartSource,
+    choices: &[Option<Option<usize>>],
+    decided_count: usize,
+) -> bool {
+    if choices.len() != scenario.flights.len()
+        || decided_count > scenario.flights.len()
+        || !scenario.source_is_usable(source)
+    {
+        return false;
+    }
+
+    let repair_ready_at = match source {
+        PartSource::None => None,
+        PartSource::QualifiedStock => Some(scenario.maintenance_duration),
+        PartSource::QualifiedProduction => scenario
+            .production
+            .duration
+            .checked_add(scenario.maintenance_duration),
+    };
+
+    let mut by_aircraft: Vec<Vec<usize>> = vec![Vec::new(); scenario.aircraft.len()];
+    for flight_index in 0..decided_count {
+        let Some(aircraft_index) = choices[flight_index].expect("decided prefix must be populated") else {
+            continue;
+        };
+        let Some(aircraft) = scenario.aircraft.get(aircraft_index) else {
+            return false;
+        };
+        let flight = &scenario.flights[flight_index];
+        let ready_at = if aircraft.id == scenario.repair_aircraft_id {
+            let Some(repair_ready) = repair_ready_at else {
+                return false;
+            };
+            aircraft.available_at.max(repair_ready)
+        } else {
+            aircraft.available_at
+        };
+        if flight.start < ready_at {
+            return false;
+        }
+        by_aircraft[aircraft_index].push(flight_index);
+    }
+
+    for (aircraft_index, assigned) in by_aircraft.iter_mut().enumerate() {
+        assigned.sort_by_key(|&index| {
+            (
+                scenario.flights[index].start,
+                scenario.flights[index].end,
+                scenario.flights[index].id.as_str(),
+            )
+        });
+        let turnaround = scenario.aircraft[aircraft_index].turnaround;
+        for pair in assigned.windows(2) {
+            let Some(earliest_next) = scenario.flights[pair[0]]
+                .end
+                .checked_add(turnaround)
+            else {
+                return false;
+            };
+            if scenario.flights[pair[1]].start < earliest_next {
+                return false;
+            }
+        }
+    }
+    true
+}
