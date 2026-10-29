@@ -280,27 +280,40 @@ fn make_dataset(seed: u64, factors: usize, radius: i32) -> Result<Dataset, Strin
 
 fn write_dataset(config: &Config) -> Result<(), String> {
     let dataset = make_dataset(config.seed, config.factors, config.radius)?;
-    fs::create_dir_all(&config.out)
-        .map_err(|err| format!("cannot create output directory: {err}"))?;
+    let candidate_dir = config.out.join("candidate");
+    let evaluator_dir = config.out.join("evaluator");
+    fs::create_dir_all(&candidate_dir)
+        .map_err(|err| format!("cannot create candidate directory: {err}"))?;
+    fs::create_dir_all(&evaluator_dir)
+        .map_err(|err| format!("cannot create evaluator directory: {err}"))?;
 
     for name in dataset.files.keys() {
-        let path = config.out.join(name);
+        let target_dir = if name == "answer-key.tsv" || name == "manifest.json" {
+            &evaluator_dir
+        } else {
+            &candidate_dir
+        };
+        let path = target_dir.join(name);
         if path.exists() {
             return Err(format!(
-                "refusing to overwrite existing output file {}; choose an empty directory",
+                "refusing to overwrite existing output file {}; choose an empty output root",
                 path.display()
             ));
         }
     }
     for (name, bytes) in &dataset.files {
-        fs::write(config.out.join(name), bytes)
+        let target_dir = if name == "answer-key.tsv" || name == "manifest.json" {
+            &evaluator_dir
+        } else {
+            &candidate_dir
+        };
+        fs::write(target_dir.join(name), bytes)
             .map_err(|err| format!("cannot write {name}: {err}"))?;
     }
-    let manifest_bytes = dataset.files.get("manifest.json").ok_or_else(|| "manifest missing".to_owned())?;
-    let manifest_hash = sha256_hex(manifest_bytes);
+
     println!(
-        "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"support_rows\":{},\"qualification_rows\":{},\"heldout_pair_count\":{},\"manifest_sha256\":\"{}\"}}",
-        dataset.support_rows, dataset.qualification_rows, dataset.heldout_pairs, manifest_hash
+        "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"support_rows\":{},\"qualification_rows\":{},\"heldout_pair_count\":{}}}",
+        dataset.support_rows, dataset.qualification_rows, dataset.heldout_pairs
     );
     Ok(())
 }
@@ -515,6 +528,23 @@ mod tests {
         assert_eq!(key.lines().next().unwrap().split('\t').count(), 12);
         assert_eq!(dataset.support_rows, 56 * 25);
         assert_eq!(dataset.qualification_rows, 8 * 25);
+    }
+
+    #[test]
+    fn writer_separates_candidate_and_evaluator_bundles_and_refuses_overwrite() {
+        let out = std::env::temp_dir().join(format!("cmaq-generator-test-{}", process::id()));
+        let _ = fs::remove_dir_all(&out);
+        let config = Config { seed: 7, factors: 8, radius: 1, out: out.clone() };
+        write_dataset(&config).expect("first write succeeds");
+        assert!(out.join("candidate/support-observations.tsv").is_file());
+        assert!(out.join("candidate/qualification-cases.tsv").is_file());
+        assert!(out.join("candidate/policy-evidence.tsv").is_file());
+        assert!(!out.join("candidate/answer-key.tsv").exists());
+        assert!(!out.join("candidate/manifest.json").exists());
+        assert!(out.join("evaluator/answer-key.tsv").is_file());
+        assert!(out.join("evaluator/manifest.json").is_file());
+        assert!(write_dataset(&config).is_err());
+        fs::remove_dir_all(&out).expect("temporary dataset removed");
     }
 
     #[test]
