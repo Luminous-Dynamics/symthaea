@@ -596,7 +596,7 @@ mod tests {
     #[test]
     fn report_aggregates_by_family_not_by_reward_timestep() {
         let rows = run();
-        assert_eq!(rows.len(), 4 * 5 * 4);
+        assert_eq!(rows.len(), 4 * 8 * 4);
         for row in rows {
             assert_eq!(row.family_count, match row.lane {
                 "all" => 256,
