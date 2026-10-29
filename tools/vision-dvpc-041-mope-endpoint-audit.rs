@@ -438,14 +438,25 @@ mod tests {
     }
 
     #[test]
-    fn direct_root_certificate_requires_wealth_and_predictable_nonnegative_second_bet() {
-        let history = vec![
-            BetRecord { w: 1.0, r: 1.0, lambda1: 0.0, lambda2: 0.4 },
-            BetRecord { w: 1.0, r: 1.0, lambda1: 0.0, lambda2: 0.4 },
-        ];
-        assert!(!certify_root(&history, 0.5, (2.0 / ALPHA_SIDE).ln()));
+    fn direct_root_certificate_accepts_real_crossing_and_rejects_invalid_bets() {
+        let mut fixed_stream = stream::StreamState::new(1.0, ALPHA_SIDE).unwrap();
+        let mut history = Vec::new();
+        let level = (2.0 / ALPHA_SIDE).ln();
+        let mut certified_root = None;
+        for _ in 0..24 {
+            let lambda = fixed_stream.current_lambda();
+            let report = fixed_stream.observe(1.0, 1.0).unwrap();
+            history.push(BetRecord { w: 1.0, r: 1.0, lambda1: lambda.x, lambda2: lambda.y });
+            if let Some(root) = report.selected_safe_root {
+                if root > 0.0 && certify_root(&history, root, level) {
+                    certified_root = Some(root);
+                }
+            }
+            fixed_stream.choose_next_bet(0.0).unwrap();
+        }
+        assert!(certified_root.is_some(), "fixed predictable-bet control must yield a certified root");
         let mut invalid = history.clone();
         invalid[0].lambda2 = -0.1;
-        assert!(!certify_root(&invalid, 0.5, (2.0 / ALPHA_SIDE).ln()));
+        assert!(!certify_root(&invalid, certified_root.unwrap(), level));
     }
 }
