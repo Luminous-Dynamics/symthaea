@@ -12,7 +12,6 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -311,7 +310,6 @@ def run_mutation_campaign(
             mutant_suite.write_bytes(suite_raw)
             result["mutated_verifier_sha256"] = digest(mutant_raw)
 
-            compile_path = mutant_root / "mutant.pyc"
             compiled = subprocess.run(
                 [sys.executable, "-m", "py_compile", "-q", str(mutant_verifier)],
                 cwd=mutant_root,
