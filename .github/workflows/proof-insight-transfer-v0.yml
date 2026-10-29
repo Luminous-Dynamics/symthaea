@@ -933,6 +933,8 @@ jobs:
           cd "$(dirname "$PITB_MANIFEST")"
           cargo test --locked --bin analyze_pitb_results
           cargo test --locked --bin verify_component_coverage_receipt
+          cargo test --locked --bin build_component_first_split_candidate
+          cargo test --locked --bin audit_component_split_feasibility
 
       - name: Validate counterfactual mutation qualification schema and controls
         shell: bash
