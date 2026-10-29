@@ -57,6 +57,13 @@ class OracleControlReplayTests(unittest.TestCase):
         self.run_git(self.repo, "commit", "-qm", "baseline source")
         self.revision = self.run_git(self.repo, "rev-parse", "HEAD").stdout.strip()
 
+        # Add a later branch and a hidden source state; the control replay must not copy it.
+        self.run_git(self.repo, "checkout", "-qb", "later-secret-state")
+        (self.repo / "app.py").write_text("VALUE = 999\\n", encoding="utf-8")
+        self.run_git(self.repo, "add", "app.py")
+        self.run_git(self.repo, "commit", "-qm", "later source state not part of the pin")
+        self.run_git(self.repo, "checkout", "--detach", self.revision)
+
         # Produce a genuine Git patch from the committed source, then restore a clean checkout.
         (self.repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
         self.patch_raw = self.run_git(self.repo, "diff", "--", "app.py").stdout.encode("utf-8")
