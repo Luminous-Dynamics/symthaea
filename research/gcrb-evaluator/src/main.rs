@@ -1,3 +1,4 @@
+use gcrb_evaluator::trace_audit::audit_trace_bytes;
 use gcrb_evaluator::{evaluate_public_development, generate_parameterized_controls, validate_fixture_bytes};
 use std::env;
 use std::fs;
@@ -9,8 +10,9 @@ fn usage() {
          Usage:\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-fixture <fixture.json>\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls <fixture.json> <count> <master-seed> <output.json>\n\
-         cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate <fixture.json> <candidate-report.json> [report-output.json]\n\n\
-         Generated controls are public known answers; never treat them as blind qualification."
+         cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate <fixture.json> <candidate-report.json> [report-output.json]\n\
+         cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- trace-audit <fixture.json> <trace.json> [audit-report.json]\n\n\
+         Generated controls are public known answers; trace input is unauthenticated unless verified externally."
     );
 }
 
@@ -55,6 +57,28 @@ fn run() -> Result<(), String> {
                 summary.negative_control_count,
                 output_path,
                 summary.fixture_sha256
+            );
+            Ok(())
+        }
+        [command, fixture_path, trace_path] if command == "trace-audit" => {
+            let fixture_bytes = read_file(fixture_path)?;
+            let trace_bytes = read_file(trace_path)?;
+            let report = audit_trace_bytes(&fixture_bytes, &trace_bytes)?;
+            print_json(&report)
+        }
+        [command, fixture_path, trace_path, output_path] if command == "trace-audit" => {
+            let fixture_bytes = read_file(fixture_path)?;
+            let trace_bytes = read_file(trace_path)?;
+            let report = audit_trace_bytes(&fixture_bytes, &trace_bytes)?;
+            let output = serde_json::to_string_pretty(&report)
+                .map_err(|error| format!("cannot serialize trace audit report: {error}"))?;
+            fs::write(output_path, format!("{output}\n"))
+                .map_err(|error| format!("cannot write {output_path}: {error}"))?;
+            eprintln!(
+                "wrote trace audit report to {}; findings={}; complete_capture_coverage={}; qualification_eligible=false",
+                output_path,
+                report.findings.len(),
+                report.complete_capture_coverage
             );
             Ok(())
         }
