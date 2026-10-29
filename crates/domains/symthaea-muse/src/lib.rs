@@ -44,7 +44,6 @@ pub mod audio_analyzer;
 pub mod audio_preservation;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
-#[cfg(feature = "theory")]
 pub mod performed_event_map;
 #[cfg(feature = "theory")]
 pub mod symbolic_audio_binding;
