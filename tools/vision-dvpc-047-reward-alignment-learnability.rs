@@ -214,7 +214,8 @@ fn snapshot_metrics(f:Fixture, t:usize,
     matured_count:usize,matured_sum:f64,
     ips_sum:&[f64;ARMS*ARMS],
     ips_sq:&[f64;ARMS*ARMS],
-    ips_n:usize) -> [f64;15]
+    ips_n:usize,
+    ips_cs_bounds:&[Interval;ARMS*ARMS]) -> [f64;15]
 {
     let greedy=estimated_greedy_actions(counts,proxy_sums);
     let proxy_best=[best_action(f,0,true),best_action(f,1,true)];
