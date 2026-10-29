@@ -138,6 +138,16 @@ impl PolynomialStats {
     }
 }
 
+/// Select the largest real polynomial root inside the admissible value range.
+/// This is a root-selection diagnostic only; full CS semantics need direct-wealth
+/// checks and running-intersection logic.
+fn safe_lower_root(roots: &[f64], previous: f64) -> Option<f64> {
+    roots.iter().copied()
+        .filter(|root| root.is_finite() && *root >= -EPS && *root <= 1.0 + EPS)
+        .map(|root| previous.max(root.clamp(0.0, 1.0)))
+        .max_by(f64::total_cmp)
+}
+
 fn real_roots([a, b, c]: [f64; 3]) -> Vec<f64> {
     if [a, b, c].iter().any(|v| !v.is_finite()) {
         return Vec::new();
@@ -190,6 +200,7 @@ struct StepReport {
     lambda_used: optimizer::Vec2,
     polynomial: PolynomialStats,
     level_roots: Vec<f64>,
+    selected_safe_root: Option<f64>,
 }
 
 impl StreamState {
@@ -228,11 +239,13 @@ impl StreamState {
 
         let level = (2.0 / self.alpha).ln();
         let roots = self.polynomial.roots_at_level(level);
+        let selected_safe_root = safe_lower_root(&roots, 0.0);
         Ok(StepReport {
             count: self.observed.count,
             lambda_used,
             polynomial: self.polynomial,
             level_roots: roots,
+            selected_safe_root,
         })
     }
 
@@ -293,6 +306,18 @@ fn direct_polynomial(samples: &[((f64, f64), optimizer::Vec2)], value: f64) -> f
     }).sum()
 }
 
+fn direct_log_wealth(samples: &[((f64, f64), optimizer::Vec2)], value: f64) -> Result<f64, String> {
+    let mut total = 0.0;
+    for &((w, r), lambda) in samples {
+        let factor = 1.0 + lambda.x * (w - 1.0) + lambda.y * (w * r - value);
+        if !factor.is_finite() || factor < 0.5 - FEAS_TOL {
+            return Err(format!("wealth factor violates the D_v^(1/2) bound: {factor}"));
+        }
+        total += factor.ln();
+    }
+    Ok(total)
+}
+
 fn close(a: f64, b: f64, tolerance: f64) -> bool {
     (a - b).abs() <= tolerance * (1.0 + a.abs().max(b.abs()))
 }
@@ -333,6 +358,9 @@ fn sweep() -> Result<String, String> {
                 }
                 let _=writeln!(output,"ROOT_DIAGNOSTIC\\t{sequence_id}\\t{}\\t{root_index}\\troot\\t{root:.12}\\t-",index+1);
             }
+            if let Some(root) = report.selected_safe_root {
+                let _=writeln!(output,"ROOT_FRONTIER\\t{sequence_id}\\t{}\\t-\\tlargest_in_range_root\\t{root:.12}\\t-",index+1);
+            }
             for &value in &TEST_VALUES {
                 let (a,b)=direct_observed(&direct_samples,value);
                 let stored_a=stream.observed().matrix_at(value);
@@ -348,7 +376,12 @@ fn sweep() -> Result<String, String> {
                 if !close(stored_bound,direct_bound,IDENTITY_TOL) {
                     return Err(format!("{sequence_id} prefix {}: polynomial identity mismatch at value {value}: {stored_bound} vs {direct_bound}",index+1));
                 }
-                let _=writeln!(output,"IDENTITY\t{sequence_id}\t{}\t{value:.2}\tpolynomial_lower_bound\t{stored_bound:.12}\t{direct_bound:.12}",index+1);
+                let actual_log_wealth=direct_log_wealth(&direct_bets,value)?;
+                if actual_log_wealth + IDENTITY_TOL * (1.0 + actual_log_wealth.abs()) < stored_bound {
+                    return Err(format!("{sequence_id} prefix {}: quadratic lower bound exceeds actual log wealth at value {value}",index+1));
+                }
+                let _=writeln!(output,"IDENTITY\\t{sequence_id}\\t{}\\t{value:.2}\\tpolynomial_lower_bound\\t{stored_bound:.12}\\t{direct_bound:.12}",index+1);
+                let _=writeln!(output,"WEALTH_BOUND\\t{sequence_id}\\t{}\\t{value:.2}\\tlog_wealth_ge_lower_bound\\t{actual_log_wealth:.12}\\t{stored_bound:.12}",index+1);
             }
             let candidate_value=if index % 3 == 0 {0.25} else if index % 3 == 1 {0.5} else {0.75};
             let next=stream.choose_next_bet(candidate_value)?;
@@ -462,5 +495,50 @@ mod tests {
         assert_eq!(linear.len(),1);
         assert!(close(linear[0],0.5,EPS));
         assert!(real_roots([1.0,0.0,1.0]).is_empty());
+    } 
+    #[test]
+    fn safe_root_frontier_uses_largest_in_range_root_and_never_decreases() {
+        assert_eq!(safe_lower_root(&[-1.0, 0.2, 0.8, 1.5], 0.1), Some(0.8));
+        assert_eq!(safe_lower_root(&[-1.0, 1.5], 0.1), None);
+        assert_eq!(safe_lower_root(&[0.2, 0.8], 0.9), Some(0.9));
     }
+
+    #[test]
+    fn polynomial_bound_is_below_direct_log_wealth_and_roots_certify_low_values() {
+        let mut stream=StreamState::new(100.0,0.05).unwrap();
+        stream.current_lambda=optimizer::Vec2::new(0.0,0.4);
+        let samples=vec![(1.0,1.0); 24];
+        let mut history:Vec<((f64,f64),optimizer::Vec2)>=Vec::new();
+        let level=(2.0/0.05_f64).ln();
+        let mut certified_roots=0;
+        for (index,(w,r)) in samples.iter().copied().enumerate() {
+            let used=stream.current_lambda();
+            let report=stream.observe(w,r).unwrap();
+            history.push(((w,r),used));
+            for &value in &TEST_VALUES {
+                let lower=report.polynomial.value(value);
+                let actual=direct_log_wealth(&history,value).unwrap();
+                assert!(actual + IDENTITY_TOL * (1.0+actual.abs()) >= lower,
+                    "prefix={} value={value} actual={actual} lower={lower}",index+1);
+            }
+            for &root in &report.level_roots {
+                if (0.0..=1.0).contains(&root) {
+                    certified_roots += 1;
+                    assert!(close(report.polynomial.value(root),level,1e-8));
+                    let actual_at_root=direct_log_wealth(&history,root).unwrap();
+                    assert!(actual_at_root + 1e-8 >= level,
+                        "root={root} actual log wealth={actual_at_root} level={level}");
+                    for &value in &TEST_VALUES {
+                        if value <= root {
+                            let actual=direct_log_wealth(&history,value).unwrap();
+                            assert!(actual + 1e-8 >= level,
+                                "lower candidate {value} not rejected at root {root}");
+                        }
+                    }
+                }
+            }
+        }
+        assert!(certified_roots > 0, "fixed-bet control should cross the certificate threshold");
+    }
+
 }
