@@ -11,7 +11,7 @@ Ryu, Kwon, Koppe and Jun, *Improved Offline Contextual Bandits with Second-Order
 Reference: https://proceedings.mlr.press/v291/ryu25a.html  
 Full text: https://arxiv.org/abs/2502.10826
 
-The implemented primitive is the penalized best constant-rebalanced-portfolio bound (pCRP-star-LCB), paper equations (3.3)–(3.5). For nonnegative scores Y_1,...,Y_n, candidate mean nu>0, and a constant bet b in [0,1]:
+The implemented primitive is a conservative fixed-bet-grid approximation to the penalized best constant-rebalanced-portfolio lower confidence bound (pCRP-star-LCB), paper equations (3.3)–(3.5). For nonnegative scores Y_1,...,Y_n, candidate mean nu>0, and a constant bet b in [0,1]:
 
 log W_CRP(b; nu) = sum_t log(1 - b + b Y_t / nu)
 
@@ -21,7 +21,7 @@ The lower bound is the smallest nu whose penalized wealth is at most 1/delta. Th
 
 ## Numerical-safety design
 
-A confidence bound should not become optimistic because the optimizer's numerical error changes the direction of its guarantee. The implementation evaluates the log wealth at a feasible bet; any feasible bet's wealth is less than or equal to the supremum over bets. The root inversion uses that feasible wealth as a lower witness for the supremum. Underestimating the supremum can only move the lower confidence bound down, making it more conservative; it must not be replaced by an upper envelope, which could raise the LCB and invalidate coverage. A small downward floating-point margin is applied to the evaluated log wealth. This is a numerical engineering precaution, not a machine-checked interval-arithmetic proof.
+A confidence bound should not become optimistic because numerical optimization changes the direction of the guarantee. This tranche uses a fixed grid of 129 feasible bets on [0,1]. For each candidate mean, the maximum wealth over this fixed grid is no greater than the continuous supremum. Because each fixed-bet wealth is nonincreasing in the candidate mean, the maximum over the fixed grid is also nonincreasing; this monotonicity matters for the root inversion. Underestimating the continuous supremum can only move the resulting lower confidence bound down. A small downward floating-point margin is applied to the evaluated log wealth. This is a numerical engineering precaution, not a machine-checked interval-arithmetic proof. The grid is a conservative approximation, not the paper's exact continuous-bet supremum.
 
 The code includes the endpoint cases, zero rewards, non-finite / negative inputs, probability validation, importance-weight support checks, and a distinct NOT_IDENTIFIED status for structural zero support. It never creates a numeric estimate or bound for unsupported target-policy mass.
 
@@ -36,7 +36,7 @@ The code includes the endpoint cases, zero rewards, non-finite / negative inputs
 - Horizons 64, 256 and 512; 32 replicates in the initial deterministic engineering sweep. This is a smoke-scale engineering panel, not enough to establish tight statistical performance comparisons.
 
 Methods:
-1. pCRP-star-LCB with delta_policy = 0.05 / M (variance-adaptive; confidence bound is time-uniform under its assumptions).
+1. Fixed-grid pCRP-star-LCB witness with delta_policy = 0.05 / M (variance-adaptive and conservative under the paper's assumptions; potentially wider than the continuous-supremum bound).
 2. A bounded-reward Hoeffding LCB with the same per-policy alpha allocation and a known importance-score range (fixed-horizon comparator, not advertised as anytime-valid).
 
 Metrics include familywise lower-bound coverage, top-1 policy selection accuracy, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Monte Carlo standard errors, and elapsed calculation time. Timing rows are excluded from deterministic replay comparisons.
@@ -44,13 +44,13 @@ Metrics include familywise lower-bound coverage, top-1 policy selection accuracy
 ## Acceptance and limits
 
 - Analytic constant-stream root and zero-stream tests pass.
-- The tangent envelope dominates a dense grid of log wealth in a deterministic fixture.
+- The fixed-grid wealth witness is checked against a dense grid of log wealth in a deterministic fixture, and its monotonicity in candidate mean is tested.
 - The known expectation identity for importance-weighted reward matches the analytical policy value.
 - Nonnegative finite score validation and structural-zero-support fail-closed behavior pass.
 - Repeated smoke runs produce identical non-timing output; exact source/output digests are published.
 - The full workflow must compile and test the exact PR head. Queue status, skipped general benchmark jobs, or a passing syntax check alone do not qualify the Rust result.
 
-This is a component-level reproduction of the pCRP-star bound, not the full Cover universal-portfolio integral, not the full COLT 2025 selection experiment, and not the separate freezing-based off-policy learning method. Do not claim superiority until a faithful comparison on matched workloads and an external confirmation dataset have been completed.
+This is a conservative fixed-grid component comparator for pCRP-star, not the exact continuous-supremum bound, not the full Cover universal-portfolio integral, not the full COLT 2025 selection experiment, and not the separate freezing-based off-policy learning method. Do not claim superiority until a faithful comparison on matched workloads and an external confirmation dataset have been completed.
 
 ## Reference
 
