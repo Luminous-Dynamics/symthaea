@@ -831,9 +831,18 @@ pub fn analyze_paired_evidence_outcomes(
             external_anchor_required: true,
             runner_execution_proven: false,
             uncertainty_boundary: if inferential_tests_allowed {
-                "Exact conditional McNemar tests assume independent matched pair blocks; the Wilson interval concerns discordant-win probability only; resource deltas are descriptive; no generalized-performance interval".to_owned()
+                concat!(
+                    "Exact matched tests assume independent blocks; Wilson interval is for ",
+                    "discordant-win proportion, not risk difference; resource deltas are ",
+                    "descriptive; no generalized-performance interval."
+                )
+                .to_owned()
             } else {
-                "Pair dependence is unknown: paired point estimates and denominators only; no p-values, confidence intervals, or generalized-performance interval".to_owned()
+                concat!(
+                    "Pair dependence is unknown: paired point estimates and denominators only; ",
+                    "no p-values, confidence intervals, or generalized-performance interval."
+                )
+                .to_owned()
             },
             claim_boundary: "preregistered fixed-benchmark paired contrasts only; evaluator and \
                 runner truth remain unauthenticated; no SOTA or generalized-performance claim"
