@@ -15,7 +15,7 @@ The 2026 Quantum Optimization Benchmarking Library (QOBLIB) offers a useful indu
 
 ## Frozen scenario matrix
 
-All five scenarios use two hypotheses and two actions, with utility 1 for a correct choice and 0 otherwise. Candidate A is nominally perfect in the default planning model; B is 80%-informative in both default planning scenarios. The held-out truth changes by scenario and remains evaluator-only.
+All six scenarios use two hypotheses and two actions, with utility 1 for a correct choice and 0 otherwise. Candidate A is nominally perfect in the default planning model; B is 80%-informative in both default planning scenarios. The held-out truth changes by scenario and remains evaluator-only.
 
 | Case | Stressor | Expected lesson |
 |---|---|---|
@@ -24,34 +24,35 @@ All five scenarios use two hypotheses and two actions, with utility 1 for a corr
 | Q009-03 | A is 65%-informative, B only 55% | Robustification can lose 0.10 utility vs nominal choice |
 | Q009-04 | A detector is reversed outside the ambiguity set | Robust B reduces damage but still has 0.45 regret |
 | Q009-05 | All candidates are uninformative | No measurement ties the oracle; no false advantage |
+| Q009-06 | Opposite prior shift | No-measurement must use the planning prior, not leak held-out truth |
 
-The suite compares nominal EVSI/cost, nominal information gain/cost, robust worst-case EVSI/cost, fixed-first, an exact uniform-random expectation, and **no measurement**. The oracle uses evaluator-only truth and is a regret reference, never an available selector.
+The suite compares nominal EVSI/cost, nominal information gain/cost, robust worst-case EVSI/cost, fixed-first, an exact uniform-random expectation, and **no measurement**. The deployable no-measurement baseline chooses its action using the averaged planning prior; the oracle no-measurement value uses held-out truth and is only a regret reference. This prevents leaking the true prior into a deployed baseline.
 
 ## Exact analytical reference
 
-| Policy | Mean regret over these 5 cases | Worst-case regret |
+| Policy | Mean regret over these 6 cases | Worst-case regret |
 |---|---:|---:|
-| Nominal EVSI/cost | 0.340 | 1.000 |
-| Nominal information gain/cost | 0.340 | 1.000 |
-| Robust worst-case EVSI/cost | 0.130 | 0.450 |
-| Fixed first | 0.340 | 1.000 |
-| Uniform random (exact expectation) | 0.235 | 0.725 |
-| No measurement | 0.190 | 0.500 |
+| Nominal EVSI/cost | 0.350 | 1.000 |
+| Nominal information gain/cost | 0.350 | 1.000 |
+| Robust worst-case EVSI/cost | 0.125 | 0.450 |
+| Fixed first | 0.350 | 1.000 |
+| Uniform random (exact expectation) | 0.238 | 0.725 |
+| No measurement | 0.292 | 0.800 |
 
-These numbers are computed from the fixture's analytical cases by construction. **They are not evidence of empirical superiority or a general policy ranking.** In Q009-03, robust selection loses 0.10 utility against nominal EVSI; in Q009-02, no measurement is the optimal action. The point is to measure both the robustness benefit and its cost, not to crown a winner on a curated synthetic set.
+These numbers are computed from the fixture's six analytical cases by construction. **They are not evidence of empirical superiority or a general policy ranking.** In Q009-03, robust selection loses 0.10 utility against nominal EVSI; in Q009-02, no measurement is the optimal action. The point is to measure both the robustness benefit and its cost, not to crown a winner on a curated synthetic set.
 
 ## Contract and acceptance
 
 - Held-out truth never reaches the selector.
 - Priors and likelihoods may shift; hypothesis labels, actions, utilities, candidate IDs, outcomes, and cost units remain contract-compatible.
-- Report per-case utility, regret, cost, unsupported outcome mass, no-measurement utility, and oracle reference.
+- Report per-case utility, regret, cost, unsupported outcome mass, deployable no-measurement score (using the planning prior), the oracle's true-prior no-measurement value, and the oracle reference.
 - Keep cost separate from utility unless an exchange rate is preregistered.
 - Preserve deterministic tie-breaking and scenario-order invariance.
 - Keep analytic, simulated, calibrated, and measured evidence classes distinct.
 - Exact arithmetic checks must match the frozen fixture; malformed contracts must fail closed.
 - Do not claim SOTA or quantum advantage from these tests. Use QARCH-007 predictive adequacy before physical scenario evaluation and QSIM-001 only through a separately qualified physics-to-likelihood adapter.
 
-The Rust source adds five stress tests plus an explicit `NoMeasurement` policy result. The source tests instantiate the matrices directly; this JSON is the canonical human-/machine-readable reference fixture, not yet a runtime-loaded test input.
+The Rust source adds six stress tests plus an explicit `NoMeasurement` policy result. The source tests instantiate the matrices directly; this JSON is the canonical human-/machine-readable reference fixture, not yet a runtime-loaded test input.
 
 ## Current validation boundary
 
