@@ -85,6 +85,33 @@ impl ProbabilityInterval {
     }
 }
 
+/// A positive, finite numeric interval with lower <= nominal <= upper.
+///
+/// Unlike ProbabilityInterval, this type is suitable for rates, latency and costs
+/// whose valid values are not restricted to [0, 1].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PositiveInterval {
+    /// Conservative lower value.
+    pub lower: f64,
+    /// Nominal value.
+    pub nominal: f64,
+    /// Conservative upper value.
+    pub upper: f64,
+}
+
+impl PositiveInterval {
+    /// Construct a finite, strictly positive, ordered interval.
+    pub fn new(lower: f64, nominal: f64, upper: f64) -> Result<Self, PhotonicEnvelopeError> {
+        if [lower, nominal, upper].iter().any(|value| !value.is_finite() || *value <= 0.0)
+            || lower > nominal
+            || nominal > upper
+        {
+            return Err(PhotonicEnvelopeError::InvalidPositiveInterval);
+        }
+        Ok(Self { lower, nominal, upper })
+    }
+}
+
 /// Validate a finite probability in [0, 1].
 fn validate_probability(value: f64, field: &'static str) -> Result<(), PhotonicEnvelopeError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
@@ -173,7 +200,7 @@ pub struct PhotonicPrimitiveUncertaintyEnvelope {
     /// Interval for each conditional gate-success probability.
     pub conditional_gate_success_probabilities: Vec<ProbabilityInterval>,
     /// Positive interval for aggregate primitive attempts per second.
-    pub attempts_per_second: ProbabilityInterval,
+    pub attempts_per_second: PositiveInterval,
     /// Photons consumed/emitted per whole primitive attempt.
     pub photons_per_attempt: u64,
 }
@@ -192,14 +219,11 @@ impl PhotonicPrimitiveUncertaintyEnvelope {
         for channel in &self.required_channels {
             channel.validate()?;
         }
-        ProbabilityInterval::new(
+        PositiveInterval::new(
             self.attempts_per_second.lower,
             self.attempts_per_second.nominal,
             self.attempts_per_second.upper,
         )?;
-        if self.attempts_per_second.lower <= 0.0 {
-            return Err(PhotonicEnvelopeError::InvalidAttemptRate(self.attempts_per_second.lower));
-        }
         if self.photons_per_attempt == 0 {
             return Err(PhotonicEnvelopeError::ZeroPhotonsPerAttempt);
         }
@@ -686,6 +710,8 @@ pub enum PhotonicEnvelopeError {
     InvalidProbability { field: &'static str, value: f64 },
     /// Interval endpoints are not ordered.
     InvalidProbabilityInterval,
+    /// A positive numeric interval is non-finite, non-positive or unordered.
+    InvalidPositiveInterval,
     /// Invalid or negative optical loss, in dB.
     InvalidOpticalLoss(f64),
     /// Minimum photon transmission must lie in (0, 1].
@@ -721,6 +747,8 @@ impl fmt::Display for PhotonicEnvelopeError {
                 write!(f, "invalid probability for {field}: {value}"),
             Self::InvalidProbabilityInterval =>
                 write!(f, "probability interval must satisfy lower <= nominal <= upper"),
+            Self::InvalidPositiveInterval =>
+                write!(f, "positive interval must be finite, positive and ordered"),
             Self::InvalidOpticalLoss(loss) =>
                 write!(f, "optical loss must be finite and nonnegative, got {loss} dB"),
             Self::InvalidMinimumTransmissionProbability(probability) =>
@@ -996,6 +1024,15 @@ mod tests {
     }
 
     #[test]
+    fn positive_intervals_validate_rates_without_probability_bounds() {
+        let rate = PositiveInterval::new(100.0, 120.0, 150.0).unwrap();
+        assert_eq!(rate.nominal, 120.0);
+        assert!(PositiveInterval::new(0.0, 1.0, 2.0).is_err());
+        assert!(PositiveInterval::new(2.0, 1.0, 3.0).is_err());
+        assert!(PositiveInterval::new(1.0, f64::NAN, 3.0).is_err());
+    }
+
+    #[test]
     fn loss_interval_reverses_transmission_bounds() {
         let loss = LossIntervalDb::new(0.0, 3.01029995664, 10.0).unwrap();
         let transmission = loss.transmission_interval().unwrap();
@@ -1016,7 +1053,7 @@ mod tests {
             conditional_gate_success_probabilities: vec![
                 ProbabilityInterval::new(0.4, 0.5, 0.6).unwrap(),
             ],
-            attempts_per_second: ProbabilityInterval::new(100.0, 120.0, 150.0).unwrap(),
+            attempts_per_second: PositiveInterval::new(100.0, 120.0, 150.0).unwrap(),
             photons_per_attempt: 4,
         };
         let result = model.estimate().unwrap();
