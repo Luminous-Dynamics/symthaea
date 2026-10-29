@@ -36,7 +36,7 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-003-report.json").read_text())
-          assert report["schema_version"] == "cmaq-003-regime-shift-report-v0.1"
+          assert report["schema_version"] == "cmaq-003-regime-shift-report-v0.2"
           assert report["horizon"] == 256
           assert report["change_at"] == 128
           assert report["seed_count"] == 128
@@ -47,6 +47,10 @@ jobs:
           assert "cusum_h3_0" in strategies
           assert strategies["frozen"]["stationary"]["mean_regret_per_episode"] == 0
           assert strategies["frozen"]["abrupt_shift"]["mean_regret_per_episode"] > 0
+          assert "observation_only_drift" in strategies["frozen"]
+          assert strategies["frozen"]["observation_only_drift"]["false_causal_diagnosis_episodes"] == 0
+          assert strategies["cusum_h1_5"]["observation_only_drift"]["false_causal_diagnosis_episodes"] > strategies["cusum_h3_0"]["observation_only_drift"]["false_causal_diagnosis_episodes"]
+          assert strategies["cusum_h3_0"]["observation_only_drift"]["false_causal_diagnosis_episodes"] > 0
           low = strategies["cusum_h1_5"]
           high = strategies["cusum_h3_0"]
           assert low["stationary"]["false_alarm_episodes"] > high["stationary"]["false_alarm_episodes"]
@@ -59,6 +63,7 @@ jobs:
                   "abrupt_detection_rate": value["abrupt_shift"]["detection_rate"],
                   "abrupt_p90_delay": value["abrupt_shift"]["p90_detection_delay_steps"],
                   "abrupt_regret": value["abrupt_shift"]["mean_regret_per_episode"],
+                  "observation_only_false_causal_diagnoses": value["observation_only_drift"]["false_causal_diagnosis_episodes"],
               }
               for key, value in strategies.items()
           }, sort_keys=True))
