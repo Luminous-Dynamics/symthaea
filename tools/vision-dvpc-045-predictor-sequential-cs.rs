@@ -161,7 +161,6 @@ struct PredictorSide{
     audit:predictor::Audit,
     reflected:bool,
     constraints:Vec<predictor::Constraint>,
-    samples:Vec<predictor::Sample>,
     records:Vec<Record>,
     stats:Sufficient,
     polynomial:BoundPolynomial,
@@ -174,19 +173,25 @@ impl PredictorSide{
         let constraints=predictor::action_specific_constraints(&audit,reflected);
         Self{
             audit,reflected,constraints,
-            samples:Vec::with_capacity(capacity),records:Vec::with_capacity(capacity),
+            records:Vec::with_capacity(capacity),
             stats:Sufficient::default(),polynomial:BoundPolynomial::default(),
             current_bet:predictor::Bet{x:0.0,y:0.0},endpoint:0.0,
             diagnostics:Diagnostics::default(),
         }
     }
-    fn observe(&mut self,sample:predictor::Sample){
+    fn observe(&mut self,sample:predictor::Sample)->Result<(),String>{
         let score=sample_score(sample,self.reflected);
         let bet=self.current_bet;
+        for candidate in [0.0,self.endpoint,1.0]{
+            let factor=1.0+bet.x*(sample.w-1.0)+bet.y*(score-candidate);
+            if !factor.is_finite()||factor<0.5-WEALTH_TOL{
+                return Err("predictor betting factor fell below 1/2 on an observed step".into());
+            }
+        }
         self.records.push(Record{w:sample.w,score,bet});
-        self.samples.push(sample);
         self.stats.update(sample.w,score);
         self.polynomial.update(sample.w,score,bet);
+        Ok(())
     }
     fn certified_root_candidate(&mut self,level:f64)->Option<f64>{
         let roots=real_roots(self.polynomial.a,self.polynomial.b,self.polynomial.c-level);
@@ -225,8 +230,8 @@ impl PredictorPair{
     }
     fn update(&mut self,sample:predictor::Sample)->Result<Interval,String>{
         let level=(2.0/ALPHA).ln();
-        self.lower.observe(sample);
-        self.complement.observe(sample);
+        self.lower.observe(sample)?;
+        self.complement.observe(sample)?;
         let lo_root=self.lower.certified_root_candidate(level);
         let hi_root=self.complement.certified_root_candidate(level);
 
