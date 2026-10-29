@@ -232,7 +232,7 @@ The auditor hashes the exact manifest bytes and each referenced regular source a
 
 **Receipt semantics:** the optional JSON receipt is deterministic metadata for the split audit and is created only at a new path; the tool refuses to overwrite an existing file. It includes the exact manifest SHA-256, split counts and a claim-scope label of `metadata_and_split_integrity_only`. The receipt is not signed, independently anchored, or proof of factual labels; an attacker who can rewrite both inputs and outputs can forge a self-consistent result.
 
-**Scope limit:** this checks the metadata and file identities supplied to it; it does not prove that a program/family label is factually correct, that the data are licensed for the proposed use, or that an attack is exploitable. Those remain explicit data-audit and security-review tasks. Twenty-five unit tests are authored with the example but have not yet been executed in this environment.
+**Scope limit:** this checks the metadata and file identities supplied to it; it does not prove that a program/family label is factually correct, that the data are licensed for the proposed use, or that an attack is exploitable. Those remain explicit data-audit and security-review tasks. Twenty-six unit tests are authored with the example but have not yet been executed in this environment.
 
 Phase A is the first deliverable. The protocol intentionally does not depend on completion of runners to begin data and split audits; any execution claims still require retained exact-input and exact-code receipts.
 
