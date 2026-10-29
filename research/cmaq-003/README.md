@@ -110,12 +110,19 @@ Never infer a safety rate from a raw aggregate zero. Report independent exposure
 - Include negative controls: no-change episodes, shuffled action/outcome linkage, irrelevant histories, delayed receipts, replayed episodes, tampered digests, and changed candidate artifacts.
 - Hash the generator, configuration, candidate artifact, event stream, and evaluator report. Fail closed on missing episodes, duplicate IDs, digest mismatch, stale epochs or unauthorized probes.
 
+## Initial synthetic episode envelope (proposed; freeze before tuning)
+
+- Episodes are 256 decision steps in the initial harness, with evaluator-hidden shift schedules. Abrupt shifts are drawn from multiple interior changepoints rather than always occurring at the midpoint.
+- Recurrent-regime episodes switch away and later return to a previous mechanism; gradual-drift episodes use a declared total-variation budget; observation-only drift changes only the observation/noise channel.
+- Every candidate and baseline shares the same paired stochastic tape, horizon, action/probe budget and externally enforced safety envelope.
+- At least 20 development-independent seeds are required for initial exploratory protocol validation; expand the hidden qualification set until lane-level uncertainty is adequate. This exploratory minimum is not SOTA-grade evidence.
+
 ## Initial graduation targets (hypotheses, not results)
 
 1. At least **10% relative improvement in post-shift constrained regret** versus the strongest eligible non-oracle baseline, with a paired 95% interval excluding zero.
-2. False-reset rate remains under a preregistered ceiling in S0 while recovery improves in S1/S2.
-3. No observed independent safety-envelope violations in qualification, with exposure count and uncertainty bound published.
-4. Observation-only drift in S4 does not automatically trigger a causal-law reset; report the false diagnosis rate and interval.
+2. In the 256-step abrupt-shift lane, **90th-percentile detection delay ≤8 steps**; in stationary S0, **≤1 false reset per 1,000 steps**.
+3. On observation-only drift S4, **≤5% of episodes are falsely diagnosed as causal-mechanism changes**. No observed safety-envelope violations are reported with exposure count and an appropriate one-sided uncertainty bound. Roughly 3,000 *independent* zero-violation exposures are needed for a 95% upper bound near 0.1%; correlated timesteps must not be counted as independent exposures.
+4. No corrupted, replayed, duplicated or wrong-epoch evidence receipt is accepted as valid model-updating evidence.
 5. Improvement persists on held-out causal families, equal probe/action costs, the negative controls, and ablations.
 6. The system must abstain or fall back safely where the available observations cannot identify a justified action; forced guesses do not count as coverage.
 
