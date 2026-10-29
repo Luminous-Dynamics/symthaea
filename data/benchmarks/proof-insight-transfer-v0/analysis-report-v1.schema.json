@@ -1,0 +1,457 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/analysis-report-v1.schema.json",
+  "title": "PITB Primary Analysis Report v1",
+  "description": "Strict component-aware analysis report. Validates report shape and qualification invariants; it does not establish model-run occurrence, evidence authenticity, or statistical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "protocol_sha256",
+    "run_config_sha256",
+    "power_report_sha256",
+    "validation_results_sha256",
+    "results_jsonl_sha256",
+    "analyzer_source_sha256",
+    "split_manifest_sha256",
+    "partition_digest_sha256",
+    "baseline_selection_receipt_sha256",
+    "upstream_commit",
+    "selected_baseline_arm",
+    "treatment_arm",
+    "total_test_families_in_frozen_split",
+    "eligible_validation_target_count",
+    "excluded_validation_target_count",
+    "unknown_validation_target_count",
+    "validation_baseline_scores",
+    "eligible_target_count",
+    "eligible_family_count",
+    "excluded_target_count",
+    "unknown_eligibility_target_count",
+    "known_exposed_validation_family_ids",
+    "known_exposed_test_family_ids",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "component_manifest_sha256",
+    "component_manifest_qualified_for_confirmatory_resampling",
+    "eligible_component_count",
+    "component_aggregates",
+    "arm_metrics",
+    "primary_comparison",
+    "external_replication",
+    "interpretation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.analysis-report.v1"
+    },
+    "protocol_id": {
+      "const": "proof-insight-transfer-v0"
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "power_report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "validation_results_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "results_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "analyzer_source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "split_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "partition_digest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "baseline_selection_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "upstream_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "selected_baseline_arm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "treatment_arm": {
+      "const": "F"
+    },
+    "total_test_families_in_frozen_split": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "eligible_validation_target_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_validation_target_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_validation_target_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "validation_baseline_scores": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "eligible_target_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "eligible_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "excluded_target_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_eligibility_target_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "known_exposed_validation_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "known_exposed_test_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "bootstrap_replicates": {
+      "const": 10000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "component_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "component_manifest_qualified_for_confirmatory_resampling": {
+      "type": "boolean"
+    },
+    "eligible_component_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "component_aggregates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/componentAggregate"
+      }
+    },
+    "arm_metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/armMetrics"
+      }
+    },
+    "primary_comparison": {
+      "$ref": "#/$defs/primaryComparison"
+    },
+    "external_replication": {
+      "const": "not_evaluated"
+    },
+    "interpretation": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "componentAggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "target_count",
+        "treatment_semantic_gate_successes",
+        "baseline_semantic_gate_successes",
+        "paired_delta_sum",
+        "paired_effect_percentage_points"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "pattern": "^component-[0-9a-f]{64}$"
+        },
+        "target_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "treatment_semantic_gate_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baseline_semantic_gate_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paired_delta_sum": {
+          "type": "integer"
+        },
+        "paired_effect_percentage_points": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        }
+      }
+    },
+    "armMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "target_count",
+        "checker_successes",
+        "semantic_gate_successes",
+        "checker_success_rate",
+        "semantic_gate_success_rate",
+        "total_model_calls",
+        "total_tokens",
+        "total_wall_ms",
+        "total_cost_microusd",
+        "mean_wall_ms_per_target",
+        "mean_tokens_per_target",
+        "cost_microusd_per_verified_solve"
+      ],
+      "properties": {
+        "arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "checker_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic_gate_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checker_success_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "semantic_gate_success_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "total_model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean_wall_ms_per_target": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mean_tokens_per_target": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_microusd_per_verified_solve": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "primaryComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "confidence_interval_method",
+        "baseline_arm",
+        "treatment_arm",
+        "paired_absolute_effect_percentage_points",
+        "confidence_level",
+        "clustered_bootstrap_lower_percentage_points",
+        "clustered_bootstrap_upper_percentage_points",
+        "target_pairs",
+        "component_clusters",
+        "minimum_component_clusters_for_confirmatory_claim",
+        "minimum_effect_percentage_points",
+        "confidence_interval_informative",
+        "confidence_interval_excludes_zero_positive",
+        "preregistered_utility_gate_passed",
+        "gate_decision"
+      ],
+      "properties": {
+        "metric": {
+          "const": "semantic_gate_verified_exact_target_success"
+        },
+        "confidence_interval_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_arm": {
+          "const": "F"
+        },
+        "paired_absolute_effect_percentage_points": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "confidence_level": {
+          "const": 0.95
+        },
+        "clustered_bootstrap_lower_percentage_points": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "clustered_bootstrap_upper_percentage_points": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "target_pairs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "component_clusters": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_component_clusters_for_confirmatory_claim": {
+          "const": 20
+        },
+        "minimum_effect_percentage_points": {
+          "const": 10
+        },
+        "confidence_interval_informative": {
+          "type": "boolean"
+        },
+        "confidence_interval_excludes_zero_positive": {
+          "type": "boolean"
+        },
+        "preregistered_utility_gate_passed": {
+          "type": "boolean"
+        },
+        "gate_decision": {
+          "enum": [
+            "underpowered_too_few_independent_component_clusters",
+            "no_claim_degenerate_bootstrap_interval",
+            "pass_preregistered_utility_gate",
+            "no_claim_preregistered_utility_gate_not_met",
+            "no_claim_component_manifest_unqualified"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "component_manifest_qualified_for_confirmatory_resampling": {
+            "const": false
+          }
+        },
+        "required": [
+          "component_manifest_qualified_for_confirmatory_resampling"
+        ]
+      },
+      "then": {
+        "properties": {
+          "primary_comparison": {
+            "properties": {
+              "preregistered_utility_gate_passed": {
+                "const": false
+              }
+            }
+          }
+        },
+        "required": [
+          "primary_comparison"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "primary_comparison": {
+            "properties": {
+              "preregistered_utility_gate_passed": {
+                "const": true
+              }
+            }
+          }
+        },
+        "required": [
+          "primary_comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "component_manifest_qualified_for_confirmatory_resampling": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}

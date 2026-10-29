@@ -1,0 +1,362 @@
+{
+  "schema_version": "pitb.analysis-report.v1",
+  "protocol_id": "proof-insight-transfer-v0",
+  "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "power_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "validation_results_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "results_jsonl_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "analyzer_source_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "split_manifest_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "partition_digest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "baseline_selection_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "upstream_commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+  "selected_baseline_arm": "A",
+  "treatment_arm": "F",
+  "total_test_families_in_frozen_split": 56,
+  "eligible_validation_target_count": 20,
+  "excluded_validation_target_count": 1,
+  "unknown_validation_target_count": 0,
+  "validation_baseline_scores": {
+    "A": 0.4,
+    "B": 0.35,
+    "C": 0.33,
+    "D": 0.3,
+    "E": 0.2,
+    "I": 0.1
+  },
+  "eligible_target_count": 20,
+  "eligible_family_count": 20,
+  "excluded_target_count": 1,
+  "unknown_eligibility_target_count": 0,
+  "known_exposed_validation_family_ids": [
+    "012"
+  ],
+  "known_exposed_test_family_ids": [
+    "089"
+  ],
+  "bootstrap_replicates": 10000,
+  "bootstrap_seed": 20261028,
+  "component_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "component_manifest_qualified_for_confirmatory_resampling": false,
+  "eligible_component_count": 20,
+  "component_aggregates": [
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000001",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000002",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000003",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000004",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000005",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000006",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000007",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000008",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 1,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000009",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 1,
+      "paired_effect_percentage_points": 100
+    },
+    {
+      "component_id": "component-000000000000000000000000000000000000000000000000000000000000000a",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 1,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 1,
+      "paired_effect_percentage_points": 100
+    },
+    {
+      "component_id": "component-000000000000000000000000000000000000000000000000000000000000000b",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-000000000000000000000000000000000000000000000000000000000000000c",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-000000000000000000000000000000000000000000000000000000000000000d",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-000000000000000000000000000000000000000000000000000000000000000e",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-000000000000000000000000000000000000000000000000000000000000000f",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000010",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000011",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000012",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000013",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    },
+    {
+      "component_id": "component-0000000000000000000000000000000000000000000000000000000000000014",
+      "target_count": 1,
+      "treatment_semantic_gate_successes": 0,
+      "baseline_semantic_gate_successes": 0,
+      "paired_delta_sum": 0,
+      "paired_effect_percentage_points": 0
+    }
+  ],
+  "arm_metrics": [
+    {
+      "arm": "A",
+      "target_count": 20,
+      "checker_successes": 12,
+      "semantic_gate_successes": 8,
+      "checker_success_rate": 0.6,
+      "semantic_gate_success_rate": 0.4,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 6250
+    },
+    {
+      "arm": "B",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    },
+    {
+      "arm": "C",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    },
+    {
+      "arm": "D",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    },
+    {
+      "arm": "E",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    },
+    {
+      "arm": "F",
+      "target_count": 20,
+      "checker_successes": 13,
+      "semantic_gate_successes": 10,
+      "checker_success_rate": 0.65,
+      "semantic_gate_success_rate": 0.5,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 5000
+    },
+    {
+      "arm": "G",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    },
+    {
+      "arm": "H",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    },
+    {
+      "arm": "I",
+      "target_count": 20,
+      "checker_successes": 11,
+      "semantic_gate_successes": 7,
+      "checker_success_rate": 0.55,
+      "semantic_gate_success_rate": 0.35,
+      "total_model_calls": 160,
+      "total_tokens": 3200,
+      "total_wall_ms": 30000,
+      "total_cost_microusd": 50000,
+      "mean_wall_ms_per_target": 1500,
+      "mean_tokens_per_target": 160,
+      "cost_microusd_per_verified_solve": 7142.857142857143
+    }
+  ],
+  "primary_comparison": {
+    "metric": "semantic_gate_verified_exact_target_success",
+    "confidence_interval_method": "paired target-delta percentile bootstrap; resample audited connected components with replacement; SplitMix64; linear-interpolated 2.5th/97.5th quantiles",
+    "baseline_arm": "A",
+    "treatment_arm": "F",
+    "paired_absolute_effect_percentage_points": 10,
+    "confidence_level": 0.95,
+    "clustered_bootstrap_lower_percentage_points": 1,
+    "clustered_bootstrap_upper_percentage_points": 19,
+    "target_pairs": 20,
+    "component_clusters": 20,
+    "minimum_component_clusters_for_confirmatory_claim": 20,
+    "minimum_effect_percentage_points": 10,
+    "confidence_interval_informative": true,
+    "confidence_interval_excludes_zero_positive": true,
+    "preregistered_utility_gate_passed": false,
+    "gate_decision": "no_claim_component_manifest_unqualified"
+  },
+  "external_replication": "not_evaluated",
+  "interpretation": "Synthetic schema fixture only. The component coverage receipt is not verified and no confirmatory claim is made."
+}
