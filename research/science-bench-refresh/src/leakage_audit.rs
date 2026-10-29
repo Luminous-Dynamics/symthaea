@@ -320,27 +320,27 @@ fn build_near_groups(
         let left_candidates: Vec<&IndexedTask> = if right_exact_set.len() > 1 {
             left_tasks.iter().copied().collect()
         } else {
-            let only_right_exact = right_exact_set
+            let only_right_exact = *right_exact_set
                 .iter()
                 .next()
-                .expect("a nonempty near-match group has at least one right task");
+                .ok_or_else(|| "near-match group has no right fingerprints".to_owned())?;
             left_tasks
                 .iter()
                 .copied()
-                .filter(|task| task.exact_fingerprint.as_str() != *only_right_exact)
+                .filter(|task| task.exact_fingerprint.as_str() != only_right_exact)
                 .collect()
         };
         let right_candidates: Vec<&IndexedTask> = if left_exact_set.len() > 1 {
             right_tasks.iter().copied().collect()
         } else {
-            let only_left_exact = left_exact_set
+            let only_left_exact = *left_exact_set
                 .iter()
                 .next()
-                .expect("a nonempty near-match group has at least one left task");
+                .ok_or_else(|| "near-match group has no left fingerprints".to_owned())?;
             right_tasks
                 .iter()
                 .copied()
-                .filter(|task| task.exact_fingerprint.as_str() != *only_left_exact)
+                .filter(|task| task.exact_fingerprint.as_str() != only_left_exact)
                 .collect()
         };
 
