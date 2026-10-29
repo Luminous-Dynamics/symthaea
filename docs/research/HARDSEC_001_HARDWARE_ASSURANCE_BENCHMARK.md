@@ -190,6 +190,14 @@ Require a real capture manifest, instrument calibration, trigger alignment, devi
 - **D — model replay integration:** connect Symtropy for trace/scenario orchestration and compare simulated predictions against held-out observations.
 - **E — cross-layer / physical qualification:** add RTL, firmware and laboratory lanes only when each has its own ground truth, tooling, authorized target and evidence contract.
 
+### Dataset-specific facts to preserve in Phase A
+
+- **HARPY-V V2 (physical):** its repository describes 16 attack workloads and 16 benign programs on a Xuantie C910 RISC-V board. Some attack primitives failed on the tested device in some iterations. The dataset page says its time column is approximate and should not be used to train the agent; the physical study also reports per-counter collection to control measurement interference. Preserve raw file, counter and run identity, and do not manufacture synchronized timestamps from the approximate time column. Data DOI: [10.34810/DATA2538](https://doi.org/10.34810/DATA2538).
+- **HARPY-V-GEM5 (simulated):** a separate CC0 1.0 dataset of 16 attack and 16 benign workloads, generated using a single-core gem5 O3 CPU model and statistics sampled every 10,000 instructions. The published ML study reports attack-family-dependent transfer to unseen programs. It is a separately versioned simulator domain, not a surrogate for a physical device. Data DOI: [10.34810/DATA2711](https://doi.org/10.34810/DATA2711).
+- Both data repositories identify the datasets themselves as **CC0 1.0**. This does not automatically relicense source programs, attack implementations, binaries, or our derived distributions; record those rights separately before redistribution.
+
+For these corpora, a classifier may learn to recognize an *attack workload or attempted primitive* even when that primitive did not succeed. The benchmark must distinguish (1) recognition of an attack workload, (2) an observed security effect, and (3) an independently established property violation. `security_outcome=unknown` remains unknown rather than being imputed from the workload label. The manifest auditor checks supplied metadata consistency; it cannot verify the underlying experimental truth.
+
 ### Phase A implementation slice
 
 An opt-in Rust example is now proposed on the HARDSEC-001 branch:
@@ -203,10 +211,10 @@ cargo test --example hardsec_split_audit --features hardsec-audit
 The strict TSV header is:
 
 ```text
-dataset_id domain source_artifact_id source_path source_sha256 sample_id program_id execution_id attack_family_id device_config_id capture_config_id counter_set_id split_protocol split label
+dataset_id domain source_artifact_id source_path source_sha256 sample_id program_id execution_id attack_family_id device_config_id capture_config_id counter_set_id security_outcome split_protocol split label
 ```
 
-These are tab-separated columns, not space-delimited. Supported domains are `physical_hpc`, `gem5_sim`, `rtl_netlist`, and `physical_em`; supported split protocols are `program_holdout`, `attack_family_holdout`, `execution_holdout`, `device_config_holdout`, and `capture_config_holdout`. Preserve `capture_config_id` (acquisition command/tool/settings) and `counter_set_id` (exact counter set captured together); these distinguish monitoring configurations and simultaneous measurements from separate runs. Each manifest must represent one dataset, one domain and one protocol. Use `NA` only for metadata that is genuinely unavailable and is not the selected grouping key.
+These are tab-separated columns, not space-delimited. Supported domains are `physical_hpc`, `gem5_sim`, `rtl_netlist`, and `physical_em`; supported split protocols are `program_holdout`, `attack_family_holdout`, `execution_holdout`, `device_config_holdout`, and `capture_config_holdout`. Preserve `capture_config_id` (acquisition command/tool/settings) and `counter_set_id` (exact counter set captured together); these distinguish monitoring configurations and simultaneous measurements from separate runs. Each manifest must represent one dataset, one domain and one protocol. Use `NA` only for metadata that is genuinely unavailable and is not the selected grouping key. The extra `security_outcome` field is `not_applicable` for benign samples or `success_observed`, `failed_observed`, or `unknown` for attack workloads.
 
 The auditor hashes each referenced regular source artifact with SHA-256 and fails closed on digest mismatch, malformed columns, duplicate sample IDs, duplicate identical artifacts under different identities, missing split groups, path traversal, symlinks, inconsistent source-artifact metadata, or a held-out group crossing splits. For attack-family holdout, attack rows are grouped by family and benign rows by program so a single generic benign label cannot accidentally collapse all benign controls into one group. Capture-configuration holdout is separately supported so evaluation can ask whether a monitor generalizes beyond a particular acquisition setup. It also requires both benign and attack labels in validation and test so binary recall and false-positive metrics are defined; the training split may be one-class for an explicitly unsupervised anomaly detector. Repeated windows from a single artifact may remain in one split, but may not be presented as independent artifacts.
 
