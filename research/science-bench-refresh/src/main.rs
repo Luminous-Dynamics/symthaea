@@ -1,9 +1,10 @@
 use science_bench_refresh_validator::{
     audit_policy_input_overlap, audit_lineage_overlap, compute_artifact_commitment,
-    compute_protocol_commitment, generate_task_set_bytes, match_search_exposure_exact,
+    compute_protected_index_commitment, compute_protocol_commitment,
+    generate_task_set_bytes, match_search_exposure_exact,
     sha256_hex, validate_manifest_bytes, verify_regeneration, verify_reveal,
     verify_search_exposure_exact_match_report, verify_search_exposure_match_report,
-    verify_search_exposure_receipt,
+    verify_search_exposure_receipt, ProtectedSearchArtifactIndexIndexInput,
 };
 use serde_json::json;
 use std::env;
@@ -20,6 +21,7 @@ fn usage(program: &str) {
             "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
             "  {program} verify-search-receipt RECEIPT.json\n",
             "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
+            "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
             "  {program} verify-search-exact-matches RECEIPT.json\n",
             "    PROTECTED_INDEX.json MATCH_REPORT.json\n",
@@ -47,6 +49,40 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-protected-index" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let input_bytes = match read(&args[1], "protected index fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let input: ProtectedSearchArtifactIndexIndexInput =
+                match serde_json::from_slice(&input_bytes) {
+                    Ok(input) => input,
+                    Err(error) => {
+                        eprintln!("protected index fields do not match v1 shape: {error}");
+                        return ExitCode::from(2);
+                    }
+                };
+            let commitment = match compute_protected_index_commitment(&input) {
+                Ok(commitment) => commitment,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::json!({
+                    "schema": "symthaea.science_bench_refresh_protected_search_artifact_index_commitment.v1",
+                    "generation_id": input.generation_id,
+                    "index_commitment_sha256": commitment
+                })
+            );
+            ExitCode::SUCCESS
+        }
         "match-search-exact" => {
             if args.len() != 3 {
                 usage("science-bench-refresh-validator");
