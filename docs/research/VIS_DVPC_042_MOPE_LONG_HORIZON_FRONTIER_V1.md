@@ -10,7 +10,7 @@ VIS-DVPC-041 tests exact path probability and endpoint chronology at horizon 8. 
 
 ## Reproducible design
 
-Use 2,000 sequences per DGP, horizon 512, with reported snapshots at 32, 128 and 512. The standard-library-only SplitMix64 PRNG has a fixed base seed and scenario/replicate mixing formula. No external datasets, dependencies or asynchronous workers are required. Per-method elapsed time is measured separately from the shared simulator; the MOPE figure deliberately includes the expensive direct-wealth certificates used in this audit and therefore must not be presented as optimized deployment throughput.
+Use 2,000 sequences per DGP, horizon 512, with reported snapshots at 32, 128 and 512. The standard-library-only SplitMix64 PRNG has a fixed base seed and scenario/replicate mixing formula. No external datasets, dependencies or asynchronous workers are required. A deterministic short replay compares all statistical output while excluding wall-clock timing rows, which naturally vary between runs. Per-method elapsed time is measured separately from the shared simulator; the MOPE figure deliberately includes the expensive direct-wealth certificates used in this audit and therefore must not be presented as optimized deployment throughput.
 
 | DGP | Logger P(A=1) | Reward means (A=0,A=1) | True value | W |
 |---|---:|---:|---:|---:|
