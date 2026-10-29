@@ -32,10 +32,13 @@ BASALT is the wider research and benchmark program. VLEB remains the name of the
 
 The roadmap now has a versioned task-level run-record contract:
 - [BASALT Evaluation Contract](BASALT_EVALUATION_CONTRACT_2026-10-29.md): primary endpoint, denominator policy, pair invariants, negative controls and promotion gates.
-- [Run-record JSON Schema](../../benchmarks/basalt/schema/run-record.schema.json): strict, versioned record shape for source/environment/task/system/verifier/integrity/usage evidence.
-- [Synthetic example](../../benchmarks/basalt/examples/run-record.example.json): schema-shaped paired fixture only; all digests, tasks and outcomes are synthetic and are not experiment results.
+- [Run-record JSON Schema](../../benchmarks/basalt/schema/run-record.schema.json): strict, versioned trial evidence.
+- [Suite-manifest schema](../../benchmarks/basalt/schema/suite-manifest.schema.json) and [synthetic manifest](../../benchmarks/basalt/examples/suite-manifest.example.json): frozen task membership, specification digests, and pre-run quality-audit dispositions.
+- [Synthetic run record](../../benchmarks/basalt/examples/run-record.example.json): paired fixture only; every task, revision, digest, and outcome is synthetic.
+- Rust validator source: [xtask/src/basalt_validate.rs](../../xtask/src/basalt_validate.rs), invoked as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json`.
+- Validator implementation task: [#9021](https://github.com/Luminous-Dynamics/symthaea/issues/9021); signed provenance follow-up: [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034).
 
-The schema checks local structure; a future runner/validator must additionally enforce cross-record pairing, digest equality, outcome consistency, and negative controls. Until that validator is implemented and tested, the schema is a data contract—not a security boundary or proof of evaluation validity.
+The validator source now checks cross-record pairing, verifier/evaluated-tree digest equality, budget ceilings, outcome/verifier consistency, and exact task-set/specification/audit matching against the supplied manifest. It contains 26 authored test cases. **Neither compilation nor those tests have been executed here**: no Rust toolchain or local checkout is available, and workflow results for this draft PR were skipped. Hash matching does not authenticate the issuer; signed, independently pinned receipts remain a prerequisite for confirmatory scoring.
 
 ## Existing work to compose
 - Fail-closed Rust validation of run records and cross-record evidence invariants: [#9021](https://github.com/Luminous-Dynamics/symthaea/issues/9021)
