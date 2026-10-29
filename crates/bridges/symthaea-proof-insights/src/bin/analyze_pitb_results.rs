@@ -4432,6 +4432,112 @@ mod tests {
         }
     }
 
+    #[test]
+    fn analyzer_reverifies_all_four_pinned_coverage_artifacts() {
+        let fixture = coverage_receipt::test_support::full_partition_fixture()
+            .expect("signed full-partition test fixture");
+        let split_manifest: SplitManifest =
+            serde_json::from_slice(&fixture.split_bytes).expect("split manifest");
+        let mut config = test_config();
+        config.partition_digest_sha256 = fixture.partition_digest.clone();
+        config.relationship_inventory_sha256 = Some(fixture.inventory_digest.clone());
+        config.coverage_receipt_sha256 = Some(fixture.receipt_digest.clone());
+        config.coverage_trust_store_sha256 = Some(fixture.trust_store_digest.clone());
+        config.coverage_methodology_sha256 = Some(fixture.methodology_digest.clone());
+
+        let manifest = ComponentManifest {
+            schema_version: "pitb.independent-component-manifest.v0".to_owned(),
+            upstream_commit: EXPECTED_UPSTREAM_COMMIT.to_owned(),
+            source_partition_digest_sha256: fixture.partition_digest.clone(),
+            relationship_inventory_sha256: fixture.inventory_digest.clone(),
+            relationship_inventory_status: "independently_reviewed_complete".to_owned(),
+            coverage_receipt_sha256: Some(fixture.receipt_digest.clone()),
+            total_family_count: 372,
+            total_component_count: 372,
+            independent_component_count_by_split: SplitCounts {
+                train: 260,
+                validation: 56,
+                test: 56,
+            },
+            cross_split_component_count: 0,
+            edge_counts: ComponentManifestEdgeCounts {
+                total_edges: 0,
+                hard_edges_included: 0,
+                confirmed_hard_edges: 0,
+                unresolved_hard_edges: 0,
+                dismissed_hard_edges: 0,
+                soft_edges: 0,
+                cross_split_hard_edges: 0,
+                unresolved_cross_split_hard_edges: 0,
+            },
+            families: vec![],
+            components: vec![],
+            qualification_status:
+                "qualified_coverage_verified_no_cross_split_hard_relationships".to_owned(),
+            coverage_receipt_verification_status: "verified_signature_set".to_owned(),
+            qualified_for_confirmatory_resampling: true,
+            qualification_limitations: vec!["synthetic fixture only".to_owned()],
+        };
+
+        let root = env::temp_dir().join(format!("pitb-coverage-verification-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("create temporary test directory");
+        let artifacts: [(&str, &[u8]); 4] = [
+            ("inventory.json", &fixture.inventory_bytes),
+            ("receipt.json", &fixture.receipt_bytes),
+            ("trust-store.json", &fixture.trust_store_bytes),
+            ("methodology.md", &fixture.methodology_bytes),
+        ];
+        let flag_names = [
+            "--relationship-inventory",
+            "--coverage-receipt",
+            "--coverage-trust-store",
+            "--coverage-methodology",
+        ];
+        let mut args = BTreeMap::new();
+        let mut methodology_path = None;
+        for ((filename, bytes), flag) in artifacts.iter().zip(flag_names) {
+            let artifact_path = root.join(filename);
+            fs::write(&artifact_path, bytes).expect("write pinned test artifact");
+            if *flag == "--coverage-methodology" {
+                methodology_path = Some(artifact_path.clone());
+            }
+            args.insert(flag.to_owned(), artifact_path.to_string_lossy().into_owned());
+        }
+
+        assert!(verify_component_coverage_inputs(
+            &args,
+            &config,
+            &manifest,
+            &split_manifest,
+            &fixture.split_bytes,
+        )
+        .expect("analyzer independently verifies the pinned synthetic receipt"));
+
+        assert!(verify_component_coverage_inputs(
+            &BTreeMap::new(),
+            &config,
+            &manifest,
+            &split_manifest,
+            &fixture.split_bytes,
+        )
+        .is_err(), "qualified manifest must be rejected without direct receipt inputs");
+
+        let method_path = methodology_path.expect("methodology path was recorded");
+        let mut mutated_methodology = fixture.methodology_bytes.clone();
+        mutated_methodology.push(b'!');
+        fs::write(method_path, mutated_methodology).expect("mutate methodology bytes");
+        assert!(verify_component_coverage_inputs(
+            &args,
+            &config,
+            &manifest,
+            &split_manifest,
+            &fixture.split_bytes,
+        )
+        .is_err(), "methodology mutation must fail against the frozen run-config digest");
+        fs::remove_dir_all(root).expect("remove temporary test directory");
+    }
+
     fn test_config() -> RunConfig {
         RunConfig {
             schema_version: RUN_CONFIG_SCHEMA.to_string(),
