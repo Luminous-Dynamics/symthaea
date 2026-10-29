@@ -258,7 +258,12 @@ pub fn evaluate_paired_rolling_benchmark(
     let greedy_minus_rolling_cost =
         summarize_delta(&outcomes, PolicySelector::Greedy, PolicySelector::Rolling, false)?;
 
-    let benchmark_digest = canonical_benchmark_digest(&baseline_digest, static_baseline_plan, &outcomes)?;
+    let benchmark_digest = canonical_benchmark_digest(
+        &baseline_digest,
+        static_baseline_plan,
+        &outcomes,
+        max_nodes_per_policy,
+    )?;
     Ok(PairedRollingBenchmarkReport {
         benchmark_digest,
         baseline_scenario_digest: baseline_digest,
@@ -472,10 +477,12 @@ fn canonical_benchmark_digest(
     baseline_digest: &str,
     static_plan: &EnergyHubPlan,
     outcomes: &[PairedScenarioOutcome],
+    max_nodes_per_policy: u64,
 ) -> Result<String, PairedBenchmarkError> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"symthaea.clean-airline.paired-rolling-benchmark.v1\0");
     put_string(&mut bytes, baseline_digest);
+    put_u64(&mut bytes, max_nodes_per_policy);
     put_string(&mut bytes, &static_plan.scenario_id);
     put_string(&mut bytes, &static_plan.input_digest);
     put_u32(&mut bytes, usize_to_u32(static_plan.actions.len())?);
@@ -495,9 +502,20 @@ fn canonical_benchmark_digest(
         put_u32(&mut bytes, usize_to_u32(outcome.rolling_run.steps.len())?);
         for step in &outcome.rolling_run.steps {
             put_u32(&mut bytes, usize_to_u32(step.stage_index)?);
+            put_i64(&mut bytes, step.decision_at_epoch);
+            put_i64(&mut bytes, step.observation_available_at_epoch);
+            put_i64(&mut bytes, step.forecast_issued_at_epoch);
+            put_i64(&mut bytes, step.forecast_available_at_epoch);
+            put_string(&mut bytes, &step.initial_soc_ledger_ref);
             put_string(&mut bytes, &step.forecast_digest);
             put_string(&mut bytes, &step.planning_scenario_digest);
             encode_action(&mut bytes, &step.action);
+            put_f64(&mut bytes, step.realized_step_ledger.source_cost_amount);
+            put_f64(&mut bytes, step.realized_step_ledger.accounted_lifecycle_co2e_kg);
+            put_f64(&mut bytes, step.realized_step_ledger.primary_source_energy_kwh);
+            put_f64(&mut bytes, step.realized_step_ledger.load_delivered_energy_kwh);
+            put_u64(&mut bytes, step.nodes_visited);
+            put_u64(&mut bytes, step.feasible_plans_seen);
         }
         encode_optional_evaluated(
             &mut bytes,
@@ -581,6 +599,14 @@ fn usize_to_u32(value: usize) -> Result<u32, PairedBenchmarkError> {
 }
 
 fn put_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn put_u64(bytes: &mut Vec<u8>, value: u64) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn put_i64(bytes: &mut Vec<u8>, value: i64) {
     bytes.extend_from_slice(&value.to_le_bytes());
 }
 
