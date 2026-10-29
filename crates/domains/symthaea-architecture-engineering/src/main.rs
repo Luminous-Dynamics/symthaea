@@ -23,7 +23,7 @@ struct PairedEvaluationInput {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  symthaea-architecture-engineering validate-matrix <matrix.json>\n  symthaea-architecture-engineering evaluate-paired <evaluation.json>\n  symthaea-architecture-engineering synthetic-sweep <smooth_tradeoff|deceptive> <seed-count>\n  symthaea-architecture-engineering multi-fidelity-sweep <rank_preserving|rank_reversal|late_emerging_quality> <seed-count>"
+        "usage:\n  symthaea-architecture-engineering validate-matrix <matrix.json>\n  symthaea-architecture-engineering evaluate-paired <evaluation.json>\n  symthaea-architecture-engineering synthetic-sweep <smooth_tradeoff|deceptive> <seed-count>\n  symthaea-architecture-engineering multi-fidelity-sweep <rank_preserving|rank_reversal|late_emerging_quality|miscalibrated_uncertainty> <seed-count>"
     );
     ExitCode::from(2)
 }
@@ -48,6 +48,7 @@ fn parse_multi_fidelity_landscape(value: &str) -> Option<MultiFidelityLandscape>
         "rank_preserving" => Some(MultiFidelityLandscape::RankPreserving),
         "rank_reversal" => Some(MultiFidelityLandscape::RankReversal),
         "late_emerging_quality" => Some(MultiFidelityLandscape::LateEmergingQuality),
+        "miscalibrated_uncertainty" => Some(MultiFidelityLandscape::MiscalibratedUncertainty),
         _ => None,
     }
 }
@@ -58,7 +59,7 @@ fn run_multi_fidelity_sweep_command(args: Vec<String>) -> ExitCode {
     }
     let Some(landscape) = parse_multi_fidelity_landscape(&args[0]) else {
         eprintln!(
-            "INVALID: landscape must be rank_preserving, rank_reversal, or late_emerging_quality"
+            "INVALID: landscape must be rank_preserving, rank_reversal, late_emerging_quality, or miscalibrated_uncertainty"
         );
         return ExitCode::from(2);
     };
