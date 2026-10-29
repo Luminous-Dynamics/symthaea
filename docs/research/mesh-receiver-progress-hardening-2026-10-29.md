@@ -47,7 +47,7 @@ This is a correctness-first compatibility tradeoff until the versioned length-bo
 
 ## Validation boundary
 
-The source changes were reviewed for line lengths; no modified Rust source line exceeds 100 characters. This is not a rustfmt result. Local tooling check finds no cargo, rustc or rustfmt. Draft PR [#8856](https://github.com/Luminous-Dynamics/symthaea/pull/8856) is open at head `d90c6fb0554d0fe3864083bcf9404da5b139b2d1`. Its exact-head workflows currently conclude `skipped`, not passed; the Rust tests remain unexecuted. No test PASS is claimed.
+The source changes were reviewed for line lengths; no modified Rust source line exceeds 100 characters. This is not a rustfmt result. Local tooling check finds no cargo, rustc or rustfmt. Draft PR [#8856](https://github.com/Luminous-Dynamics/symthaea/pull/8856) is open. At the last exact-head check, hosted workflows concluded `skipped`, not passed; the Rust tests remain unexecuted. No test PASS is claimed.
 
 ## Follow-on
 
