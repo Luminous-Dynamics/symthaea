@@ -16,7 +16,7 @@ The previous inventory shape also placed the receipt digest inside the relations
 - Recomputes the fixed source partition from the pinned upstream commit, split seed, algorithm, assignments, and count contract before accepting the receipt.
 - Canonicalizes the edge payload by sorting edges by `edge_id` and reviewer IDs lexicographically before hashing; validates allowed relation/status values, digest syntax, unique IDs/pairs, and references to known families.
 - Requires at least two valid endorsements from distinct organizations, where reviewer IDs/key IDs resolve through the pinned trust-store bytes.
-- Requires the trust-store digest to match both an explicit expected digest (which must be frozen in the run config by the future integration) and the digest signed into the receipt.
+- Requires both the trust-store digest and methodology digest to match explicit expected digests (which must be frozen in the versioned run config by the future integration), in addition to matching the receipt's signed values.
 - Emits a verification report whose contract explicitly says `requires_component_and_analyzer_validation`. Receipt verification **does not** set the component manifest's qualification flag or authorize a confirmatory claim.
 - Added Draft 2020-12 schemas and shape-only synthetic fixtures for receipts, trust stores, and verification reports. These fixtures do not contain a valid signature set and must never be mistaken for auditor evidence.
 
