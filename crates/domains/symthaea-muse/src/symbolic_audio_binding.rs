@@ -47,6 +47,9 @@ pub struct RendererManifest {
     pub render_config_sha256: String,
     pub sample_rate_hz: u32,
     pub channels: usize,
+    /// Signed frame offset from score-time positions to rendered-buffer positions.
+    /// Positive means output events are delayed by this many frames.
+    pub render_latency_frames: i64,
     pub latency_policy: String,
 }
 
@@ -466,6 +469,7 @@ fn derive_authorized_audio_mask(
     tempo_bpm: f64,
     sample_rate_hz: u32,
     total_frames: usize,
+    render_latency_frames: i64,
 ) -> Result<Vec<FrameInterval>, SymbolicAudioBindingError> {
     if source.is_empty() || source.len() != target.len() {
         return Err(SymbolicAudioBindingError::UnsupportedScore(
@@ -496,12 +500,23 @@ fn derive_authorized_audio_mask(
         let source_end = source_event.onset_beats + source_event.duration_beats;
         let target_end = target_event.onset_beats + target_event.duration_beats;
         let end_beat = source_end.max(target_end);
-        let start_frame = beat_to_frame(
+        let unshifted_start = beat_to_frame(
             start_beat, tempo_bpm, sample_rate_hz, total_frames, false,
         )?;
-        let end_frame = beat_to_frame(
+        let unshifted_end = beat_to_frame(
             end_beat, tempo_bpm, sample_rate_hz, total_frames, true,
         )?;
+        let shift_frame = |frame: usize| -> Result<usize, SymbolicAudioBindingError> {
+            let shifted = frame as i128 + render_latency_frames as i128;
+            if shifted < 0 || shifted > total_frames as i128 {
+                return Err(SymbolicAudioBindingError::UnsupportedScore(
+                    "renderer latency shift places an authorized interval outside the audio buffer",
+                ));
+            }
+            Ok(shifted as usize)
+        };
+        let start_frame = shift_frame(unshifted_start)?;
+        let end_frame = shift_frame(unshifted_end)?;
         if start_frame >= end_frame {
             return Err(SymbolicAudioBindingError::UnsupportedScore(
                 "authorized event does not map to a non-empty audio interval",
@@ -564,6 +579,15 @@ pub fn create_full_score_render_binding(
     // Validate buffers before using their dimensions in the score-to-audio map.
     audio_content_sha256(source_audio)?;
     audio_content_sha256(target_audio)?;
+    if renderer_manifest.sample_rate_hz != source_audio.sample_rate_hz
+        || renderer_manifest.channels != source_audio.channels
+    {
+        return Err(SymbolicAudioBindingError::InvalidRendererManifest(
+            "manifest audio format does not match the rendered buffers",
+        ));
+    }
+    // Validate the manifest before trusting its latency adjustment.
+    renderer_manifest_sha256(renderer_manifest)?;
     let total_frames = source_audio.interleaved_samples.len() / source_audio.channels;
     let expected_mask = derive_authorized_audio_mask(
         &source_events,
@@ -572,6 +596,7 @@ pub fn create_full_score_render_binding(
         source_score.tempo_bpm,
         source_audio.sample_rate_hz,
         total_frames,
+        renderer_manifest.render_latency_frames,
     )?;
     if acoustic_evidence.authorized_edits != expected_mask
         || onset_evidence.authorized_edits != expected_mask
@@ -769,6 +794,7 @@ mod tests {
             render_config_sha256: digest(b"synthetic-render-config"),
             sample_rate_hz: 16_000,
             channels: 1,
+            render_latency_frames: 0,
             latency_policy: "no-added-latency-synthetic-buffer".to_owned(),
         }
     }
@@ -1003,6 +1029,28 @@ mod tests {
         assert!(matches!(
             result,
             Err(SymbolicAudioBindingError::UnsupportedScore(_))
+        ));
+    }
+
+    #[test]
+    fn renderer_latency_is_applied_when_deriving_the_authorized_mask() {
+        let (_source_events, _target_events, _symbolic, source_audio, target_audio, acoustic, onset, mut manifest) =
+            build_fixture();
+        let source_score = full_score_source();
+        let target_score = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
+        manifest.render_latency_frames = 64;
+
+        // Child reports still use the unshifted interval; the full-score adapter
+        // must not silently accept it for a manifest that declares +64 frames.
+        let result = create_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest,
+        );
+        assert!(matches!(
+            result,
+            Err(SymbolicAudioBindingError::InvalidEvidence(_))
         ));
     }
 
