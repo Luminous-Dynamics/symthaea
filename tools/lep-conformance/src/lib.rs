@@ -162,7 +162,13 @@ impl ValidationReport {
     }
 
     pub fn invalid_json(message: impl Into<String>) -> Self {
-        Self::from_violations(vec![Violation::new("INVALID_JSON", "$", message)])
+        let message = message.into();
+        let code = if message.contains("duplicate JSON object key") {
+            "DUPLICATE_JSON_KEY"
+        } else {
+            "INVALID_JSON"
+        };
+        Self::from_violations(vec![Violation::new(code, "$", message)])
     }
 }
 
@@ -924,6 +930,8 @@ mod tests {
         let error = parse_json_unique_keys(input)
             .expect_err("duplicate keys in the committed fixture must be rejected");
         assert!(error.contains("duplicate JSON object key"));
+        let report = ValidationReport::invalid_json(error);
+        assert!(has_code(&report, "DUPLICATE_JSON_KEY"));
     }
 
     #[test]
