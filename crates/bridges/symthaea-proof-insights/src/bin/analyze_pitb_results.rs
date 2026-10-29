@@ -4487,7 +4487,7 @@ mod tests {
         }
         family_assignments.sort_by(|left, right| left.family_id.cmp(&right.family_id));
 
-        let manifest = ComponentManifest {
+        let mut manifest = ComponentManifest {
             schema_version: "pitb.independent-component-manifest.v0".to_owned(),
             upstream_commit: EXPECTED_UPSTREAM_COMMIT.to_owned(),
             source_partition_digest_sha256: fixture.partition_digest.clone(),
@@ -4569,6 +4569,17 @@ mod tests {
             &fixture.split_bytes,
         )
         .is_err(), "qualified manifest must be rejected without direct receipt inputs");
+
+        let removed_component = manifest.components.pop().expect("component to remove");
+        assert!(verify_component_coverage_inputs(
+            &args,
+            &config,
+            &manifest,
+            &split_manifest,
+            &fixture.split_bytes,
+        )
+        .is_err(), "self-consistent hashes must not hide a component omitted from the signed graph");
+        manifest.components.push(removed_component);
 
         let method_path = methodology_path.expect("methodology path was recorded");
         let mut mutated_methodology = fixture.methodology_bytes.clone();
