@@ -30,7 +30,7 @@ const WEALTH_TOL: f64 = 2e-8;
 const ENDPOINT_TOL: f64 = 1e-10;
 const Z_975: f64 = 1.959_963_984_540_054;
 
-const METHOD_NAMES: [&str; 4] = ["MOPE", "Wald_pointwise_reused", "Hoeffding_alpha_spending", "Empirical_Bernstein_alpha_spending"];
+const METHOD_NAMES: [&str; 4] = ["MOPE", "Wald_pointwise_reused", "Hoeffding_alpha_spending_intersection", "Empirical_Bernstein_alpha_spending_intersection"];
 
 #[derive(Clone, Copy, Debug)]
 struct Scenario {
@@ -189,6 +189,9 @@ impl OpeMoments {
 fn clip_interval(lower: f64, upper: f64) -> Interval {
     Interval { lower: lower.clamp(0.0,1.0), upper: upper.clamp(0.0,1.0) }
 }
+fn running_intersection(previous: Interval, raw: Interval) -> Interval {
+    Interval { lower: previous.lower.max(raw.lower), upper: previous.upper.min(raw.upper) }
+}
 fn baseline_interval(method: usize, moments: OpeMoments, w_max: f64) -> Interval {
     let n = moments.n as f64;
     let mean = moments.mean();
@@ -321,10 +324,7 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
             intervals[1]=baseline_interval(1,moments,scenario.max_weight);
             for method in 2..4 {
                 let raw=baseline_interval(method,moments,scenario.max_weight);
-                intervals[method]=Interval {
-                    lower: previous_intervals[method].lower.max(raw.lower),
-                    upper: previous_intervals[method].upper.min(raw.upper),
-                };
+                intervals[method]=running_intersection(previous_intervals[method],raw);
             }
 
             for method in 0..4 {
@@ -448,6 +448,16 @@ mod tests {
         let mut a=SplitMix64::new(BASE_SEED);
         let mut b=SplitMix64::new(BASE_SEED);
         for _ in 0..128 { assert_eq!(a.next_u64(),b.next_u64()); }
+    }
+
+    #[test]
+    fn running_intersection_is_nested_and_never_wider() {
+        let previous=Interval{lower:0.2,upper:0.8};
+        let raw=Interval{lower:0.1,upper:0.7};
+        let got=running_intersection(previous,raw);
+        assert!(close(got.lower,0.2,1e-12));
+        assert!(close(got.upper,0.7,1e-12));
+        assert!(got.width()<=previous.width()+1e-12);
     }
 
     #[test]
