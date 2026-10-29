@@ -68,7 +68,7 @@ All 6/6 declared gates passed:
 - pooled equivalence and opposite subgroup sign recovery both hold;
 - randomized ordering removes the planted drift bias;
 - randomized-order interval coverage is in 93–97%;
-- the missing-joint-arm, opposing-subgroup-schema, and fixed-order-drift mutations are detected.
+- three explicit guard tests pass: missing-arm abstention, preservation of opposing subgroup signs, and detection of the fixed-order drift artifact.
 
 The fixed-order false-positive failure is intentional and informative: it shows that **a pass/fail benchmark must include cases where the causal estimator should fail under a confounded design**, then verify that a design correction repairs it.
 
