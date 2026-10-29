@@ -83,6 +83,14 @@ pub struct EvidenceManifest {
     pub network_assessment_sha256: String,
 }
 
+/// Source identity obtained outside the evidence bundle, e.g. from pinned build metadata.
+/// Do not populate these values by merely copying the untrusted manifest fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExpectedSourceIdentity<'a> {
+    pub commit_sha: &'a str,
+    pub tree_sha256: &'a str,
+}
+
 /// Signed role-specific verifier evidence. The signature covers every field
 /// except signature_hex; see canonical_receipt_signing_bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -130,6 +138,7 @@ pub enum EvidenceBundleStatus {
 pub enum EvidenceBundleBlocker {
     UnsupportedManifestSchema { actual: u32 },
     InvalidManifestField { field: String },
+    SourceIdentityMismatch { field: String },
     InvalidManifestTimestamp { field: String },
     FutureManifestTimestamp { field: String },
     UnsupportedReceiptSchema { receipt_id: String, actual: u32 },
@@ -229,12 +238,25 @@ pub fn subject_digest_for_role(manifest: &EvidenceManifest, role: EvidenceRole) 
 /// Verification checks byte identity and signatures, not the domain conclusion itself.
 pub fn verify_evidence_bundle(
     manifest: &EvidenceManifest,
+    expected_source: &ExpectedSourceIdentity<'_>,
     receipts: &[VerifierReceipt],
     trust_anchors: &[TrustAnchor],
     verification_time_epoch_seconds: i64,
 ) -> EvidenceBundleReport {
     let manifest_digest = sha256_hex(&canonical_manifest_bytes(manifest));
     let mut blockers = validate_manifest(manifest, verification_time_epoch_seconds);
+    if !is_lower_hex_length(expected_source.commit_sha, &[40, 64]) {
+        blockers.push(EvidenceBundleBlocker::InvalidManifestField { field: "expected_source_commit_sha".into() });
+    }
+    if !is_lower_hex_length(expected_source.tree_sha256, &[64]) {
+        blockers.push(EvidenceBundleBlocker::InvalidManifestField { field: "expected_source_tree_sha256".into() });
+    }
+    if expected_source.commit_sha != manifest.source_commit_sha.as_str() {
+        blockers.push(EvidenceBundleBlocker::SourceIdentityMismatch { field: "source_commit_sha".into() });
+    }
+    if expected_source.tree_sha256 != manifest.source_tree_sha256.as_str() {
+        blockers.push(EvidenceBundleBlocker::SourceIdentityMismatch { field: "source_tree_sha256".into() });
+    }
     if verification_time_epoch_seconds < 0 {
         blockers.push(EvidenceBundleBlocker::InvalidManifestTimestamp {
             field: "verification_time_epoch_seconds".into(),
@@ -644,6 +666,20 @@ mod tests {
         (receipts, anchors)
     }
 
+
+    fn verify_fixture(
+        manifest: &EvidenceManifest,
+        receipts: &[VerifierReceipt],
+        anchors: &[TrustAnchor],
+        now: i64,
+    ) -> EvidenceBundleReport {
+        let expected = ExpectedSourceIdentity {
+            commit_sha: &manifest.source_commit_sha,
+            tree_sha256: &manifest.source_tree_sha256,
+        };
+        verify_evidence_bundle(manifest, &expected, receipts, anchors, now)
+    }
+
     fn has(report: &EvidenceBundleReport, predicate: impl Fn(&EvidenceBundleBlocker) -> bool) -> bool {
         report.blockers.iter().any(predicate)
     }
@@ -652,7 +688,7 @@ mod tests {
     fn valid_bundle_is_verified_without_authorizing_a_decision() {
         let manifest = manifest();
         let (receipts, anchors) = signed_receipts(&manifest);
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Verified);
         assert!(report.blockers.is_empty());
         assert_eq!(report.verified_roles, EvidenceRole::REQUIRED.to_vec());
@@ -672,7 +708,7 @@ mod tests {
         let (receipts, anchors) = signed_receipts(&original);
         let mut changed = original;
         changed.data_snapshot_sha256 = digest("changed-data");
-        let report = verify_evidence_bundle(&changed, &receipts, &anchors, NOW);
+        let report = verify_fixture(&changed, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptManifestMismatch { .. })));
     }
@@ -681,10 +717,10 @@ mod tests {
     fn receipt_order_does_not_change_report() {
         let manifest = manifest();
         let (receipts, anchors) = signed_receipts(&manifest);
-        let forward = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let forward = verify_fixture(&manifest, &receipts, &anchors, NOW);
         let mut reversed = receipts.clone();
         reversed.reverse();
-        assert_eq!(forward, verify_evidence_bundle(&manifest, &reversed, &anchors, NOW));
+        assert_eq!(forward, verify_fixture(&manifest, &reversed, &anchors, NOW));
     }
 
     #[test]
@@ -694,7 +730,7 @@ mod tests {
         receipts.pop();
         let duplicate = receipts[0].clone();
         receipts.push(duplicate);
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::DuplicateReceiptRole { .. })));
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::MissingReceipt { .. })));
@@ -705,7 +741,7 @@ mod tests {
         let manifest = manifest();
         let (mut receipts, anchors) = signed_receipts(&manifest);
         receipts[0].expires_at_epoch_seconds = NOW - 1;
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptExpired { .. })));
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::InvalidSignature { .. })));
@@ -716,7 +752,7 @@ mod tests {
         let manifest = manifest();
         let (receipts, mut anchors) = signed_receipts(&manifest);
         anchors[0].verifier_binary_sha256 = digest("other-binary");
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::TrustIdentityMismatch { field, .. } if field == "verifier_binary_sha256")));
     }
@@ -726,7 +762,7 @@ mod tests {
         let manifest = manifest();
         let (mut receipts, anchors) = signed_receipts(&manifest);
         receipts[0].key_id = "unknown-key".into();
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::UnknownTrustAnchor { .. })));
     }
@@ -737,7 +773,7 @@ mod tests {
         let (mut receipts, anchors) = signed_receipts(&manifest);
         let replacement = if receipts[0].signature_hex.starts_with("00") { "01" } else { "00" };
         receipts[0].signature_hex.replace_range(0..2, replacement);
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::InvalidSignature { .. })));
     }
@@ -748,7 +784,7 @@ mod tests {
         manifest.decision_time_epoch_seconds = NOW + 1;
         let (mut receipts, anchors) = signed_receipts(&manifest);
         receipts[0].issued_at_epoch_seconds = NOW + 1;
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::FutureManifestTimestamp { .. })));
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptIssuedInFuture { .. })));
@@ -759,9 +795,20 @@ mod tests {
         let manifest = manifest();
         let (mut receipts, anchors) = signed_receipts(&manifest);
         receipts[0].issued_at_epoch_seconds = manifest.created_at_epoch_seconds - 1;
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptIssuedBeforeManifest { .. })));
+    }
+
+    #[test]
+    fn source_identity_must_match_external_build_metadata() {
+        let manifest = manifest();
+        let (receipts, anchors) = signed_receipts(&manifest);
+        let wrong_commit = "c".repeat(40);
+        let expected = ExpectedSourceIdentity { commit_sha: &wrong_commit, tree_sha256: &manifest.source_tree_sha256 };
+        let report = verify_evidence_bundle(&manifest, &expected, &receipts, &anchors, NOW);
+        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::SourceIdentityMismatch { field } if field == "source_commit_sha")));
     }
 
     #[test]
@@ -769,7 +816,7 @@ mod tests {
         let manifest = manifest();
         let (receipts, mut anchors) = signed_receipts(&manifest);
         anchors[0].revoked = true;
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::RevokedTrustAnchor { .. })));
     }
@@ -779,7 +826,7 @@ mod tests {
         let manifest = manifest();
         let (mut receipts, anchors) = signed_receipts(&manifest);
         receipts[0].subject_sha256 = digest("different-subject");
-        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptSubjectMismatch { .. })));
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::InvalidSignature { .. })));

@@ -9,7 +9,7 @@
 
 The readiness function needs to know not only that specialist reports exist, but that the reports are the exact artifacts produced for this run by expected verifiers. A matching ID or internally consistent JSON is not an authenticity guarantee.
 
-The caller supplies an independently provisioned trust store. Evidence cannot add its own trusted key. Each trust anchor pins a key ID, permitted role, verifier identity, verifier-binary SHA-256, public key, validity interval, maximum receipt lifetime, and revocation state. Production key provisioning, rotation, revocation, and incident response remain separate operational responsibilities.
+The caller supplies an independently provisioned trust store and an ExpectedSourceIdentity obtained from pinned build metadata outside the evidence bundle. The verifier requires the manifest commit and source-tree digest to match those expected values; copying them from the untrusted manifest defeats this check. Evidence cannot add its own trusted key. Each trust anchor pins a key ID, permitted role, verifier identity, verifier-binary SHA-256, public key, validity interval, maximum receipt lifetime, and revocation state. Production key provisioning, rotation, revocation, and incident response remain separate operational responsibilities.
 
 ## Manifest binding
 

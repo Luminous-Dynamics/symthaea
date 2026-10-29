@@ -8,11 +8,25 @@
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use symthaea_operations_research::aviation_evidence_bundle::{
-    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, TrustAnchor,
+    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, ExpectedSourceIdentity, TrustAnchor,
     VerifierReceipt, EVIDENCE_MANIFEST_SCHEMA_VERSION, VERIFIER_RECEIPT_SCHEMA_VERSION,
 };
 
 const NOW: i64 = 1_800_000_000;
+
+
+fn verify_fixture(
+    manifest: &EvidenceManifest,
+    receipts: &[VerifierReceipt],
+    anchors: &[TrustAnchor],
+    now: i64,
+) -> symthaea_operations_research::aviation_evidence_bundle::EvidenceBundleReport {
+    let expected = ExpectedSourceIdentity {
+        commit_sha: &manifest.source_commit_sha,
+        tree_sha256: &manifest.source_tree_sha256,
+    };
+    verify_evidence_bundle(manifest, &expected, receipts, anchors, now)
+}
 
 fn independent_sha256(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
@@ -185,7 +199,7 @@ fn independent_byte_contract_matches_canonical_api_and_accepts_signed_bundle() {
             symthaea_operations_research::aviation_evidence_bundle::canonical_receipt_signing_bytes(receipt),
         );
     }
-    let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+    let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
     assert_eq!(report.status, EvidenceBundleStatus::Verified);
     assert!(report.blockers.is_empty());
 }
@@ -194,15 +208,15 @@ fn independent_byte_contract_matches_canonical_api_and_accepts_signed_bundle() {
 fn independent_oracle_detects_mutated_snapshot_and_permutation_is_irrelevant() {
     let manifest = fixture_manifest();
     let (receipts, anchors) = signed_bundle(&manifest);
-    let first = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+    let first = verify_fixture(&manifest, &receipts, &anchors, NOW);
     let mut reversed = receipts.clone();
     reversed.reverse();
-    let second = verify_evidence_bundle(&manifest, &reversed, &anchors, NOW);
+    let second = verify_fixture(&manifest, &reversed, &anchors, NOW);
     assert_eq!(first, second);
 
     let mut mutated = manifest;
     mutated.data_snapshot_sha256 = digest_label("mutated-data");
-    let blocked = verify_evidence_bundle(&mutated, &receipts, &anchors, NOW);
+    let blocked = verify_fixture(&mutated, &receipts, &anchors, NOW);
     assert_eq!(blocked.status, EvidenceBundleStatus::Blocked);
     assert!(blocked.blockers.iter().any(|b| {
         matches!(b, symthaea_operations_research::aviation_evidence_bundle::EvidenceBundleBlocker::ReceiptManifestMismatch { .. })
