@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -201,15 +201,23 @@ pub fn generate_file(
     evaluator_output_path: &Path,
     policy_tick: u64,
 ) -> anyhow::Result<GenerationSummary> {
+    let policy_target = normalized_output_target(policy_output_path)?;
+    let evaluator_target = normalized_output_target(evaluator_output_path)?;
     ensure!(
-        policy_output_path != evaluator_output_path,
-        "policy tick input and evaluator schedule must be separate output paths"
+        policy_target != evaluator_target,
+        "policy tick input and evaluator schedule must resolve to different files"
     );
     let input_bytes = fs::read(input_path)
         .with_context(|| format!("reading missingness schedule input {}", input_path.display()))?;
     let input: ScheduleInput = serde_json::from_slice(&input_bytes)
         .with_context(|| format!("parsing missingness schedule input {}", input_path.display()))?;
     let generated = generate(&input, &input_bytes)?;
+    ensure!(
+        policy_tick <= generated.evaluator_schedule.evaluation_horizon_tick,
+        "requested policy tick {} is beyond evaluation horizon {}",
+        policy_tick,
+        generated.evaluator_schedule.evaluation_horizon_tick
+    );
     let policy_tick_input = generated.policy_tick_input(policy_tick);
     let mut policy_bytes = serde_json::to_vec_pretty(&policy_tick_input)?;
     policy_bytes.push(b'\\n');
@@ -461,6 +469,23 @@ fn sample_delay(seed: u64, event_id: &str, pattern: &DelayPattern) -> anyhow::Re
             }
         }
     }
+}
+
+fn normalized_output_target(path: &Path) -> anyhow::Result<PathBuf> {
+    if fs::symlink_metadata(path).is_ok() {
+        return fs::canonicalize(path)
+            .with_context(|| format!("canonicalizing existing output path {}", path.display()));
+    }
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent = fs::canonicalize(parent)
+        .with_context(|| format!("canonicalizing output directory {}", parent.display()))?;
+    let file_name = path
+        .file_name()
+        .context("output path must include a file name")?;
+    Ok(canonical_parent.join(file_name))
 }
 
 fn policy_message_tick(message: &PolicyVisibleMessage) -> u64 {
