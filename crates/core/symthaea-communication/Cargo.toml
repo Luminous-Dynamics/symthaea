@@ -16,3 +16,7 @@ hound = { workspace = true }
 name = "symthaea-comm-eval"
 path = "src/bin/eval.rs"
 
+
+[[bin]]
+name = "symthaea-whisper-cpp-worker"
+path = "src/bin/whisper_cpp_worker.rs"

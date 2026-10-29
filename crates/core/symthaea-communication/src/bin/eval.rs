@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use symthaea_communication::benchmark::{
     BenchmarkReport, EvaluationPlan, ReleaseGate, compare_reports,
 };
@@ -88,6 +89,9 @@ enum Command {
         output: PathBuf,
         #[arg(long = "worker-arg")]
         worker_args: Vec<String>,
+        /// Per-response timeout, including local model cold-start latency.
+        #[arg(long, default_value_t = 600)]
+        worker_timeout_seconds: u64,
     },
     /// Aggregate per-sample pilot JSONL without manufacturing release evidence.
     SummarizePilot { outcomes: PathBuf, output: PathBuf },
@@ -113,12 +117,23 @@ fn read_jsonl<T: serde::de::DeserializeOwned>(path: &Path) -> Result<Vec<T>, Str
         .collect()
 }
 
-fn write_jsonl<T: serde::Serialize>(path: &Path, values: &[T]) -> Result<(), String> {
-    let mut output = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
+/// Create a new private output file. Pilot outcomes include raw hypotheses,
+/// so their confidentiality must not depend on the caller's umask or directory.
+fn create_new_private_output(path: &Path) -> Result<fs::File, String> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options
         .open(path)
-        .map_err(|error| format!("{}: {error}", path.display()))?;
+        .map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn write_jsonl<T: serde::Serialize>(path: &Path, values: &[T]) -> Result<(), String> {
+    let mut output = create_new_private_output(path)?;
     for value in values {
         serde_json::to_writer(&mut output, value).map_err(|error| error.to_string())?;
         output.write_all(b"\n").map_err(|error| error.to_string())?;
@@ -288,16 +303,17 @@ fn run() -> Result<(), String> {
             provider_id,
             output,
             worker_args,
+            worker_timeout_seconds,
         } => {
-            let policy = WorkerPolicy::allow_one(&worker)?;
+            if worker_timeout_seconds == 0 || worker_timeout_seconds > 3_600 {
+                return Err("worker-timeout-seconds must be in [1, 3600]".into());
+            }
+            let mut policy = WorkerPolicy::allow_one(&worker)?;
+            policy.response_timeout = Duration::from_secs(worker_timeout_seconds);
             let mut provider =
                 LocalJsonlProvider::spawn(provider_id, &worker, &worker_args, policy)?;
             let input = fs::File::open(&samples).map_err(|error| error.to_string())?;
-            let mut output = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&output)
-                .map_err(|error| error.to_string())?;
+            let mut output = create_new_private_output(&output)?;
             let mut count = 0_u64;
             for line in BufReader::new(input).lines() {
                 let line = line.map_err(|error| error.to_string())?;
@@ -361,5 +377,33 @@ fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
         std::process::exit(2);
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn pilot_outcome_outputs_are_owner_only_and_exclusive() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after Unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-private-pilot-output-{}-{stamp}",
+            std::process::id()
+        ));
+        fs::create_dir(&root).expect("create test directory");
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700))
+            .expect("restrict test directory");
+        let output_path = root.join("outcomes.jsonl");
+        let output = create_new_private_output(&output_path).expect("create output");
+        assert_eq!(output.metadata().unwrap().permissions().mode() & 0o777, 0o600);
+        drop(output);
+        assert!(create_new_private_output(&output_path).is_err(), "must not overwrite existing output");
+        fs::remove_dir_all(&root).expect("remove test directory");
     }
 }

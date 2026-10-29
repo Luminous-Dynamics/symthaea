@@ -33,53 +33,59 @@ struct PhoneSpan {
     syllable: usize,
 }
 
-fn ipa_to_arpa(ipa: &str) -> &'static str {
-    match ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit()) {
-        "i" | "iː" => "IY",
-        "ɪ" => "IH",
-        "e" | "eɪ" => "EY",
-        "ɛ" => "EH",
-        "æ" => "AE",
-        "ɑ" | "ɑː" | "ɒ" => "AA",
-        "ɔ" | "ɔː" => "AO",
-        "o" | "oʊ" => "OW",
-        "ʊ" => "UH",
-        "u" | "uː" => "UW",
-        "ʌ" => "AH",
-        "ə" => "AX",
-        "ɝ" | "ɜ" | "ɜː" => "ER",
-        "aɪ" => "AY",
-        "aʊ" => "AW",
-        "ɔɪ" => "OY",
-        "p" => "P",
-        "b" => "B",
-        "t" => "T",
-        "d" => "D",
-        "k" => "K",
-        "g" | "ɡ" => "G",
-        "f" => "F",
-        "v" => "V",
-        "θ" => "TH",
-        "ð" => "DH",
-        "s" => "S",
-        "z" => "Z",
-        "ʃ" => "SH",
-        "ʒ" => "ZH",
-        "h" => "HH",
-        "tʃ" => "CH",
-        "dʒ" => "JH",
-        "m" => "M",
-        "n" => "N",
-        "ŋ" => "NG",
-        "l" => "L",
-        "r" | "ɹ" => "R",
-        "w" => "W",
-        "j" => "Y",
-        _ => "AX",
-    }
+/// Map supported English IPA symbols to the tract planner's phone inventory.
+/// Unknown symbols are rejected; mapping them to AX would silently alter words.
+fn ipa_to_arpa(ipa: &str) -> Option<&'static [&'static str]> {
+    let normalized = ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit());
+    let mapped: &'static [&'static str] = match normalized {
+        "i" | "iː" => &["IY"],
+        "ɪ" => &["IH"],
+        "e" | "eɪ" => &["EY"],
+        "ɛ" => &["EH"],
+        "æ" => &["AE"],
+        "ɑ" | "ɑː" | "ɒ" => &["AA"],
+        "ɔ" | "ɔː" => &["AO"],
+        "o" | "oʊ" => &["OW"],
+        "ʊ" => &["UH"],
+        "u" | "uː" => &["UW"],
+        "ʌ" => &["AH"],
+        "ə" => &["AX"],
+        "ɝ" | "ɜ" | "ɜː" => &["ER"],
+        "aɪ" => &["AY"],
+        "aʊ" => &["AW"],
+        "ɔɪ" => &["OY"],
+        "p" => &["P"],
+        "b" => &["B"],
+        "t" => &["T"],
+        "d" => &["D"],
+        "k" => &["K"],
+        "g" | "ɡ" => &["G"],
+        "f" => &["F"],
+        "v" => &["V"],
+        "θ" => &["TH"],
+        "ð" => &["DH"],
+        "s" => &["S"],
+        "z" => &["Z"],
+        "ʃ" => &["SH"],
+        "ʒ" => &["ZH"],
+        "h" => &["HH"],
+        "tʃ" => &["CH"],
+        "dʒ" => &["JH"],
+        "m" => &["M"],
+        "n" => &["N"],
+        "ŋ" => &["NG"],
+        "l" => &["L"],
+        "r" | "ɹ" => &["R"],
+        "w" => &["W"],
+        "j" => &["Y"],
+        "ks" => &["K", "S"],
+        _ => return None,
+    };
+    Some(mapped)
 }
 
-fn phone_spans(performance: &VocalPerformance) -> Vec<PhoneSpan> {
+
+fn phone_spans(performance: &VocalPerformance) -> Result<Vec<PhoneSpan>> {
     let mut spans = Vec::new();
     for (syllable_index, syllable) in performance.syllables.iter().enumerate() {
         let total: f32 = syllable.notes().map(|note| note.duration).sum();
@@ -99,22 +105,32 @@ fn phone_spans(performance: &VocalPerformance) -> Vec<PhoneSpan> {
         let vowel_budget = (total - consonant_total * consonant_scale).max(0.03);
         let mut cursor = (syllable.note.start_time - syllable.consonant_advance_s).max(0.0);
         for phone in &syllable.phonemes {
+            let mapped = ipa_to_arpa(&phone.ipa).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "functional singing does not support IPA phoneme {:?} in syllable {}; refusing silent schwa substitution",
+                    phone.ipa,
+                    syllable_index
+                )
+            })?;
             let duration = if phone.is_vowel {
                 vowel_budget * phone.natural_duration_s.max(0.01) / vowel_weight.max(1e-6)
             } else {
                 phone.natural_duration_s.max(0.015) * consonant_scale
             }
             .max(0.005);
-            spans.push(PhoneSpan {
-                start: cursor,
-                end: cursor + duration,
-                phoneme: ipa_to_arpa(&phone.ipa).to_string(),
-                syllable: syllable_index,
-            });
-            cursor += duration;
+            let segment_duration = duration / mapped.len() as f32;
+            for symbol in mapped {
+                spans.push(PhoneSpan {
+                    start: cursor,
+                    end: cursor + segment_duration,
+                    phoneme: (*symbol).to_string(),
+                    syllable: syllable_index,
+                });
+                cursor += segment_duration;
+            }
         }
     }
-    spans
+    Ok(spans)
 }
 
 fn interpolate_curve(points: &[(f32, f32)], time: f32, fallback: f32) -> f32 {
@@ -491,7 +507,7 @@ impl FunctionalSingingEngine {
     ) -> Result<Vec<ArticulatoryState>> {
         performance.validate()?;
         self.pipeline.reset();
-        let spans = phone_spans(performance);
+        let spans = phone_spans(performance)?;
         let pitch: Vec<_> = performance
             .pitch_curve
             .iter()
@@ -555,7 +571,7 @@ impl FunctionalSingingEngine {
     /// `motor_states`, this contains no absolute tube geometry.
     pub fn gesture_frames(&mut self, performance: &VocalPerformance) -> Result<Vec<GestureFrame>> {
         let states = self.motor_states(performance)?;
-        let spans = phone_spans(performance);
+        let spans = phone_spans(performance)?;
         Ok(states
             .iter()
             .enumerate()
@@ -675,5 +691,83 @@ mod tests {
         assert_eq!(stem.backend, "functional-tract-hdc-cfc");
         assert!(stem.samples.iter().any(|sample| sample.abs() > 1e-6));
         assert!(stem.samples.iter().all(|sample| sample.is_finite()));
+    }
+
+    #[test]
+    fn unsupported_ipa_fails_closed_instead_of_becoming_schwa() {
+        let mut performance = VocalPerformance::from_melody(
+            "light",
+            &[Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.16,
+                velocity: 0.72,
+            }],
+            "en",
+        )
+        .unwrap();
+        performance.syllables[0].phonemes[0].ipa = "ʎ".to_string();
+
+        let mut engine = FunctionalSingingEngine::new(24_000);
+        let error = engine.motor_states(&performance).unwrap_err().to_string();
+        assert!(
+            error.contains("unsupported IPA phoneme") || error.contains("does not support IPA phoneme"),
+            "{error}"
+        );
+        assert!(error.contains("ʎ"), "{error}");
+        assert!(error.contains("schwa"), "{error}");
+    }
+
+    #[test]
+    fn click_consonants_are_rejected_until_the_renderer_models_click_gestures() {
+        // IPA click places: bilabial, dental, post-alveolar, palatoalveolar,
+        // and alveolar lateral. These need velaric ingressive gestures and
+        // burst models; mapping them to pulmonic ARPAbet phones would be false.
+        for click in ["ʘ", "ǀ", "ǃ", "ǂ", "ǁ"] {
+            assert!(
+                ipa_to_arpa(click).is_none(),
+                "click {click:?} must fail closed until a click-specific gesture exists"
+            );
+        }
+    }
+
+    #[test]
+    fn mapper_covers_current_g2p_dictionary_and_letter_fallback() {
+        let corpus = "abcdefghijklmnopqrstuvwxyz i the a is am feel hello world yes peace consciousness awareness expanding harmony rising something this calm still silence light dark feels right not but and my can see hear know think now here";
+        let phonemes = symthaea_vocal_tract::speech::g2p::text_to_phonemes(corpus);
+        let mut observed = 0usize;
+        for phone in phonemes.iter().filter(|phone| phone.ipa != " ") {
+            observed += 1;
+            assert!(
+                ipa_to_arpa(phone.ipa).is_some(),
+                "current G2P output {:?} must have an explicit functional mapping",
+                phone.ipa
+            );
+        }
+        assert!(observed > 0, "G2P inventory fixture unexpectedly emitted no phones");
+        assert!(
+            phonemes.iter().any(|phone| phone.ipa == "ks"),
+            "the letter fallback should exercise the x -> ks mapping"
+        );
+    }
+
+    #[test]
+    fn letter_x_cluster_preserves_both_articulations_in_order() {
+        let performance = VocalPerformance::from_melody(
+            "x",
+            &[Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.16,
+                velocity: 0.72,
+            }],
+            "en",
+        )
+        .unwrap();
+        let spans = phone_spans(&performance).unwrap();
+        let symbols: Vec<_> = spans.iter().map(|span| span.phoneme.as_str()).collect();
+        assert_eq!(symbols, vec!["K", "S"]);
+        assert!((spans[0].end - spans[1].start).abs() < 1e-6);
+        assert!(spans[1].end > spans[0].start);
     }
 }

@@ -238,6 +238,24 @@ impl VocalPerformance {
         {
             bail!("lyrics, language, and syllables are required");
         }
+        if self.pitch_curve.is_empty() {
+            bail!("a vocal performance requires a pitch curve");
+        }
+        let mut previous_pitch_time = None;
+        for (i, point) in self.pitch_curve.iter().enumerate() {
+            if !point.time_s.is_finite()
+                || point.time_s < 0.0
+                || !point.frequency_hz.is_finite()
+                || point.frequency_hz <= 0.0
+            {
+                bail!("invalid pitch-curve point {i}");
+            }
+            if previous_pitch_time.is_some_and(|previous| point.time_s < previous) {
+                bail!("pitch curve times must be chronological");
+            }
+            previous_pitch_time = Some(point.time_s);
+        }
+
         let mut previous_start = 0.0f32;
         for (i, syllable) in self.syllables.iter().enumerate() {
             let note = syllable.note;
@@ -247,6 +265,9 @@ impl VocalPerformance {
                 || note.start_time < 0.0
                 || !note.duration.is_finite()
                 || note.duration <= 0.0
+                || !(note.start_time + note.duration).is_finite()
+                || !note.velocity.is_finite()
+                || !(0.0..=1.0).contains(&note.velocity)
                 || syllable.phonemes.is_empty()
             {
                 bail!("invalid vocal syllable {i}");
@@ -258,12 +279,44 @@ impl VocalPerformance {
             {
                 bail!("invalid phrase or consonant timing in vocal syllable {i}");
             }
+            let phrase = &self.phrases[syllable.phrase_index];
+            if i < phrase.syllable_start || i >= phrase.syllable_end {
+                bail!("vocal syllable {i} is outside its assigned phrase");
+            }
+            if !syllable.portamento.is_finite()
+                || !(0.0..=1.0).contains(&syllable.portamento)
+                || !syllable.vibrato_onset.is_finite()
+                || !(0.0..=1.0).contains(&syllable.vibrato_onset)
+                || !syllable.vibrato_rate_hz.is_finite()
+                || syllable.vibrato_rate_hz < 0.0
+                || !syllable.vibrato_depth_cents.is_finite()
+                || syllable.vibrato_depth_cents < 0.0
+                || !syllable.breathiness.is_finite()
+                || !(0.0..=1.0).contains(&syllable.breathiness)
+                || !syllable.energy.is_finite()
+                || !(0.0..=1.0).contains(&syllable.energy)
+            {
+                bail!("invalid expression controls in vocal syllable {i}");
+            }
+            for (phoneme_index, phoneme) in syllable.phonemes.iter().enumerate() {
+                if phoneme.ipa.trim().is_empty()
+                    || !phoneme.natural_duration_s.is_finite()
+                    || phoneme.natural_duration_s <= 0.0
+                {
+                    bail!("invalid phoneme {phoneme_index} in vocal syllable {i}");
+                }
+            }
             let mut note_start = note.start_time;
             for melisma in &syllable.melisma_notes {
                 if !melisma.frequency.is_finite()
                     || melisma.frequency <= 0.0
+                    || !melisma.start_time.is_finite()
                     || melisma.start_time < note_start
+                    || !melisma.duration.is_finite()
                     || melisma.duration <= 0.0
+                    || !(melisma.start_time + melisma.duration).is_finite()
+                    || !melisma.velocity.is_finite()
+                    || !(0.0..=1.0).contains(&melisma.velocity)
                 {
                     bail!("invalid melisma note in vocal syllable {i}");
                 }
@@ -278,19 +331,30 @@ impl VocalPerformance {
             if phrase.syllable_start >= phrase.syllable_end
                 || phrase.syllable_end > self.syllables.len()
                 || phrase.expression_curve.is_empty()
+                || !phrase.breath_before_s.is_finite()
                 || phrase.breath_before_s < 0.0
+                || !phrase.breath_after_s.is_finite()
                 || phrase.breath_after_s < 0.0
             {
                 bail!("invalid vocal phrase {i}");
             }
-            if phrase.expression_curve.iter().any(|point| {
-                !point.time_s.is_finite()
+            let mut previous_expression_time = None;
+            for point in &phrase.expression_curve {
+                if !point.time_s.is_finite()
+                    || point.time_s < 0.0
                     || !point.energy.is_finite()
                     || !(0.0..=1.0).contains(&point.energy)
+                    || !point.breathiness.is_finite()
                     || !(0.0..=1.0).contains(&point.breathiness)
+                    || !point.tension.is_finite()
                     || !(0.0..=1.0).contains(&point.tension)
-            }) {
-                bail!("invalid expression curve in vocal phrase {i}");
+                {
+                    bail!("invalid expression curve in vocal phrase {i}");
+                }
+                if previous_expression_time.is_some_and(|previous| point.time_s < previous) {
+                    bail!("expression curve times must be chronological in vocal phrase {i}");
+                }
+                previous_expression_time = Some(point.time_s);
             }
         }
         Ok(())
@@ -363,6 +427,75 @@ mod tests {
         assert!(decoded.pitch_curve.len() >= 3);
         assert_eq!(decoded.version, 2);
         assert_eq!(decoded.phrases.len(), 1);
+    }
+
+    #[test]
+    fn validation_rejects_non_finite_melisma_timing_and_velocity() {
+        let melody = [Note {
+            frequency: 261.63,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.syllables[0].melisma_notes.push(Note {
+            frequency: 293.66,
+            start_time: f32::NAN,
+            duration: 0.2,
+            velocity: 0.7,
+        });
+        assert!(performance.validate().is_err());
+
+        performance.syllables[0].melisma_notes[0].start_time = 0.5;
+        performance.syllables[0].melisma_notes[0].velocity = f32::NAN;
+        assert!(performance.validate().is_err());
+    }
+
+    #[test]
+    fn validation_rejects_non_chronological_pitch_curve() {
+        let melody = [Note {
+            frequency: 261.63,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.pitch_curve.swap(0, 1);
+        assert!(performance.validate().is_err());
+    }
+
+    #[test]
+    fn validation_rejects_invalid_pitch_curve_and_phoneme_duration() {
+        let melody = [Note {
+            frequency: 261.63,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.pitch_curve[0].frequency_hz = f32::NAN;
+        assert!(performance.validate().is_err());
+
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.syllables[0].phonemes[0].natural_duration_s = f32::NAN;
+        assert!(performance.validate().is_err());
+    }
+
+    #[test]
+    fn validation_rejects_non_finite_expression_bounds() {
+        let melody = [Note {
+            frequency: 261.63,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.phrases[0].breath_after_s = f32::NAN;
+        assert!(performance.validate().is_err());
+
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.phrases[0].expression_curve[0].breathiness = f32::NAN;
+        assert!(performance.validate().is_err());
     }
 
     #[test]
