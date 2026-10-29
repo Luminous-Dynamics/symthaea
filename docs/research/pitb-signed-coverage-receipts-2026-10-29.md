@@ -20,14 +20,13 @@ The previous inventory shape also placed the receipt digest inside the relations
 - Emits a verification report whose contract explicitly says `requires_component_and_analyzer_validation`. Receipt verification **does not** set the component manifest's qualification flag or authorize a confirmatory claim.
 - Added Draft 2020-12 schemas and shape-only synthetic fixtures for receipts, trust stores, and verification reports. These fixtures do not contain a valid signature set and must never be mistaken for auditor evidence.
 
-## Remaining integration gates
+## Remaining integration and qualification gates
 
-1. Add the coverage trust-store digest and receipt artifact to the frozen run config and analysis report; bump the schema version rather than silently changing an existing config contract.
-2. Make the component-manifest builder consume the exact verified report/receipt and keep qualification false for incomplete inventory or any non-dismissed hard relationship crossing splits.
-3. Make `analyze_pitb_results` reverify the receipt and trust-store bytes itself, or verify a verifier report whose full inputs and executable digest are pinned. It must not trust a bare boolean or a user-editable status field.
-4. Add an end-to-end workflow case that generates deterministic test keys in Rust, creates a signed synthetic receipt in memory, runs the CLI through the exact frozen partition path, and exercises bad-key, changed-methodology, changed-edge, same-organization, incomplete-inventory, and wrong-trust-root negatives.
-5. Obtain and independently audit a genuine reviewer trust root and two reviewers from distinct organizations. Until this occurs, the inventory stays unqualified regardless of the code's synthetic positive tests.
-6. Run the new Rust tests and exact-head workflow. The current environment has no local Rust toolchain, and no CI result for the new head has been observed. A green schema test would not establish cryptographic verification, reviewer independence, or scientific validity.
+1. **Implemented in this branch:** run-config v3 all-or-none artifact pins, shared receipt verifier, component-builder signature verification, analyzer-side re-verification in both `analyze` and `power` modes, and manifest state reconciliation. The old v2 schema is retained as historical contract; the workflow validates v3.
+2. **Still required:** an end-to-end workflow test must generate deterministic synthetic Ed25519 keys, sign a receipt over the exact pinned partition/inventory/methodology/trust-store, drive the real builder and analyzer CLIs, and reject bad-key, changed-methodology, changed-edge, same-organization, incomplete-inventory, wrong-trust-root, missing-input, and changed-manifest controls.
+3. Obtain and independently audit a genuine reviewer trust root and two reviewers from distinct organizations. Until this occurs, the checked-in fixture cannot qualify the actual inventory regardless of passing synthetic tests.
+4. Run the new Rust tests and exact-head workflow. The current environment has no local Rust toolchain, and no passing CI result for the current head has been observed. Static inspection and JSON fixture checks are not substitutes for a successful compiler/test run.
+5. Independently audit retained review logs for the full 372-family review and verify that trust-store provisioning was not controlled solely by the experiment author. Signatures authenticate endorsements under a trust root; they do not prove review competence or logical exhaustiveness.
 
 ## External comparison and benchmark targets
 
