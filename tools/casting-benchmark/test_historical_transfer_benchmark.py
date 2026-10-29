@@ -101,11 +101,15 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         self.assertEqual(costs["target_low_evaluation_cost_per_task_units"], 12 * LOW_COST_UNITS)
         self.assertEqual(costs["target_high_only_evaluation_cost_per_task_units"], 12 * HIGH_COST_UNITS)
         self.assertEqual(set(receipt["aggregate_metrics_macro_averaged_over_target_tasks"]), set(POLICY_IDS))
-        self.assertEqual(set(receipt["comparisons_vs_low_fidelity_only"]), set(POLICY_IDS) - {"low_fidelity_only"})
+        self.assertEqual(
+            set(receipt["comparisons_vs_low_fidelity_only"]),
+            set(POLICY_IDS) - {"low_fidelity_only", ABSTENTION_POLICY_ID},
+        )
         self.assertEqual(
             set(receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"]),
-            set(POLICY_IDS) - {"low_fidelity_only"},
+            set(POLICY_IDS) - {"low_fidelity_only", ABSTENTION_POLICY_ID},
         )
+        self.assertIn(ABSTENTION_POLICY_ID, receipt["policy_ids"])
         for policy in POLICY_IDS:
             self.assertEqual(
                 receipt["aggregate_metrics_macro_averaged_over_target_families"][policy]["family_count"], 8
