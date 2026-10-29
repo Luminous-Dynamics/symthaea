@@ -510,7 +510,7 @@ fn build(
         total_family_count: splits.len(),
         total_component_count: components.len(),
         independent_component_count_by_split: counts,
-        cross_split_component_count: cross_split_component_count,
+        cross_split_component_count,
         edge_counts,
         families: family_rows,
         components,
@@ -523,12 +523,29 @@ fn build(
         qualified_for_confirmatory_resampling,
         qualification_limitations: vec![
             if receipt_verified {
-                "Coverage receipt signatures were verified against caller-pinned methodology and trust-store digests; this attestation cannot mathematically prove reviewer competence or exhaustive discovery.".into()
+                concat!(
+                    "Coverage receipt signatures were verified against caller-pinned methodology ",
+                    "and trust-store digests; this attestation cannot mathematically prove reviewer ",
+                    "competence or exhaustive discovery."
+                )
+                .into()
             } else {
-                "Receipt bytes, reviewer trust-root bytes, and review-methodology bytes were not supplied and verified; the manifest remains unqualified.".into()
+                concat!(
+                    "Receipt bytes, reviewer trust-root bytes, and review-methodology bytes were not ",
+                    "supplied and verified; the manifest remains unqualified."
+                )
+                .into()
             },
-            "Unresolved non-dismissed hard links are joined; any cross-split component blocks qualification.".into(),
-            "Primary scorer and power planner must independently reverify the pinned receipt inputs and bind this exact manifest digest before confirmatory qualification.".into(),
+            concat!(
+                "Unresolved non-dismissed hard links are joined; any cross-split component ",
+                "blocks qualification."
+            )
+            .into(),
+            concat!(
+                "Primary scorer and power planner must independently reverify the pinned receipt ",
+                "inputs and bind this exact manifest digest before confirmatory qualification."
+            )
+            .into(),
         ],
     })
 }
@@ -540,7 +557,8 @@ fn main() -> Result<()> {
             concat!(
                 "usage: build_family_component_manifest <splits.json> <edges.json> ",
                 "<receipt.json|none> <trust-store.json|none> <review-methodology.md|none> ",
-                "<expected-trust-store-sha256|none> <expected-methodology-sha256|none> <manifest.json>"
+                "<expected-trust-store-sha256|none> ",
+                "<expected-methodology-sha256|none> <manifest.json>"
             )
         );
     }
@@ -552,14 +570,22 @@ fn main() -> Result<()> {
     let (partition_digest, families) = validate_splits(&split_doc)?;
     let independently_validated = coverage_receipt::validate_frozen_partition(&split_bytes)?;
     if independently_validated != families {
-        bail!("shared receipt verifier and component builder disagree on frozen family assignments");
+        bail!(
+            concat!(
+                "shared receipt verifier and component builder disagree on frozen family ",
+                "assignments"
+            )
+        );
     }
 
     let all_none = args[2..7].iter().all(|value| value == "none");
     let all_supplied = args[2..7].iter().all(|value| value != "none");
     if !all_none && !all_supplied {
         bail!(
-            "receipt, trust store, methodology, and both expected digests must be supplied together or all be none"
+            concat!(
+                "receipt, trust store, methodology, and both expected digests must be supplied ",
+                "together or all be none"
+            )
         );
     }
     let receipt_verified = if all_supplied {
@@ -608,7 +634,10 @@ fn main() -> Result<()> {
     fs::write(&args[7], serde_json::to_vec_pretty(&manifest)?)
         .with_context(|| format!("cannot write {}", args[7]))?;
     println!(
-        "PITB_COMPONENT_MANIFEST: qualification={} families={} components={} cross_split_components={} coverage={} receipt_verified={}",
+        concat!(
+            "PITB_COMPONENT_MANIFEST: qualification={} families={} components={} ",
+            "cross_split_components={} coverage={} receipt_verified={}"
+        ),
         manifest.qualification_status,
         manifest.total_family_count,
         manifest.total_component_count,
@@ -759,7 +788,8 @@ mod tests {
     #[test]
     fn ids_are_content_addressed() {
         let first = vec!["001".to_owned(), "002".to_owned()];
-        assert_eq!(component_id(&first), component_id(&first));
+        let same_members = first.clone();
+        assert_eq!(component_id(&first), component_id(&same_members));
         assert_ne!(
             component_id(&first),
             component_id(&["001".to_owned(), "003".to_owned()])
