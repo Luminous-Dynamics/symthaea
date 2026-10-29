@@ -8,6 +8,7 @@
   "required": [
     "schema_version",
     "status",
+    "candidate_dataset_kind",
     "candidate_split_sha256",
     "candidate_partition_digest_sha256",
     "eligibility_census_sha256",
@@ -105,6 +106,12 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "candidate_dataset_kind": {
+      "enum": [
+        "candidate_only",
+        "synthetic_fixture"
+      ]
     }
   },
   "$defs": {
