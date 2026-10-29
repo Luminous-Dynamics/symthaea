@@ -3452,6 +3452,76 @@ jobs:
               )
           PY
           echo "PITB_PINNED_SOURCE_INDEX_PASS: $upstream_sha"
+      - name: Validate signed coverage receipt contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          import os
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          base = root / "data/benchmarks/proof-insight-transfer-v0"
+          checks = [
+              (
+                  "component-coverage-receipt.schema.json",
+                  "fixtures/component-coverage-receipt.synthetic.json",
+              ),
+              (
+                  "coverage-reviewer-trust-store.schema.json",
+                  "fixtures/coverage-reviewer-trust-store.synthetic.json",
+              ),
+              (
+                  "coverage-receipt-verification-report.schema.json",
+                  "fixtures/coverage-receipt-verification-report.synthetic.json",
+              ),
+          ]
+          validators = {}
+          fixtures = {}
+          for schema_name, fixture_name in checks:
+              schema = json.loads((base / schema_name).read_text())
+              fixture = json.loads((base / fixture_name).read_text())
+              Draft202012Validator.check_schema(schema)
+              validator = Draft202012Validator(schema)
+              errors = sorted(validator.iter_errors(fixture), key=lambda error: list(error.path))
+              if errors:
+                  raise SystemExit(
+                      f"{fixture_name} fails {schema_name}: "
+                      + "; ".join(error.message for error in errors)
+                  )
+              validators[schema_name] = validator
+              fixtures[schema_name] = fixture
+
+          receipt = fixtures["component-coverage-receipt.schema.json"]
+          invalid_receipt = copy.deepcopy(receipt)
+          invalid_receipt["signatures"] = invalid_receipt["signatures"][:1]
+          if validators["component-coverage-receipt.schema.json"].is_valid(invalid_receipt):
+              raise SystemExit("receipt schema accepted fewer than two signatures")
+          invalid_receipt = copy.deepcopy(receipt)
+          invalid_receipt["unregistered_claim"] = True
+          if validators["component-coverage-receipt.schema.json"].is_valid(invalid_receipt):
+              raise SystemExit("receipt schema accepted an unknown property")
+
+          trust = fixtures["coverage-reviewer-trust-store.schema.json"]
+          invalid_trust = copy.deepcopy(trust)
+          invalid_trust["reviewers"][0]["role"] = "experiment_owner"
+          if validators["coverage-reviewer-trust-store.schema.json"].is_valid(invalid_trust):
+              raise SystemExit("trust-store schema accepted a non-auditor role")
+
+          report = fixtures["coverage-receipt-verification-report.schema.json"]
+          invalid_report = copy.deepcopy(report)
+          invalid_report["resampling_qualification"] = "qualified_for_confirmatory_resampling"
+          if validators["coverage-receipt-verification-report.schema.json"].is_valid(invalid_report):
+              raise SystemExit("receipt verifier report schema allowed signatures to authorize analysis")
+
+          print(
+              "PITB_SIGNED_COVERAGE_CONTRACTS_PASS: schemas=3 shape_fixtures=3 "
+              "negative_controls=4 qualification=requires_component_and_analyzer_validation"
+          )
+          PY
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
         with:
