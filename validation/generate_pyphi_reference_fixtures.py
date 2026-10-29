@@ -106,11 +106,13 @@ def _model_digest(
     reference_manifest_sha256 = hashlib.sha256(_canonical_json(model)).hexdigest()
     return model_sha256, evaluation_sha256, reference_manifest_sha256, model, model_bytes
 
-def _extract_measurements(substrate: Any, state: tuple[int, ...], formalism: str) -> dict[str, float]:
+def _extract_measurements(
+    pyphi_module: Any, substrate: Any, state: tuple[int, ...], formalism: str
+) -> dict[str, float]:
     analyses = {
-        "system-phi-s-A": pyphi.analyze(substrate, state=state, subset=(0,), formalism=formalism),
-        "system-phi-s-AB": pyphi.analyze(substrate, state=state, subset=(0, 1), formalism=formalism),
-        "system-phi-s-ABC": pyphi.analyze(substrate, state=state, subset=(0, 1, 2), formalism=formalism),
+        "system-phi-s-A": pyphi_module.analyze(substrate, state=state, subset=(0,), formalism=formalism),
+        "system-phi-s-AB": pyphi_module.analyze(substrate, state=state, subset=(0, 1), formalism=formalism),
+        "system-phi-s-ABC": pyphi_module.analyze(substrate, state=state, subset=(0, 1, 2), formalism=formalism),
     }
     ab = analyses["system-phi-s-AB"]
     values = {
@@ -177,7 +179,7 @@ def run(output_path: Path) -> dict[str, Any]:
     model_sha256, evaluation_sha256, reference_manifest_sha256, canonical_model, model_bytes = _model_digest(
         substrate, state, formalism
     )
-    measured = _extract_measurements(substrate, state, formalism)
+    measured = _extract_measurements(pyphi, substrate, state, formalism)
 
     comparisons = []
     for expected in fixture["quantities"]:
