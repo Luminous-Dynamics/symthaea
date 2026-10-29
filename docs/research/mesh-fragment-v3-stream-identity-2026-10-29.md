@@ -80,6 +80,8 @@ The full CSV includes SF7/SF9/SF12 and the exact frame-length arithmetic. This i
 - Verify a caller-owned output buffer matches Vec serialization and a short output is rejected without partial writes.
 - Confirm external AEAD-size accounting never exceeds 222 bytes.
 - Reject fragments from a different authenticated peer context, session generation or message sequence.
+- Explicitly preserve the negative control: if the exact peer + generation + sequence is reused for two different messages, framing alone can mix them; this is an upstream allocator failure that #8534 must prevent.
+- Accept sequence zero as a valid first message sequence while rejecting zero session generation.
 - Poison the assembly on a conflicting duplicate.
 - Reject V3 from the hardened legacy V1 parser.
 - Reject every single-bit mutation of one representative frame.
