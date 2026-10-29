@@ -1,0 +1,37 @@
+name: CMAQ-001 causal-memory trace scorer
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-001/**"
+      - ".github/workflows/cmaq-001.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-001/**"
+      - ".github/workflows/cmaq-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scorer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/cmaq-001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Test dependency-free scorer
+        run: cargo test --locked
+      - name: Score public smoke trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cargo run --quiet --locked -- score fixtures/answer-key-smoke.tsv fixtures/candidate-trace-smoke.tsv)"
+          printf '%s\n' "$report"
+          grep -F '"schema_version": "cmaq-001-report-v0.1"' <<< "$report"
+          grep -F '"gate_pass": true' <<< "$report"
