@@ -128,7 +128,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         arm_ids.append(arm["arm_id"])
     if len(arm_ids) != len(set(arm_ids)):
         raise ValueError("arm IDs must be unique")
-    if manifest["reference_arm"] not in set(arm_ids):
+    if not isinstance(manifest["reference_arm"], str) or manifest["reference_arm"] not in set(arm_ids):
         raise ValueError("reference_arm must identify one declared arm")
 
     bootstrap = manifest["bootstrap"]
@@ -164,13 +164,15 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             raise ValueError(f"{label} must be an object")
         _exact_keys(row, RESULT_KEYS, label)
         task_id, seed, arm_id = row["task_id"], row["seed"], row["arm_id"]
-        if task_id not in task_set or seed not in seed_set or arm_id not in arm_set:
+        if (not isinstance(task_id, str) or not isinstance(arm_id, str)
+                or type(seed) is not int or task_id not in task_set
+                or seed not in seed_set or arm_id not in arm_set):
             raise ValueError(f"{label} is outside the locked task/seed/arm inventory")
         cell = (task_id, seed, arm_id)
         if cell in observed_cells:
             raise ValueError(f"duplicate result cell {cell!r}")
         observed_cells.add(cell)
-        if row["outcome"] not in OUTCOMES:
+        if not isinstance(row["outcome"], str) or row["outcome"] not in OUTCOMES:
             raise ValueError(f"{label}.outcome must be pass, fail, or unresolved")
         _require_nonempty(row["run_id"], label + ".run_id")
         if row["run_id"] in run_ids:
@@ -194,7 +196,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             raise ValueError(f"{label}.expected_revision must be a lowercase 40-character commit SHA")
         if not isinstance(row["image_id"], str) or not IMAGE.fullmatch(row["image_id"]):
             raise ValueError(f"{label}.image_id must be an immutable sha256 image reference")
-        if row["network_mode"] not in NETWORK_MODES:
+        if not isinstance(row["network_mode"], str) or row["network_mode"] not in NETWORK_MODES:
             raise ValueError(f"{label}.network_mode is invalid")
         if not _is_number(row["cost_usd"]) or row["cost_usd"] < 0:
             raise ValueError(f"{label}.cost_usd must be finite and non-negative")
