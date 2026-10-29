@@ -1216,6 +1216,19 @@ mod tests {
     }
 
     #[test]
+    fn identical_content_aliases_across_splits_are_rejected() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        let bytes = fs::read(fixture.root.join("a.trace")).unwrap();
+        fs::write(fixture.root.join("e.trace"), &bytes).unwrap();
+        fixture.rows[4][4] = sha256_file(&fixture.root.join("e.trace")).unwrap();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("identical source bytes appear under distinct splits"));
+    }
+
+    #[test]
     fn identical_content_aliases_within_one_split_are_counted_not_rejected() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
