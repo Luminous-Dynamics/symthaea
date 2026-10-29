@@ -63,6 +63,7 @@ jobs:
           python3 tools/casting-benchmark/test_discrete_decision_voi.py
           python3 tools/casting-benchmark/test_forecast_validation.py
           python3 tools/casting-benchmark/test_forecast_event_journal.py
+          python3 tools/casting-benchmark/test_paired_benchmark_audit.py
 
           # End-to-end synthetic diagnostic: runner -> frozen selection/shift
           # manifests -> hash-checking adapter -> independent receipt evaluator.
