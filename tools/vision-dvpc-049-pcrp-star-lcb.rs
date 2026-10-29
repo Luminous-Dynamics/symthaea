@@ -22,7 +22,7 @@ const MU0: f64 = 0.25;
 const MU1: f64 = 0.75;
 const GOLDEN_SEED: u64 = 0x49_50_43_57_2A_01_10_29;
 const ROOT_ITERS: usize = 36;
-const BET_ITERS: usize = 32;
+const BET_GRID_STEPS: usize = 128;
 const EPS: f64 = 1.0e-10;
 const METHODS: [&str; 2] = ["pCRP_star", "Hoeffding_fixed_horizon"];
 
@@ -193,24 +193,12 @@ fn log_crp_wealth(values: &[f64], candidate_mean: f64, bet: f64) -> f64 {
     total
 }
 
-fn log_wealth_derivative(values: &[f64], candidate_mean: f64, bet: f64) -> f64 {
-    let cash_fraction = 1.0 - bet;
-    let mut total = 0.0;
-    for &y in values {
-        let denominator = cash_fraction * candidate_mean + bet * y;
-        if denominator <= 0.0 {
-            return if y < candidate_mean { f64::NEG_INFINITY } else { f64::INFINITY };
-        }
-        total += (y - candidate_mean) / denominator;
-    }
-    total
-}
-
-/// A conservative feasible-wealth witness for sup_{b in [0,1]} log CRP wealth.
+/// Monotone lower witness for sup_{b in [0,1]} log CRP wealth.
 ///
-/// Evaluating any feasible bet gives a lower bound on the supremum. Underestimating
-/// the supremum can only lower the inverted LCB; it must never be changed into an
-/// upper envelope, which could make the reported confidence bound anti-conservative.
+/// The candidate bet grid is fixed independently of candidate_mean. Each CRP
+/// log wealth is nonincreasing in candidate_mean, and the maximum over this fixed
+/// grid is therefore also nonincreasing. The grid maximum is no larger than the
+/// continuous supremum, so inversion remains conservative though possibly looser.
 fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, String> {
     if values.is_empty() || !candidate_mean.is_finite() || candidate_mean <= 0.0 {
         return Err("need a nonempty stream and a positive finite candidate mean".into());
@@ -224,50 +212,25 @@ fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, 
     }
     let mean = sum / values.len() as f64;
     if candidate_mean >= mean {
-        // The derivative at b=0 is nonpositive, so concavity makes b=0 optimal.
+        // For a nonnegative process, b=0 attains the exact supremum of log wealth.
         return Ok(0.0);
     }
 
-    let has_zero = values.iter().any(|&y| y == 0.0);
-    if !has_zero {
-        let derivative_at_one: f64 = values
-            .iter()
-            .map(|&y| (y - candidate_mean) / y)
-            .sum();
-        if derivative_at_one >= 0.0 {
-            let endpoint = log_crp_wealth(values, candidate_mean, 1.0);
-            let pad = 64.0 * f64::EPSILON * (1.0 + endpoint.abs() + values.len() as f64);
-            return Ok(endpoint - pad);
-        }
-    }
-
-    let mut left = 0.0;
-    let mut right = 1.0;
-    for _ in 0..BET_ITERS {
-        let mid = left + (right - left) * 0.5;
-        let derivative = log_wealth_derivative(values, candidate_mean, mid);
-        if derivative.is_nan() {
-            let witness = log_crp_wealth(values, candidate_mean, 0.5);
-            let pad = 64.0 * f64::EPSILON * (1.0 + witness.abs() + values.len() as f64);
-            return Ok(witness - pad);
-        }
-        if derivative > 0.0 {
-            left = mid;
-        } else {
-            right = mid;
-        }
-    }
-    let bet = left + (right - left) * 0.5;
-    let witness = log_crp_wealth(values, candidate_mean, bet);
-    if witness == f64::NEG_INFINITY {
-        return Ok(witness);
-    }
-    if !witness.is_finite() {
-        return Err("non-finite feasible log-wealth witness".into());
+    // b=0 is included, so best is nonnegative; the grid is fixed for every candidate mean.
+    let mut best = 0.0_f64;
+    for i in 1..=BET_GRID_STEPS {
+        let bet = i as f64 / BET_GRID_STEPS as f64;
+        best = best.max(log_crp_wealth(values, candidate_mean, bet));
     }
     let roundoff_pad =
-        64.0 * f64::EPSILON * (1.0 + witness.abs() + values.len() as f64);
-    Ok(witness - roundoff_pad)
+        64.0 * f64::EPSILON * (1.0 + best.abs() + values.len() as f64);
+    // Returning zero when the grid maximum is numerically indistinguishable from zero
+    // preserves monotonicity at the empirical-mean boundary and remains a valid witness.
+    if best <= roundoff_pad {
+        Ok(0.0)
+    } else {
+        Ok(best - roundoff_pad)
+    }
 }
 
 /// pCRP-star lower confidence bound from Ryu et al. (COLT 2025), Eq. (3.3)-(3.5).
@@ -420,7 +383,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
     let _ = writeln!(out, "CONFIG\tpolicies\t{}", POLICY_P1.len());
     let _ = writeln!(out, "CONFIG\tseed\t{GOLDEN_SEED}");
     let _ = writeln!(out, "CONFIG\thorizons\t{}", horizons.iter().map(usize::to_string).collect::<Vec<_>>().join(","));
-    let _ = writeln!(out, "CONFIG\tbet_optimizer\tderivative_root_plus_concave_tangent_upper_envelope");
+    let _ = writeln!(out, "CONFIG\tbet_optimizer\tfixed_bet_grid_129_point_lower_witness");
     let _ = writeln!(out, "CONFIG\treward_means\ta0={MU0:.4},a1={MU1:.4}");
 
     for (scenario_index, scenario) in SCENARIOS.iter().enumerate() {
