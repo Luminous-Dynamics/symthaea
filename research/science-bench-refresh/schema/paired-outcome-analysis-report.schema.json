@@ -36,6 +36,12 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
+    "nonzero_digest": {
+      "allOf": [
+        { "$ref": "#/$defs/digest" },
+        { "not": { "pattern": "^0{64}$" } }
+      ]
+    },
     "optional_number": {
       "oneOf": [
         { "type": "number" },
@@ -198,7 +204,7 @@
           ]
         },
         "dependence_justification_sha256": {
-          "$ref": "#/$defs/digest"
+          "$ref": "#/$defs/nonzero_digest"
         },
         "assigned_pair_count": { "type": "integer", "minimum": 0 },
         "contrast_results": {
