@@ -53,12 +53,16 @@ impl SplitMix64 {
 struct Scenario {
     name: &'static str,
     logger_p1: f64,
+    reward0: f64,
+    reward1: f64,
 }
 
-const SCENARIOS: [Scenario; 3] = [
-    Scenario { name: "healthy_logger", logger_p1: 0.50 },
-    Scenario { name: "weak_overlap_logger", logger_p1: 0.99 },
-    Scenario { name: "zero_support_logger", logger_p1: 1.00 },
+const SCENARIOS: [Scenario; 5] = [
+    Scenario { name: "healthy_clear_margin", logger_p1: 0.50, reward0: 0.25, reward1: 0.75 },
+    Scenario { name: "weak_overlap_clear_margin", logger_p1: 0.99, reward0: 0.25, reward1: 0.75 },
+    Scenario { name: "healthy_small_margin", logger_p1: 0.50, reward0: 0.49, reward1: 0.51 },
+    Scenario { name: "healthy_policy_tie", logger_p1: 0.50, reward0: 0.50, reward1: 0.50 },
+    Scenario { name: "zero_support_logger", logger_p1: 1.00, reward0: 0.25, reward1: 0.75 },
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -73,8 +77,8 @@ fn seed_for(rep: usize, scenario_index: usize) -> u64 {
         ^ (scenario_index as u64).wrapping_mul(0xE703_7ED1_A0B4_28DB)
 }
 
-fn true_value(target_p1: f64) -> f64 {
-    (1.0 - target_p1) * MU0 + target_p1 * MU1
+fn true_value(target_p1: f64, reward0: f64, reward1: f64) -> f64 {
+    (1.0 - target_p1) * reward0 + target_p1 * reward1
 }
 
 fn support_complete(logger_p1: f64, target_p1: f64) -> bool {
@@ -115,7 +119,7 @@ fn draw_stream(scenario: Scenario, n: usize, rng: &mut SplitMix64) -> Vec<Observ
     let mut out = Vec::with_capacity(n);
     for _ in 0..n {
         let action = if rng.unit() < scenario.logger_p1 { 1 } else { 0 };
-        let mean = if action == 1 { MU1 } else { MU0 };
+        let mean = if action == 1 { scenario.reward1 } else { scenario.reward0 };
         let reward = if rng.unit() < mean { 1.0 } else { 0.0 };
         out.push(Observation { action, reward });
     }
@@ -542,7 +546,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
     let _ = writeln!(out, "CONFIG\tseed\t{GOLDEN_SEED}");
     let _ = writeln!(out, "CONFIG\thorizons\t{}", horizons.iter().map(usize::to_string).collect::<Vec<_>>().join(","));
     let _ = writeln!(out, "CONFIG\tbet_optimizer\tfixed_bet_grid_129_point_lower_witness");
-    let _ = writeln!(out, "CONFIG\treward_means\ta0={MU0:.4},a1={MU1:.4}");
+    let _ = writeln!(out, "CONFIG\tbet_grid_points\t{}", BET_GRID_STEPS + 1);
 
     for (scenario_index, scenario) in SCENARIOS.iter().enumerate() {
         let identified = POLICY_P1
@@ -551,8 +555,8 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
         let status = if identified { "IDENTIFIED" } else { "NOT_IDENTIFIED_ZERO_SUPPORT" };
         let _ = writeln!(
             out,
-            "FIXTURE\t{}\tstatus\t{}\tlogger_p1={:.6}\t-\t-",
-            scenario.name, status, scenario.logger_p1
+            "FIXTURE\t{}\tstatus\t{}\tlogger_p1={:.6}\treward0={:.4}\treward1={:.4}",
+            scenario.name, status, scenario.logger_p1, scenario.reward0, scenario.reward1
         );
         if !identified {
             let _ = writeln!(
@@ -568,12 +572,10 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
         let mut paired = vec![PairedAggregate::default(); horizons.len()];
         // Two tails across M policies: total familywise error budget is at most ALPHA.
         let delta_per_tail = ALPHA / (2.0 * POLICY_P1.len() as f64);
-        let true_values: Vec<f64> = POLICY_P1.iter().map(|&p| true_value(p)).collect();
+        let true_values: Vec<f64> = POLICY_P1.iter()
+            .map(|&p| true_value(p, scenario.reward0, scenario.reward1))
+            .collect();
         let oracle_value = true_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-        let oracle_index = true_values
-            .iter()
-            .position(|v| (*v - oracle_value).abs() <= EPS)
-            .unwrap();
 
         for rep in 0..replicates {
             let mut rng = SplitMix64::new(seed_for(rep, scenario_index));
@@ -643,12 +645,12 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     if familywise_covered {
                         ag.familywise_covered += 1;
                     }
-                    if chosen == oracle_index {
+                    if (true_values[chosen] - oracle_value).abs() <= EPS {
                         ag.top1 += 1;
                     }
                     if let Some(winner) = certified_winner {
                         ag.winner_certificates += 1;
-                        if winner != oracle_index {
+                        if true_values[winner] + EPS < oracle_value {
                             ag.false_certificates += 1;
                         }
                     }
@@ -665,10 +667,10 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     ag.selected_lcb_gap.push(true_values[chosen] - lower_bounds[chosen]);
                     let is_winner_certificate = certified_winner.is_some();
                     let is_false_certificate = certified_winner
-                        .map(|winner| winner != oracle_index)
+                        .map(|winner| true_values[winner] + EPS < oracle_value)
                         .unwrap_or(false);
                     replicate_method_metrics[method_index] = Some(TrialSummary {
-                        top1: if chosen == oracle_index { 1.0 } else { 0.0 },
+                        top1: if (true_values[chosen] - oracle_value).abs() <= EPS { 1.0 } else { 0.0 },
                         regret,
                         winner_certificate: if is_winner_certificate { 1.0 } else { 0.0 },
                         false_certificate: if is_false_certificate { 1.0 } else { 0.0 },
@@ -933,7 +935,7 @@ mod tests {
                 let pi = [1.0 - target, target];
                 let expectation = h[0] * (pi[0] / h[0]) * MU0
                     + h[1] * (pi[1] / h[1]) * MU1;
-                close(expectation, true_value(target), 1.0e-12);
+                close(expectation, true_value(target, MU0, MU1), 1.0e-12);
             }
         }
     }
@@ -954,7 +956,7 @@ mod tests {
                 let pi = [1.0 - target, target];
                 let expectation = h[0] * (pi[0] / h[0]) * (1.0 - MU0)
                     + h[1] * (pi[1] / h[1]) * (1.0 - MU1);
-                close(expectation, 1.0 - true_value(target), 1.0e-12);
+                close(expectation, 1.0 - true_value(target, MU0, MU1), 1.0e-12);
             }
         }
     }
