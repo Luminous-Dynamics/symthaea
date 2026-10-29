@@ -221,7 +221,15 @@ Candidate episode: a municipality commits to repair water infrastructure at a de
 
 Possible outcomes include restoration time, hours of reliable supply, repeat failures, cost, geographic access, and unresolved complaints. No single indicator should determine success.
 
-Use public retrospective records and synthetic attack fixtures first. The source-selection audit must establish whether records are sufficiently complete, time-aligned, legally usable, and independently corroborable before a municipality or date range is named. If suitable water data are not available, use another measurable service domain rather than weakening the evidence standard.
+Use public retrospective records and synthetic attack fixtures first. Initial source discovery (checked 29 October 2026) found three plausible starting points:
+
+- **National Treasury eTender Transparency Portal** — https://data.etenders.gov.za/ publishes monthly procurement data in OCDS-compatible CSV, JSON, and Excel formats from May 2021; the portal states a CC BY 4.0 license for these downloads. The portal and publication policy explicitly warn that the published data cover only a subset of public procurement captured by eTender, so absence from the export cannot be interpreted as proof that a tender or contract did not exist.
+- **National Treasury Municipal Finance Data / Municipal Money API** — https://municipaldata.treasury.gov.za/ covers financial years 2008–09 through 2025–26 for 292 municipalities, with more than 85 million reported facts. The portal says the data are still being checked for completeness and integrity and that values are only as complete/trustworthy as municipal submissions. These are reported financial records, not an independent truth oracle for service delivery.
+- **Department of Water and Sanitation NIWIS** — https://www.dws.gov.za/niwis2/ exposes dashboard themes including Water Services, Sanitation Services, water quantity, and water quality. Availability of stable series, raw downloads, location/time granularity, and lawful reuse must be verified before treating a dashboard as a machine-readable dataset.
+
+The first data-audit deliverable should be a versioned coverage matrix: source and snapshot date; municipality and period coverage; source fields and missingness; persistent identifiers and join rates; publication/correction history; measurement units and definitions; frequency and lag; license and privacy constraints; and independent corroboration status. Manually sample records against original tender documents, published municipal reports, and independent measurements before selecting cases.
+
+Do not name a municipality or date range until coverage rules and case-selection criteria are frozen. Do not merge finance, procurement, and service-outcome records merely because their municipality names match; establish temporal and identifier alignment and retain unresolved joins as unknown. The procurement source is explicitly incomplete, the municipal-finance source is undergoing verification, and the water-service source's export/coverage properties remain unverified. If suitable water data are not available, use another measurable service domain rather than weakening the evidence standard.
 
 Pilot rules:
 
