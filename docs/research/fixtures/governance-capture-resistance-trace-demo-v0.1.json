@@ -4,7 +4,7 @@
   "trace_id": "public-demo-six-gates-v1",
   "recorder_id": "synthetic-demo-recorder-not-authenticated",
   "capture_profile_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "fixture_sha256": "09d8c41eb33e2a6dcd3e190235e64dcc7811702e340f712b5e9c3c62059a3094",
+  "fixture_sha256": "e1b7599cb7f3631b59eae41a1b2608cd776833cc786d53d1cb047a60985556be",
   "cases": [
     {
       "case_id": "GCRB-A01",
