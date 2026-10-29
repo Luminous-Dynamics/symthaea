@@ -271,7 +271,7 @@ Track answer/task quality against end-to-end latency, memory footprint, context 
 **Research question:** can the system return better-supported answers and actions at lower latency/cost by spending retrieval effort only where additional evidence changes the decision?
 
 ## Counterfactual fixture validator (new executable structural seam)
-Recent adjacent work changes the experimental target in a useful way. [MemCalib (arXiv:2609.24259)](https://arxiv.org/abs/2609.24259) labels each memory atom's target influence as Ignore, Bound or Control and measures over-use separately from under-use; its authors report that optimization can improve one direction while worsening the other. [DynamicMem (arXiv:2606.22877)](https://arxiv.org/abs/2606.22877) adds multi-timescale profile changes, causally grounded cross-application behavior and quarterly checkpoints; it reports that more than 93% of its observed failures traced to memory retrieval rather than answer generation. These are published claims for their own evaluation settings, not results for Symthaea.
+Recent adjacent work changes the experimental target in a useful way. [MemCalib (arXiv:2609.24259)](https://arxiv.org/abs/2609.24259) labels each memory atom's target influence as Ignore, Bound or Control and measures over-use separately from under-use; its authors report that optimization can improve one direction while worsening the other. [DynamicMem (arXiv:2606.22877)](https://arxiv.org/abs/2606.22877) adds multi-timescale profile changes, causally grounded cross-application behavior and quarterly checkpoints; it reports that more than 93% of its observed failures traced to memory retrieval rather than answer generation. These are published claims for their own evaluation settings, not results for Symthaea. [MemOps (arXiv:2607.12893)](https://arxiv.org/abs/2607.12893) provides a complementary lifecycle-operation benchmark: each event records trigger, target, scope, state transition, and supporting evidence, with probes for remembering, forgetting, updating, reflecting, and operation sequences. Its main contribution for Broca is a diagnostic path beyond final-answer accuracy: evaluate whether the memory state transition was correct before measuring answer quality. The paper reports ordered memory-state trajectory failures across evaluated systems; its results are not Symthaea measurements.
 
 The next memory-use experiment should pair evidence sufficiency with an atom-ablation audit: for each labeled atom, compare the same frozen query/prompt with and without that atom. Test whether Ignore atoms have no material answer-specific footprint, Bound atoms contribute only locally, and Control atoms actually affect required claims/constraints. Report over-use, under-use, answerability/coverage and retrieval failures separately. This is a new evaluation arm, not a current model capability or a performance claim.
 
@@ -279,6 +279,20 @@ The next memory-use experiment should pair evidence sufficiency with an atom-abl
 The Rust module `crates/domains/symthaea-broca/src/counterfactual_evidence_audit.rs` and CLI `broca-counterfactual-audit` define a deterministic input-fixture validator. The current synthetic corpus contains 10 pairs / 20 cases across polarity, temporal validity, entity binding, scope, source dependence, missing requirements, ordered transitions, correction updates, qualifier context, and memory influence (Ignore/Bound/Control target levels). The evaluator-only labels are stored separately under `tests/fixtures/evaluator-only/`.
 
 The validator checks the pinned schema, unique IDs, explicit scopes/entities/source families, RFC3339 timestamps, allowed mutation families/relations, family-specific mutation kinds/paths, forbidden evaluator-only keys, and exact agreement between declared and observed evidence diffs. The memory-influence pair supplies a positive atom-level Ignore/Control label fixture inspired by MemCalib; label validation only checks schema and evidence identity, not actual model behavior. It also exposes a runtime projection containing only query, as-of timestamp, and evidence, excluding pair/mutation metadata. Tests link each gold-label pair back to its exact input pair and require every case to have one label.
+
+The offline scorer is now exposed as `broca-memory-influence-score`. It consumes three distinct inputs: actual reader ablation observations, the exact input fixture corpus, and evaluator-only labels. Every observation pins the input fixture SHA-256, prompt SHA-256, tokenizer SHA-256, reader revision, and system commit SHA; the scorer recomputes the fixture digest and validates case/evidence identity before scoring. It compares structured material fields (stable claim/action/decision paths) and emits separate over-use and under-use rates for Ignore, Bound, and Control. It does not use free-form answer-string similarity and does not claim semantic entailment.
+
+Run from the workspace root once an adapter has emitted real observations:
+
+```sh
+cargo run -p symthaea-broca --bin broca-memory-influence-score -- \
+  path/to/observations.jsonl \
+  crates/domains/symthaea-broca/tests/fixtures/counterfactual-evidence-audit-v1.jsonl \
+  crates/domains/symthaea-broca/tests/fixtures/evaluator-only/counterfactual-evidence-audit-labels-v1.jsonl
+cargo test -p symthaea-broca counterfactual_evidence_audit
+```
+
+The Rust scoring tests construct synthetic outputs to validate the metric mechanics (including deliberate over-use and under-use cases); those synthetic rates are not model measurements. The reader adapter and actual ablation run remain to be implemented.
 
 Run from the workspace root:
 
