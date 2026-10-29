@@ -123,8 +123,8 @@ def run_scenario(name, scenario_class, pre_p, post_p, trials, horizon, change_af
         if count_detected:
             delays = first_alarm[detected] - change_after
             row["mean_post_change_delay"] = float(delays.mean())
-            row["median_post_change_delay"] = float(np.quantile(delays, 0.50, method="higher"))
-            row["p90_post_change_delay"] = float(np.quantile(delays, 0.90, method="higher"))
+            row["median_post_change_delay"] = float(np.quantile(delays, 0.50))
+            row["p90_post_change_delay"] = float(np.quantile(delays, 0.90))
     return row
 
 
