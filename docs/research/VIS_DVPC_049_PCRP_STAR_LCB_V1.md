@@ -33,13 +33,13 @@ The code includes endpoint cases, zero rewards, non-finite / negative inputs, pr
 - Weak-overlap fixed logger: P(A=1)=0.99.
 - Structural zero-support logger: P(A=1)=1; target policies put positive mass on action zero, so results must be suppressed.
 - Same logged stream and seed schedule for all candidates and both comparison methods.
-- Horizons 64, 256 and 512; 32 replicates in the initial deterministic engineering sweep. This is a smoke-scale engineering panel, not enough to establish tight statistical performance comparisons.
+- Horizons 64, 256 and 512; 1,024 deterministic paired replicates per identified scenario. This is a materially stronger simulation panel than the earlier 32-replicate smoke pilot, but it remains synthetic and cannot establish external validity.
 
 Methods:
 1. Fixed-grid pCRP-star-LCB witness with `delta_tail = 0.05 / (2M)` for each policy and each tail. The UCB follows Appendix B.6 of the paper: build the nonnegative complement score `w(a)(1-r)` with expectation `1 - V(pi)` and use `U(pi) = 1 - LCB(w(1-r))`. This is the pCRP-star variant of PUB-style pessimistic selection, with a conservative fixed-bet-grid approximation that may widen the bound.
 2. A bounded-reward Hoeffding interval with the same two-sided familywise allocation and a known importance-score range (fixed-horizon comparator, not advertised as anytime-valid).
 
-Metrics include familywise two-sided interval coverage, top-1 policy selection accuracy, winner-certificate rate, unconditional and conditional false-certificate probability, reversed-interval candidate rate, mean interval width, plausible-winner set size, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Monte Carlo standard errors, and elapsed calculation time. Timing rows are excluded from deterministic replay comparisons.
+Metrics include familywise two-sided interval coverage, top-1 policy selection accuracy, winner-certificate rate, unconditional and conditional false-certificate probability, reversed-interval candidate rate, mean interval width, plausible-winner set size, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Wilson 95% intervals for empirical rates, and paired pCRP-star-minus-Hoeffding differences with standard errors for accuracy, regret, certification and width. Exact score-frequency compression makes the pCRP bet-grid evaluation much cheaper on this finite-support DGP without changing the sample stream or objective. Timing rows are excluded from deterministic replay comparisons.
 
 ## Acceptance and limits
 
