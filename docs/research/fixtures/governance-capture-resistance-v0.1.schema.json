@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/fixtures/governance-capture-resistance-v0.1.schema.json",
+  "title": "Governance Capture-Resistance Benchmark public synthetic fixture",
+  "description": "Structural schema for public development cases only. Passing this schema is not benchmark qualification, source-truth verification, or an adjudication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_name",
+    "version",
+    "partition",
+    "qualification_status",
+    "evidence_status",
+    "purpose",
+    "integrity",
+    "expected_case_count",
+    "expected_attack_count",
+    "expected_negative_control_count",
+    "hard_gates",
+    "provisional_targets",
+    "required_reporting",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "gcrb-synthetic-case-manifest-v0.1"
+    },
+    "benchmark_id": {
+      "const": "GOV-CAP-001"
+    },
+    "benchmark_name": {
+      "const": "Governance Capture-Resistance Benchmark"
+    },
+    "version": {
+      "const": "0.1"
+    },
+    "partition": {
+      "const": "public_development"
+    },
+    "qualification_status": {
+      "const": "not_qualified"
+    },
+    "evidence_status": {
+      "const": "synthetic_only"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash_algorithm",
+        "manifest_digest",
+        "digest_note"
+      ],
+      "properties": {
+        "hash_algorithm": {
+          "const": "sha256"
+        },
+        "manifest_digest": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(sha256:)?[0-9a-fA-F]{64}$"
+            }
+          ]
+        },
+        "digest_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "expected_case_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "expected_attack_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expected_negative_control_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "provisional_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic_tamper_detection",
+        "synthetic_attack_macro_recall_min",
+        "synthetic_per_family_recall_min",
+        "benign_control_false_high_severity_escalation_max",
+        "qualification_status",
+        "sample_warning"
+      ],
+      "properties": {
+        "deterministic_tamper_detection": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "synthetic_attack_macro_recall_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "synthetic_per_family_recall_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "benign_control_false_high_severity_escalation_max": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "qualification_status": {
+          "const": "provisional_target_not_result"
+        },
+        "sample_warning": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "required_reporting": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "master_seed",
+        "parameterized_control_count",
+        "algorithm",
+        "known_answers_public"
+      ],
+      "properties": {
+        "name": {
+          "const": "gcrb-parameterized-control-generator"
+        },
+        "version": {
+          "const": "0.1"
+        },
+        "master_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parameterized_control_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "algorithm": {
+          "const": "splitmix64-v1"
+        },
+        "known_answers_public": {
+          "const": true
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "class",
+          "family",
+          "severity",
+          "seed",
+          "scenario",
+          "oracle_expected_disposition",
+          "required_behaviors",
+          "forbidden_behaviors",
+          "data_status",
+          "public_known_answer"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "attack",
+              "negative_control"
+            ]
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "oracle_expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "forbidden_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "data_status": {
+            "const": "synthetic"
+          },
+          "public_known_answer": {
+            "const": true
+          },
+          "parameters": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}
