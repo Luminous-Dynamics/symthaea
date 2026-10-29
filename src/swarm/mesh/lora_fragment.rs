@@ -168,11 +168,24 @@ impl LoRaFragment {
         let flags = buf[5];
         let checksum = u16::from_le_bytes([buf[6], buf[7]]);
 
-        // Sanity checks
-        if total_fragments == 0 || fragment_index >= total_fragments {
+        // Fail closed on unknown flags. This also prevents versioned frames
+        // from being ambiguously interpreted as legacy 8-byte-header frames.
+        if flags & !FLAG_FEC != 0 {
             return None;
         }
-        if payload_len as usize > PAYLOAD_SIZE {
+
+        // The protocol always has at least one data fragment plus parity.
+        if total_fragments < 2 || fragment_index >= total_fragments {
+            return None;
+        }
+        let is_final_index = fragment_index == total_fragments - 1;
+        if (flags & FLAG_FEC != 0) != is_final_index {
+            return None;
+        }
+        if payload_len == 0 || payload_len as usize > PAYLOAD_SIZE {
+            return None;
+        }
+        if is_final_index && payload_len as usize != PAYLOAD_SIZE {
             return None;
         }
         if buf.len() < HEADER_SIZE + payload_len as usize {
@@ -352,27 +365,74 @@ impl FragmentAssembler {
         }
     }
 
-    /// Feed a received fragment. Returns `true` when the payload is reconstructable.
-    pub fn feed(&mut self, frag: &LoRaFragment) -> bool {
-        if frag.thought_id != self.thought_id {
+    fn layout_is_valid(&self) -> bool {
+        if self.total_fragments < 2 || self.expected_payload_size == 0 {
             return false;
         }
-        if frag.fragment_index >= self.total_fragments {
+        let Some(rounded_size) = self
+            .expected_payload_size
+            .checked_add(PAYLOAD_SIZE - 1)
+        else {
+            return false;
+        };
+        let expected_data_count = rounded_size / PAYLOAD_SIZE;
+        expected_data_count > 0
+            && expected_data_count <= 254
+            && self.data_count as usize == expected_data_count
+            && self.total_fragments as usize == expected_data_count + 1
+    }
+
+    /// Feed a received fragment. Returns true when the payload is reconstructable.
+    /// Invalid shape/metadata is rejected before any assembler state advances.
+    pub fn feed(&mut self, frag: &LoRaFragment) -> bool {
+        if !self.layout_is_valid()
+            || frag.thought_id != self.thought_id
+            || frag.total_fragments != self.total_fragments
+            || frag.flags & !FLAG_FEC != 0
+            || frag.payload_len == 0
+            || frag.payload_len as usize > PAYLOAD_SIZE
+            || frag.compute_checksum() != frag.checksum
+        {
             return false;
         }
 
         let idx = frag.fragment_index as usize;
+        if idx >= self.received.len() {
+            return false;
+        }
+        if frag.is_fec() != (idx == self.data_count as usize) {
+            return false;
+        }
 
-        // Duplicate — ignore but report current status
+        let expected_len = if frag.is_fec() || idx + 1 < self.data_count as usize {
+            PAYLOAD_SIZE
+        } else {
+            let Some(prefix_len) = (self.data_count as usize - 1).checked_mul(PAYLOAD_SIZE)
+            else {
+                return false;
+            };
+            let Some(last_len) = self.expected_payload_size.checked_sub(prefix_len) else {
+                return false;
+            };
+            last_len
+        };
+        if expected_len == 0
+            || expected_len > PAYLOAD_SIZE
+            || frag.payload_len as usize != expected_len
+        {
+            return false;
+        }
+
+        // Duplicate — ignore but report current status.
         if self.received[idx] {
             return self.is_complete();
         }
 
         self.received[idx] = true;
-
         if frag.is_fec() {
             self.fec = Some(frag.payload);
         } else {
+            // Index/FEC consistency above ensures idx is a valid data slot.
             self.fragments[idx] = Some(frag.payload);
             self.payload_lens[idx] = frag.payload_len;
         }
@@ -382,22 +442,21 @@ impl FragmentAssembler {
 
     /// Whether the payload can be fully reconstructed.
     pub fn is_complete(&self) -> bool {
-        let data_received = self.received[..self.data_count as usize]
-            .iter()
-            .filter(|&&r| r)
-            .count();
+        if !self.layout_is_valid() {
+            return false;
+        }
         let data_count = self.data_count as usize;
-        let has_fec = self.fec.is_some();
+        let data_received = self.received[..data_count]
+            .iter()
+            .filter(|&&received| received)
+            .count();
 
-        // All data fragments present
+        // All data fragments present.
         if data_received == data_count {
             return true;
         }
-        // Exactly one missing + FEC available → recoverable
-        if data_received == data_count - 1 && has_fec {
-            return true;
-        }
-        false
+        // Exactly one missing + FEC available -> recoverable.
+        data_received + 1 == data_count && self.fec.is_some()
     }
 
     /// Number of fragments not yet received.
@@ -428,64 +487,58 @@ impl FragmentAssembler {
                 .any(|&r| !r)
     }
 
-    /// Reconstruct the original payload. Returns `None` if insufficient fragments.
+    /// Reconstruct the original payload. Returns None on insufficient or inconsistent input.
     pub fn assemble(&self) -> Option<Vec<u8>> {
         if !self.is_complete() {
             return None;
         }
 
         let data_count = self.data_count as usize;
+        let missing_idx = self.received[..data_count]
+            .iter()
+            .position(|&received| !received);
 
-        // Find the missing data fragment index (if any)
-        let missing_idx = self.received[..data_count].iter().position(|&r| !r);
-
-        // Recover the missing fragment via XOR
-        let recovered: Option<[u8; PAYLOAD_SIZE]> = missing_idx.map(|missing| {
-            let fec = self
-                .fec
-                .as_ref()
-                .expect("FEC required when data fragment missing");
-            let mut recovered = *fec;
+        let recovered = if let Some(missing) = missing_idx {
+            let mut recovered = *self.fec.as_ref()?;
             for i in 0..data_count {
-                if i != missing {
-                    let frag = self.fragments[i].as_ref().expect("data fragment present");
-                    for (r, &f) in recovered.iter_mut().zip(frag.iter()) {
-                        *r ^= f;
-                    }
+                if i == missing {
+                    continue;
+                }
+                let frag = self.fragments.get(i)?.as_ref()?;
+                for (dst, &src) in recovered.iter_mut().zip(frag.iter()) {
+                    *dst ^= src;
                 }
             }
-            recovered
-        });
+            Some(recovered)
+        } else {
+            None
+        };
 
-        // Assemble the full payload
         let mut payload = Vec::with_capacity(self.expected_payload_size);
         for i in 0..data_count {
-            let frag_data = if Some(i) == missing_idx {
-                recovered
-                    .as_ref()
-                    .expect("FEC recovery must produce data for missing fragment")
+            let frag_data: &[u8; PAYLOAD_SIZE] = if Some(i) == missing_idx {
+                recovered.as_ref()?
             } else {
-                self.fragments[i]
-                    .as_ref()
-                    .expect("non-missing fragment must be present")
+                self.fragments.get(i)?.as_ref()?
             };
 
             let len = if Some(i) == missing_idx {
-                // Recovered fragment: compute its length from the expected total
-                if i < data_count - 1 {
+                if i + 1 < data_count {
                     PAYLOAD_SIZE
                 } else {
-                    // Last data fragment — infer from expected payload size
-                    self.expected_payload_size - (data_count - 1) * PAYLOAD_SIZE
+                    let prefix_len = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
+                    self.expected_payload_size.checked_sub(prefix_len)?
                 }
             } else {
-                self.payload_lens[i] as usize
+                usize::from(*self.payload_lens.get(i)?)
             };
-
+            if len == 0 || len > PAYLOAD_SIZE {
+                return None;
+            }
             payload.extend_from_slice(&frag_data[..len]);
         }
 
-        Some(payload)
+        (payload.len() == self.expected_payload_size).then_some(payload)
     }
 }
 
