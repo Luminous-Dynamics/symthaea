@@ -41,9 +41,9 @@ The Rust unit suite contains 13 tests covering identity preservation, one locali
 
 Run the fixture-only conformance suite with:
 
-\`\`\`bash
+```bash
 cargo run --locked -p symthaea-muse --example mel_mr_eval_006_conformance
-\`\`\`
+```
 
 The runner emits JSON for eight predeclared cases and exits non-zero if any expected verdict is not reproduced:
 
