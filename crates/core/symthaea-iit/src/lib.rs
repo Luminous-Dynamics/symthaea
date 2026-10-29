@@ -850,4 +850,27 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn matches_published_pyphi_state_by_node_tpm_ordering() {
+        // The canonical two-node table in PyPhi's conventions documentation:
+        // states are 00, 10, 01, 11 because unit 0 is the least-significant bit.
+        let model = BinaryCausalModel::new(
+            2,
+            vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            vec![true; 4],
+        ).unwrap();
+        assert_eq!(model.probability_next_one(&[false, false], 0).unwrap(), 0.1);
+        assert_eq!(model.probability_next_one(&[true, false], 0).unwrap(), 0.3);
+        assert_eq!(model.probability_next_one(&[false, true], 0).unwrap(), 0.5);
+        assert_eq!(model.probability_next_one(&[true, true], 1).unwrap(), 0.8);
+    }
+
+    #[test]
+    fn rejects_dense_models_above_representation_limit_before_allocation() {
+        assert!(matches!(
+            BinaryCausalModel::new(MAX_DENSE_UNITS + 1, vec![], vec![]),
+            Err(ModelError::InvalidUnitCount { .. })
+        ));
+    }
+
 }
