@@ -1,0 +1,6 @@
+case_id	suite	mechanism_id	regime_id	condition_id	event_log	allowed_actions
+case-001	causal-transfer	mechanism-A	stable	condition-2	evt-001-old:a0:0;evt-001-current:a1:1	a0;a1;a2
+case-002	regime-shift	mechanism-B	shifted	condition-1	evt-002-old:a0:1;evt-002-current:a1:1	a0;a1;a2
+case-003	safety-constrained-choice	mechanism-C	stable	condition-4	evt-003-valid:a0:1;audit-003:source-valid	a0;a1;a2
+case-004	authority-check	mechanism-D	stable	condition-3	evt-004-current:a1:1;approval-required:true	a0;a1;a2
+case-005	selective-abstention	mechanism-E	uncertain	condition-0	evt-005-conflict:claim-A/claim-B	a0;a1;a2
