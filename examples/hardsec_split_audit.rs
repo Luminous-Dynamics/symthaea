@@ -129,7 +129,7 @@ fn parse_args() -> Result<Option<(PathBuf, PathBuf)>, String> {
                 println!(
                     "HARDSEC-001 split-manifest audit\n\n\
                      Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT\n\n\
-                     Requires a strict 13-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."
+                     Requires a strict 15-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."
                 );
                 return Ok(None);
             }
@@ -151,8 +151,12 @@ fn parse_args() -> Result<Option<(PathBuf, PathBuf)>, String> {
 }
 
 fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSummary, String> {
-    let root = fs::canonicalize(dataset_root)
-        .map_err(|error| format!("cannot resolve dataset root {}: {error}", dataset_root.display()))?;
+    let root = fs::canonicalize(dataset_root).map_err(|error| {
+        format!(
+            "cannot resolve dataset root {}: {error}",
+            dataset_root.display()
+        )
+    })?;
     if !fs::metadata(&root)
         .map_err(|error| format!("cannot inspect dataset root {}: {error}", root.display()))?
         .is_dir()
@@ -592,9 +596,39 @@ mod tests {
     #[test]
     fn valid_program_holdout_passes() {
         let mut fixture = Fixture::new();
-        fixture.add_row("s-train", "a", "program-a", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
-        fixture.add_row("s-val", "b", "program-b", "run-b", "family-b", "board-a", "program_holdout", "validation", "benign");
-        fixture.add_row("s-test", "c", "program-c", "run-c", "family-c", "board-a", "program_holdout", "test", "attack");
+        fixture.add_row(
+            "s-train",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
         let result = fixture.audit().expect("valid manifest should pass");
         assert_eq!(result.samples, 3);
         assert_eq!(result.artifacts, 3);
@@ -603,21 +637,111 @@ mod tests {
     #[test]
     fn same_program_cannot_cross_splits() {
         let mut fixture = Fixture::new();
-        fixture.add_row("s-train", "a", "program-shared", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
-        fixture.add_row("s-val", "b", "program-b", "run-b", "family-b", "board-a", "program_holdout", "validation", "benign");
-        fixture.add_row("s-test", "c", "program-shared", "run-c", "family-c", "board-a", "program_holdout", "test", "attack");
+        fixture.add_row(
+            "s-train",
+            "a",
+            "program-shared",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test",
+            "c",
+            "program-shared",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
         assert!(fixture.audit().unwrap_err().contains("crosses splits"));
     }
 
     #[test]
     fn attack_family_holdout_keeps_benign_programs_independently_grouped() {
         let mut fixture = Fixture::new();
-        fixture.add_row("s-train-attack", "a", "program-a", "run-a", "family-a", "board-a", "attack_family_holdout", "train", "attack");
-        fixture.add_row("s-val-attack", "b", "program-b", "run-b", "family-b", "board-a", "attack_family_holdout", "validation", "attack");
-        fixture.add_row("s-test-attack", "c", "program-c", "run-c", "family-c", "board-a", "attack_family_holdout", "test", "attack");
-        fixture.add_row("s-train-benign", "d", "benign-a", "run-d", "NA", "board-a", "attack_family_holdout", "train", "benign");
-        fixture.add_row("s-val-benign", "e", "benign-b", "run-e", "NA", "board-a", "attack_family_holdout", "validation", "benign");
-        fixture.add_row("s-test-benign", "f", "benign-c", "run-f", "NA", "board-a", "attack_family_holdout", "test", "benign");
+        fixture.add_row(
+            "s-train-attack",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "attack_family_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val-attack",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "attack_family_holdout",
+            "validation",
+            "attack",
+        );
+        fixture.add_row(
+            "s-test-attack",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "attack_family_holdout",
+            "test",
+            "attack",
+        );
+        fixture.add_row(
+            "s-train-benign",
+            "d",
+            "benign-a",
+            "run-d",
+            "NA",
+            "board-a",
+            "attack_family_holdout",
+            "train",
+            "benign",
+        );
+        fixture.add_row(
+            "s-val-benign",
+            "e",
+            "benign-b",
+            "run-e",
+            "NA",
+            "board-a",
+            "attack_family_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test-benign",
+            "f",
+            "benign-c",
+            "run-f",
+            "NA",
+            "board-a",
+            "attack_family_holdout",
+            "test",
+            "benign",
+        );
         assert_eq!(fixture.audit().expect("valid family holdout").samples, 6);
     }
 
@@ -686,9 +810,39 @@ mod tests {
     #[test]
     fn altered_source_bytes_fail_hash_check() {
         let mut fixture = Fixture::new();
-        fixture.add_row("s-train", "a", "program-a", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
-        fixture.add_row("s-val", "b", "program-b", "run-b", "family-b", "board-a", "program_holdout", "validation", "benign");
-        fixture.add_row("s-test", "c", "program-c", "run-c", "family-c", "board-a", "program_holdout", "test", "attack");
+        fixture.add_row(
+            "s-train",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
         let _ = fixture.write_manifest();
         fs::write(fixture.root.join("a.trace"), "tampered-after-freeze").unwrap();
         assert!(fixture.audit().unwrap_err().contains("SHA-256 mismatch"));
@@ -697,9 +851,39 @@ mod tests {
     #[test]
     fn path_traversal_fails_closed() {
         let mut fixture = Fixture::new();
-        fixture.add_row("s-train", "a", "program-a", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
-        fixture.add_row("s-val", "b", "program-b", "run-b", "family-b", "board-a", "program_holdout", "validation", "benign");
-        fixture.add_row("s-test", "c", "program-c", "run-c", "family-c", "board-a", "program_holdout", "test", "attack");
+        fixture.add_row(
+            "s-train",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
         let path = fixture.write_manifest();
         let mut text = fs::read_to_string(&path).unwrap();
         text = text.replace("a.trace", "../a.trace");
@@ -710,9 +894,39 @@ mod tests {
     #[test]
     fn duplicate_sample_ids_are_rejected() {
         let mut fixture = Fixture::new();
-        fixture.add_row("same-id", "a", "program-a", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
-        fixture.add_row("s-val", "b", "program-b", "run-b", "family-b", "board-a", "program_holdout", "validation", "benign");
-        fixture.add_row("same-id", "c", "program-c", "run-c", "family-c", "board-a", "program_holdout", "test", "attack");
+        fixture.add_row(
+            "same-id",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "same-id",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
         assert!(fixture.audit().unwrap_err().contains("duplicate sample_id"));
     }
 }
