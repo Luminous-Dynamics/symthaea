@@ -1218,24 +1218,111 @@ struct AnytimeMixtureProbe {
 }
 
 const ANYTIME_MIXTURE_PROBES: [AnytimeMixtureProbe; 14] = [
-    AnytimeMixtureProbe { name: "stationary_p050", class: "stationary_null", pre_p: 0.50, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "stable_edge_p048", class: "stationary_null", pre_p: 0.48, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "stable_edge_p052", class: "stationary_null", pre_p: 0.52, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "selection_bias_p074", class: "selection_bias_control", pre_p: 0.74, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "within_band_alternating", class: "within_band_transition_control", pre_p: 0.50, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "within_band_feedback", class: "within_band_transition_control", pre_p: 0.50, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "step_up_055", class: "target_shift", pre_p: 0.50, post_p: Some(0.55), change_after: 100 },
-    AnytimeMixtureProbe { name: "step_up_060", class: "target_shift", pre_p: 0.50, post_p: Some(0.60), change_after: 100 },
-    AnytimeMixtureProbe { name: "step_up_080", class: "target_shift", pre_p: 0.50, post_p: Some(0.80), change_after: 100 },
-    AnytimeMixtureProbe { name: "step_down_045", class: "target_shift", pre_p: 0.50, post_p: Some(0.45), change_after: 100 },
-    AnytimeMixtureProbe { name: "step_down_040", class: "target_shift", pre_p: 0.50, post_p: Some(0.40), change_after: 100 },
-    AnytimeMixtureProbe { name: "step_down_020", class: "target_shift", pre_p: 0.50, post_p: Some(0.20), change_after: 100 },
-    AnytimeMixtureProbe { name: "all_ones_adversarial", class: "extreme_path_control", pre_p: 1.0, post_p: None, change_after: 0 },
-    AnytimeMixtureProbe { name: "all_zeros_adversarial", class: "extreme_path_control", pre_p: 0.0, post_p: None, change_after: 0 },
+    AnytimeMixtureProbe {
+        name: "stationary_p050",
+        class: "stationary_null",
+        pre_p: 0.50,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "stable_edge_p048",
+        class: "stationary_null",
+        pre_p: 0.48,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "stable_edge_p052",
+        class: "stationary_null",
+        pre_p: 0.52,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "selection_bias_p074",
+        class: "selection_bias_control",
+        pre_p: 0.74,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "within_band_alternating",
+        class: "within_band_transition_control",
+        pre_p: 0.50,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "within_band_feedback",
+        class: "within_band_transition_control",
+        pre_p: 0.50,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "step_up_055",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.55),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_up_060",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.60),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_up_080",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.80),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_down_045",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.45),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_down_040",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.40),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_down_020",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.20),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "all_ones_adversarial",
+        class: "extreme_path_control",
+        pre_p: 1.0,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "all_zeros_adversarial",
+        class: "extreme_path_control",
+        pre_p: 0.0,
+        post_p: None,
+        change_after: 0,
+    },
 ];
 
 fn print_anytime_mixture_probe_csv() {
-    use anytime_change_mixture::{probe_bernoulli, AnytimeChangeMixture, CHANGE_HAZARDS, DOWNWARD_ALTERNATIVES, UPWARD_ALTERNATIVES};
+    use anytime_change_mixture::{
+        probe_bernoulli, AnytimeChangeMixture, CHANGE_HAZARDS, DOWNWARD_ALTERNATIVES,
+        UPWARD_ALTERNATIVES,
+    };
 
     let horizon = FAMILY_HORIZON;
     let alpha = PER_CELL_ALPHA;
@@ -1256,7 +1343,11 @@ fn print_anytime_mixture_probe_csv() {
             } else if scenario.name == "all_zeros_adversarial" {
                 0.0
             } else if scenario.name == "within_band_alternating" {
-                if step % 2 == 0 { anytime_change_mixture::NULL_UPPER } else { anytime_change_mixture::NULL_LOWER }
+                if step % 2 == 0 {
+                    anytime_change_mixture::NULL_UPPER
+                } else {
+                    anytime_change_mixture::NULL_LOWER
+                }
             } else if scenario.name == "within_band_feedback" {
                 if monitor.log_e_value() < log_threshold / 2.0 {
                     anytime_change_mixture::NULL_UPPER
@@ -1275,7 +1366,9 @@ fn print_anytime_mixture_probe_csv() {
             }
         }
 
-        let alarm_step_text = first_alarm.map(|step| step.to_string()).unwrap_or_else(|| "NA".to_owned());
+        let alarm_step_text = first_alarm
+            .map(|step| step.to_string())
+            .unwrap_or_else(|| "NA".to_owned());
         let schedule_policy = if scenario.name == "within_band_alternating" {
             "alternating_band_endpoints"
         } else if scenario.name == "within_band_feedback" {
@@ -1303,17 +1396,36 @@ fn print_anytime_mixture_probe_csv() {
             (None, Some(_)) => "alarm_on_control",
             (None, None) => "no_alarm",
         };
-        let post_p_text = scenario.post_p.map(|p| format!("{p:.12}")).unwrap_or_else(|| "NA".to_owned());
-        let up_text = UPWARD_ALTERNATIVES.iter().map(|p| format!("{p:.2}")).collect::<Vec<_>>().join(";");
-        let down_text = DOWNWARD_ALTERNATIVES.iter().map(|p| format!("{p:.2}")).collect::<Vec<_>>().join(";");
-        let hazard_text = CHANGE_HAZARDS.iter().map(|h| format!("{h:.4}")).collect::<Vec<_>>().join(";");
+        let post_p_text = scenario
+            .post_p
+            .map(|p| format!("{p:.12}"))
+            .unwrap_or_else(|| "NA".to_owned());
+        let up_text = UPWARD_ALTERNATIVES
+            .iter()
+            .map(|p| format!("{p:.2}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        let down_text = DOWNWARD_ALTERNATIVES
+            .iter()
+            .map(|p| format!("{p:.2}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        let hazard_text = CHANGE_HAZARDS
+            .iter()
+            .map(|h| format!("{h:.4}"))
+            .collect::<Vec<_>>()
+            .join(";");
         println!(
             "{},{},{},{},{},{},{},{},{:.12},{:.12},{},{},{},{:.12e},{},{},{}",
             index + 1,
             scenario.name,
             scenario.class,
             monitor.steps(),
-            if scenario.post_p.is_some() { scenario.change_after.to_string() } else { "NA".to_owned() },
+            if scenario.post_p.is_some() {
+                scenario.change_after.to_string()
+            } else {
+                "NA".to_owned()
+            },
             schedule_policy,
             pre_rate_text,
             post_p_text,
