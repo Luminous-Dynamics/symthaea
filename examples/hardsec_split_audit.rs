@@ -1031,6 +1031,29 @@ mod tests {
     }
 
     #[test]
+    fn source_artifact_cannot_have_conflicting_outcomes() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.add_row(
+            "s-train-extra",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        let last = fixture.rows.len() - 1;
+        fixture.rows[last][12] = "success_observed".into();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("inconsistent path, digest, or split"));
+    }
+
+    #[test]
     fn evaluation_split_without_both_classes_is_rejected() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
