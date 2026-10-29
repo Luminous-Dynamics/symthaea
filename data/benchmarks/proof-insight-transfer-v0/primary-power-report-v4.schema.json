@@ -22,20 +22,20 @@
     "eligible_validation_target_count",
     "eligible_validation_family_count",
     "validation_baseline_semantic_success_rate",
-    "family_target_counts",
-    "assumed_family_icc_grid",
+    "component_target_counts",
+    "assumed_component_icc_grid",
     "pair_association_fraction_grid",
     "true_effect_grid_percentage_points",
     "study_simulations",
     "bootstrap_replicates_per_simulated_study",
     "simulation_seed",
-    "confirmatory_minimum_family_count",
+    "confirmatory_minimum_component_count",
     "utility_effect_threshold_percentage_points",
     "required_power_at_20pp_and_icc_020",
     "maximum_false_claim_probability_at_zero_effect",
     "null_effect_false_claim_probability_max",
     "null_effect_false_claim_probability_upper_simultaneous_95_max",
-    "weak_null_family_effect_heterogeneity_sd_grid_percentage_points",
+    "weak_null_component_effect_heterogeneity_sd_grid_percentage_points",
     "weak_null_scenarios",
     "weak_null_false_claim_probability_max",
     "weak_null_false_claim_probability_upper_simultaneous_95_max",
@@ -231,9 +231,9 @@
         "required": [
           "status",
           "true_target_weighted_mean_effect_percentage_points",
-          "assumed_family_icc",
+          "assumed_component_icc",
           "pair_association_fraction",
-          "requested_family_effect_heterogeneity_sd_percentage_points",
+          "requested_component_effect_heterogeneity_sd_percentage_points",
           "study_simulations",
           "bootstrap_replicates_per_simulated_study",
           "false_claims",
@@ -249,7 +249,7 @@
           "false_claim_probability_upper_95",
           "false_claim_probability_upper_simultaneous_95",
           "mean_observed_effect_percentage_points",
-          "mean_realized_family_effect_heterogeneity_sd_percentage_points",
+          "mean_realized_component_effect_heterogeneity_sd_percentage_points",
           "interpretation"
         ],
         "properties": {
@@ -445,7 +445,7 @@
         "required": [
           "status",
           "true_treatment_effect_percentage_points",
-          "assumed_family_icc",
+          "assumed_component_icc",
           "pair_association_fraction",
           "study_simulations",
           "bootstrap_replicates_per_simulated_study",
@@ -895,10 +895,6 @@
       },
       "then": {
         "properties": {
-          "eligible_validation_family_count": {
-            "type": "integer",
-            "minimum": 20
-          },
           "estimated_power_at_20pp_and_icc_020_lower_95": {
             "type": "number",
             "minimum": 0.8
@@ -910,8 +906,13 @@
           "weak_null_false_claim_probability_upper_simultaneous_95_max": {
             "type": "number",
             "maximum": 0.05
+          },
+          "eligible_validation_component_count": {
+            "type": "integer",
+            "minimum": 20
           }
-        }
+        },
+        "required": []
       }
     },
     {

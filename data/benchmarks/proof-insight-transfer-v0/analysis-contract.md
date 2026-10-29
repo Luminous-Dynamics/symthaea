@@ -159,3 +159,6 @@ The current builder does not verify the underlying coverage-receipt bytes or aut
 ### Component-level calibration vocabulary
 
 Power-report v4 names its ICC grid and effect-heterogeneity diagnostics at the connected-component level. Original theorem family IDs remain source identifiers and descriptive denominators; they are not treated as independent bootstrap units after the relationship graph joins them.
+
+
+Power-report v4 applies the 20-independent-component floor to `eligible_validation_component_count`. The separate `eligible_validation_family_count` is descriptive only and must not determine confirmatory eligibility.
