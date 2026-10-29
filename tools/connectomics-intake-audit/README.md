@@ -55,23 +55,25 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin proof
   --prediction-profile-sha256 <64-character-config-sha256> \
   --evaluation-partition development \
   --review-time-basis synthetic-proxy \
+  --bootstrap-replicates 500 \
   --output score-report.json
 ```
 
 The input JSONL contains one row per unique source operation:
 ```json
-{"sample_id":"source-op-001","group":"mouse:merge","label_is_error":true,"p_error":0.93,"review_priority_score":0.94,"review_minutes":2.0,"impact_weight":4.0}
-{"sample_id":"source-op-002","group":"fly:split","label_is_error":false,"p_error":0.12,"review_priority_score":0.07,"review_minutes":1.5,"impact_weight":0.0}
+{"sample_id":"source-op-001","group":"mouse:merge","cluster_id":"mouse-cube-017","label_is_error":true,"p_error":0.93,"review_priority_score":0.94,"review_minutes":2.0,"impact_weight":4.0}
+{"sample_id":"source-op-002","group":"fly:split","cluster_id":"fly-cube-204","label_is_error":false,"p_error":0.12,"review_priority_score":0.07,"review_minutes":1.5,"impact_weight":0.0}
 ```
 
+- `cluster_id` is the declared dependency unit for uncertainty estimation (e.g. source volume/spatial cube/neuron); choose the unit that matches the sampling and intended generalization claim. Multiple rows from one cluster are resampled together. A cluster ID is not proof that clusters are independent.
 - `label_is_error` is an **evaluation-only** adjudicated label, normalized so `true` means a genuine reconstruction error requiring correction. `mapping_reference` must point to the reviewed task/label contract.
 - `p_error` is the model's error probability; the scorer reports balanced accuracy at 0.5, AUROC, tie-aware average precision, Brier score, log loss, and group-level metrics.
 - `review_priority_score` is the frozen policy ranking for which candidate an expert should review next. The evaluator measures error yield and impact-weight capture at fixed item and review-minute budgets.
 - `impact_weight` is ground-truth evaluator metadata. It must never be a runtime input to the ranker or the candidate model.
 - `review_minutes` may be prospectively measured or a synthetic proxy. The required `--review-time-basis` makes that distinction explicit; synthetic proxies cannot support a real-world time-saving claim.
-- The report includes dataset revision commit SHA, pinned upstream code commit, policy ID, frozen profile digest, evaluation partition, input SHA-256, group breakdowns, and risk–coverage checkpoints. The status is always `SCORED_NOT_PROMOTED`; passing metrics do not by themselves qualify a model.
+- The report includes dataset revision commit SHA, pinned upstream code commit, policy ID, frozen profile digest, evaluation partition, input SHA-256, group breakdowns, deterministic cluster-bootstrap 95% intervals for balanced accuracy, review-budget yield, and risk–coverage checkpoints. Bootstrap resamples caller-declared clusters, uses a seed derived from the frozen input digest, and marks intervals not estimable when too few valid replicates or fewer than two clusters exist. The status is always `SCORED_NOT_PROMOTED`; passing metrics do not by themselves qualify a model.
 - Duplicate sample IDs fail closed. Aggregate multiple image views to the source-operation level before scoring.
-- The scorer does not yet calculate cluster-aware confidence intervals or validate Parquet labels. It is a metric calculator for a frozen output file; scientific claims still require the locked split protocol and grouped statistical analysis.
+- Cluster-bootstrap intervals cover balanced accuracy only; AUROC, average precision, and calibration metrics currently have point estimates only. The scorer does not validate Parquet labels or certify cluster independence. It is a metric calculator for a frozen output file; scientific claims still require the locked split protocol and independent grouped statistical analysis.
 
 ## Exit codes
 
