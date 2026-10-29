@@ -46,4 +46,7 @@ jobs:
           printf '%s\n' "$report"
           grep -F '"schema_version": "cmaq-world-model-report-v0.1"' <<< "$report"
           grep -F '"counterfactual_reward_mae_milli": 0.000000' <<< "$report"
+          grep -F '"safe_action_pair_ranking_accuracy": 1.000000' <<< "$report"
+          grep -F '"selected_policy_mean_regret_milli": 0.000000' <<< "$report"
+          grep -F '"model_greedy_mean_regret_milli": 0.000000' <<< "$report"
           grep -F '"hard_gate_pass": true' <<< "$report"
