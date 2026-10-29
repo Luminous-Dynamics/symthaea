@@ -180,6 +180,8 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
     rows_by_cell: dict[tuple[str, int, str], dict[str, Any]] = {}
     rows_by_scenario: dict[str, list[dict[str, Any]]] = {scenario_id: [] for scenario_id in scenario_by_id}
     common_by_pair: dict[tuple[str, int], tuple[Any, ...]] = {}
+    configuration_by_scenario: dict[str, tuple[Any, ...]] = {}
+    post_shift_configuration_by_scenario: dict[str, tuple[Any, ...]] = {}
 
     for index, row in enumerate(runs):
         label = f"runs[{index}]"
@@ -238,15 +240,15 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
                 raise ValueError(f"{label}.{key} must be a non-empty string")
         for key in ("scaffold_sha256", "initial_execution_profile_sha256"):
             require_digest(row[key], label + "." + key)
-        if row["initial_network_mode"] not in NETWORK_MODES:
-            raise ValueError(f"{label}.initial_network_mode is invalid")
+        if not isinstance(row["initial_network_mode"], str) or row["initial_network_mode"] not in NETWORK_MODES:
+            raise ValueError(f"{label}.initial_network_mode must be a valid network-mode string")
         if row["condition"] == "clean":
             if row["post_shift_execution_profile_sha256"] is not None or row["post_shift_network_mode"] is not None:
                 raise ValueError(f"{label} clean condition must not claim a post-shift profile or network mode")
         else:
             require_digest(row["post_shift_execution_profile_sha256"], label + ".post_shift_execution_profile_sha256")
-            if row["post_shift_network_mode"] not in NETWORK_MODES:
-                raise ValueError(f"{label}.post_shift_network_mode is invalid")
+            if not isinstance(row["post_shift_network_mode"], str) or row["post_shift_network_mode"] not in NETWORK_MODES:
+                raise ValueError(f"{label}.post_shift_network_mode must be a valid network-mode string")
         if not is_number(row["cost_usd"]) or row["cost_usd"] < 0:
             raise ValueError(f"{label}.cost_usd must be finite and non-negative")
         if type(row["duration_ms"]) is not int or row["duration_ms"] < 0:
@@ -262,6 +264,20 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         previous = common_by_pair.setdefault(paired_key, common)
         if previous != common:
             raise ValueError(f"clean and shifted continuations do not share the same pinned starting identity for {paired_key!r}")
+        scenario_configuration = (
+            row["model_id"], row["model_version"], row["scaffold_sha256"],
+            row["initial_execution_profile_sha256"], row["initial_network_mode"],
+        )
+        previous_configuration = configuration_by_scenario.setdefault(scenario_id, scenario_configuration)
+        if previous_configuration != scenario_configuration:
+            raise ValueError(f"scenario {scenario_id!r} drifts in model/scaffold/initial profile across seeds")
+        if condition == "shifted":
+            post_shift_configuration = (
+                row["post_shift_execution_profile_sha256"], row["post_shift_network_mode"]
+            )
+            previous_post_shift = post_shift_configuration_by_scenario.setdefault(scenario_id, post_shift_configuration)
+            if previous_post_shift != post_shift_configuration:
+                raise ValueError(f"scenario {scenario_id!r} drifts in post-shift profile/network mode across seeds")
         rows_by_cell[cell] = row
         rows_by_scenario[scenario_id].append(row)
 
@@ -291,12 +307,17 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
                 "clean_duration_ms": clean["duration_ms"],
                 "shifted_duration_ms": shifted["duration_ms"],
             })
+    paired_rows_by_scenario: dict[str, list[dict[str, Any]]] = {
+        scenario_id: [] for scenario_id in scenario_by_id
+    }
+    for paired_row in paired_rows:
+        paired_rows_by_scenario[paired_row["scenario_id"]].append(paired_row)
     return {
         "scenario_by_id": scenario_by_id,
         "scenario_ids": [scenario["scenario_id"] for scenario in scenarios],
         "seeds": seeds,
         "bootstrap": bootstrap,
-        "rows_by_scenario": rows_by_scenario,
+        "rows_by_scenario": paired_rows_by_scenario,
         "paired_rows": paired_rows,
         "protocol_sha256": manifest["protocol_sha256"],
     }
