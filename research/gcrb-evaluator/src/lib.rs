@@ -1912,6 +1912,8 @@ mod tests {
         let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
         let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
         value["records"][0]["depends_on"] = serde_json::json!(["GCRB-FORECAST-ERROR-001"]);
+        value["records"][4]["depends_on"] = serde_json::json!(["MYCELIX-CASE-001"]);
+        value["records"][4]["derivation"]["input_evidence_ids"] = serde_json::json!(["MYCELIX-CASE-001"]);
         let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
         assert!(result.unwrap_err().contains("dependency cycle"));
     }
