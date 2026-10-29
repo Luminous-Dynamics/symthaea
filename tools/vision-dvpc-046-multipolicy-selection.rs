@@ -815,7 +815,7 @@ mod tests{
         let output=benchmark(2,&[8,16]).unwrap();
         assert!(output.contains("pcrp_bet_grid_points\t33"));
         assert!(output.contains("ls_lambda_scales\t0.5,1.0,2.0"));
-        assert!(output.contains("tls_safe_grid_size\t3"));
+        assert!(output.contains("ls_safe_grid_size\t3"));
         assert!(output.contains("fixed_horizon_tail_budget"));
     }
 
