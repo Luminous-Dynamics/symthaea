@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.coverage-reviewer-trust-store.v1.json",
+  "title": "PITB Coverage Reviewer Trust Store",
+  "description": "Allowlisted Ed25519 public keys and independently registered organization identifiers. This schema does not establish the trust store's external provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reviewers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.coverage-reviewer-trust-store.v1"
+    },
+    "reviewers": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/reviewer"
+      }
+    }
+  },
+  "$defs": {
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "key_id",
+        "organization_id",
+        "role",
+        "public_key_hex"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "const": "coverage_auditor"
+        },
+        "public_key_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
