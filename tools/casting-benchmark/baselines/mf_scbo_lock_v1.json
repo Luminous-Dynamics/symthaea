@@ -39,7 +39,8 @@
     "fidelity_api": "eval_objectives is a list of scalar objective callables ordered by fidelity level",
     "constraint_sign": "c(x) <= 0",
     "native_multiobjective": false,
-    "native_historical_task_descriptor_transfer": false
+    "native_historical_task_descriptor_transfer": false,
+    "constraint_fidelity_api": "one shared constraints callable, invoked without a fidelity argument; the API does not represent fidelity-dependent constraints"
   },
   "comparison_requirements": [
     "Use a preregistered scalarization of the casting objective vector for direct MF-SCBO comparison; do not call its fidelity list a multi-objective interface.",
@@ -51,5 +52,13 @@
     "Keep the Python/PyTorch/BoTorch experiment isolated from production Rust code."
   ],
   "related_publication_url": "https://arxiv.org/abs/2609.29941",
-  "claim_ceiling": "Source and semantics are pinned from repository artifacts. This lock does not mean MF-SCBO has been installed, executed, reproduced, or compared against Symthaea."
+  "claim_ceiling": "Source and semantics are pinned from repository artifacts. This lock does not mean MF-SCBO has been installed, executed, reproduced, or compared against Symthaea.",
+  "randomness_notes": [
+    "The upstream initialization helper accepts a seed but the public initialize path does not pass one.",
+    "The optimization SobolEngine and torch sampling use no explicit local seed; seed numpy and torch externally and verify repeatability before comparing."
+  ],
+  "source_review_findings": [
+    "In the perturbation fallback, torch.randint(0, dim - 1, ...) excludes the last coordinate because the high bound is exclusive. The branch is reached only when a candidate perturbation mask is empty, which is possible when dim > 20 under the implementation's probability rule. Preserve unmodified upstream behavior for the faithful run and report any corrected sensitivity fork separately.",
+    "The single shared constraint callable means the baseline cannot faithfully model different low- and high-fidelity constraint margins. Do not provide high-fidelity-only constraint truth to low-fidelity calls and count it as free."
+  ]
 }
