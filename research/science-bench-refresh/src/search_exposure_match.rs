@@ -428,14 +428,14 @@ pub fn verify_search_exposure_match_report(
     };
     let admission = if !integrity_valid {
         "match_report_integrity_or_coverage_invalid"
-    } else if !receipt_verification.policy_compliant {
-        "blocked_receipt_network_policy_violation"
     } else if count("explicit_answer") > 0 {
         "blocked_explicit_answer_exposure"
     } else if count("question_context") > 0 {
         "blocked_question_context_exposure"
     } else if count("benchmark_metadata") > 0 {
         "blocked_benchmark_metadata_exposure"
+    } else if !receipt_verification.policy_compliant {
+        "blocked_receipt_network_policy_violation"
     } else if review_required_event_count > 0 {
         "manual_review_required"
     } else {
