@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::process;
 
 const HORIZON: usize = 256;
@@ -85,8 +84,8 @@ fn run_episode(seed: u64, lane: Lane, threshold: Option<f64>) -> Episode {
             _ => unreachable!("the action space is binary"),
         };
 
-        let reward = u64::from(noise < chosen_probability);
-        let oracle_reward = u64::from(noise < NULL_MEAN_REWARD);
+        let reward = if noise < chosen_probability { 1_u64 } else { 0_u64 };
+        let oracle_reward = if noise < NULL_MEAN_REWARD { 1_u64 } else { 0_u64 };
         reward_total += reward;
         regret_total += oracle_reward.saturating_sub(reward);
 
@@ -199,32 +198,6 @@ fn strategy_report(threshold: Option<f64>) -> StrategyReport {
         stationary: Metrics::summarize(Lane::Stationary, threshold),
         abrupt_shift: Metrics::summarize(Lane::AbruptShift, threshold),
     }
-}
-
-fn emit_metrics(metrics: &Metrics, lane: Lane) {
-    print!(
-        "{{\"lane\":\"{}\",\"episodes\":{},\"false_alarm_episodes\":{},\"false_alarm_rate_per_1000_steps\":{:.6},\"pre_shift_false_alarm_episodes\":{},\"detection_episodes\":{},\"detection_rate\":{:.6},\"p50_detection_delay_steps\":",
-        lane.name(),
-        metrics.episodes,
-        metrics.false_alarm_episodes,
-        metrics.false_alarm_rate_per_1000_steps,
-        metrics.pre_shift_false_alarm_episodes,
-        metrics.detection_episodes,
-        metrics.detection_rate()
-    );
-    match metrics.quantile_nearest_rank(0.50) {
-        Some(value) => print!("{value}"),
-        None => print!("null"),
-    }
-    print!(",\"p90_detection_delay_steps\":");
-    match metrics.quantile_nearest_rank(0.90) {
-        Some(value) => print!("{value}"),
-        None => print!("null"),
-    }
-    println!(
-        ",\"mean_regret_per_episode\":{:.6},\"mean_reward_rate\":{:.6}}}",
-        metrics.mean_regret_per_episode, metrics.mean_reward_rate
-    );
 }
 
 fn emit_report(reports: &[StrategyReport]) {
