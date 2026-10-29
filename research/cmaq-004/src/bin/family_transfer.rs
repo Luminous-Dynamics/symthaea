@@ -192,7 +192,7 @@ fn spec_seed_key(spec: FamilySpec) -> u64 {
         spec.holdout_shift,
     ];
     values.iter().enumerate().fold(spec.lane as u64 + 1, |acc, (i, value)| {
-        acc.rotate_left(9) ^ ((*value_to_u64(*value)).wrapping_add(i as u64 + 1))
+        acc.rotate_left(9) ^ (value_to_u64(*value).wrapping_add(i as u64 + 1))
     })
 }
 
@@ -347,7 +347,7 @@ fn summarize(
         lower_cvar05_net_lift: lower_cvar05(&lifts),
         minimum_family_net_lift: lifts.iter().copied().fold(f64::INFINITY, f64::min),
         harmed_family_rate: if lifts.is_empty() { 0.0 } else { lifts.iter().filter(|value| **value < -1e-12).count() as f64 / lifts.len() as f64 },
-        mean_additive_prediction_mae: if matches!(strategy, Strategy::AdditiveModel | Strategy::ShuffledModel | Strategy::StaleModel) { mean(&errors) } else { 0.0 },
+        mean_additive_prediction_mae: if matches!(strategy, Strategy::AdditiveModel | Strategy::ShuffledModel) { mean(&errors) } else { 0.0 },
         action_one_rate: mean(&actions),
     }
 }
@@ -467,9 +467,9 @@ mod tests {
     fn negative_interaction_can_make_additive_extrapolation_choose_the_wrong_action() {
         let spec = FamilySpec {
             lane: Lane::Interaction,
-            intercept: 0.42,
-            x_effect: 0.10,
-            y_effect: 0.10,
+            intercept: 0.35,
+            x_effect: 0.15,
+            y_effect: 0.15,
             interaction: -0.25,
             holdout_shift: 0.0,
         };
@@ -499,7 +499,8 @@ mod tests {
         for row in rows {
             assert_eq!(row.family_count, match row.lane {
                 "all" => 256,
-                "additive" | "interaction" | "holdout_shift" => 85,
+                "additive" => 86,
+                "interaction" | "holdout_shift" => 85,
                 _ => panic!("unknown lane"),
             });
             assert!(row.mean_net_lift_vs_direct.is_finite());
