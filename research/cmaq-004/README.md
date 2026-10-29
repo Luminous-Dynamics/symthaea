@@ -1,6 +1,6 @@
 # CMAQ-004: World-Model Value-Add Under Matched Budgets
 
-**Status:** executable synthetic smoke harness, v0.4 companion adds family-level held-out transfer and lower-tail risk  
+**Status:** executable synthetic smoke harness; family-level held-out transfer v0.3 adds gross/net cost analysis and selective-trust margin gates  
 **Tracking issue:** [#9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010)  
 **Evidence status:** original value-add binary passed exact-head Rust workflow at [`9eddcf5`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40950457324); family-transfer companion and the integrated workflow passed exact-head run [#19 at `0a51bd2`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960013206): 7 original tests, 6 family-panel tests, and both report validators passed. Both panels remain synthetic smoke evidence, not blind qualification.  
 **Claim ceiling:** tiny finite held-out-composition harness only; no industry/SOTA, broad causal reasoning, or production Symthaea claim
@@ -85,7 +85,7 @@ The first smoke test therefore suggests a design principle worth testing in Symt
 
 ## Family-level transfer companion (v0.2)
 
-The new `family_transfer` Rust binary widens the unit of analysis from repeated reward draws on one fixed law to **256 generated mechanism families**. For each family, the candidate receives support-outcome means for contexts `00`, `01`, and `10`; context `11` remains evaluator-only. The direct nearest-context policy and additive extrapolator use the same support outcomes. The generator balances three lanes: near-additive laws, strong held-out interaction laws, and a held-out sign-shift stress lane.
+The `family_transfer` Rust binary widens the unit of analysis from repeated reward draws on one fixed law to **256 generated mechanism families** and, in v0.3, compares three selective-trust margin gates. For each family, the candidate receives support-outcome means for contexts `00`, `01`, and `10`; context `11` remains evaluator-only. The direct nearest-context policy and additive extrapolator use the same support outcomes. The generator balances three lanes: near-additive laws, strong held-out interaction laws, and a held-out sign-shift stress lane.
 
 Run it explicitly (the crate now has two binaries):
 
@@ -95,12 +95,14 @@ cargo run --quiet --locked --bin cmaq-004-world-model-value-add
 cargo run --quiet --locked --bin family_transfer
 ```
 
-The companion crosses five strategies—direct nearest-context, additive model, shuffled-model control, stale-model control and evaluator-only oracle—with four query-cost levels and four reporting groups (all families plus each mechanism lane). Its 80 JSON rows (schema `cmaq-004-family-transfer-v0.2`) report:
+The companion crosses eight strategies—direct nearest-context, additive model, three margin gates, shuffled-model control, stale-model control and evaluator-only oracle—with four query-cost levels and four reporting groups (all families plus each mechanism lane). Its 128 JSON rows (schema `cmaq-004-family-transfer-v0.3`) report:
 
 - mean **gross** lift before model-query fees, mean **net** lift after fees, and implied break-even fee per query (gross lift divided by two queries), with an approximate 95% interval on net lift at the generated-mechanism-family unit;
 - fraction of families where the strategy is worse than the direct comparator;
 - lower-tail CVaR05 of family-level lift and the single worst family;
-- fraction of families showing positive gross lift before cost, action-one rate, query cost and (for additive/shuffled policies) held-out prediction MAE.
+- fraction of families showing positive gross lift before cost, action-one rate, query cost, action override rate versus direct, and (for additive/shuffled/margin-gated policies) held-out prediction MAE.
+
+The three margin gates accept the additive-model action only when it disagrees with the direct comparator and its predicted advantage over that direct action is at least 0.005, 0.020, or 0.050 respectively. A stricter margin must never override direct more often than a looser margin. Because the margin itself is computed from model outputs, **all gate variants still incur the two-query inference fee**, even when they abstain and preserve the direct action. This deliberately tests decision selectivity separately from inference-cost savings; the latter would require a cheap pre-query uncertainty signal or cached model output.
 
 The most important new question is not just whether the *average* family benefits, but whether the model's average advantage masks a bad tail or fails under interaction/held-out-shift lanes. The cost sweep charges two model queries per decision; this is declared synthetic utility accounting, **not** measured wall-clock latency, energy, or hardware cost.
 
