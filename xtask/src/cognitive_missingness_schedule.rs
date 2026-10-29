@@ -702,6 +702,53 @@ mod tests {
     }
 
     #[test]
+    fn informative_mechanisms_follow_their_registered_risk_direction() {
+        let mut low = HiddenOutcomeEvent {
+            event_id: "low".to_string(),
+            decision_tick: 0,
+            hidden_loss: 0.0,
+            observed_covariate: 0.0,
+            prediction_error_signal: 0.0,
+            action_taken: false,
+        };
+        let mut high = low.clone();
+        high.event_id = "high".to_string();
+        high.hidden_loss = 1.0;
+        high.observed_covariate = 1.0;
+        high.prediction_error_signal = 1.0;
+        high.action_taken = true;
+
+        let config = |mechanism| MissingnessScheduleConfig {
+            mechanism,
+            base_missing_probability: 0.2,
+            missing_probability_slope: if mechanism == MissingnessMechanism::Mcar { 0.0 } else { 0.7 },
+            declaration_mode: MissingnessDeclarationMode::Explicit,
+            declaration_delay_ticks: 1,
+            delay: DelayPattern::Fixed { ticks: 1 },
+        };
+
+        for mechanism in [
+            MissingnessMechanism::MarByObservedCovariate,
+            MissingnessMechanism::MnarHighLoss,
+            MissingnessMechanism::PredictionErrorDependent,
+            MissingnessMechanism::ActionDependent,
+        ] {
+            let cfg = config(mechanism);
+            assert!(missingness_probability(&cfg, &low) < missingness_probability(&cfg, &high));
+        }
+        let reverse = config(MissingnessMechanism::MnarLowLoss);
+        assert!(missingness_probability(&reverse, &low) > missingness_probability(&reverse, &high));
+
+        let mcar = config(MissingnessMechanism::Mcar);
+        low.hidden_loss = 0.9;
+        low.observed_covariate = 0.7;
+        low.prediction_error_signal = 0.8;
+        low.action_taken = true;
+        assert_eq!(missingness_probability(&mcar, &low), 0.2);
+        assert_eq!(missingness_probability(&mcar, &high), 0.2);
+    }
+
+    #[test]
     fn rejects_duplicate_ids_invalid_losses_and_mcar_dependence() {
         let mut duplicate = fixture(MissingnessMechanism::Mcar, MissingnessDeclarationMode::Explicit);
         duplicate.events[1].event_id = duplicate.events[0].event_id.clone();
