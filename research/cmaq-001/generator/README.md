@@ -58,8 +58,9 @@ Coefficients are generated from a specified seeded SplitMix64 stream. The safety
 ## Reproducibility and split hygiene
 
 - Generation is deterministic for the same source version and inputs; the manifest contains file hashes and a seed commitment, but not the seed itself.
-- The public seed and fixtures are for development only. For a genuinely blinded qualification run, the evaluator must choose a high-entropy seed outside candidate control, keep the seed and answer key private, publish neither them nor the manifest before the run, and bind the exact candidate, generator source, data digests, and scoring code in a separate evaluator receipt.
+- The public seed and fixtures are for development only. For a genuinely blinded qualification run, the evaluator must draw a uniform 64-bit seed from a cryptographically secure random generator outside candidate control, keep the seed and answer key private, publish neither them nor the manifest before the run, and bind the exact candidate, generator source, data digests, and scoring code in a separate evaluator receipt.
 - A SHA-256 digest is a commitment to bytes, not proof that the evaluator was fair or that the generated distribution is scientifically adequate.
+- The seed commitment is an integrity aid, not strong secrecy: the seed space is 64-bit and an adversary with enough compute could exhaust it. Do not give candidates the manifest or answer-key digest; a later qualification version should support a larger secret seed and a signed evaluator receipt.
 - The factor-composition split is public by design. It tests compositional transfer, not secrecy of the split rule.
 - This v0.1 generator does not yet generate independent held-out causal-law families, distribution-shift schedules, noisy outcomes, or multi-step transition dynamics. Those should be separate preregistered lanes, not silently mixed into the first score.
 
