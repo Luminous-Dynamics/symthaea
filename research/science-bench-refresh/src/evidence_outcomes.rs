@@ -502,10 +502,12 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
                     }
                     if !matches!(
                         record.evidence_use,
-                        EvidenceUseV1::NoRelevantEvidence | EvidenceUseV1::NotEvaluated
+                        EvidenceUseV1::UsedRelevant
+                            | EvidenceUseV1::NoRelevantEvidence
+                            | EvidenceUseV1::NotEvaluated
                     ) {
                         issues.push(format!(
-                            "{label} abstained but claims answer-based evidence use"
+                            "{label} abstained but claims ignored or misinterpreted evidence"
                         ));
                     }
                     if !matches!(
@@ -561,11 +563,9 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
             if record.response_status != OutcomeResponseStatusV1::NoResponse {
                 issues.push(format!("{label} has a non-completed terminal status with a response"));
             }
-            if record.response_artifact_sha256.is_some()
-                || record.evaluator_record_sha256.is_some()
-            {
+            if record.evaluator_record_sha256.is_some() {
                 issues.push(format!(
-                    "{label} has a response/evaluator artifact for an unscored terminal status"
+                    "{label} has an evaluator score record for an unscored terminal status"
                 ));
             }
             if !unscored(record) {
@@ -574,14 +574,17 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
                 ));
             }
             if record.terminal_status == OutcomeTerminalStatusV1::NotStarted
-                && (record.resources.wall_clock_ms.is_some()
+                && (record.response_artifact_sha256.is_some()
+                    || record.resources.wall_clock_ms.is_some()
                     || record.resources.tool_calls.is_some()
                     || record.resources.experiment_count.is_some()
                     || record.resources.input_tokens.is_some()
                     || record.resources.output_tokens.is_some()
                     || record.resources.cost_micro_usd.is_some())
             {
-                issues.push(format!("{label} is not_started but carries resource observations"));
+                issues.push(format!(
+                    "{label} is not_started but carries response artifacts or resource observations"
+                ));
             }
         }
     }
