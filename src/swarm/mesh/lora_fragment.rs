@@ -878,6 +878,13 @@ mod tests {
         assert!(!assembler.has_fragment(malformed.fragment_index));
         assert_eq!(assembler.received_data_count(), 0);
 
+        let mut malformed_fec = frags[0].clone();
+        malformed_fec.flags |= FLAG_FEC;
+        malformed_fec.checksum = malformed_fec.compute_checksum();
+        assert!(!assembler.feed(&malformed_fec));
+        assert!(!assembler.has_fragment(malformed_fec.fragment_index));
+        assert_eq!(assembler.received_data_count(), 0);
+
         for frag in &frags {
             assembler.feed(frag);
         }
