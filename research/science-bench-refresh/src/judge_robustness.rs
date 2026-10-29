@@ -754,7 +754,6 @@ fn validate_report_fields(
         .map(|case| (case.case_id.as_str(), case))
         .collect();
     let mut seen_cases = BTreeSet::new();
-    let mut total_observations = 0usize;
     for outcome in &fields.cases {
         if !seen_cases.insert(outcome.case_id.as_str()) {
             issues.push(format!("duplicate judge audit outcome {}", outcome.case_id));
@@ -809,7 +808,6 @@ fn validate_report_fields(
                 expected_observation_count
             ));
         }
-        total_observations = total_observations.saturating_add(outcome.observations.len());
         let mut seen_observations = BTreeSet::new();
         for observation in &outcome.observations {
             if observation.repeat_index >= plan.repeats_per_condition {
@@ -876,7 +874,6 @@ fn validate_report_fields(
     }
     // Avoid imposing any quality threshold here: an internally sound report may
     // document the judge's failure to comply with the expected relation.
-    let _ = total_observations;
     Ok((plan, issues))
 }
 
@@ -1335,12 +1332,7 @@ mod tests {
             .cases
             .iter()
             .map(|case| {
-                let reference_baseline_decision =
-                    if case.family == JudgeAuditFamilyV1::SemanticSensitivityControl {
-                        SemanticDecisionV1::CandidateA
-                    } else {
-                        SemanticDecisionV1::CandidateA
-                    };
+                let reference_baseline_decision = SemanticDecisionV1::CandidateA;
                 let reference_variant_decision =
                     if case.family == JudgeAuditFamilyV1::SemanticSensitivityControl {
                         SemanticDecisionV1::CandidateB
@@ -1416,7 +1408,7 @@ mod tests {
         }
     }
 
-    fn full_report_bytes(plan_bytes: &[u8], fields: JudgeRobustnessReportFieldsV1) -> Vec<u8> {
+    fn full_report_bytes(_plan_bytes: &[u8], fields: JudgeRobustnessReportFieldsV1) -> Vec<u8> {
         let commitment = report_commitment(&fields).unwrap();
         let report = JudgeRobustnessReportV1 {
             schema: fields.schema,
@@ -1431,7 +1423,6 @@ mod tests {
             cases: fields.cases,
             report_commitment_sha256: commitment,
         };
-        let _ = plan_bytes;
         serde_json::to_vec(&report).unwrap()
     }
 
