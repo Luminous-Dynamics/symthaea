@@ -6,6 +6,7 @@
 //! GKP quality, error correction, or a logical operation. Architecture families must
 //! supply family-specific models; do not collapse them into one universal score.
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 
@@ -523,6 +524,8 @@ pub enum OpticalRouteObjective {
 /// Directed optical interconnect with a declared insertion-loss interval.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpticalLink {
+    /// Stable physical-link identifier, unique within one supplied topology.
+    pub id: u64,
     /// Directed source node identifier.
     pub from: usize,
     /// Directed destination node identifier.
@@ -536,6 +539,8 @@ pub struct OpticalLink {
 pub struct OpticalRoute {
     /// Node sequence, including source and destination.
     pub nodes: Vec<usize>,
+    /// Stable physical-link IDs chosen for each consecutive node pair, in route order.
+    pub link_ids: Vec<u64>,
     /// Sum of link losses along the selected route.
     pub total_loss_db: LossIntervalDb,
     /// Transmission interval implied by the route loss interval.
@@ -545,6 +550,7 @@ pub struct OpticalRoute {
 #[derive(Debug, Clone)]
 struct RouteCandidate {
     nodes: Vec<usize>,
+    link_ids: Vec<u64>,
     cost: f64,
     loss: LossIntervalDb,
 }
@@ -570,9 +576,14 @@ fn route_candidate_is_better(candidate: &RouteCandidate, current: &RouteCandidat
                     match candidate.loss.nominal_db.total_cmp(&current.loss.nominal_db) {
                         std::cmp::Ordering::Less => true,
                         std::cmp::Ordering::Greater => false,
-                        std::cmp::Ordering::Equal =>
-                            candidate.loss.lower_db.total_cmp(&current.loss.lower_db)
-                                == std::cmp::Ordering::Less,
+                        std::cmp::Ordering::Equal => {
+                            match candidate.loss.lower_db.total_cmp(&current.loss.lower_db) {
+                                std::cmp::Ordering::Less => true,
+                                std::cmp::Ordering::Greater => false,
+                                std::cmp::Ordering::Equal =>
+                                    candidate.link_ids < current.link_ids,
+                            }
+                        }
                     }
                 }
             }
@@ -610,7 +621,11 @@ pub fn find_optical_route(
     if destination >= node_count {
         return Err(PhotonicEnvelopeError::OpticalNodeOutOfRange(destination));
     }
+    let mut seen_link_ids = HashSet::with_capacity(links.len());
     for link in links {
+        if !seen_link_ids.insert(link.id) {
+            return Err(PhotonicEnvelopeError::DuplicateOpticalLinkId(link.id));
+        }
         if link.from >= node_count {
             return Err(PhotonicEnvelopeError::OpticalNodeOutOfRange(link.from));
         }
@@ -630,6 +645,7 @@ pub fn find_optical_route(
     if source == destination {
         return Ok(Some(OpticalRoute {
             nodes: vec![source],
+            link_ids: Vec::new(),
             total_loss_db: LossIntervalDb { lower_db: 0.0, nominal_db: 0.0, upper_db: 0.0 },
             transmission_probability: ProbabilityInterval { lower: 1.0, nominal: 1.0, upper: 1.0 },
         }));
@@ -638,7 +654,12 @@ pub fn find_optical_route(
     let zero_loss = LossIntervalDb { lower_db: 0.0, nominal_db: 0.0, upper_db: 0.0 };
     let mut best: Vec<Option<RouteCandidate>> = vec![None; node_count];
     let mut settled = vec![false; node_count];
-    best[source] = Some(RouteCandidate { nodes: vec![source], cost: 0.0, loss: zero_loss });
+    best[source] = Some(RouteCandidate {
+        nodes: vec![source],
+        link_ids: Vec::new(),
+        cost: 0.0,
+        loss: zero_loss,
+    });
 
     for _ in 0..node_count {
         let mut chosen: Option<usize> = None;
@@ -674,11 +695,13 @@ pub fn find_optical_route(
             )?;
             let mut nodes = current.nodes.clone();
             nodes.push(link.to);
+            let mut link_ids = current.link_ids.clone();
+            link_ids.push(link.id);
             let cost = current.cost + link_cost(link, objective);
             if !cost.is_finite() {
                 return Err(PhotonicEnvelopeError::InvalidRouteCost);
             }
-            let candidate = RouteCandidate { nodes, cost, loss };
+            let candidate = RouteCandidate { nodes, link_ids, cost, loss };
             let should_replace = best[link.to]
                 .as_ref()
                 .is_none_or(|incumbent| route_candidate_is_better(&candidate, incumbent));
@@ -698,6 +721,7 @@ pub fn find_optical_route(
     )?;
     Ok(Some(OpticalRoute {
         nodes: route.nodes,
+        link_ids: route.link_ids,
         total_loss_db: route.loss,
         transmission_probability,
     }))
@@ -722,6 +746,8 @@ pub enum PhotonicEnvelopeError {
     OpticalNodeOutOfRange(usize),
     /// Self-loop links are rejected as noncanonical topology entries.
     SelfLoopOpticalLink(usize),
+    /// Physical-link ID occurs more than once in a supplied topology.
+    DuplicateOpticalLinkId(u64),
     /// Routing objective accumulated a non-finite cost.
     InvalidRouteCost,
     /// Invalid aggregate attempt rate.
@@ -759,6 +785,8 @@ impl fmt::Display for PhotonicEnvelopeError {
                 write!(f, "optical node {node} is out of range"),
             Self::SelfLoopOpticalLink(node) =>
                 write!(f, "optical link self-loop at node {node} is not supported"),
+            Self::DuplicateOpticalLinkId(id) =>
+                write!(f, "duplicate optical-link ID {id} in topology"),
             Self::InvalidRouteCost =>
                 write!(f, "optical route cost is not finite"),
             Self::InvalidAttemptRate(rate) =>
@@ -847,6 +875,7 @@ mod tests {
                         let lower = (from + to) as f64 * 0.1;
                         let upper = nominal + ((from + to) % 2) as f64 * 0.5;
                         OpticalLink {
+                            id: (from * node_count + to) as u64,
                             from,
                             to,
                             loss_db: LossIntervalDb::new(lower.min(nominal), nominal, upper.max(nominal)).unwrap(),
@@ -917,6 +946,7 @@ mod tests {
     fn loss_budget_check_recomputes_transmission_instead_of_trusting_public_metadata() {
         let forged = OpticalRoute {
             nodes: vec![0, 1],
+            link_ids: vec![123],
             total_loss_db: LossIntervalDb::new(10.0, 10.0, 10.0).unwrap(),
             transmission_probability: ProbabilityInterval {
                 lower: 1.0,
@@ -933,10 +963,12 @@ mod tests {
             3,
             &[
                 OpticalLink {
+                    id: 1,
                     from: 0, to: 1,
                     loss_db: LossIntervalDb::new(0.05, 0.1, 0.15).unwrap(),
                 },
                 OpticalLink {
+                    id: 2,
                     from: 1, to: 2,
                     loss_db: LossIntervalDb::new(0.05, 0.1, 0.15).unwrap(),
                 },
@@ -947,6 +979,7 @@ mod tests {
         let lossy = find_optical_route(
             2,
             &[OpticalLink {
+                id: 3,
                 from: 0, to: 1,
                 loss_db: LossIntervalDb::new(0.4, 0.4, 0.4).unwrap(),
             }],
@@ -960,18 +993,22 @@ mod tests {
     fn route_objectives_choose_shortest_nominal_loss_or_robust_loss_paths() {
         let links = vec![
             OpticalLink {
+                id: 4,
                 from: 0, to: 1,
                 loss_db: LossIntervalDb::new(0.1, 0.2, 3.0).unwrap(),
             },
             OpticalLink {
+                id: 5,
                 from: 1, to: 3,
                 loss_db: LossIntervalDb::new(0.1, 0.2, 3.0).unwrap(),
             },
             OpticalLink {
+                id: 6,
                 from: 0, to: 2,
                 loss_db: LossIntervalDb::new(0.8, 1.0, 1.2).unwrap(),
             },
             OpticalLink {
+                id: 7,
                 from: 2, to: 3,
                 loss_db: LossIntervalDb::new(0.8, 1.0, 1.2).unwrap(),
             },
@@ -987,8 +1024,11 @@ mod tests {
         ).unwrap().unwrap();
 
         assert_eq!(fewest.nodes, vec![0, 1, 3]);
+        assert_eq!(fewest.link_ids, vec![4, 5]);
         assert_eq!(nominal.nodes, vec![0, 1, 3]);
+        assert_eq!(nominal.link_ids, vec![4, 5]);
         assert_eq!(robust.nodes, vec![0, 2, 3]);
+        assert_eq!(robust.link_ids, vec![6, 7]);
         near(nominal.total_loss_db.nominal_db, 0.4);
         near(nominal.total_loss_db.upper_db, 6.0);
         near(robust.total_loss_db.upper_db, 2.4);
@@ -998,10 +1038,12 @@ mod tests {
     #[test]
     fn parallel_link_ties_are_independent_of_input_order() {
         let conservative = OpticalLink {
+            id: 10,
             from: 0, to: 1,
             loss_db: LossIntervalDb::new(0.5, 1.0, 2.0).unwrap(),
         };
         let fragile = OpticalLink {
+            id: 20,
             from: 0, to: 1,
             loss_db: LossIntervalDb::new(0.1, 1.0, 5.0).unwrap(),
         };
@@ -1011,6 +1053,7 @@ mod tests {
             ).unwrap().unwrap();
             near(route.total_loss_db.upper_db, 2.0);
             near(route.total_loss_db.lower_db, 0.5);
+            assert_eq!(route.link_ids, vec![10]);
         }
     }
 
@@ -1029,6 +1072,7 @@ mod tests {
         assert!(find_optical_route(0, &[], 0, 0, OpticalRouteObjective::FewestHops).is_err());
         assert!(find_optical_route(2, &[], 2, 0, OpticalRouteObjective::FewestHops).is_err());
         let self_loop = [OpticalLink {
+            id: 99,
             from: 0, to: 0, loss_db: LossIntervalDb::new(0.0, 0.0, 0.0).unwrap()
         }];
         assert!(matches!(
