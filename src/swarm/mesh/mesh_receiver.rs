@@ -892,15 +892,11 @@ mod tests {
             source: PEER_A,
             thought_id: packet.thought_id(),
         };
-        let before = receiver
-            .pending
-            .get(&key)
-            .expect("first fragment creates pending assembly")
-            .last_fragment_at;
+        // Backdate deterministically instead of depending on sleep timing.
+        let before = Instant::now() - Duration::from_secs(1);
+        receiver.pending.get_mut(&key).unwrap().last_fragment_at = before;
 
-        // Make the distinction from the old implementation observable without
-        // relying on timeout timing: the timestamp itself must remain unchanged.
-        std::thread::sleep(Duration::from_millis(2));
+        // A duplicate must not count as new progress or move the deadline.
         receiver.receive_fragment(PEER_A, &wire[0]);
 
         let after = receiver
@@ -925,7 +921,6 @@ mod tests {
             thought_id: packet.thought_id(),
         };
         let assembly = receiver.pending.get(&key).unwrap();
-        let before = assembly.last_fragment_at;
         assert_eq!(assembly.last_fragment_index, Some(0));
 
         // Fragment 1 still looks like a valid non-final data fragment, but its
@@ -934,7 +929,9 @@ mod tests {
         malformed[3] = malformed[3].saturating_add(1);
         recompute_wire_crc(&mut malformed);
 
-        std::thread::sleep(Duration::from_millis(2));
+        // Backdate to make any accidental refresh visible deterministically.
+        let before = Instant::now() - Duration::from_secs(1);
+        receiver.pending.get_mut(&key).unwrap().last_fragment_at = before;
         assert!(receiver.receive_fragment(PEER_A, &malformed).is_none());
 
         let after = receiver.pending.get(&key).unwrap();
