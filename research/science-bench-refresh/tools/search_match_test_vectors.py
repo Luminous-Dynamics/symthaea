@@ -112,7 +112,7 @@ def main() -> int:
         "exact_digest",
         1_000_000,
         1_000_000,
-        sha256(b"exact-matched-answer-snippet"),
+        sha256(b"opaque-reference-id"),
         sha256(b"exact-matched-answer-snippet"),
     )
     write_json(output / "explicit-answer-report.json", explicit_answer)
