@@ -292,7 +292,7 @@ impl PolicyPinnedLedger {
             }
             policies.push(PolicyVersion {
                 version: policy.policy_version,
-                recorded_at,
+                recorded_at: recorded_at.clone(),
                 sources,
             });
             last_version = policy.policy_version;
@@ -397,7 +397,7 @@ impl PolicyPinnedLedger {
 
     fn compute_admission(&self, event_index: usize) -> Admission {
         let record = &self.events[event_index];
-        let Some(policy) = self.policy_at(record.recorded_at) else {
+        let Some(policy) = self.policy_at(record.recorded_at.clone()) else {
             return Admission {
                 admitted: false,
                 record_policy_version: None,
@@ -473,7 +473,7 @@ impl PolicyPinnedLedger {
         non_empty(&query.attribute, "query attribute")?;
         let valid_at = parse_day(&query.valid_at, "query valid_at")?;
         let known_at = parse_time(&query.known_at, "query known_at")?;
-        let policy = self.policy_at(known_at);
+        let policy = self.policy_at(known_at.clone());
         let mut excluded_events = Vec::new();
         let mut applied_retractions = Vec::new();
         let mut retracted_ids = BTreeSet::new();
