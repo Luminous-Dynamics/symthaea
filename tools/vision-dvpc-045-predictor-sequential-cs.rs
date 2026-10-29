@@ -326,7 +326,7 @@ fn make_case(name:&'static str,weak:bool,means:[f64;2],predictor_kind:u8)->predi
         _=>vec![means[1],means[0]],
     };
     predictor::Dgp{
-        name:name.to_owned().leak(),
+        name,
         h:if weak{vec![0.01,0.99]}else{vec![0.5,0.5]},
         pi:vec![0.5,0.5],
         reward_mean:means.to_vec(),
@@ -361,10 +361,14 @@ struct Aggregate{
     point_hits:usize,sequence_hits:usize,promotion_hits:usize,reversed_hits:usize,
     width_sum:f64,width_sq_sum:f64,lower_sum:f64,upper_sum:f64,
     elapsed_sum:f64,elapsed_sq_sum:f64,promotion_times:Vec<usize>,trials:usize,
+    root_checks:u64,root_failures:u64,endpoint_collisions:u64,
 }
 impl Aggregate{
-    fn add(&mut self,interval:Interval,point:bool,sequence:bool,promotion:Option<usize>,elapsed:f64){
+    fn add(&mut self,interval:Interval,point:bool,sequence:bool,promotion:Option<usize>,elapsed:f64,diagnostics:Diagnostics){
         self.trials+=1;
+        self.root_checks+=diagnostics.root_checks;
+        self.root_failures+=diagnostics.root_failures;
+        self.endpoint_collisions+=diagnostics.endpoint_collisions;
         if point{self.point_hits+=1;}
         if sequence{self.sequence_hits+=1;}
         if interval.reversed(){self.reversed_hits+=1;}
@@ -440,8 +444,9 @@ fn simulate_case(dgp:predictor::Dgp,index:usize,reps:usize,looks:&[usize])->Resu
             }
             while look_index<looks.len()&&looks[look_index]==t{
                 for method in 0..2{
+                    let diagnostics=if method==0{raw.diagnostics}else{adjusted.diagnostics};
                     aggregates[method][look_index].add(intervals[method],intervals[method].covers(audit.true_value),
-                        sequence_covered[method],promotion_times[method],elapsed[method]);
+                        sequence_covered[method],promotion_times[method],elapsed[method],diagnostics);
                 }
                 look_index+=1;
             }
@@ -488,7 +493,7 @@ fn emit_case(out:&mut String,result:&CaseResult,looks:&[usize]){
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmean_method_elapsed_seconds\t{:.8}\t{:.8}\t-\t-",result.name,methods[method],look,elapsed,elapsed_se);
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tpromotion_time_median_conditional\t{}\t-\t-\t-",result.name,methods[method],look,median(&a.promotion_times).map(|x|x.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tpromotion_time_p90_conditional\t{}\t-\t-\t-",result.name,methods[method],look,percentile90(&a.promotion_times).map(|x|x.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
-            let _=writeln!(out,"ROOT_METRIC\t{}\t{}\t{}\tchecks\t{}\tfailures\t{}",result.name,look,methods[method],result.root_checks[method],result.root_failures[method]);
+            let _=writeln!(out,"ROOT_METRIC\t{}\t{}\t{}\tchecks\t{}\tfailures\t{}\tcollisions\t{}",result.name,look,methods[method],a.root_checks,a.root_failures,a.endpoint_collisions);
         }
     }
     let _=writeln!(out,"SYSTEM\t{}\tseconds\t{:.6}\tobservations\t{}\tobservations_per_second\t{:.3}",result.name,result.elapsed_seconds,result.observations,result.observations as f64/result.elapsed_seconds.max(1e-12));
