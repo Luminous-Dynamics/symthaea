@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/search-exposure-receipt.schema.json",
+  "title": "Symthaea Search Exposure Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "generation_id",
+    "policy_revision_sha256",
+    "task_ref_sha256",
+    "network_policy",
+    "allowed_hosts",
+    "expected_event_count",
+    "final_event_sha256",
+    "events",
+    "receipt_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_search_exposure_receipt.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "policy_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task_ref_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Opaque digest for the task input/reference, not a task answer or target."
+    },
+    "network_policy": {
+      "enum": [
+        "isolated",
+        "audited_open_web",
+        "controlled_allowlist"
+      ]
+    },
+    "allowed_hosts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\\.([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$"
+      }
+    },
+    "expected_event_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 250000
+    },
+    "final_event_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 250000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "event_kind",
+          "decision",
+          "request_sha256",
+          "host",
+          "response_sha256",
+          "previous_event_sha256",
+          "event_sha256"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "event_kind": {
+            "enum": [
+              "search_query",
+              "fetch",
+              "redirect",
+              "cache_hit",
+              "network_request"
+            ]
+          },
+          "decision": {
+            "enum": [
+              "allow",
+              "block"
+            ]
+          },
+          "request_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "host": {
+            "type": "string",
+            "pattern": "^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\\.([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$"
+          },
+          "response_sha256": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_event_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "event_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "receipt_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "description": "A run-level receipt for observable retrieval/network actions. Store only digests for query/request/response content. This schema does not authenticate the runner or prove all network channels were logged. Anchor the final receipt commitment outside the runner before relying on tamper evidence."
+}
