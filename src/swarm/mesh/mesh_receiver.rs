@@ -17,7 +17,7 @@
 //! - **Peer discovery**: Learns about peers from received data.
 //! - **Telemetry**: Fragment loss rates, FEC recovery stats, peer visibility.
 
-use super::{FragmentAssembler, LoRaFragment, WISDOM_PACKET_SIZE, WisdomPacket};
+use super::{FragmentAssembler, LoRaFragment, PAYLOAD_SIZE, WISDOM_PACKET_SIZE, WisdomPacket};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -74,6 +74,9 @@ pub struct ReceiverStats {
     pub fragments_received: u64,
     /// Fragments rejected by CRC-16 validation (corrupted in transit).
     pub fragments_corrupt: u64,
+    /// Valid-CRC fragments rejected because the advertised shard count exceeds the
+    /// configured encoded-message size budget.
+    pub fragments_oversize: u64,
     /// Duplicate fragments (same position already received, ignored).
     pub fragments_duplicate: u64,
     /// Whole packets received (B.A.T.M.A.N./Yggdrasil, no fragmentation).
@@ -140,8 +143,11 @@ pub struct MeshReceiver {
     peers: HashMap<[u8; 8], MeshPeer>,
     /// Timeout for incomplete assemblies before expiry.
     timeout: Duration,
-    /// Expected payload size for WisdomPacket reassembly.
+    /// Expected decoded payload size for WisdomPacket reassembly (nominal for legacy envelopes).
     expected_payload_size: usize,
+    /// Maximum allowed encoded bytes for a fragmented envelope before state allocation.
+    /// Defaults to WISDOM_PACKET_SIZE plus 92 bytes of envelope/transport margin.
+    max_encoded_payload_size: usize,
     /// Maximum concurrent pending assemblies (prevents memory exhaustion).
     max_pending: usize,
     /// Maximum recently-completed keys to remember (ring buffer).
@@ -167,6 +173,7 @@ impl MeshReceiver {
             peers: HashMap::new(),
             timeout: Duration::from_secs(30),
             expected_payload_size: WISDOM_PACKET_SIZE,
+            max_encoded_payload_size: WISDOM_PACKET_SIZE + 92,
             max_pending: 64,
             max_recent: 32,
             stats: ReceiverStats::default(),
@@ -215,6 +222,15 @@ impl MeshReceiver {
     /// Set the expected payload size (default: [`WISDOM_PACKET_SIZE`]).
     pub fn with_expected_payload_size(mut self, size: usize) -> Self {
         self.expected_payload_size = size;
+        self
+    }
+
+    /// Set the maximum accepted encoded envelope length before any assembly state is allocated.
+    ///
+    /// The default is WISDOM_PACKET_SIZE + 92 to allow compression/encryption envelope overhead.
+    /// This is an independent admission limit from the nominal decoded payload size.
+    pub fn with_max_encoded_payload_size(mut self, size: usize) -> Self {
+        self.max_encoded_payload_size = size;
         self
     }
 
@@ -285,6 +301,25 @@ impl MeshReceiver {
                 self.stats.packets_decrypt_failed += 1;
                 return None;
             }
+        }
+
+        // Bound peer-controlled fragment-count metadata before creating an assembler.
+        // Legacy headers do not carry exact encoded length, so use the configured maximum
+        // envelope size as an upper bound and reject impossible counts before allocation.
+        let Some(rounded_max_size) = self
+            .max_encoded_payload_size
+            .checked_add(PAYLOAD_SIZE - 1)
+        else {
+            self.stats.fragments_oversize += 1;
+            return None;
+        };
+        let max_data_fragments = rounded_max_size / PAYLOAD_SIZE;
+        let max_total_fragments = max_data_fragments.saturating_add(1).min(255);
+        if self.max_encoded_payload_size == 0
+            || usize::from(frag.total_fragments) > max_total_fragments
+        {
+            self.stats.fragments_oversize += 1;
+            return None;
         }
 
         self.stats.fragments_received += 1;
