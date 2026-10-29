@@ -7,7 +7,7 @@
     "source_path": "crates/domains/symthaea-muse/src/audio_preservation.rs",
     "source_blob_sha": "771b75ee53dcb42f4ee594a2589a2e241e9a8257",
     "runner_path": "crates/domains/symthaea-muse/examples/mel_mr_eval_006_conformance.rs",
-    "runner_blob_sha": "d43e960af838bd090187e1e8d66a285e4ec38dcf",
+    "runner_blob_sha": "fa45c83a180b542e6e98cbbbcf0a24696cb2cb55",
     "claimed_execution_of_rust": false
   },
   "evaluator": {
@@ -49,14 +49,14 @@
     "critical_false_accepts": 0,
     "critical_false_accept_rate": 0,
     "critical_false_accept_rate_wilson_95_two_sided": {
-      "lower": 2.7755575615628914e-17,
+      "lower": 0,
       "upper": 0.3903342879021653
     },
     "positive_controls_total": 3,
     "false_rejections": 0,
     "false_rejection_rate": 0,
     "false_rejection_rate_wilson_95_two_sided": {
-      "lower": 5.551115123125783e-17,
+      "lower": 0,
       "upper": 0.5614970317550454
     },
     "caveat": "The 0/6 false-accept panel has a two-sided 95% Wilson upper bound of about 39.0%; this is only a smoke test and does not support a reliability claim."
@@ -74,7 +74,7 @@
       "critical_mutations": 3,
       "critical_false_accepts": 0,
       "critical_false_accept_rate_wilson_95_two_sided": {
-        "lower": 5.551115123125783e-17,
+        "lower": 0,
         "upper": 0.5614970317550454
       }
     },
@@ -90,7 +90,7 @@
       "critical_mutations": 3,
       "critical_false_accepts": 0,
       "critical_false_accept_rate_wilson_95_two_sided": {
-        "lower": 5.551115123125783e-17,
+        "lower": 0,
         "upper": 0.5614970317550454
       }
     },
