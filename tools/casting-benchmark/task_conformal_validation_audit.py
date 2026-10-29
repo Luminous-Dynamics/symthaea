@@ -293,12 +293,14 @@ def evaluate(
             reasons.append("insufficient_tasks_with_recommendations")
         if not n:
             decision_state = "inconclusive"
+        elif upper is not None and upper > contract["risk_target"]:
+            # A risk-bound failure is a known promotion failure. Do not mask it
+            # with an unrelated small total-validation sample.
+            decision_state = "fail"
         elif reasons:
             decision_state = "inconclusive"
-        elif upper is not None and upper <= contract["risk_target"]:
-            decision_state = "pass"
         else:
-            decision_state = "fail"
+            decision_state = "pass"
         if decision_state == "fail":
             hard_failure = True
         elif decision_state == "inconclusive":
