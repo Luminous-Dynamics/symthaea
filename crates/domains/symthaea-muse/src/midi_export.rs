@@ -29,7 +29,11 @@ struct MidiEvent {
 
 #[derive(Debug, Clone)]
 enum MidiEventType {
-    NoteOn { note: u8, velocity: u8 },
+    NoteOn {
+        note: u8,
+        velocity: u8,
+        source_event_index: Option<usize>,
+    },
     NoteOff { note: u8 },
     Tempo(u32),            // microseconds per beat
     TimeSignature(u8, u8), // numerator, denominator power of 2
@@ -44,6 +48,7 @@ struct ScheduledNote {
     off: u64,
     pitch: u8,
     velocity: u8,
+    source_event_index: Option<usize>,
 }
 
 /// Build NoteOn/NoteOff events for `notes` on `channel`, resolving the
@@ -92,6 +97,7 @@ fn sanitized_note_events(channel: u8, mut notes: Vec<ScheduledNote>) -> Vec<Midi
             event_type: MidiEventType::NoteOn {
                 note: note.pitch,
                 velocity: note.velocity,
+                source_event_index: note.source_event_index,
             },
         });
         events.push(MidiEvent {
@@ -404,7 +410,8 @@ fn export_performance_midi_impl(
         let scheduled: Vec<ScheduledNote> = voice
             .notes
             .iter()
-            .map(|n| {
+            .zip(voice.source_event_indices.iter())
+            .map(|(n, source_event_index)| {
                 let on = secs_to_ticks(n.start_time, score.tempo_bpm);
                 let off = secs_to_ticks(n.start_time + n.duration, score.tempo_bpm).max(on + 1);
                 ScheduledNote {
@@ -412,6 +419,7 @@ fn export_performance_midi_impl(
                     off,
                     pitch: freq_to_midi(n.frequency),
                     velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                    source_event_index: *source_event_index,
                 }
             })
             .collect();
@@ -550,6 +558,7 @@ pub fn export_score_midi(
     };
 
     let beats_to_ticks = |beats: f64| (beats * TICKS_PER_BEAT as f64).round() as u64;
+    let ordered_score_events = score.events();
     let mut tracks = vec![tempo_track];
     for (role, name, channel, instrument) in [
         (TheoryRole::Melody, "Melody", 0u8, melody_i),
@@ -564,10 +573,16 @@ pub fn export_score_midi(
             channel,
             event_type: MidiEventType::ProgramChange(instrument.gm_program()),
         }];
-        let scheduled: Vec<ScheduledNote> = score
-            .voice(role)
+        let role_notes = score.voice(role);
+        let source_indices: Vec<usize> = ordered_score_events
             .iter()
-            .map(|n| {
+            .enumerate()
+            .filter_map(|(index, event)| (event.role == role).then_some(index))
+            .collect();
+        let scheduled: Vec<ScheduledNote> = role_notes
+            .iter()
+            .zip(source_indices)
+            .map(|(n, source_event_index)| {
                 let on = beats_to_ticks(n.onset.beats());
                 let off = beats_to_ticks((n.onset + n.duration).beats()).max(on + 1);
                 ScheduledNote {
@@ -575,6 +590,7 @@ pub fn export_score_midi(
                     off,
                     pitch: n.pitch.midi(),
                     velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                    source_event_index: Some(source_event_index),
                 }
             })
             .collect();
@@ -664,7 +680,24 @@ fn encode_track(track: &Track) -> Vec<u8> {
         last_tick = event.tick;
 
         match &event.event_type {
-            MidiEventType::NoteOn { note, velocity } => {
+            MidiEventType::NoteOn {
+                note,
+                velocity,
+                source_event_index,
+            } => {
+                if let Some(source_event_index) = source_event_index {
+                    let payload = crate::performed_event_map::encode_midi_lineage_marker_payload(
+                        *source_event_index,
+                        0,
+                    );
+                    // Sequencer-specific marker shares the NoteOn tick and is
+                    // immediately followed by that NoteOn with zero delta.
+                    data.push(0xFF);
+                    data.push(0x7F);
+                    write_vlq(&mut data, payload.len() as u32);
+                    data.extend_from_slice(&payload);
+                    write_vlq(&mut data, 0);
+                }
                 data.push(0x90 | (event.channel & 0x0F));
                 data.push(*note & 0x7F);
                 data.push(*velocity & 0x7F);
@@ -768,12 +801,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
+source_event_index: None,
             },
             ScheduledNote {
                 on: 5,
                 off: 15,
                 pitch: 60,
                 velocity: 90,
+source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -808,12 +843,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
+source_event_index: None,
             },
             ScheduledNote {
                 on: 0,
                 off: 8,
                 pitch: 60,
                 velocity: 90,
+source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -845,12 +882,14 @@ mod tests {
                 off: 20,
                 pitch: 60,
                 velocity: 100,
+source_event_index: None,
             },
             ScheduledNote {
                 on: 5,
                 off: 15,
                 pitch: 64,
                 velocity: 90,
+source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -872,12 +911,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
+source_event_index: None,
             },
             ScheduledNote {
                 on: 20,
                 off: 15,
                 pitch: 62,
                 velocity: 100,
+source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -895,6 +936,7 @@ mod tests {
                 event_type: MidiEventType::NoteOn {
                     note: 64,
                     velocity: 90,
+                    source_event_index: None,
                 },
             },
             MidiEvent {
