@@ -104,6 +104,22 @@ Report the mutation denominator, attempted/applicable/killed/survived/inconclusi
 
 Two orthogonal controls are essential: (1) the deny-all mutant must fail because valid positive controls stop completing, and (2) the no-op adapter mutant must fail because an authorized operation lacks its independently observed effect/postcondition. Together they prevent a benchmark from looking secure by blocking everything or reporting success without doing anything. The context-insensitivity mutant belongs to the alignment lane; it does not test production runtime authority.
 
+## Event evidence ledger and denominator conservation
+
+Current agent-security research also shows why the execution trace matters. TraceProbe executes sandbox scenarios, looks for latent intermediate-rule violations as well as endpoint failures, and replays recorded tool actions to localize failures ([ACL Anthology, EMNLP 2026](https://aclanthology.org/2026.emnlp-main.1233/)). NIST's October 27, 2026 agent-identity tenets explicitly include independent, append-only, tamper-evident evidence covering identity, delegated intent and resulting actions ([NIST](https://www.nist.gov/blogs/cybersecurity-insights/design-tenets-agent-identity-management-systems)). Symthaea should therefore account for events at the effect boundary and validate the trace, not infer execution from model output or process exit status.
+
+The new Rust module `xtask/src/effect_evidence_ledger.rs` is wired as:
+
+```sh
+cargo run -p xtask -- authorization-evidence-ledger
+```
+
+It checks an event log against an independently supplied expected-case-set manifest, validates a contiguous sequence and SHA-256 previous-hash chain, rejects events after a terminal record, enforces a one-shot event/state contract, reconciles every expected case with exactly one start and terminal row, and checks that a confirmed outcome has an observed effect, a confirmed postcondition and a verified receipt. It separately counts adapter invocations, observed effects, confirmed/failed postconditions, unknown outcomes and rejected receipts. The committed synthetic smoke fixture has one valid allow case and one denied case; it is designed to exercise the verifier and is not an actual policy/runtime experiment.
+
+The record hash uses an explicit, field-ordered, length-prefixed byte encoding instead of relying on JSON object-key order. The expected case IDs come from a separate file, and their digest is bound into the ledger, so dropping an entire case from a trace cannot silently redefine the denominator while the case manifest remains unchanged.
+
+**Limits matter:** this command validates a self-consistent trace; it does not authenticate the event producer, prove that an event is true, or prove that a malicious log owner did not rewrite and recompute an unanchored chain. That requires an independently held signed run receipt or externally published checkpoint/root. The command therefore reports external attestation as not provided and never labels its output a security qualification. Production integration must emit the ledger at the actual adapter/effect boundary, preserve raw rows outside the model's write control, bind source/model/toolchain/configuration digests, and verify the final receipt in an independent verifier.
+
 ## Implementation sequence
 
 1. Keep #8769 focused on the executable 41-vector effect harness, real test adapter instrumentation, independent witnesses, positive utility controls and fail-closed outcome accounting.
