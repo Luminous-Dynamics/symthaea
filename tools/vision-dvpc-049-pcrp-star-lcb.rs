@@ -219,42 +219,108 @@ fn log_crp_wealth(values: &[f64], candidate_mean: f64, bet: f64) -> f64 {
     total
 }
 
+#[derive(Clone, Debug)]
+struct ScoreProfile {
+    // Exact run-length compression: equal finite score values are represented by
+    // (score, multiplicity). This changes arithmetic cost, not the mathematical sum.
+    bins: Vec<(f64, usize)>,
+    n: usize,
+    sum: f64,
+}
+
+impl ScoreProfile {
+    fn new(values: &[f64]) -> Result<Self, String> {
+        if values.is_empty() {
+            return Err("score profile requires a nonempty stream".into());
+        }
+        if values.iter().any(|y| !y.is_finite() || *y < 0.0) {
+            return Err("scores must be finite and nonnegative".into());
+        }
+        let sum: f64 = values.iter().sum();
+        if !sum.is_finite() {
+            return Err("score sum overflowed".into());
+        }
+        let mut sorted = values.to_vec();
+        sorted.sort_by(f64::total_cmp);
+        let mut bins: Vec<(f64, usize)> = Vec::new();
+        for value in sorted {
+            if let Some((last_value, count)) = bins.last_mut() {
+                if *last_value == value {
+                    *count += 1;
+                    continue;
+                }
+            }
+            bins.push((value, 1));
+        }
+        Ok(Self { bins, n: values.len(), sum })
+    }
+
+    fn mean(&self) -> f64 {
+        self.sum / self.n as f64
+    }
+}
+
+fn log_crp_wealth_profile(profile: &ScoreProfile, candidate_mean: f64, bet: f64) -> f64 {
+    if bet <= 0.0 {
+        return 0.0;
+    }
+    if bet >= 1.0 {
+        if profile.bins.iter().any(|(y, _)| *y == 0.0) {
+            return f64::NEG_INFINITY;
+        }
+        return profile.bins.iter()
+            .map(|(y, count)| (*count as f64) * (y.ln() - candidate_mean.ln()))
+            .sum();
+    }
+
+    let log_cash = (-bet).ln_1p();
+    let log_bet = bet.ln();
+    let log_mean = candidate_mean.ln();
+    let mut total = 0.0;
+    for (y, count) in &profile.bins {
+        let log_risky = if *y == 0.0 {
+            f64::NEG_INFINITY
+        } else {
+            log_bet + y.ln() - log_mean
+        };
+        let term = log_add_exp(log_cash, log_risky);
+        if !term.is_finite() {
+            return term;
+        }
+        total += (*count as f64) * term;
+    }
+    total
+}
+
 /// Monotone lower witness for sup_{b in [0,1]} log CRP wealth.
 ///
 /// The candidate bet grid is fixed independently of candidate_mean. Each CRP
 /// log wealth is nonincreasing in candidate_mean, and the maximum over this fixed
 /// grid is therefore also nonincreasing. The grid maximum is no larger than the
 /// continuous supremum, so inversion remains conservative though possibly looser.
-fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, String> {
-    if values.is_empty() || !candidate_mean.is_finite() || candidate_mean <= 0.0 {
-        return Err("need a nonempty stream and a positive finite candidate mean".into());
+fn log_sup_crp_wealth_profile(profile: &ScoreProfile, candidate_mean: f64) -> Result<f64, String> {
+    if !candidate_mean.is_finite() || candidate_mean <= 0.0 {
+        return Err("candidate mean must be positive and finite".into());
     }
-    if values.iter().any(|y| !y.is_finite() || *y < 0.0) {
-        return Err("scores must be finite and nonnegative".into());
-    }
-    let sum: f64 = values.iter().sum();
-    if !sum.is_finite() {
-        return Err("score sum overflowed".into());
-    }
-    let mean = sum / values.len() as f64;
+    let mean = profile.mean();
     if candidate_mean >= mean {
         // For a nonnegative process, b=0 attains the exact supremum of log wealth.
         return Ok(0.0);
     }
 
-    // b=0 is included, so best is nonnegative; the grid is fixed for every candidate mean.
     let mut best = 0.0_f64;
     for i in 1..=BET_GRID_STEPS {
         let bet = i as f64 / BET_GRID_STEPS as f64;
-        best = best.max(log_crp_wealth(values, candidate_mean, bet));
+        best = best.max(log_crp_wealth_profile(profile, candidate_mean, bet));
     }
-    // A candidate-independent multiplicative margin preserves the grid witness's
-    // monotonicity in candidate_mean. A candidate-dependent additive pad could, in
-    // principle, make (best - pad) rise locally as best and the pad both shrink.
-    let shrink = (1.0
-        - 64.0 * f64::EPSILON * (values.len() as f64 + 1.0))
-        .max(0.0);
+    // A candidate-independent multiplicative margin preserves monotonicity in candidate_mean.
+    let shrink = (1.0 - 64.0 * f64::EPSILON * (profile.n as f64 + 1.0)).max(0.0);
     Ok(best * shrink)
+}
+
+fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, String> {
+    let profile = ScoreProfile::new(values)?;
+    log_sup_crp_wealth_profile(&profile, candidate_mean)
 }
 
 /// Conservative fixed-grid pCRP-star LCB witness based on Ryu et al. (COLT 2025), Eq. (3.3)-(3.5).
@@ -263,20 +329,11 @@ fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, 
 /// This approximation uses a fixed-grid lower witness for that supremum, so its LCB can
 /// only be lower (more conservative) than the exact continuous-supremum LCB.
 fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
-    if values.is_empty() {
-        return Err("confidence bound requires at least one observation".into());
-    }
     if !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
         return Err("delta must lie strictly between zero and one".into());
     }
-    if values.iter().any(|y| !y.is_finite() || *y < 0.0) {
-        return Err("scores must be finite and nonnegative".into());
-    }
-    let sum: f64 = values.iter().sum();
-    if !sum.is_finite() {
-        return Err("score sum overflowed".into());
-    }
-    let mean = sum / values.len() as f64;
+    let profile = ScoreProfile::new(values)?;
+    let mean = profile.mean();
     if mean == 0.0 {
         return Ok(0.0);
     }
@@ -291,7 +348,7 @@ fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
         if probe <= 0.0 {
             break;
         }
-        let log_wealth = log_sup_crp_wealth_lower(values, probe)?;
+        let log_wealth = log_sup_crp_wealth_profile(&profile, probe)?;
         if log_wealth > log_threshold {
             lo = Some(probe);
             break;
@@ -309,7 +366,7 @@ fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
         if mid == low || mid == hi {
             break;
         }
-        let log_wealth = log_sup_crp_wealth_lower(values, mid)?;
+        let log_wealth = log_sup_crp_wealth_profile(&profile, mid)?;
         if log_wealth > log_threshold {
             low = mid;
         } else {
@@ -652,6 +709,24 @@ mod tests {
             (a - b).abs() <= tolerance * (1.0 + a.abs().max(b.abs())),
             "actual={a:.15}, expected={b:.15}, tolerance={tolerance}"
         );
+    }
+
+    #[test]
+    fn compressed_profile_matches_direct_crp_wealth() {
+        let values = [0.0, 0.0, 0.2, 0.2, 0.8, 1.5, 1.5];
+        let profile = ScoreProfile::new(&values).unwrap();
+        for &nu in &[0.1_f64, 0.4, 0.9] {
+            for i in 0..=128 {
+                let bet = i as f64 / 128.0;
+                let direct = log_crp_wealth(&values, nu, bet);
+                let compressed = log_crp_wealth_profile(&profile, nu, bet);
+                if direct == f64::NEG_INFINITY {
+                    assert_eq!(compressed, f64::NEG_INFINITY);
+                } else {
+                    close(compressed, direct, 1.0e-12);
+                }
+            }
+        }
     }
 
     #[test]
