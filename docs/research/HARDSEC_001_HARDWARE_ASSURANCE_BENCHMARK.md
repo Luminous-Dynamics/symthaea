@@ -168,6 +168,12 @@ Use a canonical serialization and explicit hash domain/version before any record
 
 A failed replay, digest mismatch, unknown configuration, absent coverage, or verifier failure returns **inconclusive**; never silently coerce it to **secure**.
 
+### Reuse cross-repository foundations rather than fork them
+
+Before adding a second model-confidence or abstention subsystem, review Symtropy's existing [MINE-MCRED-001 model-credibility gate](https://github.com/Luminous-Dynamics/symtropy/issues/2179), which already treats stale telemetry, residual drift, degraded-model latching and recovery as explicit admission states. HARDSEC may reuse its general credibility vocabulary and test patterns, but must add hardware-specific assumptions, capture provenance and the strict distinction between attempted attack and verified security effect. Do not import an industrial process model's calibration envelope as if it were evidence about CPU behavior.
+
+For reproducible execution when shared CI runners are unavailable, coordinate with Symtropy's [QUAL-002 hermetic qualification work](https://github.com/Luminous-Dynamics/symtropy/issues/1280). This is a potential independent execution path, not proof that the current PR has been compiled: the exact code/configuration and retained test output still have to match. Do not register a persistent personal workstation as a general public-PR runner.
+
 ## 10. Future lanes (separate qualification)
 
 ### RTL and hardware-Trojan lane
