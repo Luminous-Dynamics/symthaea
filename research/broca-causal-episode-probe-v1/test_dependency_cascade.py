@@ -162,6 +162,44 @@ class DependencyCascadeTests(unittest.TestCase):
             {"db_endpoint", "service_dsn", "worker_dsn", "alert_threshold"},
         )
 
+    def test_deep_dependency_chain_does_not_depend_on_python_recursion_limit(self) -> None:
+        depth = 1500
+        claims = []
+        for index in range(depth):
+            dependencies = [] if index == 0 else [dep(f"node-{index - 1:04d}", 1)]
+            claims.append(claim(f"node-{index:04d}", 1, f"value-{index}", dependencies))
+        report = evaluate_snapshot({"snapshot_id": "deep-chain", "claims": claims})
+        self.assertEqual(report["latest_claim_count"], depth)
+        self.assertEqual(report["state_counts"]["current"], depth)
+        self.assertEqual(len(report["current_claims"]), depth)
+        self.assertEqual(report["absence_claims"], [])
+
+    def test_claim_input_order_does_not_change_revision_statuses(self) -> None:
+        original = {
+            "snapshot_id": "order-invariance",
+            "claims": [
+                claim("root", 1, "R"),
+                claim("left", 1, "L", [dep("root", 1)]),
+                claim("right", 1, "X", [dep("root", 1)]),
+                claim("leaf", 1, "Y", [dep("left", 1), dep("right", 1)]),
+            ],
+        }
+        reversed_snapshot = {
+            "snapshot_id": original["snapshot_id"],
+            "claims": list(reversed(original["claims"])),
+        }
+        a = evaluate_snapshot(original)
+        b = evaluate_snapshot(reversed_snapshot)
+        key = lambda report: {
+            (row["claim_id"], row["revision"]): row["status"]
+            for row in report["evaluations"]
+        }
+        self.assertEqual(key(a), key(b))
+        self.assertEqual(
+            {row["claim_id"] for row in a["current_claims"]},
+            {row["claim_id"] for row in b["current_claims"]},
+        )
+
     def test_duplicate_claim_revision_fails_closed(self) -> None:
         snapshot = {
             "snapshot_id": "duplicate",
