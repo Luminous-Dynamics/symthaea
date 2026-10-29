@@ -282,7 +282,6 @@ fn verify_receipt(
     if inventory.coverage_status != "independently_reviewed_complete" {
         bail!("inventory must explicitly claim independently reviewed complete coverage");
     }
-
     let receipt: Receipt =
         serde_json::from_slice(receipt_bytes).context("parse signed coverage receipt")?;
     if sha256_hex(receipt_bytes)
@@ -609,7 +608,7 @@ mod tests {
 
     #[test]
     fn incomplete_inventory_cannot_be_promoted_by_a_signature() {
-        let (inventory_bytes, receipt, trust, method, trust_digest, families) =
+        let (inventory_bytes, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["org-a", "org-b"]);
         let mut inventory: Value = serde_json::from_slice(&inventory_bytes).unwrap();
         inventory["coverage_status"] = Value::String("incomplete".to_owned());
@@ -624,6 +623,6 @@ mod tests {
             &families,
         )
         .unwrap_err();
-        assert!(error.to_string().contains("does not match inventory coverage_receipt_sha256"));
+        assert!(error.to_string().contains("inventory must explicitly claim"));
     }
 }
