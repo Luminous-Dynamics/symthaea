@@ -120,3 +120,29 @@ This is intentionally a first, limited layer. It does not yet prove lineage inde
 
 
 **Ordering requirement:** this command accepts raw task-set JSON bytes and does not itself verify the associated manifest, seed commitment, or regenerated task bytes. First require the existing `verify-reveal` and `verify-regeneration` gates to pass independently for each set; then run `audit-overlap` across the relevant splits. A report saying no overlap is detected is not a standalone scoring authorization.
+
+
+## Cross-split lineage ledger and ancestry audit
+
+The lineage audit complements overlap fingerprints with explicit evaluator-side ancestry metadata. See `schema/lineage-ledger.schema.json` for the v1 sidecar format. Each ledger:
+- binds the exact task-set bytes with `task_set_sha256`;
+- covers every task ID exactly once, with no orphan or duplicate records;
+- binds each row to the canonical digest of that task's policy-visible input;
+- declares one or more typed lineage commitments for a parent world, source task, source item, or transform ancestor;
+- records whether the task has never been exposed, was public development material, appeared in a prior scored refresh, or has unknown exposure.
+
+A lineage commitment must describe a specific ancestry/world/source item. Do **not** use generic family names, schema IDs, template IDs, or corpus-version identifiers as lineage commitments; sharing those does not establish task leakage. Lineage digests are commitments, not independently authenticated facts. The ledger must remain evaluator-side, and a hash alone does not prove that the runner enforced this boundary.
+
+After each task set has independently passed `verify-reveal` and `verify-regeneration`, compare the set and its matching ledger:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  audit-lineage development-tasks.json development-lineage.json \
+  refresh-tasks.json refresh-lineage.json
+```
+
+The command validates the ledger against the exact artifact bytes and task IDs, then compares typed ancestry commitments across split boundaries. Shared parent-world/source ancestry blocks admission even when task IDs and policy-visible inputs differ. A refresh record marked as anything other than `never_exposed` also blocks admission. Exit code 8 means shared declared lineage or exposed refresh tasks; exit 2 means invalid task-set/ledger evidence. Exit 0 means no conflict was detected under the supplied lineage records—it is not a general scoring authorization.
+
+The deterministic report includes task-set and ledger digests, shared lineage commitment digests, bounded task-ID samples, and exposed-refresh counts. It does not include evaluator-only target values.
+
+The ledger cannot independently prove the truthfulness of lineage declarations, full ancestry coverage, absence of unrecorded source overlap, pretraining contamination status, or runtime isolation. Those require independent generator/evaluator audits, controlled exposure logs, and evidence that the evaluated policy cannot read evaluator-side artifacts.
