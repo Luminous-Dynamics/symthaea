@@ -67,7 +67,8 @@
         "snapshot_id",
         "sequence_index",
         "captured_at",
-        "graph_sha256"
+        "graph_sha256",
+        "previous_graph_sha256"
       ],
       "properties": {
         "snapshot_id": {
@@ -100,7 +101,8 @@
       "additionalProperties": false,
       "required": [
         "cumulative_committed",
-        "by_operation_class"
+        "by_operation_class",
+        "edits_since_previous_snapshot"
       ],
       "properties": {
         "cumulative_committed": {
@@ -229,5 +231,64 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "snapshot": {
+            "properties": {
+              "sequence_index": {
+                "const": 0
+              }
+            },
+            "required": [
+              "sequence_index"
+            ]
+          }
+        },
+        "required": [
+          "snapshot"
+        ]
+      },
+      "then": {
+        "properties": {
+          "snapshot": {
+            "properties": {
+              "previous_graph_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "edits": {
+            "properties": {
+              "edits_since_previous_snapshot": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "snapshot": {
+            "properties": {
+              "previous_graph_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "edits": {
+            "properties": {
+              "edits_since_previous_snapshot": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
