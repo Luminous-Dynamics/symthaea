@@ -547,7 +547,8 @@ mod tests {
     fn validator_rejects_undeclared_mutations_and_gold_label_leaks() {
         let pairs = validate_counterfactual_fixture_jsonl(FIXTURES).unwrap();
         let mut pair_value = serde_json::to_value(&pairs[0]).unwrap();
-        pair_value["cases"][1]["evidence"][0]["text"] = Value::String("undeclared mutation".into());
+        // The declared mutation is a text change; adding a second scope change must fail.
+        pair_value["cases"][1]["evidence"][0]["scope"] = Value::String("prod-west".into());
         let mutated = format!("{}\n", pair_value);
         assert!(validate_counterfactual_fixture_jsonl(&mutated).is_err());
 
