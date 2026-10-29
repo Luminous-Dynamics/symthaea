@@ -55,7 +55,10 @@ pub fn route_fits_minimum_transmission(
             minimum_transmission_probability,
         ));
     }
-    Ok(route.transmission_probability.lower >= minimum_transmission_probability)
+    // Do not trust the public transmission field: callers can construct OpticalRoute
+    // directly. Recompute the conservative transmission from the upper-loss bound.
+    let conservative_transmission = transmission_probability(route.total_loss_db.upper_db)?;
+    Ok(conservative_transmission >= minimum_transmission_probability)
 }
 
 /// Probability range for a component parameter, ordered lower <= nominal <= upper.
@@ -776,6 +779,20 @@ mod tests {
         near(loss_budget_db_for_minimum_transmission(1.0).unwrap(), 0.0);
         assert!(loss_budget_db_for_minimum_transmission(0.0).is_err());
         assert!(loss_budget_db_for_minimum_transmission(-0.1).is_err());
+    }
+
+    #[test]
+    fn loss_budget_check_recomputes_transmission_instead_of_trusting_public_metadata() {
+        let forged = OpticalRoute {
+            nodes: vec![0, 1],
+            total_loss_db: LossIntervalDb::new(10.0, 10.0, 10.0).unwrap(),
+            transmission_probability: ProbabilityInterval {
+                lower: 1.0,
+                nominal: 1.0,
+                upper: 1.0,
+            },
+        };
+        assert!(!route_fits_minimum_transmission(&forged, 0.92).unwrap());
     }
 
     #[test]
