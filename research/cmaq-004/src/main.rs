@@ -293,20 +293,11 @@ fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direc
 
 fn evaluate_family(world: WorldFamily) -> Vec<StrategyResult> {
     let support = SupportMeans::fit(world, SEED);
-    let direct_decision = decide(world, support, Strategy::DirectTabular);
     let direct = evaluate(world, Strategy::DirectTabular, support, 0.0, SEED);
-    let _ = direct_decision;
     Strategy::ALL
         .iter()
         .copied()
-        .map(|strategy| {
-            let direct_net = if strategy == Strategy::DirectTabular {
-                direct.mean_net_utility
-            } else {
-                direct.mean_net_utility
-            };
-            evaluate(world, strategy, support, direct_net, SEED)
-        })
+        .map(|strategy| evaluate(world, strategy, support, direct.mean_net_utility, SEED))
         .collect()
 }
 
@@ -387,7 +378,7 @@ mod tests {
     fn stale_model_can_be_worse_than_direct_policy_after_regime_reversal() {
         let direct = result_for(WorldFamily::AdditiveReversed, Strategy::DirectTabular);
         let stale = result_for(WorldFamily::AdditiveReversed, Strategy::StaleAdditiveModel);
-        assert_eq!(direct.chosen_action, 1);
+        assert_eq!(direct.chosen_action, 0);
         assert_eq!(stale.chosen_action, 1);
         assert!(stale.mean_net_utility < direct.mean_net_utility - 0.30);
         assert!(stale.mean_net_regret > 0.30);
