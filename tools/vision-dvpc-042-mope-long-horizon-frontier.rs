@@ -47,6 +47,10 @@ impl Scenario {
         Self { name: "healthy_null", behavior_action_one: 0.50, reward_mean_action_zero: 0.20,
             reward_mean_action_one: 0.80, true_value: 0.50, max_weight: 1.0 }
     }
+    fn healthy_alternative() -> Self {
+        Self { name: "healthy_alt", behavior_action_one: 0.50, reward_mean_action_zero: 0.50,
+            reward_mean_action_one: 0.80, true_value: 0.65, max_weight: 1.0 }
+    }
     fn weak_overlap_null() -> Self {
         Self { name: "weak_overlap_null", behavior_action_one: 0.99, reward_mean_action_zero: 0.20,
             reward_mean_action_one: 0.80, true_value: 0.50, max_weight: 50.0 }
@@ -390,7 +394,7 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
 }
 
 fn benchmark(replicates: usize, horizons: &[usize]) -> Result<String,String> {
-    let scenarios=[Scenario::healthy_null(),Scenario::weak_overlap_null(),Scenario::weak_overlap_alternative()];
+    let scenarios=[Scenario::healthy_null(),Scenario::healthy_alternative(),Scenario::weak_overlap_null(),Scenario::weak_overlap_alternative()];
     let mut out=String::from("record_type\tscenario\tmethod_or_field\thorizon\tmetric\testimate\tstandard_error\tci_low\tci_high\n");
     let _=writeln!(out,"SEED_SCHEDULE\tbase_seed\t{BASE_SEED}\tformula\tBASE_SEED xor scenario*D6E8FEB86659FD93 xor replicate*A0761D6478BD642F");
     let _=writeln!(out,"BENCHMARK_CONFIG\treplicates\t{replicates}\tmax_horizon\t{}",horizons.iter().max().unwrap_or(&0));
@@ -448,7 +452,7 @@ mod tests {
 
     #[test]
     fn short_seeded_benchmark_replays_and_has_no_mope_root_failures() {
-        let scenarios=[Scenario::healthy_null(),Scenario::weak_overlap_null(),Scenario::weak_overlap_alternative()];
+        let scenarios=[Scenario::healthy_null(),Scenario::healthy_alternative(),Scenario::weak_overlap_null(),Scenario::weak_overlap_alternative()];
         for (index,s) in scenarios.into_iter().enumerate() {
             let first=simulate_scenario(s,index,8,&[8]).unwrap();
             let second=simulate_scenario(s,index,8,&[8]).unwrap();
