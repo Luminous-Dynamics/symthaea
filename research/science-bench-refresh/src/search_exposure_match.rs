@@ -48,6 +48,7 @@ pub struct SearchExposureMatchReportV1 {
     pub generation_id: String,
     pub receipt_sha256: String,
     pub receipt_commitment_sha256: String,
+    pub protected_index_sha256: String,
     pub matcher_revision_sha256: String,
     pub decision_rules_sha256: String,
     pub expected_event_count: u64,
@@ -74,6 +75,7 @@ struct MatchCommitmentPayloadV1<'a> {
     generation_id: &'a str,
     receipt_sha256: &'a str,
     receipt_commitment_sha256: &'a str,
+    protected_index_sha256: &'a str,
     matcher_revision_sha256: &'a str,
     decision_rules_sha256: &'a str,
     expected_event_count: u64,
@@ -135,13 +137,14 @@ fn valid_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn match_commitment(report: &SearchExposureMatchReportV1) -> Result<String, String> {
+pub(crate) fn match_commitment(report: &SearchExposureMatchReportV1) -> Result<String, String> {
     let payload = MatchCommitmentPayloadV1 {
         schema: &report.schema,
         run_id: &report.run_id,
         generation_id: &report.generation_id,
         receipt_sha256: &report.receipt_sha256,
         receipt_commitment_sha256: &report.receipt_commitment_sha256,
+        protected_index_sha256: &report.protected_index_sha256,
         matcher_revision_sha256: &report.matcher_revision_sha256,
         decision_rules_sha256: &report.decision_rules_sha256,
         expected_event_count: report.expected_event_count,
@@ -333,6 +336,7 @@ pub fn verify_search_exposure_match_report(
     for (label, digest) in [
         ("receipt_sha256", report.receipt_sha256.as_str()),
         ("receipt_commitment_sha256", report.receipt_commitment_sha256.as_str()),
+        ("protected_index_sha256", report.protected_index_sha256.as_str()),
         ("matcher_revision_sha256", report.matcher_revision_sha256.as_str()),
         ("decision_rules_sha256", report.decision_rules_sha256.as_str()),
         ("report_commitment_sha256", report.report_commitment_sha256.as_str()),
