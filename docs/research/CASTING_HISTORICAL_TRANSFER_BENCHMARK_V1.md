@@ -25,7 +25,7 @@ All code uses the Python standard library. The run is deterministic under a fixe
 
 ## Benchmark construction
 
-The frozen suite has eight source tasks across four source families and four target tasks, each in a target family not present among the source families. Each task has three normalized descriptors standing in for composition, thermal properties and geometry. Task family is used only for split metadata and is not a prediction input.
+The frozen suite has eight source tasks across four source families and **32 target task variants across eight held-out target families**, with four variants per family. None of the target families appears in the source archive. Each task has three normalized descriptors standing in for composition, thermal properties and geometry. Task family is used only for split metadata and is not a prediction input. Variants probe within-family sensitivity; they do not turn eight family clusters into 32 independent demonstrations of cross-family generalization.
 
 A deterministic two-dimensional Halton design supplies non-overlapping source and target point ranges. For each source task and historical design point, the suite forms a paired low/high observation and archives the vector residual `high - low` for two minimization objectives and one constraint margin. No target-task high-fidelity response is passed to a prediction policy. Target truth is queried after all four predictions for the target point are fixed, solely by the audit scorer.
 
@@ -51,7 +51,7 @@ For each held-out target task and policy, the receipt reports:
 - worst target-task objective and margin MAE;
 - paired per-target-task objective-MAE improvement over low-fidelity-only.
 
-The **independent unit is the target task**, not each candidate point. The default contains only four target tasks; 128 points inside each task are nested measurements, not 512 independent trials. The receipt intentionally does not claim statistically supported SOTA superiority from four task units.
+The receipt reports metrics both macro-averaged over target task variants and macro-averaged over the eight held-out families. Four variants within a family are nested family cases, not independent family replications; candidate points within a task are further nested measurements. The family-level comparison therefore has eight held-out family units, and this synthetic suite still does not justify broad generalization or SOTA claims. Any confidence interval used for cross-family inference must resample at family level rather than count target design points as independent samples.
 
 ## Full-cost treatment
 
@@ -63,7 +63,9 @@ This is a sensitivity model, not an industry cost estimate. It does not yet pric
 
 - Sweep history sizes (0, 5, 10, 25, 50, 100+ high-fidelity paired points), number of source tasks, kNN neighbourhood and reuse count.
 - Add interpolative and extrapolative targets and report both, without pooling them into one score.
+- Extend the suite with public analytic problems and real simulation exports; the current eight-family synthetic suite is only a method-control stage.
 - Hold out complete alloy and process families, not random rows from the same task.
+- Compute family-clustered uncertainty intervals; keep task variants and candidate points nested under family/task.
 - Compare cold-start baseline, nearest-task transfer, descriptor-conditioned residual transfer, and faithful implementations of OOL-MFBO, RESCUE and MF-SCBO.
 - Test wrong / missing / stale descriptors, shuffled and intentionally misleading history, sign-reversed fidelity discrepancy, abrupt constraint-boundary changes, and histories drawn from the wrong process regime.
 - Keep task descriptors and historical cutoffs frozen before target outcomes are opened. Use a separate calibration split if hyperparameters are selected.
@@ -72,4 +74,4 @@ This is a sensitivity model, not an industry cost estimate. It does not yet pric
 
 ## Claim ceiling
 
-The current harness is a four-target, fully synthetic prediction-transfer diagnostic. It does not run an optimizer, establish calibrated uncertainty, prove descriptor availability, demonstrate a cost advantage after real archive preparation, outperform OOL-MFBO / RESCUE / MF-SCBO, establish physical feasibility, or qualify a foundry process. The shuffled-history control and explicit cost accounting make the hypothesis falsifiable; only preregistered held-out experiments can establish whether useful transfer occurs.
+The current harness is a 32-variant, eight-held-out-family, fully synthetic prediction-transfer diagnostic. It does not run an optimizer, establish calibrated uncertainty, prove descriptor availability, demonstrate a cost advantage after real archive preparation, outperform OOL-MFBO / RESCUE / MF-SCBO, establish physical feasibility, or qualify a foundry process. Eight synthetic family clusters remain too small and too stylized to support broad cross-family/SOTA claims. The shuffled-history control and explicit cost accounting make the hypothesis falsifiable; only preregistered held-out experiments can establish whether useful transfer occurs.
