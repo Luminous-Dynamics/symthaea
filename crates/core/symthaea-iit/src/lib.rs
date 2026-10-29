@@ -1000,4 +1000,57 @@ mod tests {
         );
     }
 
+    #[test]
+    fn unit_relabeling_preserves_repertoire_values() {
+        let original = two_unit_model();
+        let mut permuted_tpm = vec![0.0; 8];
+        for new_state_index in 0..4 {
+            let new_unit_0_on = (new_state_index & 1) != 0;
+            let new_unit_1_on = (new_state_index & 2) != 0;
+            // New unit 0 is old unit 1 and new unit 1 is old unit 0.
+            let old_state_index = usize::from(new_unit_1_on)
+                | (usize::from(new_unit_0_on) << 1);
+            for new_target in 0..2 {
+                let old_target = 1 - new_target;
+                permuted_tpm[new_state_index * 2 + new_target] =
+                    original.transition_probabilities[old_state_index * 2 + old_target];
+            }
+        }
+
+        let mut permuted_connectivity = vec![false; 4];
+        for new_source in 0..2 {
+            for new_target in 0..2 {
+                let old_source = 1 - new_source;
+                let old_target = 1 - new_target;
+                permuted_connectivity[new_source * 2 + new_target] =
+                    original.connectivity[old_source * 2 + old_target];
+            }
+        }
+        let permuted = BinaryCausalModel::new(
+            2,
+            permuted_tpm,
+            permuted_connectivity,
+        ).unwrap();
+
+        let original_effect = original
+            .effect_repertoire(&[0], &[true, false], &[1])
+            .unwrap();
+        let permuted_effect = permuted
+            .effect_repertoire(&[1], &[false, true], &[0])
+            .unwrap();
+        let original_cause = original
+            .cause_repertoire(&[0], &[true, false], &[1])
+            .unwrap();
+        let permuted_cause = permuted
+            .cause_repertoire(&[1], &[false, true], &[0])
+            .unwrap();
+
+        for (left, right) in original_effect.iter().zip(&permuted_effect) {
+            assert!((left - right).abs() < 1e-12);
+        }
+        for (left, right) in original_cause.iter().zip(&permuted_cause) {
+            assert!((left - right).abs() < 1e-12);
+        }
+    }
+
 }
