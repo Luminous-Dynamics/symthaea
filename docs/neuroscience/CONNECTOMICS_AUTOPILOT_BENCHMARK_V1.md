@@ -1,5 +1,7 @@
 # Connectomics Autopilot: benchmark and research plan V1
 
+> **State-of-the-art update (2026-10-29):** ConnectomeBench2 V2 is the primary proofreading benchmark candidate. The original ConnectomeBench (2025) is retained only as a historical/reproducibility comparison. Do not score the original dataset or ConnectomeBench2's `main` revision as though either were the current ConnectomeBench2 paper release.
+
 **Status:** proposed research contract; no benchmark results claimed  
 **Date:** 2026-10-29  
 **Owner:** Symthaea neuroscience / scientific-workflow integration  
@@ -19,9 +21,11 @@ This document proposes a falsifiable benchmark. It does **not** report an implem
 
 ## Why this is a timely wedge
 
-Existing results establish both meaningful automation and an unresolved proofing bottleneck:
+Existing results establish both meaningful automation and a sharper new frontier:
 
-- **ConnectomeBench (NeurIPS 2025)** evaluates segment-type identification, split-error correction, and merge-error detection against expert annotations from mouse visual cortex and the Drosophila brain. Its reported multimodal models reach 52–82% balanced accuracy on segment identification and 75–85% on split-error tasks, while merge-error identification remains a weakness. These numbers are task- and dataset-specific; they are not a global ranking of connectomics systems.
+- **ConnectomeBench2 (2026)** reports more than 716,000 expert-labeled proofreading decisions and more than 4.5 million associated images across mouse, human, zebrafish, and fly connectomes. Its shared-encoder Vision Transformer reaches human-level accuracy in the paper's evaluated split/merge correction tasks, with within-distribution calibration, distribution-distance diagnostics, and preliminary benefits from connectomics-specific pretraining and active learning. This makes raw in-distribution accuracy an insufficient goal for Symthaea; we must target label efficiency, cross-region/species transfer, calibration under shift, reviewer utility, and downstream graph impact.
+- **Benchmarking Vision-Language Models on Synapse Detection and Proofreading in Connectomics (arXiv, 29 Sep 2026)** reports that most tested VLMs are near chance at zero-shot proofreading; a few-shot prompt helps some models, and LoRA adaptation on a few thousand labels can bring some open VLMs to specialist-model level. On unseen species, the best adapted VLMs reportedly outperform specialist models trained on the same data for merge-error identification. This suggests a strong comparison arm and a valuable challenge: match the accuracy with fewer labels or compute, better calibration/abstention, or stronger region-/species-held-out generalization.
+- **ConnectomeBench (NeurIPS 2025)** is still useful as a historical multimodal-LLM benchmark. Its reported models reached 52–82% balanced accuracy on segment identification and 75–85% on split-error tasks, while merge-error identification remained difficult. Do not compare these values directly to ConnectomeBench2 results without aligning task definitions, data versions, metrics, and splits.
 - **RoboEM (Nature Methods, 2024)** uses self-steering 3D tracing to correct difficult neurites. The authors report approximately 400-fold lower *computational annotation cost* than manual correction for evaluated cortical tasks—not a 400-fold end-to-end speedup for building a whole-brain connectome.
 - **NEURD (Nature, 2025)** decomposes neuron meshes into annotated graphs and applies morphological rules for proofreading. The paper reports nearly 150,000 high-confidence edits in MICrONS and more than a threefold speedup for a semi-supervised multi-soma splitting workflow. This is an important baseline, not something to ignore or relabel as Symthaea's contribution.
 - **H01** demonstrates the data scale: approximately 1 mm³ of human temporal cortex, 1.4 petabytes of images, tens of thousands of cells, and roughly 150 million synapses. Its proofread ground truth is sparse relative to the entire volume, so raw scale must not be confused with complete independent validation.
@@ -33,24 +37,41 @@ References and scope notes:
 - NEURD: https://www.nature.com/articles/s41586-025-08660-5
 - H01 release: https://h01-release.storage.googleapis.com/landing.html
 - Google Neural Mapping datasets: https://sites.research.google/gr/neural-mapping/datasets/
+- ConnectomeBench2 paper (arXiv:2606.21116): https://arxiv.org/abs/2606.21116
+- ConnectomeBench2 official project page: https://synthneuro.org/publications/connectomebench2-a-unified-benchmark-for-automated-connectomic-proofreading/
+- ConnectomeBench2 training and data-generation code (MIT code license; upstream data licenses still apply): https://github.com/timfarkas/ConnectomeBench2
+- ConnectomeBench2 Hugging Face dataset card; pin `revision="v2"`, do not use `main` for paper replication: https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2
+- VLM benchmark for synapse detection/proofreading (arXiv:2609.36492, submitted 29 Sep 2026): https://arxiv.org/abs/2609.36492
 - ConnectomeBench source code (MIT): https://github.com/jffbrwn2/ConnectomeBench
 - ConnectomeBench dataset card/files (MIT): https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench/tree/main
 
-### Concrete dataset-audit finding
+### Required ConnectomeBench2 V2 intake and leakage audit
 
-The published Hugging Face dataset is listed as approximately 2.82 GB and includes a 688 kB `connectomebench_unified.parquet`, separate FlyWire/MICrONS task Parquet files, and JSONL annotation files. This is enough to start an offline format/label audit without downloading raw microscopy volumes or requiring CAVE authentication.
+The Hugging Face dataset card explicitly warns that `main` points to the initially submitted V1; the revision used by the paper is `v2`. The card's current `main` snapshot describes 401,170 samples, while the paper abstract reports more than 716,485 expert-labeled decisions. These are version-dependent counts, not numbers to reconcile by assumption. Pin the dataset revision and file hashes before reporting counts or metrics.
 
-**Integrity warning:** as inspected on 2026-10-29, the dataset card's configuration table appears to associate `Split Error Correction` with filenames named `*_merge_errors.parquet` and `Merge Error Identification` with `*_split_errors.parquet` for both FlyWire and MICrONS. This may be a metadata typo, but must be resolved against the upstream ConnectomeBench scripts, Parquet schemas, and annotation JSONL before scoring. Never infer task/label semantics from filenames or the dataset card alone.
+The dataset schema and instructions introduce several high-priority leakage guards:
 
-Required intake manifest before an experiment:
-- source URL, repository commit or dataset revision, and exact file SHA-256;
-- Parquet schema, row count, unique sample IDs, class distribution, null counts, and duplicate IDs;
-- task-name / filename / label mapping cross-checked against the upstream evaluation code;
-- label agreement between the task Parquet and corresponding annotation JSONL where a reliable join key exists;
-- license and provenance snapshot;
-- declared train/development/hidden partitions and leakage grouping keys.
+- `task_routing` defines which tasks a row is valid for. Filter through the verified routing semantics, not just a populated boolean label column.
+- The card defines `false_split_correction_label = same_neuron` and `false_merge_identification_label = not same_neuron`. Verify those definitions against the paper/code and retain separate task metrics.
+- For single-segment tasks, fuse A/B EM mask channels and zero the B mask as specified. Do not use `em_best` where it can leak ground-truth information because the oblique view was selected using both labels.
+- Geometry has both `geometry` and `geometry_single`; the card notes they can differ in more than mask channels. Model inputs must be chosen to match the task without exposing post-edit geometry or hidden target state.
+- Train/validation/test assignment uses spatial cubes around the proofreading location. Audit overlap in source operation, source archive, neuron identity, nearby regions, duplicated views, and annotation lineage. Spatially distinct cubes alone do not prove independent samples.
+- The dataset's overall license field is `other`; upstream source datasets can have different licenses. Check use and redistribution conditions per source, not merely the MIT license on the data-generation code.
 
-Do not treat the compact unified Parquet as sufficient until its columns and row coverage have been compared with the task-specific tables.
+Required intake manifest:
+- exact dataset repository and revision (default target: `v2`), upstream code commit, source URL, file SHA-256 and byte size;
+- Parquet schema, per-shard row count, unique sample IDs, class distribution, null coverage, and duplicate checks;
+- task routing and label semantics verified against upstream training/evaluation code;
+- per-modality input declaration that blocks `em_best` and post-edit / dual-mask leakage in incompatible tasks;
+- spatial/source/operation/neuron split-overlap report; every unresolved lineage key is marked unknown rather than assumed independent;
+- license/provenance audit by source archive;
+- label and annotation consistency where a valid join key and independent reference exist.
+
+Fail closed if the revision is ambiguous, input view contains known label leakage, labels do not match task routing, or sample identity is not stable. Do not silently relabel rows to resolve a mismatch.
+
+### Historical ConnectomeBench V1 note
+
+The older ConnectomeBench Hugging Face card was observed to associate some split/merge task names with filenames carrying the opposite error-family words. Treat this as a historical metadata warning only: verify task meaning against upstream code and row semantics if running that legacy benchmark. Do not let it distract from the primary ConnectomeBench2 V2 intake gate.
 
 ## Paradigm shifts worth testing
 
@@ -141,7 +162,7 @@ Do not compare an end-to-end system against a post-processing component as if th
 
 ### Datasets and split policy
 
-**Phase A — audit, then reproduce a public task.** First obtain the published ConnectomeBench task tables and annotations, verify checksums/schema/row counts/class labels, and resolve the task-name/filename mismatch noted above against the upstream scripts. Pin the exact code commit and dataset revision. Only after this intake gate passes should the first offline scorer be written; no raw-EM download or large GPU run is needed for this stage.
+**Phase A — audit ConnectomeBench2 V2 first.** Pin the Hugging Face `v2` revision, verify the exact task routing and label semantics from upstream code, block known modality leakage, and audit split/source lineage before reproducing the paper's ViT baseline. Then add the 2025 ConnectomeBench protocol as a historical multimodal-LLM comparison if its task definitions and data version are recoverable.
 
 **Phase B — test structural generalization.** Add an eligible MICrONS subset with expert-verified cases and NEURD-compatible morphology when data access permits. Use H01 as a human-tissue transfer case only where independent reference annotations support the metric. Do not treat automated labels or sparse proofreads as universal ground truth.
 
@@ -151,16 +172,18 @@ Splits must be grouped by source volume, spatial block, neuron/cell identity, an
 
 ### Comparator matrix
 
-1. Existing segmentation/tracing output with no additional triage.
-2. Random review at the same reviewer-minute budget.
-3. Simple uncertainty-only ranking.
-4. Model-disagreement ranking, with shared ancestry tracked where known.
-5. Existing morphology rules, including NEURD on compatible data.
-6. Published ConnectomeBench model/task baselines, using their stated protocols where reproducible.
-7. An error/impact ranker using only directly observable, available features.
-8. Symthaea orchestration with correction memory and budgeted selection.
-9. Ablations: no HDC retrieval; no correction memory; no active selection; no graph-impact term; no calibration/abstention policy.
-10. Expert review as a reference ceiling only where expert labels and reviewer effort are actually measured. Never present the ceiling as an automated baseline.
+1. **Published ConnectomeBench2 ViT baseline**, reproducing the pinned `v2` dataset, modality, and split protocol where possible.
+2. **Specialist task models and morphology rules**, including NEURD where source data and operation semantics are compatible.
+3. **VLM comparison arms:** zero-shot, few-shot, and LoRA-adapted configurations from the September 2026 VLM study where model/code/artifact access and license permit a faithful reproduction.
+4. Existing segmentation/tracing output with no additional triage.
+5. Random review at the same expert-review budget.
+6. Simple uncertainty-only and calibrated-uncertainty-only ranking.
+7. Model-disagreement ranking, with shared ancestry tracked where known.
+8. Active-learning baseline matching the same annotation budget; report the labels needed to reach a fixed target quality.
+9. An error/impact ranker using only directly observable, available features.
+10. Symthaea orchestration with correction memory and budgeted selection.
+11. Ablations: no HDC retrieval; no correction memory; no active selection; no graph-impact term; no calibration/abstention policy.
+12. Expert review as a reference ceiling only where expert labels and reviewer effort are actually measured. Never present the ceiling as an automated baseline.
 
 Keep model version, prompts, preprocessing, compute, reviewer instructions, candidate pool, and stopping rules fixed across paired comparisons. Give every baseline the same input access and review budget.
 
@@ -196,7 +219,7 @@ Use paired, cluster-aware uncertainty estimates (cluster on volume/region/neuron
 
 ### Proposed promotion targets — targets, not results
 
-After reproducing the selected benchmark and measuring variance, preregister these initial targets:
+After reproducing the pinned ConnectomeBench2 V2 baseline, validating the split/leakage audit, and estimating variance on development data, preregister these initial targets. Do not choose thresholds after viewing the lockbox:
 
 - At a matched review budget, increase **impact-weighted true-error yield by at least 15% relative** to the strongest eligible non-oracle baseline, with the cluster-aware 95% confidence interval for the paired gain excluding zero.
 - Alternatively, for a fixed high-impact merge-recall target, reduce reviewer minutes needed by at least 20% relative to the strongest eligible baseline, without more than a 1 percentage-point absolute loss in correction precision. If sample size is insufficient to support either target, report the estimate and uncertainty; do not lower thresholds after seeing test labels.
@@ -204,6 +227,9 @@ After reproducing the selected benchmark and measuring variance, preregister the
 - V1 automatically applies **zero** edits to authoritative data. Every suggestion carries evidence, predicted graph delta, source lineage, and an explicit uncertainty/abstention state.
 - No hidden-label leakage, source/version mismatch, silent post hoc model/profile changes, or false claim that queued/unfinished runs passed. Any such failure invalidates the run regardless of average score.
 - A cross-dataset or cross-species claim requires replication on at least two genuinely distinct dataset families with leakage-resistant splits. A single dataset win stays a single-dataset claim.
+- **Label-efficiency target:** reduce expert labels/review decisions needed to reach a prespecified quality target by at least 20% relative to the strongest eligible active-learning baseline, under equal reviewer/compute budgets and with no critical error-class regression.
+- **Shift-safety target:** on held-out region/species/source groups, report risk-coverage and calibration-vs-coverage; abstention must lower accepted-case error as coverage is reduced. If a subgroup lacks enough labels for a calibration claim, mark it not estimable and default to human review.
+- Report two Pareto frontiers, not one leaderboard: (accuracy / accepted-case risk) vs expert-label budget, and (accepted-case risk) vs coverage, with all-in latency and compute reported alongside.
 
 These targets are intentionally about efficient, safe proofreading, not unsupported claims of beating every segmenter or achieving whole-brain autonomy.
 
