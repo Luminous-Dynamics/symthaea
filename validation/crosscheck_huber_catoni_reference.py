@@ -46,17 +46,21 @@ def compare_bounds(expected: tuple[float, float],
                     observed: tuple[float, float]) -> dict:
     """Return endpoint errors; infinities are not silently considered equal."""
     errors = []
+    nonfinite_mismatch = False
     for lhs, rhs in zip(expected, observed, strict=True):
         if lhs == rhs:
             errors.append(0.0)
         elif not (np.isfinite(lhs) and np.isfinite(rhs)):
-            errors.append(float("inf"))
+            errors.append(None)
+            nonfinite_mismatch = True
         else:
             errors.append(abs(float(lhs) - float(rhs)))
+    finite_errors = [error for error in errors if error is not None]
     return {
         "lower_abs_error": errors[0],
         "upper_abs_error": errors[1],
-        "max_abs_error": max(errors),
+        "max_abs_error": max(finite_errors) if not nonfinite_mismatch else None,
+        "nonfinite_mismatch": nonfinite_mismatch,
     }
 
 
@@ -144,11 +148,17 @@ def run(reference_dir: Path, *, max_n: int = 128, seed: int = 20261031,
                     "independent_bounds": list(independent_bounds),
                     "upstream_clipped_bounds": list(upstream_bounds),
                     **errors,
-                    "within_tolerance": errors["max_abs_error"] <= tolerance,
+                    "within_tolerance": (
+                        not errors["nonfinite_mismatch"]
+                        and errors["max_abs_error"] is not None
+                        and errors["max_abs_error"] <= tolerance
+                    ),
                 })
 
-    max_error = max((c["max_abs_error"] for c in cases), default=0.0)
+    finite_errors = [c["max_abs_error"] for c in cases if c["max_abs_error"] is not None]
+    max_error = max(finite_errors, default=0.0)
     failures = [c for c in cases if not c["within_tolerance"]]
+    nonfinite_mismatches = sum(bool(c["nonfinite_mismatch"]) for c in cases)
     implementation_path = Path(__file__).with_name("huber_catoni_reference.py")
     return {
         "schema": "symthaea-huber-catoni-reference-crosscheck-v1",
@@ -168,7 +178,8 @@ def run(reference_dir: Path, *, max_n: int = 128, seed: int = 20261031,
         },
         "summary": {
             "comparison_count": len(cases), "failure_count": len(failures),
-            "max_abs_endpoint_error": max_error,
+            "nonfinite_mismatch_count": nonfinite_mismatches,
+            "max_abs_finite_endpoint_error": max_error,
         },
         "cases": cases,
         "limitations": [
