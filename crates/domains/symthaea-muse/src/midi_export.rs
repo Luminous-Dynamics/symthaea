@@ -255,6 +255,7 @@ pub fn export_midi_voices(
                 off: on + 120, // short duration
                 pitch: note,
                 velocity: vel,
+                source_event_index: None,
             }
         })
         .collect();
@@ -464,6 +465,7 @@ fn export_performance_midi_impl(
                     off: on + 120,
                     pitch: hit.drum.gm_note(),
                     velocity: (hit.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                    source_event_index: None,
                 }
             })
             .collect();
@@ -623,6 +625,7 @@ fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_b
                 off,
                 pitch: freq_to_midi(note.frequency),
                 velocity: (note.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                source_event_index: None,
             }
         })
         .collect();
@@ -801,14 +804,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
-source_event_index: None,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 5,
                 off: 15,
                 pitch: 60,
                 velocity: 90,
-source_event_index: None,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -843,14 +846,14 @@ source_event_index: None,
                 off: 10,
                 pitch: 60,
                 velocity: 100,
-source_event_index: None,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 0,
                 off: 8,
                 pitch: 60,
                 velocity: 90,
-source_event_index: None,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -882,14 +885,14 @@ source_event_index: None,
                 off: 20,
                 pitch: 60,
                 velocity: 100,
-source_event_index: None,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 5,
                 off: 15,
                 pitch: 64,
                 velocity: 90,
-source_event_index: None,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -911,14 +914,14 @@ source_event_index: None,
                 off: 10,
                 pitch: 60,
                 velocity: 100,
-source_event_index: None,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 20,
                 off: 15,
                 pitch: 62,
                 velocity: 100,
-source_event_index: None,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
