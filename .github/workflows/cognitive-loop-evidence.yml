@@ -437,18 +437,22 @@ jobs:
           ' "$RUNNER_TEMP/informative-missingness-score.json"
       - name: Generate separated policy and evaluator missingness artifacts
         run: |
-          cargo run --locked -p xtask -- generate-cognitive-missingness-schedule --input benchmarks/cognitive-loop-evidence/synthetic-missingness-schedule-input.json --policy-out "$RUNNER_TEMP/missingness-policy-feed.json" --evaluator-out "$RUNNER_TEMP/missingness-evaluator-schedule.json" > "$RUNNER_TEMP/missingness-generation-summary.json"
+          cargo run --locked -p xtask -- generate-cognitive-missingness-schedule --input benchmarks/cognitive-loop-evidence/synthetic-missingness-schedule-input.json --policy-tick-out "$RUNNER_TEMP/missingness-policy-tick.json" --evaluator-out "$RUNNER_TEMP/missingness-evaluator-schedule.json" --tick 40 > "$RUNNER_TEMP/missingness-generation-summary.json"
           jq -e '
             .generator_version == "cognitive-missingness-schedule-v1" and
             .eligible_event_count == 64 and
+            .policy_tick == 40 and
+            .policy_tick_message_count >= 1 and
             (.observed_count + .delayed_pending_count + .right_censored_count + .declared_missing_count + .unknown_unnotified_count) == 64 and
             (.source_input_sha256 | length) == 64 and
-            (.policy_feed_sha256 | length) == 64 and
+            (.policy_tick_sha256 | length) == 64 and
             (.evaluator_schedule_sha256 | length) == 64 and
-            (.interpretation_guard | contains("must remain outside the policy process"))
+            (.interpretation_guard | contains("outside the policy process"))
           ' "$RUNNER_TEMP/missingness-generation-summary.json"
           jq -e '
-            (.messages | length) >= 64 and
+            .tick == 40 and
+            (.messages | length) >= 1 and
+            ([.messages[] | select(.tick != 40)] | length) == 0 and
             (has("seed") | not) and
             (has("scenario_id") | not) and
             (has("dataset_id") | not) and
@@ -459,7 +463,7 @@ jobs:
               has("expected_reveal_tick") or has("declaration_tick") or
               has("scenario_id") or has("seed")
             )] | length) == 0
-          ' "$RUNNER_TEMP/missingness-policy-feed.json"
+          ' "$RUNNER_TEMP/missingness-policy-tick.json"
           jq -e '
             . as $schedule |
             (.events | length) == 64 and
