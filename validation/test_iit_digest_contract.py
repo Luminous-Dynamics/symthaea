@@ -66,6 +66,11 @@ class IitDigestContractTests(unittest.TestCase):
             analysis_request_digest(self.model_bytes, [1, 0], [0, 1], "IIT_4_0_2023", "iit4_structure_big_phi"),
         ]
         self.assertEqual(len(set(variants + [base])), 5)
+        reversed_subset = analysis_request_digest(
+            self.model_bytes, [1, 0], [1, 0],
+            "IIT_4_0_2023", "iit4_system_phi_s",
+        )
+        self.assertEqual(base, reversed_subset)
 
     def test_negative_zero_is_canonicalized(self):
         positive = canonical_model_bytes([[0.0], [1.0]], [[1]])
@@ -76,6 +81,13 @@ class IitDigestContractTests(unittest.TestCase):
         for value in (float("nan"), float("inf"), float("-inf"), -0.01, 1.01):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 canonical_model_bytes([[value], [1.0]], [[1]])
+
+    def test_rejects_fractional_state_or_connectivity_bits(self):
+        with self.assertRaisesRegex(ValueError, "binary bits"):
+            evaluation_digest(self.model_bytes, [0.5, 1])
+        tpm, _ = fixture()
+        with self.assertRaisesRegex(ValueError, "binary entries"):
+            canonical_model_bytes(tpm, [[1, 0.25], [0, 1]])
 
     def test_rejects_connectivity_that_omits_tpm_influence(self):
         tpm, _ = fixture()
