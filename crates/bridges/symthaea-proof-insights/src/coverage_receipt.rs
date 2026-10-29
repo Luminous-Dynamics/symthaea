@@ -655,6 +655,7 @@ mod tests {
             &trust,
             &method,
             &trust_digest,
+            &sha256_hex(&method),
             &partition_digest,
             &families,
         )
