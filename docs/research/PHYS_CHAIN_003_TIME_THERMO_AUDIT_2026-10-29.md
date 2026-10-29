@@ -126,6 +126,18 @@ Report the state and edge denominator for each cell; each monotonicity violation
 7. Every physical claim is assigned a status: formal combinatorial result, conditional theorem, open result, proposed correspondence, or empirically tested prediction.
 8. No test is described as passing before exact-head artifacts and logs exist.
 
+## Follow-on stress test: discrete time crystals
+
+A dedicated follow-on is tracked in [#8964 — PHYS-CHAIN-004](https://github.com/Luminous-Dynamics/symthaea/issues/8964).
+
+A discrete time crystal is a nonequilibrium many-body phase in a periodically driven system where a robust observable responds with a longer period than the drive, often 2T for drive period T. It breaks the discrete time-translation symmetry of the drive; this does not imply that time itself is discrete, and does not imply perpetual motion. See Else et al., Annual Review of Condensed Matter Physics (2020), https://doi.org/10.1146/annurev-conmatphys-031119-050658, and Cenedese et al., Physical Review B (2025), https://doi.org/10.1103/hl8q-4wy9.
+
+Full-text search of the current Chain Theory compendium returned no “time crystal” or “Floquet” match. DTCs therefore supply a useful external stress test, not a phenomenon this draft explicitly models.
+
+The proposed test uses a pinned Floquet spin-1/2 chain with small-system exact diagonalization as reference, then checks period-doubled response, robustness to pulse detuning, interaction protection, and noise/bath effects. It computes temporal order, drive work, heat and entropy production separately. Crucially, it tests whether a fixed, preregistered mapping from Chain Theory configurations to observable time series can represent a recurrent macro-observable while the hidden order coordinate remains monotone. A monotone hidden counter is not automatically incompatible with periodic observables; the required coarse-graining/mapping must be explicit and independently tested.
+
+The detailed benchmark and acceptance gates are in [#8964](https://github.com/Luminous-Dynamics/symthaea/issues/8964).
+
 ## Relationship to other work
 
 - #8921: independent alpha-candidate reconstruction and proof-boundary audit.
