@@ -25,8 +25,8 @@ The target policy is P_pi(A=1)=0.5 for all scenarios. Each sample uses known-log
 
 - **MOPE:** two one-sided streaming confidence sequences, alpha_side=0.025, root updates gated by direct polynomial and product-wealth checks.
 - **Reused Wald:** a conventional pointwise 95% normal interval re-evaluated at every look. It is explicitly an invalid anytime-valid comparator.
-- **Hoeffding alpha spending:** per-side delta_t = 0.05 / [2 t(t+1)], radius W sqrt(log(1/delta_t)/(2t)).
-- **Empirical-Bernstein alpha spending:** the corresponding bounded empirical-variance radius, using the SCOPE-RL documented finite-sample form with W and sample variance.
+- **Hoeffding alpha spending:** per-side delta_t = 0.05 / [2 t(t+1)], radius W sqrt(log(1/delta_t)/(2t)); each tail spends alpha/2 over all looks.
+- **Empirical-Bernstein alpha spending:** a two-sided interval with delta_t = 0.05 / [t(t+1)] and the SCOPE-RL documented finite-sample empirical-variance radius using W and sample variance; the two-sided per-look allocations sum to alpha.
 
 For both time-uniform baselines, raw intervals are combined with a running intersection at every observation: lower endpoints can only increase and upper endpoints can only decrease. This matches the sequential set semantics used for MOPE and avoids making the comparison artificially unfavorable by measuring a fresh non-nested bound at each look. The Wald comparator intentionally remains a reused pointwise interval. All intervals are clipped to the known target-value range [0,1]. Clipping alone does not make Wald anytime-valid.
 
