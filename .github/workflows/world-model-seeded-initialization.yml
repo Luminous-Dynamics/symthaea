@@ -2,6 +2,7 @@ name: World Model Seeded Initialization
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - fix/workspace-orphan-core-symthaea-2026-10-29
@@ -31,6 +32,7 @@ jobs:
   seeded-initialization:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
