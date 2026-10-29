@@ -19686,6 +19686,8 @@ name = "symthaea-proof-insights"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek 2.1.0",
+ "hex 0.4.3",
  "regex",
  "serde",
  "serde_json",
