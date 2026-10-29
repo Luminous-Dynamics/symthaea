@@ -72,6 +72,11 @@ jobs:
           (staged / "src").mkdir(parents=True)
           (staged / "Cargo.toml").write_text(package_text + "\n".join(dependency_lines) + "\n")
           shutil.copy2(crate_dir / "src/main.rs", staged / "src/main.rs")
+          # Keep shared sibling source modules available to path-based binary
+          # imports (for example, bin/* -> ../coverage_receipt.rs).
+          for support_source in (crate_dir / "src").glob("*.rs"):
+              if support_source.name != "main.rs":
+                  shutil.copy2(support_source, staged / "src" / support_source.name)
           if (crate_dir / "src/bin").is_dir():
               shutil.copytree(crate_dir / "src/bin", staged / "src/bin")
           shutil.copy2(root / "Cargo.lock", staged / "Cargo.lock")
