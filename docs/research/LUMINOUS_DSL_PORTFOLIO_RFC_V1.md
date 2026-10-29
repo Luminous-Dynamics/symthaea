@@ -277,6 +277,9 @@ Use **SLSA Provenance v1** for software build provenance where it fits. Do not f
 
 Existing `symthaea-evidence-plane` and `symthaea-communication` records remain domain/runtime interfaces. LEP should map to them through adapters rather than replace them. The evidence-plane crate's `config_hash` is explicitly non-cryptographic and unsuitable for signing or adversarial integrity checks.
 
+
+The SLSA reference was updated to v1.2 based on the current official specification index as of 2026-10-29. Treat the spec version as pinned metadata in each software-build provenance record; do not bake a floating `latest` link into a reproducibility identity.
+
 ### B. First schema and fixture prototype
 
 A first draft predicate schema lives at `docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json`; examples live in `docs/research/fixtures/luminous-evidence-v0.1/`.
@@ -318,7 +321,7 @@ No state-of-the-art claim should be made until the baseline tools are run on pin
 - RFC 8785 JSON Canonicalization Scheme: https://www.rfc-editor.org/rfc/rfc8785.html
 - in-toto Statement v1: https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md
 - in-toto attestation framework: https://github.com/in-toto/attestation/blob/main/spec/README.md
-- SLSA Provenance v1: https://slsa.dev/spec/v1.1/provenance
+- SLSA Provenance v1: https://slsa.dev/spec/v1.2/provenance
 - FMI 3.0.2 specification: https://fmi-standard.org/docs/3.0.2/
 - Existing Symtropy sealed scenario manifest issue: https://github.com/Luminous-Dynamics/symtropy/issues/1202
 - Existing Symtropy engineering replay substrate issue: https://github.com/Luminous-Dynamics/symtropy/issues/1172
