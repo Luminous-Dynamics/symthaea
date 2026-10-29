@@ -39,6 +39,7 @@ pub struct PredictiveObservationSet {
     model_id: String,
     model_version: String,
     workload_fingerprint: String,
+    holdout_artifact_digest: String,
     outcomes: Vec<String>,
     predicted_probabilities: Vec<f64>,
     observed_counts: Vec<u64>,
@@ -56,6 +57,7 @@ impl PredictiveObservationSet {
         model_id: impl Into<String>,
         model_version: impl Into<String>,
         workload_fingerprint: impl Into<String>,
+        holdout_artifact_digest: impl Into<String>,
         outcomes: Vec<String>,
         predicted_probabilities: Vec<f64>,
         observed_counts: Vec<u64>,
@@ -65,9 +67,11 @@ impl PredictiveObservationSet {
         let model_id = model_id.into();
         let model_version = model_version.into();
         let workload_fingerprint = workload_fingerprint.into();
+        let holdout_artifact_digest = holdout_artifact_digest.into();
         if model_id.trim().is_empty()
             || model_version.trim().is_empty()
             || workload_fingerprint.trim().is_empty()
+            || holdout_artifact_digest.trim().is_empty()
         {
             return Err(PredictiveAdequacyError::EmptyMetadata);
         }
@@ -88,6 +92,7 @@ impl PredictiveObservationSet {
             model_id,
             model_version,
             workload_fingerprint,
+            holdout_artifact_digest,
             outcomes,
             predicted_probabilities,
             observed_counts,
@@ -195,6 +200,12 @@ pub struct PredictiveAdequacyReport {
     pub model_version: String,
     /// Workload/scenario fingerprint.
     pub workload_fingerprint: String,
+    /// Digest of the frozen raw holdout or count artifact.
+    pub holdout_artifact_digest: String,
+    /// Sampling assumption used for this assessment.
+    pub sampling_assumption: SamplingAssumption,
+    /// Exact policy and thresholds used for the report.
+    pub policy: PredictiveAdequacyPolicy,
     /// Holdout evidence provenance.
     pub source: ObservationSource,
     /// Frozen outcome order.
@@ -377,6 +388,9 @@ pub fn assess_predictive_adequacy(
         model_id: data.model_id.clone(),
         model_version: data.model_version.clone(),
         workload_fingerprint: data.workload_fingerprint.clone(),
+        holdout_artifact_digest: data.holdout_artifact_digest.clone(),
+        sampling_assumption: data.sampling_assumption,
+        policy,
         source: data.source,
         outcomes: data.outcomes.clone(),
         predicted_probabilities: predicted.clone(),
@@ -427,7 +441,8 @@ mod tests {
         source: ObservationSource,
     ) -> PredictiveObservationSet {
         PredictiveObservationSet::new(
-            "model-A", "fixture-sha", "workload-1",
+            "model-A", "model-version-fixture-sha", "workload-1",
+            "holdout-counts-fixture-sha",
             (0..probabilities.len()).map(|i| format!("o{i}")).collect(),
             probabilities.to_vec(), counts.to_vec(), source, sampling,
         ).unwrap()
@@ -507,19 +522,19 @@ mod tests {
     #[test]
     fn invalid_probabilities_duplicate_labels_and_count_overflow_fail_closed() {
         assert_eq!(
-            PredictiveObservationSet::new("m", "v", "w", vec!["x".into(), "y".into()],
+            PredictiveObservationSet::new("m", "v", "w", "holdout-sha", vec!["x".into(), "y".into()],
                 vec![0.4, 0.4], vec![1, 1], ObservationSource::SyntheticFixture,
                 SamplingAssumption::IidCategorical),
             Err(PredictiveAdequacyError::InvalidProbabilityDistribution)
         );
         assert_eq!(
-            PredictiveObservationSet::new("m", "v", "w", vec!["x".into(), "x".into()],
+            PredictiveObservationSet::new("m", "v", "w", "holdout-sha", vec!["x".into(), "x".into()],
                 vec![0.5, 0.5], vec![1, 1], ObservationSource::SyntheticFixture,
                 SamplingAssumption::IidCategorical),
             Err(PredictiveAdequacyError::InvalidOutcomeLabels)
         );
         assert_eq!(
-            PredictiveObservationSet::new("m", "v", "w", vec!["x".into(), "y".into()],
+            PredictiveObservationSet::new("m", "v", "w", "holdout-sha", vec!["x".into(), "y".into()],
                 vec![0.5, 0.5], vec![u64::MAX, 1], ObservationSource::SyntheticFixture,
                 SamplingAssumption::IidCategorical),
             Err(PredictiveAdequacyError::ObservationCountOverflow)
