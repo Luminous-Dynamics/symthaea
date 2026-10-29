@@ -63,6 +63,12 @@ The runner labels its threshold ID as synthetic-only. It is a quick regression/c
 
 An independent NumPy/FFT reference simulation was executed for the same eleven scenarios in the development environment and reproduced all eleven predeclared verdicts, including the gain-drop, frequency-swap, and extra-transient mutations. The fixture definitions contain six critical negative controls and three expected-pass controls. Even if this tiny fixture panel observes zero false accepts, the two-sided 95% Wilson upper bound for the false-accept rate is about 39.0% (0/6); that is far too weak for a reliability claim. Zero false accepts in 300 independent critical negatives would lower that same bound to about 1.26%, still not proof of zero population risk. These are statistical properties of the sample sizes, not measured performance of the Rust implementation. This remains independent reference evidence—not execution of the Rust runner, whose compile and test status remains unknown until a Rust toolchain is available.
 
+## Preserved reference artifact
+
+The independently executed synthetic reference check is committed as `MEL-MR-EVAL-006_REFERENCE_SANITY_2026-10-29.json`. It pins the acoustic source and conformance-runner file blob hashes and records every case's verdict, representative measurements, onset frames, mutation family, and uncertainty intervals. It explicitly records that this was a Python/NumPy reference simulation—not execution of Rust.
+
+The fixture panel observed 0 false accepts in 6 critical negatives and 0 false rejects in 3 positive controls. The 95% two-sided Wilson upper bounds are approximately 39.0% and 56.1%, respectively. This is why the panel is only a smoke test. The future reliability gate should target at least 300 independent critical negatives and report composition/renderer-family holdouts; the interval would still be non-zero even then.
+
 ## Positioning against public benchmarks
 
 Treat the evaluator as one layer in a broader stack, not as a replacement for music or instruction-level benchmarks:
