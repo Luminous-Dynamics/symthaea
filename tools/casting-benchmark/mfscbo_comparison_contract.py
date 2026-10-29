@@ -129,16 +129,67 @@ def validate_contract(raw: Any) -> dict[str, Any]:
 
     declared_suite_digest = _sha256(contract["task_suite_sha256"], "task_suite_sha256")
     suite_path = _safe_repo_file(contract["task_suite_path"], "task_suite_path")
-    actual_suite_digest = hashlib.sha256(suite_path.read_bytes()).hexdigest()
+    suite_bytes = suite_path.read_bytes()
+    actual_suite_digest = hashlib.sha256(suite_bytes).hexdigest()
     if declared_suite_digest != actual_suite_digest:
         raise ValueError("task_suite_sha256 does not match the referenced suite file bytes")
-    _sha256(contract["constraint_definition_sha256"], "constraint_definition_sha256")
+    try:
+        suite = json.loads(
+            suite_bytes,
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"referenced task suite is not strict JSON: {exc}") from exc
+    if not isinstance(suite, dict) or suite.get("schema_version") != "1.0.0":
+        raise ValueError("referenced task suite must be a version 1.0.0 object")
+    if suite.get("suite_type") != "public_analytic_mfscbo_compatible_control":
+        raise ValueError(
+            "task suite must declare public_analytic_mfscbo_compatible_control; "
+            "general crossed-fidelity casting suites are not automatically MF-SCBO compatible"
+        )
+    compatibility = _strict_object(
+        suite.get("mfscbo_compatibility"),
+        frozenset({"constraint_fidelity_invariant", "objective_api", "claim_limit"}),
+        "suite.mfscbo_compatibility",
+    )
+    if compatibility["constraint_fidelity_invariant"] is not True:
+        raise ValueError("suite does not declare a fidelity-invariant shared constraint")
+    if compatibility["objective_api"] != "one scalarized objective per fidelity":
+        raise ValueError("suite objective API declaration does not match MF-SCBO")
+    constraint = _strict_object(
+        suite.get("constraint_contract"),
+        frozenset({"constraint_id", "definition", "fidelity_invariant", "margin_sign"}),
+        "suite.constraint_contract",
+    )
+    _nonblank(constraint["constraint_id"], "suite.constraint_contract.constraint_id")
+    _nonblank(constraint["definition"], "suite.constraint_contract.definition")
+    if constraint["fidelity_invariant"] is not True:
+        raise ValueError("suite constraint definition is fidelity-dependent and incompatible with MF-SCBO")
+    if contract["constraint_fidelity_invariant"] is not True:
+        raise ValueError("MF-SCBO comparison contract must declare a fidelity-invariant constraint")
+    actual_constraint_digest = hashlib.sha256(canonical_json(constraint)).hexdigest()
+    declared_constraint_digest = _sha256(
+        contract["constraint_definition_sha256"], "constraint_definition_sha256"
+    )
+    if declared_constraint_digest != actual_constraint_digest:
+        raise ValueError("constraint_definition_sha256 does not match the suite's constraint_contract")
+    if contract["constraint_margin_sign"] != constraint["margin_sign"]:
+        raise ValueError("constraint_margin_sign does not match the suite constraint contract")
     if contract["evidence_class"] not in ALLOWED_EVIDENCE:
         raise ValueError("evidence_class is unsupported")
+    if suite.get("evidence_class") != contract["evidence_class"]:
+        raise ValueError("evidence_class does not match the referenced task suite")
 
     directions = contract["objective_directions"]
     if directions != ["minimize", "minimize"]:
         raise ValueError("this comparator contract expects two minimization objectives in fixed order")
+    if suite.get("objective_directions") != directions:
+        raise ValueError("objective_directions do not match the referenced task suite")
+    if suite.get("fidelities") != list(FIDELITIES):
+        raise ValueError("referenced task suite must define low, medium, and high fidelities")
+    if suite.get("fidelity_cost_units") != contract["fidelity_cost_units"]:
+        raise ValueError("fidelity_cost_units do not match the referenced task suite")
     offsets = contract["normalization_offset"]
     scales = contract["normalization_scale"]
     if not isinstance(offsets, list) or len(offsets) != 2:
@@ -211,6 +262,7 @@ def validate_contract(raw: Any) -> dict[str, Any]:
 
     return {
         **contract,
+        "task_suite_benchmark_id": suite["benchmark_id"],
         "fidelity_cost_units": clean_costs,
         "initial_points_per_fidelity": clean_points,
         "initialization_cost_units": initial_cost,
@@ -288,6 +340,7 @@ def evaluate_contract_receipt(contract_bytes: bytes, validated_contract: dict[st
         "upstream_commit_sha": lock["upstream_commit_sha"],
         "evidence_class": validated_contract["evidence_class"],
         "task_suite_path": validated_contract["task_suite_path"],
+        "task_suite_benchmark_id": validated_contract["task_suite_benchmark_id"],
         "task_suite_sha256": validated_contract["task_suite_sha256"],
         "constraint_definition_sha256": validated_contract["constraint_definition_sha256"],
         "scalarization_weight_count": len(validated_contract["scalarization_weights"]),
