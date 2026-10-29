@@ -4,7 +4,7 @@
 
 This module explores whether a finite aircraft-recovery candidate universe can be searched faster by screening candidates in a fixed order and expanding only when the best verified plan is not yet justified by admissible lower bounds.
 
-The first implementation is a **generic bounded research contract**, not a complete airline-recovery optimizer. It does not yet enumerate operational aircraft swaps, encode crew/maintenance/airport rules, produce optimization bounds, or connect to dispatch. Its callback is a contract boundary: `VerifiedFeasible` must mean an independent checker has re-evaluated all hard constraints and recomputed the objective from frozen inputs. A caller must not return this variant merely because a ranking or solver says so.
+The implementation now contains two distinct research slices. `aviation_adaptive_screen.rs` is a generic bounded finite-candidate screening contract. `aviation_enterprise::solve_branch_and_bound` searches the existing tiny synthetic flight/aircraft assignment model directly, using fixed-source plus committed cancellation costs as an admissible lower bound, partial feasibility pruning, deterministic best-first expansion, a node budget, and independently re-verified incumbents. Neither is a complete airline-recovery optimizer: the model has no crew/passenger schedule, airport capacity, airspace restrictions, real disruption stream, or operational cost calibration, and it is not connected to dispatch.
 
 The implementation does not prove the admissibility of caller-supplied bounds. The tiny-instance oracle and later bound-verifier implementation must independently test this premise. A false lower bound can make a false optimality claim possible; hashes alone do not make a bound mathematically valid.
 
@@ -18,15 +18,15 @@ The conventional pipeline is:
 
 This is unsafe: optimality over the screened set does not imply optimality over the original set.
 
-The adaptive contract instead requires:
+The adaptive contract and search solver instead require:
 
-1. Freeze the complete candidate universe and provenance.
-2. Rank candidates deterministically; the ranking changes work order, not feasibility or objective semantics.
-3. Evaluate a small batch using an independently checked feasibility/cost path.
-4. Compare the best verified feasible cost to a lower bound over every unresolved candidate.
-5. Stop only if the absolute gap is within the preregistered tolerance. Otherwise expand the set.
-6. If the budget ends first, return `FeasibleUncertified`, never an optimality claim.
-7. Preserve candidate IDs, bounds, exact outcomes, and unresolved reasons.
+1. Freeze the scenario, objective, candidate-space semantics/coverage, and provenance.
+2. Use stable deterministic ordering only as a work-prioritization mechanism; ranking never changes feasibility or objective semantics.
+3. Derive a lower bound from objective terms already irrevocably committed. For the current tiny model, this is source/maintenance cost plus explicit cancellation costs; undecided flights contribute zero.
+4. Independently check partial constraints before expanding, and independently re-verify any new incumbent against the frozen scenario.
+5. Stop only if the incumbent-to-frontier gap is within the preregistered tolerance. Otherwise expand the search.
+6. If the node budget ends first, return `FeasibleUncertified` (or `NoFeasiblePlanWithinBudget`), never an optimality claim.
+7. Preserve candidate IDs, bounds, exact outcomes, frontier statistics, and unresolved reasons.
 
 The implementation uses integer objective units for exact gap arithmetic. A future percentage tolerance must define a fixed nonzero normalization denominator before test evaluation; it must not be improvised from results.
 
@@ -55,6 +55,8 @@ Every method must receive the same frozen scenario, full candidate universe, har
 | C | Stable-ID greedy / heuristic rank, no bound stop | Ranking quality only |
 | D | Ranking plus hard candidate cap, no expansion | Unsafe ablation; optimality claims forbidden |
 | E | Adaptive expansion with verified outcomes and admissible bounds | Proposed method |
+| F | Best-first branch-and-bound on the complete synthetic assignment tree | Lower-bound and partial-feasibility pruning |
+| G | Independent exhaustive raw-input oracle | Correctness reference on tiny scenarios |
 | F | Recovery-aware features (swap savings and disruption proximity) | Feature-engineering contribution |
 | G | ML-ranked candidates with the same verifier and bound protocol | Ranker contribution, not a separate safety guarantee |
 | H | Hindsight/perfect-information plan | Upper/lower-bound context only; not deployable |
@@ -83,7 +85,9 @@ Targets, not achieved results:
 
 ## Industry comparison and evidence tiers
 
-A published October 2026 study reports an average 66% end-to-end recovery-runtime reduction at comparable solution quality using recovery-specific swap-cost and disruption-aware features across five major Chinese airlines (DOI: [10.1016/j.trb.2026.103566](https://doi.org/10.1016/j.trb.2026.103566)). That percentage is a benchmark target only until the task, constraints, hardware, runtime accounting, and gap are matched.
+Industry systems already combine heuristics, restricted neighborhoods, and exact optimization rather than relying on one ranker. A Lufthansa Group schedule-recovery case study describes a portfolio of Aircraft, Crew, and Passenger subsolvers; it uses large-neighborhood candidate sets that eventually encompass the full candidate pool, a sequential feasibility-preserving heuristic, column generation, and LP-relaxation-derived costs ([INFORMS Journal on Applied Analytics, DOI 10.1287/inte.2025.0296](https://doi.org/10.1287/inte.2025.0296)). This directly motivates the full-cover and anytime-feasibility requirements here.
+
+An MIT thesis on large-scale airline crew recovery describes mixed-integer optimization with supervised-learning-derived cuts and time-budget-tunable solution-space reduction on real schedules exceeding 2,500 daily flights. It reports improvements up to 15% over benchmark methods in its evaluated setting; this is a different crew-recovery task, so the number is a research comparator, not a directly comparable target ([MIT thesis, 2024](https://hdl.handle.net/1721.1/153670)). The October 2026 aircraft-recovery study reports a 66% average runtime reduction at comparable solution quality using recovery-specific swap-cost and disruption-aware features across five major Chinese airlines (DOI: [10.1016/j.trb.2026.103566](https://doi.org/10.1016/j.trb.2026.103566)). Neither figure is a Symthaea result; they set reference points only after task, constraints, hardware, runtime accounting, and gap are matched.
 
 A separate 2026 study evaluates airline recovery coordinated with network-manager capacity/disruption decisions and a fairness mechanism. This motivates separate actor-level and network-level outputs, but its results are not directly comparable to the synthetic fixture (DOI: [10.1016/j.tre.2026.104977](https://doi.org/10.1016/j.tre.2026.104977)).
 
@@ -115,14 +119,14 @@ The current module validates digest encoding and echoes caller-supplied scenario
 
 ## Current scope and next integration steps
 
-The Rust module `aviation_adaptive_screen.rs` provides a deterministic finite-candidate control loop with explicit bounds, audit records, and fail-closed terminal statuses. The separately compiled integration oracle uses an independent truth table to test expansion, stopping, budget exhaustion, indeterminate evidence, false bound witnesses, stable tie-breaking, and infeasibility.
+The branch now includes `aviation_adaptive_screen.rs` for generic finite-candidate screening and a best-first branch-and-bound solver in `aviation_enterprise.rs` for the current complete synthetic assignment tree. The separate branch-and-bound integration oracle independently enumerates source/assignment combinations from raw scenario fields and compares costs across 16 varied scenarios; it also checks verified incumbents, stock/production evidence, deterministic reports, and a one-node budget. The generic screening module retains its separate truth-table oracle.
 
-Still required before calling this an optimizer:
-1. Build the full candidate universe from a frozen recovery model and produce mathematically admissible per-candidate lower bounds.
-2. Bind candidate outcomes to the independent hard-constraint/cost verifier.
-3. Add deterministic scenario generators and exhaustive assignment checks against `aviation_enterprise` where the model semantics align.
-4. Add per-stage runtime measurement and a matched baseline runner.
-5. Bind the report into the evidence-bundle/readiness protocol and test mutation/rollback cases.
+Still required before calling this an airline optimizer:
+1. Expand the model with explicit disruption windows, swap actions, airport/crew/passenger constraints, and authoritative objective semantics.
+2. Preserve a complete coverage argument and derive admissible bounds for every decision region; the current branch-and-bound bound is admissible only for the narrow toy objective.
+3. Bind candidate outcomes to independent hard-constraint/cost verifiers and the signed evidence-bundle/readiness protocol.
+4. Add frozen randomized/property-based scenario generation, stress scenarios, and mutation/fault-injection tests.
+5. Add per-stage wall-clock runtime measurements, repeated trials, and a matched baseline runner; node counts alone do not establish a runtime advantage.
 6. Run `cargo fmt --check` and `cargo test --locked -p symthaea-operations-research` on the exact final source SHA in a Rust-equipped environment.
 
 No compilation, runtime benchmark, airline savings, SOTA superiority, operational-safety, dispatch-authority, or certification claim is made by this document.
