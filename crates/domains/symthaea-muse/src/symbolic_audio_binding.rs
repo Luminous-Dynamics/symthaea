@@ -22,8 +22,8 @@ use symthaea_music_theory::edit_locality::{
 use symthaea_music_theory::Score;
 
 use crate::edit_contract::{
-    AttributeValue, EditAttribute, FrozenEditContract, ObligationRequirement, ObligationScope,
-    SupportedEditOperation,
+    AttributeValue, EditAttribute, EditObligation, FrozenEditContract, ObligationRequirement,
+    ObligationScope, QuantizedTolerance, SupportedEditOperation,
 };
 use crate::audio_preservation::{
     AudioAuditInputError, AudioPreservationReport, AudioView, FrameInterval,
@@ -1201,6 +1201,222 @@ mod tests {
                 calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
             },
         }
+    }
+
+    fn complete_contract_for_full_score(
+        instruction_sha256: &str,
+        source: &Score,
+        target: &Score,
+        symbolic: &EditLocalityEvidence,
+        manifest: &RendererManifest,
+        profile: &AudioPreservationProfile,
+    ) -> FrozenEditContract {
+        let source_events = validate_score_projection(source).expect("source projection");
+        let target_events = validate_score_projection(target).expect("target projection");
+        let (operation_id, pitch_scope, pitch_requirement, rms_scope) =
+            match symbolic.request.operation {
+                symthaea_music_theory::edit_locality::EditOperation::PitchAt { index, semitones } => {
+                    assert!(index < source_events.len());
+                    assert_eq!(target_events[index].pitch_midi - source_events[index].pitch_midi, semitones);
+                    (
+                        "pitch-at",
+                        ObligationScope::Event { event_id: format!("score_event_index:{index}") },
+                        ObligationRequirement::ChangeTo {
+                            expected: AttributeValue::Numeric {
+                                value_microunits: i64::from(target_events[index].pitch_midi) * 1_000_000,
+                                unit: "midi_note".to_string(),
+                            },
+                        },
+                        ObligationScope::Event { event_id: format!("score_event_index:{index}") },
+                    )
+                }
+                symthaea_music_theory::edit_locality::EditOperation::Transpose { semitones } => (
+                    "transpose",
+                    ObligationScope::ScoreWide,
+                    ObligationRequirement::ChangeBy {
+                        delta: AttributeValue::Numeric {
+                            value_microunits: i64::from(semitones) * 1_000_000,
+                            unit: "semitone".to_string(),
+                        },
+                    },
+                    ObligationScope::ScoreWide,
+                ),
+                _ => panic!("only the currently supported pitch operations are valid in this fixture"),
+            };
+        let preservation = |id: &str,
+                            attribute: EditAttribute,
+                            scope: ObligationScope,
+                            comparator_id: &str,
+                            unit: &str,
+                            value_microunits: u64| EditObligation {
+            obligation_id: id.to_string(),
+            attribute,
+            scope,
+            requirement: ObligationRequirement::PreserveWithin {
+                comparator_id: comparator_id.to_string(),
+                tolerance: QuantizedTolerance {
+                    value_microunits,
+                    unit: unit.to_string(),
+                },
+            },
+            critical: true,
+        };
+        let renderer_digest = renderer_manifest_sha256(manifest).expect("manifest digest");
+        let profile_digest = audio_preservation_profile_sha256(profile).expect("profile digest");
+        FrozenEditContract::new(
+            "contract-bound-test".to_string(),
+            operation_id.to_string(),
+            instruction_sha256.to_string(),
+            full_score_sha256(source).expect("source score digest"),
+            full_score_sha256(target).expect("target score digest"),
+            profile.profile_id.clone(),
+            profile_digest,
+            vec![
+                EditObligation {
+                    obligation_id: "pitch-change".to_string(),
+                    attribute: EditAttribute::Pitch,
+                    scope: pitch_scope,
+                    requirement: pitch_requirement,
+                    critical: true,
+                },
+                preservation("onset", EditAttribute::Onset, ObligationScope::ScoreWide,
+                    "onset-preservation-v1", "seconds", 10_000),
+                preservation("duration", EditAttribute::Duration, ObligationScope::ScoreWide,
+                    "score-duration-exact-v1", "beats", 0),
+                preservation("edited-envelope", EditAttribute::RmsEnvelope, rms_scope,
+                    "rms-envelope-delta-v1", "db", 1_000_000),
+                preservation("protected-rms", EditAttribute::NeighboringContent,
+                    ObligationScope::ProtectedRemainder, "protected-region-rms-v1", "db", 500_000),
+                preservation("protected-spectrum", EditAttribute::NeighboringContent,
+                    ObligationScope::ProtectedRemainder, "protected-region-spectral-v1",
+                    "normalized_distance", 80_000),
+                EditObligation {
+                    obligation_id: "renderer-config".to_string(),
+                    attribute: EditAttribute::RendererConfig,
+                    scope: ObligationScope::ScoreWide,
+                    requirement: ObligationRequirement::BindDigest { expected_sha256: renderer_digest },
+                    critical: true,
+                },
+            ],
+        ).seal().expect("complete contract should seal")
+    }
+
+    #[test]
+    fn frozen_contract_binds_exact_instruction_scores_profile_renderer_and_target_event() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        assert!(validate_frozen_edit_contract_for_rendering(
+            &contract, &instruction, &source, &target, &symbolic, &manifest, &profile,
+        ).is_ok());
+    }
+
+    #[test]
+    fn frozen_contract_rejects_wrong_target_score_hash() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let mut contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        contract.target_score_sha256 = digest(b"different target score");
+        let contract = contract.seal().expect("tampered contract can be resealed");
+        assert!(validate_frozen_edit_contract_for_rendering(
+            &contract, &instruction, &source, &target, &symbolic, &manifest, &profile,
+        ).is_err());
+    }
+
+    #[test]
+    fn frozen_contract_rejects_renderer_digest_substitution() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let mut contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        for obligation in &mut contract.obligations {
+            if obligation.attribute == EditAttribute::RendererConfig {
+                obligation.requirement = ObligationRequirement::BindDigest {
+                    expected_sha256: digest(b"substituted renderer"),
+                };
+            }
+        }
+        let contract = contract.seal().expect("renderer digest substitution is syntactically valid");
+        assert!(validate_frozen_edit_contract_for_rendering(
+            &contract, &instruction, &source, &target, &symbolic, &manifest, &profile,
+        ).is_err());
+    }
+
+    #[test]
+    fn frozen_contract_rejects_wrong_instruction_digest() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        assert!(validate_frozen_edit_contract_for_rendering(
+            &contract, &digest(b"edit something else"), &source, &target, &symbolic, &manifest, &profile,
+        ).is_err());
+    }
+
+    #[test]
+    fn contract_bound_full_score_binding_replays_exact_contract_and_audio_evidence() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let (source_audio, target_audio) = audio_pair();
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        let mask = [FrameInterval { start_frame: 4_096, end_frame: 5_120 }];
+        let acoustic = audit_protected_audio(
+            audio_view(&source_audio),
+            audio_view(&target_audio),
+            &mask,
+            &profile.acoustic_config,
+        ).expect("acoustic evidence");
+        let onset = audit_onset_preservation(
+            audio_view(&source_audio),
+            audio_view(&target_audio),
+            &[],
+            &profile.onset_config,
+        ).expect("onset evidence");
+        let binding = create_contract_bound_full_score_render_binding(
+            &contract, &instruction, &source, &target, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset,
+            &manifest, &profile,
+        ).expect("contract-bound binding should be constructed");
+        assert!(verify_contract_bound_full_score_render_binding(
+            &contract, &instruction, &source, &target, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset,
+            &manifest, &profile, &binding,
+        ).expect("binding replay"));
+        let mut tampered = binding.clone();
+        tampered.contract_sha256 = digest(b"other contract");
+        assert!(!verify_contract_bound_full_score_render_binding(
+            &contract, &instruction, &source, &target, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset,
+            &manifest, &profile, &tampered,
+        ).expect("tampered binding should return false"));
     }
 
     fn build_fixture() -> (
