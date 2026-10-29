@@ -57,7 +57,7 @@ The following numbers were reproduced with a Python mirror of the exact SplitMix
 | Interaction only | Learned additive model | 0 | 0.4846 | 0.0800 | 0.4046 | -0.0800 | 0.3159 |
 | Additive reversed | Direct nearest-context | 0 | 0.5090 | 0.0000 | 0.5090 | 0.0000 | — |
 | Additive reversed | Learned additive model | 0 | 0.5090 | 0.0800 | 0.4290 | -0.0800 | 0.0480 |
-| Additive reversed | Stale model control | 1 | 0.1541 | 0.0800 | 0.0741 | **-0.4350** | 0.3020 |
+| Additive reversed | Stale model control | 1 | 0.1541 | 0.0800 | 0.0741 | **-0.4350** | 0.3000 |
 
 ## What this says—and does not say
 
