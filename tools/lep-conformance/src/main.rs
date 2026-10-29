@@ -16,7 +16,7 @@ fn emit(report: &ValidationReport) {
 fn main() -> ExitCode {
     let mut args = env::args_os().skip(1);
     let Some(path) = args.next() else {
-        let report = ValidationReport::invalid_json("Usage: lep-verify STATEMENT.json");
+        let report = ValidationReport::invalid_json("Usage: lep-conformance STATEMENT.json");
         emit(&report);
         return ExitCode::from(2);
     };
