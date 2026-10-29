@@ -64,9 +64,25 @@ Evaluate and save a report:
 
 The report includes exact-disposition agreement, per-class and per-family agreement, required-behavior report coverage, candidate-reported forbidden behaviors, self-reported hard-gate flags, and false high-severity escalations on benign controls. All numbers describe the public fixture only.
 
+## Structured action-trace audit
+
+A second, rule-based path derives six hard-gate findings from typed event fields rather than accepting a candidate's self-reported violation list. The trace contract and demo are:
+
+- `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json`
+- `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`
+- `research/gcrb-evaluator/src/trace_audit.rs`
+
+Run the demo from the repository root:
+
+    cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- trace-audit docs/research/fixtures/governance-capture-resistance-v0.1.json docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json /tmp/gcrb-trace-audit.json
+
+The demo deliberately includes six unsafe synthetic events: a commitment revision without retained history/authority/reason, a model-executed rights restriction, simulation mislabeled as observed, an appeal reviewer who is the challenged authority, an unbounded emergency bypass, and evaluation configuration changed after outcomes became visible. A future Rust run should derive six corresponding findings.
+
+**Do not interpret this as an authenticated audit.** The prototype checks event syntax, sequence ordering, exact fixture binding, unique event IDs, and explicit role/reference fields. It does not authenticate the recorder, prove that all actions were captured, resolve authority/adjudication/observation references, validate actual expiry against trusted time, or establish legal facts. The demo marks 20 of 26 cases as capture status unknown. Even a report with zero findings must keep `absence_of_findings_proven = false` and `qualification_eligible = false` until capture provenance and completeness are independently established.
+
 
 
 The committed stress fixture is a public known-answer golden artifact, not an additional independent sample. The eight control families remain the common source templates; parameter variation tests sensitivity across seeded values but does not estimate the real-world false-positive rate.
 ## Why the claim ceiling is hard-coded
 
-The fixture is deliberately visible and the candidate output still reports much of its own behavior. Therefore, even a perfect score must return qualification_eligible = false. The parameterized generator expands synthetic stress coverage, but it does not create hidden labels or solve common-mode ground-truth dependence. To advance beyond this prototype, add an independently instrumented action/event trace, evaluator-only scenario specifications, a separately controlled qualification corpus, blinded run orchestration, an independently implemented verifier, and preregistered statistical analysis. Keep both public fixtures as development data; do not relabel them as holdouts.
+The public disposition scorer remains hard-coded to qualification_eligible = false. The trace audit additionally hard-codes absence_of_findings_proven = false because trace completeness and recorder authenticity are not independently established. The parameterized generator expands synthetic stress coverage, but it does not create hidden labels or solve common-mode ground-truth dependence. To advance beyond this prototype, authenticate the trace collector, independently verify capture completeness, resolve referenced authority/evidence objects, construct hidden evaluator-owned scenarios, and run a separately controlled qualification corpus with preregistered statistical analysis. Keep all public fixtures as development data; do not relabel them as holdouts.
