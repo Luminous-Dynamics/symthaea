@@ -419,7 +419,11 @@ mod tests {
                 decision: if network_policy == "isolated" { "block" } else { "allow" }.to_owned(),
                 request_sha256: sha256_hex(b"query-not-stored"),
                 host: "search.example.org".to_owned(),
-                response_sha256: if network_policy == "isolated" { None } else { Some(sha256_hex(b"results-not-stored")) },
+                response_sha256: if network_policy == "isolated" {
+                    None
+                } else {
+                    Some(sha256_hex(b"results-not-stored"))
+                },
                 previous_event_sha256: ZERO_DIGEST.to_owned(),
                 event_sha256: ZERO_DIGEST.to_owned(),
             },
@@ -429,7 +433,11 @@ mod tests {
                 decision: if network_policy == "isolated" { "block" } else { "allow" }.to_owned(),
                 request_sha256: sha256_hex(b"https://docs.example.org/resource"),
                 host: "docs.example.org".to_owned(),
-                response_sha256: if network_policy == "isolated" { None } else { Some(sha256_hex(b"body-not-stored")) },
+                response_sha256: if network_policy == "isolated" {
+                    None
+                } else {
+                    Some(sha256_hex(b"body-not-stored"))
+                },
                 previous_event_sha256: ZERO_DIGEST.to_owned(),
                 event_sha256: ZERO_DIGEST.to_owned(),
             },
