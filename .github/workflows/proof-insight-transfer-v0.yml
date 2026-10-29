@@ -3595,6 +3595,51 @@ jobs:
               raise SystemExit("randomized joint-error accounting does not reconcile")
           print("PITB_COMPONENT_ALLOCATION_SCREEN_PASS: synthetic_only=true component_quotas=reconciled")
           PY
+      - name: Audit eligible-target component coverage before split scoring
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin audit_component_split_feasibility -- \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/component-first-split-candidate.synthetic.json" \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/pre-split-target-eligibility-census.synthetic.json" \
+            "$RUNNER_TEMP/component-split-feasibility.synthetic.json"
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/pre-split-target-eligibility-census-v0.schema.json" \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/component-split-feasibility-report-v0.schema.json" \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/pre-split-target-eligibility-census.synthetic.json" \
+            "$RUNNER_TEMP/component-split-feasibility.synthetic.json" <<'PY'
+          import copy, json, sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          census_schema_path, report_schema_path, census_fixture_path, report_path = map(Path, sys.argv[1:])
+          census_schema = json.loads(census_schema_path.read_text())
+          report_schema = json.loads(report_schema_path.read_text())
+          census_fixture = json.loads(census_fixture_path.read_text())
+          report = json.loads(report_path.read_text())
+          Draft202012Validator.check_schema(census_schema)
+          Draft202012Validator.check_schema(report_schema)
+          Draft202012Validator(census_schema).validate(census_fixture)
+          Draft202012Validator(report_schema).validate(report)
+          if report["qualified_for_confirmatory_use"] is not False:
+              raise SystemExit("feasibility diagnostic must never qualify a confirmatory result")
+          if report["eligible_component_count_by_split"] != {"train": 3, "validation": 1, "test": 0}:
+              raise SystemExit("eligible component counts do not match the synthetic negative fixture")
+          if report["heldout_structural_floor_met"] is not False:
+              raise SystemExit("synthetic underpowered fixture was incorrectly marked as meeting the held-out floor")
+          if report["structurally_feasible_for_power_planning"] is not False:
+              raise SystemExit("synthetic fixture must not be marked ready for power planning")
+          bad = copy.deepcopy(census_fixture)
+          bad["outcomes_used"] = True
+          if Draft202012Validator(census_schema).is_valid(bad):
+              raise SystemExit("census schema accepted outcome-derived eligibility")
+          bad = copy.deepcopy(census_fixture)
+          bad["families"][0]["eligibility_status"] = "excluded"
+          if Draft202012Validator(census_schema).is_valid(bad):
+              raise SystemExit("census schema accepted an unregistered or malformed family classification")
+          print("PITB_ELIGIBLE_COMPONENT_FEASIBILITY_PASS: underpowered_case_detected=true confirmatory=false")
+          PY
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
         with:
