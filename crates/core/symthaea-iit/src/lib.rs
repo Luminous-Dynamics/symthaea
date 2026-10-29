@@ -834,8 +834,8 @@ mod tests {
 
     #[test]
     fn rejects_connectivity_that_omits_a_tpm_influence() {
-        // Unit 0 changes target 1's transition probability, but the declared
-        // graph omits edge 0 -> 1. PyPhi likewise rejects such under-specified connectivity.
+        // Unit 1 changes target 1's transition probability, but the declared
+        // graph omits edge 1 -> 1. PyPhi likewise rejects such under-specified connectivity.
         assert!(matches!(
             BinaryCausalModel::new(
                 2,
