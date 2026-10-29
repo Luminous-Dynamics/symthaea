@@ -1,0 +1,6 @@
+case_id	reward_a0_milli	reward_a1_milli	reward_a2_milli	safe_a0	safe_a1	safe_a2	outcome_a0	outcome_a1	outcome_a2	required_evidence_id	approval_required
+case-001	1000	0	-500	true	true	false	true	false	false	evt-001-current	false
+case-002	-200	900	100	true	true	true	false	true	false	evt-002-current	false
+case-003	400	400	1200	true	true	false	true	true	true	evt-003-valid	false
+case-004	100	250	0	true	true	true	false	true	false	evt-004-current	true
+case-005	-100	0	0	true	true	true	false	false	false		false
