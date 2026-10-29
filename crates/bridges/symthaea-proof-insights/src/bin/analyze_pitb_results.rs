@@ -2188,6 +2188,114 @@ fn validate_component_manifest(
     Ok(family_to_component)
 }
 
+
+fn verify_component_coverage_inputs(
+    args: &BTreeMap<String, String>,
+    config: &RunConfig,
+    manifest: &ComponentManifest,
+    split_manifest: &SplitManifest,
+    split_bytes: &[u8],
+) -> Result<bool> {
+    let flags = [
+        "--relationship-inventory",
+        "--coverage-receipt",
+        "--coverage-trust-store",
+        "--coverage-methodology",
+    ];
+    let supplied_flags = flags.iter().filter(|flag| args.contains_key(**flag)).count();
+    let pins = [
+        config.relationship_inventory_sha256.as_deref(),
+        config.coverage_receipt_sha256.as_deref(),
+        config.coverage_trust_store_sha256.as_deref(),
+        config.coverage_methodology_sha256.as_deref(),
+    ];
+    let supplied_pins = pins.iter().filter(|pin| pin.is_some()).count();
+
+    if supplied_flags == 0 && supplied_pins == 0 {
+        if manifest.qualified_for_confirmatory_resampling
+            || manifest.coverage_receipt_verification_status == "verified_signature_set"
+        {
+            bail!("manifest claims receipt qualification but no receipt inputs were supplied for independent re-verification");
+        }
+        return Ok(false);
+    }
+    if supplied_flags != flags.len() || supplied_pins != pins.len() {
+        bail!("coverage verification requires all four original artifacts and all four frozen SHA-256 pins");
+    }
+
+    let inventory_bytes = read_arg(args, "--relationship-inventory")?;
+    let receipt_bytes = read_arg(args, "--coverage-receipt")?;
+    let trust_store_bytes = read_arg(args, "--coverage-trust-store")?;
+    let methodology_bytes = read_arg(args, "--coverage-methodology")?;
+
+    let expected_inventory_digest = config.relationship_inventory_sha256.as_deref()
+        .context("missing pinned relationship inventory digest")?;
+    let expected_receipt_digest = config.coverage_receipt_sha256.as_deref()
+        .context("missing pinned coverage receipt digest")?;
+    let expected_trust_store_digest = config.coverage_trust_store_sha256.as_deref()
+        .context("missing pinned reviewer trust-store digest")?;
+    let expected_methodology_digest = config.coverage_methodology_sha256.as_deref()
+        .context("missing pinned review-methodology digest")?;
+
+    for (label, expected, bytes) in [
+        ("relationship inventory", expected_inventory_digest, inventory_bytes.as_slice()),
+        ("coverage receipt", expected_receipt_digest, receipt_bytes.as_slice()),
+        ("reviewer trust store", expected_trust_store_digest, trust_store_bytes.as_slice()),
+        ("review methodology", expected_methodology_digest, methodology_bytes.as_slice()),
+    ] {
+        if expected != sha256_hex(bytes) {
+            bail!("{label} bytes do not match their frozen run-config digest");
+        }
+    }
+    if manifest.relationship_inventory_sha256 != expected_inventory_digest
+        || manifest.coverage_receipt_sha256.as_deref() != Some(expected_receipt_digest)
+    {
+        bail!("component manifest artifact digests do not reconcile with the independently pinned inventory and receipt");
+    }
+    if manifest.relationship_inventory_status != "independently_reviewed_complete" {
+        bail!("signed completeness receipts can only be consumed for a complete relationship inventory");
+    }
+
+    let frozen_families = coverage_receipt::validate_frozen_partition(split_bytes)?;
+    let analyzer_families: BTreeMap<String, String> = split_manifest.families.iter()
+        .map(|family| (family.family_id.clone(), family.split.clone()))
+        .collect();
+    if frozen_families != analyzer_families
+        || split_manifest.split_plan.partition_digest_sha256
+            != coverage_receipt::EXPECTED_PARTITION_DIGEST
+    {
+        bail!("coverage verifier and analyzer disagree on the frozen split partition");
+    }
+
+    let report = verify_receipt(
+        &inventory_bytes,
+        &receipt_bytes,
+        &trust_store_bytes,
+        &methodology_bytes,
+        expected_trust_store_digest,
+        expected_methodology_digest,
+        &config.partition_digest_sha256,
+        &frozen_families,
+    )?;
+    if report.schema_version != "pitb.coverage-receipt-verification.v1"
+        || report.verification_status != "verified_signature_set"
+        || !report.cryptographically_verified
+        || report.resampling_qualification != "requires_component_and_analyzer_validation"
+        || report.upstream_commit != EXPECTED_UPSTREAM_COMMIT
+        || report.source_partition_digest_sha256 != config.partition_digest_sha256
+        || report.relationship_inventory_sha256 != expected_inventory_digest
+        || report.coverage_receipt_sha256 != expected_receipt_digest
+        || report.trust_store_sha256 != expected_trust_store_digest
+        || report.review_methodology_sha256 != expected_methodology_digest
+        || report.verified_reviewer_ids.len() < 2
+        || report.distinct_reviewer_organization_count < 2
+        || report.limitation.trim().is_empty()
+    {
+        bail!("coverage receipt verifier output failed analyzer-side provenance reconciliation");
+    }
+    Ok(true)
+}
+
 fn parse_target_jsonl(bytes: &[u8], split: &str) -> Result<Vec<TargetOutcome>> {
     let text = String::from_utf8(bytes.to_vec())
         .with_context(|| format!("{split} target results must be UTF-8"))?;
