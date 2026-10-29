@@ -187,6 +187,13 @@ def main() -> int:
     contaminated_scored["records"][0]["terminal_status"] = "contaminated"
     write_json(output / "contaminated-scored-report.json", make_full(contaminated_scored))
 
+    budget_violation_scored = copy.deepcopy(fields)
+    budget_violation_scored["records"][0]["terminal_status"] = "budget_violation"
+    write_json(
+        output / "budget-violation-scored-report.json",
+        make_full(budget_violation_scored),
+    )
+
     tampered = copy.deepcopy(valid)
     tampered["report_commitment_sha256"] = "0" * 64
     write_json(output / "mutated-commitment-report.json", tampered)
