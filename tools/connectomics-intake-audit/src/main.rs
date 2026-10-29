@@ -747,3 +747,4 @@ mod tests {
         assert_eq!(report.files[0].status, "sha256_mismatch");
         fs::remove_dir_all(root).expect("cleanup test root");
     }
+}
