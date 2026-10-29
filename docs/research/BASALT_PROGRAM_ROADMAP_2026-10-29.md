@@ -38,6 +38,7 @@ The roadmap now has a versioned task-level run-record contract:
 The schema checks local structure; a future runner/validator must additionally enforce cross-record pairing, digest equality, outcome consistency, and negative controls. Until that validator is implemented and tested, the schema is a data contract—not a security boundary or proof of evaluation validity.
 
 ## Existing work to compose
+- Fail-closed Rust validation of run records and cross-record evidence invariants: [#9021](https://github.com/Luminous-Dynamics/symthaea/issues/9021)
 
 - VLEB family-stratified paired inference: [#8900](https://github.com/Luminous-Dynamics/symthaea/pull/8900)
 - VLEB clean-to-shifted robustness: [#8901](https://github.com/Luminous-Dynamics/symthaea/pull/8901)
