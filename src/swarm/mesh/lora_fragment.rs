@@ -388,11 +388,27 @@ impl FragmentAssembler {
     }
 
     fn layout_is_valid(&self) -> bool {
-        self.expected_payload_size > 0
-            && self.total_fragments >= 2
-            && self.data_count > 0
-            && self.data_count <= 254
-            && self.total_fragments as usize == self.data_count as usize + 1
+        if self.expected_payload_size == 0
+            || self.total_fragments < 2
+            || self.data_count == 0
+            || self.data_count > 254
+            || self.total_fragments as usize != self.data_count as usize + 1
+        {
+            return false;
+        }
+
+        if !self.allow_final_fec_recovery {
+            // Legacy receiver mode: exact encoded length is not carried on wire.
+            return true;
+        }
+
+        // Exact-size mode: expected bytes and shard count must agree.
+        let Some(rounded_size) = self.expected_payload_size.checked_add(PAYLOAD_SIZE - 1)
+        else {
+            return false;
+        };
+        let expected_data_count = rounded_size / PAYLOAD_SIZE;
+        expected_data_count == self.data_count as usize && expected_data_count <= 254
     }
 
     /// Feed a received fragment. Returns true when the payload is reconstructable.
@@ -417,13 +433,29 @@ impl FragmentAssembler {
             return false;
         }
 
-        // Non-final data shards and parity are always full-size. The final
-        // data shard can be shorter because legacy frames do not carry the
-        // exact encoded message length.
-        if (frag.is_fec() || idx + 1 < self.data_count as usize)
-            && frag.payload_len as usize != PAYLOAD_SIZE
-        {
-            return false;
+        // Parity and non-final data shards are always full-size.
+        if frag.is_fec() || idx + 1 < self.data_count as usize {
+            if frag.payload_len as usize != PAYLOAD_SIZE {
+                return false;
+            }
+        } else if self.allow_final_fec_recovery {
+            // In exact-size mode the final shard length is known before state
+            // advances; in legacy compatibility mode it is learned from wire.
+            let Some(prefix_len) =
+                (self.data_count as usize - 1).checked_mul(PAYLOAD_SIZE)
+            else {
+                return false;
+            };
+            let Some(expected_final_len) = self.expected_payload_size.checked_sub(prefix_len)
+            else {
+                return false;
+            };
+            if expected_final_len == 0
+                || expected_final_len > PAYLOAD_SIZE
+                || frag.payload_len as usize != expected_final_len
+            {
+                return false;
+            }
         }
 
         // Duplicate — ignore but report current status.
@@ -571,10 +603,13 @@ impl FragmentAssembler {
             payload.extend_from_slice(&frag_data[..len]);
         }
 
-        // When every data shard arrives (or only a non-final shard is recovered),
-        // the observed final-shard length is authoritative. Legacy envelopes may
-        // be compressed, so their encoded size need not equal the nominal size.
-        Some(payload)
+        if self.allow_final_fec_recovery {
+            (payload.len() == self.expected_payload_size).then_some(payload)
+        } else {
+            // The legacy wire format does not carry exact encoded length. Use
+            // observed shard lengths, but never infer a lost final shard's tail.
+            Some(payload)
+        }
     }
 }
 
