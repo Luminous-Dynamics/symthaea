@@ -149,6 +149,30 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
         self.assertEqual(set(by_family), {"local_bias_island", "structural_discrepancy"})
         self.assertEqual(by_family["local_bias_island"]["auc_delta"]["n_paired_units"], 2)
         self.assertEqual(by_family["structural_discrepancy"]["auc_delta"]["n_paired_units"], 1)
+        self.assertIn("relative_auc_improvement", by_family["local_bias_island"])
+        self.assertEqual(by_family["local_bias_island"]["relative_auc_improvement"]["n_paired_units"], 2)
+
+    def test_all_unit_win_rate_counts_ties_as_nonwins(self):
+        doc = manifest()
+        for row in doc["runs"]:
+            if row["policy_id"] == "candidate":
+                baseline = next(
+                    item for item in doc["runs"]
+                    if item["unit_id"] == row["unit_id"] and item["policy_id"] == "baseline"
+                )
+                row["curve"] = [dict(point) for point in baseline["curve"]]
+        receipt = analyze_manifest(doc)
+        effect = receipt["comparisons_vs_baseline"]["candidate"]["effects"]["cost_normalized_quality_auc_delta"]
+        self.assertEqual(effect["wins"], 0)
+        self.assertEqual(effect["ties"], 3)
+        self.assertEqual(effect["win_rate_all_units"], 0.0)
+        self.assertEqual(effect["bootstrap_95pct_ci_win_rate_all_units"], [0.0, 0.0])
+
+    def test_rejects_unknown_evidence_class(self):
+        doc = manifest()
+        doc["evidence_class"] = "synthetic_plus_simulated"
+        with self.assertRaisesRegex(ValueError, "evidence_class"):
+            analyze_manifest(doc)
 
     def test_rejects_candidate_or_shift_rows_as_sampling_units(self):
         doc = manifest()
