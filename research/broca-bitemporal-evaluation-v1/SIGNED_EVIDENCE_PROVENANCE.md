@@ -23,17 +23,17 @@ The branch adds crates/domains/symthaea-broca/src/memory_attestation.rs, exporte
 
 A verified event's transaction time is overwritten with the trusted-ingress receipt's accepted_at before it enters PolicyPinnedLedger. Policy envelopes also require a distinct trusted-ingress receipt. The policy signer's claimed recorded_at is authenticated as part of the signed source payload, but is not trusted as the policy's timeline timestamp: verification replaces it with accepted_at. Both event and policy signing keys are checked for validity at trusted acceptance time, preventing backdating a newly signed policy into a retired key's old validity window. The policy/event digests cover normalized signed envelopes, including source signatures and ingress receipts, in stable ID/version order.
 
-SignedAuthorityPolicy separately verifies policy changes under an explicitly provisioned policy-signing key and requires an independently provisioned ingress-receipt key. The trust store rejects configurations where a key has more than one role, so a policy/event signer cannot mint its own receipt. Policy records are normalized and sorted for signing so a harmless reorder of policy sources does not change the signature payload.
+SignedAuthorityPolicy separately verifies policy changes under an explicitly provisioned policy-signing key and requires an independently provisioned ingress-receipt key. The trust store rejects configurations where a key has more than one role or where the same public key is aliased under separate IDs, so a policy/event signer cannot mint its own receipt. Policy records are normalized and sorted for signing so a harmless reorder of policy sources does not change the signature payload.
 
 EvidenceTrustStore::verify_batch verifies the policy envelopes and event envelopes. The resulting VerifiedLedgerBatch has private input fields, exposes policy/event digests, and can be converted to PolicyPinnedLedger only after verification.
 
 ### Authored Rust tests
 
-The module includes 25 authored unit tests covering:
+The module includes 26 authored unit tests covering:
 - valid source, policy and ingress signatures;
 - source-payload and receipt-time tampering;
 - source/key identity mismatch and unknown key rejection;
-- role separation among policy, source-event and ingestion-receipt keys, including rejection of multi-role keys;
+- role separation among policy, source-event and ingestion-receipt keys, including rejection of multi-role keys and aliases that reuse public-key material;
 - event and policy key validity checked at actual receipt time, including a backdated policy from an expired key;
 - source-claimed event time cannot override trusted ingress time in a query;
 - policy timestamps are replaced with trusted ingress time;
