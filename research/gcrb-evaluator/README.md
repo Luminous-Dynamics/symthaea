@@ -6,7 +6,7 @@ It does not make decisions about people, public officials, legal guilt, rights, 
 
 ## Status
 
-- The isolated Rust CLI/library is authored with 25 core evaluator tests and seven trace-auditor tests (32 authored total). None has been compiled or executed.
+- The isolated Rust CLI/library is authored with 33 core evaluator tests and seven trace-auditor tests (40 authored total). None has been compiled or executed.
 - The fixture and its expected dispositions are public known answers, so this is **not blind qualification**.
 
 The current cross-system source audit is published at `docs/research/fixtures/governance-capture-resistance-adapter-map-v0.1.json`. It records the real Mycelix Justice Cases `Case/Evidence/Decision/Appeal` owner, the separate DeSci signed-event/receipt/checkpoint pattern, Symtropy's transient `SimSnapshot/SimEvent` interface, and the fact that the standalone Symtropy–Mycelix simulation bridge is not wired as a default dependency. These are source references and an integration plan—not working runtime adapters.
@@ -71,6 +71,22 @@ Evaluate and save a report:
     cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate docs/research/fixtures/governance-capture-resistance-v0.1.json candidate-report.json evaluation-report.json
 
 The report includes exact-disposition agreement, per-class and per-family agreement, required-behavior report coverage, candidate-reported forbidden behaviors, self-reported hard-gate flags, and false high-severity escalations on benign controls. All numbers describe the public fixture only.
+
+## Cross-system evidence-class contract
+
+The evidence-envelope schema and synthetic example are:
+
+- `docs/research/fixtures/governance-capture-resistance-cross-system-evidence-v0.1.schema.json`
+- `docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json`
+- `docs/research/fixtures/governance-capture-resistance-adapter-map-v0.1.json`
+
+Validate the example:
+
+    cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-evidence-bundle docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json
+
+The Rust validator enforces source-system/record-type compatibility, explicit limitations, synthetic references in the synthetic-only bundle, mandatory metadata for simulated and observed claims, independent corroboration for the observed class, exact dependencies for inferred claims, dependency resolution, and acyclic lineage. It reports class/source counts and pins a digest to the exact input bytes.
+
+The example includes two reported records (Mycelix Justice Cases and a DeSci signed-event pattern), one simulated Symtropy snapshot, one **hypothetical** observed-measurement shape, and one inferred forecast-error claim. It intentionally states that all records are synthetic placeholders. No actual observation, simulator execution, runtime cross-system integration, or independent evidence validation is claimed.
 
 ## Cross-system integration boundary
 
