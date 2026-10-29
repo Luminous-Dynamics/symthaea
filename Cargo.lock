@@ -18767,6 +18767,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-evidence-profile"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-exoskeleton"
 version = "0.1.0"
 dependencies = [
