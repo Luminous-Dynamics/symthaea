@@ -945,6 +945,27 @@ mod tests {
         assert_eq!(model.probability_next_one(&[true, false], 0).unwrap(), 0.3);
         assert_eq!(model.probability_next_one(&[false, true], 0).unwrap(), 0.5);
         assert_eq!(model.probability_next_one(&[true, true], 1).unwrap(), 0.8);
+
+        // Frozen cross-language digest vector for the PyPhi conventions example.
+        assert_eq!(
+            model.model_sha256(),
+            "8e8000cfacf6631f5d229449662b260e07419d76b566d6a78214fe1f4b408894"
+        );
+        assert_eq!(
+            model.evaluation_sha256(&[true, false]).unwrap(),
+            "143ea0c7ae2676acb89adbd02f93d40a71ee3e6098bade2421a4a2105176eab8"
+        );
+        let request = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            vec![0, 1],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        ).unwrap();
+        assert_eq!(
+            request.request_sha256(&model),
+            "1b1d3a2f76139abfd2e5bf89da48376b6fac11420382844be813e6e7ac87f2fd"
+        );
     }
 
     #[test]
