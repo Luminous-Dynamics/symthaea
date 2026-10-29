@@ -52,14 +52,14 @@ jobs:
           assert strategies["frozen"]["observation_only_drift"]["false_causal_diagnosis_episodes"] == 0
           assert strategies["cusum_h1_5"]["observation_only_drift"]["false_causal_diagnosis_episodes"] > strategies["cusum_h3_0"]["observation_only_drift"]["false_causal_diagnosis_episodes"]
           assert strategies["cusum_h3_0"]["observation_only_drift"]["false_causal_diagnosis_episodes"] > 0
+          low = strategies["cusum_h1_5"]
+          high = strategies["cusum_h3_0"]
           contrast = strategies["causal_contrast_h3_0"]
           assert contrast["observation_only_drift"]["false_causal_diagnosis_episodes"] <= 6
           assert contrast["observation_only_drift"]["false_causal_diagnosis_episodes"] < high["observation_only_drift"]["false_causal_diagnosis_episodes"]
           assert contrast["abrupt_shift"]["detection_rate"] >= 0.95
           assert contrast["abrupt_shift"]["p90_detection_delay_steps"] > 8
           assert contrast["abrupt_shift"]["mean_diagnostic_steps_per_episode"] > 0
-          low = strategies["cusum_h1_5"]
-          high = strategies["cusum_h3_0"]
           assert low["stationary"]["false_alarm_episodes"] > high["stationary"]["false_alarm_episodes"]
           assert low["abrupt_shift"]["detection_rate"] < high["abrupt_shift"]["detection_rate"]
           assert low["abrupt_shift"]["p90_detection_delay_steps"] < high["abrupt_shift"]["p90_detection_delay_steps"]
