@@ -354,7 +354,9 @@ impl FragmentAssembler {
     ///
     /// - `thought_id`: must match incoming fragments
     /// - `total_fragments`: data_count + 1 (from any received fragment header)
-    /// - `expected_payload_size`: total original payload size (e.g., 2048 for BinaryHV)
+    /// - `expected_payload_size`: exact original size, required to reconstruct a lost final
+    ///   data fragment. If the encoded envelope can vary (e.g. compression), use
+    ///   `new_without_final_fragment_recovery` until the wire format carries the exact length.
     pub fn new(thought_id: u16, total_fragments: u8, expected_payload_size: usize) -> Self {
         let data_count = total_fragments.saturating_sub(1);
         Self {
