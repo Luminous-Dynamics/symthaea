@@ -124,15 +124,17 @@ class PolicyPinnedLedgerTests(unittest.TestCase):
             "valid_from": "2026-01-15",
             "valid_to": None,
             "recorded_at": "2026-03-10T10:00:00Z",
-            "source": "operations",
+            "source": "incident-review",
         }
         events = ledger.validate_events(self.raw_events + [extra])
         admission = ledger.validate_admission(events, self.policies)
         result = self.result("Q003", events=events, admission=admission)
         self.assertEqual(result["state"], "conflict")
         self.assertIsNone(result["value"])
-        self.assertEqual(result["conflicting_values"], ["db-primary-c", "db-primary-d"]) if False else None
-        self.assertEqual(set(result["conflicting_values"]), {"db-primary-c.internal", "db-primary-d.internal", "db-primary-x.internal"})
+        self.assertEqual(
+            set(result["conflicting_values"]),
+            {"db-primary-d.internal", "db-primary-x.internal"},
+        )
 
     def test_duplicate_event_id_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "duplicate event_id"):
