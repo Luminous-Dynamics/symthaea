@@ -74,6 +74,7 @@ fn candidate_catalog(seed: u64) -> Vec<CandidateAction> {
                 predicted_utility,
                 predicted_uncertainty,
                 support_score,
+                shuffled_support_score: rng.unit(),
                 supported: !unsupported,
             }
         })
