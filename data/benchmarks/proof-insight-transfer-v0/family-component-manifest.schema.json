@@ -93,7 +93,8 @@
       "enum": [
         "not_qualified_incomplete_inventory",
         "not_qualified_cross_split_hard_relationships",
-        "structurally_eligible_receipt_unverified"
+        "structurally_eligible_receipt_unverified",
+        "qualified_coverage_verified_no_cross_split_hard_relationships"
       ]
     },
     "qualified_for_confirmatory_resampling": {
@@ -108,7 +109,11 @@
       }
     },
     "coverage_receipt_verification_status": {
-      "const": "not_verified_receipt_bytes_not_supplied"
+      "type": "string",
+      "enum": [
+        "not_verified_receipt_bytes_not_supplied",
+        "verified_signature_set"
+      ]
     }
   },
   "$defs": {
@@ -356,6 +361,62 @@
           },
           "qualified_for_confirmatory_resampling": {
             "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_status": {
+            "const": "qualified_coverage_verified_no_cross_split_hard_relationships"
+          }
+        },
+        "required": [
+          "qualification_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relationship_inventory_status": {
+            "const": "independently_reviewed_complete"
+          },
+          "cross_split_component_count": {
+            "const": 0
+          },
+          "coverage_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "coverage_receipt_verification_status": {
+            "const": "verified_signature_set"
+          },
+          "qualified_for_confirmatory_resampling": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualified_for_confirmatory_resampling": {
+            "const": true
+          }
+        },
+        "required": [
+          "qualified_for_confirmatory_resampling"
+        ]
+      },
+      "then": {
+        "properties": {
+          "qualification_status": {
+            "const": "qualified_coverage_verified_no_cross_split_hard_relationships"
+          },
+          "coverage_receipt_verification_status": {
+            "const": "verified_signature_set"
+          },
+          "cross_split_component_count": {
+            "const": 0
           }
         }
       }
