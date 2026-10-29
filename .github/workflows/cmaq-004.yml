@@ -36,7 +36,7 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-004-report.json").read_text())
-          assert report["schema_version"] == "cmaq-004-value-add-report-v0.2"
+          assert report["schema_version"] == "cmaq-004-value-add-report-v0.3"
           assert report["support_contexts"] == [0, 1, 2]
           assert report["heldout_context"] == 3
           assert report["support_samples_per_context_action"] == 1024
