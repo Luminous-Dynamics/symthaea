@@ -24,7 +24,7 @@ const GOLDEN_SEED: u64 = 0x49_50_43_57_2A_01_10_29;
 const ROOT_ITERS: usize = 36;
 const BET_GRID_STEPS: usize = 128;
 const EPS: f64 = 1.0e-10;
-const METHODS: [&str; 2] = ["pCRP_star", "Hoeffding_fixed_horizon"];
+const METHODS: [&str; 3] = ["pCRP_star_fixed_grid", "Logarithmic_Smoothing", "Hoeffding_fixed_horizon"];
 
 #[derive(Clone, Copy, Debug)]
 struct SplitMix64 {
@@ -380,6 +380,44 @@ fn pcrp_star_lcb(values: &[f64], delta: f64) -> Result<f64, String> {
     Ok(hi.max(0.0).min(mean))
 }
 
+/// Fixed-horizon LS lower confidence bound for a [0,1] reward, derived from
+/// Sakhi et al. (NeurIPS 2024), Corollary 5 / equations (12)-(14), after mapping
+/// reward r to cost c=-r. The lambda rule is frozen and scale-aware:
+/// lambda = sqrt(2 ln(1/delta) / (n W^2)), where W is the known IPS score ceiling.
+/// This is not the paper's sequential PAC-Bayesian 2026 method.
+fn logarithmic_smoothing_lcb(
+    values: &[f64],
+    delta: f64,
+    known_upper_bound: f64,
+) -> Result<f64, String> {
+    if values.is_empty() || !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
+        return Err("invalid logarithmic-smoothing input".into());
+    }
+    if !known_upper_bound.is_finite() || known_upper_bound <= 0.0 {
+        return Err("logarithmic smoothing requires a positive finite score ceiling".into());
+    }
+    if values.iter().any(|y| !y.is_finite() || *y < 0.0 || *y > known_upper_bound + EPS) {
+        return Err("score violates the declared logarithmic-smoothing range".into());
+    }
+    let n = values.len() as f64;
+    let lambda = (2.0 * (1.0 / delta).ln() / (n * known_upper_bound * known_upper_bound)).sqrt();
+    if !lambda.is_finite() || lambda <= 0.0 {
+        return Err("logarithmic-smoothing lambda is non-finite or non-positive".into());
+    }
+    let smoothed_mean = values.iter().map(|y| (lambda * y).ln_1p()).sum::<f64>() / (lambda * n);
+    let log_lower_factor = lambda * smoothed_mean - (1.0 / delta).ln() / n;
+    if !log_lower_factor.is_finite() {
+        return Err("logarithmic-smoothing log factor is non-finite".into());
+    }
+    // expm1 is accurate when the confidence correction is small. For a negative
+    // candidate bound, zero is the valid lower endpoint for a nonnegative reward.
+    let lower = log_lower_factor.exp_m1() / lambda;
+    if !lower.is_finite() {
+        return Err("logarithmic-smoothing lower bound is non-finite".into());
+    }
+    Ok(lower.clamp(0.0, (values.iter().sum::<f64>() / n).min(1.0)))
+}
+
 fn hoeffding_lcb(values: &[f64], delta: f64, known_upper_bound: f64) -> Result<f64, String> {
     if values.is_empty() || !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
         return Err("invalid Hoeffding-bound input".into());
@@ -589,7 +627,9 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
 
         let mut aggregates = vec![vec![Aggregate::default(); METHODS.len()]; horizons.len()];
         let mut elapsed_seconds = vec![vec![0.0_f64; METHODS.len()]; horizons.len()];
-        let mut paired = vec![PairedAggregate::default(); horizons.len()];
+        let mut paired: Vec<Vec<PairedAggregate>> = horizons.iter()
+            .map(|_| vec![PairedAggregate::default(); METHODS.len() - 1])
+            .collect();
         // Two tails across M policies: total familywise error budget is at most ALPHA.
         let delta_per_tail = ALPHA / (2.0 * POLICY_P1.len() as f64);
         let true_values: Vec<f64> = POLICY_P1.iter()
@@ -622,9 +662,13 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                         let complement = &complement_streams[policy_index][..horizon];
                         let score_bound = max_importance_weight(scenario.logger_p1, target_p1)?;
                         let (lower_lcb, complement_lcb) = match *method {
-                            "pCRP_star" => (
+                            "pCRP_star_fixed_grid" => (
                                 pcrp_star_lcb(scores, delta_per_tail)?,
                                 pcrp_star_lcb(complement, delta_per_tail)?,
+                            ),
+                            "Logarithmic_Smoothing" => (
+                                logarithmic_smoothing_lcb(scores, delta_per_tail, score_bound)?,
+                                logarithmic_smoothing_lcb(complement, delta_per_tail, score_bound)?,
                             ),
                             "Hoeffding_fixed_horizon" => (
                                 hoeffding_lcb(scores, delta_per_tail, score_bound)?,
@@ -698,19 +742,20 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                         plausible_winner_set_size,
                     });
                 }
-                if METHODS.len() == 2 {
-                    let pcrp = replicate_method_metrics[0]
-                        .ok_or_else(|| "missing pCRP trial summary".to_owned())?;
-                    let hoeffding = replicate_method_metrics[1]
-                        .ok_or_else(|| "missing Hoeffding trial summary".to_owned())?;
-                    let pair = &mut paired[horizon_index];
+                let hoeffding_index = METHODS.len() - 1;
+                let hoeffding = replicate_method_metrics[hoeffding_index]
+                    .ok_or_else(|| "missing Hoeffding trial summary".to_owned())?;
+                for method_index in 0..hoeffding_index {
+                    let method_trial = replicate_method_metrics[method_index]
+                        .ok_or_else(|| format!("missing trial summary for {}", METHODS[method_index]))?;
+                    let pair = &mut paired[horizon_index][method_index];
                     pair.n += 1;
-                    pair.top1_difference.push(pcrp.top1 - hoeffding.top1);
-                    pair.regret_difference.push(pcrp.regret - hoeffding.regret);
-                    pair.certificate_rate_difference.push(pcrp.winner_certificate - hoeffding.winner_certificate);
-                    pair.false_certificate_difference.push(pcrp.false_certificate - hoeffding.false_certificate);
-                    pair.interval_width_difference.push(pcrp.interval_width - hoeffding.interval_width);
-                    pair.plausible_set_size_difference.push(pcrp.plausible_winner_set_size - hoeffding.plausible_winner_set_size);
+                    pair.top1_difference.push(method_trial.top1 - hoeffding.top1);
+                    pair.regret_difference.push(method_trial.regret - hoeffding.regret);
+                    pair.certificate_rate_difference.push(method_trial.winner_certificate - hoeffding.winner_certificate);
+                    pair.false_certificate_difference.push(method_trial.false_certificate - hoeffding.false_certificate);
+                    pair.interval_width_difference.push(method_trial.interval_width - hoeffding.interval_width);
+                    pair.plausible_set_size_difference.push(method_trial.plausible_winner_set_size - hoeffding.plausible_winner_set_size);
                 }
             }
         }
@@ -788,21 +833,25 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     scenario.name, horizon, method, elapsed_seconds[horizon_index][method_index]
                 );
             }
-            let pair = paired[horizon_index];
-            if pair.n > 0 {
+            for method_index in 0..METHODS.len() - 1 {
+                let pair = paired[horizon_index][method_index];
+                if pair.n == 0 {
+                    continue;
+                }
+                let method_label = format!("{}_minus_Hoeffding_fixed_horizon", METHODS[method_index]);
                 let comparisons = [
-                    ("delta_top1_accuracy_pcrp_minus_hoeffding", pair.top1_difference),
-                    ("delta_simple_regret_pcrp_minus_hoeffding", pair.regret_difference),
-                    ("delta_winner_certificate_rate_pcrp_minus_hoeffding", pair.certificate_rate_difference),
-                    ("delta_false_certificate_rate_pcrp_minus_hoeffding", pair.false_certificate_difference),
-                    ("delta_interval_width_pcrp_minus_hoeffding", pair.interval_width_difference),
-                    ("delta_plausible_winner_set_size_pcrp_minus_hoeffding", pair.plausible_set_size_difference),
+                    ("delta_top1_accuracy", pair.top1_difference),
+                    ("delta_simple_regret", pair.regret_difference),
+                    ("delta_winner_certificate_rate", pair.certificate_rate_difference),
+                    ("delta_false_certificate_rate", pair.false_certificate_difference),
+                    ("delta_interval_width", pair.interval_width_difference),
+                    ("delta_plausible_winner_set_size", pair.plausible_set_size_difference),
                 ];
                 for (metric, stats) in comparisons {
                     let _ = writeln!(
                         out,
-                        "PAIR_METRIC\t{}\t{}\tpCRP_star_minus_Hoeffding_fixed_horizon\t{}\t{:.12}\t{:.12}\t{}",
-                        scenario.name, horizon, metric, stats.mean, stats.standard_error(), pair.n
+                        "PAIR_METRIC\t{}\t{}\t{}\t{}\t{:.12}\t{:.12}\t{}",
+                        scenario.name, horizon, method_label, metric, stats.mean, stats.standard_error(), pair.n
                     );
                 }
             }
@@ -931,6 +980,18 @@ mod tests {
             max_importance_weight(1.0, 0.9).unwrap_err(),
             "NOT_IDENTIFIED_ZERO_SUPPORT"
         );
+    }
+
+    #[test]
+    fn logarithmic_smoothing_lcb_is_nonnegative_bounded_and_conservative_on_constant_stream() {
+        let delta = 0.01;
+        let values = vec![0.6; 128];
+        let lower = logarithmic_smoothing_lcb(&values, delta, 1.0).unwrap();
+        assert!(lower >= 0.0 && lower <= 0.6 + 1.0e-9, "LS LCB={lower}");
+        assert_eq!(logarithmic_smoothing_lcb(&[0.0; 12], delta, 1.0).unwrap(), 0.0);
+        assert!(logarithmic_smoothing_lcb(&[0.1, 1.1], delta, 1.0).is_err());
+        assert!(logarithmic_smoothing_lcb(&[0.1, 0.2], 0.0, 1.0).is_err());
+        assert!(logarithmic_smoothing_lcb(&[0.1, 0.2], delta, 0.0).is_err());
     }
 
     #[test]
