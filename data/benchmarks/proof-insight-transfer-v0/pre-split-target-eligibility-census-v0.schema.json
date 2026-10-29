@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/pre-split-target-eligibility-census-v0.schema.json",
+  "title": "PITB Outcome-Blind Pre-Split Target Eligibility Census v0",
+  "description": "Complete target-eligibility census pinned before split allocation. Receipt digests are provenance references, not signature verification or qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_kind",
+    "upstream_commit",
+    "family_universe_sha256",
+    "eligibility_policy_sha256",
+    "census_receipt_sha256",
+    "sealed_before_evaluation",
+    "outcomes_used",
+    "families",
+    "targets"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.pre-split-target-eligibility-census.v0"
+    },
+    "dataset_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "reviewed_census"
+      ]
+    },
+    "upstream_commit": {
+      "const": "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+    },
+    "family_universe_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "eligibility_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "census_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sealed_before_evaluation": {
+      "const": true
+    },
+    "outcomes_used": {
+      "const": false
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/family"
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "dataset_kind": {
+            "const": "reviewed_census"
+          }
+        },
+        "required": [
+          "dataset_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "families": {
+            "minItems": 372,
+            "maxItems": 372
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_id",
+        "candidate_target_ids",
+        "eligibility_receipt_sha256"
+      ],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_target_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "eligibility_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "family_id",
+        "status",
+        "artifact_path",
+        "artifact_sha256",
+        "statement_sha256",
+        "eligibility_receipt_sha256"
+      ],
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "eligible",
+            "excluded",
+            "unknown"
+          ]
+        },
+        "artifact_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "statement_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eligibility_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "eligible"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "statement_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
