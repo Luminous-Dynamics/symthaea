@@ -1,0 +1,65 @@
+name: CMAQ-007 planner exploitability smoke benchmark
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-007/**"
+      - ".github/workflows/cmaq-007.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-007/**"
+      - ".github/workflows/cmaq-007.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exploitability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-007
+        run: cargo test --locked
+      - name: Generate report and validate invariants
+        working-directory: research/cmaq-007
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-007-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-007-report.json").read_text())
+          assert report["schema_version"] == "cmaq-007-exploitability-report-v0.1"
+          assert report["seed_count"] == 256
+          assert report["search_sizes"] == [8, 32, 128, 512]
+          rows = report["summary"]
+          assert len(rows) == 36
+          by_key = {(row["search_size"], row["strategy"]): row for row in rows}
+          assert len(by_key) == len(rows)
+          for size in report["search_sizes"]:
+              assert by_key[(size, "oracle_upper_bound")]["mean_regret"] <= 1e-9
+              assert by_key[(size, "direct_fallback")]["unsupported_selection_rate"] == 0.0
+              assert by_key[(size, "predicted_greedy")]["mean_prediction_mae"] < 0.10
+              assert by_key[(size, "support_gate_097")]["coverage_rate"] <= by_key[(size, "support_gate_055")]["coverage_rate"]
+          assert by_key[(512, "predicted_greedy")]["unsupported_selection_rate"] > by_key[(8, "predicted_greedy")]["unsupported_selection_rate"]
+          print("CMAQ-007 report schema, paired panel, oracle, fallback, and risk-coverage invariants validated")
+          print(json.dumps({
+              size: {
+                  strategy: {
+                      "prediction_mae": by_key[(size, strategy)]["mean_prediction_mae"],
+                      "regret": by_key[(size, strategy)]["mean_regret"],
+                      "unsupported_rate": by_key[(size, strategy)]["unsupported_selection_rate"],
+                      "coverage": by_key[(size, strategy)]["coverage_rate"],
+                  }
+                  for strategy in ["direct_fallback", "predicted_greedy", "uncertainty_penalty", "support_gate_055", "support_gate_097", "oracle_upper_bound"]
+              }
+              for size in report["search_sizes"]
+          }, sort_keys=True))
+          PY
