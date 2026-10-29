@@ -25,8 +25,13 @@ const MANIFEST_KEYS: &[&str] = &[
     "feature_columns",
     "target_column",
     "label_semantics",
+    "scenario_class",
     "transform_family",
     "transform_severity",
+    "selection_transform_family",
+    "selection_transform_severity",
+    "intervention_config_sha256",
+    "rng_algorithm",
     "transition_shape",
     "change_start",
     "change_end",
@@ -187,6 +192,27 @@ fn comma_list<'a>(value: &'a str, field: &str) -> Result<Vec<&'a str>, String> {
     Ok(items)
 }
 
+fn validate_transition(transition: &str, start: &str, end: &str) -> Result<(), String> {
+    match transition {
+        "abrupt" => {
+            let start_value = canonical_u64(start, "change_start")?;
+            let end_value = canonical_u64(end, "change_end")?;
+            if start_value == 0 || start_value != end_value {
+                return Err(fail("abrupt transitions require identical positive change_start and change_end"));
+            }
+        }
+        "gradual" => {
+            let start_value = canonical_u64(start, "change_start")?;
+            let end_value = canonical_u64(end, "change_end")?;
+            if start_value == 0 || end_value <= start_value {
+                return Err(fail("gradual transitions require 0 < change_start < change_end"));
+            }
+        }
+        other => return Err(fail(format!("active interventions require abrupt or gradual transition_shape, got {other}"))),
+    }
+    Ok(())
+}
+
 fn validate_manifest(fields: &Fields) -> Result<(), String> {
     if required(fields, "schema_version")? != "1" {
         return Err(fail("unsupported manifest schema_version (expected 1)"));
@@ -269,46 +295,110 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
         other => return Err(fail(format!("unsupported label_semantics: {other}"))),
     }
 
+    let scenario_class = required(fields, "scenario_class")?;
+    if !matches!(
+        scenario_class,
+        "zero_shift_control"
+            | "target_distribution_shift"
+            | "selection_only_shift"
+            | "joint_target_selection_shift"
+    ) {
+        return Err(fail(format!("unsupported scenario_class: {scenario_class}")));
+    }
+
+    // Target-population intervention and sample-selection intervention are separate
+    // channels. This prevents selected-stream changes from being mislabeled target drift.
     let transform = required(fields, "transform_family")?;
     let severity = canonical_unit_float(required(fields, "transform_severity")?, "transform_severity")?;
-    let transition = required(fields, "transition_shape")?;
-    let start = required(fields, "change_start")?;
-    let end = required(fields, "change_end")?;
-    if transform == "none" {
-        if severity != 0.0 || transition != "none" || start != "NA" || end != "NA" {
-            return Err(fail("zero-shift sham requires transform_family=none, severity=0.000000, transition_shape=none, and NA change bounds"));
-        }
-    } else {
+    let selection_transform = required(fields, "selection_transform_family")?;
+    let selection_severity = canonical_unit_float(
+        required(fields, "selection_transform_severity")?,
+        "selection_transform_severity",
+    )?;
+    validate_sha256(required(fields, "intervention_config_sha256")?, "intervention_config_sha256")?;
+    let rng = required(fields, "rng_algorithm")?;
+    if !matches!(rng, "none" | "chacha20_v1" | "splitmix64_v1") {
+        return Err(fail(format!("unsupported rng_algorithm: {rng}")));
+    }
+
+    let target_active = transform != "none";
+    let selection_active = selection_transform != "none";
+    if target_active {
         match transform {
             "class_prior" | "label_swap" | "feature_permutation" | "feature_filtering"
             | "covariate_affine" | "sensor_noise" => {}
             other => return Err(fail(format!("unsupported transform_family: {other}"))),
         }
         if severity == 0.0 {
-            return Err(fail("non-sham transform requires transform_severity greater than zero"));
+            return Err(fail("active target transform requires transform_severity greater than zero"));
         }
-        match transition {
-            "abrupt" => {
-                let start_value = canonical_u64(start, "change_start")?;
-                let end_value = canonical_u64(end, "change_end")?;
-                if start_value == 0 || start_value != end_value {
-                    return Err(fail("abrupt transitions require identical positive change_start and change_end"));
-                }
+    } else if severity != 0.0 {
+        return Err(fail("transform_family=none requires transform_severity=0.000000"));
+    }
+
+    if selection_active {
+        match selection_transform {
+            "selection_rate" | "selection_label_bias" | "selection_feature_bias" => {}
+            other => return Err(fail(format!("unsupported selection_transform_family: {other}"))),
+        }
+        if selection_severity == 0.0 {
+            return Err(fail("active selection transform requires selection_transform_severity greater than zero"));
+        }
+    } else if selection_severity != 0.0 {
+        return Err(fail("selection_transform_family=none requires selection_transform_severity=0.000000"));
+    }
+
+    match scenario_class {
+        "zero_shift_control" if !target_active && !selection_active => {
+            if transition != "none" || start != "NA" || end != "NA" || rng != "none" {
+                return Err(fail("zero_shift_control requires no transform, no transition bounds, and rng_algorithm=none"));
             }
-            "gradual" => {
-                let start_value = canonical_u64(start, "change_start")?;
-                let end_value = canonical_u64(end, "change_end")?;
-                if start_value == 0 || end_value <= start_value {
-                    return Err(fail("gradual transitions require 0 < change_start < change_end"));
-                }
+        }
+        "zero_shift_control" => {
+            return Err(fail("zero_shift_control cannot contain target or selection interventions"));
+        }
+        "target_distribution_shift" if target_active && !selection_active => {
+            validate_transition(transition, start, end)?;
+            if rng == "none" {
+                return Err(fail("active target intervention requires a named RNG algorithm"));
             }
-            other => return Err(fail(format!("non-sham transform requires abrupt or gradual transition_shape, got {other}"))),
         }
-        if matches!(transform, "class_prior" | "label_swap")
-            && !matches!(required(fields, "label_semantics")?, "binary" | "categorical")
-        {
-            return Err(fail("class_prior and label_swap require binary or categorical labels"));
+        "selection_only_shift" if !target_active && selection_active => {
+            validate_transition(transition, start, end)?;
+            if rng == "none" {
+                return Err(fail("active selection intervention requires a named RNG algorithm"));
+            }
         }
+        "joint_target_selection_shift" if target_active && selection_active => {
+            validate_transition(transition, start, end)?;
+            if rng == "none" {
+                return Err(fail("joint intervention requires a named RNG algorithm"));
+            }
+        }
+        "target_distribution_shift" => {
+            return Err(fail("target_distribution_shift requires a target transform and no selection transform"));
+        }
+        "selection_only_shift" => {
+            return Err(fail("selection_only_shift requires a selection transform and no target transform"));
+        }
+        "joint_target_selection_shift" => {
+            return Err(fail("joint_target_selection_shift requires both target and selection transforms"));
+        }
+        _ => unreachable!("scenario classes are exhaustively validated"),
+    }
+
+    if matches!(transform, "class_prior" | "label_swap")
+        && !matches!(required(fields, "label_semantics")?, "binary" | "categorical")
+    {
+        return Err(fail("class_prior and label_swap require binary or categorical labels"));
+    }
+    if selection_transform == "selection_label_bias"
+        && !matches!(required(fields, "label_semantics")?, "binary" | "categorical")
+    {
+        return Err(fail("selection_label_bias requires binary or categorical labels"));
+    }
+    if selection_transform == "selection_feature_bias" && target == "NA" && features.is_empty() {
+        return Err(fail("selection_feature_bias requires feature columns"));
     }
 
     canonical_u64(required(fields, "seed")?, "seed")?;
@@ -516,8 +606,13 @@ mod tests {
             ("feature_columns", "demand,price,temperature"),
             ("target_column", "label"),
             ("label_semantics", "binary"),
+            ("scenario_class", "target_distribution_shift"),
             ("transform_family", "feature_permutation"),
             ("transform_severity", "0.500000"),
+            ("selection_transform_family", "none"),
+            ("selection_transform_severity", "0.000000"),
+            ("intervention_config_sha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+            ("rng_algorithm", "chacha20_v1"),
             ("transition_shape", "gradual"),
             ("change_start", "100"),
             ("change_end", "200"),
