@@ -195,6 +195,7 @@ def run(*, repeats: int = N_REPEATS) -> dict:
         results[name] = {}
         for method, rows in collected[name].items():
             adm = sum(row["status"] == "admit" for row in rows)
+            rej = sum(row["status"] == "reject" for row in rows)
             unsafe = sum(row["status"] == "admit" and true_errors[name] > EPSILON_ALLOWANCE + TOL for row in rows)
             status_counts = {status: sum(row["status"] == status for row in rows) for status in ("admit", "reject", "refuse_unresolved")}
             total_obs = np.array([row["total_observations"] for row in rows], dtype=float)
