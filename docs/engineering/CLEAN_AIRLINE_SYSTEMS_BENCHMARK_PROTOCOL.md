@@ -504,3 +504,34 @@ Required next gates:
 - separately report infeasible and unresolved weight, runtime, P50/P95/P99, and work counters.
 
 No real airport saving, robust probability claim, or SOTA result follows from the synthetic runner.
+
+
+## 17. P3 paired policy bake-off — static versus rolling versus clairvoyant (2026-10-29)
+
+The paired benchmark evaluator runs four policies over one weighted, fixed scenario panel:
+
+1. **Static plan:** actions from a separately verified frozen baseline are replayed unchanged against every realized scenario; each replay is independently re-verified.
+2. **Greedy baseline:** the existing deterministic renewable-first/grid-second/battery-last policy is evaluated on each realized scenario.
+3. **Rolling horizon:** the timestamped forecast-as-of-decision policy is replayed on that scenario, carrying state of charge and source-flow accounting forward.
+4. **Perfect-information exact:** the exact energy-hub solver sees the full realized scenario. This is an optimistic reference, not an implementable policy.
+
+### Paired evaluation contract
+
+- Scenario weights are positive integer ppm and sum exactly to 1,000,000. Treat them as design weights unless empirically calibrated.
+- Every scenario binds a canonical digest and must share currency, energy quantum, service/lifecycle accounting denominator, physical storage/opening-inventory configuration, and ordered interval grid with the frozen baseline.
+- A single baseline plan is verified against its source scenario, then its action sequence is rebound to each realized scenario and independently verified there.
+- Static, greedy, rolling and exact results carry independent feasibility verification. Search-budget exhaustion is unresolved, not infeasible. An actual no-plan result is separate from unresolved solver failure.
+- Each policy reports feasible, infeasible and unresolved weight; conditional mean cost/CO2e is accompanied by its feasible-weight denominator. Missing scenarios are never assigned zero cost.
+- Paired delta statistics are calculated only on scenarios where both compared policies have verified feasible plans. The report includes rolling cost regret relative to the perfect-information reference, static-minus-rolling cost and greedy-minus-rolling cost.
+- If rolling's cost is lower than the exact perfect-information minimum beyond tolerance on any scenario with the same objective and constraints, the bake-off fails closed with a comparator-dominance error; inspect accounting, scenario identity or solver correctness before reporting a gain.
+- The canonical benchmark digest binds the frozen baseline identity/actions, weighted scenario/forecast episode digests, policy statuses and evaluated output metrics/actions.
+
+### Required interpretation
+
+Feasibility gains and cost gains are separate. If the frozen schedule is infeasible under a stress case but rolling dispatch succeeds, report the avoided infeasibility by scenario/weight; do not hide that case by calculating cost only on successful static cases. Conversely, if rolling remains more expensive than the clairvoyant reference under an inaccurate forecast, report the regret as the observable cost of forecast error and delayed information.
+
+A paired synthetic fixture holds identical service and storage configuration. One realized scenario has cheap future grid energy; a second has a first-interval grid-capacity outage. The frozen plan becomes infeasible in the outage while rolling recourse uses the opening inventory and then buys later grid energy. The exact full-information cost is a lower bound; rolling regret is computed only on the jointly feasible subset. All inputs are synthetic.
+
+### Claim ceiling
+
+This evaluator is a small synthetic benchmark harness. It does not imply calibrated scenario probabilities, real-world dispatch savings, causal operational impact, aircraft feasibility or SOTA outperformance. The next benchmark stage must reproduce a published charging/microgrid baseline on matched data/formulation and then compare paired held-out scenarios with identical inputs and compute budgets.
