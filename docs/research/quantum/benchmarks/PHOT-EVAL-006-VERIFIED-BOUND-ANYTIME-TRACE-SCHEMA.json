@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/docs/research/quantum/benchmarks/PHOT-EVAL-006-VERIFIED-BOUND-ANYTIME-TRACE-SCHEMA.json",
+  "title": "PHOT-EVAL-006 Verified MIS Incumbent-and-Bound Trace",
+  "description": "Structural schema only. Consumers must read and hash artifact bytes, independently verify candidates and clique-partition certificates against the exact canonical graph, enforce L<=U and monotonicity, and enforce clock/protocol invariants.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "example_only",
+    "protocol_id",
+    "protocol_sha256",
+    "trial_id",
+    "pair_id",
+    "seed_id",
+    "budget_id",
+    "graph_sha256",
+    "incumbent_verifier_sha256",
+    "bound_verifier_sha256",
+    "solver_source_sha256",
+    "solver_configuration_sha256",
+    "environment_sha256",
+    "graph_vertices",
+    "horizon_ms",
+    "clock_boundary",
+    "terminal_outcome",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "example_only": {
+      "type": "boolean"
+    },
+    "protocol_id": {
+      "const": "PHOT-EVAL-006"
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "trial_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "seed_id": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 20,
+      "description": "Canonical base-10 u64 seed."
+    },
+    "budget_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "graph_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "incumbent_verifier_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "bound_verifier_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "solver_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "solver_configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "graph_vertices": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "horizon_ms": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "clock_boundary": {
+      "const": "request-entry-to-persisted-candidate-and-verification-evidence"
+    },
+    "terminal_outcome": {
+      "enum": [
+        "target-hit",
+        "feasible-below-target",
+        "no-feasible-candidate",
+        "timeout",
+        "crash",
+        "abort",
+        "missing-output"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "relativeArtifactPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\)(?!.*:)[A-Za-z0-9._/-]+$",
+      "description": "Relative POSIX path; runtime verifier must additionally reject symlink escapes and non-regular files."
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "stageTimes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "generation_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "transfer_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "persistence_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "independent_verification_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "Optional measured stage durations. Do not infer omitted costs or treat these durations as event timestamps."
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "elapsed_deployment_ms",
+        "event_type",
+        "verification_status",
+        "artifact_sha256",
+        "artifact_path"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "elapsed_deployment_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "When this evidence artifact was persisted and independently verified; a monotonic elapsed deployment time, not certificate generation time."
+        },
+        "event_type": {
+          "enum": [
+            "incumbent",
+            "upper-bound-clique-partition"
+          ]
+        },
+        "verification_status": {
+          "enum": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_path": {
+          "$ref": "#/$defs/relativeArtifactPath",
+          "description": "Candidate bytes for incumbent events; certificate bytes for upper-bound events."
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_artifact_path": {
+          "$ref": "#/$defs/relativeArtifactPath"
+        },
+        "certificate_type": {
+          "const": "CliquePartitionV1"
+        },
+        "reported_cardinality": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Untrusted diagnostic claim only; verifier recomputes cardinality from candidate bytes."
+        },
+        "reported_upper_bound": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Untrusted diagnostic claim only; verifier derives the certified upper bound from certificate bytes."
+        },
+        "stage_times_ms": {
+          "$ref": "#/$defs/stageTimes"
+        },
+        "rejection_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verification_status": {
+                "const": "accepted"
+              }
+            },
+            "required": [
+              "verification_status"
+            ]
+          },
+          "then": {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "incumbent"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "receipt_sha256",
+                "receipt_artifact_path"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verification_status": {
+                "const": "accepted"
+              },
+              "event_type": {
+                "const": "upper-bound-clique-partition"
+              }
+            },
+            "required": [
+              "verification_status",
+              "event_type"
+            ]
+          },
+          "then": {
+            "required": [
+              "certificate_type"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verification_status": {
+                "const": "rejected"
+              }
+            },
+            "required": [
+              "verification_status"
+            ]
+          },
+          "then": {
+            "required": [
+              "rejection_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": {
+                "const": "upper-bound-clique-partition"
+              }
+            },
+            "required": [
+              "event_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "certificate_type": {
+                "const": "CliquePartitionV1"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
