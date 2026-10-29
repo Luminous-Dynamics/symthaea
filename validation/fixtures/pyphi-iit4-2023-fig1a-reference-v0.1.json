@@ -1,0 +1,87 @@
+{
+  "schema_version": "pyphi-reference-anchor-v0.1",
+  "fixture_id": "iit4-2023-fig1a-state-aBC",
+  "status": "documented_reference_anchor_not_locally_reexecuted",
+  "purpose": "Independent smoke test of the pinned upstream PyPhi API and a published IIT 4.0 (2023) example. This is not a Symthaea/HDC comparison and is not evidence of consciousness.",
+  "reference": {
+    "distribution": "pyphi",
+    "exact_version": "2.0.0",
+    "formalism": "IIT_4_0_2023",
+    "api_example": "pyphi.examples.iit4_2023_fig1a_substrate()",
+    "state": [
+      0,
+      1,
+      1
+    ],
+    "source_url": "https://pyphi.readthedocs.io/en/latest/tutorials/worked-example.html",
+    "theory_reference": "https://doi.org/10.1371/journal.pcbi.1011465"
+  },
+  "quantities": [
+    {
+      "id": "system-phi-s-A",
+      "kind": "system_integrated_information_phi_s",
+      "subset": [
+        0
+      ],
+      "expected": 0.0396,
+      "absolute_tolerance": 0.001
+    },
+    {
+      "id": "system-phi-s-AB",
+      "kind": "system_integrated_information_phi_s",
+      "subset": [
+        0,
+        1
+      ],
+      "expected": 0.1719,
+      "absolute_tolerance": 0.001
+    },
+    {
+      "id": "AB-cause-phi",
+      "kind": "cause_direction_system_phi",
+      "subset": [
+        0,
+        1
+      ],
+      "expected": 0.2446,
+      "absolute_tolerance": 0.002
+    },
+    {
+      "id": "AB-effect-phi",
+      "kind": "effect_direction_system_phi",
+      "subset": [
+        0,
+        1
+      ],
+      "expected": 0.1719,
+      "absolute_tolerance": 0.001
+    },
+    {
+      "id": "AB-structure-Phi",
+      "kind": "structure_integrated_information_big_phi",
+      "subset": [
+        0,
+        1
+      ],
+      "expected": 1.5627,
+      "absolute_tolerance": 0.005
+    },
+    {
+      "id": "system-phi-s-ABC",
+      "kind": "system_integrated_information_phi_s",
+      "subset": [
+        0,
+        1,
+        2
+      ],
+      "expected": 0.1339,
+      "absolute_tolerance": 0.001
+    }
+  ],
+  "interpretation_ceiling": [
+    "Passing qualifies only reproduction of this named upstream example under the exact package and formalism pins.",
+    "phi_s and structure-level Phi are distinct quantities and must not be conflated.",
+    "This fixture does not test Symthaea's HDC proxy, and does not support a consciousness inference.",
+    "Any mismatch must fail; expected values must never replace computed values."
+  ]
+}
