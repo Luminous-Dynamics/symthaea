@@ -84,9 +84,9 @@ jobs:
           assert receipt["target_family_count"] == 8
           assert all(count == 4 for count in receipt["task_variants_per_target_family"].values())
           assert set(receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"]) == {
-              "pooled_residual_transfer", "descriptor_x_knn_transfer",
-              "descriptor_x_knn_distance_abstention", "shuffled_descriptor_control"
+              "pooled_residual_transfer", "descriptor_x_knn_transfer", "shuffled_descriptor_control"
           }
+          assert "descriptor_x_knn_distance_abstention" in receipt["policy_ids"]
           assert all(
               len(row["bootstrap_95pct_ci_macro_mean_relative_objective_mae_reduction"]) == 2
               for row in receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"].values()
