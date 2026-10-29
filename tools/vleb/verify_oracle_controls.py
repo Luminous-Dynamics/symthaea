@@ -330,6 +330,17 @@ def tracked_tree_delta_sha256(workspace: Path) -> str:
     return digest(raw)
 
 
+def untracked_paths(workspace: Path) -> list[str]:
+    """List non-ignored untracked files without ambiguous newline path parsing."""
+    raw = _git(workspace, "ls-files", "--others", "--exclude-standard", "-z").stdout
+    return sorted(item for item in raw.split("\\x00") if item)
+
+
+def path_list_sha256(paths: list[str]) -> str:
+    raw = json.dumps(paths, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return digest(raw)
+
+
 def verify_test_bundle_files(workspace: Path, files: list[dict[str, Any]], arm_name: str) -> tuple[list[dict[str, Any]], list[str]]:
     observations: list[dict[str, Any]] = []
     issues: list[str] = []
@@ -507,7 +518,7 @@ def run_two_sided_controls(
         patch_file.write_bytes(reference_patch_raw)
         check = subprocess.run(
             ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
-             "apply", "--check", "--whitespace=error", str(patch_file)],
+             "apply", "--check", "--index", "--whitespace=error", str(patch_file)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
             text=True, encoding="utf-8", errors="replace", timeout=60, env=git_process_environment(),
         )
@@ -515,7 +526,7 @@ def run_two_sided_controls(
             raise ControlError(f"reference patch does not apply cleanly to locked revision: {check.stdout[-2000:]}")
         apply = subprocess.run(
             ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
-             "apply", "--whitespace=error", str(patch_file)],
+             "apply", "--index", "--whitespace=error", str(patch_file)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
             text=True, encoding="utf-8", errors="replace", timeout=60, env=git_process_environment(),
         )
@@ -524,8 +535,12 @@ def run_two_sided_controls(
 
         baseline_delta_before = tracked_tree_delta_sha256(baseline)
         reference_delta_before = tracked_tree_delta_sha256(reference)
+        baseline_untracked_before = untracked_paths(baseline)
+        reference_untracked_before = untracked_paths(reference)
         baseline_files = bundle_manifest[0]["files"]
         reference_files = bundle_manifest[1]["files"]
+        baseline_bundle_paths = sorted(item["path"] for item in baseline_files)
+        reference_bundle_paths = sorted(item["path"] for item in reference_files)
 
         baseline_results, baseline_issues = _run_arm(
             baseline, commands, arm_name="baseline", evidence_root=evidence_root,
@@ -535,6 +550,8 @@ def run_two_sided_controls(
         )
         baseline_delta_after = tracked_tree_delta_sha256(baseline)
         reference_delta_after = tracked_tree_delta_sha256(reference)
+        baseline_untracked_after = untracked_paths(baseline)
+        reference_untracked_after = untracked_paths(reference)
         baseline_file_observations, baseline_file_issues = verify_test_bundle_files(
             baseline, baseline_files, "baseline",
         )
@@ -542,12 +559,24 @@ def run_two_sided_controls(
             reference, reference_files, "reference",
         )
         baseline_integrity_valid = (
-            baseline_delta_before == baseline_delta_after and not baseline_file_issues
+            baseline_delta_before == baseline_delta_after
+            and baseline_untracked_before == baseline_untracked_after == baseline_bundle_paths
+            and not baseline_file_issues
         )
         reference_integrity_valid = (
-            reference_delta_before == reference_delta_after and not reference_file_issues
+            reference_delta_before == reference_delta_after
+            and reference_untracked_before == reference_untracked_after == reference_bundle_paths
+            and not reference_file_issues
         )
         integrity_issues = baseline_file_issues + reference_file_issues
+        if baseline_untracked_before != baseline_bundle_paths:
+            integrity_issues.append("baseline checkout contains undeclared untracked files before control execution")
+        if reference_untracked_before != reference_bundle_paths:
+            integrity_issues.append("reference checkout contains undeclared untracked files before control execution")
+        if baseline_untracked_before != baseline_untracked_after:
+            integrity_issues.append("baseline untracked-file inventory changed during control execution")
+        if reference_untracked_before != reference_untracked_after:
+            integrity_issues.append("reference untracked-file inventory changed during control execution")
         if baseline_delta_before != baseline_delta_after:
             integrity_issues.append("baseline tracked source tree changed during control execution")
         if reference_delta_before != reference_delta_after:
@@ -588,12 +617,20 @@ def run_two_sided_controls(
                 "valid": baseline_integrity_valid,
                 "tracked_diff_sha256_before": baseline_delta_before,
                 "tracked_diff_sha256_after": baseline_delta_after,
+                "untracked_paths_sha256_before": path_list_sha256(baseline_untracked_before),
+                "untracked_paths_sha256_after": path_list_sha256(baseline_untracked_after),
+                "untracked_file_count_before": len(baseline_untracked_before),
+                "untracked_file_count_after": len(baseline_untracked_after),
                 "test_bundle_file_observations": baseline_file_observations,
             },
             "reference_tree_integrity": {
                 "valid": reference_integrity_valid,
                 "tracked_diff_sha256_before": reference_delta_before,
                 "tracked_diff_sha256_after": reference_delta_after,
+                "untracked_paths_sha256_before": path_list_sha256(reference_untracked_before),
+                "untracked_paths_sha256_after": path_list_sha256(reference_untracked_after),
+                "untracked_file_count_before": len(reference_untracked_before),
+                "untracked_file_count_after": len(reference_untracked_after),
                 "test_bundle_file_observations": reference_file_observations,
             },
             "baseline_results": baseline_results,
