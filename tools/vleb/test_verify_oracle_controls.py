@@ -168,7 +168,7 @@ import app
 class ContractTest(unittest.TestCase):
     def test_expected_behavior(self):
         self.assertEqual(app.VALUE, 1)
-        pathlib.Path("app.py").write_text("VALUE = 2\\n", encoding="utf-8")
+        pathlib.Path("app.py").write_text("VALUE = 2" + chr(10), encoding="utf-8")
 """)
         ])
         result = self.run_controls(bundle_raw=bundle, evidence_root=self.root / "mutated-source-evidence")
@@ -185,7 +185,7 @@ import app
 class ContractTest(unittest.TestCase):
     def test_expected_behavior(self):
         self.assertEqual(app.VALUE, 1)
-        pathlib.Path("test_contract.py").write_text("BROKEN = True\\n", encoding="utf-8")
+        pathlib.Path("test_contract.py").write_text("BROKEN = True" + chr(10), encoding="utf-8")
 """)
         ])
         result = self.run_controls(bundle_raw=bundle, evidence_root=self.root / "mutated-tests-evidence")
