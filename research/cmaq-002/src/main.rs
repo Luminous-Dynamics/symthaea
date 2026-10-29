@@ -610,6 +610,26 @@ mod tests {
     }
 
     #[test]
+    fn candidate_observation_hides_reward_magnitude() {
+        let worlds = mechanisms();
+        let mut found = false;
+        for left in 0..worlds.len() {
+            for right in (left + 1)..worlds.len() {
+                for query in all_queries() {
+                    let left_outcome = worlds[left].observe(query);
+                    let right_outcome = worlds[right].observe(query);
+                    if left_outcome.reward != right_outcome.reward
+                        && worlds[left].sense(query) == worlds[right].sense(query)
+                    {
+                        found = true;
+                    }
+                }
+            }
+        }
+        assert!(found, "some worlds must share a binary observation despite differing reward magnitudes");
+    }
+
+    #[test]
     fn posterior_update_keeps_true_mechanism_for_every_probe() {
         let worlds = mechanisms();
         let initial: Vec<usize> = (0..worlds.len()).collect();
@@ -691,6 +711,21 @@ mod tests {
             assert_eq!(summary.unsafe_actions, 0, "strategy {}", strategy.name());
             assert_eq!(summary.contradictions, 0, "strategy {}", strategy.name());
         }
+    }
+
+    #[test]
+    fn evoi_beats_information_only_on_the_calibration_panel() {
+        let evoi = evaluate_strategy(Strategy::Evoi, 4_242, 2, 0.25);
+        let max_information = evaluate_strategy(Strategy::MaxInformation, 4_242, 2, 0.25);
+        let no_probe = evaluate_strategy(Strategy::NoProbe, 4_242, 2, 0.25);
+        assert!(
+            evoi.mean_net_regret < max_information.mean_net_regret,
+            "calibration panel must distinguish decision-value probing from information-only probing"
+        );
+        assert!(
+            evoi.mean_net_regret < no_probe.mean_net_regret,
+            "calibration panel must show value over no-probe baseline"
+        );
     }
 
     #[test]
