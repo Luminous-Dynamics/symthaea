@@ -33,6 +33,7 @@ BASALT is the wider research and benchmark program. VLEB remains the name of the
 - VLEB family-stratified paired inference: [#8900](https://github.com/Luminous-Dynamics/symthaea/pull/8900)
 - VLEB clean-to-shifted robustness: [#8901](https://github.com/Luminous-Dynamics/symthaea/pull/8901)
 - Crossed task/seed uncertainty: [#8879](https://github.com/Luminous-Dynamics/symthaea/pull/8879)
+- Metamorphic robustness under validated semantics-preserving transformations: [#9003](https://github.com/Luminous-Dynamics/symthaea/issues/9003)
 - Geometry representation bake-off: [#8947](https://github.com/Luminous-Dynamics/symthaea/issues/8947)
 - Typed declarative change IR / counterexample-guided synthesis: [#8948](https://github.com/Luminous-Dynamics/symthaea/issues/8948)
 - Geodesic-assisted coding plan qualification: [#8975](https://github.com/Luminous-Dynamics/symthaea/issues/8975)
@@ -49,7 +50,9 @@ Reuse existing code and contracts. Do not create a parallel manifold crate, dupl
 
 ### A. Measurement and benchmark validity
 
-Keep benchmark admission, oracle integrity, exact execution identity, evaluator mutation tests, paired statistics, and shift-event evidence distinct from agent generation. Evaluator-controlled inputs and independent reference evidence are mandatory. Treat queued as pending—not pass or fail.
+Keep benchmark admission, oracle integrity, exact execution identity, evaluator mutation tests, paired statistics, shift-event evidence, and transformation validity distinct from agent generation. Evaluator-controlled inputs and independent reference evidence are mandatory. Add metamorphic pairs only when each transformation is independently validated as semantics-preserving for the declared language/repository; retain meaning-changing negative controls. Treat queued as pending—not pass or fail.
+
+Recent external audits justify ongoing task-quality scrutiny: OpenAI's July 2026 review estimated about 30% of the reviewed SWE-bench Pro tasks had defects, while Epoch AI's September 2026 review flagged scoring issues in 30 of 66 Terminal-Bench 4.0 tasks. The audits differ in method and do not imply every task is invalid. They motivate independent oracle/task qualification, not blanket rejection of external benchmarks.
 
 ### B. Declarative change contracts
 
@@ -129,6 +132,8 @@ Use external suites as complementing reference points rather than combine incomp
 - [Terminal-Bench](https://www.tbench.ai/): terminal and tool-use tasks.
 - [AgentSuite/COBA](https://proceedings.mlr.press/v306/suh26a.html): benchmark validity methods.
 - [SWE-Shift](https://arxiv.org/abs/2610.32196): clean-to-shifted execution evaluation.
+- [OpenAI SWE-bench Pro audit (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/): task, ground-truth and grading quality audit.
+- [Epoch AI Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review): reviewer findings about scoring defects.
 - [HypeCodeNet / The Natural Geometry of Code](https://proceedings.iclr.cc/paper_files/paper/2026/hash/408598c7e142b607c828f5f769e8c1bd-Abstract-Conference.html): motivation for evaluating hyperbolic structural representations.
 
 Pin versions and license/usage constraints before execution. Public scores are useful reference points, not directly comparable to BASALT unless cohort, environment, budget and verifier are matched.
