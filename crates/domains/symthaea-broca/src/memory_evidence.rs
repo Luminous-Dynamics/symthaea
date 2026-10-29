@@ -1821,6 +1821,35 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_state_index_rebuilds_after_snapshot_restore_and_filters_tombstones() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, step, text) in [
+            (1, "previous", 4, "previous active state"),
+            (2, "seed", 5, "retrieval seed"),
+            (3, "next-deleted", 6, "deleted next state"),
+        ] {
+            let (mut record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", "trajectory-a", text,
+            );
+            record.source.step_index = Some(step);
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+        evidence.mark_deleted(3).unwrap();
+
+        let snapshot = evidence.snapshot_bytes(7).unwrap();
+        let restored = EvidenceIndex::restore_snapshot(&snapshot).unwrap();
+        let expanded = restored.expand_text_candidates_with_adjacent_states(
+            &[(2, 0.99)], "web", 150, 3, 2,
+        ).unwrap();
+
+        assert_eq!(expanded, vec![
+            AdjacentStateCandidate { hdc_id: 2, anchor_hdc_id: None },
+            AdjacentStateCandidate { hdc_id: 1, anchor_hdc_id: Some(2) },
+        ]);
+        assert!(expanded.iter().all(|candidate| candidate.hdc_id != 3));
+    }
+
+    #[test]
     fn adjacent_state_expansion_rejects_unknown_seed_and_malformed_score() {
         let evidence = EvidenceIndex::new();
         assert!(evidence.expand_text_candidates_with_adjacent_states(
