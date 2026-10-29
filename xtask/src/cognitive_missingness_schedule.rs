@@ -137,7 +137,10 @@ pub struct EvaluatorSchedule {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvaluatorOutcomeRecord {
+    /// Original source ID, evaluator-only.
     pub event_id: String,
+    /// Opaque stable pseudonym used in all policy-visible messages.
+    pub policy_event_id: String,
     pub decision_tick: u64,
     pub hidden_loss: f64,
     pub observed_covariate: f64,
@@ -268,9 +271,10 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
     let mut evaluator_records = Vec::with_capacity(events.len());
     let mut policy_messages = Vec::with_capacity(events.len() * 2);
     for event in events {
+        let policy_event_id = opaque_policy_event_id(input.seed, &event.event_id);
         policy_messages.push(PolicyVisibleMessage::OutcomePending {
             tick: event.decision_tick,
-            event_id: event.event_id.clone(),
+            event_id: policy_event_id.clone(),
             observed_covariate: event.observed_covariate,
             action_taken: event.action_taken,
         });
@@ -293,7 +297,7 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
                     if tick <= input.evaluation_horizon_tick {
                         policy_messages.push(PolicyVisibleMessage::MissingDeclared {
                             tick,
-                            event_id: event.event_id.clone(),
+                            event_id: policy_event_id.clone(),
                         });
                         OutcomeStateAtHorizon::DeclaredMissing
                     } else {
@@ -313,7 +317,7 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
             if reveal_tick <= input.evaluation_horizon_tick {
                 policy_messages.push(PolicyVisibleMessage::OutcomeRevealed {
                     tick: reveal_tick,
-                    event_id: event.event_id.clone(),
+                    event_id: policy_event_id.clone(),
                     outcome_loss: event.hidden_loss,
                 });
                 OutcomeStateAtHorizon::Observed
@@ -324,6 +328,7 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
 
         evaluator_records.push(EvaluatorOutcomeRecord {
             event_id: event.event_id.clone(),
+            policy_event_id,
             decision_tick: event.decision_tick,
             hidden_loss: event.hidden_loss,
             observed_covariate: event.observed_covariate,
@@ -506,6 +511,16 @@ fn policy_message_key(message: &PolicyVisibleMessage) -> (u64, u8, &str) {
     }
 }
 
+fn opaque_policy_event_id(seed: u64, source_event_id: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea-policy-event-id-v1\\0");
+    digest.update(seed.to_le_bytes());
+    digest.update([0]);
+    digest.update(source_event_id.as_bytes());
+    let bytes = digest.finalize();
+    format!("evt_{}", bytes[..16].iter().map(|byte| format!("{byte:02x}")).collect::<String>())
+}
+
 fn deterministic_u64(seed: u64, event_id: &str, domain: &str) -> u64 {
     let mut digest = Sha256::new();
     digest.update(b"symthaea-cognitive-missingness-schedule-v1\0");
@@ -608,6 +623,12 @@ mod tests {
         assert!(!policy_json.contains("expected_reveal_tick"));
         assert!(!policy_json.contains("declaration_tick"));
         assert!(!policy_json.contains("mnar_high_loss"));
+        assert!(!policy_json.contains("evt-007"));
+        assert!(policy_tick.messages.iter().all(|message| match message {
+            PolicyVisibleMessage::OutcomePending { event_id, .. }
+            | PolicyVisibleMessage::OutcomeRevealed { event_id, .. }
+            | PolicyVisibleMessage::MissingDeclared { event_id, .. } => event_id.starts_with("evt_") && event_id.len() == 36,
+        }));
         assert!(!policy_json.contains("scenario_id"));
         assert!(!policy_json.contains("dataset_id"));
         assert!(!policy_json.contains("run_id"));
@@ -792,7 +813,7 @@ mod tests {
 
         for message in messages {
             if let PolicyVisibleMessage::OutcomeRevealed { tick, event_id, .. } = message {
-                let record = generated.evaluator_schedule.events.iter().find(|e| &e.event_id == event_id).unwrap();
+                let record = generated.evaluator_schedule.events.iter().find(|e| &e.policy_event_id == event_id).unwrap();
                 assert!(record.expected_reveal_tick.is_some_and(|reveal| reveal == *tick));
                 assert!(*tick >= record.decision_tick);
             }
