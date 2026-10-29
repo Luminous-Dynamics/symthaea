@@ -50,6 +50,201 @@ fn validate_probability(value: f64, field: &'static str) -> Result<(), PhotonicE
     }
 }
 
+/// Interval for an insertion-loss parameter, in dB.
+///
+/// The fields are ordered as lower_db <= nominal_db <= upper_db. Since larger
+/// loss means lower transmission, the corresponding probability interval reverses
+/// these endpoints.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LossIntervalDb {
+    /// Lowest plausible insertion loss.
+    pub lower_db: f64,
+    /// Nominal insertion loss.
+    pub nominal_db: f64,
+    /// Highest plausible insertion loss.
+    pub upper_db: f64,
+}
+
+impl LossIntervalDb {
+    /// Construct and validate a nonnegative ordered insertion-loss interval.
+    pub fn new(
+        lower_db: f64,
+        nominal_db: f64,
+        upper_db: f64,
+    ) -> Result<Self, PhotonicEnvelopeError> {
+        for loss in [lower_db, nominal_db, upper_db] {
+            transmission_probability(loss)?;
+        }
+        if lower_db > nominal_db || nominal_db > upper_db {
+            return Err(PhotonicEnvelopeError::InvalidLossInterval);
+        }
+        Ok(Self { lower_db, nominal_db, upper_db })
+    }
+
+    /// Convert the loss range to transmission probability, reversing the endpoints.
+    pub fn transmission_interval(&self) -> Result<ProbabilityInterval, PhotonicEnvelopeError> {
+        ProbabilityInterval::new(
+            transmission_probability(self.upper_db)?,
+            transmission_probability(self.nominal_db)?,
+            transmission_probability(self.lower_db)?,
+        )
+    }
+}
+
+/// Optical path whose loss and optional detector efficiency are uncertain intervals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OpticalChannelInterval {
+    /// Interval for the optical insertion loss.
+    pub insertion_loss_db: LossIntervalDb,
+    /// Detector efficiency interval; None means no detector is assigned to this path.
+    pub detector_efficiency: Option<ProbabilityInterval>,
+}
+
+impl OpticalChannelInterval {
+    /// Validate path loss and detector interval semantics.
+    pub fn validate(&self) -> Result<(), PhotonicEnvelopeError> {
+        LossIntervalDb::new(
+            self.insertion_loss_db.lower_db,
+            self.insertion_loss_db.nominal_db,
+            self.insertion_loss_db.upper_db,
+        )?;
+        if let Some(efficiency) = self.detector_efficiency {
+            ProbabilityInterval::new(efficiency.lower, efficiency.nominal, efficiency.upper)?;
+        }
+        Ok(())
+    }
+}
+
+/// Component-envelope model that propagates declared parameter intervals.
+///
+/// Multiplication uses independent component interval bounds and assumes the same
+/// one-shot, restart-on-any-failure semantics as PhotonicPrimitiveEnvelope. These
+/// are deterministic parameter ranges, not confidence intervals or a noise model.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotonicPrimitiveUncertaintyEnvelope {
+    /// Interval for the probability that the source stage supplies a valid input state.
+    pub source_success_probability: ProbabilityInterval,
+    /// Required paths and their insertion-loss/detection-efficiency intervals.
+    pub required_channels: Vec<OpticalChannelInterval>,
+    /// Interval for each conditional gate-success probability.
+    pub conditional_gate_success_probabilities: Vec<ProbabilityInterval>,
+    /// Positive interval for aggregate primitive attempts per second.
+    pub attempts_per_second: ProbabilityInterval,
+    /// Photons consumed/emitted per whole primitive attempt.
+    pub photons_per_attempt: u64,
+}
+
+impl PhotonicPrimitiveUncertaintyEnvelope {
+    /// Propagate conservative component ranges into output probability and cost ranges.
+    pub fn estimate(&self) -> Result<RobustPrimitiveEnvelopeEstimate, PhotonicEnvelopeError> {
+        ProbabilityInterval::new(
+            self.source_success_probability.lower,
+            self.source_success_probability.nominal,
+            self.source_success_probability.upper,
+        )?;
+        for probability in &self.conditional_gate_success_probabilities {
+            ProbabilityInterval::new(probability.lower, probability.nominal, probability.upper)?;
+        }
+        for channel in &self.required_channels {
+            channel.validate()?;
+        }
+        ProbabilityInterval::new(
+            self.attempts_per_second.lower,
+            self.attempts_per_second.nominal,
+            self.attempts_per_second.upper,
+        )?;
+        if self.attempts_per_second.lower <= 0.0 {
+            return Err(PhotonicEnvelopeError::InvalidAttemptRate(self.attempts_per_second.lower));
+        }
+        if self.photons_per_attempt == 0 {
+            return Err(PhotonicEnvelopeError::ZeroPhotonsPerAttempt);
+        }
+
+        let unit = ProbabilityInterval { lower: 1.0, nominal: 1.0, upper: 1.0 };
+        let mut probability = self.source_success_probability;
+        for channel in &self.required_channels {
+            probability = multiply_probability_intervals(
+                probability,
+                channel.insertion_loss_db.transmission_interval()?,
+            )?;
+            if let Some(detector_efficiency) = channel.detector_efficiency {
+                probability = multiply_probability_intervals(probability, detector_efficiency)?;
+            }
+        }
+        for gate_probability in &self.conditional_gate_success_probabilities {
+            probability = multiply_probability_intervals(probability, *gate_probability)?;
+        }
+        // Keep the interval API explicitly bounded even when there are no channels/gates.
+        probability = multiply_probability_intervals(probability, unit)?;
+
+        let rate = self.attempts_per_second;
+        let expected_attempts = BoundedCostInterval {
+            lower: reciprocal_if_positive(probability.upper),
+            nominal: reciprocal_if_positive(probability.nominal),
+            upper: reciprocal_if_positive(probability.lower),
+        };
+        let expected_seconds = BoundedCostInterval {
+            lower: reciprocal_if_positive(probability.upper * rate.upper),
+            nominal: reciprocal_if_positive(probability.nominal * rate.nominal),
+            upper: reciprocal_if_positive(probability.lower * rate.lower),
+        };
+        let photons = self.photons_per_attempt as f64;
+        let expected_photons = BoundedCostInterval {
+            lower: expected_attempts.lower.map(|value| value * photons),
+            nominal: expected_attempts.nominal.map(|value| value * photons),
+            upper: expected_attempts.upper.map(|value| value * photons),
+        };
+
+        Ok(RobustPrimitiveEnvelopeEstimate {
+            accepted_event_probability: probability,
+            expected_attempts,
+            expected_seconds,
+            expected_photons,
+        })
+    }
+}
+
+fn multiply_probability_intervals(
+    left: ProbabilityInterval,
+    right: ProbabilityInterval,
+) -> Result<ProbabilityInterval, PhotonicEnvelopeError> {
+    ProbabilityInterval::new(
+        left.lower * right.lower,
+        left.nominal * right.nominal,
+        left.upper * right.upper,
+    )
+}
+
+fn reciprocal_if_positive(value: f64) -> Option<f64> {
+    (value > 0.0).then(|| 1.0 / value)
+}
+
+/// Bounded estimate for an expected cost. A missing upper bound means the declared
+/// parameter interval allows zero output probability, so finite worst-case cost is
+/// not established; it never means zero cost.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedCostInterval {
+    /// Best-case cost implied by the declared bounds, if finite.
+    pub lower: Option<f64>,
+    /// Nominal cost implied by nominal parameters, if finite.
+    pub nominal: Option<f64>,
+    /// Worst-case finite cost implied by the declared bounds, if finite.
+    pub upper: Option<f64>,
+}
+
+/// Robust, interval-propagated output from the component-envelope model.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RobustPrimitiveEnvelopeEstimate {
+    /// Accepted-event probability interval.
+    pub accepted_event_probability: ProbabilityInterval,
+    /// Expected attempts per accepted output.
+    pub expected_attempts: BoundedCostInterval,
+    /// Expected seconds per accepted output.
+    pub expected_seconds: BoundedCostInterval,
+    /// Expected photons per accepted output.
+    pub expected_photons: BoundedCostInterval,
+}
+
 /// One required photon channel through a declared optical path.
 ///
 /// insertion_loss_db includes only the declared path boundary. Detector efficiency is
@@ -252,6 +447,8 @@ pub enum PhotonicEnvelopeError {
     InvalidOpticalLoss(f64),
     /// Invalid aggregate attempt rate.
     InvalidAttemptRate(f64),
+    /// Loss interval endpoints are not ordered.
+    InvalidLossInterval,
     /// A resource event cannot have zero declared photon cost.
     ZeroPhotonsPerAttempt,
     /// Multiplexing requires at least one source.
@@ -275,6 +472,8 @@ impl fmt::Display for PhotonicEnvelopeError {
                 write!(f, "optical loss must be finite and nonnegative, got {loss} dB"),
             Self::InvalidAttemptRate(rate) =>
                 write!(f, "attempt rate must be finite and positive, got {rate} Hz"),
+            Self::InvalidLossInterval =>
+                write!(f, "loss interval must satisfy lower <= nominal <= upper"),
             Self::ZeroPhotonsPerAttempt =>
                 write!(f, "photons per attempt must be positive"),
             Self::ZeroParallelSources =>
@@ -388,6 +587,62 @@ mod tests {
         invalid = simple_model(0.3);
         invalid.conditional_gate_success_probabilities.push(f64::NEG_INFINITY);
         assert!(invalid.estimate().is_err());
+    }
+
+    #[test]
+    fn loss_interval_reverses_transmission_bounds() {
+        let loss = LossIntervalDb::new(0.0, 3.01029995664, 10.0).unwrap();
+        let transmission = loss.transmission_interval().unwrap();
+        near(transmission.lower, 0.1);
+        near(transmission.nominal, 0.5);
+        near(transmission.upper, 1.0);
+        assert!(LossIntervalDb::new(2.0, 1.0, 3.0).is_err());
+    }
+
+    #[test]
+    fn uncertain_primitive_propagates_bounds_and_does_not_call_them_confidence_intervals() {
+        let model = PhotonicPrimitiveUncertaintyEnvelope {
+            source_success_probability: ProbabilityInterval::new(0.5, 0.6, 0.7).unwrap(),
+            required_channels: vec![OpticalChannelInterval {
+                insertion_loss_db: LossIntervalDb::new(1.0, 2.0, 3.0).unwrap(),
+                detector_efficiency: Some(ProbabilityInterval::new(0.8, 0.85, 0.9).unwrap()),
+            }],
+            conditional_gate_success_probabilities: vec![
+                ProbabilityInterval::new(0.4, 0.5, 0.6).unwrap(),
+            ],
+            attempts_per_second: ProbabilityInterval::new(100.0, 120.0, 150.0).unwrap(),
+            photons_per_attempt: 4,
+        };
+        let result = model.estimate().unwrap();
+        assert!(result.accepted_event_probability.lower
+            <= result.accepted_event_probability.nominal);
+        assert!(result.accepted_event_probability.nominal
+            <= result.accepted_event_probability.upper);
+        assert!(result.expected_seconds.lower.unwrap()
+            <= result.expected_seconds.nominal.unwrap());
+        assert!(result.expected_seconds.nominal.unwrap()
+            <= result.expected_seconds.upper.unwrap());
+        assert!(result.expected_photons.lower.unwrap()
+            <= result.expected_photons.nominal.unwrap());
+        assert!(result.expected_photons.nominal.unwrap()
+            <= result.expected_photons.upper.unwrap());
+    }
+
+    #[test]
+    fn uncertain_zero_lower_yield_leaves_worst_case_cost_unbounded() {
+        let model = PhotonicPrimitiveUncertaintyEnvelope {
+            source_success_probability: ProbabilityInterval::new(0.0, 0.5, 0.8).unwrap(),
+            required_channels: Vec::new(),
+            conditional_gate_success_probabilities: Vec::new(),
+            attempts_per_second: ProbabilityInterval::new(100.0, 100.0, 100.0).unwrap(),
+            photons_per_attempt: 1,
+        };
+        let result = model.estimate().unwrap();
+        assert!(result.expected_attempts.lower.is_some());
+        assert!(result.expected_attempts.nominal.is_some());
+        assert_eq!(result.expected_attempts.upper, None);
+        assert_eq!(result.expected_seconds.upper, None);
+        assert_eq!(result.expected_photons.upper, None);
     }
 
     #[test]
