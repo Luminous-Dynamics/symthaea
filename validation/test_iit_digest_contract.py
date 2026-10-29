@@ -144,9 +144,9 @@ class IitDigestContractTests(unittest.TestCase):
             model_digest(bytes(encoded))
 
     def test_rejects_wrong_state_size_and_out_of_range_subset(self):
-        with self.assertRaisesRegex(ValueError, "n_units binary bits"):
+        with self.assertRaisesRegex(ValueError, "n_units integer/bool binary bits"):
             evaluation_digest(self.model_bytes, [1])
-        with self.assertRaisesRegex(ValueError, "n_units binary bits"):
+        with self.assertRaisesRegex(ValueError, "n_units integer/bool binary bits"):
             analysis_request_digest(
                 self.model_bytes, [0.5, 1], [0, 1],
                 "IIT_4_0_2023", "iit4_system_phi_s",
@@ -164,6 +164,26 @@ class IitDigestContractTests(unittest.TestCase):
                     self.model_bytes, [1, 0], subset,
                     "IIT_4_0_2023", "iit4_system_phi_s",
                 )
+
+    def test_rejects_unknown_or_incompatible_formalism_quantity_pairs(self):
+        invalid_requests = [
+            ("IIT_4_0_2023", "iit3_system_phi"),
+            ("IIT_3_0", "iit4_system_phi_s"),
+            ("IIT_4_0_2026", "not_a_quantity"),
+            ("IIT_9_9", "iit4_system_phi_s"),
+        ]
+        for formalism, quantity in invalid_requests:
+            with self.subTest(formalism=formalism, quantity=quantity), self.assertRaises(ValueError):
+                analysis_request_digest(
+                    self.model_bytes, [1, 0], [0, 1], formalism, quantity
+                )
+
+    def test_rejects_fractional_candidate_subsystem_index(self):
+        with self.assertRaisesRegex(ValueError, "candidate subsystem indices must be integers"):
+            analysis_request_digest(
+                self.model_bytes, [1, 0], [0, 1.5],
+                "IIT_4_0_2023", "iit4_system_phi_s",
+            )
 
 
 if __name__ == "__main__":
