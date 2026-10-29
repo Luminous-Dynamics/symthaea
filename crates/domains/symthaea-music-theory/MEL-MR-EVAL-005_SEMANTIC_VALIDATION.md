@@ -50,7 +50,7 @@ The following are mandatory rules beyond JSON Schema:
 | Target domain | Target type and range must be valid for the operation (e.g. MIDI pitch in [0,127], valid scale factor > 0) | `TARGET_OUT_OF_DOMAIN` |
 | Scope conflict | A requested change cannot simultaneously promise the same property as invariant over the same affected scope, unless a finer selector explicitly separates affected and protected events | `REQUEST_PROTECTED_SCOPE_CONFLICT` |
 | Overlapping requests | Conflicting operations on the same axis and region must specify explicit order/composition semantics or be rejected | `AMBIGUOUS_OVERLAPPING_REQUESTS` |
-| Tolerance semantics | Metric and unit must be meaningful for the axis; max deviation finite and non-negative; comparison boundary (inclusive/exclusive) fixed by schema version | `TOLERANCE_UNIT_AXIS_MISMATCH` |
+| Tolerance semantics | Every requested change declares an explicit tolerance; metric, unit, axis, calibration identity, finite non-negative max deviation and comparison boundary must agree | `TOLERANCE_UNIT_AXIS_MISMATCH` |
 | Calibrated threshold | Feature-distance / annotator-calibrated limits require a named calibration artifact, detector version and evaluation domain | `CALIBRATION_ID_REQUIRED` |
 | Evidence availability | A required audio gate cannot pass if no audio output or no supported detector exists | `REQUIRED_EVIDENCE_MISSING` or abstain when unavailable rather than malformed |
 | Render replay | If the contract requires deterministic rerendering, nondeterministic or unidentified renderer configuration yields abstain | `REPLAY_NOT_REPRODUCIBLE` |
