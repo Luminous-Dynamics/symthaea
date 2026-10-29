@@ -815,6 +815,55 @@ fn contract_bound_receipt_sha256(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+fn profile_tolerance_microunits(
+    value: f32,
+) -> Result<u64, SymbolicAudioBindingError> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "preservation profile contains a non-finite or negative tolerance",
+        ));
+    }
+    let scaled = (value as f64 * 1_000_000.0).round();
+    if !scaled.is_finite() || scaled > u64::MAX as f64 {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "preservation profile tolerance cannot be represented as integer microunits",
+        ));
+    }
+    Ok(scaled as u64)
+}
+
+fn require_contract_profile_tolerance(
+    contract: &FrozenEditContract,
+    attribute: EditAttribute,
+    comparator_id: &str,
+    expected_unit: &str,
+    expected_value_microunits: u64,
+) -> Result<(), SymbolicAudioBindingError> {
+    let matching: Vec<&EditObligation> = contract.obligations.iter()
+        .filter(|obligation| obligation.attribute == attribute)
+        .filter(|obligation| matches!(
+            &obligation.requirement,
+            ObligationRequirement::PreserveWithin { comparator_id: actual, .. }
+                if actual == comparator_id
+        ))
+        .collect();
+    if matching.len() != 1 {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "contract must contain exactly one registered comparator for each profile tolerance",
+        ));
+    }
+    match &matching[0].requirement {
+        ObligationRequirement::PreserveWithin { comparator_id, tolerance }
+            if matching[0].critical
+                && comparator_id == comparator_id.as_str()
+                && tolerance.unit == expected_unit
+                && tolerance.value_microunits == expected_value_microunits => Ok(()),
+        _ => Err(SymbolicAudioBindingError::InvalidEvidence(
+            "contract tolerance does not exactly match the trusted preservation profile",
+        )),
+    }
+}
+
 /// Validate a frozen contract against the actual symbolic inputs before
 /// rendering. This checks the full Score digests, raw-instruction digest,
 /// approved-profile identity/digest, renderer-manifest digest, operation,
@@ -859,6 +908,37 @@ pub fn validate_frozen_edit_contract_for_rendering(
             "frozen contract does not match the selected preservation profile",
         ));
     }
+
+    // The operation policy requires the comparators and scopes; these checks
+    // prevent a validly resealed contract from weakening their thresholds.
+    let profile_onset_tolerance = u64::from(preservation_profile.onset_config.onset_time_tolerance_ms)
+        .checked_mul(1_000)
+        .ok_or(SymbolicAudioBindingError::InvalidEvidence(
+            "onset tolerance cannot be represented in microseconds",
+        ))?;
+    require_contract_profile_tolerance(
+        contract, EditAttribute::Onset, "onset-preservation-v1", "seconds",
+        profile_onset_tolerance,
+    )?;
+    require_contract_profile_tolerance(
+        contract, EditAttribute::Duration, "score-duration-exact-v1", "beats", 0,
+    )?;
+    let acoustic_rms_tolerance =
+        profile_tolerance_microunits(preservation_profile.acoustic_config.rms_delta_db_tolerance)?;
+    require_contract_profile_tolerance(
+        contract, EditAttribute::RmsEnvelope, "rms-envelope-delta-v1", "db",
+        acoustic_rms_tolerance,
+    )?;
+    require_contract_profile_tolerance(
+        contract, EditAttribute::NeighboringContent, "protected-region-rms-v1", "db",
+        acoustic_rms_tolerance,
+    )?;
+    let spectral_tolerance =
+        profile_tolerance_microunits(preservation_profile.acoustic_config.spectral_distance_tolerance)?;
+    require_contract_profile_tolerance(
+        contract, EditAttribute::NeighboringContent, "protected-region-spectral-v1",
+        "normalized_distance", spectral_tolerance,
+    )?;
 
     let renderer_digest = renderer_manifest_sha256(renderer_manifest)?;
     let renderer_obligation = contract.obligations.iter()
