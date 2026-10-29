@@ -343,3 +343,17 @@ This composes with the existing generic paired-trial auditor [PR #8738](https://
 Focused CI authors independent Python/Rust typed-commitment parity plus positive and hostile controls for missing/duplicate records, wrong condition binding, contaminated-scored records, mutated report commitment, confidence range/source mismatch, and omitted nullable fields. These tests are not claimed passed before exact-head CI completes.
 
 For an actual claim, compare matched-budget closed-book, conventional retrieval and tool-using RAG baselines across frozen task/world pairs. Predeclare the evidence interventions and expected direction; report full trial accounting, per-condition category counts, confidence coverage, native costs, paired effect estimates and uncertainty. Any GLMM or other inferential layer belongs in a separate preregistered analysis. A valid outcome receipt cannot prove complete telemetry, accurate adjudication, causal evidence use, generalized capability or frontier/SOTA superiority.
+
+## Follow-on: preregistered matched outcome analysis
+
+The implementation is in draft [PR #REPLACE_PAIRED_ANALYSIS](https://github.com/Luminous-Dynamics/symthaea/pull/REPLACE_PAIRED_ANALYSIS) for [SCI-RETRIEVAL-PAIRED-ANALYSIS-001 / #8982](https://github.com/Luminous-Dynamics/symthaea/issues/8982). It composes with plan PR #8929 and outcome-receipt PR #8960.
+
+The new Rust analyzer requires three verified inputs: the exact intervention plan, the exact outcome report and the exact analysis-plan artifact whose SHA-256 was precommitted in the plan. The analysis artifact also names the full analyzer source revision. This is intended to make post-hoc endpoint/rubric changes detectable rather than merely documenting a promise to preregister.
+
+The initial endpoint set is deliberately small: strict task correctness, fully supported claims, relevant evidence use, expected-response adherence, and paired resource differences. Each contrast keeps per-pair rows, assigned/eligible/incomplete counts, reason counts, wins/losses/ties and paired risk difference. Binary outcomes use an exact two-sided McNemar conditional test; optional Holm adjustment is preregistered across binary contrasts. A Wilson interval is reported only for win probability among discordant pairs and is explicitly not a risk-difference interval. Resource differences are descriptive; no unsupported p-value is manufactured for them.
+
+### Claim boundary and future statistics
+
+This is a fixed-benchmark paired estimator, not a generalization model. It cannot prove causal evidence use just because answers changed, authenticate evaluator truth, or show SOTA improvement. A later GLMM must declare the target item population, task/world and family structure, missingness rules, model assumptions and diagnostics, and should be separately qualified. NIST AI 800-3 distinguishes fixed-benchmark from generalized accuracy and gives a current rationale for this separation: https://www.nist.gov/publications/expanding-ai-evaluation-toolbox-statistical-models.
+
+Synthetic CI vectors build a new intervention plan whose analysis-plan SHA references the actual exact bytes, generate outcomes from that plan, then check analysis validity, source-revision binding, deterministic output, endpoint counts and refusal of tampered analysis/outcome artifacts. The vectors are synthetic only. No experimental effects or SOTA claims are asserted.
