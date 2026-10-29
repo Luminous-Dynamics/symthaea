@@ -135,6 +135,8 @@ struct Report {
     item_budget_results: Vec<ReviewYield>,
     review_time_budget_results: Vec<ReviewYield>,
     risk_coverage_results: Vec<RiskCoveragePoint>,
+    /// Matched-budget controls generated from the same frozen rows: uncertainty, probability, and deterministic random.
+    baseline_comparisons: Vec<PolicyEvaluation>,
     scope_note: &'static str,
 }
 
@@ -149,6 +151,15 @@ struct GroupEvaluation {
     review_time_budget_results: Vec<ReviewYield>,
     /// Local selective-risk curve; pooled coverage must not mask a weak species/error family.
     risk_coverage_results: Vec<RiskCoveragePoint>,
+    /// Matched-budget policy controls computed using only this group's rows.
+    baseline_comparisons: Vec<PolicyEvaluation>,
+}
+
+#[derive(Debug, Serialize)]
+struct PolicyEvaluation {
+    policy: &'static str,
+    item_budget_results: Vec<ReviewYield>,
+    review_time_budget_results: Vec<ReviewYield>,
 }
 
 #[derive(Debug, Serialize)]
@@ -485,13 +496,60 @@ fn ratio(num: usize, den: usize) -> Option<f64> {
     if den == 0 { None } else { Some(num as f64 / den as f64) }
 }
 
-fn ranked<'a>(rows: &[&'a Prediction]) -> Vec<&'a Prediction> {
+#[derive(Debug, Clone, Copy)]
+enum RankingPolicy {
+    UncertaintyOnly,
+    ProbabilityOnly,
+    DeterministicRandom,
+    PriorityScore,
+}
+
+impl RankingPolicy {
+    fn id(self) -> &'static str {
+        match self {
+            Self::UncertaintyOnly => "uncertainty_only",
+            Self::ProbabilityOnly => "probability_only",
+            Self::DeterministicRandom => "deterministic_random",
+            Self::PriorityScore => "submitted_priority_score",
+        }
+    }
+}
+
+fn ranked_for_policy<'a>(
+    rows: &[&'a Prediction],
+    policy: RankingPolicy,
+    seed_material: &str,
+) -> Vec<&'a Prediction> {
     let mut result = rows.to_vec();
-    result.sort_by(|a, b| {
-        b.review_priority_score
-            .total_cmp(&a.review_priority_score)
-            .then_with(|| a.sample_id.cmp(&b.sample_id))
-    });
+    match policy {
+        RankingPolicy::PriorityScore => result.sort_by(|a, b| {
+            b.review_priority_score
+                .total_cmp(&a.review_priority_score)
+                .then_with(|| a.sample_id.cmp(&b.sample_id))
+        }),
+        RankingPolicy::UncertaintyOnly => result.sort_by(|a, b| {
+            let confidence_a = a.p_error.max(1.0 - a.p_error);
+            let confidence_b = b.p_error.max(1.0 - b.p_error);
+            confidence_a.total_cmp(&confidence_b)
+                .then_with(|| a.sample_id.cmp(&b.sample_id))
+        }),
+        RankingPolicy::ProbabilityOnly => result.sort_by(|a, b| {
+            b.p_error.total_cmp(&a.p_error)
+                .then_with(|| a.sample_id.cmp(&b.sample_id))
+        }),
+        RankingPolicy::DeterministicRandom => {
+            let mut keyed: Vec<(String, &'a Prediction)> = result.into_iter()
+                .map(|row| {
+                    let key = sha256(format!("{seed_material}:{}", row.sample_id).as_bytes());
+                    (key, row)
+                })
+                .collect();
+            keyed.sort_by(|(key_a, row_a), (key_b, row_b)| {
+                key_a.cmp(key_b).then_with(|| row_a.sample_id.cmp(&row_b.sample_id))
+            });
+            result = keyed.into_iter().map(|(_, row)| row).collect();
+        }
+    }
     result
 }
 
@@ -501,7 +559,25 @@ fn review_yield(
     requested_item_fraction: Option<f64>,
     budget_kind: &'static str,
 ) -> ReviewYield {
-    let ordered = ranked(rows);
+    review_yield_for_policy(
+        rows,
+        requested_budget,
+        requested_item_fraction,
+        budget_kind,
+        RankingPolicy::PriorityScore,
+        "primary",
+    )
+}
+
+fn review_yield_for_policy(
+    rows: &[&Prediction],
+    requested_budget: f64,
+    requested_item_fraction: Option<f64>,
+    budget_kind: &'static str,
+    policy: RankingPolicy,
+    seed_material: &str,
+) -> ReviewYield {
+    let ordered = ranked_for_policy(rows, policy, seed_material);
     let total_errors = rows.iter().filter(|r| r.label_is_error).count();
     let total_impact: f64 = rows.iter().filter(|r| r.label_is_error).map(|r| r.impact_weight).sum();
     let mut selected = Vec::new();
@@ -537,7 +613,7 @@ fn review_yield(
         impact_weight_captured: captured_impact,
         impact_weight_recall: if total_impact > 0.0 { Some(captured_impact / total_impact) } else { None },
         true_errors_per_review_minute: if used_minutes > 0.0 { Some(found as f64 / used_minutes) } else { None },
-        selection_policy: "descending review_priority_score; lexical sample_id breaks ties; time budgets skip items that do not fit",
+        selection_policy: policy.id(),
     }
 }
 
@@ -608,7 +684,44 @@ fn evaluate_group(
         item_budget_results,
         review_time_budget_results,
         risk_coverage_results: risk_coverage(rows, coverage_targets),
+        baseline_comparisons: baseline_policy_results(
+            rows,
+            item_fractions,
+            minute_budgets,
+            seed_material,
+        ),
     }
+}
+
+fn baseline_policy_results(
+    rows: &[&Prediction],
+    item_fractions: &[f64],
+    minute_budgets: &[f64],
+    seed_prefix: &str,
+) -> Vec<PolicyEvaluation> {
+    let policies = [
+        RankingPolicy::UncertaintyOnly,
+        RankingPolicy::ProbabilityOnly,
+        RankingPolicy::DeterministicRandom,
+    ];
+    policies.iter().map(|policy| {
+        let item_budget_results = item_fractions.iter().map(|fraction| {
+            let count = (*fraction * rows.len() as f64).ceil().max(1.0);
+            review_yield_for_policy(
+                rows, count, Some(*fraction), "items", *policy, seed_prefix,
+            )
+        }).collect();
+        let review_time_budget_results = minute_budgets.iter().map(|minutes| {
+            review_yield_for_policy(
+                rows, *minutes, None, "minutes", *policy, seed_prefix,
+            )
+        }).collect();
+        PolicyEvaluation {
+            policy: policy.id(),
+            item_budget_results,
+            review_time_budget_results,
+        }
+    }).collect()
 }
 
 fn run() -> Result<i32, String> {
@@ -669,7 +782,7 @@ fn run() -> Result<i32, String> {
     let risk_coverage_results = risk_coverage(&refs, &coverage_targets);
 
     let report = Report {
-        schema_version: 2,
+        schema_version: 3,
         scorer: "proofreading-score",
         scorer_version: env!("CARGO_PKG_VERSION"),
         dataset_id: DATASET_ID,
@@ -693,6 +806,12 @@ fn run() -> Result<i32, String> {
         item_budget_results,
         review_time_budget_results,
         risk_coverage_results,
+        baseline_comparisons: baseline_policy_results(
+            &refs,
+            &item_fractions,
+            &minute_budgets,
+            &format!("{input_hash}:overall"),
+        ),
         scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
     };
     let json = serde_json::to_string_pretty(&report)
@@ -757,6 +876,35 @@ mod tests {
         assert_eq!(local.risk_coverage_results[0].accepted_case_risk, Some(0.0));
         assert_eq!(local.risk_coverage_results[0].achieved_coverage, 0.5);
         assert_eq!(local.classification.n, 2);
+    }
+
+    #[test]
+    fn uncertainty_baseline_prefers_ambiguous_predictions() {
+        let confident = row("confident", true, 0.99, 0.1, 1.0, 1.0, "mouse:merge");
+        let ambiguous = row("ambiguous", false, 0.51, 0.9, 1.0, 0.0, "mouse:merge");
+        let ordered = ranked_for_policy(
+            &[&confident, &ambiguous],
+            RankingPolicy::UncertaintyOnly,
+            "test",
+        );
+        assert_eq!(ordered[0].sample_id, "ambiguous");
+    }
+
+    #[test]
+    fn deterministic_random_baseline_replays_for_same_seed() {
+        let a = row("a", true, 0.9, 0.9, 1.0, 1.0, "mouse:merge");
+        let b = row("b", false, 0.1, 0.1, 1.0, 0.0, "mouse:merge");
+        let c = row("c", true, 0.8, 0.8, 1.0, 1.0, "mouse:merge");
+        let rows = [&a, &b, &c];
+        let first: Vec<String> = ranked_for_policy(&rows, RankingPolicy::DeterministicRandom, "run-a")
+            .iter().map(|row| row.sample_id.clone()).collect();
+        let second: Vec<String> = ranked_for_policy(&rows, RankingPolicy::DeterministicRandom, "run-a")
+            .iter().map(|row| row.sample_id.clone()).collect();
+        assert_eq!(first, second);
+        let first_yield = review_yield_for_policy(
+            &rows, 1.0, Some(1.0 / 3.0), "items", RankingPolicy::DeterministicRandom, "run-a",
+        );
+        assert_eq!(first_yield.selection_policy, "deterministic_random");
     }
 
     #[test]
