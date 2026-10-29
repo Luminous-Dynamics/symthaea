@@ -348,6 +348,37 @@ mod tests{
         }
     }
     #[test]
+    fn every_simulated_ipcw_score_respects_its_registered_bound(){
+        for f in [Fixture::no_censoring(),Fixture::uniform_censoring(),Fixture::cell_dependent()]{
+            let b=ipcw_bound(f).unwrap();
+            let mut rng=SplitMix64::new(seed_for(31));
+            for _ in 0..10_000{
+                let o=draw_observation(f,&mut rng);
+                let z=ipcw_score(f,o).unwrap();
+                assert!(z>=0.0&&z<=b+EPS,"score {z} exceeded bound {b} for {}",f.name);
+            }
+        }
+    }
+
+    #[test]
+    fn zero_filled_expectation_is_downward_biased_under_any_uniform_censoring(){
+        let f=Fixture::uniform_censoring();
+        let mut expected_zero=0.0;
+        for context in 0..2{
+            let action=target_action(context);
+            expected_zero+=0.25*f.q[context][action]*IPS_BOUND*REWARD_MEAN[context][action];
+        }
+        assert!(close(expected_zero,true_value()*0.5,1e-12));
+        let no_censor=Fixture::no_censoring();
+        let mut expected_no_censor=0.0;
+        for context in 0..2{
+            let action=target_action(context);
+            expected_no_censor+=0.25*no_censor.q[context][action]*IPS_BOUND*REWARD_MEAN[context][action];
+        }
+        assert!(close(expected_no_censor,true_value(),1e-12));
+    }
+
+    #[test]
     fn confidence_sequence_is_nested_and_uses_full_assigned_horizon(){
         let f=Fixture::cell_dependent();
         let b=ipcw_bound(f).unwrap();
