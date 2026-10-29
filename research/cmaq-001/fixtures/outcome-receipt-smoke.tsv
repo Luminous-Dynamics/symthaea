@@ -1,6 +1,6 @@
-case_id	action_id	receipt_id	recorder_verified	observed_success
-case-001	0	rcpt-001	true	true
-case-002	1	rcpt-002	true	true
-case-003	0	rcpt-003	true	true
-case-004	1	rcpt-004	true	true
-case-005	-1	no-action-005	true	
+case_id	action_id	receipt_id	recorder_verified	observed_success	approval_token_present	postcondition_verified
+case-001	0	rcpt-001	true	true	false	true
+case-002	1	rcpt-002	true	true	false	true
+case-003	0	rcpt-003	true	true	false	true
+case-004	1	rcpt-004	true	true	true	true
+case-005	-1	no-action-005	true		false	false
