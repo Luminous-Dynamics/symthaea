@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-robustness-report.schema.json",
+  "title": "Symthaea Judge Robustness Audit Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "judge_source_revision",
+    "judge_prompt_sha256",
+    "rubric_sha256",
+    "decision_policy_sha256",
+    "blind_to_system_identity",
+    "cases",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_robustness_report.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "judge_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "decision_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "blind_to_system_identity": {
+      "type": "boolean"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 digest; zero placeholders are allowed only in example-only artifacts."
+    },
+    "decision": {
+      "enum": [
+        "candidate_a",
+        "candidate_b",
+        "tie",
+        "abstain"
+      ]
+    },
+    "condition": {
+      "enum": [
+        "baseline",
+        "variant"
+      ]
+    },
+    "order": {
+      "enum": [
+        "candidate_a_first",
+        "candidate_b_first"
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "repeat_index",
+        "input_sha256",
+        "candidate_order",
+        "raw_decision",
+        "judge_receipt_sha256"
+      ],
+      "properties": {
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "repeat_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "candidate_order": {
+          "$ref": "#/$defs/order"
+        },
+        "raw_decision": {
+          "enum": [
+            "left",
+            "right",
+            "tie",
+            "abstain"
+          ]
+        },
+        "judge_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "reference_baseline_decision",
+        "reference_variant_decision",
+        "observations"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reference_baseline_decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "reference_variant_decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "judge_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "judge_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "decision_policy_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "report_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "cases": {
+            "items": {
+              "properties": {
+                "observations": {
+                  "items": {
+                    "properties": {
+                      "judge_receipt_sha256": {
+                        "not": {
+                          "pattern": "^0{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
