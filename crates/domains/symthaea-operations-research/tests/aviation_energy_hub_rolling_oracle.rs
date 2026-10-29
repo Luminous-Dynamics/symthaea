@@ -107,6 +107,11 @@ fn rolling_horizon_does_not_use_unobserved_future_realization() {
     assert_eq!(run.steps[0].decision_at_epoch, 100);
     assert_eq!(run.steps[0].forecast_issued_at_epoch, 70);
     assert_eq!(run.steps[0].forecast_available_at_epoch, 80);
+    assert_eq!(
+        run.steps[0].initial_soc_ledger_ref,
+        "synthetic:external-opening-inventory-ledger-v1"
+    );
+    assert!(run.steps[1].initial_soc_ledger_ref.starts_with("sha256:"));
     assert_eq!(run.steps[1].action.battery_discharge_output_quanta, 1);
     assert_eq!(run.final_soc_quanta, 0);
 
