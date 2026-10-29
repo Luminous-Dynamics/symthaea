@@ -26,6 +26,8 @@ DEFAULT_HISTORY_POINTS = 48
 DEFAULT_TEST_POINTS = 128
 DEFAULT_NEAREST_K = 16
 DEFAULT_REUSE_COUNT = 50
+ABSTENTION_POLICY_ID = "descriptor_x_knn_distance_abstention"
+ABSTENTION_DISTANCE_THRESHOLD = 0.9
 FAMILY_BOOTSTRAP_REPLICATES = 2_000
 FAMILY_BOOTSTRAP_SEED = 17
 
@@ -82,6 +84,7 @@ POLICY_IDS = (
     "low_fidelity_only",
     "pooled_residual_transfer",
     "descriptor_x_knn_transfer",
+    "descriptor_x_knn_distance_abstention",
     "shuffled_descriptor_control",
 )
 TASK_SUITE = {
@@ -254,12 +257,12 @@ def _distance(
     return math.sqrt(0.5 * descriptor_part + 0.5 * design_part)
 
 
-def _knn_residual(
+def _knn_residual_with_distance(
     task: dict[str, Any],
     x: tuple[float, float],
     history: Sequence[dict[str, Any]],
     k: int,
-) -> tuple[float, float, float]:
+) -> tuple[tuple[float, float, float], float]:
     query_descriptor = _descriptor(task)
     nearest = sorted(
         ((_distance(query_descriptor, x, row), index, row) for index, row in enumerate(history)),
@@ -270,10 +273,21 @@ def _knn_residual(
     raw_weights = [1.0 / ((distance + 0.025) ** 2) for distance, _, _ in nearest]
     total = sum(raw_weights)
     weights = [weight / total for weight in raw_weights]
-    return tuple(
+    residual = tuple(
         sum(weight * row["residual"][j] for weight, (_, _, row) in zip(weights, nearest))
         for j in range(3)
-    )  # type: ignore[return-value]
+    )
+    return residual, nearest[0][0]  # type: ignore[return-value]
+
+
+def _knn_residual(
+    task: dict[str, Any],
+    x: tuple[float, float],
+    history: Sequence[dict[str, Any]],
+    k: int,
+) -> tuple[float, float, float]:
+    residual, _ = _knn_residual_with_distance(task, x, history, k)
+    return residual
 
 
 def _metrics(
@@ -385,14 +399,13 @@ def run_benchmark(
     test_points = _positive_int(test_points, "test_points", maximum=10_000)
     nearest_k = _positive_int(nearest_k, "nearest_k", maximum=10_000)
     reuse_count = _positive_int(reuse_count, "reuse_count", maximum=1_000_000)
-    # Bound O(target_points * history_records * log(history_records)) kNN work
-    # so a malformed or accidental configuration cannot launch a huge sort loop.
+    # Each target point scans both the labeled archive and shuffled-descriptor control.
     estimated_distance_evaluations = (
-        history_points * len(SOURCE_TASKS) * test_points * len(TARGET_TASKS)
+        2 * history_points * len(SOURCE_TASKS) * test_points * len(TARGET_TASKS)
     )
     if estimated_distance_evaluations > 25_000_000:
         raise ValueError(
-            "history_points × source_tasks × test_points × target_tasks must be <= 25000000"
+            "2 × history_points × source_tasks × test_points × target_tasks must be <= 25000000"
         )
     _validate_task_registry()
 
@@ -436,15 +449,25 @@ def run_benchmark(
         points = [design_point(10_001 + task_index * test_points + i) for i in range(test_points)]
         target_low = [low_fidelity(task, x) for x in points]
         # Audit truth is generated only after each prediction below is determined.
+        knn_residuals_and_distances = [
+            _knn_residual_with_distance(task, x, history, nearest_k) for x in points
+        ]
+        knn_residuals = [row[0] for row in knn_residuals_and_distances]
+        nearest_distances = [row[1] for row in knn_residuals_and_distances]
+        knn_predictions = [
+            tuple(row[j] + residual[j] for j in range(3))
+            for row, residual in zip(target_low, knn_residuals)
+        ]
+        distance_abstained = [
+            distance > ABSTENTION_DISTANCE_THRESHOLD for distance in nearest_distances
+        ]
         predictions = {
             "low_fidelity_only": target_low,
             "pooled_residual_transfer": [
                 tuple(row[j] + pooled_residual[j] for j in range(3)) for row in target_low
             ],
-            "descriptor_x_knn_transfer": [
-                tuple(row[j] + _knn_residual(task, x, history, nearest_k)[j] for j in range(3))
-                for x, row in zip(points, target_low)
-            ],
+            "descriptor_x_knn_transfer": knn_predictions,
+            "descriptor_x_knn_distance_abstention": knn_predictions,
             "shuffled_descriptor_control": [
                 tuple(row[j] + _knn_residual(task, x, shuffled_history, nearest_k)[j] for j in range(3))
                 for x, row in zip(points, target_low)
@@ -459,6 +482,28 @@ def run_benchmark(
             policy_metrics["pareto_membership_f1"] = _f1(predicted_front, true_front)
             policy_metrics["mean_pareto_front_size_predicted"] = len(predicted_front)
             policy_metrics["mean_pareto_front_size_truth"] = len(true_front)
+            if policy == ABSTENTION_POLICY_ID:
+                covered_indices = [i for i, abstain in enumerate(distance_abstained) if not abstain]
+                covered_truth = [truth[i] for i in covered_indices]
+                covered_predictions = [predictions[policy][i] for i in covered_indices]
+                covered = _metrics(covered_truth, covered_predictions) if covered_indices else None
+                policy_metrics["selective_prediction"] = {
+                    "method": "fixed nearest archive distance threshold; heuristic OOD guard, not calibrated uncertainty",
+                    "nearest_distance_threshold": ABSTENTION_DISTANCE_THRESHOLD,
+                    "abstained_count": sum(distance_abstained),
+                    "covered_point_count": len(covered_indices),
+                    "total_point_count": len(points),
+                    "coverage": len(covered_indices) / len(points),
+                    "abstention_rate": sum(distance_abstained) / len(points),
+                    "covered_objective_mae": covered["objective_mae"] if covered else None,
+                    "covered_constraint_margin_mae": covered["constraint_margin_mae"] if covered else None,
+                    "covered_feasibility_f1": covered["feasibility_f1"] if covered else None,
+                    "covered_false_feasible_count": covered["false_feasible_count"] if covered else 0,
+                    "covered_predicted_feasible_count": covered["predicted_feasible_count"] if covered else 0,
+                    "covered_false_feasible_rate_among_predicted_feasible": (
+                        covered["false_feasible_rate_among_predicted_feasible"] if covered else None
+                    ),
+                }
             by_policy[policy] = policy_metrics
         target_results.append({
             "target_task_id": task["task_id"],
@@ -495,6 +540,20 @@ def run_benchmark(
         aggregate["false_feasible_rate_among_predicted_feasible"] = (
             aggregate["false_feasible_count_all_target_points"] / n_pred if n_pred else None
         )
+        if policy == ABSTENTION_POLICY_ID:
+            selective_rows = [row["policy_metrics"][policy]["selective_prediction"] for row in target_results]
+            covered_predictions = sum(row["covered_predicted_feasible_count"] for row in selective_rows)
+            covered_false = sum(row["covered_false_feasible_count"] for row in selective_rows)
+            covered_mae = [row["covered_objective_mae"] for row in selective_rows if row["covered_objective_mae"] is not None]
+            aggregate["selective_prediction"] = {
+                "nearest_distance_threshold": ABSTENTION_DISTANCE_THRESHOLD,
+                "macro_coverage_over_target_tasks": statistics.fmean(row["coverage"] for row in selective_rows),
+                "macro_covered_objective_mae_over_tasks_with_coverage": statistics.fmean(covered_mae) if covered_mae else None,
+                "covered_predicted_feasible_count": covered_predictions,
+                "covered_false_feasible_count": covered_false,
+                "covered_false_feasible_rate_among_predicted_feasible": covered_false / covered_predictions if covered_predictions else None,
+                "claim_ceiling": "Selective synthetic diagnostic only; distance threshold is not a calibrated risk guarantee.",
+            }
         aggregate["target_task_units"] = len(target_results)
         aggregate["target_points_nested_within_tasks"] = True
         aggregation[policy] = aggregate
@@ -564,6 +623,19 @@ def run_benchmark(
                 )
             }
             family_metrics[family]["task_count_nested_within_family"] = len(family_rows)
+            if policy == ABSTENTION_POLICY_ID:
+                selective_rows = [row["policy_metrics"][policy]["selective_prediction"] for row in family_rows]
+                covered_n = sum(row["covered_predicted_feasible_count"] for row in selective_rows)
+                covered_false = sum(row["covered_false_feasible_count"] for row in selective_rows)
+                covered_mae = [row["covered_objective_mae"] for row in selective_rows if row["covered_objective_mae"] is not None]
+                family_metrics[family]["selective_prediction"] = {
+                    "macro_coverage_over_task_variants": statistics.fmean(row["coverage"] for row in selective_rows),
+                    "macro_covered_objective_mae_over_variants_with_coverage": statistics.fmean(covered_mae) if covered_mae else None,
+                    "covered_predicted_feasible_count": covered_n,
+                    "covered_false_feasible_count": covered_false,
+                    "covered_false_feasible_rate_among_predicted_feasible": covered_false / covered_n if covered_n else None,
+                    "nearest_distance_threshold": ABSTENTION_DISTANCE_THRESHOLD,
+                }
         family_aggregation[policy] = {
             "family_count": len(family_metrics),
             "family_metrics": family_metrics,
@@ -654,6 +726,13 @@ def run_benchmark(
         ).hexdigest(),
         "task_suite_sha256": TASK_SUITE_SHA256,
         "policy_ids": list(POLICY_IDS),
+        "policy_configuration": {
+            ABSTENTION_POLICY_ID: {
+                "nearest_distance_threshold": ABSTENTION_DISTANCE_THRESHOLD,
+                "decision_rule": "abstain when nearest normalized task-descriptor/design distance to source archive exceeds threshold",
+                "calibration_status": "fixed heuristic threshold; not calibrated probability or safety bound",
+            }
+        },
         "cost_accounting": {
             "low_fidelity_cost_units": LOW_COST_UNITS,
             "high_fidelity_cost_units": HIGH_COST_UNITS,
@@ -675,9 +754,9 @@ def run_benchmark(
         "claim_ceiling": (
             "Deterministic synthetic prediction-transfer audit over 32 task variants in eight held-out families. "
             "Family-macro summaries avoid treating variants as independent evidence of cross-family generalization. "
-            "Eight synthetic families remain insufficient for broad SOTA or physical claims. Does not benchmark "
-            "an optimizer, prove descriptor availability, show transfer superiority on physical casting, "
-            "calibrate uncertainty, or certify feasibility."
+            "Eight synthetic families remain insufficient for broad SOTA or physical claims. The distance-abstention "
+            "policy is an uncalibrated defer heuristic. Does not benchmark an optimizer, prove descriptor availability, "
+            "show transfer superiority on physical casting, calibrate uncertainty, or certify feasibility."
         ),
         "source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
     }
