@@ -1,6 +1,6 @@
 {
   "suite": "LEP-CONFORMANCE-0.1",
-  "status": "prototype-with-rust-semantic-checker-source",
+  "status": "prototype-with-schema-semantic-and-strict-parse-checker-source",
   "cases": [
     {
       "id": "LEP-SCHEMA-001",
@@ -63,6 +63,15 @@
       "expectedFailure": "MISSING_TARGET",
       "implementationStatus": "test-added-not-run-locally",
       "purpose": "A claim without a source/configuration/input target must fail closed."
+    },
+    {
+      "id": "LEP-PARSE-001",
+      "file": "invalid-duplicate-key.json",
+      "schemaExpected": "not_reached",
+      "semanticExpected": "reject",
+      "expectedFailure": "DUPLICATE_JSON_KEY",
+      "implementationStatus": "strict-parser-and-fixture-test-added-not-run-locally",
+      "purpose": "Duplicate keys in JSON objects are rejected during parsing before a parser's last-key-wins behavior can alter the attested meaning."
     }
   ]
 }
