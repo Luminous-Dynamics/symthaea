@@ -17,7 +17,8 @@ HERE = Path(__file__).resolve().parent
 FIXTURE_DIR = HERE / "fixtures" / "mutations"
 MAX_LINE_BYTES = 32 * 1024 * 1024
 RUNNER_SCHEMA = "broca-causal-episode-probe-v1"
-FILTER_SCHEMA = "broca-eligibility-first-ablation-v1"
+FILTER_SCHEMA = "broca-eligibility-first-ablation-v2"
+INTENT_CLASSIFIER_SCHEMA = "broca-keyword-intent-v1"
 LEDGER_SCHEMA = "broca-eligibility-ledger-v1"
 
 ALLOWED_STATUSES = {
@@ -34,6 +35,33 @@ ELIGIBLE_BY_INTENT: dict[str, frozenset[str]] = {
     # filtering would erase the negative intervention needed to interpret outcome.
     "causal_chain": frozenset(ALLOWED_STATUSES),
 }
+
+
+def infer_retrieval_intent(query: str) -> tuple[str | None, str]:
+    """Transparent keyword baseline; unknown queries return None for fail-closed abstention."""
+    if not isinstance(query, str) or not query.strip():
+        return None, "empty_query"
+    text = " ".join(query.casefold().split())
+
+    # Order matters: proposal history is more specific than the word "approved";
+    # revocation is more specific than generic state/currentness language.
+    if any(term in text for term in ("proposed", "proposal", "never approved", "not approved")):
+        return "proposal_history", "proposal_lexeme"
+    if "credential" in text and any(term in text for term in ("revok", "still be used", "active")):
+        return "revocation_status", "credential_status"
+    if "approved" in text and "deployed" in text:
+        return "approved_state", "approved_and_deployed"
+    if (
+        "preceded" in text and any(term in text for term in ("recovery", "spike", "outcome"))
+    ) or ("failed" in text and "which action" in text):
+        return "causal_chain", "event_sequence"
+    if (
+        any(term in text for term in ("before ", "prior to ", "during migration testing", "previously"))
+    ):
+        return "historical_state", "historical_temporal_cue"
+    if any(term in text for term in ("current", "currently", "right now", "at present", "today", "now")):
+        return "current_state", "current_temporal_cue"
+    return None, "no_confident_rule"
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -109,6 +137,7 @@ def filter_dataset(
     predictions: list[dict[str, Any]],
     ledger_records: list[dict[str, Any]],
     k: int,
+    intent_source: str = "annotated",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Filter candidate evidence in rank order, then enforce an exact top-k ceiling.
 
@@ -118,6 +147,8 @@ def filter_dataset(
     """
     if isinstance(k, bool) or not isinstance(k, int) or not 1 <= k <= 100:
         raise ValueError("k must be an integer in [1, 100]")
+    if intent_source not in {"annotated", "heuristic"}:
+        raise ValueError("intent_source must be annotated or heuristic")
     question_by_id = _index_questions(questions)
     prediction_by_id: dict[str, dict[str, Any]] = {}
     for index, prediction in enumerate(predictions):
@@ -145,14 +176,32 @@ def filter_dataset(
         "removed_unannotated_count": 0,
         "removed_by_status": {status: 0 for status in sorted(ALLOWED_STATUSES)},
         "questions_below_k": 0,
+        "intent_source": intent_source,
+        "intent_evaluation": {"correct": 0, "unknown": 0, "rows": []},
         "per_intent": {},
     }
 
     for question_id in sorted(question_by_id):
         question = question_by_id[question_id]
         prediction = prediction_by_id[question_id]
-        intent = question["retrieval_intent"]
-        allowed = ELIGIBLE_BY_INTENT[intent]
+        expected_intent = question["retrieval_intent"]
+        if intent_source == "annotated":
+            intent: str | None = expected_intent
+            rule = "oracle_annotation"
+        else:
+            intent, rule = infer_retrieval_intent(question.get("query", ""))
+        policy_intent = intent if intent is not None else "abstain"
+        allowed = ELIGIBLE_BY_INTENT.get(intent, frozenset())
+        intent_correct = intent == expected_intent
+        aggregate["intent_evaluation"]["correct"] += int(intent_correct)
+        aggregate["intent_evaluation"]["unknown"] += int(intent is None)
+        aggregate["intent_evaluation"]["rows"].append({
+            "question_id": question_id,
+            "expected_intent": expected_intent,
+            "predicted_intent": intent,
+            "rule": rule,
+            "correct": intent_correct,
+        })
         seen: set[tuple[str, str]] = set()
         eligible: list[dict[str, Any]] = []
         candidates = prediction["audit"]
@@ -182,7 +231,7 @@ def filter_dataset(
         if len(final) < k:
             aggregate["questions_below_k"] += 1
         intent_stats = aggregate["per_intent"].setdefault(
-            intent, {"questions": 0, "input": 0, "eligible": 0, "output": 0}
+            policy_intent, {"questions": 0, "input": 0, "eligible": 0, "output": 0}
         )
         intent_stats["questions"] += 1
         intent_stats["input"] += len(candidates)
@@ -194,9 +243,16 @@ def filter_dataset(
     aggregate["removed_total"] = (
         aggregate["input_candidate_count"] - aggregate["output_count"]
     )
+    aggregate["intent_evaluation"]["accuracy"] = round(
+        aggregate["intent_evaluation"]["correct"] / len(question_by_id), 6
+    )
     aggregate["interpretation"] = (
-        "oracle-intent eligibility-filter upper bound; no gold support labels consumed; "
-        "not a production intent classifier or end-to-end answer benchmark"
+        "oracle-intent eligibility upper bound"
+        if intent_source == "annotated"
+        else "transparent keyword-intent baseline; fixture scores are not held-out generalization evidence"
+    )
+    aggregate["interpretation"] += (
+        "; unknown intent fails closed to an empty evidence context; no gold support arrays consumed"
     )
     return output, aggregate
 
@@ -260,6 +316,12 @@ def main() -> int:
     parser.add_argument("--trajectories", type=Path, default=FIXTURE_DIR / "trajectories.jsonl")
     parser.add_argument("--ledger", type=Path, default=FIXTURE_DIR / "eligibility-ledger.jsonl")
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument(
+        "--intent-source",
+        choices=("annotated", "heuristic"),
+        default="annotated",
+        help="use annotated oracle intent or the transparent keyword baseline",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -276,7 +338,9 @@ def main() -> int:
     predictions, _ = read_jsonl_bytes(predictions_path)
     questions, _ = read_jsonl_bytes(questions_path)
     ledger_records, ledger_bytes = read_jsonl_bytes(ledger_path)
-    filtered, metrics = filter_dataset(questions, predictions, ledger_records, args.k)
+    filtered, metrics = filter_dataset(
+        questions, predictions, ledger_records, args.k, intent_source=args.intent_source
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_bytes = "".join(
@@ -299,6 +363,10 @@ def main() -> int:
         "bm25": input_manifest["bm25"],
         "candidate_pool_size": input_manifest["bm25"]["max_items"],
         "final_k": args.k,
+        "intent_source": args.intent_source,
+        "intent_classifier_schema": (
+            INTENT_CLASSIFIER_SCHEMA if args.intent_source == "heuristic" else None
+        ),
         "intent_policy": {
             key: sorted(value) for key, value in sorted(ELIGIBLE_BY_INTENT.items())
         },
@@ -306,7 +374,7 @@ def main() -> int:
         "prediction_sha256": sha256_bytes(output_bytes),
         "metrics": metrics,
         "claim_ceiling": (
-            "synthetic currentness ablation using oracle retrieval intent; not official answer accuracy"
+            "synthetic currentness ablation; not official answer accuracy; intent_source=" + args.intent_source
         ),
     }
     manifest_path = output_path.with_suffix(output_path.suffix + ".manifest.json")
@@ -317,6 +385,9 @@ def main() -> int:
         "manifest": str(manifest_path),
         "question_count": len(filtered),
         "safe_eligibility_policy": True,
+        "intent_source": args.intent_source,
+        "intent_accuracy": metrics["intent_evaluation"]["accuracy"],
+        "intent_unknown_count": metrics["intent_evaluation"]["unknown"],
         "output_sha256": sha256_bytes(output_bytes),
         "removed_total": metrics["removed_total"],
         "questions_below_k": metrics["questions_below_k"],
