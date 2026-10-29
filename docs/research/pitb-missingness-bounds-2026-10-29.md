@@ -17,15 +17,15 @@ An absent target row is not permitted: the script rejects it. An `unknown` outco
 
 ## Exact paired bounds
 
-Let (Y_{Ti}) and (Y_{Ci}) be the treatment and control outcome for target (i) in the frozen finite cohort of (N) targets. The quantity of interest is:
+Let the treatment and control outcomes for target i be Y_Ti and Y_Ci in the frozen finite cohort of N targets. The quantity of interest is:
 
-[
-\Delta_N = \frac{1}{N}\sum_{i=1}^{N}(Y_{Ti}-Y_{Ci}).
-]
+$
+\Delta_N = \frac{1}{N}\sum_{i=1}^{N}(Y_{Ti}-Y_{Ci})
+$
 
-For targets with both outcomes observed, the contribution is exact. If only control is observed, the missing treatment outcome is bounded in `[0,1]`; if only treatment is observed, the control outcome is bounded in ([0,1]); if both are unknown, the difference is in `[-1,1]`. Summing these per-target minima and maxima and dividing by the *full frozen target count* gives the sharp finite-cohort identification interval under only binary outcome bounds. Every possible completion of unknown outcomes must lie inside this interval.
+For targets with both outcomes observed, the contribution is exact. If only control is observed, the missing treatment outcome is bounded in `[0,1]`; if only treatment is observed, the control outcome is bounded in `[0,1]`; if both are unknown, the difference is in `[-1,1]`. Summing these per-target minima and maxima and dividing by the *full frozen target count* gives the sharp finite-cohort identification interval under only binary outcome bounds. Every possible completion of unknown outcomes must lie inside this interval.
 
-The report also provides a (5\times5) assumption grid over success probabilities among unknown treatment and control outcomes (0, 0.25, 0.5, 0.75, 1). These are explicit sensitivity assumptions—not imputed facts. A complete-case paired effect is shown for diagnosis only and must never replace the fixed-cohort bound.
+The report also provides a 5×5 assumption grid over success probabilities among unknown treatment and control outcomes (0, 0.25, 0.5, 0.75, 1). These are explicit sensitivity assumptions—not imputed facts. A complete-case paired effect is shown for diagnosis only and must never replace the fixed-cohort bound.
 
 ## Synthetic negative-control fixture
 
