@@ -8,6 +8,7 @@ on:
       - "crates/bridges/symthaea-proof-insights/**"
       - "data/benchmarks/proof-insight-transfer-v0/**"
       - "docs/research/proof-insight-transfer-2026.md"
+      - "scripts/research/pitb_component_allocation_sensitivity_v0.py"
       - ".github/workflows/proof-insight-transfer-v0.yml"
   workflow_dispatch:
 
@@ -3565,6 +3566,34 @@ jobs:
               "PITB_SIGNED_COVERAGE_CONTRACTS_PASS: schemas=3 shape_fixtures=3 "
               "negative_controls=4 qualification=requires_component_and_analyzer_validation"
           )
+          PY
+      - name: Smoke-test synthetic component allocation screen (design-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/research/pitb_component_allocation_sensitivity_v0.py --random-replicates 10 --output "$RUNNER_TEMP/pitb-component-allocation-screen.synthetic.json"
+          python - "$RUNNER_TEMP/pitb-component-allocation-screen.synthetic.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          if report.get("schema_version") != "pitb.component-allocation-sensitivity-screen.v0":
+              raise SystemExit("wrong component allocation screen schema")
+          if report.get("status") != "synthetic_screen_only":
+              raise SystemExit("allocation screen must remain explicitly synthetic")
+          for name, scenario in report["scenario_results"].items():
+              candidate = scenario["component_first_with_family_swaps"]
+              if candidate["component_count_by_split"] != candidate["target_component_count_by_split"]:
+                  raise SystemExit(f"{name}: component-count quotas were not preserved")
+              if abs(sum(candidate["family_count_by_split"].values()) - scenario["family_total"]) != 0:
+                  raise SystemExit(f"{name}: family denominator does not reconcile")
+          random_summary = report["randomized_summary"]
+          if sum(random_summary["family_share_error_better_equal_worse"].values()) != report["random_replicates"]:
+              raise SystemExit("randomized family-error accounting does not reconcile")
+          if sum(random_summary["joint_max_share_error_better_equal_worse"].values()) != report["random_replicates"]:
+              raise SystemExit("randomized joint-error accounting does not reconcile")
+          print("PITB_COMPONENT_ALLOCATION_SCREEN_PASS: synthetic_only=true component_quotas=reconciled")
           PY
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
