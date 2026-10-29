@@ -323,7 +323,7 @@ Proposed qualification targets (targets, not achieved results):
 
 ## Follow-on: evaluator-side outcome receipts and multidimensional scorecards
 
-The companion [SCI-RETRIEVAL-OUTCOMES-001 / #8950](https://github.com/Luminous-Dynamics/symthaea/issues/8950) implementation is in draft [PR 8952](https://github.com/Luminous-Dynamics/symthaea/pull/REPLACE_OUTCOME_PR). It binds evaluator-side labels to the exact bytes and typed commitment of the paired intervention plan, then requires one ordered outcome record for every planned trial.
+The companion [SCI-RETRIEVAL-OUTCOMES-001 / #8950](https://github.com/Luminous-Dynamics/symthaea/issues/8950) implementation is in draft [PR 8952](https://github.com/Luminous-Dynamics/symthaea/pull/8952). It binds evaluator-side labels to the exact bytes and typed commitment of the paired intervention plan, then requires one ordered outcome record for every planned trial.
 
 ### New measurement boundary
 
