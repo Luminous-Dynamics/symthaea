@@ -107,6 +107,10 @@ def make_analysis(plan_fields: dict[str, Any], revision: str) -> dict[str, Any]:
         "schema": ANALYSIS_SCHEMA,
         "analysis_implementation_revision": revision,
         "multiplicity_policy": "holm_across_binary_contrasts",
+        "pair_dependence_policy": "exact_conditional_independent_pairs",
+        "dependence_justification_sha256": sha256(
+            b"synthetic fixture: one unique task/world pair per independent block"
+        ),
         "contrasts": contrasts,
         "expected_responses": expected_responses,
     }
