@@ -135,11 +135,20 @@ fn validate(ledger: &Ledger, expected: &ExpectedCaseSet, sha256: String) -> Resu
     if !["synthetic_fixture", "completed"].contains(&ledger.status.as_str()) {
         bail!("unsupported run status {:?}; incomplete runs cannot validate", ledger.status);
     }
-    if ledger.non_claims.len() < 3
-        || !ledger.non_claims.iter().any(|v| v.contains("not a model or runtime evaluation"))
+    if ledger.non_claims.is_empty()
         || !ledger.non_claims.iter().any(|v| v.contains("does not prove the underlying events are true"))
     {
-        bail!("ledger must preserve explicit non-claims about synthetic data and hash-chain limits");
+        bail!("ledger must preserve explicit non-claims about hash-chain limits");
+    }
+    if ledger.status == "synthetic_fixture"
+        && !ledger.non_claims.iter().any(|v| v.contains("not a model or runtime evaluation"))
+    {
+        bail!("synthetic fixture must explicitly disclaim model/runtime evaluation");
+    }
+    if ledger.status == "completed"
+        && !ledger.non_claims.iter().any(|v| v.contains("not externally attested"))
+    {
+        bail!("completed ledgers must state whether external attestation is provided");
     }
     if expected.case_set_hash_algorithm != CASE_SET_HASH_ALGORITHM {
         bail!("unsupported expected-case-set hash algorithm");
@@ -523,12 +532,23 @@ mod tests {
     }
 
     #[test]
-    fn confirmed_postcondition_requires_observed_effect_and_verified_receipt() {
+    fn confirmed_postcondition_requires_an_observed_effect() {
         let (ledger_path, cases_path) = fixture_paths();
         let ledger_raw = std::fs::read(ledger_path).unwrap();
         let cases_raw = std::fs::read(cases_path).unwrap();
         let mut value: serde_json::Value = serde_json::from_slice(&ledger_raw).unwrap();
         value["events"].as_array_mut().unwrap().remove(3);
+        rehash_events(&mut value);
+        assert!(parse_and_validate(&serde_json::to_vec(&value).unwrap(), &cases_raw).is_err());
+    }
+
+    #[test]
+    fn confirmed_terminal_requires_a_verified_receipt() {
+        let (ledger_path, cases_path) = fixture_paths();
+        let ledger_raw = std::fs::read(ledger_path).unwrap();
+        let cases_raw = std::fs::read(cases_path).unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&ledger_raw).unwrap();
+        value["events"].as_array_mut().unwrap().remove(5);
         rehash_events(&mut value);
         assert!(parse_and_validate(&serde_json::to_vec(&value).unwrap(), &cases_raw).is_err());
     }
@@ -547,7 +567,7 @@ mod tests {
         let events = ledger["events"].as_array_mut().unwrap();
         for (index, value) in events.iter_mut().enumerate() {
             value["sequence"] = serde_json::json!(index as u64);
-            value["previous_hash"] = serde_json::json!(previous_hash);
+            value["previous_hash"] = serde_json::json!(previous_hash.clone());
             let event: Event = serde_json::from_value(value.clone()).unwrap();
             let hash = event_digest(&event);
             value["event_hash"] = serde_json::json!(hash.clone());
