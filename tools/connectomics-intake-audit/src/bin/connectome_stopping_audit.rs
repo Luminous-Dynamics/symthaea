@@ -34,6 +34,10 @@ struct Args {
     #[arg(long, default_value_t = 1e-9)]
     absolute_tolerance: f64,
 
+    /// Minimum prior snapshots required before issuing a one-step-ahead forecast.
+    #[arg(long, default_value_t = 4)]
+    forecast_min_training_snapshots: usize,
+
     /// Optional output JSON path; stdout when omitted.
     #[arg(long)]
     output: Option<PathBuf>,
@@ -131,6 +135,10 @@ struct AuditReport {
     query_metric_tail: BTreeMap<String, MetricStability>,
     graph_invariants_stable_in_tail: Option<bool>,
     query_metrics_stable_in_tail: Option<bool>,
+    forecast_min_training_snapshots: usize,
+    walk_forward_forecast_status: &'static str,
+    walk_forward_forecasts: Vec<WalkForwardForecast>,
+    forecast_summaries: Vec<ForecastSeriesSummary>,
     recommendation: &'static str,
     status: &'static str,
     errors: Vec<String>,
@@ -145,6 +153,75 @@ struct MetricStability {
     absolute_range: Option<f64>,
     relative_range: Option<f64>,
     stable_under_declared_tolerance: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+struct WalkForwardForecast {
+    metric_id: String,
+    metric_kind: &'static str,
+    training_snapshot_count: usize,
+    training_through_snapshot_id: String,
+    target_snapshot_id: String,
+    target_sequence_index: u64,
+    target_cumulative_edits: u64,
+    actual_value: f64,
+    persistence_prediction: f64,
+    linear_prediction: Option<f64>,
+    asymptotic_prediction: Option<f64>,
+    fitted_asymptote: Option<f64>,
+    fitted_decay_per_normalized_edit_span: Option<f64>,
+    asymptotic_training_rmse: Option<f64>,
+    persistence_absolute_error: f64,
+    linear_absolute_error: Option<f64>,
+    asymptotic_absolute_error: Option<f64>,
+    asymptotic_status: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct ForecastSeriesSummary {
+    metric_id: String,
+    metric_kind: &'static str,
+    forecast_count: usize,
+    asymptotic_estimable_count: usize,
+    asymptotic_mean_absolute_error: Option<f64>,
+    persistence_mean_absolute_error: Option<f64>,
+    linear_mean_absolute_error: Option<f64>,
+    asymptotic_relative_mae_improvement_over_persistence: Option<f64>,
+    asymptotic_relative_mae_improvement_over_linear: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AsymptoticFit {
+    origin_edits: f64,
+    edit_span: f64,
+    limit: f64,
+    amplitude: f64,
+    decay: f64,
+    training_rmse: f64,
+}
+
+impl AsymptoticFit {
+    fn predict(&self, cumulative_edits: u64) -> Option<f64> {
+        let x = (cumulative_edits as f64 - self.origin_edits) / self.edit_span;
+        let prediction = self.limit + self.amplitude * (-self.decay * x).exp();
+        prediction.is_finite().then_some(prediction)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LinearFit {
+    origin_edits: f64,
+    edit_span: f64,
+    intercept: f64,
+    slope: f64,
+}
+
+impl LinearFit {
+    fn predict(&self, cumulative_edits: u64) -> Option<f64> {
+        let x = (cumulative_edits as f64 - self.origin_edits) / self.edit_span;
+        let prediction = self.intercept + self.slope * x;
+        prediction.is_finite().then_some(prediction)
+    }
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -374,8 +451,189 @@ fn aggregate_stability(metrics: &BTreeMap<String, MetricStability>) -> Option<bo
     Some(metrics.values().all(|metric| metric.stable_under_declared_tolerance == Some(true)))
 }
 
+fn fit_asymptotic(edit_counts: &[u64], values: &[f64]) -> Option<AsymptoticFit> {
+    if edit_counts.len() != values.len() || edit_counts.len() < 4 || values.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let origin = *edit_counts.first()? as f64;
+    let span = *edit_counts.last()? as f64 - origin;
+    if !span.is_finite() || span <= 0.0 {
+        return None;
+    }
+    let xs: Vec<f64> = edit_counts.iter().map(|count| (*count as f64 - origin) / span).collect();
+    let y_mean = values.iter().sum::<f64>() / values.len() as f64;
+    let min_log_k = 0.01_f64.ln();
+    let max_log_k = 100.0_f64.ln();
+    let grid_size = 256_usize;
+    let mut best: Option<AsymptoticFit> = None;
+
+    for index in 0..grid_size {
+        let fraction = index as f64 / (grid_size - 1) as f64;
+        let decay = (min_log_k + fraction * (max_log_k - min_log_k)).exp();
+        let zs: Vec<f64> = xs.iter().map(|x| (-decay * x).exp()).collect();
+        let z_mean = zs.iter().sum::<f64>() / zs.len() as f64;
+        let variance = zs.iter().map(|z| (z - z_mean).powi(2)).sum::<f64>();
+        if variance <= 1e-14 {
+            continue;
+        }
+        let covariance = zs.iter().zip(values).map(|(z, y)| (z - z_mean) * (y - y_mean)).sum::<f64>();
+        let amplitude = covariance / variance;
+        let limit = y_mean - amplitude * z_mean;
+        let squared_error = zs.iter().zip(values).map(|(z, y)| {
+            let predicted = limit + amplitude * z;
+            (y - predicted).powi(2)
+        }).sum::<f64>();
+        if !squared_error.is_finite() || !limit.is_finite() || !amplitude.is_finite() {
+            continue;
+        }
+        let fit = AsymptoticFit {
+            origin_edits: origin,
+            edit_span: span,
+            limit,
+            amplitude,
+            decay,
+            training_rmse: (squared_error / values.len() as f64).sqrt(),
+        };
+        if best.is_none_or(|old| fit.training_rmse < old.training_rmse) {
+            best = Some(fit);
+        }
+    }
+    best
+}
+
+fn fit_linear(edit_counts: &[u64], values: &[f64]) -> Option<LinearFit> {
+    if edit_counts.len() != values.len() || edit_counts.len() < 2 || values.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let origin = *edit_counts.first()? as f64;
+    let span = *edit_counts.last()? as f64 - origin;
+    if !span.is_finite() || span <= 0.0 {
+        return None;
+    }
+    let xs: Vec<f64> = edit_counts.iter().map(|count| (*count as f64 - origin) / span).collect();
+    let x_mean = xs.iter().sum::<f64>() / xs.len() as f64;
+    let y_mean = values.iter().sum::<f64>() / values.len() as f64;
+    let variance = xs.iter().map(|x| (x - x_mean).powi(2)).sum::<f64>();
+    if variance <= 1e-14 {
+        return None;
+    }
+    let covariance = xs.iter().zip(values).map(|(x, y)| (x - x_mean) * (y - y_mean)).sum::<f64>();
+    let slope = covariance / variance;
+    let intercept = y_mean - slope * x_mean;
+    (slope.is_finite() && intercept.is_finite()).then_some(LinearFit {
+        origin_edits: origin,
+        edit_span: span,
+        intercept,
+        slope,
+    })
+}
+
+fn mean_absolute_error(values: impl Iterator<Item = f64>) -> Option<f64> {
+    let values: Vec<f64> = values.collect();
+    if values.is_empty() { None } else { Some(values.iter().sum::<f64>() / values.len() as f64) }
+}
+
+fn relative_mae_improvement(baseline: Option<f64>, model: Option<f64>) -> Option<f64> {
+    match (baseline, model) {
+        (Some(base), Some(candidate)) if base.is_finite() && base > 0.0 && candidate.is_finite() =>
+            Some((base - candidate) / base),
+        _ => None,
+    }
+}
+
+fn walk_forward_forecasts(
+    snapshots: &[Snapshot],
+    min_training_snapshots: usize,
+) -> (Vec<WalkForwardForecast>, Vec<ForecastSeriesSummary>) {
+    if snapshots.len() <= min_training_snapshots || min_training_snapshots < 4 {
+        return (Vec::new(), Vec::new());
+    }
+    let edits: Vec<u64> = snapshots.iter().map(|snapshot| snapshot.edits.cumulative_committed).collect();
+    let mut series: Vec<(String, &'static str, Vec<f64>)> = Vec::new();
+
+    if let Some(first) = snapshots.first() {
+        for name in first.graph.invariants.keys() {
+            let values: Vec<f64> = snapshots.iter().filter_map(|snapshot| snapshot.graph.invariants.get(name).copied()).collect();
+            if values.len() == snapshots.len() {
+                series.push((format!("graph:{name}"), "graph_invariant", values));
+            }
+        }
+        for (name, metric) in &first.query_evidence.metrics {
+            let values: Vec<f64> = snapshots.iter().filter_map(|snapshot| snapshot.query_evidence.metrics.get(name).map(|value| value.value)).collect();
+            if values.len() == snapshots.len() {
+                series.push((format!("query:{name}"), "query_metric", values));
+            }
+            let _ = metric;
+        }
+    }
+
+    let mut forecasts = Vec::new();
+    let mut summaries = Vec::new();
+    for (metric_id, metric_kind, values) in series {
+        let series_forecasts_start = forecasts.len();
+        for target_index in min_training_snapshots..snapshots.len() {
+            let train_edits = &edits[..target_index];
+            let train_values = &values[..target_index];
+            let target = &snapshots[target_index];
+            let previous_value = train_values[train_values.len() - 1];
+            let asymptotic = fit_asymptotic(train_edits, train_values);
+            let linear = fit_linear(train_edits, train_values);
+            let asymptotic_prediction = asymptotic.and_then(|fit| fit.predict(target.edits.cumulative_committed));
+            let linear_prediction = linear.and_then(|fit| fit.predict(target.edits.cumulative_committed));
+            let actual_value = values[target_index];
+            forecasts.push(WalkForwardForecast {
+                metric_id: metric_id.clone(),
+                metric_kind,
+                training_snapshot_count: target_index,
+                training_through_snapshot_id: snapshots[target_index - 1].snapshot.snapshot_id.clone(),
+                target_snapshot_id: target.snapshot.snapshot_id.clone(),
+                target_sequence_index: target.snapshot.sequence_index,
+                target_cumulative_edits: target.edits.cumulative_committed,
+                actual_value,
+                persistence_prediction: previous_value,
+                linear_prediction,
+                asymptotic_prediction,
+                fitted_asymptote: asymptotic.map(|fit| fit.limit),
+                fitted_decay_per_normalized_edit_span: asymptotic.map(|fit| fit.decay),
+                asymptotic_training_rmse: asymptotic.map(|fit| fit.training_rmse),
+                persistence_absolute_error: (actual_value - previous_value).abs(),
+                linear_absolute_error: linear_prediction.map(|prediction| (actual_value - prediction).abs()),
+                asymptotic_absolute_error: asymptotic_prediction.map(|prediction| (actual_value - prediction).abs()),
+                asymptotic_status: if asymptotic_prediction.is_some() { "FORECASTED_NOT_PROMOTED" } else { "NOT_ESTIMABLE" },
+            });
+        }
+
+        let observations = &forecasts[series_forecasts_start..];
+        let asym_mae = mean_absolute_error(observations.iter().filter_map(|forecast| forecast.asymptotic_absolute_error));
+        let persistence_mae = mean_absolute_error(observations.iter().map(|forecast| forecast.persistence_absolute_error));
+        let linear_mae = mean_absolute_error(observations.iter().filter_map(|forecast| forecast.linear_absolute_error));
+        summaries.push(ForecastSeriesSummary {
+            metric_id,
+            metric_kind,
+            forecast_count: observations.len(),
+            asymptotic_estimable_count: observations.iter().filter(|forecast| forecast.asymptotic_absolute_error.is_some()).count(),
+            asymptotic_mean_absolute_error: asym_mae,
+            persistence_mean_absolute_error: persistence_mae,
+            linear_mean_absolute_error: linear_mae,
+            asymptotic_relative_mae_improvement_over_persistence: relative_mae_improvement(persistence_mae, asym_mae),
+            asymptotic_relative_mae_improvement_over_linear: relative_mae_improvement(linear_mae, asym_mae),
+        });
+    }
+    (forecasts, summaries)
+}
+
 fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditReport {
     let errors = validate_series(snapshots);
+    let (walk_forward_forecasts, forecast_summaries) = if errors.is_empty() {
+        walk_forward_forecasts(snapshots, args.forecast_min_training_snapshots)
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    let forecast_status = if walk_forward_forecasts.iter().any(|forecast| forecast.asymptotic_prediction.is_some()) {
+        "WALK_FORWARD_FORECASTS_RECORDED_NOT_PROMOTED"
+    } else {
+        "NOT_ESTIMABLE"
+    };
     let mut invariant_tail = BTreeMap::new();
     let mut query_metric_tail = BTreeMap::new();
 
@@ -416,6 +674,10 @@ fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditRepor
         query_metrics_stable_in_tail: aggregate_stability(&query_metric_tail),
         invariant_tail,
         query_metric_tail,
+        forecast_min_training_snapshots: args.forecast_min_training_snapshots,
+        walk_forward_forecast_status: forecast_status,
+        walk_forward_forecasts,
+        forecast_summaries,
         // The snapshot schema has no independently estimated residual-error risk. Never authorize stopping.
         recommendation: "CONTINUE_REVIEW",
         status: if errors.is_empty() { "VALIDATED_NOT_STOPPED" } else { "FAIL" },
@@ -428,6 +690,9 @@ fn run() -> Result<i32, String> {
     let args = Args::parse();
     if args.tail_window < 2 {
         return Err("--tail-window must be at least 2".into());
+    }
+    if args.forecast_min_training_snapshots < 4 {
+        return Err("--forecast-min-training-snapshots must be at least 4".into());
     }
     if !args.relative_tolerance.is_finite() || !(0.0..=1.0).contains(&args.relative_tolerance) {
         return Err("--relative-tolerance must be finite and in [0,1]".into());
@@ -526,8 +791,41 @@ mod tests {
             tail_window,
             relative_tolerance: 0.01,
             absolute_tolerance: 1e-9,
+            forecast_min_training_snapshots: 4,
             output: None,
         }
+    }
+
+    #[test]
+    fn walk_forward_forecast_does_not_leak_the_target_value() {
+        let values = [10.0, 8.2, 7.0, 6.1, 5.7, 5.3];
+        let mut snapshots: Vec<Snapshot> = values.iter().enumerate().map(|(index, value)| {
+            snapshot(
+                index as u64,
+                (index as u64) * 10,
+                &format!("{:064x}", index + 1),
+                if index == 0 { None } else { Some(Box::leak(format!("{:064x}", index).into_boxed_str()) as &str) },
+                0.5 + index as f64 * 0.0001,
+                *value,
+            )
+        }).collect();
+        for index in 1..snapshots.len() {
+            snapshots[index].edits.edits_since_previous_snapshot = Some(10);
+        }
+        let before = walk_forward_forecasts(&snapshots, 4).0;
+        let original = before.iter().find(|forecast| forecast.metric_id == "query:path_count" && forecast.target_sequence_index == 4).unwrap();
+        snapshots[4].query_evidence.metrics.get_mut("path_count").unwrap().value = 500.0;
+        let after = walk_forward_forecasts(&snapshots, 4).0;
+        let changed_target = after.iter().find(|forecast| forecast.metric_id == "query:path_count" && forecast.target_sequence_index == 4).unwrap();
+        assert_eq!(original.asymptotic_prediction, changed_target.asymptotic_prediction);
+        assert_eq!(original.linear_prediction, changed_target.linear_prediction);
+        assert_ne!(original.actual_value, changed_target.actual_value);
+    }
+
+    #[test]
+    fn asymptotic_fit_is_not_estimable_without_four_snapshots_or_edit_span() {
+        assert!(fit_asymptotic(&[0, 1, 2], &[3.0, 2.0, 1.0]).is_none());
+        assert!(fit_asymptotic(&[5, 5, 5, 5], &[4.0, 3.0, 2.0, 1.0]).is_none());
     }
 
     #[test]
