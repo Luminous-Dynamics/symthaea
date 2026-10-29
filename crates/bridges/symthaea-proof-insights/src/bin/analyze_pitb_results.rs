@@ -19,7 +19,11 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v2";
+#[path = "../coverage_receipt.rs"]
+mod coverage_receipt;
+use coverage_receipt::verify_receipt;
+
+const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v3";
 const RUN_RESULTS_SCHEMA: &str = "pitb.target-outcome.v0";
 const ANALYSIS_REPORT_SCHEMA: &str = "pitb.analysis-report.v1";
 const EXPECTED_PROTOCOL_ID: &str = "proof-insight-transfer-v0";
@@ -46,6 +50,10 @@ struct RunConfig {
     component_manifest_sha256: String,
     partition_digest_sha256: String,
     baseline_selection_receipt_sha256: String,
+    relationship_inventory_sha256: Option<String>,
+    coverage_receipt_sha256: Option<String>,
+    coverage_trust_store_sha256: Option<String>,
+    coverage_methodology_sha256: Option<String>,
     known_exposed_validation_family_ids: Vec<String>,
     known_exposed_test_family_ids: Vec<String>,
     bootstrap_replicates: usize,
@@ -492,7 +500,15 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
     let component_manifest: ComponentManifest = serde_json::from_slice(&component_manifest_bytes)
         .context("parse exact component manifest JSON")?;
-    let family_to_component = validate_component_manifest(&component_manifest, &config, &split_manifest)?;
+    let receipt_verified = verify_component_coverage_inputs(
+        args,
+        &config,
+        &component_manifest,
+        &split_manifest,
+        &split_bytes,
+    )?;
+    let family_to_component =
+        validate_component_manifest(&component_manifest, &config, &split_manifest, receipt_verified)?;
     let receipt: BaselineSelectionReceipt =
         serde_json::from_slice(&receipt_bytes).context("parse baseline selection receipt JSON")?;
     validate_baseline_receipt(&receipt, &validation_bytes)?;
@@ -693,7 +709,15 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
     let component_manifest: ComponentManifest = serde_json::from_slice(&component_manifest_bytes)
         .context("parse exact component manifest JSON")?;
-    let family_to_component = validate_component_manifest(&component_manifest, &config, &split_manifest)?;
+    let receipt_verified = verify_component_coverage_inputs(
+        args,
+        &config,
+        &component_manifest,
+        &split_manifest,
+        &split_bytes,
+    )?;
+    let family_to_component =
+        validate_component_manifest(&component_manifest, &config, &split_manifest, receipt_verified)?;
     let receipt: BaselineSelectionReceipt =
         serde_json::from_slice(&receipt_bytes).context("parse baseline-selection receipt JSON")?;
     validate_baseline_receipt(&receipt, &validation_bytes)?;
@@ -1619,6 +1643,10 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
             "--splits",
             "--baseline-receipt",
             "--component-manifest",
+            "--relationship-inventory",
+            "--coverage-receipt",
+            "--coverage-trust-store",
+            "--coverage-methodology",
             "--power-report",
             "--out",
             "--power-simulations",
@@ -1739,6 +1767,26 @@ fn validate_config(
         ),
     ] {
         validate_sha256(value).with_context(|| format!("invalid {field}"))?;
+    }
+    let coverage_pins = [
+        config.relationship_inventory_sha256.as_deref(),
+        config.coverage_receipt_sha256.as_deref(),
+        config.coverage_trust_store_sha256.as_deref(),
+        config.coverage_methodology_sha256.as_deref(),
+    ];
+    let pin_count = coverage_pins.iter().filter(|pin| pin.is_some()).count();
+    if pin_count != 0 && pin_count != coverage_pins.len() {
+        bail!("coverage trust boundary requires all four artifact digests or none");
+    }
+    for (field, value) in [
+        ("relationship_inventory_sha256", config.relationship_inventory_sha256.as_deref()),
+        ("coverage_receipt_sha256", config.coverage_receipt_sha256.as_deref()),
+        ("coverage_trust_store_sha256", config.coverage_trust_store_sha256.as_deref()),
+        ("coverage_methodology_sha256", config.coverage_methodology_sha256.as_deref()),
+    ] {
+        if let Some(value) = value {
+            validate_sha256(value).with_context(|| format!("invalid {field}"))?;
+        }
     }
     if config.protocol_sha256 != sha256_hex(protocol_bytes) {
         bail!("evaluation protocol digest mismatch; do not analyze against a changed protocol");
@@ -1965,6 +2013,7 @@ fn validate_component_manifest(
     manifest: &ComponentManifest,
     config: &RunConfig,
     split_manifest: &SplitManifest,
+    receipt_verified: bool,
 ) -> Result<BTreeMap<String, String>> {
     if manifest.schema_version != "pitb.independent-component-manifest.v0"
         || manifest.upstream_commit != EXPECTED_UPSTREAM_COMMIT
@@ -1975,10 +2024,14 @@ fn validate_component_manifest(
     }
     validate_sha256(&manifest.relationship_inventory_sha256)
         .context("invalid relationship inventory digest in component manifest")?;
-    if manifest.coverage_receipt_verification_status != "not_verified_receipt_bytes_not_supplied"
-        || manifest.qualified_for_confirmatory_resampling
-    {
-        bail!("this analyzer build does not authorize unverified component manifests for confirmatory resampling");
+    if manifest.coverage_receipt_verification_status == "verified_signature_set" && !receipt_verified {
+        bail!("manifest claims verified coverage, but this analyzer did not independently verify receipt inputs");
+    }
+    if receipt_verified && manifest.coverage_receipt_verification_status != "verified_signature_set" {
+        bail!("receipt inputs verified, but component manifest does not record the verified signature set");
+    }
+    if manifest.qualified_for_confirmatory_resampling && !receipt_verified {
+        bail!("qualified component manifest requires independent receipt, trust-store, and methodology verification");
     }
     if manifest.qualification_limitations.is_empty()
         || manifest.qualification_limitations.iter().any(|limitation| limitation.trim().is_empty())
@@ -2119,11 +2172,15 @@ fn validate_component_manifest(
         "not_qualified_incomplete_inventory"
     } else if cross_split_count > 0 {
         "not_qualified_cross_split_hard_relationships"
+    } else if receipt_verified {
+        "qualified_coverage_verified_no_cross_split_hard_relationships"
     } else {
         "structurally_eligible_receipt_unverified"
     };
-    if manifest.qualification_status != expected_status {
-        bail!("component qualification status does not follow coverage and cross-split controls");
+    if manifest.qualification_status != expected_status
+        || manifest.qualified_for_confirmatory_resampling != receipt_verified
+    {
+        bail!("component qualification status does not reconcile with authenticated coverage and split controls");
     }
     if cross_split_count > 0 {
         bail!("cross-split hard-link components must be resolved/quarantined before power planning or test analysis");
@@ -4259,6 +4316,10 @@ mod tests {
                 max_cost_microusd: 500_000,
             },
             power_report_sha256: None,
+            relationship_inventory_sha256: None,
+            coverage_receipt_sha256: None,
+            coverage_trust_store_sha256: None,
+            coverage_methodology_sha256: None,
         }
     }
 
