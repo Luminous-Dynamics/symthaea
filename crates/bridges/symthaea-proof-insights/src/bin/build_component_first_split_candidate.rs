@@ -480,7 +480,7 @@ mod tests {
 
     #[test]
     fn singleton_components_approximate_the_registered_split_shares() {
-        let source = units(&vec![1; 100]);
+        let source = units(&[1; 100]);
         let assignments = assign_components(&source).expect("singleton components allocate");
         let counts = [
             assignments.values().filter(|split| *split == "train").count(),
