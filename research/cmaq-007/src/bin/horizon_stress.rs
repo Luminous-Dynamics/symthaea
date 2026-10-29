@@ -7,7 +7,7 @@
 use std::process;
 
 const REPORT_SCHEMA: &str = "cmaq-007-horizon-stress-v0.1";
-const SEEDS: usize = 128;
+const SEEDS: usize = 256;
 const BASE_SEED: u64 = 0xC0A7_0075_5EED_2026;
 const SEARCH_SIZES: [usize; 4] = [8, 32, 128, 512];
 const HORIZONS: [usize; 3] = [1, 4, 16];
@@ -267,6 +267,18 @@ fn mean(values: &[f64]) -> f64 {
 }
 
 /// Exploratory paired normal-approximation interval; episodes are the sampling unit.
+/// Empirical CVaR95: mean of the worst ceil(5% * n) episode regrets.
+/// Descriptive finite-panel tail risk; not a population-level confidence guarantee.
+fn cvar95(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    let tail_count = ((sorted.len() as f64 * 0.05).ceil() as usize).max(1);
+    mean(&sorted[sorted.len() - tail_count..])
+}
+
 fn mean_ci95(values: &[f64]) -> (f64, f64, f64) {
     let average = mean(values);
     if values.len() < 2 {
@@ -292,6 +304,8 @@ struct Summary {
     mean_selected_optimism_gap: f64,
     mean_selected_decision_score_gap: f64,
     mean_regret: f64,
+    cvar95_regret: f64,
+    max_regret: f64,
     unsupported_selection_rate: f64,
     unsupported_rate_given_model_action: f64,
     model_action_coverage: f64,
@@ -337,6 +351,8 @@ fn summarize(
         mean_selected_optimism_gap: mean(&optimism_values),
         mean_selected_decision_score_gap: mean(&samples.iter().map(|row| row.selected_decision_score_gap).collect::<Vec<_>>()),
         mean_regret: mean(&regret_values),
+        cvar95_regret: cvar95(&regret_values),
+        max_regret: regret_values.iter().copied().fold(0.0, f64::max),
         unsupported_selection_rate: mean(&unsupported_values),
         unsupported_rate_given_model_action: if covered_count == 0.0 {
             0.0
@@ -422,7 +438,9 @@ fn render_report(rows: &[Summary]) -> String {
                 "\"mean_selected_optimism_gap\": {:.8}, ",
                 "\"mean_selected_decision_score_gap\": {:.8}, ",
                 "\"mean_regret\": {:.8}, ",
-                "\"unsupported_selection_rate\": {:.8}, ",
+                "\"cvar95_regret\": {:.8}, ",
+                "\"max_regret\": {:.8}, ",
+                "\"unsupported_selection_rate\": {:.8}, "
                 "\"unsupported_rate_given_model_action\": {:.8}, ",
                 "\"model_action_coverage\": {:.8}, ",
                 "\"paired_regret_reduction_vs_greedy\": {:.8}, ",
@@ -439,6 +457,8 @@ fn render_report(rows: &[Summary]) -> String {
             row.mean_selected_optimism_gap,
             row.mean_selected_decision_score_gap,
             row.mean_regret,
+            row.cvar95_regret,
+            row.max_regret,
             row.unsupported_selection_rate,
             row.unsupported_rate_given_model_action,
             row.model_action_coverage,
@@ -563,11 +583,21 @@ mod tests {
             assert!(row.mean_selected_optimism_gap.is_finite());
             assert!(row.mean_selected_decision_score_gap.is_finite());
             assert!(row.mean_regret.is_finite() && row.mean_regret >= 0.0);
+            assert!(row.cvar95_regret.is_finite() && row.cvar95_regret >= row.mean_regret - 1e-12);
+            assert!(row.max_regret.is_finite() && row.max_regret >= row.cvar95_regret - 1e-12);
             assert!((0.0..=1.0).contains(&row.unsupported_selection_rate));
             assert!((0.0..=1.0).contains(&row.unsupported_rate_given_model_action));
             assert!((0.0..=1.0).contains(&row.model_action_coverage));
             assert!(row.paired_regret_reduction_ci95_low <= row.paired_regret_reduction_ci95_high);
         }
+    }
+
+    #[test]
+    fn empirical_cvar95_uses_worst_five_percent_and_dominates_mean() {
+        let values = (0..100).map(|value| value as f64).collect::<Vec<_>>();
+        assert!((cvar95(&values) - 94.0).abs() < 1e-12);
+        assert!(cvar95(&values) >= mean(&values));
+        assert_eq!(cvar95(&[]), 0.0);
     }
 
     #[test]
