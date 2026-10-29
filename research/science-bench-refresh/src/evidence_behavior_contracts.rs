@@ -353,9 +353,13 @@ fn validate_plan_fields(fields: &EvidenceBehaviorContractPlanFieldsV1) -> Vec<St
     }
     if fields.purpose.is_qualified() {
         if !valid_revision(&fields.evaluator_source_revision) {
-            issues.push("qualified run requires a non-zero lower-case source revision SHA".to_owned());
+            issues.push(
+                "qualified run requires a non-zero lower-case source revision SHA".to_owned(),
+            );
         } else if fields.evaluator_source_revision != BUILT_GENERATOR_SOURCE_REVISION {
-            issues.push("evaluator source revision does not match the inspected build revision".to_owned());
+            issues.push(
+                "evaluator source revision does not match the inspected build revision".to_owned(),
+            );
         }
     } else if fields.evaluator_source_revision.trim().is_empty() {
         issues.push("example-only source revision marker must be non-empty".to_owned());
@@ -382,7 +386,9 @@ fn validate_plan_fields(fields: &EvidenceBehaviorContractPlanFieldsV1) -> Vec<St
             issues.push(format!("case {} has invalid decision_rule_id", item.case_id));
         }
         let (expected_intervention, expected_behavior) = expected_pair(item.family);
-        if item.intervention != expected_intervention || item.expected_behavior != expected_behavior {
+        if item.intervention != expected_intervention
+            || item.expected_behavior != expected_behavior
+        {
             issues.push(format!(
                 "case {} has intervention/behavior incompatible with family {:?}",
                 item.case_id, item.family
@@ -824,7 +830,9 @@ fn family_scorecard(
             let rate = if eligible == 0 {
                 None
             } else {
-                Some(((u128::from(value.violations) * 1_000_000 + u128::from(eligible) / 2) / u128::from(eligible)) as u32)
+                let numerator =
+                    u128::from(value.violations) * 1_000_000 + u128::from(eligible) / 2;
+                Some((numerator / u128::from(eligible)) as u32)
             };
             ContractFamilySummaryV1 {
                 family,
@@ -900,7 +908,11 @@ pub fn verify_evidence_behavior_contract_report(
         generalized_accuracy_estimated: false,
         runner_execution_proven: false,
         external_anchor_required: true,
-        claim_boundary: "Adjudication is conditional on the frozen contract, evidence-authority policy and rubric; a digest does not prove runner execution, evaluator independence, truth or generalization.".to_owned(),
+        claim_boundary: concat!(
+            "Adjudication is conditional on the frozen contract, evidence-authority policy and rubric; ",
+            "a digest does not prove runner execution, evaluator independence, truth or generalization."
+        )
+        .to_owned(),
     });
     Ok(EvidenceBehaviorContractReportVerificationV1 {
         schema: "symthaea.science_bench_refresh_evidence_behavior_contract_report_verification.v1"
