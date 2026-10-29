@@ -21,7 +21,7 @@ The lower bound is the smallest nu whose penalized wealth is at most 1/delta. Th
 
 ## Numerical-safety design
 
-A confidence bound should not become optimistic because the optimizer slightly underestimates a maximum. The log wealth is concave in b. At an interior point, its tangent line is a global upper bound. Maximizing that tangent over [0,1] produces an upper envelope for the best log wealth even when the derivative root is approximate. The LCB inversion accepts a candidate only when this upper envelope is below the wealth threshold, which errs conservatively relative to the exact pCRP-star calculation. A floating-point margin is added; this is a numerical engineering precaution, not a machine-checked interval-arithmetic proof.
+A confidence bound should not become optimistic because the optimizer's numerical error changes the direction of its guarantee. The implementation evaluates the log wealth at a feasible bet; any feasible bet's wealth is less than or equal to the supremum over bets. The root inversion uses that feasible wealth as a lower witness for the supremum. Underestimating the supremum can only move the lower confidence bound down, making it more conservative; it must not be replaced by an upper envelope, which could raise the LCB and invalidate coverage. A small downward floating-point margin is applied to the evaluated log wealth. This is a numerical engineering precaution, not a machine-checked interval-arithmetic proof.
 
 The code includes the endpoint cases, zero rewards, non-finite / negative inputs, probability validation, importance-weight support checks, and a distinct NOT_IDENTIFIED status for structural zero support. It never creates a numeric estimate or bound for unsupported target-policy mass.
 
