@@ -78,6 +78,11 @@ impl DecisionExperiment {
     pub fn outcomes(&self) -> &[String] {
         &self.outcomes
     }
+
+    /// Per-hypothesis outcome probabilities, in hypothesis and outcome order.
+    pub fn likelihoods_by_hypothesis(&self) -> &[Vec<f64>] {
+        &self.likelihoods_by_hypothesis
+    }
 }
 
 /// A finite decision problem and the experiments available to resolve it.
@@ -159,6 +164,41 @@ impl ActiveExperimentProblem {
             measurement_cost_unit,
             experiments,
         })
+    }
+
+    /// Hypothesis labels in prior and utility-matrix column order.
+    pub fn hypotheses(&self) -> &[String] {
+        &self.hypotheses
+    }
+
+    /// Declared prior over hypotheses.
+    pub fn prior(&self) -> &[f64] {
+        &self.prior
+    }
+
+    /// Available decision actions in utility-matrix row order.
+    pub fn actions(&self) -> &[String] {
+        &self.actions
+    }
+
+    /// Action utilities, with rows as actions and columns as hypotheses.
+    pub fn utilities_by_action_and_hypothesis(&self) -> &[Vec<f64>] {
+        &self.utilities_by_action_and_hypothesis
+    }
+
+    /// Declared unit of action utility.
+    pub fn utility_unit(&self) -> &str {
+        &self.utility_unit
+    }
+
+    /// Declared measurement-cost unit shared by candidate experiments.
+    pub fn measurement_cost_unit(&self) -> &str {
+        &self.measurement_cost_unit
+    }
+
+    /// Candidate experiments in the order supplied to the constructor.
+    pub fn experiments(&self) -> &[DecisionExperiment] {
+        &self.experiments
     }
 
     /// Rank experiments from highest to lowest decision improvement per cost.
