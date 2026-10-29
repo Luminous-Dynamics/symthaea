@@ -455,132 +455,129 @@ def run_two_sided_controls(
         temp_root = Path(temporary)
         baseline = temp_root / "baseline"
         reference = temp_root / "reference"
-        try:
-            checkout_metadata["baseline"] = _initialize_isolated_checkout(source, expected_source_revision, baseline)
-            checkout_metadata["reference"] = _initialize_isolated_checkout(source, expected_source_revision, reference)
+        checkout_metadata["baseline"] = _initialize_isolated_checkout(source, expected_source_revision, baseline)
+        checkout_metadata["reference"] = _initialize_isolated_checkout(source, expected_source_revision, reference)
 
-            bundle_manifest.append({"arm": "baseline", "files": extract_test_bundle(test_bundle_raw, baseline)})
-            # Extracting the same trusted tests independently ensures both arms use identical test bytes.
-            # A separate digest per extracted file is emitted for later audit.
-            reference_bundle = extract_test_bundle(test_bundle_raw, reference)
-            bundle_manifest.append({"arm": "reference", "files": reference_bundle})
-            if reference_bundle != bundle_manifest[0]["files"]:
-                raise ControlError("test bundle extraction differed between baseline and reference worktrees")
+        bundle_manifest.append({"arm": "baseline", "files": extract_test_bundle(test_bundle_raw, baseline)})
+        # Extracting the same trusted tests independently ensures both arms use identical test bytes.
+        # A separate digest per extracted file is emitted for later audit.
+        reference_bundle = extract_test_bundle(test_bundle_raw, reference)
+        bundle_manifest.append({"arm": "reference", "files": reference_bundle})
+        if reference_bundle != bundle_manifest[0]["files"]:
+            raise ControlError("test bundle extraction differed between baseline and reference worktrees")
 
-            patch_file = temp_root / "reference.patch"
-            patch_file.write_bytes(reference_patch_raw)
-            check = subprocess.run(
-                ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
-                 "apply", "--check", "--whitespace=error", str(patch_file)],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-                text=True, encoding="utf-8", errors="replace", timeout=60,
-            )
-            if check.returncode != 0:
-                raise ControlError(f"reference patch does not apply cleanly to locked revision: {check.stdout[-2000:]}")
-            apply = subprocess.run(
-                ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
-                 "apply", "--whitespace=error", str(patch_file)],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-                text=True, encoding="utf-8", errors="replace", timeout=60,
-            )
-            if apply.returncode != 0:
-                raise ControlError(f"reference patch application failed: {apply.stdout[-2000:]}")
+        patch_file = temp_root / "reference.patch"
+        patch_file.write_bytes(reference_patch_raw)
+        check = subprocess.run(
+            ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
+             "apply", "--check", "--whitespace=error", str(patch_file)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+            text=True, encoding="utf-8", errors="replace", timeout=60,
+        )
+        if check.returncode != 0:
+            raise ControlError(f"reference patch does not apply cleanly to locked revision: {check.stdout[-2000:]}")
+        apply = subprocess.run(
+            ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
+             "apply", "--whitespace=error", str(patch_file)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+            text=True, encoding="utf-8", errors="replace", timeout=60,
+        )
+        if apply.returncode != 0:
+            raise ControlError(f"reference patch application failed: {apply.stdout[-2000:]}")
 
-            baseline_delta_before = tracked_tree_delta_sha256(baseline)
-            reference_delta_before = tracked_tree_delta_sha256(reference)
-            baseline_files = bundle_manifest[0]["files"]
-            reference_files = bundle_manifest[1]["files"]
+        baseline_delta_before = tracked_tree_delta_sha256(baseline)
+        reference_delta_before = tracked_tree_delta_sha256(reference)
+        baseline_files = bundle_manifest[0]["files"]
+        reference_files = bundle_manifest[1]["files"]
 
-            baseline_results, baseline_issues = _run_arm(
-                baseline, commands, arm_name="baseline", evidence_root=evidence_root,
-            )
-            reference_results, reference_issues = _run_arm(
-                reference, commands, arm_name="reference", evidence_root=evidence_root,
-            )
-            baseline_delta_after = tracked_tree_delta_sha256(baseline)
-            reference_delta_after = tracked_tree_delta_sha256(reference)
-            baseline_file_observations, baseline_file_issues = verify_test_bundle_files(
-                baseline, baseline_files, "baseline",
-            )
-            reference_file_observations, reference_file_issues = verify_test_bundle_files(
-                reference, reference_files, "reference",
-            )
-            baseline_integrity_valid = (
-                baseline_delta_before == baseline_delta_after and not baseline_file_issues
-            )
-            reference_integrity_valid = (
-                reference_delta_before == reference_delta_after and not reference_file_issues
-            )
-            integrity_issues = baseline_file_issues + reference_file_issues
-            if baseline_delta_before != baseline_delta_after:
-                integrity_issues.append("baseline tracked source tree changed during control execution")
-            if reference_delta_before != reference_delta_after:
-                integrity_issues.append("reference tracked source tree changed during control execution")
+        baseline_results, baseline_issues = _run_arm(
+            baseline, commands, arm_name="baseline", evidence_root=evidence_root,
+        )
+        reference_results, reference_issues = _run_arm(
+            reference, commands, arm_name="reference", evidence_root=evidence_root,
+        )
+        baseline_delta_after = tracked_tree_delta_sha256(baseline)
+        reference_delta_after = tracked_tree_delta_sha256(reference)
+        baseline_file_observations, baseline_file_issues = verify_test_bundle_files(
+            baseline, baseline_files, "baseline",
+        )
+        reference_file_observations, reference_file_issues = verify_test_bundle_files(
+            reference, reference_files, "reference",
+        )
+        baseline_integrity_valid = (
+            baseline_delta_before == baseline_delta_after and not baseline_file_issues
+        )
+        reference_integrity_valid = (
+            reference_delta_before == reference_delta_after and not reference_file_issues
+        )
+        integrity_issues = baseline_file_issues + reference_file_issues
+        if baseline_delta_before != baseline_delta_after:
+            integrity_issues.append("baseline tracked source tree changed during control execution")
+        if reference_delta_before != reference_delta_after:
+            integrity_issues.append("reference tracked source tree changed during control execution")
 
-            baseline_failed = any(row["observed_test_outcome"] == "failed" for row in baseline_results)
-            reference_all_passed = (
-                len(reference_results) == len(commands)
-                and all(row["observed_test_outcome"] == "passed" for row in reference_results)
-            )
-            baseline_complete = (
-                len(baseline_results) == len(commands)
-                and all(row["observed_test_outcome"] in ("passed", "failed") for row in baseline_results)
-            )
-            controls_passed = baseline_failed and baseline_complete and reference_all_passed
-            issues = baseline_issues + reference_issues + integrity_issues
-            if not baseline_failed:
-                issues.append("empty-patch baseline did not demonstrate a test-level failure")
-            if not baseline_complete:
-                issues.append("one or more empty-patch test commands were unresolved")
-            if not reference_all_passed:
-                issues.append("reference patch did not pass every preregistered test command")
-            return {
-                "schema_version": "vleb-oracle-control-result-v1",
-                "valid": controls_passed and not issues,
-                "two_sided_gate_passed": controls_passed and not issues,
-                "baseline_empty_patch_must_fail": True,
-                "reference_patch_must_pass": True,
-                "source_revision": expected_source_revision,
-                "source_repository_head_checked": True,
-                "isolated_checkout_metadata": checkout_metadata,
-                "manifest_sha256": digest(manifest_raw),
-                "reference_patch_sha256": digest(reference_patch_raw),
-                "test_bundle_sha256": digest(test_bundle_raw),
-                "verifier_sha256": verifier_sha,
-                "test_bundle_files_by_arm": bundle_manifest,
-                "baseline_tree_integrity": {
-                    "valid": baseline_integrity_valid,
-                    "tracked_diff_sha256_before": baseline_delta_before,
-                    "tracked_diff_sha256_after": baseline_delta_after,
-                    "test_bundle_file_observations": baseline_file_observations,
-                },
-                "reference_tree_integrity": {
-                    "valid": reference_integrity_valid,
-                    "tracked_diff_sha256_before": reference_delta_before,
-                    "tracked_diff_sha256_after": reference_delta_after,
-                    "test_bundle_file_observations": reference_file_observations,
-                },
-                "baseline_results": baseline_results,
-                "reference_results": reference_results,
-                "baseline_test_failure_count": sum(row["observed_test_outcome"] == "failed" for row in baseline_results),
-                "reference_passed_command_count": sum(row["observed_test_outcome"] == "passed" for row in reference_results),
-                "command_count": len(commands),
-                "issues": issues,
-                "analysis_only": True,
-                "score_eligible": False,
-                "runner_attestation_required": True,
-                "network_isolation_independently_verified": False,
-                "limitations": [
-                    "The tool proves the pinned empty-patch/reference-patch test controls ran on isolated Git worktrees of one revision; it does not run or score a candidate submission.",
-                    "A test bundle must contain independent test files and cannot overwrite any file already present in the source revision.",
-                    "The command manifest must be authored and digest-pinned by a trusted evaluator; its regex markers must identify genuine test-start and test-summary lines for the chosen test framework.",
-                    "The tool does not enforce network isolation, VM/container isolation, resource limits, or signed runner provenance. Protected execution infrastructure must attest these separately.",
-                    "The output is analysis-only and cannot establish benchmark-score eligibility.",
-                ],
-            }
-        finally:
-            # TemporaryDirectory removes the two isolated repositories; source repository metadata is untouched.
-            pass
+        baseline_failed = any(row["observed_test_outcome"] == "failed" for row in baseline_results)
+        reference_all_passed = (
+            len(reference_results) == len(commands)
+            and all(row["observed_test_outcome"] == "passed" for row in reference_results)
+        )
+        baseline_complete = (
+            len(baseline_results) == len(commands)
+            and all(row["observed_test_outcome"] in ("passed", "failed") for row in baseline_results)
+        )
+        controls_passed = baseline_failed and baseline_complete and reference_all_passed
+        issues = baseline_issues + reference_issues + integrity_issues
+        if not baseline_failed:
+            issues.append("empty-patch baseline did not demonstrate a test-level failure")
+        if not baseline_complete:
+            issues.append("one or more empty-patch test commands were unresolved")
+        if not reference_all_passed:
+            issues.append("reference patch did not pass every preregistered test command")
+        return {
+            "schema_version": "vleb-oracle-control-result-v1",
+            "valid": controls_passed and not issues,
+            "two_sided_gate_passed": controls_passed and not issues,
+            "baseline_empty_patch_must_fail": True,
+            "reference_patch_must_pass": True,
+            "source_revision": expected_source_revision,
+            "source_repository_head_checked": True,
+            "isolated_checkout_metadata": checkout_metadata,
+            "manifest_sha256": digest(manifest_raw),
+            "reference_patch_sha256": digest(reference_patch_raw),
+            "test_bundle_sha256": digest(test_bundle_raw),
+            "verifier_sha256": verifier_sha,
+            "test_bundle_files_by_arm": bundle_manifest,
+            "baseline_tree_integrity": {
+                "valid": baseline_integrity_valid,
+                "tracked_diff_sha256_before": baseline_delta_before,
+                "tracked_diff_sha256_after": baseline_delta_after,
+                "test_bundle_file_observations": baseline_file_observations,
+            },
+            "reference_tree_integrity": {
+                "valid": reference_integrity_valid,
+                "tracked_diff_sha256_before": reference_delta_before,
+                "tracked_diff_sha256_after": reference_delta_after,
+                "test_bundle_file_observations": reference_file_observations,
+            },
+            "baseline_results": baseline_results,
+            "reference_results": reference_results,
+            "baseline_test_failure_count": sum(row["observed_test_outcome"] == "failed" for row in baseline_results),
+            "reference_passed_command_count": sum(row["observed_test_outcome"] == "passed" for row in reference_results),
+            "command_count": len(commands),
+            "issues": issues,
+            "analysis_only": True,
+            "score_eligible": False,
+            "runner_attestation_required": True,
+            "network_isolation_independently_verified": False,
+            "limitations": [
+                "The tool proves the pinned empty-patch/reference-patch test controls ran on isolated shallow Git checkouts containing only the pinned source commit; it does not run or score a candidate submission.",
+                "A test bundle must contain independent test files and cannot overwrite any file already present in the source revision.",
+                "The command manifest must be authored and digest-pinned by a trusted evaluator; its regex markers must identify genuine test-start and test-summary lines for the chosen test framework.",
+                "The tool does not enforce network isolation, VM/container isolation, resource limits, or signed runner provenance. Protected execution infrastructure must attest these separately.",
+                "The output is analysis-only and cannot establish benchmark-score eligibility.",
+            ],
+        }
+
 
 
 def main(argv: list[str] | None = None) -> int:
