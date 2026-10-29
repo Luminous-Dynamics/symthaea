@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
@@ -254,6 +255,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     let mut sample_ids = BTreeSet::new();
     let mut groups: BTreeMap<String, String> = BTreeMap::new();
     let mut artifact_bindings: BTreeMap<String, ArtifactBinding> = BTreeMap::new();
+    let mut verified_source_hashes: BTreeMap<String, String> = BTreeMap::new();
     let mut digest_to_artifact: BTreeMap<String, String> = BTreeMap::new();
     let mut split_counts = BTreeMap::from([
         ("train".to_owned(), 0usize),
@@ -318,8 +320,14 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         }
         verify_regular_file_without_symlinks(&root, relative, line_number)?;
         let resolved = root.join(relative);
-        let actual_digest = sha256_file(&resolved)
-            .map_err(|error| format!("line {line_number}: cannot hash source: {error}"))?;
+        let actual_digest = if let Some(cached) = verified_source_hashes.get(&sample.source_path) {
+            cached.clone()
+        } else {
+            let digest = sha256_file(&resolved)
+                .map_err(|error| format!("line {line_number}: cannot hash source: {error}"))?;
+            verified_source_hashes.insert(sample.source_path.clone(), digest.clone());
+            digest
+        };
         if actual_digest != sample.source_sha256 {
             return Err(format!(
                 "line {line_number}: SHA-256 mismatch for {}: expected {}, got {}",
@@ -449,8 +457,17 @@ fn verify_regular_file_without_symlinks(
 }
 
 fn sha256_file(path: &Path) -> Result<String, std::io::Error> {
-    let bytes = fs::read(path)?;
-    Ok(sha256_hex(&bytes))
+    let mut file = fs::File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    Ok(hex::encode(digest.finalize()))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -632,6 +649,58 @@ mod tests {
         let result = fixture.audit().expect("valid manifest should pass");
         assert_eq!(result.samples, 3);
         assert_eq!(result.artifacts, 3);
+    }
+
+    #[test]
+    fn repeated_windows_from_one_artifact_are_allowed_within_one_split() {
+        let mut fixture = Fixture::new();
+        fixture.add_row(
+            "s-train-1",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-train-2",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
+        let summary = fixture.audit().expect("repeated windows should pass");
+        assert_eq!(summary.samples, 4);
+        assert_eq!(summary.artifacts, 3);
     }
 
     #[test]
