@@ -9,12 +9,15 @@
 //! aircraft feasibility, flight timing, charging queues, storage dynamics, network
 //! flows, continuous dispatch, physical fuel production, or a real airport.
 //!
-//! The manifest digest is an opaque caller-supplied identity bound into each plan;
-//! this module does not hash or authenticate the manifest bytes. The caller must
-//! independently canonicalize and verify that digest before relying on provenance.
+//! The scenario identity uses a versioned, domain-separated SHA-256 digest of a
+//! canonical encoding. Input vector order is normalized by stable IDs, and plan
+//! verification recomputes the digest. This is integrity/content identity, not a
+//! signature, evidence of physical validity, or authority to operate an airport.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+
+use sha2::{Digest, Sha256};
 
 use crate::aviation_energy_accounting::{
     account_energy_ledger, AccountingError, AccountingSummary, EnergyCarrier, EnergyRecord,
@@ -110,6 +113,7 @@ pub enum EnergyDispatchError {
     NoFeasiblePlan,
     SearchBudgetExceeded { nodes_visited: u64 },
     PlanIdentityMismatch,
+    ScenarioDigestMismatch,
     UnknownOffer,
     DuplicateAllocation,
     ZeroAllocation,
@@ -138,6 +142,7 @@ impl fmt::Display for EnergyDispatchError {
                 write!(f, "exact search budget exceeded after {nodes_visited} nodes")
             }
             Self::PlanIdentityMismatch => write!(f, "plan scenario ID or input digest does not match"),
+            Self::ScenarioDigestMismatch => write!(f, "scenario input digest does not match canonical scenario content"),
             Self::UnknownOffer => write!(f, "plan references an unknown source offer"),
             Self::DuplicateAllocation => write!(f, "plan allocates the same source offer more than once"),
             Self::ZeroAllocation => write!(f, "canonical plans may contain only positive allocations"),
@@ -151,6 +156,127 @@ impl fmt::Display for EnergyDispatchError {
 
 impl std::error::Error for EnergyDispatchError {}
 
+/// Calculate a domain-separated SHA-256 digest over the canonical scenario fields.
+///
+/// Demands and offers are sorted by their stable IDs; the input_digest field itself is
+/// excluded to avoid self-reference. Floating-point values are encoded by normalized
+/// IEEE-754 bits (negative zero is canonicalized to positive zero). Any schema change
+/// must use a new domain/version string.
+///
+/// This identifies exact declared inputs; it does not attest to their truth or validity.
+pub fn canonical_scenario_digest(
+    scenario: &CleanAirlineEnergyScenario,
+) -> Result<String, EnergyDispatchError> {
+    let mut validation_copy = scenario.clone();
+    validation_copy.input_digest = "canonicalization-validation-placeholder".to_owned();
+    validate_scenario(&validation_copy)?;
+
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"symthaea.clean-airline.energy-scenario.v1\0");
+    put_string(&mut bytes, &scenario.scenario_id);
+    put_string(&mut bytes, &scenario.currency_code);
+    put_f64(&mut bytes, scenario.quantum_kwh);
+    put_string(&mut bytes, &scenario.service.period_id);
+    put_string(&mut bytes, &scenario.service.lifecycle_boundary_id);
+    put_f64(&mut bytes, scenario.service.completed_passenger_km);
+    put_f64(&mut bytes, scenario.service.available_seat_km);
+
+    let mut demands = scenario.demands.iter().collect::<Vec<_>>();
+    demands.sort_by(|left, right| left.id.cmp(&right.id));
+    put_u32(&mut bytes, demands.len() as u32);
+    for demand in demands {
+        put_string(&mut bytes, &demand.id);
+        encode_carrier(&mut bytes, &demand.carrier);
+        put_u32(&mut bytes, demand.required_quanta);
+    }
+
+    let mut offers = scenario.offers.iter().collect::<Vec<_>>();
+    offers.sort_by(|left, right| left.id.cmp(&right.id));
+    put_u32(&mut bytes, offers.len() as u32);
+    for offer in offers {
+        put_string(&mut bytes, &offer.id);
+        put_string(&mut bytes, &offer.source_id);
+        encode_carrier(&mut bytes, &offer.carrier);
+        put_u32(&mut bytes, offer.capacity_quanta);
+        put_f64(&mut bytes, offer.cost_per_quantum);
+        put_f64(&mut bytes, offer.upstream_co2e_kg_per_quantum);
+        put_f64(&mut bytes, offer.direct_operational_co2e_kg_per_quantum);
+        put_string(&mut bytes, &offer.evidence_ref);
+        bytes.push(encode_evidence_class(offer.evidence_class));
+    }
+
+    let digest = Sha256::digest(&bytes);
+    let mut hex = String::with_capacity(7 + digest.len() * 2);
+    hex.push_str("sha256:");
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    Ok(hex)
+}
+
+/// Seal a mutable scenario with its canonical content digest.
+pub fn seal_scenario(
+    scenario: &mut CleanAirlineEnergyScenario,
+) -> Result<(), EnergyDispatchError> {
+    scenario.input_digest = canonical_scenario_digest(scenario)?;
+    Ok(())
+}
+
+/// Verify that the stored digest exactly identifies the current canonical scenario.
+pub fn verify_scenario_digest(
+    scenario: &CleanAirlineEnergyScenario,
+) -> Result<(), EnergyDispatchError> {
+    let expected = canonical_scenario_digest(scenario)?;
+    if scenario.input_digest != expected {
+        return Err(EnergyDispatchError::ScenarioDigestMismatch);
+    }
+    Ok(())
+}
+
+fn put_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn put_u64(bytes: &mut Vec<u8>, value: u64) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn put_string(bytes: &mut Vec<u8>, value: &str) {
+    put_u64(bytes, value.len() as u64);
+    bytes.extend_from_slice(value.as_bytes());
+}
+
+fn put_f64(bytes: &mut Vec<u8>, value: f64) {
+    let normalized = if value == 0.0 { 0.0 } else { value };
+    put_u64(bytes, normalized.to_bits());
+}
+
+fn encode_carrier(bytes: &mut Vec<u8>, carrier: &EnergyCarrier) {
+    match carrier {
+        EnergyCarrier::Electricity => bytes.push(0),
+        EnergyCarrier::Hydrogen => bytes.push(1),
+        EnergyCarrier::SustainableAviationFuel => bytes.push(2),
+        EnergyCarrier::SyntheticAviationFuel => bytes.push(3),
+        EnergyCarrier::FossilJetFuel => bytes.push(4),
+        EnergyCarrier::Other(name) => {
+            bytes.push(5);
+            put_string(bytes, name);
+        }
+    }
+}
+
+fn encode_evidence_class(class: EvidenceClass) -> u8 {
+    match class {
+        EvidenceClass::Measured => 0,
+        EvidenceClass::SupplierReported => 1,
+        EvidenceClass::LiteratureDerived => 2,
+        EvidenceClass::CalibratedModel => 3,
+        EvidenceClass::UncalibratedModel => 4,
+        EvidenceClass::Synthetic => 5,
+    }
+}
+
 /// Validate a plan independently of the search algorithm and recompute all reported
 /// ledger metrics from the frozen scenario and selected source offers.
 pub fn verify_energy_plan(
@@ -158,6 +284,7 @@ pub fn verify_energy_plan(
     plan: &EnergyPlan,
 ) -> Result<EvaluatedEnergyPlan, EnergyDispatchError> {
     validate_scenario(scenario)?;
+    verify_scenario_digest(scenario)?;
     if plan.scenario_id != scenario.scenario_id || plan.input_digest != scenario.input_digest {
         return Err(EnergyDispatchError::PlanIdentityMismatch);
     }
@@ -254,6 +381,7 @@ pub fn solve_exact_pareto(
     max_nodes: u64,
 ) -> Result<ExactParetoResult, EnergyDispatchError> {
     validate_scenario(scenario)?;
+    verify_scenario_digest(scenario)?;
     if max_nodes == 0 || max_nodes > MAX_SEARCH_NODES {
         return Err(EnergyDispatchError::InvalidSearchBudget);
     }
@@ -295,6 +423,7 @@ pub fn solve_cost_greedy(
     scenario: &CleanAirlineEnergyScenario,
 ) -> Result<EvaluatedEnergyPlan, EnergyDispatchError> {
     validate_scenario(scenario)?;
+    verify_scenario_digest(scenario)?;
     let mut remaining = demand_totals(scenario);
     let mut offers: Vec<&EnergySourceOffer> = scenario.offers.iter().collect();
     offers.sort_by(|left, right| {
