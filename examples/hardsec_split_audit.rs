@@ -1083,7 +1083,7 @@ mod tests {
     fn same_program_cannot_cross_splits() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[4][6] = "program-a".into();
+        fixture.rows[4][9] = "program-a".into();
         assert!(fixture.audit().unwrap_err().contains("crosses splits"));
     }
 
@@ -1247,7 +1247,7 @@ mod tests {
     fn one_source_artifact_cannot_be_assigned_to_two_splits() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        for field in [2usize, 3, 4, 6, 7, 8, 9, 10, 11] {
+        for field in [5usize, 6, 7, 9, 10, 11, 12, 13, 14] {
             fixture.rows[4][field] = fixture.rows[0][field].clone();
         }
         assert!(fixture.audit().unwrap_err().contains("inconsistent path, digest, or split"));
@@ -1266,6 +1266,36 @@ mod tests {
         assert!(audit_manifest(&manifest, &fixture.root)
             .unwrap_err()
             .contains("symlinks are not allowed"));
+    }
+
+    #[test]
+    fn altered_raw_corpus_bytes_fail_hash_check() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        let _ = fixture.write_manifest();
+        fs::write(
+            fixture.root.join("source-corpus.csv"),
+            "tampered-raw-source-corpus",
+        )
+        .unwrap();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("source corpus SHA-256 mismatch"));
+    }
+
+    #[test]
+    fn one_corpus_id_cannot_resolve_to_conflicting_paths() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        let alternate = fixture.root.join("alternate-corpus.csv");
+        fs::copy(fixture.root.join("source-corpus.csv"), &alternate).unwrap();
+        fixture.rows[1][3] = "alternate-corpus.csv".into();
+        fixture.rows[1][4] = sha256_file(&alternate).unwrap();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("source corpus"));
     }
 
     #[test]
@@ -1292,7 +1322,7 @@ mod tests {
     fn same_execution_cannot_cross_splits_under_another_holdout_protocol() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[4][7] = fixture.rows[0][7].clone();
+        fixture.rows[4][10] = fixture.rows[0][10].clone();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1305,7 +1335,7 @@ mod tests {
         add_balanced_program_holdout(&mut fixture);
         let bytes = fs::read(fixture.root.join("a.trace")).unwrap();
         fs::write(fixture.root.join("e.trace"), &bytes).unwrap();
-        fixture.rows[4][4] = sha256_file(&fixture.root.join("e.trace")).unwrap();
+        fixture.rows[4][7] = sha256_file(&fixture.root.join("e.trace")).unwrap();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1319,7 +1349,7 @@ mod tests {
         fs::write(fixture.root.join("b.trace"), fs::read(fixture.root.join("a.trace")).unwrap())
             .unwrap();
         let digest = sha256_file(&fixture.root.join("b.trace")).unwrap();
-        fixture.rows[1][4] = digest;
+        fixture.rows[1][7] = digest;
         let summary = fixture.audit().expect("same-split alias is not leakage");
         assert_eq!(summary.duplicate_content_aliases, 1);
     }
@@ -1360,8 +1390,8 @@ mod tests {
         add_balanced_program_holdout(&mut fixture);
         for row in &mut fixture.rows {
             row[1] = "gem5_sim".into();
-            row[11] = "NA".into();
-            row[12] = "instruction_mnemonics".into();
+            row[14] = "NA".into();
+            row[15] = "instruction_mnemonics".into();
         }
         let summary = fixture.audit().expect("valid instruction-only simulator manifest");
         assert_eq!(summary.domain, "gem5_sim");
@@ -1372,7 +1402,7 @@ mod tests {
     fn mixed_feature_modalities_cannot_share_one_manifest() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[5][12] = "instruction_mnemonics".into();
+        fixture.rows[5][15] = "instruction_mnemonics".into();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1385,7 +1415,7 @@ mod tests {
         add_balanced_program_holdout(&mut fixture);
         let bytes = fs::read(fixture.root.join("a.trace")).unwrap();
         fs::write(fixture.root.join("b.trace"), &bytes).unwrap();
-        fixture.rows[1][4] = sha256_file(&fixture.root.join("b.trace")).unwrap();
+        fixture.rows[1][7] = sha256_file(&fixture.root.join("b.trace")).unwrap();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1398,9 +1428,9 @@ mod tests {
         add_balanced_program_holdout(&mut fixture);
         for row in &mut fixture.rows {
             row[1] = "gem5_sim".into();
-            row[11] = "NA".into();
-            row[12] = "instruction_mnemonics".into();
-            row[14] = "counter_set_holdout".into();
+            row[14] = "NA".into();
+            row[15] = "instruction_mnemonics".into();
+            row[17] = "counter_set_holdout".into();
         }
         assert!(fixture
             .audit()
@@ -1412,7 +1442,7 @@ mod tests {
     fn telemetry_domain_requires_capture_and_counter_metadata() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[0][10] = "NA".into();
+        fixture.rows[0][13] = "NA".into();
         assert!(fixture.audit().unwrap_err().contains("capture_config_id is required"));
     }
 
@@ -1440,7 +1470,7 @@ mod tests {
             "attack",
         );
         let last = fixture.rows.len() - 1;
-        fixture.rows[last][13] = "success_observed".into();
+        fixture.rows[last][16] = "success_observed".into();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1462,7 +1492,7 @@ mod tests {
     fn benign_sample_cannot_claim_attack_success() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[1][13] = "success_observed".into();
+        fixture.rows[1][16] = "success_observed".into();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1473,7 +1503,7 @@ mod tests {
     fn duplicate_sample_ids_are_rejected() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[5][5] = fixture.rows[0][5].clone();
+        fixture.rows[5][8] = fixture.rows[0][8].clone();
         assert!(fixture.audit().unwrap_err().contains("duplicate sample_id"));
     }
 
