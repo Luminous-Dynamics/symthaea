@@ -29,5 +29,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake audit and frozen-prediction scorer
+      - name: Test intake audit, frozen-prediction scorer, and stopping snapshot audit
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
