@@ -56,9 +56,9 @@ Frozen sequences cover:
 - a high-importance-weight observation at W=100;
 - all-zero rewards.
 
-At every prefix, the implementation compares the streamed expansions against independent direct O(n) recomputation for v=0.00,0.05,...,1.00. It also invokes the parent optimizer on updated sufficient statistics and checks returned bets are feasible. Separate tests exercise quadratic, linear and no-real-root polynomial cases.
+At every prefix, the implementation compares the streamed expansions against independent direct O(n) recomputation for v=0.00,0.05,...,1.00. It also checks direct log wealth is at least the polynomial lower bound, enforces the per-step minimum wealth factor, and invokes the parent optimizer on updated sufficient statistics to check feasible returned bets. A fixed predictable-bet control creates an in-range threshold root and verifies direct wealth at that root and at lower candidate values. Separate tests exercise quadratic, linear and no-real-root polynomial cases.
 
-The run reports algebraic identity success, not statistical coverage. No interval endpoints are emitted or interpreted as a confidence sequence here.
+The run reports algebraic identity success and checks the lower-bound inequality against actual direct log wealth for every tested value and stream prefix. It emits polynomial roots only as diagnostics, with any in-range root checked against direct wealth on a fixed predictable-bet control. This tests the one-sided root certificate locally, but it does not implement persistent endpoint updates, a running intersection, or a two-tail interval. No statistical coverage is claimed.
 
 ## References and boundaries
 
