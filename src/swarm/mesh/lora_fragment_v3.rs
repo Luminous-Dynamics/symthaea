@@ -242,7 +242,7 @@ impl LoRaFragmentV3 {
 
     /// Parses a complete V3 frame, rejecting wrong magic/version, lengths, identity, flags and CRC.
     pub fn from_bytes(raw: &[u8]) -> Option<Self> {
-        if raw.len() < V3_HEADER_SIZE || raw[0..2] != V3_MAGIC {
+        if raw.len() < V3_HEADER_SIZE || raw[0] != V3_MAGIC[0] || raw[1] != V3_MAGIC[1] {
             return None;
         }
         let fragment_index = raw[2];
