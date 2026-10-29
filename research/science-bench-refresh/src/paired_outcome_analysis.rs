@@ -593,7 +593,8 @@ fn build_contrast(
             interval.map(|value| value.2),
         )
     };
-    let mcnemar_statistics = if inferential_tests_allowed && !is_resource && eligible_pair_count > 0 {
+    let mcnemar_statistics =
+        if inferential_tests_allowed && !is_resource && eligible_pair_count > 0 {
         Some(exact_mcnemar_statistics(wins, losses))
     } else {
         None
