@@ -495,6 +495,7 @@ pub fn score_atom_ablation_jsonl(
     let expected_fixture_sha256 = hex::encode(Sha256::digest(input_fixture_jsonl.as_bytes()));
     let mut fixture_evidence_keys = BTreeSet::<(String, String)>::new();
     let mut fixture_case_ids = BTreeSet::<String>::new();
+    let mut fixture_case_evidence = BTreeMap::<String, BTreeSet<String>>::new();
     let mut fixture_pair_cases = BTreeMap::<String, BTreeSet<String>>::new();
     for pair in &fixtures {
         fixture_pair_cases.insert(
@@ -503,6 +504,12 @@ pub fn score_atom_ablation_jsonl(
         );
         for case in &pair.cases {
             fixture_case_ids.insert(case.case_id.clone());
+            let case_evidence_ids: BTreeSet<_> = case
+                .evidence
+                .iter()
+                .map(|evidence| evidence.evidence_id.clone())
+                .collect();
+            fixture_case_evidence.insert(case.case_id.clone(), case_evidence_ids);
             for evidence in &case.evidence {
                 fixture_evidence_keys.insert((case.case_id.clone(), evidence.evidence_id.clone()));
             }
@@ -576,6 +583,25 @@ pub fn score_atom_ablation_jsonl(
                     "case {:?} is not a member of its labelled fixture pair {:?}",
                     case.case_id, pair.pair_id
                 ));
+            }
+            if !["answerable", "unanswerable"].contains(&case.answerability.as_str()) {
+                return Err(format!("unsupported answerability label {:?}", case.answerability));
+            }
+            if !["answer", "abstain", "refine"].contains(&case.expected_decision.as_str()) {
+                return Err(format!("unsupported expected decision {:?}", case.expected_decision));
+            }
+            require_trimmed("expected_claim", &case.expected_claim)?;
+            let available_evidence = fixture_case_evidence
+                .get(&case.case_id)
+                .expect("case belongs to input fixture");
+            for evidence_id in &case.supporting_evidence_ids {
+                require_trimmed("supporting evidence ID", evidence_id)?;
+                if !available_evidence.contains(evidence_id) {
+                    return Err(format!(
+                        "evaluator label for {:?} references absent support evidence {:?}",
+                        case.case_id, evidence_id
+                    ));
+                }
             }
             for target in case.atom_use_targets {
                 validate_atom_target(&target)?;
