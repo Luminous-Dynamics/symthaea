@@ -252,19 +252,28 @@ Pilot rules:
 
 Freeze definitions, scope, attack families, negative controls, metrics, and claim limits through review. This change is documentation only.
 
-### GCRB-1 — Machine-readable synthetic protocol
+### GCRB-1 — Machine-readable synthetic protocol (development tranche)
 
-The initial public-development fixture is now committed at `docs/research/fixtures/governance-capture-resistance-v0.1.json`. It contains 18 synthetic attack cases and eight benign hard negatives, with stable IDs, declared severity, deterministic seeds, expected dispositions, required behaviors, and forbidden behaviors.
+The public-development fixture is committed at `docs/research/fixtures/governance-capture-resistance-v0.1.json`, with 18 attack cases and eight benign control templates. The structural schema is `docs/research/fixtures/governance-capture-resistance-v0.1.schema.json` (JSON Schema Draft 2020-12).
 
-This is a public known-answer fixture for development and mutation testing—not a blind qualification corpus and not an empirical finding. Its embedded expected dispositions are intentionally public. It does not yet provide schema validation, a parameterized corpus large enough to support the proposed statistical targets, a separately controlled evaluator manifest, or an independent Rust runner.
+The isolated Rust crate now contains a deterministic SplitMix64-based generator for parameterized benign controls. For example:
 
-Next: formalize the schema; add seeded mutation generators and at least 1,000 parameterized benign-control episodes; freeze a distinct evaluator manifest and qualification set; compute release digests over precisely specified canonical bytes; and ensure candidate inputs cannot read the evaluator-only labels during blind evaluation.
+```bash
+cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls docs/research/fixtures/governance-capture-resistance-v0.1.json 1000 20261029 /tmp/gcrb-stress-1000.json
+```
+
+With that count and seed, the intended output contains 18 original attacks plus 1,000 seeded variants drawn from the eight declared benign-control families. The generated fixture records the generator version, master seed, count, algorithm, and the fact that expected answers remain public.
+
+**Statistical limitation:** 1,000 generated variants are not 1,000 independent real-world samples. They are correlated variations over eight authored families and can exercise parameter sensitivity, malformed-input handling, and benign/attack separation under a declared synthetic distribution. They cannot establish a real-world false-positive rate, external validity, or blind qualification.
+
+The current public schema and semantic validator check structure and declared counts; they do not create hidden labels, validate source truth, or provide an independent evaluator manifest. Next: pin a separate JSON Schema validator in reproducible tooling; add input/seed/config digests to a versioned report envelope; design an evaluator-owned event-trace oracle and hidden family templates; and keep candidate-visible public fixtures separate from held-out qualification material.
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and thirteen authored unit tests. The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and sixteen authored unit tests. The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
+- generates deterministic seeded parameterized controls while preserving the attack cases and recording generator metadata;
 - SHA-256 binds the candidate report to the exact fixture bytes, not a reserialized JSON object;
 - requires exactly one candidate result for each fixture case and rejects duplicate, missing, extra, malformed, repeated behavior labels, or mismatched records;
 - calculates public known-answer disposition agreement by case/class/family, required-behavior report coverage, candidate-reported forbidden behaviors, false high-severity escalations over benign controls, and candidate-reported hard-gate violation counts;
@@ -274,7 +283,13 @@ This is a deliberately narrow initial evaluator, not an independent action-trace
 
 Next: run formatting/compilation/tests at an environment with the toolchain, fix concrete failures without relaxing checks, and then separate candidate output from evaluator-owned event traces and held-out known answers. Do not attach a production or real-world efficacy claim to this prototype.
 
-### GCRB-3 — Cross-system adapters
+### GCRB-3 — Independent event trace and evaluation contract
+
+Before adding Symthaea/Mycelix/Symtropy runtime adapters, define a separate event-trace contract. Candidate systems should emit bounded actions and evidence references; a separately implemented evaluator should derive whether prohibited transitions occurred from the trace, not from a candidate-supplied violation list. Public expected dispositions must remain development data. Hidden family templates and final outcomes must live outside the candidate-visible input and be released only after the frozen evaluation is complete. A pass must identify the exact code, manifest, adapter and evaluator versions.
+
+This is the next substantive research gate because a self-reported candidate flag cannot prove its own absence.
+
+### GCRB-4 — Cross-system adapters
 
 - Mycelix: exact commitment/event/reference and appeal-history adapters.
 - Symthaea: evidence graph, counterclaim, uncertainty, and forecast adapters.
@@ -283,11 +298,11 @@ Next: run formatting/compilation/tests at an environment with the toolchain, fix
 
 Use typed references into existing owners; do not duplicate ledger, governance, policy, or simulation state machines.
 
-### GCRB-4 — Public retrospective corpus
+### GCRB-5 — Public retrospective corpus
 
 Select documented public cases with traceable records and sufficient ground truth. Use official adjudications and verifiable procedural facts; treat allegations and media claims as evidence to assess, not as established labels. Publish the coding guide and inter-reviewer disagreement.
 
-### GCRB-5 — Prospective civic pilot
+### GCRB-6 — Prospective civic pilot
 
 Only after the previous stages pass, undertake a bounded, independently reviewed pilot with a civil-society partner or public-interest auditor, using preregistered outcomes and a suitable comparison design.
 
