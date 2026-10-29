@@ -129,6 +129,8 @@ def validate_manifest(document: Any) -> dict[str, Any]:
     _nonblank(doc["normalization_id"], "normalization_id")
     _nonblank(doc["baseline_policy"], "baseline_policy")
     _nonblank(doc["sampling_unit"], "sampling_unit")
+    if doc["sampling_unit"] != "unit_id":
+        raise ValueError("sampling_unit must be unit_id; candidate and shift rows are nested observations")
     _nonblank(doc["independence_note"], "independence_note")
     target = _quality(doc["quality_target"], "quality_target")
     if target <= 0.0:
