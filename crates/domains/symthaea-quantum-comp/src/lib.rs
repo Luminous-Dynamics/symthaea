@@ -24,6 +24,7 @@
 
 pub mod api_inventory;
 pub mod active_experiment;
+pub mod robust_experiment;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -173,4 +174,9 @@ pub use quantum_utility::{
 pub use active_experiment::{
     ActiveExperimentProblem, DecisionExperiment, ExperimentDesignError, ExperimentRanking,
     ExperimentScore, OutcomeProbability,
+};
+
+pub use robust_experiment::{
+    rank_robust_experiments, RobustExperimentError, RobustExperimentRanking,
+    RobustExperimentScore, RobustModelScenario, ScenarioValue,
 };
