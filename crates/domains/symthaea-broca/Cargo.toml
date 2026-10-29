@@ -44,6 +44,7 @@ chrono = "0.4"
 md5 = "0.7"
 hex = "0.4"
 sha2 = "0.10"
+ed25519-dalek = { workspace = true } # Signed source and policy attestations
 sysinfo = "0.32"
 pqcrypto-dilithium = "0.5"
 pqcrypto-traits = "0.3"

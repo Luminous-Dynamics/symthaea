@@ -252,6 +252,14 @@ fn non_empty(value: &str, field: &str) -> Result<(), String> {
 }
 
 impl PolicyPinnedLedger {
+    /// Construct a ledger only from a batch whose policy and event signatures
+    /// have already been verified by an explicit trust store.
+    pub fn from_verified(
+        batch: crate::memory_attestation::VerifiedLedgerBatch,
+    ) -> Result<Self, String> {
+        Self::new(batch.policies, batch.events)
+    }
+
     pub fn new(
         policy_inputs: Vec<AuthorityPolicy>,
         event_inputs: Vec<LedgerEvent>,
