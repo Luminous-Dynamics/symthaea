@@ -126,7 +126,14 @@ A separate Audio Editing Challenge for ICASSP 2027 states that its submission SD
 - https://audio-editing-challenge.github.io/
 - https://audio-editing-challenge.github.io/leaderboard/
 
-As of 2026-10-29, those hidden-test submissions are not yet available. Do not claim challenge results in advance.
+The AudioEditSurvey repository's snapshot (checked 2026-10-29) reports several **different-scope** reference numbers:
+- On the original full MMAE single-model comparison, Step-Audio-EditX leads IFR at 44.86% and CR at 58.88%; Ming-UniAudio leads EMR at 3.20%.
+- The challenge's LLM-agent baseline (router + DSP + SAM-Audio + AuK) reports 7.45% EMR, 44.06% IFR, and 74.63% CR across all 2,000 cases.
+- AuK without Prompt Enhancer reports 7.58% EMR on a 1,003-case single-operation subset; Audio-Omni's 4.99% EMR is on a separate 801-case subset of clips up to 10 seconds.
+
+These figures are not one leaderboard table and must not be ranked against each other without matching evaluator version, task subset, model/tool versions and compute budget. MEL is not an audio editor today; they are references for a future ablation of **baseline agent vs the same agent + contract verifier vs the same agent + verifier-driven repair**. Source: https://github.com/MM-Speech/AudioEditSurvey#benchmarks.
+
+As of 2026-10-29, the challenge's hidden-test submission interface is not yet open. The published registration deadline was October 8; participation requires existing registration or explicit organizer permission. Do not claim challenge results in advance.
 
 ### How to compare without conflating tasks
 
