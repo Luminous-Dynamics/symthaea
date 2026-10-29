@@ -636,7 +636,7 @@ mod tests {
         let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::EligibleForHumanReview);
         assert!(report.blockers.is_empty());
-        assert_eq!(report.verified_roles, EvidenceRole::REQUIRED);
+        assert_eq!(report.verified_roles, EvidenceRole::REQUIRED.to_vec());
         assert_eq!(report.receipt_count, EvidenceRole::REQUIRED.len());
     }
 
@@ -673,7 +673,8 @@ mod tests {
         let manifest = manifest();
         let (mut receipts, anchors) = signed_receipts(&manifest);
         receipts.pop();
-        receipts.push(receipts[0].clone());
+        let duplicate = receipts[0].clone();
+        receipts.push(duplicate);
         let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::DuplicateReceiptRole { .. })));
