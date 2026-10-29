@@ -279,7 +279,12 @@ impl OpticalChannel {
     /// Probability of surviving the path and, if present, being detected.
     pub fn detected_survival_probability(&self) -> Result<f64, PhotonicEnvelopeError> {
         let transmission = self.transmission_probability()?;
-        Ok(transmission * self.detector_efficiency.unwrap_or(1.0))
+        if let Some(efficiency) = self.detector_efficiency {
+            validate_probability(efficiency, "detector efficiency")?;
+            Ok(transmission * efficiency)
+        } else {
+            Ok(transmission)
+        }
     }
 }
 
@@ -516,6 +521,15 @@ mod tests {
         assert!(transmission_probability(-0.1).is_err());
         assert!(transmission_probability(f64::NAN).is_err());
         assert!(transmission_probability(f64::INFINITY).is_err());
+    }
+
+    #[test]
+    fn direct_channel_method_rejects_invalid_public_field_values() {
+        let invalid = OpticalChannel {
+            insertion_loss_db: 0.0,
+            detector_efficiency: Some(1.1),
+        };
+        assert!(invalid.detected_survival_probability().is_err());
     }
 
     #[test]
