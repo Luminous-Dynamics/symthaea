@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Dependency-free tests for the Rust/Python binary digest contract."""
 
+import struct
 import unittest
 
 from validation.iit_digest_contract import (
+    MODEL_MAGIC,
     analysis_request_digest,
     canonical_model_bytes,
     evaluation_digest,
@@ -93,6 +95,28 @@ class IitDigestContractTests(unittest.TestCase):
         tpm, _ = fixture()
         with self.assertRaisesRegex(ValueError, "connectivity omits TPM influence"):
             canonical_model_bytes(tpm, [[1, 0], [1, 0]])
+
+    def test_raw_model_digest_rejects_invalid_encoded_probability(self):
+        encoded = bytearray(self.model_bytes)
+        offset = len(MODEL_MAGIC) + 4
+        encoded[offset:offset + 8] = struct.pack("<d", 1.5)
+        with self.assertRaisesRegex(ValueError, "invalid TPM probability"):
+            model_digest(bytes(encoded))
+
+    def test_raw_model_digest_rejects_nonbinary_connectivity(self):
+        encoded = bytearray(self.model_bytes)
+        n_units = 2
+        offset = len(MODEL_MAGIC) + 4 + (1 << n_units) * n_units * 8
+        encoded[offset] = 2
+        with self.assertRaisesRegex(ValueError, "connectivity is not binary"):
+            model_digest(bytes(encoded))
+
+    def test_raw_model_digest_rejects_noncanonical_negative_zero(self):
+        encoded = bytearray(self.model_bytes)
+        offset = len(MODEL_MAGIC) + 4
+        encoded[offset:offset + 8] = struct.pack("<d", -0.0)
+        with self.assertRaisesRegex(ValueError, "non-canonical negative zero"):
+            model_digest(bytes(encoded))
 
     def test_rejects_wrong_state_size_and_out_of_range_subset(self):
         with self.assertRaisesRegex(ValueError, "n_units binary bits"):
