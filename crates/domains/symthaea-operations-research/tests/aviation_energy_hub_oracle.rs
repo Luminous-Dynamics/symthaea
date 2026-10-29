@@ -9,6 +9,7 @@ use symthaea_operations_research::aviation_energy_hub::{
 fn storage(capacity: u32, charge: u32, discharge: u32, terminal: u32) -> EnergyStorageSpec {
     EnergyStorageSpec {
         capacity_quanta: capacity,
+        initial_soc_quanta: 0,
         max_charge_input_quanta_per_interval: charge,
         max_discharge_output_quanta_per_interval: discharge,
         charge_efficiency_ppm: 1_000_000,
@@ -309,6 +310,7 @@ fn storage_efficiency_uses_conservative_integer_rounding() {
     let mut case = frontier_scenario();
     case.storage = EnergyStorageSpec {
         capacity_quanta: 2,
+        initial_soc_quanta: 0,
         max_charge_input_quanta_per_interval: 4,
         max_discharge_output_quanta_per_interval: 1,
         charge_efficiency_ppm: 500_000,
