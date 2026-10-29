@@ -29,14 +29,15 @@ The selector's `complete=true` is layer 3 only. A payload-span digest establishe
 
 Store fixtures as deterministic UTF-8 JSONL. One row is one pair; a pair contains two independently executed cases. Use a fixed schema version and reject unknown fields in the generator/validator. The generator emits only the data needed for the memory write/query path. Any byte-range witnesses in this protocol are defined against the exact text payload supplied to the selector, not automatically against the original trajectory JSON or raw source bytes. Keep gold labels in a separate evaluator-only file inaccessible to the system under test.
 
-Proposed pair record:
+Canonical input corpus: `crates/domains/symthaea-broca/tests/fixtures/counterfactual-evidence-audit-v1.jsonl`. The current strict Rust schema includes an `as_of` timestamp and explicit `source_family`, `entity_id`, and `scope` on every evidence record. The example below is intentionally short; executable examples in the fixture file are authoritative for field names and mutation paths.
 
 ```json
 {
   "schema_version": "BROCA-COUNTERFACTUAL-EVIDENCE-AUDIT-V1",
   "pair_id": "negation-0001",
   "family": "polarity_negation",
-  "query": "Did the service recover after the restart?",
+  "query": "Did service svc-17 recover after restart?",
+  "as_of": "2026-10-29T12:00:00Z",
   "cases": [
     {
       "case_id": "negation-0001-a",
@@ -44,10 +45,12 @@ Proposed pair record:
         {
           "evidence_id": "event-1",
           "source_id": "source-1",
+          "source_family": "ops-ticket-17",
+          "entity_id": "svc-17",
           "scope": "prod-east",
-          "observed_at": "2026-01-02T10:00:00Z",
+          "observed_at": "2026-10-29T10:00:00Z",
           "valid_until": null,
-          "text": "After the restart, the service recovered."
+          "text": "After the restart, service svc-17 recovered."
         }
       ]
     },
@@ -57,21 +60,27 @@ Proposed pair record:
         {
           "evidence_id": "event-1",
           "source_id": "source-1",
+          "source_family": "ops-ticket-17",
+          "entity_id": "svc-17",
           "scope": "prod-east",
-          "observed_at": "2026-01-02T10:00:00Z",
+          "observed_at": "2026-10-29T10:00:00Z",
           "valid_until": null,
-          "text": "After the restart, the service did not recover."
+          "text": "After the restart, service svc-17 did not recover."
         }
       ]
     }
   ],
   "mutation": {
     "kind": "polarity_flip",
-    "changed_fields": ["evidence.text"],
-    "expected_decision_relation": "answer_claim_must_flip_or_be_rejected"
+    "changed_fields": ["evidence[0].text"],
+    "expected_decision_relation": "claim_must_flip_or_be_rejected"
   }
 }
 ```
+
+The `changed_fields` list uses exact structural paths from the validator. For a fixed-length evidence array, a text mutation is `evidence[0].text`; when list length changes, the list path `evidence` is declared. The validator rejects undeclared differences, extra differences, duplicate IDs, malformed timestamps, unknown fields, evaluator-label fields, and unsupported mutation families/relations.
+
+The evaluator-only labels are physically separate at `crates/domains/symthaea-broca/tests/fixtures/evaluator-only/counterfactual-evidence-audit-labels-v1.jsonl`. The production validator does not open this file. `CounterfactualPairFixture::runtime_case(index)` returns only query, as-of time, and evidence; it omits pair IDs, mutation metadata, expected decision relations, and all gold labels.
 
 This is an illustrative schema, not a released dataset example. Replace timestamps, identifiers, and evidence with synthetic or properly licensed material in committed fixtures. The evaluator-only label file should map each case ID to: answerability, the required claim(s), supporting/rebutting source spans, expected current state, expected action/abstention, and the applicable mutation invariant.
 
