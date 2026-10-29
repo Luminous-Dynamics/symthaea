@@ -27,17 +27,15 @@ These are small finite controls, not public datasets and not an empirical indust
 
 ## Endpoint and alpha semantics
 
-Use alpha_side=0.025 in each one-sided stream. Thus the quadratic lower-bound threshold is
+Use the paper's overall alpha=0.05 for each of the two half-initialized wealth processes. Each process starts at capital 1/2, so Ville's inequality allocates at most alpha/2=0.025 noncoverage to that side when it crosses 1/alpha. Equivalently, the uninitialized product-log wealth threshold is ln(2/alpha)=ln(40). The union bound across lower and upper sides is therefore 0.05. Do not pass alpha/2 into the stream as well as use the half-wealth threshold: that double-counts the hedge and makes the interval unnecessarily conservative.
 
-ln(2 / alpha_side) = ln(80).
-
-The factor 2 comes from the paper's half-wealth hedge. Allocating 0.025 to each one-sided confidence sequence gives a union-bound target of at most 0.05 simultaneous noncoverage, provided each side's martingale conditions and construction are correct. The code still measures joint exact-path coverage; it does not substitute the argument for evidence.
+The code still measures joint exact-path coverage; it does not substitute the argument for evidence.
 
 After each observation:
 1. evaluate roots for the lower stream on (w,r) and the complement stream on (w,1-r);
 2. consider the largest real root in [0,1];
 3. before advancing an endpoint, independently recompute the polynomial and the direct log wealth for the recorded predictable bets;
-4. require the root residual to equal ln(80), the direct log wealth to exceed the threshold, and each second-coordinate bet to be nonnegative;
+4. require the root residual to equal ln(40), the direct log wealth to exceed the threshold, and each second-coordinate bet to be nonnegative;
 5. update the lower endpoint monotonically, and update the upper endpoint as one minus the complement's lower endpoint;
 6. choose next bets only after the current sample has been observed.
 
