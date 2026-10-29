@@ -1,11 +1,12 @@
 //! VIS-DVPC-046: multiplicity-aware, anytime-valid multi-policy selection.
 //!
-//! Eight comparators share exact logged trajectories:
+//! Nine comparators share exact logged trajectories:
 //!   0..5: pointwise/anytime-valid confidence-sequence baselines;
 //!   6: fixed-horizon pCRP-star LCBs (conservative fixed-bet-grid approximation);
-//!   7: fixed-horizon Logarithmic Smoothing LCBs.
+//!   7: fixed-horizon Logarithmic Smoothing LCBs;
+//!   8: fixed-horizon safe LS lambda-grid selection with a union-bound correction.
 //!
-//! Methods 6 and 7 are evaluated only at registered looks and are NOT anytime-valid.
+//! Methods 6..8 are evaluated only at registered looks and are NOT anytime-valid.
 //! A best-policy certificate requires one lower bound to exceed every competitor's upper
 //! bound; empty/reversed intervals fail closed.
 #![deny(unsafe_code)]
@@ -770,8 +771,8 @@ mod tests{
     fn ls_constant_profile_matches_closed_form() {
         let mut profile=ScoreProfile::default();
         for _ in 0..64 { profile.push(0.4).unwrap(); }
-        let delta=0.01;
-        let w_max=1.5;
+        let delta: f64 = 0.01;
+        let w_max: f64 = 1.5;
         let n=profile.n as f64;
         let lambda=(2.0*(1.0/delta).ln()/(n*w_max*w_max)).sqrt();
         let expected=(((lambda*0.4).ln_1p() - (1.0/delta).ln()/n).exp_m1()/lambda)
