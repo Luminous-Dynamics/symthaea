@@ -1,0 +1,62 @@
+name: VIS-DVPC-044 predictor control-variate wealth-floor audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-044-control-variate-feasibility-audit.rs"
+      - "docs/research/VIS_DVPC_044_CONTROL_VARIATE_FEASIBILITY_AUDIT_V1.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-044-control-variate-feasibility-audit.rs"
+      - "docs/research/VIS_DVPC_044_CONTROL_VARIATE_FEASIBILITY_AUDIT_V1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact predictor audit
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run all Rust tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-044-control-variate-feasibility-audit.rs -o /tmp/vis-dvpc-044-tests
+          /tmp/vis-dvpc-044-tests
+      - name: Run frozen predictor and wealth-floor controls
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-044-control-variate-feasibility-audit.rs -o /tmp/vis-dvpc-044
+          /tmp/vis-dvpc-044 > /tmp/vis-dvpc-044-results.tsv
+          test "$(grep -c '^PREDICTOR_CASE' /tmp/vis-dvpc-044-results.tsv)" = "45"
+          test "$(grep -c '^ACTION' /tmp/vis-dvpc-044-results.tsv)" = "10"
+          test "$(grep -c '^CASE' /tmp/vis-dvpc-044-results.tsv)" = "5"
+          test "$(grep -c '^LEGACY_WITNESS' /tmp/vis-dvpc-044-results.tsv)" = "5"
+          test "$(grep -c '^SAFE_REGION' /tmp/vis-dvpc-044-results.tsv)" = "2"
+          test "$(grep -c '^SAFE_BET_OPTIMIZER' /tmp/vis-dvpc-044-results.tsv)" = "5"
+          grep -Fq $'LEGACY_WITNESS\tfeasible_under_encoded_constraints\ttrue' /tmp/vis-dvpc-044-results.tsv
+          grep -Fq $'LEGACY_WITNESS\tactual_minimum_factor\t0.455000000000' /tmp/vis-dvpc-044-results.tsv
+          grep -Fq $'LEGACY_WITNESS\tviolates_half_wealth_floor\ttrue' /tmp/vis-dvpc-044-results.tsv
+          grep -Fq $'SAFE_REGION\twitness_rejected\ttrue' /tmp/vis-dvpc-044-results.tsv
+          awk -F '\t' '$1=="PREDICTOR_CASE" && $3=="true_value" { truth[$2]=$4 } $1=="PREDICTOR_CASE" && $3=="adjusted_mean" { if (($4-truth[$2])>0.00000001 || (truth[$2]-$4)>0.00000001) exit 1; n++ } END { if (n != 5) exit 1 }' /tmp/vis-dvpc-044-results.tsv
+      - name: Create exact source and output receipt
+        run: |
+          {
+            printf 'VIS_DVPC_044_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-044-control-variate-feasibility-audit.rs /tmp/vis-dvpc-044-results.tsv
+          } > /tmp/vis-dvpc-044-receipt.tsv
+          cat /tmp/vis-dvpc-044-receipt.tsv
+      - name: Publish predictor feasibility report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-044-control-variate-feasibility-audit
+          path: |
+            /tmp/vis-dvpc-044-results.tsv
+            /tmp/vis-dvpc-044-receipt.tsv
+          retention-days: 90
