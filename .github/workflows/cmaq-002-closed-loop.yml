@@ -25,7 +25,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.96.0
       - name: Unit tests
         run: cargo test --locked
-      - name: Known-answer smoke fixture
+      - name: Exact-model known-answer fixture
         run: |
-          cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exact.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-002-actual.tsv
-          diff -u fixtures/expected.tsv /tmp/cmaq-002-actual.tsv
+          cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exact.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-002-exact.tsv
+          diff -u fixtures/expected.tsv /tmp/cmaq-002-exact.tsv
+      - name: Optimizer-exploitation negative control
+        run: |
+          cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exploit.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-002-exploit.tsv
+          diff -u fixtures/expected-exploit.tsv /tmp/cmaq-002-exploit.tsv

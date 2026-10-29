@@ -12,7 +12,8 @@ From this directory, use Rust 1.96.0:
 
 - Test: cargo test --locked
 - Format check: cargo fmt -- --check
-- Score the smoke fixture: cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exact.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv
+- Score the exact-model fixture: cargo run --locked -- --environment fixtures/environment.tsv --model fixtures/model-exact.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv
+- Score the optimizer-exploitation negative control by replacing model-exact.tsv with model-exploit.tsv. It should select the overvalued branch and report constrained regret 3400 milli-utility and a model-to-rollout optimism gap of 7000.
 
 The program emits a deterministic TSV with one row per task. The command requires four inputs: the ground-truth deterministic transition table, candidate predictions for every state-action pair, evaluator-owned support counts, and task start/horizon settings. A duplicate, missing, or unknown key, malformed probability, unsupported state identifier, or out-of-range setting fails closed.
 

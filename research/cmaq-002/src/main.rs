@@ -105,7 +105,7 @@ fn read_tsv(path: &str, expected_header: &[&str]) -> Result<Vec<Vec<String>>, St
     let mut lines = contents.lines();
     let header = lines.next().ok_or_else(|| format!("{path} is empty"))?;
     let actual_header: Vec<&str> = header.split('\t').collect();
-    if actual_header != expected_header {
+    if actual_header.as_slice() != expected_header {
         return Err(format!(
             "{path} header mismatch: expected {}, got {}",
             expected_header.join("\t"),
