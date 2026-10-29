@@ -204,6 +204,10 @@ fn make_dataset(seed: u64, factors: usize, radius: i32) -> Result<Dataset, Strin
     let contexts = (-(radius)..=radius)
         .flat_map(|x| (-(radius)..=radius).map(move |y| (x, y)))
         .collect::<Vec<_>>();
+    // Keep intervention assignment independent from the hidden world parameters.
+    // Shuffle contexts per supported factor pair, then allocate actions round-robin
+    // so action coverage is balanced without a fixed feature-to-action formula.
+    let mut intervention_rng = SplitMix64::new(seed ^ 0x494E_5445_5256_454E);
 
     for left in 0..factors {
         for right in 0..factors {
@@ -213,12 +217,13 @@ fn make_dataset(seed: u64, factors: usize, radius: i32) -> Result<Dataset, Strin
             }
 
             if !held_out {
-                for &(x, y) in &contexts {
-                    let action = (left * 31
-                        + right * 17
-                        + usize::try_from(x + radius).map_err(|_| "invalid x feature")? * 7
-                        + usize::try_from(y + radius).map_err(|_| "invalid y feature")? * 11)
-                        % ACTIONS;
+                let mut pair_contexts = contexts.clone();
+                for index in (1..pair_contexts.len()).rev() {
+                    let swap_index = (intervention_rng.next_u64() % ((index + 1) as u64)) as usize;
+                    pair_contexts.swap(index, swap_index);
+                }
+                for (context_index, &(x, y)) in pair_contexts.iter().enumerate() {
+                    let action = context_index % ACTIONS;
                     let reward = world.reward(left, right, x, y, action);
                     let safe = world.safe(left, right, x, y, action);
                     let success = world.success(left, right, x, y, action);
@@ -448,6 +453,7 @@ mod tests {
         let first = make_dataset(4_242, 8, 2).expect("valid configuration");
         let second = make_dataset(4_243, 8, 2).expect("valid configuration");
         assert_ne!(first.files.get("answer-key.tsv"), second.files.get("answer-key.tsv"));
+        assert_ne!(first.files.get("support-observations.tsv"), second.files.get("support-observations.tsv"));
         assert_ne!(first.files.get("manifest.json"), second.files.get("manifest.json"));
     }
 
@@ -504,13 +510,22 @@ mod tests {
         let dataset = make_dataset(7, 8, 2).expect("valid configuration");
         let support = text(&dataset, "support-observations.tsv");
         let mut actions = std::collections::HashSet::new();
+        let mut pair_action_counts: BTreeMap<(usize, usize), [usize; ACTIONS]> = BTreeMap::new();
         for line in support.lines().skip(1) {
             let fields: Vec<&str> = line.split('\t').collect();
+            let left: usize = fields[1].parse().expect("left factor");
+            let right: usize = fields[2].parse().expect("right factor");
             let action: usize = fields[5].parse().expect("chosen action");
             actions.insert(action);
+            pair_action_counts.entry((left, right)).or_insert([0; ACTIONS])[action] += 1;
             assert_eq!(fields.len(), 9);
         }
         assert_eq!(actions, [0usize, 1, 2].into_iter().collect());
+        for counts in pair_action_counts.values() {
+            let min_count = *counts.iter().min().expect("three action counts");
+            let max_count = *counts.iter().max().expect("three action counts");
+            assert!(max_count - min_count <= 1, "per-pair actions must be balanced: {counts:?}");
+        }
         assert!(!support.contains("reward_a0_milli"));
         assert!(!support.contains("safe_a0"));
         assert!(!support.contains("outcome_a0"));
