@@ -19,7 +19,7 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-const HEADER: [&str; 15] = [
+const HEADER: [&str; 16] = [
     "dataset_id",
     "domain",
     "source_artifact_id",
@@ -32,6 +32,7 @@ const HEADER: [&str; 15] = [
     "device_config_id",
     "capture_config_id",
     "counter_set_id",
+    "security_outcome",
     "split_protocol",
     "split",
     "label",
@@ -58,6 +59,7 @@ struct Sample {
     device_config_id: String,
     capture_config_id: String,
     counter_set_id: String,
+    security_outcome: String,
     split_protocol: String,
     split: String,
     label: String,
@@ -218,9 +220,10 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             device_config_id: values[9].clone(),
             capture_config_id: values[10].clone(),
             counter_set_id: values[11].clone(),
-            split_protocol: values[12].clone(),
-            split: values[13].clone(),
-            label: values[14].clone(),
+            security_outcome: values[12].clone(),
+            split_protocol: values[13].clone(),
+            split: values[14].clone(),
+            label: values[15].clone(),
         });
     }
 
@@ -307,6 +310,21 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         if !["benign", "attack"].contains(&sample.label.as_str()) {
             return Err(format!(
                 "line {line_number}: label must be benign or attack"
+            ));
+        }
+        let valid_outcome = match sample.label.as_str() {
+            "benign" => sample.security_outcome == "not_applicable",
+            "attack" => [
+                "success_observed",
+                "failed_observed",
+                "unknown",
+            ]
+            .contains(&sample.security_outcome.as_str()),
+            _ => false,
+        };
+        if !valid_outcome {
+            return Err(format!(
+                "line {line_number}: security_outcome is incompatible with the workload label"
             ));
         }
         *split_counts
@@ -591,6 +609,7 @@ mod tests {
                 device_config_id.into(),
                 capture_config_id.into(),
                 counter_set_id.into(),
+                if label == "benign" { "not_applicable" } else { "unknown" }.into(),
                 split_protocol.into(),
                 split.into(),
                 label.into(),
