@@ -533,7 +533,7 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
         OutcomeTerminalStatusV1::Contaminated | OutcomeTerminalStatusV1::BudgetViolation => {
             if record.evaluator_record_sha256.is_none() {
                 issues.push(format!(
-                    "{label} has a non-scoreable disposition but lacks an evaluator disposition digest"
+                    "{label} lacks an evaluator disposition digest"
                 ));
             }
             if record.response_status == OutcomeResponseStatusV1::NoResponse {
