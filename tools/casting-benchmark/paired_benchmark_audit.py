@@ -19,7 +19,7 @@ from typing import Any, Sequence
 SCHEMA_VERSION = "1.0.0"
 BENCHMARK_ID = "CASTING-PAIRED-COST-001"
 TOP_FIELDS = frozenset({
-    "schema_version", "benchmark_id", "protocol_sha256", "normalization_id",
+    "schema_version", "benchmark_id", "evidence_class", "protocol_sha256", "normalization_id",
     "baseline_policy", "quality_target", "sampling_unit", "independence_note",
     "bootstrap_replicates", "bootstrap_seed", "runs",
 })
@@ -125,6 +125,8 @@ def validate_manifest(document: Any) -> dict[str, Any]:
         raise ValueError(f"schema_version must be {SCHEMA_VERSION}")
     if doc["benchmark_id"] != BENCHMARK_ID:
         raise ValueError(f"benchmark_id must be {BENCHMARK_ID}")
+    if doc["evidence_class"] not in {"synthetic", "public_analytic", "simulator_backed", "physical"}:
+        raise ValueError("evidence_class must be synthetic, public_analytic, simulator_backed, or physical")
     _sha256(doc["protocol_sha256"], "protocol_sha256")
     _nonblank(doc["normalization_id"], "normalization_id")
     _nonblank(doc["baseline_policy"], "baseline_policy")
@@ -329,8 +331,9 @@ def _paired_effect(
     if not differences:
         return {
             "n_paired_units": 0, "mean_delta": None, "median_delta": None,
-            "wins": 0, "ties": 0, "losses": 0, "win_rate_excluding_ties": None,
-            "bootstrap_95pct_ci_win_rate": None,
+            "wins": 0, "ties": 0, "losses": 0, "win_rate_all_units": None,
+            "win_rate_excluding_ties": None, "bootstrap_95pct_ci_win_rate_all_units": None,
+            "bootstrap_95pct_ci_win_rate_excluding_ties": None,
             "bootstrap_95pct_ci_mean_delta": None, "bootstrap_95pct_ci_median_delta": None,
         }
     wins = sum(value > tie_tolerance for value in differences)
@@ -349,13 +352,24 @@ def _paired_effect(
         estimates.sort()
         return [_quantile(estimates, 0.025), _quantile(estimates, 0.975)] if estimates else None
 
+    def bootstrap_all_unit_win_rate() -> list[float]:
+        estimates = []
+        count = len(differences)
+        for _ in range(replicates):
+            sample = [differences[rng.randrange(count)] for _ in range(count)]
+            estimates.append(sum(value > tie_tolerance for value in sample) / count)
+        estimates.sort()
+        return [_quantile(estimates, 0.025), _quantile(estimates, 0.975)]
+
     return {
         "n_paired_units": len(differences),
         "mean_delta": statistics.mean(differences),
         "median_delta": statistics.median(differences),
         "wins": wins, "ties": ties, "losses": losses,
+        "win_rate_all_units": wins / len(differences),
         "win_rate_excluding_ties": wins / n_not_tied if n_not_tied else None,
-        "bootstrap_95pct_ci_win_rate": bootstrap_win_rate() if n_not_tied else None,
+        "bootstrap_95pct_ci_win_rate_all_units": bootstrap_all_unit_win_rate(),
+        "bootstrap_95pct_ci_win_rate_excluding_ties": bootstrap_win_rate() if n_not_tied else None,
         "bootstrap_95pct_ci_mean_delta": _bootstrap_interval(
             differences, replicates=replicates, rng=rng, statistic="mean"
         ),
@@ -520,9 +534,20 @@ def analyze_manifest(document: Any) -> dict[str, Any]:
                 - metrics[unit_id][baseline]["worst_shift_quality"]
                 for unit_id in family_ids
             ]
+            family_relative_deltas = []
+            family_relative_excluded = 0
+            for family_unit_id in family_ids:
+                base_auc = metrics[family_unit_id][baseline]["cost_normalized_quality_auc"]
+                cand_auc = metrics[family_unit_id][policy_id]["cost_normalized_quality_auc"]
+                if base_auc > 0.0:
+                    family_relative_deltas.append((cand_auc - base_auc) / base_auc)
+                else:
+                    family_relative_excluded += 1
             per_family[family] = {
                 "unit_count": len(family_ids),
                 "auc_delta": _paired_effect(family_deltas, replicates=reps, rng=rng),
+                "relative_auc_improvement": _paired_effect(family_relative_deltas, replicates=reps, rng=rng),
+                "relative_auc_excluded_zero_baseline_units": family_relative_excluded,
                 "worst_shift_quality_delta": _paired_effect(family_worst_deltas, replicates=reps, rng=rng),
             }
         comparisons[policy_id] = {
@@ -547,9 +572,19 @@ def analyze_manifest(document: Any) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "benchmark_id": BENCHMARK_ID,
+        "evidence_class": manifest["evidence_class"],
         "receipt_label": "PAIRED_MATCHED_COST_COMPARISON_NOT_PHYSICAL_CERTIFICATION",
         "baseline_policy": baseline,
         "protocol_sha256": manifest["protocol_sha256"],
+        "policy_provenance": {
+            policy_id: {
+                "policy_source_sha256": units[sorted(units)[0]][policy_id]["policy_source_sha256"].lower(),
+                "policy_config_sha256": units[sorted(units)[0]][policy_id]["policy_config_sha256"].lower(),
+                "environment_sha256": units[sorted(units)[0]][policy_id]["environment_sha256"].lower(),
+                "suite_manifest_sha256": units[sorted(units)[0]][policy_id]["suite_manifest_sha256"].lower(),
+            }
+            for policy_id in policies
+        },
         "policy_ids": policies,
         "unit_count": len(units),
         "shift_ids": manifest["shift_ids"],
