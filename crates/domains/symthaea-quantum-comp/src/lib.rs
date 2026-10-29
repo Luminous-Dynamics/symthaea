@@ -43,6 +43,7 @@ pub mod matrix;
 pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
+pub mod photonic_architecture;
 pub mod preflight;
 pub mod presets;
 pub mod probe;
@@ -112,6 +113,10 @@ pub use matrix::{
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
+pub use photonic_architecture::{
+    OpticalChannel, PhotonicEnvelopeError, PhotonicPrimitiveEnvelope, PrimitiveEnvelopeEstimate,
+    ProbabilityInterval, multiplexed_source_success_probability, transmission_probability,
+};
 pub use preflight::{
     PreflightFinding, PreflightReport, PreflightSeverity, preflight_binding_config,
     preflight_comparative_config, preflight_matrix_config, preflight_noise_sweep_config,
