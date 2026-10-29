@@ -126,13 +126,14 @@ If pilot variance suggests these thresholds are inappropriate, revise them befor
 
 ## Execution order
 
-1. Finish scorer tests and receipt contract in `research/cmaq-001/`.
-2. Reconcile companion PR #8886's factor-composition generator with the scorer branch; then extend it beyond one additive law to held-out causal-law families, regime shifts, stale evidence, and partial observability.
-3. Replace the smoke receipt's caller-supplied verification bit with an authenticated recorder identity/signature and action/outcome digest binding before any production integration.
-4. Add the scorer adapter for generated agent cases and evaluator-only keys.
-5. Run negative controls (shuffled action/outcome labels, stale revisions, altered receipts, missing source IDs) and baseline sanity checks.
-6. Compare all ablations on held-out mechanism families, then run mapped public comparators under frozen common protocols.
-7. Keep the PR draft until exact-head tests pass and the result bundle is bound to the exact candidate SHA.
+1. Execute the focused Rust tests and smoke workflows for both the receipt-bound action scorer and `src/bin/score_world_model.rs` on the exact candidate head.
+2. Reconcile companion PR #8886's factor-composition generator with this scoring branch; extend it beyond one additive law to held-out causal-law families, regime shifts, stale evidence, and partial observability.
+3. Replace the smoke receipt's caller-supplied verification bit with an authenticated recorder identity/signature and action/outcome digest binding before production integration.
+4. Add the adapter that turns generated agent-visible cases into candidate predictions and keeps the evaluator key inaccessible to the candidate.
+5. Run negative controls (shuffled action/outcome labels, stale revisions, altered receipts, factor-ID permutation, action-ranking inversion, and missing source IDs) and baseline sanity checks.
+6. Compare all ablations on held-out mechanism families; for world-model claims, add multi-step closed-loop rollouts, policy ranking, fixed-budget policy lift, and adversarial search for optimistic model exploitation.
+7. Map every claim to external comparators (AMA-Bench, MemoryArena, WorldTest/AutumnBench, and relevant memory/world-model suites) and reproduce each under its published protocol rather than comparing raw cross-benchmark scores.
+8. Keep the PR draft until exact-head tests pass and every result bundle is bound to the exact candidate SHA.
 
 ## Current evidence state
 
