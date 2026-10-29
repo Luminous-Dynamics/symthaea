@@ -245,6 +245,18 @@
         "missing or ambiguous logs remain unresolved and cannot be dropped from the denominator"
       ]
     },
+    "two_sided_oracle_control_replay_coverage_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Share of scored tasks with an evaluator-pinned replay from the frozen source revision where the empty baseline demonstrates a test-level failure and the reference patch passes every preregistered test command.",
+      "requirements": [
+        "source revision, test bundle, reference patch, command manifest and verifier are pinned out of band",
+        "both arms start from the same clean source revision and use identical independent test bytes",
+        "baseline failures require actual test-start and fail-summary markers; startup failures and timeouts are unresolved",
+        "reference passes every command and the baseline has at least one test-level failure",
+        "protected runner separately attests network/resource isolation and execution identity"
+      ]
+    },
     "requirement_source_item_coverage_pct": {
       "target": 100,
       "status": "target_not_measured",
@@ -352,6 +364,12 @@
       "eligible": false,
       "status": "not_measured",
       "reason": "Per-test baseline expectations are implemented in draft PR #8801, but the exact-head suite has not passed and no locked confirmatory cohort has been evaluated."
+    },
+    "two_sided_oracle_control_replay_coverage_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The replay verifier and synthetic integration tests are draft work in PR #8859; no independently pinned scored-task cohort has a successful exact-head replay with protected runner attestation."
     },
     "requirement_source_item_coverage_pct": {
       "value": null,
@@ -468,6 +486,23 @@
         "freeze expected status values before observing the candidate outcome",
         "unknown, missing, ambiguous, or mismatched test results remain unresolved or failed and cannot be dropped",
         "report overall two-sided baseline/reference gate separately from per-test alignment",
+        "composite_weighted_score is false"
+      ],
+      "composite_weighted_score": false
+    },
+    "two_sided_oracle_control_replay_coverage": {
+      "formula": "scored tasks with a valid pinned empty-baseline/reference-patch replay / all scored tasks assigned to the locked cohort",
+      "pass_requirements": [
+        "the control manifest, source revision, independent test bundle, reference patch and verifier match evaluator-supplied pins",
+        "empty baseline has at least one actual test-level failure and every reference command passes",
+        "test bundle bytes are identical across both source worktrees and cannot overwrite source files",
+        "raw combined output is retained and hashed for each command",
+        "protected runner attests isolation, resource limits and execution provenance outside this analysis-only tool"
+      ],
+      "denominator_rules": [
+        "freeze the task inventory and all oracle-control pins before candidate evaluation",
+        "missing artifacts, startup failures, timeouts, marker ambiguity or patch-application errors remain unresolved and cannot be omitted",
+        "this metric is necessary but not sufficient for benchmark-score eligibility",
         "composite_weighted_score is false"
       ],
       "composite_weighted_score": false
