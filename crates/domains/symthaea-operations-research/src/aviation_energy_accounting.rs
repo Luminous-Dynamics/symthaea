@@ -52,8 +52,8 @@ pub enum NonCo2Evidence {
 
 /// One non-overlapping energy-use accounting row.
 ///
-/// \`source_energy_kwh\` is the energy of the declared carrier procured at the chosen
-/// boundary; \`delivered_energy_kwh\` is energy of that same carrier delivered to the
+/// `source_energy_kwh` is the energy of the declared carrier procured at the chosen
+/// boundary; `delivered_energy_kwh` is energy of that same carrier delivered to the
 /// declared service boundary after distribution/storage losses. Both must use the
 /// same carrier-energy convention. Upstream emissions include the declared upstream
 /// lifecycle stages exactly once; direct emissions cover the declared operational
@@ -63,6 +63,7 @@ pub enum NonCo2Evidence {
 pub struct EnergyRecord {
     pub id: String,
     pub boundary_id: String,
+    pub lifecycle_boundary_id: String,
     pub period_id: String,
     pub evidence_ref: String,
     pub evidence_class: EvidenceClass,
@@ -80,6 +81,7 @@ pub struct EnergyRecord {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TransportService {
     pub period_id: String,
+    pub lifecycle_boundary_id: String,
     pub completed_passenger_km: f64,
     pub available_seat_km: f64,
 }
@@ -102,13 +104,25 @@ pub enum NonCo2ObservationKind {
     },
 }
 
-/// Independently recomputable aggregates. \`accounted_lifecycle_co2e_kg\` is only
+/// Per-record provenance retained in the summary so aggregation does not erase evidence maturity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordEvidence {
+    pub record_id: String,
+    pub boundary_id: String,
+    pub evidence_ref: String,
+    pub evidence_class: EvidenceClass,
+    pub carrier: EnergyCarrier,
+}
+
+/// Independently recomputable aggregates. `accounted_lifecycle_co2e_kg` is only
 /// the sum of the declared upstream + direct CO2e fields. It is not a complete
 /// climate-impact score and does not include the separate non-CO2 observations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AccountingSummary {
     pub period_id: String,
+    pub lifecycle_boundary_id: String,
     pub currency_code: String,
+    pub record_evidence: Vec<RecordEvidence>,
     pub total_source_energy_kwh: f64,
     pub total_delivered_energy_kwh: f64,
     pub upstream_co2e_kg: f64,
@@ -136,6 +150,7 @@ pub enum AccountingError {
     CurrencyMismatch,
     InvalidCurrencyCode,
     PeriodMismatch,
+    LifecycleBoundaryMismatch,
     InvalidServiceDenominator,
     NoDeliveredEnergy,
     InvalidNonCo2Evidence,
@@ -157,6 +172,7 @@ impl fmt::Display for AccountingError {
             Self::CurrencyMismatch => write!(f, "ledger records use different currencies"),
             Self::InvalidCurrencyCode => write!(f, "currency code must be three uppercase ASCII letters"),
             Self::PeriodMismatch => write!(f, "ledger and transport service periods do not match"),
+            Self::LifecycleBoundaryMismatch => write!(f, "ledger records and service use different lifecycle boundaries"),
             Self::InvalidServiceDenominator => {
                 write!(f, "passenger-km and seat-km denominators must be finite and positive")
             }
@@ -182,6 +198,7 @@ pub fn account_energy_ledger(
         return Err(AccountingError::EmptyLedger);
     }
     require_identifier(&service.period_id, "service period id")?;
+    require_identifier(&service.lifecycle_boundary_id, "service lifecycle boundary id")?;
     require_positive_finite(service.completed_passenger_km, "completed passenger-km")?;
     require_positive_finite(service.available_seat_km, "available seat-km")?;
 
@@ -196,11 +213,13 @@ pub fn account_energy_ledger(
     let mut total_cost = 0.0;
     let mut non_co2_not_assessed_record_ids = Vec::new();
     let mut non_co2_observations = Vec::new();
+    let mut record_evidence = Vec::new();
 
     for record in records {
         require_identifier(&record.id, "record id")?;
         require_identifier(&record.boundary_id, "accounting boundary id")?;
         require_identifier(&record.period_id, "record period id")?;
+        require_identifier(&record.lifecycle_boundary_id, "record lifecycle boundary id")?;
         require_identifier(&record.evidence_ref, "evidence reference")?;
 
         if !record_ids.insert(record.id.as_str()) {
@@ -211,6 +230,9 @@ pub fn account_energy_ledger(
         }
         if record.period_id != service.period_id {
             return Err(AccountingError::PeriodMismatch);
+        }
+        if record.lifecycle_boundary_id != service.lifecycle_boundary_id {
+            return Err(AccountingError::LifecycleBoundaryMismatch);
         }
 
         if record.currency_code.len() != 3
@@ -288,6 +310,13 @@ pub fn account_energy_ledger(
                 });
             }
         }
+        record_evidence.push(RecordEvidence {
+            record_id: record.id.clone(),
+            boundary_id: record.boundary_id.clone(),
+            evidence_ref: record.evidence_ref.clone(),
+            evidence_class: record.evidence_class,
+            carrier: record.carrier.clone(),
+        });
     }
 
     if total_delivered_energy_kwh <= 0.0 {
@@ -312,11 +341,14 @@ pub fn account_energy_ledger(
 
     non_co2_not_assessed_record_ids.sort();
     non_co2_observations.sort_by(|left, right| left.record_id.cmp(&right.record_id));
+    record_evidence.sort_by(|left, right| left.record_id.cmp(&right.record_id));
 
     let currency_code = currency.ok_or(AccountingError::MissingIdentifier("currency code"))?;
     Ok(AccountingSummary {
         period_id: service.period_id.clone(),
+        lifecycle_boundary_id: service.lifecycle_boundary_id.clone(),
         currency_code: currency_code.to_owned(),
+        record_evidence,
         total_source_energy_kwh,
         total_delivered_energy_kwh,
         upstream_co2e_kg,
