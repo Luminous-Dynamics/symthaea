@@ -11,10 +11,10 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 serde = { workspace = true }
 sha2 = { workspace = true }
+# Runtime serialization for content-bound verification receipts.
+serde_json = { workspace = true }
 
 [dev-dependencies]
-# Spec JSON round-trip test.
-serde_json = { workspace = true }
 # Only for the standalone `render_wav` example — a tiny self-contained synth so
 # a Score can be HEARD without pulling in muse's heavy (wgpu) synthesis stack.
 hound = { workspace = true }
