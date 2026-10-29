@@ -21,7 +21,7 @@ RECEIPT_LABEL = "TASK_LEVEL_SPLIT_CONFORMAL_FEASIBILITY_SCREEN_NOT_PHYSICAL_SAFE
 EVIDENCE_CLASSES = {"synthetic", "public_analytic", "simulator_backed", "physical"}
 CONFIG_FIELDS = frozenset({
     "schema_version", "config_id", "evidence_class", "policy_source_sha256",
-    "policy_config_sha256", "alpha", "minimum_calibration_tasks_per_stratum",
+    "policy_config_sha256", "candidate_pool_sha256", "alpha", "minimum_calibration_tasks_per_stratum",
     "maximum_descriptor_distance", "frozen_before_outcome_unseal",
 })
 CALIBRATION_FIELDS = frozenset({
@@ -96,6 +96,11 @@ def _unit_distance(left: Sequence[float], right: Sequence[float]) -> float:
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)) / len(left))
 
 
+def _candidate_pool_digest(candidate_ids: Sequence[str]) -> str:
+    encoded = json.dumps(list(candidate_ids), separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def validate_config(raw: Any) -> dict[str, Any]:
     config = _strict_object(raw, CONFIG_FIELDS, "config")
     if config["schema_version"] != SCHEMA_VERSION:
@@ -105,6 +110,7 @@ def validate_config(raw: Any) -> dict[str, Any]:
         raise ValueError("config evidence_class is unsupported")
     _sha256(config["policy_source_sha256"], "policy_source_sha256")
     _sha256(config["policy_config_sha256"], "policy_config_sha256")
+    _sha256(config["candidate_pool_sha256"], "candidate_pool_sha256")
     alpha = _finite(config["alpha"], "alpha")
     if not 0.0 < alpha < 0.5:
         raise ValueError("alpha must be in (0, 0.5)")
@@ -155,6 +161,7 @@ def validate_calibration(raw: Any, config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("calibration tasks must be a non-empty array")
     task_ids: set[str] = set()
     descriptor_size: int | None = None
+    candidate_pool_roster: list[str] | None = None
     for ti, item in enumerate(tasks):
         task = _strict_object(item, CALIBRATION_TASK_FIELDS, f"calibration.tasks[{ti}]")
         task_id = _nonblank(task["task_id"], f"calibration.tasks[{ti}].task_id")
@@ -172,14 +179,22 @@ def validate_calibration(raw: Any, config: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(rows, list) or not rows:
             raise ValueError(f"calibration.tasks[{ti}].rows must be non-empty")
         row_ids: set[str] = set()
+        task_roster: list[str] = []
         for ri, raw_row in enumerate(rows):
             row = _strict_object(raw_row, CALIBRATION_ROW_FIELDS, f"calibration.tasks[{ti}].rows[{ri}]")
             cid = _nonblank(row["candidate_id"], f"calibration.tasks[{ti}].rows[{ri}].candidate_id")
             if cid in row_ids:
                 raise ValueError(f"duplicate candidate_id within calibration task {task_id}: {cid}")
             row_ids.add(cid)
+            task_roster.append(cid)
             _finite(row["predicted_margin"], f"calibration.tasks[{ti}].rows[{ri}].predicted_margin")
             _finite(row["observed_margin"], f"calibration.tasks[{ti}].rows[{ri}].observed_margin")
+        if candidate_pool_roster is None:
+            candidate_pool_roster = task_roster
+        elif task_roster != candidate_pool_roster:
+            raise ValueError("calibration tasks must share the same ordered frozen candidate pool")
+    if candidate_pool_roster is None or _candidate_pool_digest(candidate_pool_roster) != config["candidate_pool_sha256"].lower():
+        raise ValueError("candidate pool roster digest does not match frozen config")
     return manifest
 
 
@@ -202,6 +217,7 @@ def validate_targets(raw: Any, config: dict[str, Any], calibration: dict[str, An
         raise ValueError("target prediction tasks must be a non-empty array")
     calibration_ids = {task["task_id"] for task in calibration["tasks"]}
     target_ids: set[str] = set()
+    calibration_roster = [row["candidate_id"] for row in calibration["tasks"][0]["rows"]]
     descriptor_size = len(calibration["tasks"][0]["descriptor"])
     for ti, item in enumerate(tasks):
         task = _strict_object(item, TARGET_TASK_FIELDS, f"target.tasks[{ti}]")
@@ -220,13 +236,17 @@ def validate_targets(raw: Any, config: dict[str, Any], calibration: dict[str, An
         if not isinstance(predictions, list) or not predictions:
             raise ValueError(f"target.tasks[{ti}].predictions must be a non-empty array")
         candidate_ids: set[str] = set()
+        target_roster: list[str] = []
         for pi, prediction in enumerate(predictions):
             row = _strict_object(prediction, TARGET_PREDICTION_FIELDS, f"target.tasks[{ti}].predictions[{pi}]")
             cid = _nonblank(row["candidate_id"], f"target.tasks[{ti}].predictions[{pi}].candidate_id")
             if cid in candidate_ids:
                 raise ValueError(f"duplicate target candidate_id in task {task_id}: {cid}")
             candidate_ids.add(cid)
+            target_roster.append(cid)
             _finite(row["predicted_margin"], f"target.tasks[{ti}].predictions[{pi}].predicted_margin")
+        if target_roster != calibration_roster:
+            raise ValueError("target task must use the exact frozen calibration candidate-pool roster")
     return manifest
 
 
