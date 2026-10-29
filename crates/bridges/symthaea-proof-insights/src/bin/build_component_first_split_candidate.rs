@@ -280,9 +280,10 @@ fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>
         bail!("cannot allocate an empty component set");
     }
     if units.len() < 4 {
-        bail!(
-            "at least four independent components are required to populate all three floor-based candidate splits"
-        );
+        bail!(concat!(
+            "at least four independent components are required to populate ",
+            "all three floor-based candidate splits"
+        ));
     }
     let mut component_ids = BTreeSet::new();
     let mut family_ids = BTreeSet::new();
@@ -546,11 +547,15 @@ fn execute() -> Result<()> {
         },
         "heldout_component_floor": {
             "minimum_components_per_validation_and_test": MIN_HELDOUT_COMPONENTS,
-            "minimum_total_components_needed_under_70_15_15_quotas": minimum_total_components_for_heldout_floor,
+            "minimum_total_components_needed_under_70_15_15_quotas":
+                minimum_total_components_for_heldout_floor,
             "validation_component_count": target_component_counts[1],
             "test_component_count": target_component_counts[2],
             "met": heldout_component_floor_met,
-            "meaning": "structural sample-size floor only; not a power guarantee or confirmatory qualification"
+            "meaning": concat!(
+                "structural sample-size floor only; not a power guarantee or ",
+                "confirmatory qualification"
+            )
         },
         "allocation_diagnostics": {
             "family_share_by_split": {
@@ -566,13 +571,19 @@ fn execute() -> Result<()> {
             "max_absolute_family_share_error": max_absolute_family_share_error,
             "max_absolute_component_share_error": max_absolute_component_share_error,
             "family_balance_objective": "sum over splits of squared relative deviation between achieved and target family counts",
-            "family_balance_optimum": "deterministic one-swap local optimum; not guaranteed globally optimal"
+            "family_balance_optimum": concat!(
+                "deterministic one-swap local optimum; ",
+                "not guaranteed globally optimal"
+            )
         },
         "source_v0_partition_digest_sha256": V0_PARTITION,
         "family_universe_sha256": candidate_family_universe_sha256,
         "source_split_manifest_sha256": sha256(&split_bytes),
         "source_component_manifest_sha256": sha256(&component_bytes),
-        "relationship_inventory_sha256": required_str(&component_doc, "relationship_inventory_sha256")?,
+        "relationship_inventory_sha256": required_str(
+            &component_doc,
+            "relationship_inventory_sha256",
+        )?,
         "candidate_partition_digest_sha256": partition_digest(&new_assignments),
         "source_inventory_status": required_str(&component_doc, "relationship_inventory_status")?,
         "source_receipt_verification_status": component_doc["coverage_receipt_verification_status"],
@@ -583,7 +594,10 @@ fn execute() -> Result<()> {
             "The v0 relationship inventory and receipt are bound to the old split digest.",
             "A successor receipt contract must authenticate the complete sorted family universe and relationship inventory independently of any train/validation/test assignment.",
             "A confirmatory verifier must independently re-verify the new receipt and reconstruct the full hard-component graph from the signed inventory.",
-            "Freeze the successor protocol, allocation, target eligibility audit, and power plan before any model outcomes are observed."
+            concat!(
+                "Freeze the successor protocol, allocation, target eligibility audit, ",
+                "and power plan before any model outcomes are observed."
+            )
         ],
         "components": component_family_rows,
         "families": family_rows
