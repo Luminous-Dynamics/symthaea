@@ -25,9 +25,11 @@ from typing import Any
 HEX = re.compile(r"^[a-f0-9]{64}$")
 REVISION = re.compile(r"^[a-f0-9]{40}$")
 COMMAND_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+SECRET_ENV_NAME = re.compile(r"(TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|ACCESS_KEY|PRIVATE_KEY|AUTHORIZATION)", re.IGNORECASE)
 TOP_KEYS = {"schema_version", "commands"}
 COMMAND_KEYS = {
-    "command_id", "argv", "working_directory", "timeout_seconds",
+    "command_id", "argv", "environment", "working_directory", "timeout_seconds",
     "test_start_pattern", "pass_pattern", "fail_pattern",
 }
 
@@ -99,6 +101,16 @@ def validate_manifest(value: Any) -> list[dict[str, Any]]:
         if (not isinstance(argv, list) or not argv
                 or any(not isinstance(arg, str) or not arg or "\x00" in arg for arg in argv)):
             raise ControlError(f"{label}.argv must be a non-empty list of non-empty strings")
+        environment = row["environment"]
+        if not isinstance(environment, dict):
+            raise ControlError(f"{label}.environment must be a complete explicit environment map")
+        for key, value in environment.items():
+            if not isinstance(key, str) or not ENV_NAME.fullmatch(key):
+                raise ControlError(f"{label}.environment contains an invalid environment variable name")
+            if SECRET_ENV_NAME.search(key):
+                raise ControlError(f"{label}.environment must not contain secret-bearing variable names")
+            if not isinstance(value, str) or "\x00" in value:
+                raise ControlError(f"{label}.environment values must be NUL-free strings")
         cwd = row["working_directory"]
         if not isinstance(cwd, str) or "\\" in cwd or "\x00" in cwd:
             raise ControlError(f"{label}.working_directory must be a canonical POSIX relative path")
@@ -123,6 +135,26 @@ def validate_manifest(value: Any) -> list[dict[str, Any]]:
     return checked
 
 
+def git_process_environment() -> dict[str, str]:
+    """Drop ambient Git overrides and external protocols for trusted checkout operations."""
+    env = {
+        key: value for key, value in os.environ.items()
+        if not key.startswith("GIT_") and not key.startswith("GIT_CONFIG_")
+    }
+    env.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ALLOW_PROTOCOL": "file",
+    })
+    return env
+
+
+def command_environment(environment: dict[str, str]) -> dict[str, str]:
+    """Return exactly the evaluator-pinned command environment, without ambient variables."""
+    return dict(environment)
+
+
 def _git(source: Path, *args: str) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         ["git", "-C", str(source), "-c", "core.hooksPath=/dev/null", *args],
@@ -133,6 +165,7 @@ def _git(source: Path, *args: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
         timeout=60,
+        env=git_process_environment(),
     )
     if result.returncode != 0:
         raise ControlError(f"git {' '.join(args)} failed ({result.returncode}): {result.stdout[-2000:]}")
@@ -252,7 +285,7 @@ def _initialize_isolated_checkout(source_repo: Path, revision: str, destination:
     init = subprocess.run(
         ["git", "init", "-q", str(destination)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-        text=True, encoding="utf-8", errors="replace", timeout=60,
+        text=True, encoding="utf-8", errors="replace", timeout=60, env=git_process_environment(),
     )
     if init.returncode != 0:
         raise ControlError(f"cannot initialize isolated checkout: {init.stdout[-2000:]}")
@@ -262,7 +295,7 @@ def _initialize_isolated_checkout(source_repo: Path, revision: str, destination:
          "fetch", "--no-tags", "--depth=1", "--no-recurse-submodules",
          str(source_repo), revision],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-        text=True, encoding="utf-8", errors="replace", timeout=120,
+        text=True, encoding="utf-8", errors="replace", timeout=120, env=git_process_environment(),
     )
     if fetch.returncode != 0:
         raise ControlError(f"cannot fetch only the pinned source revision into isolated checkout: {fetch.stdout[-2000:]}")
@@ -359,6 +392,7 @@ def _run_arm(
                 encoding="utf-8",
                 errors="replace",
                 shell=False,
+                env=command_environment(command["environment"]),
             )
             output = completed.stdout
             returncode: int | None = completed.returncode
@@ -392,6 +426,8 @@ def _run_arm(
             "argv": command["argv"],
             "working_directory": command["working_directory"],
             "timeout_seconds": command["timeout_seconds"],
+            "environment_names": sorted(command["environment"]),
+            "environment_sha256": digest(json.dumps(command["environment"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")),
             "return_code": returncode,
             "timed_out": combined_timeout,
             "test_start_seen": start_seen,
@@ -472,7 +508,7 @@ def run_two_sided_controls(
             ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
              "apply", "--check", "--whitespace=error", str(patch_file)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-            text=True, encoding="utf-8", errors="replace", timeout=60,
+            text=True, encoding="utf-8", errors="replace", timeout=60, env=git_process_environment(),
         )
         if check.returncode != 0:
             raise ControlError(f"reference patch does not apply cleanly to locked revision: {check.stdout[-2000:]}")
@@ -480,7 +516,7 @@ def run_two_sided_controls(
             ["git", "-C", str(reference), "-c", "core.hooksPath=/dev/null",
              "apply", "--whitespace=error", str(patch_file)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-            text=True, encoding="utf-8", errors="replace", timeout=60,
+            text=True, encoding="utf-8", errors="replace", timeout=60, env=git_process_environment(),
         )
         if apply.returncode != 0:
             raise ControlError(f"reference patch application failed: {apply.stdout[-2000:]}")
