@@ -39,6 +39,7 @@ fn storage(initial_soc: u32) -> EnergyStorageSpec {
     EnergyStorageSpec {
         capacity_quanta: 1,
         initial_soc_quanta: initial_soc,
+        initial_soc_ledger_ref: if initial_soc == 0 { "none:opening-soc" } else { "synthetic:external-opening-inventory-ledger-v1" }.to_owned(),
         max_charge_input_quanta_per_interval: 1,
         max_discharge_output_quanta_per_interval: 1,
         charge_efficiency_ppm: 1_000_000,
