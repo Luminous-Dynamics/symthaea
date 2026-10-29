@@ -37,6 +37,7 @@ jobs:
           test "$(grep -c '^CASE' /tmp/vis-dvpc-044-results.tsv)" = "5"
           test "$(grep -c '^LEGACY_WITNESS' /tmp/vis-dvpc-044-results.tsv)" = "5"
           test "$(grep -c '^SAFE_REGION' /tmp/vis-dvpc-044-results.tsv)" = "2"
+          test "$(grep -c '^SAFE_BET_OPTIMIZER' /tmp/vis-dvpc-044-results.tsv)" = "5"
           grep -Fq $'LEGACY_WITNESS\tfeasible_under_encoded_constraints\ttrue' /tmp/vis-dvpc-044-results.tsv
           grep -Fq $'LEGACY_WITNESS\tactual_minimum_factor\t0.455000000000' /tmp/vis-dvpc-044-results.tsv
           grep -Fq $'LEGACY_WITNESS\tviolates_half_wealth_floor\ttrue' /tmp/vis-dvpc-044-results.tsv
