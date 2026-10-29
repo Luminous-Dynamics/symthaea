@@ -675,9 +675,16 @@ mod tests {
         let bytes = serde_json::to_vec(&doc).expect("serialize fixture");
         assert!(parse_candidate_split(&bytes).is_err());
 
-        let mut bad_digest: Value = serde_json::from_slice(SYNTHETIC_SPLIT).expect("valid JSON fixture");
+        let mut bad_digest: Value =
+            serde_json::from_slice(SYNTHETIC_SPLIT).expect("valid JSON fixture");
         bad_digest["candidate_partition_digest_sha256"] = json!("0".repeat(64));
         let bytes = serde_json::to_vec(&bad_digest).expect("serialize fixture");
+        assert!(parse_candidate_split(&bytes).is_err());
+
+        let mut bad_quotas: Value = serde_json::from_slice(&candidate_with_correct_digest())
+            .expect("valid candidate fixture");
+        bad_quotas["component_count_by_split"]["train"] = json!(3);
+        let bytes = serde_json::to_vec(&bad_quotas).expect("serialize fixture");
         assert!(parse_candidate_split(&bytes).is_err());
     }
 }
