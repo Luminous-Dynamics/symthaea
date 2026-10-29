@@ -35,6 +35,8 @@ pub enum MultiFidelityLandscape {
     RankReversal,
     /// Early scores favor a misleading feature prior; signal improves gradually with fidelity.
     LateEmergingQuality,
+    /// Rank-preserving mean signal but deliberately under-reported uncertainty.
+    MiscalibratedUncertainty,
 }
 
 /// One paired trial comparing multi-fidelity promotion and full-fidelity random search.
@@ -58,6 +60,14 @@ pub struct MultiFidelityRun {
     /// Spearman rank correlation between F0 scores and the known full-fidelity oracle.
     /// This is diagnostic-only and is available because this is a synthetic test.
     pub f0_quality_spearman: f64,
+    /// Fraction of F0 residuals within 1.96 times the declared standard error.
+    /// Empirical synthetic diagnostic; not a substitute for a calibrated confidence interval.
+    pub f0_nominal_95_coverage: f64,
+    /// Mean absolute F0 residual divided by the declared standard error.
+    pub f0_mean_absolute_standardized_residual: f64,
+    /// Complete audit trace for policy and baseline evaluations. Oracle fields are scored
+    /// post hoc and are never passed into the promotion policy.
+    pub candidate_trace: Vec<MultiFidelityTraceEvent>,
 }
 
 /// Aggregate of paired seeds; standard deviations use sample denominator n - 1.
@@ -74,8 +84,35 @@ pub struct MultiFidelityAggregate {
     pub promotion_global_optimum_hit_rate: f64,
     pub random_global_optimum_hit_rate: f64,
     pub mean_f0_quality_spearman: f64,
+    pub mean_f0_nominal_95_coverage: f64,
+    pub mean_f0_absolute_standardized_residual: f64,
     pub mean_promoted_full_fidelity_count: f64,
     pub mean_random_full_fidelity_count: f64,
+}
+
+/// Which experiment arm produced an auditable trace event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MultiFidelityArm {
+    PromotionPolicy,
+    FullFidelityRandom,
+}
+
+/// One candidate/fidelity measurement. The oracle fields are post-hoc synthetic diagnostics;
+/// the promotion policy receives only candidate ID, fidelity index, observed score and SE.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MultiFidelityTraceEvent {
+    pub arm: MultiFidelityArm,
+    pub candidate_id: String,
+    pub fidelity_index: usize,
+    pub fidelity_id: String,
+    pub observed_score: f64,
+    pub reported_standard_error: f64,
+    pub expected_fidelity_score: f64,
+    pub oracle_full_quality: f64,
+    pub noise_scale: f64,
+    pub incremental_cost_units: u64,
+    pub promoted_to_next_fidelity: bool,
 }
 
 /// Four cumulative-cost levels. The full-fidelity run is 64 synthetic cost units.
@@ -137,14 +174,15 @@ pub fn run_multi_fidelity_trial(
         .collect();
     let f0_quality_spearman = spearman(&f0_scores, &true_scores);
 
-    // Promotion decisions only see observations from the current fidelity. No later-rung
-    // or oracle score is passed into the policy.
+    let mut candidate_trace = Vec::with_capacity(candidates.len() + 128);
+    // Promotion decisions only see observations from the current fidelity. Oracle quality,
+    // expected scores and noise metadata are attached only to the post-hoc output trace.
     for fidelity_index in 0..(levels.len() - 1) {
         let observations: Vec<FidelityObservation> = active
             .iter()
             .copied()
             .map(|candidate| {
-                let (mean_score, standard_error) =
+                let (mean_score, standard_error, _, _) =
                     score_at_fidelity(candidate, landscape, fidelity_index, seed);
                 FidelityObservation {
                     candidate_id: candidate.id(),
@@ -168,6 +206,35 @@ pub fn run_multi_fidelity_trial(
         )
         .map_err(|error| format!("fidelity {fidelity_index} promotion failed: {error}"))?;
 
+        let promoted_ids: HashSet<&str> = decision
+            .promoted_candidate_ids
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let rung_incremental_cost = if fidelity_index == 0 {
+            levels[fidelity_index].cumulative_cost_units
+        } else {
+            levels[fidelity_index].cumulative_cost_units
+                - levels[fidelity_index - 1].cumulative_cost_units
+        };
+        for candidate in &active {
+            let (observed_score, reported_standard_error, expected_fidelity_score, noise_scale) =
+                score_at_fidelity(*candidate, landscape, fidelity_index, seed);
+            candidate_trace.push(MultiFidelityTraceEvent {
+                arm: MultiFidelityArm::PromotionPolicy,
+                candidate_id: candidate.id(),
+                fidelity_index,
+                fidelity_id: levels[fidelity_index].id.clone(),
+                observed_score,
+                reported_standard_error,
+                expected_fidelity_score,
+                oracle_full_quality: evaluate_candidate(*candidate, quality_landscape).quality,
+                noise_scale,
+                incremental_cost_units: rung_incremental_cost,
+                promoted_to_next_fidelity: promoted_ids.contains(candidate.id().as_str()),
+            });
+        }
+
         total_cost = total_cost
             .checked_add(decision.estimated_incremental_cost_units)
             .ok_or_else(|| "promotion cost overflow".to_owned())?;
@@ -188,6 +255,25 @@ pub fn run_multi_fidelity_trial(
         return Err("synthetic scheduler produced no full-fidelity candidates".to_owned());
     }
 
+    // Charge the finalists' final rung and retain their actual full-fidelity observations.
+    for candidate in &active {
+        let quality = evaluate_candidate(*candidate, quality_landscape).quality;
+        candidate_trace.push(MultiFidelityTraceEvent {
+            arm: MultiFidelityArm::PromotionPolicy,
+            candidate_id: candidate.id(),
+            fidelity_index: levels.len() - 1,
+            fidelity_id: levels[levels.len() - 1].id.clone(),
+            observed_score: quality,
+            reported_standard_error: 0.0,
+            expected_fidelity_score: quality,
+            oracle_full_quality: quality,
+            noise_scale: 0.0,
+            incremental_cost_units: levels[levels.len() - 1].cumulative_cost_units
+                - levels[levels.len() - 2].cumulative_cost_units,
+            promoted_to_next_fidelity: false,
+        });
+    }
+
     // The baseline spends exactly the same cost budget on full-fidelity candidates. Because
     // all synthetic full runs have fixed cost 64, this baseline evaluates floor(budget/64)
     // candidates sampled without replacement, and charges the unused remainder as unused.
@@ -198,12 +284,58 @@ pub fn run_multi_fidelity_trial(
     let mut random_candidates = candidates.clone();
     shuffle_candidates(&mut random_candidates, seed ^ 0xa076_1d64_78bd_642f);
     random_candidates.truncate(random_full_fidelity_count.min(random_candidates.len()));
+    for candidate in &random_candidates {
+        let quality = evaluate_candidate(*candidate, quality_landscape).quality;
+        candidate_trace.push(MultiFidelityTraceEvent {
+            arm: MultiFidelityArm::FullFidelityRandom,
+            candidate_id: candidate.id(),
+            fidelity_index: levels.len() - 1,
+            fidelity_id: levels[levels.len() - 1].id.clone(),
+            observed_score: quality,
+            reported_standard_error: 0.0,
+            expected_fidelity_score: quality,
+            oracle_full_quality: quality,
+            noise_scale: 0.0,
+            incremental_cost_units: FULL_COST,
+            promoted_to_next_fidelity: false,
+        });
+    }
 
     let promotion_best = best_candidate(&active, quality_landscape)?;
     let random_best = best_candidate(&random_candidates, quality_landscape)?;
     let promotion_best_quality = evaluate_candidate(promotion_best, quality_landscape).quality;
     let random_best_quality = evaluate_candidate(random_best, quality_landscape).quality;
     let global_quality = oracle.global_optimum_quality;
+    let f0_trace: Vec<&MultiFidelityTraceEvent> = candidate_trace
+        .iter()
+        .filter(|event| {
+            event.arm == MultiFidelityArm::PromotionPolicy && event.fidelity_index == 0
+        })
+        .collect();
+    let f0_nominal_95_coverage = if f0_trace.is_empty() {
+        0.0
+    } else {
+        f0_trace
+            .iter()
+            .filter(|event| {
+                (event.observed_score - event.expected_fidelity_score).abs()
+                    <= 1.96 * event.reported_standard_error
+            })
+            .count() as f64
+            / f0_trace.len() as f64
+    };
+    let f0_mean_absolute_standardized_residual = if f0_trace.is_empty() {
+        0.0
+    } else {
+        f0_trace
+            .iter()
+            .map(|event| {
+                (event.observed_score - event.expected_fidelity_score).abs()
+                    / event.reported_standard_error.max(f64::MIN_POSITIVE)
+            })
+            .sum::<f64>()
+            / f0_trace.len() as f64
+    };
 
     Ok(MultiFidelityRun {
         landscape,
@@ -222,6 +354,9 @@ pub fn run_multi_fidelity_trial(
         promotion_hit_global_optimum: optimum_ids.contains(promotion_best.id().as_str()),
         random_hit_global_optimum: optimum_ids.contains(random_best.id().as_str()),
         f0_quality_spearman,
+        f0_nominal_95_coverage,
+        f0_mean_absolute_standardized_residual,
+        candidate_trace,
     })
 }
 
@@ -293,6 +428,18 @@ pub fn run_multi_fidelity_sweep(
                 .map(|run| run.f0_quality_spearman)
                 .collect::<Vec<_>>(),
         ),
+        mean_f0_nominal_95_coverage: mean(
+            &runs
+                .iter()
+                .map(|run| run.f0_nominal_95_coverage)
+                .collect::<Vec<_>>(),
+        ),
+        mean_f0_absolute_standardized_residual: mean(
+            &runs
+                .iter()
+                .map(|run| run.f0_mean_absolute_standardized_residual)
+                .collect::<Vec<_>>(),
+        ),
         mean_promoted_full_fidelity_count: mean(
             &runs
                 .iter()
@@ -311,7 +458,9 @@ pub fn run_multi_fidelity_sweep(
 
 fn quality_landscape(landscape: MultiFidelityLandscape) -> SyntheticLandscape {
     match landscape {
-        MultiFidelityLandscape::RankPreserving | MultiFidelityLandscape::LateEmergingQuality => {
+        MultiFidelityLandscape::RankPreserving
+        | MultiFidelityLandscape::LateEmergingQuality
+        | MultiFidelityLandscape::MiscalibratedUncertainty => {
             SyntheticLandscape::SmoothTradeoff
         }
         MultiFidelityLandscape::RankReversal => SyntheticLandscape::Deceptive,
@@ -327,7 +476,7 @@ fn score_at_fidelity(
     landscape: MultiFidelityLandscape,
     fidelity_index: usize,
     seed: u64,
-) -> (f64, f64) {
+) -> (f64, f64, f64, f64) {
     let quality = evaluate_candidate(candidate, quality_landscape(landscape)).quality;
     let target_distance = 0.12 * (3.0 - candidate.width as f64).abs()
         + 0.11 * (2.0 - candidate.depth as f64).abs()
@@ -355,6 +504,14 @@ fn score_at_fidelity(
             2 => (0.25 * misleading_prior + 0.75 * quality, 0.010, 0.008),
             _ => (quality, 0.0, 0.0),
         },
+        MultiFidelityLandscape::MiscalibratedUncertainty => match fidelity_index {
+            // Same expected ranking as the rank-preserving case, but the reported error is
+            // deliberately far too small relative to the injected score perturbation.
+            0 => (0.65 * quality + 0.35 * target_prior, 0.035, 0.001),
+            1 => (0.82 * quality + 0.18 * target_prior, 0.020, 0.001),
+            2 => (0.96 * quality + 0.04 * target_prior, 0.008, 0.001),
+            _ => (quality, 0.0, 0.0),
+        },
     };
 
     let key = candidate
@@ -369,7 +526,12 @@ fn score_at_fidelity(
     ) * noise_scale;
     let heteroscedastic = ((key % 3) as f64) * 0.004;
     let standard_error = (base_error + heteroscedastic).max(0.0);
-    ((expected + noise).clamp(0.0, 1.0), standard_error)
+    (
+        (expected + noise).clamp(0.0, 1.0),
+        standard_error,
+        expected.clamp(0.0, 1.0),
+        noise_scale,
+    )
 }
 
 fn best_candidate(
@@ -532,6 +694,35 @@ mod tests {
         let reversal =
             run_multi_fidelity_trial(MultiFidelityLandscape::RankReversal, 29).unwrap();
         assert!(preserving.f0_quality_spearman > reversal.f0_quality_spearman);
+    }
+
+    #[test]
+    fn miscalibrated_uncertainty_is_detectable_from_empirical_coverage() {
+        let miscalibrated =
+            run_multi_fidelity_trial(MultiFidelityLandscape::MiscalibratedUncertainty, 29).unwrap();
+        let preserving =
+            run_multi_fidelity_trial(MultiFidelityLandscape::RankPreserving, 29).unwrap();
+        assert!(miscalibrated.f0_nominal_95_coverage < 0.5);
+        assert!(miscalibrated.f0_mean_absolute_standardized_residual
+            > preserving.f0_mean_absolute_standardized_residual);
+        assert!(miscalibrated.candidate_trace.len() > 256);
+        assert!(miscalibrated.candidate_trace.iter().all(|event| event.incremental_cost_units > 0));
+    }
+
+    #[test]
+    fn trace_costs_reconcile_to_the_exact_arm_budgets() {
+        let run = run_multi_fidelity_trial(MultiFidelityLandscape::RankPreserving, 43).unwrap();
+        let promotion_cost: u64 = run.candidate_trace.iter()
+            .filter(|event| event.arm == MultiFidelityArm::PromotionPolicy)
+            .map(|event| event.incremental_cost_units)
+            .sum();
+        let random_cost: u64 = run.candidate_trace.iter()
+            .filter(|event| event.arm == MultiFidelityArm::FullFidelityRandom)
+            .map(|event| event.incremental_cost_units)
+            .sum();
+        assert_eq!(promotion_cost, run.promotion_policy_cost_units);
+        assert_eq!(random_cost, run.random_baseline_cost_units);
+        assert_eq!(promotion_cost, random_cost);
     }
 
     #[test]
