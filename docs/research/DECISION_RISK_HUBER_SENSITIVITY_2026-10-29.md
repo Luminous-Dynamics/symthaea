@@ -52,11 +52,7 @@ This is the important negative result: robust certification trades false admissi
 
 ## Identifiability frontier
 
-For a clean risk p=.32, model risk .30, and contamination R=0, the exact sensitivity lower endpoint is p_lower = p - rho/(1-rho). For worst-case model error to remain below .05, the contamination-only offset must satisfy
-
-.02 + rho/(1-rho) <= .05,
-
-or rho <= 0.029126... (about 2.91%), before adding any sampling uncertainty. Above that rate, this particular safe model cannot be certified against the .05 tolerance under the stated arbitrary-contamination model without stronger assumptions or additional evidence about the contamination mechanism. This is an identifiability limit, not a scheduler failure.
+For a clean risk p=.32, model risk .30, and contamination R=0, the exact sensitivity interval is [p - rho/(1-rho), p] for this scenario. The worst-case absolute error from the model is max(.02, abs(rho/(1-rho) - .02)). Requiring this contamination-only error to remain at most .05 yields rho/(1-rho) <= .07, or rho <= 0.07/1.07 = 0.065421 (about 6.54%), before adding sampling uncertainty. Above that rate, this particular safe model cannot be certified against the .05 tolerance under the stated arbitrary-contamination model without stronger assumptions or additional evidence about the contamination mechanism. At 5%, the ideal sensitivity interval still fits but the finite-sample confidence-sequence width exceeds the available margin under our cap; at 10% and above, the contamination-only interval is itself too wide. This is an identifiability limit, not a scheduler failure.
 
 ## Integrity negative controls
 
