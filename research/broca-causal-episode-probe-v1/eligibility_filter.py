@@ -72,6 +72,8 @@ def evidence_key(item: dict[str, Any], context: str) -> tuple[str, str]:
 def load_ledger(records: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, str]]:
     ledger: dict[tuple[str, str], dict[str, str]] = {}
     for index, row in enumerate(records):
+        if row.get("schema") != LEDGER_SCHEMA:
+            raise ValueError(f"ledger row {index}: wrong or missing schema")
         key = evidence_key(row, f"ledger row {index}")
         status = row.get("status")
         reason = row.get("reason")
