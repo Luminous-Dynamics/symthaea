@@ -10,7 +10,7 @@ CMAQ-007 demonstrated two related failure modes in deliberately constructed pane
 
 CMAQ-003 measures causal regime-change detection. CMAQ-006 makes model use conditional on freshness and held-out decision-value evidence. CMAQ-008 tests a narrower online control contract: **monitor the stream of post-action support outcomes, revoke model authority when sequential evidence contradicts the calibrated baseline, and measure the cost of both delayed detection and false revocation**.
 
-This v0.1 smoke harness models the outcome feedback itself rather than a learned support estimator. It assumes a trusted evaluator can reveal whether the selected action was unsupported after that action executes. That is a strong, often unrealistic observability assumption; later work must test delayed, noisy, missing and adversarially corrupted feedback.
+This v0.2 smoke harness models the outcome feedback itself rather than a learned support estimator. It assumes a trusted evaluator can reveal whether the selected action was unsupported after that action executes. That is a strong, often unrealistic observability assumption; later work must test delayed, noisy, missing and adversarially corrupted feedback.
 
 ## Executable panel
 
@@ -29,7 +29,8 @@ These rates and payoffs define a synthetic falsification mechanism. They are not
 - **Direct fallback:** never delegates a decision to the model. This exposes its zero-risk / zero-coverage utility baseline.
 - **Fixed gate:** uses model actions for all 128 steps. This isolates the cost of never revoking stale model authority.
 - **First unsupported revocation:** immediately falls back after the first unsupported outcome. This is an intentionally overreactive baseline; it tests the cost of treating every adverse event as a shift.
-- **CUSUM revocable gate:** maintains a one-sided log-likelihood CUSUM for a frozen null rate (p_0=0.01) against a shifted rate (p_1=0.25). Each supported/unsupported post-action outcome updates the score. It revokes future model use at statistic (ge 5.0). Threshold and likelihoods are fixed before running the panel.
+- **CUSUM revocable gate:** maintains a one-sided log-likelihood CUSUM for a frozen null rate (p_0=0.01) against a shifted rate (p_1=0.25). It updates when primary post-action feedback arrives and revokes future model use at statistic >= 5.0. The threshold and likelihoods are fixed before running the panel.
+- **Integrity-witnessed CUSUM:** the same detector uses a second trusted feedback witness rather than the potentially corrupted primary channel. The report charges two feedback records per model action. This is an explicit redundancy-cost baseline; the witness is assumed trustworthy and is not a free or generally available production signal.
 - **Oracle changepoint:** knows the hidden shift onset and switches to fallback immediately at that point. It is an evaluator-only upper-bound comparator, not an eligible method.
 
 A revocation is applied **after** the observation that triggered it; that action's utility and unsupported outcome remain in the totals. Detection delay includes the triggering decision. The monitor does not receive a changepoint label.
@@ -48,11 +49,15 @@ The oracle's per-episode realised outcome is not guaranteed to dominate every st
 
 ## Initial frozen targets (hypotheses, not results)
 
-1. Stationary false-revocation rate ≤ 5% of episodes for CUSUM.
-2. Abrupt-shift detection coverage ≥ 90%, with conditional p90 detection delay ≤ 16 decisions.
-3. CUSUM improves mean paired cumulative utility versus the fixed gate under the abrupt shift; report the paired interval and retain the result if the interval includes zero.
-4. First-error revocation has higher stationary false-revocation rate than CUSUM on the same tape; preserve this baseline to quantify overreaction.
-5. Report gradual-shift results separately. Passing the abrupt target does not qualify the gradual lane.
+1. Stationary false-revocation rate <= 5% of episodes for CUSUM.
+2. Abrupt-shift detection coverage >= 90%, with conditional p90 detection delay <= 16 decisions.
+3. CUSUM improves mean paired cumulative utility versus the fixed gate under the abrupt shift; its paired 95% lower bound should exceed zero.
+4. First-error revocation has higher stationary false-revocation rate than CUSUM on the same tape.
+5. On noisy stationary feedback, the primary-channel monitor should expose its false-revocation failure; the witnessed channel should materially reduce, but is not assumed to eliminate, baseline false revocations.
+6. Under delayed feedback, p90 detection delay should increase relative to immediate feedback while coverage remains >= 80%.
+7. Report gradual-shift results separately.
+
+**Important:** these are preregistered performance hypotheses, not conditions to quietly redefine after seeing a run. The first v0.2 smoke panel is expected to miss both the 5% stationary false-revocation target and 16-step p90 delay target. The focused workflow locks those misses as explicit regression facts so a green CI run means the code and report behave as specified—not that the monitor qualifies. A later monitor improvement must use a new qualification seed stream and report whether it actually closes those gaps.
 
 These are smoke-panel qualification checks, not industry/SOTA targets. Any missed target is an engineering finding, not a reason to tune on the same seeds.
 
@@ -65,7 +70,7 @@ cargo test --locked
 cargo run --quiet --locked
 ```
 
-The focused workflow validates strict report schema, row uniqueness, fixed/fallback behavior, stationary false-alarm budget, abrupt and delayed detection/delay, paired utility lift, gradual-lane output, observation-channel corruption, witness overhead and risk/coverage accounting. Rust must compile and the exact-head workflow must pass before reporting benchmark outputs as Rust evidence.
+The focused workflow validates strict report schema, row uniqueness, fixed/fallback behavior, abrupt and delayed detection, paired utility lift, the noisy-feedback failure and witness contrast, and tail-risk accounting. It deliberately reports the currently unmet false-alarm and delay targets instead of mislabeling them as passes. Rust must compile and the exact-head workflow must pass before reporting benchmark outputs as Rust evidence.
 
 ## Limitations and next work
 
