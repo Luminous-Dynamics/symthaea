@@ -93,7 +93,7 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 
 ## Eligibility-first currentness ablation
 
-The mutation suite includes a versioned policy ledger covering all 107 string-valued source pointers exactly once. The CLI verifies that coverage against the source trajectories. Each question has a manually annotated retrieval intent. The filter runs after BM25 candidate generation but **before final top-k selection**, preserves the BM25 order among eligible candidates, fails closed for unannotated pointers, and emits a receipt binding the candidate manifest, worker hash, fixture hashes, policy-ledger hash, filter-code SHA-256, intent mode, policy and output digest.
+The mutation suite includes a versioned policy ledger covering all 107 string-valued source pointers exactly once and a 13th composite query that asks for both current and prior state. The CLI verifies that coverage against the source trajectories. Each question has a manually annotated retrieval intent, including `current_and_history` for questions that request both present and historical state. The filter runs after BM25 candidate generation but **before final top-k selection**, preserves the BM25 order among eligible candidates, fails closed for unannotated pointers, and emits a receipt binding the candidate manifest, worker hash, fixture hashes, policy-ledger hash, filter-code SHA-256, intent mode, policy and output digest.
 
 Run both modes against the same candidate pool:
 
@@ -122,7 +122,7 @@ python3 research/broca-causal-episode-probe-v1/score_probe.py \
   --predictions /tmp/broca-mutation-heuristic.jsonl --k 5
 ```
 
-The annotated mode is an **oracle-intent upper bound**; it is not a production-system win. The heuristic mode uses simple keyword rules and records the matched rule, per-question intent predictions, accuracy, and unknowns in the receipt. The rules were authored against this tiny fixture, so the current 12 prompts are not held out. Even perfect intent accuracy on these prompts would only be a fixture smoke check, not generalization evidence. The filter never reads required/forbidden support labels to select candidates. Next, evaluate intent prediction on independently authored, held-out queries and report per-class precision/recall, confusion matrix, abstention, policy coverage, retained candidate count, stale-aware quality, latency and lifecycle cost.
+The annotated mode is an **oracle-intent upper bound**; it is not a production-system win. The heuristic mode uses simple keyword rules and records the matched rule, per-question intent predictions, accuracy, and unknowns in the receipt. The rules were authored against this tiny fixture, so the current 13 prompts are not held out. Even perfect intent accuracy on these prompts would only be a fixture smoke check, not generalization evidence. The filter never reads required/forbidden support labels to select candidates. Next, evaluate intent prediction on independently authored, held-out queries and report per-class precision/recall, confusion matrix, abstention, policy coverage, retained candidate count, stale-aware quality, latency and lifecycle cost.
 
 ## Paired official-run decision analysis
 
