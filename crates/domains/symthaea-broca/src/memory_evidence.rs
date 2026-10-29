@@ -111,6 +111,63 @@ pub(crate) struct AdjacentStateCandidate {
     pub(crate) anchor_hdc_id: Option<u64>,
 }
 
+/// Why an input candidate was not emitted by an audited evidence resolution.
+///
+/// These dispositions describe deterministic operational checks; they do not
+/// establish whether emitted text semantically supports the user's question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceCandidateDisposition {
+    Emitted,
+    DuplicateCandidate,
+    UnknownCandidate,
+    InvalidRecord,
+    InactiveLifecycle,
+    ScopeMismatch,
+    NotYetValid,
+    Expired,
+    EligibleBeyondOutputLimit,
+}
+
+/// Per-input-candidate disposition, retained in the original hit order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceCandidateAudit {
+    pub hdc_id: u64,
+    pub disposition: EvidenceCandidateDisposition,
+}
+
+/// Minimum operational coverage required before a caller proceeds to answer/action.
+///
+/// This is not a semantic sufficiency model. Configure the floor for the application
+/// and validate its abstention/coverage trade-off against labeled held-out tasks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceFloorPolicy {
+    pub minimum_items: usize,
+    pub minimum_distinct_trajectories: usize,
+}
+
+/// Observable outcome of applying the configured operational coverage floor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceFloorAudit {
+    pub required_items: usize,
+    pub required_distinct_trajectories: usize,
+    pub emitted_items: usize,
+    pub distinct_trajectories: usize,
+    pub meets_floor: bool,
+}
+
+/// Resolution output plus an audit for every input HDC hit.
+///
+/// If an eligible payload is corrupt or cannot be verified, resolution returns an
+/// error instead of disguising an integrity problem as insufficient evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditedMemoryResolution {
+    pub items: Vec<ResolvedMemoryContextItem>,
+    pub candidate_audit: Vec<EvidenceCandidateAudit>,
+    pub floor: EvidenceFloorAudit,
+}
+
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -1401,6 +1458,98 @@ impl EvidenceIndex {
         Ok(output)
     }
 
+    /// Resolve candidates and report why every input hit was emitted or excluded.
+    ///
+    /// The configured floor measures operational evidence coverage (item count and
+    /// distinct source trajectories) only. A passing floor does not prove the context
+    /// answers the question; the downstream caller should treat a failed floor as a
+    /// reason to abstain, ask for clarification, or perform a separately authorized
+    /// retrieval step, and must validate that policy on held-out tasks.
+    ///
+    /// Candidate decisions are reported in input order, including duplicates. Unknown,
+    /// invalid, inactive, cross-scope, not-yet-valid, expired and over-limit candidates
+    /// are never emitted. An eligible payload whose bytes fail verification is an
+    /// integrity error and aborts the call; it is never mislabeled as an empty result.
+    pub fn resolve_with_audit(
+        &self,
+        hdc_hits: &[u64],
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: &Path,
+        max_items: usize,
+        floor_policy: EvidenceFloorPolicy,
+    ) -> Result<AuditedMemoryResolution, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if floor_policy.minimum_items == 0 {
+            return Err("minimum_items must be positive".into());
+        }
+        if floor_policy.minimum_distinct_trajectories == 0 {
+            return Err("minimum_distinct_trajectories must be positive".into());
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut items = Vec::new();
+        let mut candidate_audit = Vec::with_capacity(hdc_hits.len());
+        for hdc_id in hdc_hits {
+            let disposition = if !seen.insert(*hdc_id) {
+                EvidenceCandidateDisposition::DuplicateCandidate
+            } else if let Some(record) = self.records.get(hdc_id) {
+                if record.lifecycle != EvidenceLifecycle::Active {
+                    EvidenceCandidateDisposition::InactiveLifecycle
+                } else if record.validate().is_err() {
+                    EvidenceCandidateDisposition::InvalidRecord
+                } else if record.scope_id != scope_id {
+                    EvidenceCandidateDisposition::ScopeMismatch
+                } else if record.valid_from_unix_ms.is_some_and(|start| now_ms < start) {
+                    EvidenceCandidateDisposition::NotYetValid
+                } else if record.valid_until_unix_ms.is_some_and(|end| now_ms >= end) {
+                    EvidenceCandidateDisposition::Expired
+                } else if items.len() >= max_items {
+                    EvidenceCandidateDisposition::EligibleBeyondOutputLimit
+                } else {
+                    // Any payload integrity/path failure must abort rather than
+                    // silently lowering the evidence floor.
+                    let item = record.context_item(payload_root)?;
+                    items.push(ResolvedMemoryContextItem {
+                        hdc_id: *hdc_id,
+                        evidence_id: record.evidence_id.clone(),
+                        source: record.source.clone(),
+                        item,
+                    });
+                    EvidenceCandidateDisposition::Emitted
+                }
+            } else {
+                EvidenceCandidateDisposition::UnknownCandidate
+            };
+            candidate_audit.push(EvidenceCandidateAudit {
+                hdc_id: *hdc_id,
+                disposition,
+            });
+        }
+
+        let distinct_trajectories = items.iter()
+            .map(|item| item.source.trajectory_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let meets_floor = items.len() >= floor_policy.minimum_items
+            && distinct_trajectories >= floor_policy.minimum_distinct_trajectories;
+        let floor = EvidenceFloorAudit {
+            required_items: floor_policy.minimum_items,
+            required_distinct_trajectories: floor_policy.minimum_distinct_trajectories,
+            emitted_items: items.len(),
+            distinct_trajectories,
+            meets_floor,
+        };
+
+        Ok(AuditedMemoryResolution {
+            items,
+            candidate_audit,
+            floor,
+        })
+    }
+
     /// ABI projection for consumers that require only official `type/value`
     /// context items. Use `resolve_with_provenance` when an audit trail is needed.
     pub fn resolve(
@@ -1860,6 +2009,135 @@ mod tests {
         ).is_err());
         assert!(evidence.expand_text_candidates_with_adjacent_states(
             &[], "", 150, 3, 2,
+        ).is_err());
+    }
+
+    #[test]
+    fn audited_resolution_explains_rejections_and_fails_the_coverage_floor() {
+        let mut evidence = EvidenceIndex::new();
+        let (active, active_source) = text_record_for_trajectory(
+            1, "active", "web", "trajectory-a", "current valid context",
+        );
+        evidence.insert(active, &active_source).unwrap();
+
+        let (private, private_source) = text_record_for_trajectory(
+            2, "private", "enterprise", "trajectory-private", "private context",
+        );
+        evidence.insert(private, &private_source).unwrap();
+
+        let (mut future, future_source) = text_record_for_trajectory(
+            3, "future", "web", "trajectory-future", "future context",
+        );
+        future.valid_from_unix_ms = Some(200);
+        evidence.insert(future, &future_source).unwrap();
+
+        let (mut expired, expired_source) = text_record_for_trajectory(
+            4, "expired", "web", "trajectory-expired", "expired context",
+        );
+        expired.valid_until_unix_ms = Some(150);
+        evidence.insert(expired, &expired_source).unwrap();
+
+        let (revoked, revoked_source) = text_record_for_trajectory(
+            5, "revoked", "web", "trajectory-revoked", "revoked context",
+        );
+        evidence.insert(revoked, &revoked_source).unwrap();
+        evidence.revoke(5).unwrap();
+
+        let result = evidence.resolve_with_audit(
+            &[1, 1, 2, 3, 4, 5, 404],
+            "web", 150, Path::new("."), 10,
+            EvidenceFloorPolicy { minimum_items: 2, minimum_distinct_trajectories: 2 },
+        ).unwrap();
+
+        assert_eq!(result.items.len(), 1);
+        assert_eq!(result.candidate_audit.iter().map(|decision| decision.disposition).collect::<Vec<_>>(), vec![
+            EvidenceCandidateDisposition::Emitted,
+            EvidenceCandidateDisposition::DuplicateCandidate,
+            EvidenceCandidateDisposition::ScopeMismatch,
+            EvidenceCandidateDisposition::NotYetValid,
+            EvidenceCandidateDisposition::Expired,
+            EvidenceCandidateDisposition::InactiveLifecycle,
+            EvidenceCandidateDisposition::UnknownCandidate,
+        ]);
+        assert_eq!(result.floor.emitted_items, 1);
+        assert_eq!(result.floor.distinct_trajectories, 1);
+        assert!(!result.floor.meets_floor);
+    }
+
+    #[test]
+    fn audited_resolution_requires_distinct_trajectory_coverage_not_just_item_count() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, trajectory_id, text) in [
+            (1, "state-a1", "trajectory-a", "first state"),
+            (2, "state-a2", "trajectory-a", "second state"),
+            (3, "state-b1", "trajectory-b", "independent state"),
+        ] {
+            let (record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", trajectory_id, text,
+            );
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+        let policy = EvidenceFloorPolicy {
+            minimum_items: 2,
+            minimum_distinct_trajectories: 2,
+        };
+
+        let one_trajectory = evidence.resolve_with_audit(
+            &[1, 2], "web", 150, Path::new("."), 2, policy,
+        ).unwrap();
+        assert_eq!(one_trajectory.items.len(), 2);
+        assert_eq!(one_trajectory.floor.distinct_trajectories, 1);
+        assert!(!one_trajectory.floor.meets_floor);
+
+        let diverse = evidence.resolve_with_audit(
+            &[1, 3], "web", 150, Path::new("."), 2, policy,
+        ).unwrap();
+        assert_eq!(diverse.items.len(), 2);
+        assert_eq!(diverse.floor.distinct_trajectories, 2);
+        assert!(diverse.floor.meets_floor);
+    }
+
+    #[test]
+    fn audited_resolution_marks_eligible_candidates_beyond_output_limit() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, trajectory_id) in [
+            (1, "first", "trajectory-a"),
+            (2, "second", "trajectory-b"),
+        ] {
+            let (record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", trajectory_id, "eligible context",
+            );
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+        let result = evidence.resolve_with_audit(
+            &[1, 2], "web", 150, Path::new("."), 1,
+            EvidenceFloorPolicy { minimum_items: 1, minimum_distinct_trajectories: 1 },
+        ).unwrap();
+        assert_eq!(result.items.len(), 1);
+        assert_eq!(result.candidate_audit[1].disposition, EvidenceCandidateDisposition::EligibleBeyondOutputLimit);
+        assert!(result.floor.meets_floor);
+    }
+
+    #[test]
+    fn audited_resolution_fails_closed_on_corrupt_payload_and_invalid_floor() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(7, "evidence-corrupt", "web", "verified text"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        evidence.records.get_mut(&7).unwrap().content_sha256 = hash(b"tampered text");
+
+        let policy = EvidenceFloorPolicy { minimum_items: 1, minimum_distinct_trajectories: 1 };
+        assert!(evidence.resolve_with_audit(
+            &[7], "web", 150, Path::new("."), 1, policy,
+        ).is_err());
+        assert!(evidence.resolve_with_audit(
+            &[7], "web", 150, Path::new("."), 1,
+            EvidenceFloorPolicy { minimum_items: 0, minimum_distinct_trajectories: 1 },
+        ).is_err());
+        assert!(evidence.resolve_with_audit(
+            &[7], "web", 150, Path::new("."), 1,
+            EvidenceFloorPolicy { minimum_items: 1, minimum_distinct_trajectories: 0 },
         ).is_err());
     }
 
