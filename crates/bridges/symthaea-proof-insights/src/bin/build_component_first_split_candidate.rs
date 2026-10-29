@@ -226,9 +226,7 @@ fn rank_digest(component_id: &str) -> String {
 }
 
 /// Assign each complete component to one split. Components are visited in a
-/// deterministic pseudo-random order; each goes to the split with the largest
-/// remaining *fractional* family-count deficit. The allocation is approximate
-/// when components are indivisible and is never allowed to change PITB v0.
+/// Exact floor-based 70/15/15 quotas over independent components.
 fn component_quotas(component_count: usize) -> [usize; 3] {
     let train_end = component_count * 70 / 100;
     let validation_end = component_count * 85 / 100;
@@ -255,6 +253,9 @@ fn family_balance_loss(family_counts: &[usize; 3], total_families: usize) -> f64
 fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>> {
     if units.is_empty() {
         bail!("cannot allocate an empty component set");
+    }
+    if units.len() < 4 {
+        bail!("at least four independent components are required to populate all three floor-based candidate splits");
     }
     let mut component_ids = BTreeSet::new();
     let mut family_ids = BTreeSet::new();
@@ -677,6 +678,17 @@ mod tests {
             },
         ];
         assert!(assign_components(&source).is_err());
+    }
+
+    #[test]
+    fn fewer_than_four_components_cannot_populate_all_candidate_splits() {
+        for sizes in [&[1usize][..], &[1, 1][..], &[1, 1, 1][..]] {
+            let source = units(sizes);
+            assert!(
+                assign_components(&source).is_err(),
+                "component counts below four must not emit an empty validation split"
+            );
+        }
     }
 
     #[test]
