@@ -1,8 +1,8 @@
-"""Oracle-intent eligibility-first ablation for Broca's BM25 candidate lists.
+"""Eligibility-first retrieval ablation with oracle and keyword-intent modes.
 
-This is a research upper bound, not a production intent classifier or worker patch.
-It filters a BM25 candidate pool using an explicitly versioned source eligibility
-ledger before applying the fixed final top-k budget. Gold support labels are never read.
+This is a research evaluator, not a production intent classifier or worker patch.
+It filters BM25 candidates using a versioned source eligibility ledger before the
+final top-k budget. Gold support labels are never read by the selection policy.
 """
 from __future__ import annotations
 
@@ -147,7 +147,7 @@ def filter_dataset(
     """
     if isinstance(k, bool) or not isinstance(k, int) or not 1 <= k <= 100:
         raise ValueError("k must be an integer in [1, 100]")
-    if intent_source not in {"annotated", "heuristic"}:
+    if not isinstance(intent_source, str) or intent_source not in {"annotated", "heuristic"}:
         raise ValueError("intent_source must be annotated or heuristic")
     question_by_id = _index_questions(questions)
     prediction_by_id: dict[str, dict[str, Any]] = {}
