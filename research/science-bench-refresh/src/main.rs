@@ -68,7 +68,7 @@ fn run(args: &[String]) -> ExitCode {
                 serde_json::to_string_pretty(&report)
                     .expect("overlap audit report serializes")
             );
-            if report.exact_overlap_pair_count > 0 {
+            if report.shared_task_id_count > 0 || report.exact_overlap_pair_count > 0 {
                 ExitCode::from(6)
             } else if report.near_duplicate_candidate_pair_count > 0 {
                 // Similarity is not a confirmed leak, but qualification must
