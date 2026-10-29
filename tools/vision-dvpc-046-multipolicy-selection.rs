@@ -661,7 +661,7 @@ mod tests{
                 let direct=if bet>=1.0 && values.iter().any(|v|*v==0.0) {
                     f64::NEG_INFINITY
                 } else {
-                    values.iter().map(|y| (1.0-bet+bet**y/nu).ln()).sum::<f64>()
+                    values.iter().map(|y| (1.0-bet+bet * *y / nu).ln()).sum::<f64>()
                 };
                 let compressed=log_crp_wealth_profile(&profile,nu,bet);
                 if direct==f64::NEG_INFINITY {
