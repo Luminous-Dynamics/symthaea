@@ -349,6 +349,19 @@ mod tests {
         assert_eq!(e.summarize("adaptive").over_budget, 2);
     }
     #[test]
+    fn candidate_bundle_does_not_leak_hidden_labels_or_rewards() {
+        let visible = format!(
+            "{}{}{}",
+            include_str!("../fixtures/candidate-cases.tsv"),
+            include_str!("../fixtures/candidate-action-menu.tsv"),
+            include_str!("../fixtures/candidate-probe-menu.tsv"),
+        );
+        for forbidden in ["group_id", "reward_milli", "observation_id", "left", "right"] {
+            assert!(!visible.contains(forbidden), "candidate bundle leaks {forbidden}");
+        }
+    }
+
+    #[test]
     fn missing_policy_case_fails_closed() {
         let d = include_str!("../fixtures/decision-trace.tsv").lines()
             .filter(|line| !line.starts_with("b9\tadaptive\t"))

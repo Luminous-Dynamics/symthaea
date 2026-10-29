@@ -16,11 +16,21 @@ Use Rust 1.96.0 from this directory:
 - Known-answer fixture: cargo run --locked -- --cases fixtures/cases.tsv --actions fixtures/action-key.tsv --probes fixtures/probe-key.tsv --trace fixtures/probe-trace.tsv --decisions fixtures/decision-trace.tsv
 - Expected output is stored in fixtures/expected.tsv.
 
-## Input contract and evaluator boundary
+## Candidate-visible bundle versus evaluator key
 
-- cases.tsv: opaque case ID, evaluator-only information-group ID, agent-visible initial observation, maximum probe count and total probe-cost budget. The group ID must never be exposed to the candidate.
-- action-key.tsv: evaluator-only action rewards and safety by hidden case.
-- probe-key.tsv: evaluator-only probe observation, cost and safety by hidden case.
+Only the following files belong in the candidate context:
+
+- candidate-cases.tsv: opaque case ID, observable context, probe-count limit and cost budget.
+- candidate-action-menu.tsv: available action IDs, without reward labels.
+- candidate-probe-menu.tsv: probe IDs, declared cost and declared risk upper bound, without realized signals.
+
+The high/low context is observable and indicates the stake scale, but not which hidden variant is active. Case IDs are opaque; the group ID is not in the candidate bundle. Candidate-visible data contains no action reward labels, realized probe outcomes or evaluator safety labels. The evaluator does not hand these candidate files the hidden keys.
+
+Evaluator-side files are separate:
+
+- cases.tsv: evaluator-only information-group membership plus the observable case context and budgets.
+- action-key.tsv: evaluator-only action rewards and actual safety by hidden case.
+- probe-key.tsv: evaluator-only realized probe observation, cost and actual safety by hidden case.
 - probe-trace.tsv: candidate-reported probe order and observations.
 - decision-trace.tsv: exactly one final action per policy per case.
 
