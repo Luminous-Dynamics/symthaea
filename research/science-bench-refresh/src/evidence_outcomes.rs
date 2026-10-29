@@ -826,7 +826,10 @@ pub fn verify_evidence_outcome_report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::counterfactual_evidence::{EvidenceInterventionPairV1, EvidenceInterventionTrialV1};
+    use crate::counterfactual_evidence::{
+        EvidenceInterventionPairV1, EvidenceInterventionPlanFieldsV1,
+        EvidenceInterventionTrialV1,
+    };
     use serde_json::json;
 
     fn digest(byte: char) -> String {
@@ -839,17 +842,19 @@ mod tests {
             "network_isolated",
             "gold_evidence_injected",
         ];
-        let trials = conditions.iter().enumerate().map(|(index, condition)| {
-            EvidenceInterventionTrialV1 {
+        let trials = conditions
+            .iter()
+            .enumerate()
+            .map(|(index, condition)| EvidenceInterventionTrialV1 {
                 trial_id: format!("trial-{index}"),
                 condition: (*condition).to_owned(),
                 policy_input_sha256: digest(char::from(b'a' + index as u8)),
                 evidence_manifest_sha256: digest(char::from(b'd' + index as u8)),
                 randomization_order: index as u32,
                 seed_commitment_sha256: digest(char::from(b'g' + index as u8)),
-            }
-        }).collect::<Vec<_>>();
-        let fields = crate::counterfactual_evidence::EvidenceInterventionPlanFieldsV1 {
+            })
+            .collect::<Vec<_>>();
+        let fields = EvidenceInterventionPlanFieldsV1 {
             schema: crate::counterfactual_evidence::EVIDENCE_INTERVENTION_PLAN_SCHEMA.to_owned(),
             generation_id: "generation-test".to_owned(),
             plan_id: "plan-test".to_owned(),
@@ -860,7 +865,7 @@ mod tests {
             budget_sha256: digest('5'),
             analysis_plan_sha256: digest('6'),
             randomization_commitment_sha256: digest('7'),
-            required_conditions: conditions.iter().map(|x| (*x).to_owned()).collect(),
+            required_conditions: conditions.iter().map(|value| (*value).to_owned()).collect(),
             pairs: vec![EvidenceInterventionPairV1 {
                 pair_id: "pair-test".to_owned(),
                 task_ref_sha256: digest('8'),
@@ -869,23 +874,35 @@ mod tests {
             }],
         };
         let fields_bytes = serde_json::to_vec(&fields).unwrap();
-        let commitment = crate::counterfactual_evidence::compute_evidence_intervention_plan_commitment(&fields_bytes).unwrap();
+        let commitment = crate::counterfactual_evidence::compute_evidence_intervention_plan_commitment(
+            &fields_bytes,
+        )
+        .unwrap();
         let mut full = serde_json::to_value(fields).unwrap();
         full["plan_commitment_sha256"] = json!(commitment);
         serde_json::to_vec(&full).unwrap()
     }
 
-    fn outcome_record(index: usize, condition: &str) -> EvidenceOutcomeRecordV1 {
+    fn outcome_record(
+        pair_id: &str,
+        trial_id: &str,
+        condition: &str,
+        index: usize,
+    ) -> EvidenceOutcomeRecordV1 {
         EvidenceOutcomeRecordV1 {
-            pair_id: "pair-test".to_owned(),
-            trial_id: format!("trial-{index}"),
+            pair_id: pair_id.to_owned(),
+            trial_id: trial_id.to_owned(),
             condition: condition.to_owned(),
             terminal_status: OutcomeTerminalStatusV1::Completed,
             response_status: OutcomeResponseStatusV1::Answered,
-            runner_receipt_sha256: Some(digest('a')),
-            response_artifact_sha256: Some(digest(char::from(b'b' + index as u8))),
+            runner_receipt_sha256: Some(digest(char::from(b'a' + index as u8))),
+            response_artifact_sha256: Some(digest(char::from(b'd' + index as u8))),
             evaluator_record_sha256: Some(digest(char::from(b'f' + index as u8))),
-            task_correctness: if index == 1 { TaskCorrectnessV1::Incorrect } else { TaskCorrectnessV1::Correct },
+            task_correctness: if index == 1 {
+                TaskCorrectnessV1::Incorrect
+            } else {
+                TaskCorrectnessV1::Correct
+            },
             evidence_use: EvidenceUseV1::UsedRelevant,
             claim_support: ClaimSupportV1::FullySupported,
             abstention_quality: AbstentionQualityV1::NotApplicable,
@@ -895,7 +912,7 @@ mod tests {
                 wall_clock_ms: Some(100 + index as u64),
                 tool_calls: Some(index as u64),
                 experiment_count: Some(2),
-                input_tokens: Some(1000),
+                input_tokens: Some(1_000),
                 output_tokens: Some(100),
                 cost_micro_usd: None,
             },
@@ -904,11 +921,20 @@ mod tests {
 
     fn fields(plan: &[u8]) -> EvidenceOutcomeReportFieldsV1 {
         let plan_obj: EvidenceInterventionPlanV1 = serde_json::from_slice(plan).unwrap();
-        let records = plan_obj.pairs.iter().flat_map(|pair| {
-            pair.trials.iter().enumerate().map(move |(index, trial)| {
-                outcome_record(index, &trial.condition)
+        let records = plan_obj
+            .pairs
+            .iter()
+            .flat_map(|pair| {
+                pair.trials.iter().enumerate().map(move |(index, trial)| {
+                    outcome_record(
+                        &pair.pair_id,
+                        &trial.trial_id,
+                        &trial.condition,
+                        index,
+                    )
+                })
             })
-        }).collect::<Vec<_>>();
+            .collect::<Vec<_>>();
         EvidenceOutcomeReportFieldsV1 {
             schema: EVIDENCE_OUTCOME_REPORT_SCHEMA.to_owned(),
             plan_sha256: sha256_hex(plan),
@@ -919,61 +945,121 @@ mod tests {
         }
     }
 
-    fn full_report(plan: &[u8], fields: EvidenceOutcomeReportFieldsV1) -> Vec<u8> {
+    fn full_report(fields: EvidenceOutcomeReportFieldsV1) -> Vec<u8> {
         let commitment = commitment_from_fields(&fields).unwrap();
         let mut value = serde_json::to_value(fields).unwrap();
         value["report_commitment_sha256"] = json!(commitment);
         serde_json::to_vec(&value).unwrap()
     }
 
+    fn make_unstarted(record: &mut EvidenceOutcomeRecordV1) {
+        record.terminal_status = OutcomeTerminalStatusV1::NotStarted;
+        record.response_status = OutcomeResponseStatusV1::NoResponse;
+        record.runner_receipt_sha256 = None;
+        record.response_artifact_sha256 = None;
+        record.evaluator_record_sha256 = None;
+        record.task_correctness = TaskCorrectnessV1::NotEvaluated;
+        record.evidence_use = EvidenceUseV1::NotEvaluated;
+        record.claim_support = ClaimSupportV1::NotEvaluated;
+        record.abstention_quality = AbstentionQualityV1::NotEvaluated;
+        record.confidence_millionths = None;
+        record.confidence_source = ConfidenceSourceV1::None;
+        record.resources = OutcomeResourceUseV1 {
+            wall_clock_ms: None,
+            tool_calls: None,
+            experiment_count: None,
+            input_tokens: None,
+            output_tokens: None,
+            cost_micro_usd: None,
+        };
+    }
+
     #[test]
     fn accepts_complete_report_and_keeps_missing_cost_distinct_from_zero() {
         let plan = intervention_plan();
-        let fields = fields(&plan);
-        let report = full_report(&plan, fields);
+        let report = full_report(fields(&plan));
+        let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
+        assert!(verification.valid, "{:?}", verification.issues);
+        let scorecard = verification.scorecard.unwrap();
+        assert_eq!(scorecard.planned_trial_count, 3);
+        assert_eq!(scorecard.observed_record_count, 3);
+        assert_eq!(scorecard.missing_trial_count, 0);
+        assert_eq!(scorecard.condition_summaries.len(), 3);
+        assert_eq!(
+            scorecard.condition_summaries[0].confidence_recorded_trials,
+            1
+        );
+        assert_eq!(
+            scorecard.condition_summaries[0].cost_micro_usd.recorded_trials,
+            0
+        );
+        assert_eq!(
+            scorecard.condition_summaries[0].cost_micro_usd.total_observed,
+            0
+        );
+        assert!(!scorecard.runner_execution_proven);
+    }
+
+    #[test]
+    fn preserves_not_started_trial_and_does_not_impute_resource_zeroes() {
+        let plan = intervention_plan();
+        let mut fields = fields(&plan);
+        make_unstarted(&mut fields.records[2]);
+        let report = full_report(fields);
         let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
         assert!(verification.valid, "{:?}", verification.issues);
         let scorecard = verification.scorecard.unwrap();
         assert_eq!(scorecard.planned_trial_count, 3);
         assert_eq!(scorecard.missing_trial_count, 0);
-        assert_eq!(scorecard.condition_summaries.len(), 3);
-        assert_eq!(scorecard.condition_summaries[0].confidence_recorded_trials, 1);
-        assert_eq!(scorecard.condition_summaries[0].cost_micro_usd.recorded_trials, 0);
-        assert_eq!(scorecard.condition_summaries[0].cost_micro_usd.total_observed, 0);
-        assert!(!scorecard.runner_execution_proven);
+        assert_eq!(scorecard.terminal_status_counts.get("not_started"), Some(&1));
+        let last_condition = scorecard.condition_summaries.last().unwrap();
+        assert_eq!(last_condition.wall_clock_ms.recorded_trials, 2);
     }
 
     #[test]
-    fn rejects_missing_and_duplicate_trial_records() {
+    fn rejects_missing_duplicate_and_wrong_condition_records() {
         let plan = intervention_plan();
+
         let mut missing = fields(&plan);
         missing.records.pop();
-        assert!(compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&missing).unwrap()).is_err());
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&missing).unwrap()
+        )
+        .is_err());
 
         let mut duplicate = fields(&plan);
-        duplicate.records[1].trial_id = duplicate.records[0].trial_id.clone();
-        duplicate.records[1].pair_id = duplicate.records[0].pair_id.clone();
-        duplicate.records[1].condition = duplicate.records[0].condition.clone();
-        assert!(compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&duplicate).unwrap()).is_err());
+        duplicate.records[1] = duplicate.records[0].clone();
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&duplicate).unwrap()
+        )
+        .is_err());
+
+        let mut wrong_condition = fields(&plan);
+        wrong_condition.records[0].condition = "source_contradiction".to_owned();
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&wrong_condition).unwrap()
+        )
+        .is_err());
     }
 
     #[test]
-    fn rejects_mutated_commitment_and_wrong_condition_binding() {
+    fn rejects_mutated_report_commitment_without_emitting_a_scorecard() {
         let plan = intervention_plan();
-        let mut fields = fields(&plan);
-        fields.records[0].condition = "source_contradiction".to_owned();
-        assert!(compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&fields).unwrap()).is_err());
-
-        let good_fields = fields(&plan);
-        let mut report: serde_json::Value = serde_json::from_slice(&full_report(&plan, good_fields)).unwrap();
+        let mut report: serde_json::Value =
+            serde_json::from_slice(&full_report(fields(&plan))).unwrap();
         report["report_commitment_sha256"] = json!(digest('0'));
-        let verification = verify_evidence_outcome_report(&plan, &serde_json::to_vec(&report).unwrap()).unwrap();
+        let verification =
+            verify_evidence_outcome_report(&plan, &serde_json::to_vec(&report).unwrap()).unwrap();
         assert!(!verification.valid);
+        assert!(!verification.report_commitment_matches);
         assert!(verification.scorecard.is_none());
     }
 
     #[test]
-    fn contaminated_and_failed_trials_cannot_receive_scores() {
+    fn contaminated_trials_cannot_receive_task_scores() {
         let plan = intervention_plan();
         let mut contaminated = fields(&plan);
         let row = &mut contaminated.records[0];
@@ -984,22 +1070,47 @@ mod tests {
         row.abstention_quality = AbstentionQualityV1::NotEvaluated;
         row.confidence_millionths = None;
         row.confidence_source = ConfidenceSourceV1::None;
-        let report = full_report(&plan, contaminated.clone());
-        let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
+        let valid_report = full_report(contaminated.clone());
+        let verification = verify_evidence_outcome_report(&plan, &valid_report).unwrap();
         assert!(verification.valid, "{:?}", verification.issues);
 
         contaminated.records[0].task_correctness = TaskCorrectnessV1::Correct;
-        assert!(compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&contaminated).unwrap()).is_err());
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&contaminated).unwrap()
+        )
+        .is_err());
     }
 
     #[test]
-    fn rejects_confidence_outside_unit_interval_and_confidence_source_mismatch() {
+    fn rejects_confidence_outside_unit_interval_and_source_mismatch() {
         let plan = intervention_plan();
         let mut bad = fields(&plan);
         bad.records[0].confidence_millionths = Some(1_000_001);
-        assert!(compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&bad).unwrap()).is_err());
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&bad).unwrap()
+        )
+        .is_err());
+
         bad = fields(&plan);
         bad.records[0].confidence_source = ConfidenceSourceV1::None;
-        assert!(compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&bad).unwrap()).is_err());
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&bad).unwrap()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_omitted_nullable_resource_field() {
+        let plan = intervention_plan();
+        let mut report: serde_json::Value =
+            serde_json::from_slice(&full_report(fields(&plan))).unwrap();
+        report["records"][0]["resources"]
+            .as_object_mut()
+            .unwrap()
+            .remove("cost_micro_usd");
+        assert!(verify_evidence_outcome_report(&plan, &serde_json::to_vec(&report).unwrap()).is_err());
     }
 }
