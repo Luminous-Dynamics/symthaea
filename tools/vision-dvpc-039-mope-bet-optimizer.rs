@@ -257,7 +257,7 @@ struct Fixture {
     w: f64,
 }
 
-const FIXTURES: [Fixture; 6] = [
+const FIXTURES: [Fixture; 8] = [
     Fixture {
         id: "interior_optimum",
         a: Sym2 { a00: 1.0, a01: 0.0, a11: 1.0 },
@@ -293,6 +293,18 @@ const FIXTURES: [Fixture; 6] = [
         a: Sym2 { a00: 0.0, a01: 0.0, a11: 3.0 },
         b: Vec2 { x: 0.0, y: 0.25 },
         w: 1.0,
+    },
+    Fixture {
+        id: "weighted_edge_interior",
+        a: Sym2 { a00: 1.0, a01: 0.0, a11: 1.0 },
+        b: Vec2 { x: -2.0 * PSI * (-1.0 / 196.0) - 49.0, y: -2.0 * PSI * 0.25 + 1.0 },
+        w: 50.0,
+    },
+    Fixture {
+        id: "sum_edge_interior",
+        a: Sym2 { a00: 1.0, a01: 0.0, a11: 1.0 },
+        b: Vec2 { x: -2.0 * PSI * 0.25 + 1.0, y: -2.0 * PSI * 0.25 + 1.0 },
+        w: 50.0,
     },
 ];
 
@@ -394,6 +406,27 @@ mod tests {
         assert!(fixture.a.determinant().abs() <= EPS);
         let result = optimize(fixture.a, fixture.b, fixture.w).unwrap();
         assert!(result.objective.is_finite());
+    }
+
+    #[test]
+    fn each_active_edge_has_the_analytic_optimum() {
+        let bottom = optimize(FIXTURES[3].a, FIXTURES[3].b, FIXTURES[3].w).unwrap();
+        close(bottom.lambda.x, 0.5, 1e-9);
+        close(bottom.lambda.y, 0.0, 1e-9);
+        assert!(bottom.active_constraints.contains(&"lambda2>=0"));
+
+        let w = FIXTURES[6].w;
+        let weighted = optimize(FIXTURES[6].a, FIXTURES[6].b, w).unwrap();
+        close(weighted.lambda.x, -1.0 / 196.0, 1e-8);
+        close(weighted.lambda.y, 0.25, 1e-8);
+        assert!(weighted.active_constraints.contains(&"(1-W)lambda1+lambda2<=0.5"));
+        assert!(!weighted.active_constraints.contains(&"lambda1+lambda2<=0.5"));
+
+        let sum = optimize(FIXTURES[7].a, FIXTURES[7].b, FIXTURES[7].w).unwrap();
+        close(sum.lambda.x, 0.25, 1e-8);
+        close(sum.lambda.y, 0.25, 1e-8);
+        assert!(sum.active_constraints.contains(&"lambda1+lambda2<=0.5"));
+        assert!(!sum.active_constraints.contains(&"(1-W)lambda1+lambda2<=0.5"));
     }
 
     #[test]
