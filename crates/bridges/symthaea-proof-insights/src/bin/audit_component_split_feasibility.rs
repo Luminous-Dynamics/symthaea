@@ -128,7 +128,8 @@ fn safe_repo_path(value: &str) -> bool {
 }
 
 fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
-    let doc: Value = serde_json::from_slice(bytes).context("parse component-first candidate split")?;
+    let doc: Value = serde_json::from_slice(bytes)
+        .context("parse component-first candidate split")?;
     if doc["schema_version"].as_str() != Some("pitb.component-first-split-candidate.v0")
         || doc["status"].as_str() != Some("candidate_only")
         || doc["upstream_commit"].as_str() != Some(UPSTREAM)
@@ -153,7 +154,9 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     let component_rows = doc["components"]
         .as_array()
         .context("candidate components must be an array")?;
-    if family_rows.len() != expected_family_count || component_rows.len() != expected_component_count {
+    if family_rows.len() != expected_family_count
+        || component_rows.len() != expected_component_count
+    {
         bail!("candidate declared counts do not match family/component row counts");
     }
 
@@ -169,7 +172,10 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
         let component_id = row["component_id"]
             .as_str()
             .context("candidate family row is missing component_id")?;
-        if !valid_identifier(family_id) || !SPLITS.contains(&split) || !valid_identifier(component_id) {
+        if !valid_identifier(family_id)
+            || !SPLITS.contains(&split)
+            || !valid_identifier(component_id)
+        {
             bail!("candidate contains a blank ID or invalid split");
         }
         if family_to_split.insert(family_id.to_owned(), split.to_owned()).is_some()
@@ -251,7 +257,11 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
     validate_sha(&census.census_receipt_sha256, "census receipt digest")?;
 
     let candidate_families: BTreeSet<String> = split.family_to_split.keys().cloned().collect();
-    let census_families: BTreeSet<String> = census.families.iter().map(|f| f.family_id.clone()).collect();
+    let census_families: BTreeSet<String> = census
+        .families
+        .iter()
+        .map(|family| family.family_id.clone())
+        .collect();
     if census_families.len() != census.families.len() || census_families != candidate_families {
         bail!("census family inventory must exactly cover the candidate family universe, without duplicates");
     }
@@ -317,7 +327,9 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
         }
     }
     for family_id in &census_families {
-        let declared = declared_targets_by_family.get(family_id).context("missing family target inventory")?;
+        let declared = declared_targets_by_family
+            .get(family_id)
+            .context("missing family target inventory")?;
         let observed = observed_targets_by_family.get(family_id).cloned().unwrap_or_default();
         if declared != &observed {
             bail!("family {family_id} candidate_target_ids do not exactly match target rows");
@@ -344,11 +356,14 @@ fn execute() -> Result<()> {
         bail!("expected three file arguments");
     }
 
-    let split_bytes = fs::read(&args[1]).with_context(|| format!("read candidate split {}", args[1]))?;
-    let census_bytes = fs::read(&args[2]).with_context(|| format!("read target census {}", args[2]))?;
+    let split_bytes = fs::read(&args[1])
+        .with_context(|| format!("read candidate split {}", args[1]))?;
+    let census_bytes = fs::read(&args[2])
+        .with_context(|| format!("read target census {}", args[2]))?;
     let output_path = &args[3];
     let split = parse_candidate_split(&split_bytes)?;
-    let census: EligibilityCensus = serde_json::from_slice(&census_bytes).context("parse outcome-blind eligibility census")?;
+    let census: EligibilityCensus = serde_json::from_slice(&census_bytes)
+        .context("parse outcome-blind eligibility census")?;
     validate_census(&census, &split)?;
 
     let mut eligible_target_count = BTreeMap::<String, usize>::new();
@@ -453,7 +468,8 @@ fn execute() -> Result<()> {
         "qualified_for_confirmatory_use": false,
         "blockers": blockers
     });
-    fs::write(output_path, serde_json::to_vec_pretty(&report)?).with_context(|| format!("write report {output_path}"))?;
+    fs::write(output_path, serde_json::to_vec_pretty(&report)?)
+        .with_context(|| format!("write report {output_path}"))?;
     println!(
         "PITB_COMPONENT_SPLIT_FEASIBILITY_DIAGNOSTIC: validation_eligible_components={} test_eligible_components={} heldout_floor_met={} confirmatory=false",
         validation_eligible_components,
