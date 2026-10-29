@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from paired_benchmark_audit import analyze_manifest
+from paired_benchmark_audit import analyze_manifest, canonical_json
 from paired_benchmark_promotion_gate import assess_promotion, main
 
 HASH = "a" * 64
@@ -142,10 +142,14 @@ def contract(required_evidence="synthetic", minimum_units=30):
     }
 
 
-def scored_receipt(doc):
+def scored_receipt(doc, raw_manifest_sha256=None):
     receipt = analyze_manifest(doc)
-    receipt["source_artifacts"]["raw_manifest_sha256"] = _sha("raw paired manifest")
-    receipt["evaluator_sha256"] = _sha("paired evaluator source")
+    raw = canonical_json(doc) if raw_manifest_sha256 is None else raw_manifest_sha256
+    receipt["source_artifacts"]["raw_manifest_sha256"] = (
+        hashlib.sha256(raw).hexdigest() if isinstance(raw, bytes) else raw
+    )
+    audit_source = Path(__file__).with_name("paired_benchmark_audit.py").read_bytes()
+    receipt["evaluator_sha256"] = hashlib.sha256(audit_source).hexdigest()
     return receipt
 
 
@@ -153,10 +157,13 @@ def assess(doc=None, ct=None, val=None):
     doc = paired_manifest() if doc is None else doc
     ct = contract() if ct is None else ct
     val = validation_manifest() if val is None else val
-    receipt = scored_receipt(doc)
+    doc_raw = canonical_json(doc)
+    receipt = scored_receipt(doc, doc_raw)
+    receipt_raw = canonical_json(receipt)
     return assess_promotion(
-        receipt, ct, val,
-        paired_manifest_sha256=_sha("paired receipt raw bytes"),
+        receipt, doc, ct, val,
+        paired_receipt_file_sha256=hashlib.sha256(receipt_raw).hexdigest(),
+        paired_run_manifest_sha256=hashlib.sha256(doc_raw).hexdigest(),
         contract_manifest_sha256=_sha("contract raw bytes"),
         validation_manifest_sha256=_sha("validation raw bytes"),
         evaluator_sha256=_sha("promotion evaluator source"),
@@ -242,11 +249,17 @@ class PairedPromotionGateTests(unittest.TestCase):
             assess(val=val)
 
     def test_missing_critical_family_is_inconclusive(self):
-        receipt = scored_receipt(paired_manifest())
-        receipt["comparisons_vs_baseline"]["candidate"]["by_task_family"].pop("alloy_a")
+        doc = paired_manifest()
+        for run in doc["runs"]:
+            run["task_family"] = "alloy_b"
+        receipt = scored_receipt(doc)
+        doc_raw = canonical_json(doc)
+        receipt = scored_receipt(doc, doc_raw)
         result = assess_promotion(
-            receipt, contract(), validation_manifest(),
-            paired_manifest_sha256=_sha("paired"), contract_manifest_sha256=_sha("contract"),
+            receipt, doc, contract(), validation_manifest(),
+            paired_receipt_file_sha256=_sha("paired"),
+            paired_run_manifest_sha256=hashlib.sha256(doc_raw).hexdigest(),
+            contract_manifest_sha256=_sha("contract"),
             validation_manifest_sha256=_sha("validation"), evaluator_sha256=_sha("source"),
         )
         self.assertEqual(result["decision"], "inconclusive")
@@ -273,51 +286,67 @@ class PairedPromotionGateTests(unittest.TestCase):
 
     def test_cli_binds_input_manifest_bytes_and_evaluator(self):
         doc = paired_manifest()
-        receipt = scored_receipt(doc)
         val = validation_manifest()
         ct = contract()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            paired_path, contract_path, validation_path, output_path = [
-                root / name for name in ("paired.json", "contract.json", "validation.json", "receipt.json")
+            paired_path, run_path, contract_path, validation_path, output_path = [
+                root / name for name in (
+                    "paired.json", "runs.json", "contract.json", "validation.json", "receipt.json"
+                )
             ]
-            paired_path.write_text(json.dumps(receipt, separators=(",", ":")), encoding="utf-8")
+            run_bytes = json.dumps(doc, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+            run_path.write_bytes(run_bytes)
+            scored = scored_receipt(doc, run_bytes)
+            paired_path.write_text(json.dumps(scored, separators=(",", ":")), encoding="utf-8")
             contract_path.write_text(json.dumps(ct, separators=(",", ":")), encoding="utf-8")
             validation_path.write_text(json.dumps(val, separators=(",", ":")), encoding="utf-8")
-            raw_hashes = [hashlib.sha256(path.read_bytes()).hexdigest() for path in
-                          (paired_path, contract_path, validation_path)]
+            raw_hashes = [
+                hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in (paired_path, run_path, contract_path, validation_path)
+            ]
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = main([
-                    str(paired_path), str(contract_path), str(validation_path),
+                    str(paired_path), str(run_path), str(contract_path), str(validation_path),
                     "--output", str(output_path),
                 ])
             self.assertEqual(code, 0)
             result = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(result["decision"], "ready_for_next_stage")
-            self.assertEqual(result["source_artifacts"]["paired_receipt_manifest_sha256"], raw_hashes[0])
-            self.assertEqual(result["source_artifacts"]["promotion_contract_sha256"], raw_hashes[1])
-            self.assertEqual(result["source_artifacts"]["validation_manifest_sha256"], raw_hashes[2])
+            self.assertEqual(result["source_artifacts"]["paired_receipt_file_sha256"], raw_hashes[0])
+            self.assertEqual(result["source_artifacts"]["paired_run_manifest_sha256"], raw_hashes[1])
+            self.assertEqual(result["source_artifacts"]["promotion_contract_sha256"], raw_hashes[2])
+            self.assertEqual(result["source_artifacts"]["validation_manifest_sha256"], raw_hashes[3])
             self.assertEqual(len(result["evaluator_sha256"]), 64)
 
     def test_cli_rejects_duplicate_json_keys_and_output_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            paths = [root / name for name in ("paired.json", "contract.json", "validation.json")]
-            paths[0].write_text('{"schema_version":"1.0.0","schema_version":"1.0.0"}', encoding="utf-8")
-            paths[1].write_text(json.dumps(contract()), encoding="utf-8")
-            paths[2].write_text(json.dumps(validation_manifest()), encoding="utf-8")
+            paired_path, run_path, contract_path, validation_path = [
+                root / name for name in ("paired.json", "runs.json", "contract.json", "validation.json")
+            ]
+            paired_path.write_text('{"schema_version":"1.0.0","schema_version":"1.0.0"}', encoding="utf-8")
+            run_path.write_text(json.dumps(paired_manifest()), encoding="utf-8")
+            contract_path.write_text(json.dumps(contract()), encoding="utf-8")
+            validation_path.write_text(json.dumps(validation_manifest()), encoding="utf-8")
+            paths = [paired_path, run_path, contract_path, validation_path]
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 rc = main([*(str(p) for p in paths), "--output", str(root / "out.json")])
             self.assertEqual(rc, 2)
             self.assertIn("duplicate JSON key", stderr.getvalue())
-            paths[0].write_text(json.dumps(analyze_manifest(paired_manifest())), encoding="utf-8")
-            original = paths[0].read_bytes()
+            raw_runs = json.dumps(paired_manifest(), separators=(",", ":")).encode()
+            run_path.write_bytes(raw_runs)
+            paired_path.write_text(
+                json.dumps(scored_receipt(paired_manifest(), raw_runs), separators=(",", ":")),
+                encoding="utf-8",
+            )
+            original = paired_path.read_bytes()
             with contextlib.redirect_stderr(io.StringIO()):
-                rc = main([*(str(p) for p in paths), "--output", str(paths[0])])
+                rc = main([*(str(p) for p in paths), "--output", str(paired_path)])
             self.assertEqual(rc, 2)
-            self.assertEqual(paths[0].read_bytes(), original)
+            self.assertEqual(paired_path.read_bytes(), original)
 
 
 if __name__ == "__main__":
