@@ -30,7 +30,7 @@ The code includes endpoint cases, zero rewards, non-finite / negative inputs, pr
 - Three candidate policies with P(A=1) in {0.10, 0.50, 0.90}.
 - Clear-margin controls: E[R|A=0]=0.25 and E[R|A=1]=0.75, giving exact values 0.30, 0.50 and 0.70.
 - Small-margin control: E[R|A=0]=0.49 and E[R|A=1]=0.51, giving exact values 0.492, 0.500 and 0.508. This distinguishes weak decision margin from weak support.
-- Policy-tie control: both action reward means are 0.50, so all three target policies have exact value 0.50. Top-1 accuracy treats all true-value maximizers as correct; a valid unique-winner certificate should not occur when policies are tied.
+- Policy-tie control: both action reward means are 0.50, so all three target policies have exact value 0.50. Top-1 accuracy treats all true-value maximizers as correct; any observed unique-winner certificate in this scenario is counted as a false certificate because no candidate is strictly superior.
 - Healthy fixed logger P(A=1)=0.50; weak-overlap fixed logger P(A=1)=0.99.
 - Structural zero-support logger P(A=1)=1.00; target policies put positive mass on action zero, so all value, interval and paired-metric outputs must be suppressed.
 - The same logged stream and seed schedule are shared by every candidate and both methods within each scenario.
