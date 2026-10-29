@@ -1,6 +1,6 @@
 # CMAQ-007: Planner-Induced World-Model Exploitability
 
-**Status:** protocol v0.3 + executable synthetic smoke harness; draft  
+**Status:** protocol v0.4 + executable synthetic smoke harness; draft  
 **Tracking issue:** [#9035](https://github.com/Luminous-Dynamics/symthaea/issues/9035)  
 **Claim ceiling:** deterministic finite synthetic benchmark only; no SOTA, physical safety, trained-model, or production Symthaea claim
 
@@ -23,7 +23,7 @@ cargo test --locked
 cargo run --quiet --locked
 ```
 
-The program prints one machine-readable JSON report with 44 planner-policy rows and four risk-control rows. The focused workflow validates schema, fixed seed/action-set protocol, oracle regret, fallback accounting, a prediction-error bound for this synthetic construction, the shuffled-score negative control, and the calibrated risk-control contract. A passing smoke test establishes only that the code and declared synthetic invariants work.
+The program prints one machine-readable JSON report with 44 planner-policy rows and four risk-control rows. The focused workflow validates schema, fixed seed/action-set protocol, oracle regret, fallback accounting, a prediction-error bound for this synthetic construction, the shuffled-score negative control, the calibrated risk-control contract, and a post-calibration support-score shift panel. A passing smoke test establishes only that the code and declared synthetic invariants work.
 
 ## Candidate and evaluator boundary
 
@@ -81,7 +81,7 @@ The follow-up control passed at current source commit `22ce169ab360be31bc19f1cda
 
 At size 8, the random score happens to have lower regret because it abstains more often; this is a useful reminder that one seed panel and one threshold do not prove superiority. From sizes 32 to 512, the informative score outperforms the shuffled score on both regret and unsupported-selection rate. But it still leaves substantial unsupported selection at 512 candidates, so support scoring is evidence—not a safety certificate. The workflow now encodes the large-search contrast as a regression assertion rather than a narrative-only observation.
 
-## Joint risk- and utility-controlled planning (v0.3)
+## Joint risk- and utility-controlled planning (v0.4)
 
 CMAQ-007 v0.3 replaces hand-picked thresholds with a calibration-selected abstention rule. The design treats world-model authority as conditional: a model action is used only if the calibration evidence meets three separately declared requirements.
 
@@ -98,6 +98,14 @@ The six candidate thresholds × three criteria produce 18 bounds, so the procedu
 The report records selected threshold, whether the gate was certified, calibration event counts/rates/upper bounds, the utility-lift estimate and lower bound, held-out event rates/coverage/utility lift/regret, and direct-fallback regret on the same qualification episodes. Qualification outcomes are not used to choose the threshold. The workflow checks the schema, distinct seed roots, sample counts, risk bounds, and positive utility bound for any certified model gate; it does not require a model to be used when none qualifies.
 
 This rule is intentionally conservative, but it is still a synthetic experiment rather than a deployment guarantee. The stated confidence interpretation assumes calibration episodes are independent draws from the target episode distribution, support/downside labels are correct, and the candidate utility-lift range is valid. It does not cover arbitrary shift after calibration, adaptive adversaries, mislabelled or delayed support evidence, or dependence among episodes. If the controller abstains at larger search sizes, that shows the current estimator has not earned higher-coverage authority under these requirements. Do not weaken the bound after inspecting qualification outcomes; improve the support estimator, collect better calibration evidence, or improve the model's decision-value margin.
+
+## Post-calibration support-score shift
+
+The v0.4 stress panel keeps the calibrated threshold fixed but changes the score-generating process in qualification. For the paired shifted panel, the utility truths, predicted utilities, stated uncertainty and unsupported labels are held constant for each same seed; only the **unsupported action's support score** is shifted upward from Uniform[0.15, 1.00) to Uniform[0.90, 1.00). Supported scores and the independent shuffled-score stream are unchanged. This simulates a support estimator whose confidence becomes over-optimistic for out-of-support actions after calibration.
+
+The controller does not recalibrate on the shifted panel. The report separately records shift-panel unsupported selection, fallback-downside, coverage, utility lift and regret, plus direct-fallback regret. These metrics are never inputs to threshold selection. If the shifted panel breaches the nominal 5% risk target, the correct conclusion is that offline calibration alone does not survive this support-score drift; a separate shift detector/currentness gate or robust support estimator is required.
+
+The support-score shift is synthetic and deliberately adverse. It does not represent a measured Symthaea score distribution or a claimed real-world attack rate. The exact-head v0.4 focused run is pending; the v0.3 non-shift calibration table below remains the prior-version baseline, not evidence about the shifted panel.
 
 ### Exact-head Rust result (v0.3)
 
