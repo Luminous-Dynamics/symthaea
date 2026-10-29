@@ -505,6 +505,11 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
     let per_task_expected = run.systems.len().saturating_mul(run.suite.attempts_per_task);
     report.counts.trials_expected = run.task_records.len().saturating_mul(per_task_expected);
 
+    let manifest_by_id: BTreeMap<String, &ManifestTask> = manifest
+        .tasks
+        .iter()
+        .map(|task| (task.task_id.clone(), task))
+        .collect();
     let mut task_ids = BTreeSet::new();
     let mut group_owners: BTreeMap<String, (String, usize)> = BTreeMap::new();
     for (task_index, task) in run.task_records.iter().enumerate() {
