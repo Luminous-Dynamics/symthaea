@@ -13,16 +13,20 @@
 //! certificate. The report may say `OptimalWithinTolerance` only when the best
 //! verified feasible objective is within the declared absolute gap of the
 //! minimum admissible lower bound over every unevaluated or indeterminate
-//! candidate. These lower bounds are supplied by the caller; this module does
-//! not prove their admissibility and is not an aircraft dispatch authority.
+//! candidate. The caller must also establish that the frozen candidate universe
+//! covers the full feasible search space. This module does not prove bound
+//! admissibility or coverage and is not an aircraft dispatch authority.
 
 /// Frozen run identity. Digests are caller-computed SHA-256 values; this module
 /// validates their encoding but does not hash external files or authenticate
-/// the source of the values.
+/// the source of the values. The space-contract digest must identify the formal
+/// semantics and completeness/coverage argument for the candidate universe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecoveryScreenContext {
     pub scenario_id: String,
     pub scenario_sha256: String,
+    /// Digest of the formal candidate-space semantics and completeness/coverage contract.
+    pub candidate_space_contract_sha256: String,
     /// Digest of the complete candidate universe including stable IDs, ranking
     /// scores, and per-candidate lower bounds, in a documented canonical order.
     pub candidate_universe_sha256: String,
@@ -317,6 +321,7 @@ where
     Ok(AdaptiveScreenReport {
         scenario_id: context.scenario_id.clone(),
         scenario_sha256: context.scenario_sha256.clone(),
+        candidate_space_contract_sha256: context.candidate_space_contract_sha256.clone(),
         candidate_universe_sha256: context.candidate_universe_sha256.clone(),
         screening_policy_sha256: context.screening_policy_sha256.clone(),
         ranking_artifact_sha256: context.ranking_artifact_sha256.clone(),
@@ -381,6 +386,7 @@ fn validate_context(context: &RecoveryScreenContext) -> Result<(), AdaptiveScree
     }
     for (field, value) in [
         ("scenario_sha256", context.scenario_sha256.as_str()),
+        ("candidate_space_contract_sha256", context.candidate_space_contract_sha256.as_str()),
         (
             "candidate_universe_sha256",
             context.candidate_universe_sha256.as_str(),
