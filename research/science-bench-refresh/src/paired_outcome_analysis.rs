@@ -915,7 +915,6 @@ mod tests {
         assert!(log10_p < -300.0);
         assert!(floored);
     }
-    }
 
     #[test]
     fn wilson_interval_is_bounded_and_symmetric_at_half() {
@@ -945,6 +944,8 @@ mod tests {
                 paired_risk_difference: Some(0.4),
                 discordant_pair_count: Some(6),
                 exact_mcnemar_two_sided_p: Some(0.03125),
+                exact_mcnemar_log10_p: Some(0.03125_f64.log10()),
+                mcnemar_p_value_numerically_floored: Some(false),
                 holm_adjusted_p: None,
                 discordant_win_rate: Some(5.0 / 6.0),
                 discordant_win_rate_wilson_95_low: Some(0.0),
@@ -970,6 +971,8 @@ mod tests {
                 paired_risk_difference: Some(0.1),
                 discordant_pair_count: Some(3),
                 exact_mcnemar_two_sided_p: Some(0.25),
+                exact_mcnemar_log10_p: Some(0.25_f64.log10()),
+                mcnemar_p_value_numerically_floored: Some(false),
                 holm_adjusted_p: None,
                 discordant_win_rate: Some(2.0 / 3.0),
                 discordant_win_rate_wilson_95_low: Some(0.0),
