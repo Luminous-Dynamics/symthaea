@@ -16,7 +16,7 @@ Related work:
 
 The isolated V2 prototype identifies a stream using a 16-bit `thought_id`, encoded length, fragment count and capacity profile. Two different same-length messages can reuse that identifier while stale fragments are still in flight. A receiver that validates only those metadata can combine individually valid fragments from separate messages and create a mixed payload.
 
-V3 makes the stream identity explicit: a 64-bit `session_generation` plus a 32-bit `message_sequence`. The reassembler rejects a frame before state advances when either component differs from the assembly identity. It also poisons the assembly if a duplicate fragment index arrives with conflicting payload bytes.
+V3 makes the wire stream identity explicit: a 64-bit `session_generation` plus a 32-bit `message_sequence`. The reassembler also requires the full 32-byte authenticated peer context supplied by the caller, so two peers cannot collide merely by choosing the same numeric pair. The caller must pass this context only after frame/source authentication; it must not derive it from an unverified source-ID field. The reassembler rejects a frame before state advances when peer context or any wire identity component differs. It also poisons the assembly if a duplicate fragment index arrives with conflicting payload bytes.
 
 ## Wire format
 
@@ -41,6 +41,7 @@ The codec offers an allocation-free `write_to(&mut [u8])` path. The vector seria
 
 The header is a protocol binding, not an identity allocator. It does **not** fix a cloned or rolled-back sender on its own.
 
+- The 32-byte peer context must be derived from authenticated peer/security state and kept separate per authenticated principal.
 - `session_generation` must come from the reviewed clone-safe key/session-generation lifecycle; it must not be recycled under the same effective traffic key.
 - `message_sequence` must not repeat inside one session generation. The sender must rotate to a genuinely fresh session/key generation before sequence wrap or rollback can cause reuse.
 - Authenticated identity, flags, exact length and payload must be cryptographically bound before the receiver trusts a frame. CRC only detects accidental corruption and is forgeable.
@@ -66,7 +67,7 @@ The full CSV includes SF7/SF9/SF12 and the exact frame-length arithmetic. This i
 
 - Reconstruct boundary sizes through every single data-fragment erasure with parity available.
 - Confirm external AEAD-size accounting never exceeds 222 bytes.
-- Reject fragments from a different session generation or message sequence.
+- Reject fragments from a different authenticated peer context, session generation or message sequence.
 - Poison the assembly on a conflicting duplicate.
 - Reject V3 from the hardened legacy V1 parser.
 - Reject every single-bit mutation of one representative frame.
