@@ -747,6 +747,12 @@ fn validate_against_plan(
     if fields.plan_commitment_sha256 != plan.plan_commitment_sha256 {
         issues.push("plan_commitment_sha256 does not match the validated plan".to_owned());
     }
+    if fields.evaluator_revision_sha256 != plan.evaluator_revision_sha256 {
+        issues.push("evaluator_revision_sha256 differs from the precommitted plan".to_owned());
+    }
+    if fields.decision_rules_sha256 != plan.decision_rules_sha256 {
+        issues.push("decision_rules_sha256 differs from the precommitted plan".to_owned());
+    }
     for (name, value) in [
         ("evaluator_revision_sha256", fields.evaluator_revision_sha256.as_str()),
         ("decision_rules_sha256", fields.decision_rules_sha256.as_str()),
@@ -915,6 +921,8 @@ mod tests {
             tool_manifest_sha256: digest('4'),
             budget_sha256: digest('5'),
             analysis_plan_sha256: digest('6'),
+            evaluator_revision_sha256: digest('9'),
+            decision_rules_sha256: digest('c'),
             randomization_commitment_sha256: digest('7'),
             required_conditions: conditions.iter().map(|value| (*value).to_owned()).collect(),
             pairs: vec![EvidenceInterventionPairV1 {
@@ -991,8 +999,8 @@ mod tests {
             schema: EVIDENCE_OUTCOME_REPORT_SCHEMA.to_owned(),
             plan_sha256: sha256_hex(plan),
             plan_commitment_sha256: plan_obj.plan_commitment_sha256,
-            evaluator_revision_sha256: digest('9'),
-            decision_rules_sha256: digest('c'),
+            evaluator_revision_sha256: plan_obj.evaluator_revision_sha256,
+            decision_rules_sha256: plan_obj.decision_rules_sha256,
             records,
         }
     }
