@@ -454,7 +454,10 @@ impl LoopbackTransport {
 
         // Decode first fragment to get thought_id and total_fragments
         let first = LoRaFragment::from_bytes(&sent[0])?;
-        let mut assembler = super::FragmentAssembler::new(
+        // This helper handles the compressed/enveloped send path, whose exact
+        // encoded length is not carried in legacy fragments. Do not infer a
+        // missing final shard from the nominal capacity margin.
+        let mut assembler = super::FragmentAssembler::new_without_final_fragment_recovery(
             first.thought_id,
             first.total_fragments,
             WISDOM_PACKET_SIZE + 64,
