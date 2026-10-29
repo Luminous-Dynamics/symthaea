@@ -316,6 +316,14 @@ class ShiftEventEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "canonical locked scenario"):
             auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
 
+    def test_initial_checkpoint_must_match_locked_scenario(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
+        shifted["initial_checkpoint_sha256"] = "f" * 64
+        self.refresh_payload(shifted)
+        with self.assertRaisesRegex(ValueError, "initial_checkpoint_sha256 differs"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
     def test_task_contract_digest_mismatch_is_rejected(self) -> None:
         manifest = copy.deepcopy(self.fixture.manifest)
         shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
