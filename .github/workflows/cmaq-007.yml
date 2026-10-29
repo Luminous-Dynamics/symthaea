@@ -63,6 +63,10 @@ jobs:
           risk_by_size = {row["search_size"]: row for row in risk_rows}
           assert set(risk_by_size) == set(report["search_sizes"])
           expected_thresholds = [0.40, 0.55, 0.75, 0.90, 0.97, 1.01]
+          assert risk_by_size[8]["model_gate_certified"]
+          assert risk_by_size[8]["shifted_qualification_unsupported_rate"] > risk_by_size[8]["qualification_unsupported_rate"]
+          assert risk_by_size[8]["shifted_qualification_unsupported_rate"] > risk_by_size[8]["target_unsupported_risk"]
+          assert risk_by_size[8]["shifted_qualification_downside_rate"] > risk_by_size[8]["target_fallback_downside_risk"]
           for size, row in risk_by_size.items():
               assert row["target_unsupported_risk"] == 0.05
               assert row["target_fallback_downside_risk"] == 0.05
@@ -87,7 +91,7 @@ jobs:
               assert 0.0 <= row["qualification_unsupported_rate"] <= 1.0
               assert 0.0 <= row["qualification_downside_rate"] <= 1.0
               assert 0.0 <= row["qualification_coverage_rate"] <= 1.0
-          print("CMAQ-007 v0.2 schema, planner-exploitability panel, shuffled-score control, and risk-control calibration validated")
+          print("CMAQ-007 v0.4 schema, planner-exploitability panel, shuffled-score control, joint risk/value gate, and shifted-support stress validated")
           print(json.dumps({
               "planner_exploitability": {
                   size: {
