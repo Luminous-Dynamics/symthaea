@@ -771,6 +771,8 @@ mod tests {
       ]
     }"#;
 
+    const SYNTHETIC_COMPONENT_MANIFEST: &[u8] = br#"{"schema_version":"pitb.independent-component-manifest.v0","dataset_kind":"synthetic_fixture","upstream_commit":"1581d4cbdd69a0faf34b2089614fe2a814316a6a","source_partition_digest_sha256":"e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970","relationship_inventory_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","total_family_count":6,"total_component_count":6,"families":[{"family_id":"a","split":"train","component_id":"component-a"},{"family_id":"b","split":"train","component_id":"component-b"},{"family_id":"c","split":"train","component_id":"component-c"},{"family_id":"d","split":"train","component_id":"component-d"},{"family_id":"e","split":"validation","component_id":"component-e"},{"family_id":"f","split":"test","component_id":"component-f"}],"components":[{"component_id":"component-a","split_names":["train"],"family_ids":["a"],"hard_edge_ids":[],"confirmed_edge_ids":[],"unresolved_edge_ids":[]},{"component_id":"component-b","split_names":["train"],"family_ids":["b"],"hard_edge_ids":[],"confirmed_edge_ids":[],"unresolved_edge_ids":[]},{"component_id":"component-c","split_names":["train"],"family_ids":["c"],"hard_edge_ids":[],"confirmed_edge_ids":[],"unresolved_edge_ids":[]},{"component_id":"component-d","split_names":["train"],"family_ids":["d"],"hard_edge_ids":[],"confirmed_edge_ids":[],"unresolved_edge_ids":[]},{"component_id":"component-e","split_names":["validation"],"family_ids":["e"],"hard_edge_ids":[],"confirmed_edge_ids":[],"unresolved_edge_ids":[]},{"component_id":"component-f","split_names":["test"],"family_ids":["f"],"hard_edge_ids":[],"confirmed_edge_ids":[],"unresolved_edge_ids":[]}]} "#;
+
     const SYNTHETIC_CENSUS: &[u8] = br#"{
       "schema_version":"pitb.pre-split-target-eligibility-census.v0",
       "dataset_kind":"synthetic_fixture",
@@ -810,7 +812,33 @@ mod tests {
             );
         }
         value["candidate_partition_digest_sha256"] = json!(partition_digest(&assignments));
+        value["source_component_manifest_sha256"] =
+            json!(sha256(SYNTHETIC_COMPONENT_MANIFEST));
         serde_json::to_vec(&value).expect("serialize candidate fixture")
+    }
+
+    #[test]
+    fn candidate_must_match_exact_source_component_manifest_bytes() {
+        let split_bytes = candidate_with_correct_digest();
+        let split = parse_candidate_split(&split_bytes).expect("valid synthetic candidate");
+        validate_component_manifest(SYNTHETIC_COMPONENT_MANIFEST, &split)
+            .expect("candidate and source component manifest agree");
+
+        let mut substituted = SYNTHETIC_COMPONENT_MANIFEST.to_vec();
+        substituted.extend_from_slice(b" ");
+        assert!(validate_component_manifest(&substituted, &split).is_err());
+
+        let mut false_grouping: Value =
+            serde_json::from_slice(&split_bytes).expect("valid candidate fixture");
+        false_grouping["families"][0]["component_id"] = json!("component-x");
+        false_grouping["components"][0]["component_id"] = json!("component-x");
+        let false_bytes = serde_json::to_vec(&false_grouping).expect("serialize candidate");
+        let false_split = parse_candidate_split(&false_bytes)
+            .expect("candidate's self-described tables remain structurally consistent");
+        assert!(
+            validate_component_manifest(SYNTHETIC_COMPONENT_MANIFEST, &false_split).is_err(),
+            "the candidate must not redefine graph components independently of source manifest bytes"
+        );
     }
 
     #[test]
