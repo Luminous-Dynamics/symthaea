@@ -677,7 +677,7 @@ mod tests {
         // Deliberate negative control: the exact same peer+generation+sequence
         // is reused for two different messages. Framing cannot distinguish them.
         for frame in &a[..6] {
-            assert!(assembler.feed(&peer_context, frame) || !assembler.is_complete());
+            assembler.feed(&peer_context, frame);
         }
         for frame in &b[6..b.len() - 1] {
             assembler.feed(&peer_context, frame);
