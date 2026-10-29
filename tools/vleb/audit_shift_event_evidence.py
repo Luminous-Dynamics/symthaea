@@ -38,7 +38,7 @@ RECEIPT_KEYS = {
     "validation_results", "audit_report_sha256",
 }
 EVENT_KEYS = {
-    "event_id", "event_kind", "sequence_number", "applied", "payload_sha256",
+    "event_id", "event_kind", "sequence_number", "intervention_position", "applied", "payload_sha256",
     "pre_workspace_sha256", "post_workspace_sha256", "transition_diff_sha256",
     "runner_event_log_sha256", "observed_monotonic_ns", "event_source",
 }
@@ -194,6 +194,8 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
     run_ids: set[str] = set()
     receipt_digests: set[str] = set()
     audit_digests: set[str] = set()
+    configuration_by_scenario: dict[str, tuple[Any, ...]] = {}
+    post_shift_config_by_scenario: dict[str, tuple[Any, ...]] = {}
     normalized_receipts: list[dict[str, Any]] = []
     for index, receipt in enumerate(receipts):
         label = f"receipts[{index}]"
@@ -244,6 +246,9 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         del payload_for_digest["receipt_payload_sha256"]
         if canonical_digest(payload_for_digest) != receipt["receipt_payload_sha256"]:
             raise ValueError(f"{label} receipt payload digest does not match canonical receipt bytes")
+        if receipt["receipt_payload_sha256"] in receipt_digests:
+            raise ValueError("receipt payload digest replay detected")
+        receipt_digests.add(receipt["receipt_payload_sha256"])
         if receipt["audit_report_sha256"] in audit_digests:
             raise ValueError("audit-report digest replay detected")
         audit_digests.add(receipt["audit_report_sha256"])
@@ -253,9 +258,16 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             raise ValueError(f"{label}.model_version must be non-empty")
         if not isinstance(receipt["initial_network_mode"], str) or receipt["initial_network_mode"] not in NETWORK_MODES:
             raise ValueError(f"{label}.initial_network_mode is invalid")
-        if receipt["outcome"] not in OUTCOMES:
+        if not isinstance(receipt["outcome"], str) or receipt["outcome"] not in OUTCOMES:
             raise ValueError(f"{label}.outcome must be pass, fail, or unresolved")
 
+        configuration = (
+            receipt["model_id"], receipt["model_version"], receipt["scaffold_sha256"],
+            receipt["initial_execution_profile_sha256"], receipt["initial_network_mode"],
+        )
+        previous_configuration = configuration_by_scenario.setdefault(scenario_id, configuration)
+        if previous_configuration != configuration:
+            raise ValueError(f"scenario {scenario_id!r} drifts in model/scaffold/initial profile across seeds")
         event = receipt["runner_event"]
         stale_disposition = receipt["stale_evidence_disposition"]
         checks = receipt["validation_results"]
@@ -273,10 +285,12 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
                 raise ValueError(f"{label} shifted condition requires a runner_event object")
             exact_keys(event, EVENT_KEYS, label + ".runner_event")
             require_identifier(event["event_id"], label + ".runner_event.event_id")
-            if event["event_kind"] not in EVENT_KINDS:
+            if not isinstance(event["event_kind"], str) or event["event_kind"] not in EVENT_KINDS:
                 raise ValueError(f"{label}.runner_event.event_kind is invalid")
             if type(event["sequence_number"]) is not int or event["sequence_number"] < 1:
                 raise ValueError(f"{label}.runner_event.sequence_number must be a positive integer")
+            if event["intervention_position"] != scenario["intervention_position"]:
+                raise ValueError(f"{label}.runner_event intervention position differs from locked scenario")
             if event["applied"] is not True or event["event_source"] != "trusted_runner":
                 raise ValueError(f"{label} event must be marked applied and sourced from trusted_runner")
             for key in (
@@ -295,6 +309,12 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             require_digest(receipt["post_shift_execution_profile_sha256"], label + ".post_shift_execution_profile_sha256")
             if not isinstance(receipt["post_shift_network_mode"], str) or receipt["post_shift_network_mode"] not in NETWORK_MODES:
                 raise ValueError(f"{label}.post_shift_network_mode is invalid")
+            post_shift_configuration = (
+                receipt["post_shift_execution_profile_sha256"], receipt["post_shift_network_mode"]
+            )
+            previous_post_shift = post_shift_config_by_scenario.setdefault(scenario_id, post_shift_configuration)
+            if previous_post_shift != post_shift_configuration:
+                raise ValueError(f"scenario {scenario_id!r} drifts in post-shift profile/network mode across seeds")
 
             if len(stale_disposition) != len(scenario["stale_artifact_sha256s"]):
                 raise ValueError(f"{label} stale-evidence dispositions do not cover the locked stale-artifact inventory")
@@ -309,7 +329,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
                 if item["artifact_sha256"] in seen_stale:
                     raise ValueError(f"{label} duplicate stale-evidence disposition")
                 seen_stale.add(item["artifact_sha256"])
-                if item["disposition"] not in {"invalidated", "regenerated"}:
+                if not isinstance(item["disposition"], str) or item["disposition"] not in {"invalidated", "regenerated"}:
                     raise ValueError(f"{stale_label}.disposition must be invalidated or regenerated")
                 if item["reason_event_id"] != event["event_id"]:
                     raise ValueError(f"{stale_label} is not bound to the observed shift event")
@@ -328,7 +348,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             if check["check_id"] in seen_checks:
                 raise ValueError(f"{label} duplicate validation check ID")
             seen_checks.add(check["check_id"])
-            if check["status"] not in CHECK_STATUSES:
+            if not isinstance(check["status"], str) or check["status"] not in CHECK_STATUSES:
                 raise ValueError(f"{check_label}.status is invalid")
             require_digest(check["input_workspace_sha256"], check_label + ".input_workspace_sha256")
             if check["input_workspace_sha256"] != receipt["final_workspace_sha256"]:
