@@ -197,6 +197,39 @@ pub struct QueryEvidenceSetSelection {
     pub complete: bool,
 }
 
+/// A caller-supplied role annotation tied to one exact source-text byte span.
+///
+/// This proves only that the cited bytes occur in the current evidence payload.
+/// It does not prove that the span semantically supports the role label.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceRoleWitness {
+    pub role: String,
+    pub span_start_byte: usize,
+    pub span_end_byte: usize,
+    pub span_sha256: String,
+}
+
+/// Verified role witness included in a selected evidence-set receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedEvidenceRoleWitness {
+    pub hdc_id: u64,
+    pub evidence_id: String,
+    pub source_sha256: String,
+    pub content_sha256: String,
+    pub role: String,
+    pub span_start_byte: usize,
+    pub span_end_byte: usize,
+    pub span_sha256: String,
+}
+
+/// Evidence-set selection paired with the exact verified spans used to cover roles.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourceGroundedQueryEvidenceSetSelection {
+    pub selection: QueryEvidenceSetSelection,
+    pub witnesses: Vec<VerifiedEvidenceRoleWitness>,
+}
+
+
 
 
 impl EvidenceRecord {
@@ -1758,6 +1791,139 @@ impl EvidenceIndex {
         })
     }
 
+    /// Select an evidence set whose role annotations are anchored to verified source spans.
+    ///
+    /// Unlike the lower-level role-set selector, this entry point requires explicit
+    /// EvidenceRoleWitness items tied to byte ranges in each candidate's current text.
+    /// For eligible text candidates it verifies UTF-8 boundaries, non-empty span,
+    /// span SHA-256, and the enclosing content digest before role coverage can use the
+    /// annotation. The output receipt includes the exact source/evidence/span digests.
+    ///
+    /// A verified span is not a semantic entailment proof: it establishes that the
+    /// supplied role label has a reproducible textual witness, not that the label is
+    /// correct or that the span supports the final answer. A separately qualified
+    /// role-extraction / entailment component is still required.
+    pub(crate) fn select_source_grounded_query_evidence_set(
+        &self,
+        ranked_candidates: &[(u64, f32)],
+        candidate_token_costs: &BTreeMap<u64, usize>,
+        candidate_witnesses: &BTreeMap<u64, Vec<EvidenceRoleWitness>>,
+        required_roles: &BTreeSet<String>,
+        scope_id: &str,
+        now_ms: u64,
+        token_budget: usize,
+        max_candidates: usize,
+    ) -> Result<SourceGroundedQueryEvidenceSetSelection, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if ranked_candidates.iter().any(|(_, score)| !score.is_finite() || *score < 0.0) {
+            return Err("candidate scores must be finite and non-negative".into());
+        }
+
+        let unique_ids: BTreeSet<u64> = ranked_candidates.iter().map(|(id, _)| *id).collect();
+        let witness_ids: BTreeSet<u64> = candidate_witnesses.keys().copied().collect();
+        if unique_ids != witness_ids {
+            return Err("candidate witnesses must exactly match unique ranked candidate IDs".into());
+        }
+
+        let mut candidate_roles = BTreeMap::<u64, BTreeSet<String>>::new();
+        let mut sorted_witnesses = BTreeMap::<u64, Vec<EvidenceRoleWitness>>::new();
+
+        for hdc_id in &unique_ids {
+            let record = self.records.get(hdc_id)
+                .ok_or_else(|| format!("ranked evidence candidate references unknown HDC ID {hdc_id}"))?;
+            let witnesses = candidate_witnesses.get(hdc_id)
+                .ok_or_else(|| format!("missing explicit role-witness list for HDC ID {hdc_id}"))?;
+
+            let mut roles = BTreeSet::new();
+            let mut ordered_witnesses = witnesses.clone();
+            for witness in &ordered_witnesses {
+                if witness.role.trim().is_empty() || witness.role.trim() != witness.role {
+                    return Err(format!("role label must be non-empty and trimmed for HDC ID {hdc_id}"));
+                }
+                if !is_sha256(&witness.span_sha256) {
+                    return Err(format!("span_sha256 must be 64 lowercase hexadecimal characters for HDC ID {hdc_id}"));
+                }
+                roles.insert(witness.role.clone());
+            }
+
+            // Verify source spans only where the record is eligible to contribute.
+            // Ineligible candidates cannot contribute roles even if their metadata
+            // happens to be well formed.
+            if record.is_eligible_for(scope_id, now_ms) {
+                match &record.payload {
+                    EvidencePayload::Text { value } => {
+                        if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                            return Err(format!("text content digest mismatch for eligible HDC ID {hdc_id}"));
+                        }
+                        for witness in &ordered_witnesses {
+                            if witness.span_start_byte >= witness.span_end_byte {
+                                return Err(format!("role witness span must be non-empty for HDC ID {hdc_id}"));
+                            }
+                            let span = value.get(witness.span_start_byte..witness.span_end_byte)
+                                .ok_or_else(|| format!("role witness span is outside text or not on UTF-8 boundaries for HDC ID {hdc_id}"))?;
+                            if sha256_hex(span.as_bytes()) != witness.span_sha256 {
+                                return Err(format!("role witness span digest mismatch for HDC ID {hdc_id}"));
+                            }
+                        }
+                    }
+                    EvidencePayload::Image { .. } if !ordered_witnesses.is_empty() => {
+                        return Err(format!("text role witness cannot annotate image-only HDC ID {hdc_id}"));
+                    }
+                    EvidencePayload::Image { .. } => {}
+                }
+            }
+
+            ordered_witnesses.sort_unstable_by(|left, right| {
+                left.role.cmp(&right.role)
+                    .then_with(|| left.span_start_byte.cmp(&right.span_start_byte))
+                    .then_with(|| left.span_end_byte.cmp(&right.span_end_byte))
+                    .then_with(|| left.span_sha256.cmp(&right.span_sha256))
+            });
+            candidate_roles.insert(*hdc_id, roles);
+            sorted_witnesses.insert(*hdc_id, ordered_witnesses);
+        }
+
+        let selection = self.select_query_evidence_set(
+            ranked_candidates,
+            candidate_token_costs,
+            &candidate_roles,
+            required_roles,
+            scope_id,
+            now_ms,
+            token_budget,
+            max_candidates,
+        )?;
+
+        let mut output_witnesses = Vec::new();
+        for member in &selection.members {
+            let record = self.records.get(&member.hdc_id)
+                .ok_or_else(|| format!("selected evidence candidate disappeared: {}", member.hdc_id))?;
+            let witnesses = sorted_witnesses.get(&member.hdc_id)
+                .ok_or_else(|| format!("selected evidence role witnesses disappeared: {}", member.hdc_id))?;
+            for role in &member.newly_covered_roles {
+                let witness = witnesses.iter().find(|candidate| &candidate.role == role)
+                    .ok_or_else(|| format!("selected role has no grounded witness for HDC ID {}", member.hdc_id))?;
+                output_witnesses.push(VerifiedEvidenceRoleWitness {
+                    hdc_id: member.hdc_id,
+                    evidence_id: record.evidence_id.clone(),
+                    source_sha256: record.source.source_sha256.clone(),
+                    content_sha256: record.content_sha256.clone(),
+                    role: role.clone(),
+                    span_start_byte: witness.span_start_byte,
+                    span_end_byte: witness.span_end_byte,
+                    span_sha256: witness.span_sha256.clone(),
+                });
+            }
+        }
+
+        Ok(SourceGroundedQueryEvidenceSetSelection {
+            selection,
+            witnesses: output_witnesses,
+        })
+    }
+
     /// ABI projection for consumers that require only official `type/value`
     /// context items. Use `resolve_with_provenance` when an audit trail is needed.
     pub fn resolve(
@@ -2470,6 +2636,114 @@ mod tests {
         evidence.records.get_mut(&1).unwrap().content_sha256 = hash(b"tampered");
         assert!(evidence.select_query_evidence_set(
             &ranked, &costs, &roles, &required, "web", 150, 2, 2,
+        ).is_err());
+    }
+
+    fn role_witness(text: &str, role: &str, needle: &str) -> EvidenceRoleWitness {
+        let start = text.find(needle).expect("test witness must exist");
+        let end = start + needle.len();
+        EvidenceRoleWitness {
+            role: role.to_string(),
+            span_start_byte: start,
+            span_end_byte: end,
+            span_sha256: hash(needle.as_bytes()),
+        }
+    }
+
+    #[test]
+    fn source_grounded_evidence_set_returns_exact_verifiable_role_spans() {
+        let mut evidence = EvidenceIndex::new();
+        let text = "Procedure: restart the service. Outcome: service recovered.";
+        let (record, source_bytes) = text_record_for_trajectory(
+            1, "source-grounded", "web", "trajectory-a", text,
+        );
+        evidence.insert(record, &source_bytes).unwrap();
+
+        let witnesses = BTreeMap::from([(
+            1,
+            vec![
+                role_witness(text, "procedure", "restart the service"),
+                role_witness(text, "outcome", "service recovered"),
+            ],
+        )]);
+        let result = evidence.select_source_grounded_query_evidence_set(
+            &[(1, 0.8)],
+            &BTreeMap::from([(1, 5usize)]),
+            &witnesses,
+            &BTreeSet::from(["procedure".to_string(), "outcome".to_string()]),
+            "web", 150, 8, 2,
+        ).unwrap();
+
+        assert!(result.selection.complete);
+        assert_eq!(result.witnesses.len(), 2);
+        for witness in result.witnesses {
+            let record = evidence.records.get(&witness.hdc_id).unwrap();
+            assert_eq!(witness.evidence_id, record.evidence_id);
+            assert_eq!(witness.source_sha256, record.source.source_sha256);
+            assert_eq!(witness.content_sha256, record.content_sha256);
+            let EvidencePayload::Text { value } = &record.payload else { panic!("expected text") };
+            let span = value.get(witness.span_start_byte..witness.span_end_byte).unwrap();
+            assert_eq!(hash(span.as_bytes()), witness.span_sha256);
+        }
+    }
+
+    #[test]
+    fn source_grounded_evidence_set_rejects_spoofed_or_invalid_byte_spans() {
+        let mut evidence = EvidenceIndex::new();
+        let text = "Café was opened yesterday.";
+        let (record, source_bytes) = text_record_for_trajectory(
+            1, "utf8-source", "web", "trajectory-a", text,
+        );
+        evidence.insert(record, &source_bytes).unwrap();
+        let required = BTreeSet::from(["claim".to_string()]);
+        let costs = BTreeMap::from([(1, 2usize)]);
+
+        let spoofed = BTreeMap::from([(
+            1, vec![EvidenceRoleWitness {
+                role: "claim".to_string(),
+                span_start_byte: 0,
+                span_end_byte: 4,
+                span_sha256: hash(b"fake span"),
+            }],
+        )]);
+        assert!(evidence.select_source_grounded_query_evidence_set(
+            &[(1, 0.9)], &costs, &spoofed, &required, "web", 150, 8, 2,
+        ).is_err());
+
+        // "é" occupies two UTF-8 bytes; an endpoint inside its encoding is invalid.
+        let invalid_boundary = BTreeMap::from([(
+            1, vec![EvidenceRoleWitness {
+                role: "claim".to_string(),
+                span_start_byte: 3,
+                span_end_byte: 4,
+                span_sha256: hash(&text.as_bytes()[3..4]),
+            }],
+        )]);
+        assert!(evidence.select_source_grounded_query_evidence_set(
+            &[(1, 0.9)], &costs, &invalid_boundary, &required, "web", 150, 8, 2,
+        ).is_err());
+    }
+
+    #[test]
+    fn source_grounded_evidence_set_requires_exact_candidate_annotation_coverage() {
+        let mut evidence = EvidenceIndex::new();
+        let (one, one_source) = text_record_for_trajectory(
+            1, "one", "web", "trajectory-a", "first evidence",
+        );
+        let (two, two_source) = text_record_for_trajectory(
+            2, "two", "web", "trajectory-b", "second evidence",
+        );
+        evidence.insert(one, &one_source).unwrap();
+        evidence.insert(two, &two_source).unwrap();
+
+        let candidates = [(1, 0.9), (2, 0.8)];
+        let required = BTreeSet::from(["claim".to_string()]);
+        let witnesses = BTreeMap::from([(
+            1, vec![role_witness("first evidence", "claim", "first evidence")],
+        )]);
+        assert!(evidence.select_source_grounded_query_evidence_set(
+            &candidates, &BTreeMap::from([(1, 1usize), (2, 1usize)]),
+            &witnesses, &required, "web", 150, 8, 2,
         ).is_err());
     }
 

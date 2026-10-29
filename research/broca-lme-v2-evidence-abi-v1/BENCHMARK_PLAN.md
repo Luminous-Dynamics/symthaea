@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, an opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, and query-specific evidence-set selector are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, query-specific evidence-set selector, and source-span-witness verifier are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -192,6 +192,39 @@ Report requirement-role recall/precision, source-span visibility/traceability, c
 **Hard gates:** every candidate must have an explicit role annotation (an empty set means explicitly annotated as covering no required roles, not missing metadata); unknown/missing annotations fail closed; inactive and cross-scope evidence never contribute; eligible corrupt text is an error; uncovered required roles remain explicit; final serialized context must satisfy the actual token budget. The complete result means only that the supplied role labels cover the supplied required-role labels. It is not a truth or entailment certificate.
 
 **Decision rule:** keep the selector experimental until a matched, held-out comparison improves evidence coverage and downstream accuracy without increasing unsupported-answer rate or violating cost budgets. If the role extraction/planning stage is not calibrated, role coverage results are only a software contract test and must not be presented as cognitive sufficiency.
+
+### Source-span-bound role witnesses (new opt-in verification layer)
+
+The role-set selector can only ensure that caller-provided labels cover caller-provided query requirements. It cannot distinguish a correct role assignment from a fabricated one. The next measurable boundary is to bind each role annotation to an exact byte span in the candidate text, verify that the span is valid UTF-8 text within the current payload, hash the span, and return the evidence/source/content/span digests with the selected role.
+
+The new source-grounded selector does exactly this at the operational level. For every eligible text candidate it checks the enclosing content digest, validates byte boundaries and non-empty ranges, and verifies SHA-256 for each role witness. The selected receipt names the original evidence ID, source digest, payload digest, role label, byte range, and span digest. Candidate role metadata must exactly cover the unique ranked IDs so annotations cannot go missing or be silently inferred as empty. The function does **not** prove semantic entailment: a perfectly valid quotation can still be irrelevant to the role label or misleading without surrounding context. The role extractor still needs independent evaluation; the final context serializer must still recount actual tokens.
+
+A source-witness adversarial suite should include:
+- correct phrase and correct role;
+- exact source text but wrong role label;
+- a span from an adjacent but wrong record;
+- out-of-range and reversed ranges;
+- Unicode multi-byte boundary splits;
+- content mutation after role annotation;
+- stale source digest, duplicate projections of the same source, and witness map omission/extra IDs;
+- a role whose isolated span is textually valid but whose scope/time/negation changes its meaning.
+
+Report span-verification pass rate separately from semantic role accuracy, source-to-role traceability, false coverage, unsupported-answer rate, and end-task accuracy. Include byte-offset conformance fixtures shared across Rust and any future Mycelix/EPF adapter. Mutation testing should alter one byte, one offset, one source digest, one role, and one lifecycle flag per fixture and confirm the expected outcome. A digest only proves byte identity, not authorship, authority, or truth.
+
+Compare score-prefix, ungrounded caller labels, span-verified labels, and an independently evaluated semantic support/entailment gate as separate arms. A good result is not merely more roles marked covered: it is lower false coverage and unsupported answering at the same actual serialized-token budget, without disproportionate write/query cost.
+
+**Hard gates:** zero selected witnesses whose span bytes do not match the digest; zero offsets that cross UTF-8 boundaries; zero selected witnesses tied to the wrong evidence ID; zero eligible payload digest mismatches silently accepted. No span-validity metric may be reported as semantic-support accuracy.
+
+### Cross-benchmark comparison and reproducibility controls (2026-10 research update)
+
+Do not treat an accuracy figure as portable across benchmarks, datasets, readers, judge models, context budgets, or memory-write interfaces. The same-named benchmark/version distinction is especially important:
+
+- The official LongMemEval-V2 page currently reports AgentRunbook-C at 74.9% small-tier accuracy / 108.3 seconds and 70.1% medium-tier accuracy / 139.9 seconds, with official LAFS Gain over a fixed accuracy–latency frontier ([official V2 results](https://xiaowu0162.github.io/longmemeval-v2/)).
+- Redis' September 2026 reproduction report states that its Remis + Instruct approach reaches 86.5% task-averaged accuracy on the original LongMemEval under a common GPT-4o backbone for systems it reproduced. It also reports that its reproduced Vertex Memory Bank setup scores 42.4%, below a roughly 70% result in the publication it was based on ([Redis benchmark report](https://redis.io/resources/agent-memory-benchmark-report/)). These are useful warnings about same-harness reproduction and configuration sensitivity, but the 86.5% original-LongMemEval result must **not** be plotted as if it were an official LongMemEval-V2 score.
+- LongMINT evaluates interference-heavy long-horizon memory with 15.6K QA pairs, contexts averaging 138.8K tokens and reaching 1.8M tokens; its paper reports 27.9% average accuracy across seven representative systems, with multi-target aggregation and revising facts as major pain points ([LongMINT](https://arxiv.org/abs/2605.18565)). Include it as a complementary stress test for query-specific evidence sets and updates, not as a replacement for the official V2 score.
+- QEMem reports LoCoMo-specific results under Claude Opus 4.5 and its own judge/evaluation configuration ([QEMem](https://arxiv.org/abs/2610.22668)). Use it as a method-level comparison for evidence-set construction and refinement, not as a LongMemEval score.
+
+Every result receipt should identify exact benchmark version/split, memory write interface, history/query set digest, reader model and revision, judge/evaluator version, prompt/tokenizer, context budget, inference effort, seeds, hardware, retrieval and reader latency boundaries, and all background consolidation/write costs included. Publish each benchmark separately before any cross-benchmark synthesis. Reproduce a strong baseline on the same harness before comparing only published paper values.
 
 ## Required baseline arms
 
