@@ -443,6 +443,7 @@ def analyze_manifest(
         "protocol_sha256": manifest["protocol_sha256"],
         "analyzer_sha256": observed_analyzer_sha256,
         "reference_arm": reference,
+        "arm_profiles": manifest["arms"],
         "task_cluster_count": len(task_ids),
         "seed_count_per_task": len(seeds),
         "expected_trial_count_per_arm": expected_trials,
