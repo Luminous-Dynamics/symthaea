@@ -671,6 +671,15 @@ mod tests {
     }
 
     #[test]
+    fn executed_verification_without_checks_is_rejected() {
+        let mut statement = minimal_statement();
+        statement["predicate"]["verification"]["checks"] = json!([]);
+        let report = verify_statement(&statement);
+        assert!(!report.valid);
+        assert!(has_code(&report, "EXECUTED_VERIFICATION_HAS_NO_CHECKS"));
+    }
+
+    #[test]
     fn duplicate_check_ids_are_rejected() {
         let mut statement = minimal_statement();
         statement["predicate"]["verification"]["checks"] = json!([
