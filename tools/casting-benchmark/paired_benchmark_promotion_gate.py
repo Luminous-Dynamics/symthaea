@@ -505,13 +505,16 @@ def assess_promotion(
                 f"minimum_predicted_feasible={contract['minimum_predicted_feasible_per_critical_family']}; "
                 f"maximum={contract['maximum_false_feasible_rate']}"
             )
-            if family_predicted < contract["minimum_predicted_feasible_per_critical_family"]:
+            if (
+                family_units < contract["minimum_validation_units_per_critical_family"]
+                or family_predicted < contract["minimum_predicted_feasible_per_critical_family"]
+            ):
                 inconclusive.append({
                     "check": f"critical_family_false_feasible_risk:{family}", "detail": detail,
                 })
                 checks.append({
                     "check": f"critical_family_false_feasible_risk:{family}",
-                    "passed": False, "detail": detail + "; insufficient per-family denominator",
+                    "passed": False, "detail": detail + "; insufficient per-family sample floor",
                 })
             else:
                 family_pass = family_upper <= contract["maximum_false_feasible_rate"]
