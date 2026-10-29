@@ -114,8 +114,10 @@ pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alph
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
 pub use photonic_architecture::{
-    OpticalChannel, PhotonicEnvelopeError, PhotonicPrimitiveEnvelope, PrimitiveEnvelopeEstimate,
-    ProbabilityInterval, multiplexed_source_success_probability, transmission_probability,
+    BoundedCostInterval, LossIntervalDb, OpticalChannel, OpticalChannelInterval,
+    PhotonicEnvelopeError, PhotonicPrimitiveEnvelope, PhotonicPrimitiveUncertaintyEnvelope,
+    PrimitiveEnvelopeEstimate, ProbabilityInterval, RobustPrimitiveEnvelopeEstimate,
+    multiplexed_source_success_probability, transmission_probability,
 };
 pub use preflight::{
     PreflightFinding, PreflightReport, PreflightSeverity, preflight_binding_config,
