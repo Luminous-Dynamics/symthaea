@@ -99,7 +99,7 @@ The CSV receipt includes the composite reference family rate, half-rate directio
 The broader industry lane should still compare version-pinned CUSUM/EWMA/Page–Hinkley/ADWIN and suitable distribution-sensitive detectors at matched family-wise false-alarm operating points, as tracked in [issue #8818](https://github.com/Luminous-Dynamics/symthaea/issues/8818). Rust compilation, formatting, and exact-head CI remain separate qualification gates.
 ## Anytime-valid unknown-change-time mixture
 
-The new `anytime_change_mixture.rs` module adds a second detector family alongside the composite-band monitor and the finite-horizon CUSUM baseline. It is deliberately positioned as an engineering/reference implementation of established e-detector ideas, not as a claim that changepoint mixtures are new mathematics.
+The new `anytime_change_mixture.rs` module adds a third detector family alongside the composite-band monitor and the finite-horizon CUSUM baseline. The implementation is available in [PR #8853](https://github.com/Luminous-Dynamics/symthaea/pull/8853). It is deliberately positioned as an engineering/reference implementation of established e-detector ideas, not as a claim that changepoint mixtures are new mathematics.
 
 ### Conditional-null contract
 
