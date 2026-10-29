@@ -853,9 +853,9 @@ fn require_contract_profile_tolerance(
         ));
     }
     match &matching[0].requirement {
-        ObligationRequirement::PreserveWithin { comparator_id, tolerance }
+        ObligationRequirement::PreserveWithin { comparator_id: actual, tolerance }
             if matching[0].critical
-                && comparator_id == comparator_id.as_str()
+                && actual.as_str() == comparator_id
                 && tolerance.unit == expected_unit
                 && tolerance.value_microunits == expected_value_microunits => Ok(()),
         _ => Err(SymbolicAudioBindingError::InvalidEvidence(
