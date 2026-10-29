@@ -70,6 +70,7 @@ struct ManifestTask {
     languages: Vec<String>,
     base_tree_digest: String,
     spec_digest: String,
+    #[serde(default)]
     paired_transform_id: RequiredNullable<String>,
     quality_audit: QualityAudit,
 }
@@ -205,7 +206,9 @@ struct Trial {
     integrity: Integrity,
     usage: Usage,
     trajectory_digest: String,
+    #[serde(default)]
     patch_digest: RequiredNullable<String>,
+    #[serde(default)]
     final_tree_digest: RequiredNullable<String>,
 }
 
@@ -220,7 +223,16 @@ enum Seed {
 // preserves the schema's distinction between a required nullable property and
 // an optional property: patch_digest/final_tree_digest must exist, even if null.
 #[derive(Debug)]
-struct RequiredNullable<T>(Option<T>);
+struct RequiredNullable<T> {
+    present: bool,
+    value: Option<T>,
+}
+
+impl<T> Default for RequiredNullable<T> {
+    fn default() -> Self {
+        Self { present: false, value: None }
+    }
+}
 
 impl<'de, T> Deserialize<'de> for RequiredNullable<T>
 where
@@ -230,7 +242,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        Option::<T>::deserialize(deserializer).map(Self)
+        Option::<T>::deserialize(deserializer).map(|value| Self { present: true, value })
     }
 }
 
@@ -652,7 +664,10 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
         }
         validate_digest(report, &format!("{task_path}.base_tree_digest"), &task.base_tree_digest);
         validate_digest(report, &format!("{task_path}.spec_digest"), &task.spec_digest);
-        if let Some(transform_id) = &task.paired_transform_id.0 {
+        if !task.paired_transform_id.present {
+            error(report, "E_MANIFEST_TRANSFORM_MISSING", format!("{task_path}.paired_transform_id"), "paired_transform_id property is required even when its value is null");
+        }
+        if let Some(transform_id) = &task.paired_transform_id.value {
             if transform_id.trim().is_empty() {
                 error(report, "E_MANIFEST_TRANSFORM_ID", format!("{task_path}.paired_transform_id"), "paired_transform_id must be non-empty when present");
             }
@@ -672,7 +687,7 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
                     && task.languages == declared.languages
                     && task.base_tree_digest == declared.base_tree_digest
                     && task.spec_digest == declared.spec_digest
-                    && task.paired_transform_id.as_ref() == declared.paired_transform_id.0.as_ref()
+                    && task.paired_transform_id.as_ref() == declared.paired_transform_id.value.as_ref()
                     && task.quality_audit.status == declared.quality_audit.status
                     && task.quality_audit.audit_digest == declared.quality_audit.audit_digest
                     && task.quality_audit.oracle_independent == declared.quality_audit.oracle_independent
@@ -694,10 +709,16 @@ fn validate_trial(
     pinned_verifier_digest: &str,
 ) {
     validate_digest(report, &format!("{path}.trajectory_digest"), &trial.trajectory_digest);
-    if let Some(digest) = &trial.patch_digest.0 {
+    if !trial.patch_digest.present {
+        error(report, "E_REQUIRED_NULLABLE_MISSING", format!("{path}.patch_digest"), "patch_digest is required even when its value is null");
+    }
+    if !trial.final_tree_digest.present {
+        error(report, "E_REQUIRED_NULLABLE_MISSING", format!("{path}.final_tree_digest"), "final_tree_digest is required even when its value is null");
+    }
+    if let Some(digest) = &trial.patch_digest.value {
         validate_digest(report, &format!("{path}.patch_digest"), digest);
     }
-    if let Some(digest) = &trial.final_tree_digest.0 {
+    if let Some(digest) = &trial.final_tree_digest.value {
         validate_digest(report, &format!("{path}.final_tree_digest"), digest);
     }
 
@@ -707,7 +728,7 @@ fn validate_trial(
     if trial.verifier.bundle_digest != pinned_verifier_digest {
         error(report, "E_VERIFIER_BUNDLE_MISMATCH", format!("{verifier_path}.bundle_digest"), "trial verifier bundle differs from the run-pinned verifier bundle");
     }
-    if let Some(final_digest) = &trial.final_tree_digest.0 {
+    if let Some(final_digest) = &trial.final_tree_digest.value {
         if trial.verifier.evaluated_tree_digest != *final_digest {
             error(report, "E_FINAL_TREE_DIGEST_MISMATCH", format!("{verifier_path}.evaluated_tree_digest"), "verifier must evaluate the exact recorded final tree");
         }
@@ -772,7 +793,7 @@ fn validate_trial(
             if trial.integrity.status != IntegrityStatus::Clean {
                 error(report, "E_PASS_NOT_CLEAN", format!("{path}.integrity.status"), "pass outcome requires clean integrity status");
             }
-            if trial.final_tree_digest.0.is_none() {
+            if trial.final_tree_digest.value.is_none() {
                 error(report, "E_PASS_NO_FINAL_TREE", format!("{path}.final_tree_digest"), "pass outcome requires a final-tree digest");
             }
             if task_audit.status == TaskAuditStatus::Invalid {
@@ -1188,7 +1209,7 @@ mod tests {
             v["task_records"][0]["trials"][1].as_object_mut().unwrap().remove("final_tree_digest");
         });
         assert!(!report.valid);
-        assert!(has_code(&report, "E_JSON_OR_SHAPE"));
+        assert!(has_code(&report, "E_REQUIRED_NULLABLE_MISSING"));
     }
 
     #[test]
