@@ -2303,6 +2303,24 @@ fn verify_component_coverage_inputs(
     {
         bail!("coverage receipt verifier output failed analyzer-side provenance reconciliation");
     }
+
+    let expected_components =
+        coverage_receipt::expected_components_from_inventory(&inventory_bytes, &frozen_families)?;
+    let manifest_components: Vec<coverage_receipt::ExpectedComponent> = manifest
+        .components
+        .iter()
+        .map(|component| coverage_receipt::ExpectedComponent {
+            component_id: component.component_id.clone(),
+            split_names: component.split_names.clone(),
+            family_ids: component.family_ids.clone(),
+            hard_edge_ids: component.hard_edge_ids.clone(),
+            confirmed_edge_ids: component.confirmed_edge_ids.clone(),
+            unresolved_edge_ids: component.unresolved_edge_ids.clone(),
+        })
+        .collect();
+    if expected_components != manifest_components {
+        bail!("component manifest does not reproduce the exact connected components and hard-edge rollups from the signed relationship inventory");
+    }
     Ok(true)
 }
 
