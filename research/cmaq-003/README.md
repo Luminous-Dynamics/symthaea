@@ -185,4 +185,4 @@ Report capability and cost frontiers across task success, dynamic regret, detect
 7. Integrate CMAQ-002 EVoI under matched budgets and run component ablations.
 8. Only then connect adapters to Symthaea memory, world-model and planning interfaces; keep synthetic and external results visibly separate.
 
-**Boundary:** CMAQ-003 now has an executable *smoke harness* for two synthetic lanes. It is not yet the full qualification benchmark described above, and it has no confirmed exact-head Rust test pass. The remaining lanes, evidence-isolation controls, and external integration must be added before drawing general claims.
+**Boundary:** CMAQ-003 now has an executable *smoke harness* for three synthetic lanes and a contrast-diagnosis baseline. It is not yet the full qualification benchmark described above, and it has no confirmed exact-head Rust test pass. The remaining lanes, evidence-isolation controls, and external integration must be added before drawing general claims.
