@@ -90,11 +90,11 @@ pub enum OutcomeStateAtHorizon {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct PolicyFeed {
+pub struct PolicyTickInput {
     pub schema_version: u32,
     pub generator_version: String,
-    /// Deliberately contains no run ID, dataset/scenario label, seed, mechanism ID, selection
-    /// probability, hidden target, or future reveal time. Bind experiment identity outside policy.
+    /// Only messages deliverable at this logical tick; never includes later-tick messages.
+    pub tick: u64,
     pub messages: Vec<PolicyVisibleMessage>,
 }
 
@@ -157,51 +157,93 @@ pub struct GenerationSummary {
     pub generator_version: String,
     pub run_id: String,
     pub eligible_event_count: usize,
-    pub policy_message_count: usize,
+    pub policy_tick: u64,
+    pub policy_tick_message_count: usize,
     pub observed_count: usize,
     pub delayed_pending_count: usize,
     pub right_censored_count: usize,
     pub declared_missing_count: usize,
     pub unknown_unnotified_count: usize,
     pub source_input_sha256: String,
-    pub policy_feed_sha256: String,
+    pub policy_tick_sha256: String,
     pub evaluator_schedule_sha256: String,
     pub interpretation_guard: String,
 }
 
 pub struct GeneratedSchedules {
-    pub policy_feed: PolicyFeed,
+    // Orchestrator-only queue. It is not serialized as policy input because it contains future feedback.
+    delivery_messages: Vec<PolicyVisibleMessage>,
     pub evaluator_schedule: EvaluatorSchedule,
-    pub summary: GenerationSummary,
 }
 
-/// Read a pinned generator input and write the policy and evaluator artifacts to separate files.
+impl GeneratedSchedules {
+    /// Return one tick's messages only. The controller must receive this snapshot, never the queue.
+    pub fn policy_tick_input(&self, tick: u64) -> PolicyTickInput {
+        let messages = self
+            .delivery_messages
+            .iter()
+            .filter(|message| policy_message_tick(message) == tick)
+            .cloned()
+            .collect();
+        PolicyTickInput {
+            schema_version: 1,
+            generator_version: "cognitive-missingness-schedule-v1".to_string(),
+            tick,
+            messages,
+        }
+    }
+}
+
+/// Generate one policy-visible tick and a separate evaluator-only schedule sidecar.
 pub fn generate_file(
     input_path: &Path,
     policy_output_path: &Path,
     evaluator_output_path: &Path,
+    policy_tick: u64,
 ) -> anyhow::Result<GenerationSummary> {
     ensure!(
         policy_output_path != evaluator_output_path,
-        "policy feed and evaluator schedule must be separate output paths"
+        "policy tick input and evaluator schedule must be separate output paths"
     );
     let input_bytes = fs::read(input_path)
         .with_context(|| format!("reading missingness schedule input {}", input_path.display()))?;
     let input: ScheduleInput = serde_json::from_slice(&input_bytes)
         .with_context(|| format!("parsing missingness schedule input {}", input_path.display()))?;
     let generated = generate(&input, &input_bytes)?;
-    let mut policy_bytes = serde_json::to_vec_pretty(&generated.policy_feed)?;
-    policy_bytes.push(b'\n');
+    let policy_tick_input = generated.policy_tick_input(policy_tick);
+    let mut policy_bytes = serde_json::to_vec_pretty(&policy_tick_input)?;
+    policy_bytes.push(b'\\n');
     let mut evaluator_bytes = serde_json::to_vec_pretty(&generated.evaluator_schedule)?;
-    evaluator_bytes.push(b'\n');
+    evaluator_bytes.push(b'\\n');
     fs::write(policy_output_path, &policy_bytes)
-        .with_context(|| format!("writing policy feed {}", policy_output_path.display()))?;
+        .with_context(|| format!("writing policy tick input {}", policy_output_path.display()))?;
     fs::write(evaluator_output_path, &evaluator_bytes)
         .with_context(|| format!("writing evaluator schedule {}", evaluator_output_path.display()))?;
 
-    let mut summary = generated.summary;
-    summary.policy_feed_sha256 = sha256_hex(&policy_bytes);
-    summary.evaluator_schedule_sha256 = sha256_hex(&evaluator_bytes);
+    let count_state = |state| {
+        generated
+            .evaluator_schedule
+            .events
+            .iter()
+            .filter(|record| record.state_at_horizon == state)
+            .count()
+    };
+    let summary = GenerationSummary {
+        generator_version: "cognitive-missingness-schedule-v1".to_string(),
+        run_id: generated.evaluator_schedule.run_id.clone(),
+        eligible_event_count: generated.evaluator_schedule.events.len(),
+        policy_tick,
+        policy_tick_message_count: policy_tick_input.messages.len(),
+        observed_count: count_state(OutcomeStateAtHorizon::Observed),
+        delayed_pending_count: count_state(OutcomeStateAtHorizon::DelayedPending),
+        right_censored_count: count_state(OutcomeStateAtHorizon::RightCensoredAtHorizon),
+        declared_missing_count: count_state(OutcomeStateAtHorizon::DeclaredMissing),
+        unknown_unnotified_count: count_state(OutcomeStateAtHorizon::UnknownUnnotified),
+        source_input_sha256: generated.evaluator_schedule.source_input_sha256.clone(),
+        policy_tick_sha256: sha256_hex(&policy_bytes),
+        evaluator_schedule_sha256: sha256_hex(&evaluator_bytes),
+        interpretation_guard: "The policy artifact contains only one logical tick. The complete delivery queue and the evaluator schedule must remain in the trusted driver, outside the policy process. Synthetic plumbing only; not measured task performance, causal identification, or SOTA evidence.".to_string(),
+    };
     Ok(summary)
 }
 
@@ -312,11 +354,6 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
         "generated outcome-state accounting did not reconcile to eligible event count"
     );
 
-    let policy_feed = PolicyFeed {
-        schema_version: 1,
-        generator_version: "cognitive-missingness-schedule-v1".to_string(),
-        messages: policy_messages,
-    };
     let evaluator_schedule = EvaluatorSchedule {
         schema_version: 1,
         generator_version: "cognitive-missingness-schedule-v1".to_string(),
@@ -325,28 +362,14 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
         scenario_id: input.scenario_id.clone(),
         seed: input.seed,
         evaluation_horizon_tick: input.evaluation_horizon_tick,
-        source_input_sha256: source_digest.clone(),
+        source_input_sha256: source_digest,
         config_sha256: config_digest,
         events: evaluator_records,
     };
-    let policy_bytes = serde_json::to_vec_pretty(&policy_feed)?;
-    let evaluator_bytes = serde_json::to_vec_pretty(&evaluator_schedule)?;
-    let summary = GenerationSummary {
-        generator_version: "cognitive-missingness-schedule-v1".to_string(),
-        run_id: input.run_id.clone(),
-        eligible_event_count: input.events.len(),
-        policy_message_count: policy_feed.messages.len(),
-        observed_count,
-        delayed_pending_count,
-        right_censored_count,
-        declared_missing_count,
-        unknown_unnotified_count,
-        source_input_sha256: source_digest,
-        policy_feed_sha256: sha256_hex(&policy_bytes),
-        evaluator_schedule_sha256: sha256_hex(&evaluator_bytes),
-        interpretation_guard: "Deterministic synthetic schedule plumbing only; not measured task performance, proof of causal identification, or SOTA evidence. The evaluator artifact contains hidden truth and must remain outside the policy process.".to_string(),
-    };
-    Ok(GeneratedSchedules { policy_feed, evaluator_schedule, summary })
+    Ok(GeneratedSchedules {
+        delivery_messages: policy_messages,
+        evaluator_schedule,
+    })
 }
 
 fn validate_input(input: &ScheduleInput) -> anyhow::Result<()> {
@@ -440,6 +463,14 @@ fn sample_delay(seed: u64, event_id: &str, pattern: &DelayPattern) -> anyhow::Re
     }
 }
 
+fn policy_message_tick(message: &PolicyVisibleMessage) -> u64 {
+    match message {
+        PolicyVisibleMessage::OutcomePending { tick, .. }
+        | PolicyVisibleMessage::OutcomeRevealed { tick, .. }
+        | PolicyVisibleMessage::MissingDeclared { tick, .. } => *tick,
+    }
+}
+
 fn policy_message_key(message: &PolicyVisibleMessage) -> (u64, u8, &str) {
     match message {
         // At a shared logical tick, all decisions/pending notices precede every feedback event.
@@ -513,8 +544,8 @@ mod tests {
         let first = generate(&input, b"same-pinned-source").unwrap();
         let second = generate(&input, b"same-pinned-source").unwrap();
         assert_eq!(
-            serde_json::to_vec(&first.policy_feed).unwrap(),
-            serde_json::to_vec(&second.policy_feed).unwrap()
+            serde_json::to_vec(&first.policy_tick_input(7)).unwrap(),
+            serde_json::to_vec(&second.policy_tick_input(7)).unwrap()
         );
         assert_eq!(
             serde_json::to_vec(&first.evaluator_schedule).unwrap(),
@@ -525,8 +556,8 @@ mod tests {
         permuted.events.reverse();
         let permuted_out = generate(&permuted, b"same-pinned-source").unwrap();
         assert_eq!(
-            serde_json::to_vec(&first.policy_feed).unwrap(),
-            serde_json::to_vec(&permuted_out.policy_feed).unwrap()
+            serde_json::to_vec(&first.policy_tick_input(7)).unwrap(),
+            serde_json::to_vec(&permuted_out.policy_tick_input(7)).unwrap()
         );
         assert_eq!(
             serde_json::to_vec(&first.evaluator_schedule.events).unwrap(),
@@ -541,7 +572,10 @@ mod tests {
             b"policy-boundary",
         )
         .unwrap();
-        let policy_json = serde_json::to_string(&generated.policy_feed).unwrap();
+        let policy_tick = generated.policy_tick_input(7);
+        assert!(policy_tick.messages.iter().all(|message| policy_message_tick(message) == 7));
+        let policy_json = serde_json::to_string(&policy_tick).unwrap();
+        assert_eq!(policy_tick.tick, 7);
         assert!(!policy_json.contains("hidden_loss"));
         assert!(!policy_json.contains("prediction_error_signal"));
         assert!(!policy_json.contains("missingness_probability"));
@@ -564,20 +598,20 @@ mod tests {
         explicit.config.declaration_delay_ticks = 0;
         let explicit_out = generate(&explicit, b"explicit").unwrap();
         assert!(explicit_out.evaluator_schedule.events.iter().all(|e| e.state_at_horizon == OutcomeStateAtHorizon::DeclaredMissing));
-        assert!(explicit_out.policy_feed.messages.iter().any(|m| matches!(m, PolicyVisibleMessage::MissingDeclared { .. })));
+        assert!(explicit_out.policy_tick_input(0).messages.iter().any(|m| matches!(m, PolicyVisibleMessage::MissingDeclared { .. })));
 
         let mut silent = explicit.clone();
         silent.config.declaration_mode = MissingnessDeclarationMode::Silent;
         let silent_out = generate(&silent, b"silent").unwrap();
         assert!(silent_out.evaluator_schedule.events.iter().all(|e| e.state_at_horizon == OutcomeStateAtHorizon::UnknownUnnotified));
-        assert!(!silent_out.policy_feed.messages.iter().any(|m| matches!(m, PolicyVisibleMessage::MissingDeclared { .. })));
+        assert!(!silent_out.policy_tick_input(0).messages.iter().any(|m| matches!(m, PolicyVisibleMessage::MissingDeclared { .. })));
 
         let mut pending = explicit.clone();
         pending.config.declaration_mode = MissingnessDeclarationMode::Explicit;
         pending.config.declaration_delay_ticks = 100;
         let pending_out = generate(&pending, b"pending").unwrap();
         assert!(pending_out.evaluator_schedule.events.iter().any(|e| e.state_at_horizon == OutcomeStateAtHorizon::DelayedPending));
-        assert!(!pending_out.policy_feed.messages.iter().any(|m| matches!(m, PolicyVisibleMessage::MissingDeclared { .. })));
+        assert!(!pending_out.policy_tick_input(0).messages.iter().any(|m| matches!(m, PolicyVisibleMessage::MissingDeclared { .. })));
     }
 
     #[test]
@@ -587,7 +621,7 @@ mod tests {
         input.config.delay = DelayPattern::Fixed { ticks: 100 };
         let generated = generate(&input, b"right-censored").unwrap();
         assert!(generated.evaluator_schedule.events.iter().all(|e| e.state_at_horizon == OutcomeStateAtHorizon::RightCensoredAtHorizon));
-        let policy_json = serde_json::to_string(&generated.policy_feed).unwrap();
+        let policy_json = serde_json::to_string(&generated.policy_tick_input(0)).unwrap();
         assert!(!policy_json.contains("expected_reveal_tick"));
         assert!(!policy_json.contains("right_censored_at_horizon"));
     }
@@ -601,7 +635,7 @@ mod tests {
             event.decision_tick = 0;
         }
         let generated = generate(&input, b"same-tick-phase-order").unwrap();
-        let messages = &generated.policy_feed.messages;
+        let messages = &generated.delivery_messages;
         assert_eq!(messages.len(), input.events.len() * 2);
         assert!(messages[..input.events.len()]
             .iter()
