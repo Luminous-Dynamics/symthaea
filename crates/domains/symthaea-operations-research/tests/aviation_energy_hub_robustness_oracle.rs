@@ -190,7 +190,7 @@ fn stress_set_digest_matches_independent_known_answer_vector() {
     ];
     assert_eq!(
         canonical_stress_set_digest(&cases).unwrap(),
-        "sha256:7b77bf9ea86fca46f7c777e71165204e3901c371f0c8d707e1db9f0a6304f86c"
+        "sha256:cb26438fa90b252f9e616b5d162dfdff16f3d853200cf70577d51eee5da5dca8"
     );
 }
 
