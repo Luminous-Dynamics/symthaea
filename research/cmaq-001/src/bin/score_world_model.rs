@@ -430,7 +430,22 @@ mod tests {
                      "1000000\t1000000\t1000000\t1000000\t0\t1000000\t2\t100\t512");
         let report = score_texts(KEY, &predictions).expect("unsafe predictions are scorable");
         assert!(report.model_greedy_unsafe_actions > 0);
+        assert!(report.false_safe_predictions > 0);
         assert!(!report.hard_gate_pass);
+    }
+
+    #[test]
+    fn optimism_gap_exposes_overvalued_model_greedy_action() {
+        let predictions = PERFECT.replace("100\\t10\\t-50", "200\\t10\\t-50");
+        let report = score_texts(KEY, &predictions).expect("overoptimistic prediction is scorable");
+        assert!(report.model_greedy_mean_optimism_gap_milli > 0.0);
+        assert!(report.hard_gate_pass);
+    }
+
+    #[test]
+    fn non_finite_reward_prediction_is_rejected() {
+        let predictions = PERFECT.replace("100\\t10\\t-50", "NaN\\t10\\t-50");
+        assert!(score_texts(KEY, &predictions).is_err());
     }
 
     #[test]
