@@ -1,0 +1,72 @@
+name: VIS-DVPC-047 reward alignment and learnability diagnostics
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-047-reward-alignment-learnability.rs"
+      - "docs/research/VIS_DVPC_047_REWARD_ALIGNMENT_LEARNABILITY_V1.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-047-reward-alignment-learnability.rs"
+      - "docs/research/VIS_DVPC_047_REWARD_ALIGNMENT_LEARNABILITY_V1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact reward diagnostic benchmark
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run Rust proof controls
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-047-reward-alignment-learnability.rs -o /tmp/vis-dvpc-047-tests
+          /tmp/vis-dvpc-047-tests
+      - name: Verify deterministic statistical replay
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-047-reward-alignment-learnability.rs -o /tmp/vis-dvpc-047
+          /tmp/vis-dvpc-047 --smoke > /tmp/vis-dvpc-047-smoke-a.tsv
+          /tmp/vis-dvpc-047 --smoke > /tmp/vis-dvpc-047-smoke-b.tsv
+          grep -v '^SYSTEM' /tmp/vis-dvpc-047-smoke-a.tsv > /tmp/vis-dvpc-047-smoke-a-stable.tsv
+          grep -v '^SYSTEM' /tmp/vis-dvpc-047-smoke-b.tsv > /tmp/vis-dvpc-047-smoke-b-stable.tsv
+          cmp /tmp/vis-dvpc-047-smoke-a-stable.tsv /tmp/vis-dvpc-047-smoke-b-stable.tsv
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-047-smoke-a-stable.tsv)" = "120"
+      - name: Run 1,024 paired online-learning trajectories per fixture
+        run: |
+          /tmp/vis-dvpc-047 --benchmark > /tmp/vis-dvpc-047-results.tsv
+          test "$(grep -c '^FIXTURE' /tmp/vis-dvpc-047-results.tsv)" = "5"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-047-results.tsv)" = "180"
+          test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-047-results.tsv)" = "5"
+          awk -F '\t' '$1=="FIXTURE" && $2=="zero_personalization_headroom" && $11=="personalization_headroom" { if ($12 < -0.00000001 || $12 > 0.00000001) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
+          awk -F '\t' '$1=="FIXTURE" && $2=="misaligned_dense_personalization" && $15=="pairwise_alignment_accuracy" { if ($16 > 0.01) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($4=="proxy_policy_identification_rate" || $4=="north_star_policy_identification_rate" || $4=="matured_outcome_fraction" || $4=="batch_ips_pointwise_wald_coverage") { if ($5 < -0.000001 || $5 > 1.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($4=="online_north_star_regret_per_decision" || $4=="online_proxy_regret_per_decision" || $4=="batch_ips_absolute_error_for_learned_greedy_policy" || $4=="batch_ips_wald_interval_width") { if ($5 < -0.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
+          grep '^CONFIG' /tmp/vis-dvpc-047-results.tsv > /tmp/vis-dvpc-047-config.tsv
+          grep '^FIXTURE\|^RESULT_METRIC\|^SYSTEM' /tmp/vis-dvpc-047-results.tsv > /tmp/vis-dvpc-047-summary.tsv
+      - name: Create exact source/output SHA-256 receipt
+        run: |
+          {
+            printf 'VIS_DVPC_047_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-047-reward-alignment-learnability.rs /tmp/vis-dvpc-047-results.tsv /tmp/vis-dvpc-047-summary.tsv /tmp/vis-dvpc-047-config.tsv
+          } > /tmp/vis-dvpc-047-receipt.tsv
+          cat /tmp/vis-dvpc-047-receipt.tsv
+      - name: Publish benchmark results and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-047-reward-alignment-learnability
+          path: |
+            /tmp/vis-dvpc-047-results.tsv
+            /tmp/vis-dvpc-047-summary.tsv
+            /tmp/vis-dvpc-047-config.tsv
+            /tmp/vis-dvpc-047-smoke-a-stable.tsv
+            /tmp/vis-dvpc-047-receipt.tsv
+          retention-days: 90
