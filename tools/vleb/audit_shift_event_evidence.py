@@ -38,7 +38,7 @@ RECEIPT_KEYS = {
     "validation_results", "audit_report_sha256",
 }
 EVENT_KEYS = {
-    "event_id", "event_kind", "sequence_number", "intervention_position", "applied", "payload_sha256",
+    "event_id", "event_kind", "change_family", "sequence_number", "intervention_position", "applied", "payload_sha256",
     "pre_workspace_sha256", "post_workspace_sha256", "transition_diff_sha256",
     "runner_event_log_sha256", "observed_monotonic_ns", "event_source",
 }
@@ -287,6 +287,8 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             require_identifier(event["event_id"], label + ".runner_event.event_id")
             if not isinstance(event["event_kind"], str) or event["event_kind"] not in EVENT_KINDS:
                 raise ValueError(f"{label}.runner_event.event_kind is invalid")
+            if event["change_family"] != scenario["change_family"]:
+                raise ValueError(f"{label}.runner_event change family differs from locked scenario")
             if type(event["sequence_number"]) is not int or event["sequence_number"] < 1:
                 raise ValueError(f"{label}.runner_event.sequence_number must be a positive integer")
             if event["intervention_position"] != scenario["intervention_position"]:
@@ -373,6 +375,12 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
             "run_id": receipt["run_id"], "outcome": receipt["outcome"],
             "receipt_payload_sha256": receipt["receipt_payload_sha256"],
             "audit_report_sha256": receipt["audit_report_sha256"],
+            "runner_event_log_sha256": (
+                receipt["runner_event"]["runner_event_log_sha256"]
+                if isinstance(receipt["runner_event"], dict) else None
+            ),
+            "stale_artifact_disposition_count": len(receipt["stale_evidence_disposition"]),
+            "required_check_count": len(receipt["validation_results"]),
             "canonical_payload_sha256_recomputed": canonical_digest(comparable),
         })
 
