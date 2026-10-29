@@ -408,28 +408,6 @@ def analyze_manifest(
             "unresolved_pair_cells": unresolved_pair_cells,
             "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
             "intervals_are_simultaneous": False,
-            "multiplicity_adjustment": "none; do not treat multiple arm comparisons as simultaneous confirmatory claims",
-        pairwise.append({
-            "reference_arm": reference,
-            "comparison_arm": arm_id,
-            "paired_task_cluster_count": len(task_ids),
-            "seeds_per_task": len(seeds),
-            "score_delta_pp": round(observed_delta, 6),
-            "task_clusters_won": won,
-            "task_clusters_lost": lost,
-            "task_clusters_tied": tied,
-            "effective_comparison_task_cluster_count": effective_task_clusters,
-            "effective_comparison_task_cluster_fraction_pct": round(100.0 * effective_task_clusters / len(task_ids), 6),
-            "paired_trial_cell_count": len(paired_trial_cells),
-            "both_success_cells": both_success_cells,
-            "reference_only_success_cells": reference_only_success_cells,
-            "comparison_only_success_cells": comparison_only_success_cells,
-            "both_non_success_cells": both_non_success_cells,
-            "success_disagreement_cells": reference_only_success_cells + comparison_only_success_cells,
-            "resolved_disagreement_cells": resolved_disagreement_cells,
-            "unresolved_pair_cells": unresolved_pair_cells,
-            "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
-            "intervals_are_simultaneous": False,
         })
 
     raw_directional_pvalues = {
