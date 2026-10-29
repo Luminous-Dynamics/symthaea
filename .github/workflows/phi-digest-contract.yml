@@ -7,8 +7,10 @@ on:
   pull_request:
     paths:
       - "validation/iit_digest_contract.py"
+      - "validation/generate_pyphi_reference_fixtures.py"
       - "validation/test_iit_digest_contract.py"
       - "validation/test_phi_reference_fixture_manifest.py"
+      - "validation/test_pyphi_reference_runner_contract.py"
       - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
       - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
       - ".github/workflows/phi-digest-contract.yml"
