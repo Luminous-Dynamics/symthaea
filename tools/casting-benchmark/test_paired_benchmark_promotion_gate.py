@@ -246,6 +246,15 @@ class PairedPromotionGateTests(unittest.TestCase):
         self.assertEqual(assess(doc=paired_manifest(incomplete=True))["decision"], "not_promoted")
         self.assertEqual(assess(doc=paired_manifest(over_budget=True))["decision"], "not_promoted")
 
+    def test_hard_failure_is_not_masked_by_another_inconclusive_check(self):
+        result = assess(
+            doc=paired_manifest(unit_count=10, incomplete=True),
+            ct=contract(minimum_units=30),
+        )
+        self.assertEqual(result["decision"], "not_promoted")
+        self.assertTrue(any(check["check"] == "complete_runs" for check in result["failed_checks"]))
+        self.assertTrue(any(check["check"] == "minimum_independent_units" for check in result["inconclusive_checks"]))
+
     def test_risk_upper_bound_rejects_too_many_false_feasible_outcomes(self):
         result = assess(val=validation_manifest(count=100, false_count=12))
         self.assertEqual(result["decision"], "not_promoted")
