@@ -70,7 +70,7 @@ This demonstrates the intended falsification signal for this synthetic setup; it
 
 ## Shuffled-support negative control (Rust exact-head run)
 
-The follow-up control passed at commit `b777d2f36b9731030c2915f28ea558dcdc0b3f6c`: **8 Rust tests passed**, and the 44-row report schema plus oracle/fallback/risk–coverage invariants passed ([workflow run 40952651960](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40952651960)). The subsequent workflow revision adds a stricter assertion that the informative 0.97 gate beats the shuffled-score gate at candidate-set sizes 32, 128 and 512; verify the latest exact-head run before treating that added assertion as passed.
+The follow-up control passed at current source commit `22ce169ab360be31bc19f1cdaa69b15fa1ef8446`: **8 Rust tests passed**, and the 44-row report schema, oracle/fallback/risk–coverage invariants, and the preregistered informative-versus-shuffled strict-gate comparisons at candidate-set sizes 32, 128 and 512 passed ([exact-head workflow run 40952937400](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40952937400)).
 
 | Search candidates | Informative support gate .97: regret | Unsupported rate | Shuffled support gate .97: regret | Unsupported rate | Informative gate coverage | Shuffled gate coverage |
 |---:|---:|---:|---:|---:|---:|---:|
