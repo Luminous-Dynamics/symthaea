@@ -209,7 +209,7 @@ For these corpora, a classifier may learn to recognize an *attack workload or at
 An opt-in Rust example is present on the HARDSEC-001 draft branch:
 
 ```bash
-cargo fmt --check --example hardsec_split_audit --features hardsec-audit
+cargo fmt --check --package symthaea
 cargo test --example hardsec_split_audit --features hardsec-audit
 cargo run --example hardsec_split_audit --features hardsec-audit -- \
   --manifest /path/to/splits.tsv --root /path/to/dataset \
