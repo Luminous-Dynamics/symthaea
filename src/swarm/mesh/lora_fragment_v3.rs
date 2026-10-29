@@ -606,6 +606,35 @@ mod tests {
     }
 
     #[test]
+    fn all_data_fragments_reassemble_when_parity_is_lost() {
+        for len in [1usize, V3_AEAD_PAYLOAD_SIZE, 2048, 2105] {
+            let original = sample(len, len as u64 + 123);
+            let frames = fragment_v3_with_aead_overhead(20, 9, &original).unwrap();
+            let peer_context = [0x41; 32];
+            let mut assembler = FragmentAssemblerV3::new(peer_context, &frames[0]).unwrap();
+            for frame in &frames[..frames.len() - 1] {
+                assembler.feed(&peer_context, frame);
+            }
+            assert!(assembler.is_complete(), "len={len}");
+            assert_eq!(assembler.assemble().as_deref(), Some(original.as_slice()), "len={len}");
+        }
+    }
+
+    #[test]
+    fn caller_buffer_writer_rejects_short_output_without_partial_write() {
+        let frame = fragment_v3(33, 5, &sample(100, 19)).unwrap()[0].clone();
+        let expected = frame.to_bytes();
+        let mut full = [0xa5u8; V3_MTU];
+        let written = frame.write_to(&mut full).unwrap();
+        assert_eq!(&full[..written], expected.as_slice());
+
+        let mut short = vec![0x5a; expected.len() - 1];
+        let before = short.clone();
+        assert_eq!(frame.write_to(&mut short), None);
+        assert_eq!(short, before);
+    }
+
+    #[test]
     fn same_shape_fragments_from_different_generations_are_rejected() {
         let a = fragment_v3(10, 4, &sample(2048, 1)).unwrap();
         let b = fragment_v3(11, 4, &sample(2048, 2)).unwrap();
