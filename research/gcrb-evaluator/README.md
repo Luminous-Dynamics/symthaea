@@ -6,7 +6,7 @@ It does not make decisions about people, public officials, legal guilt, rights, 
 
 ## Status
 
-- The isolated Rust CLI/library is authored with 18 core evaluator tests and seven trace-auditor tests (25 authored total). None has been compiled or executed.
+- The isolated Rust CLI/library is authored with 25 core evaluator tests and seven trace-auditor tests (32 authored total). None has been compiled or executed.
 - The fixture and its expected dispositions are public known answers, so this is **not blind qualification**.
 - Candidate behavior observations and hard-gate violation fields are currently supplied by the candidate report. A trace-derived rule auditor exists, but recorder authentication, independent capture-completeness attestation, and a hidden qualification oracle are not implemented.
 - No Rust compile, formatter, or unit-test run is claimed in this environment.
@@ -19,6 +19,12 @@ From the repository root, validate the fixture:
     cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-fixture docs/research/fixtures/governance-capture-resistance-v0.1.json
 
 The validator checks the schema identifier, benchmark/version, public-development and synthetic-only labels, non-empty cases, unique IDs, allowed class/severity values, required behavior declarations, and consistency of declared attack/control counts. It prints the SHA-256 of the exact fixture bytes.
+
+Validate the separate **composite attack campaign**, which joins multi-step scenarios to exact case IDs in the source fixture:
+
+    cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-campaign docs/research/fixtures/governance-capture-resistance-v0.1.json docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json
+
+The current campaign has 11 composite attacks and two benign composite controls. It checks exact source-fixture digest binding, unique campaign IDs, resolved component references, ordered steps, role/severity fields, and gate labels. It does not execute attacks or claim qualification.
 
 The corresponding structural schema is `docs/research/fixtures/governance-capture-resistance-v0.1.schema.json` (JSON Schema Draft 2020-12). The committed expanded fixture `docs/research/fixtures/governance-capture-resistance-stress-1000-v0.1.json` contains 18 attacks and 1,000 generated negative controls. A deterministic JavaScript preflight checked the base and expanded documents against the schema's declared structure; that is not a Rust run or a full independent JSON Schema engine. The Rust validator implements focused semantic checks and does not claim full JSON Schema conformance. Use a separately pinned JSON Schema validator in conformance testing.
 
@@ -68,6 +74,7 @@ The report includes exact-disposition agreement, per-class and per-family agreem
 
 A second, rule-based path derives six hard-gate findings from typed event fields rather than accepting a candidate's self-reported violation list. The trace contract and demo are:
 
+- `docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json` and `...combined-attacks-v0.1.schema.json` — 11 composed attack cases and two benign composite controls, each linked to standalone known-answer cases.
 - `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json` — input event-trace schema
 - `docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json` — audit-report schema
 - `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json` — six synthetic unsafe events, 20 cases with unknown capture status
