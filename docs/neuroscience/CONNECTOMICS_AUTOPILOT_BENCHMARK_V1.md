@@ -268,7 +268,7 @@ These targets are intentionally about efficient, safe proofreading, not unsuppor
 
 ## Symthaea-specific ablation plan
 
-The first implementation should be deliberately small. Begin with deterministic ranking and traceable artifacts; then test whether cognitive components add value.
+The first implementation is deliberately small. The offline intake gate and frozen-prediction scorer are now prototyped as standalone Rust binaries; they are not yet compiled or benchmark-validated here. Next add Parquet/label/source-lineage audit, then test whether cognitive components add value.
 
 - **Base ranker:** task-specific heuristics plus available direct evidence features.
 - **HDC retrieval:** retrieve analogous reviewed error cases; compare against no retrieval and lexical/feature nearest-neighbor controls.
@@ -284,7 +284,7 @@ Promote a component only when its frozen ablation improves held-out reviewer eff
 
 1. **Dataset/metric audit:** document licenses, source revisions, ground-truth coverage, exact ConnectomeBench tasks, and reproducible data acquisition. No data downloads or large compute are prerequisites for the design review.
 2. **Benchmark contract:** define immutable run manifest, split identity, candidate edit schema, oracle boundary, and scorer outputs.
-3. **Offline scorer:** evaluate predetermined candidate rankings against known expert annotations. First demonstrate correct scoring and negative controls before adding an adaptive ranker.
+3. **Offline scorer (prototype added):** `tools/connectomics-intake-audit/src/bin/proofreading_score.rs` scores frozen JSONL predictions with task/group breakdowns, balanced accuracy, AUROC, tie-aware average precision, Brier/log loss, item/minute-budget error yield, impact-weight capture, risk–coverage checkpoints, frozen policy/config hashes, and deterministic cluster-bootstrap intervals for balanced accuracy. It is intentionally separate from runtime inference and always emits `SCORED_NOT_PROMOTED`. The intake tool still needs Parquet parsing and row/label/source-lineage audit before a real ConnectomeBench2 score can be produced. Tests are authored but not executed because Cargo/Rust are unavailable in the current execution environment.
 4. **Baselines:** random, uncertainty-only, disagreement-only, published/compatible rule-based baseline, and a small learned or HDC-assisted ranker if the data format permits.
 5. **Active queue:** add review-minute budgeting, abstention, graph-impact explanation, and replayable deterministic ordering.
 6. **Ablations and hidden lockbox:** freeze profiles and use independently held-out annotations; do not wait on an asynchronous runner to design or audit the protocol.
