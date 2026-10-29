@@ -11,7 +11,7 @@
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const COUNTERFACTUAL_FIXTURE_SCHEMA: &str = "BROCA-COUNTERFACTUAL-EVIDENCE-AUDIT-V1";
 pub const COUNTERFACTUAL_LABEL_SCHEMA: &str = "BROCA-COUNTERFACTUAL-EVIDENCE-LABELS-V1";
@@ -392,6 +392,297 @@ fn reject_forbidden_runtime_keys(value: &Value) -> Result<(), String> {
     Ok(())
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluatorLabelPair {
+    pub schema_version: String,
+    pub pair_id: String,
+    pub cases: Vec<EvaluatorCaseLabel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluatorCaseLabel {
+    pub case_id: String,
+    pub answerability: String,
+    pub expected_decision: String,
+    pub expected_claim: String,
+    pub supporting_evidence_ids: Vec<String>,
+    #[serde(default)]
+    pub atom_use_targets: Vec<AtomUseTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AtomUseTarget {
+    pub evidence_id: String,
+    pub target_level: String,
+    #[serde(default)]
+    pub must_change_fields: Vec<String>,
+    #[serde(default)]
+    pub allowed_change_fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AtomAblationObservation {
+    pub schema_version: String,
+    pub run_id: String,
+    pub case_id: String,
+    pub evidence_id: String,
+    pub reader_revision: String,
+    pub full_context_tokens: usize,
+    pub ablated_context_tokens: usize,
+    pub full_fields: BTreeMap<String, String>,
+    pub ablated_fields: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AtomAblationJudgment {
+    pub case_id: String,
+    pub evidence_id: String,
+    pub target_level: String,
+    pub actual_changed_fields: Vec<String>,
+    pub missing_required_changes: Vec<String>,
+    pub disallowed_changes: Vec<String>,
+    pub overuse: bool,
+    pub underuse: bool,
+    pub context_tokens_removed: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AtomAblationScoreSummary {
+    pub schema_version: String,
+    pub run_id: String,
+    pub reader_revision: String,
+    pub observation_count: usize,
+    pub ignore_count: usize,
+    pub ignore_overuse_count: usize,
+    pub ignore_overuse_rate: Option<f64>,
+    pub bound_count: usize,
+    pub bound_overuse_count: usize,
+    pub bound_overuse_rate: Option<f64>,
+    pub bound_underuse_count: usize,
+    pub bound_underuse_rate: Option<f64>,
+    pub control_count: usize,
+    pub control_overuse_count: usize,
+    pub control_overuse_rate: Option<f64>,
+    pub control_underuse_count: usize,
+    pub control_underuse_rate: Option<f64>,
+    pub context_tokens_removed_total: usize,
+    pub judgments: Vec<AtomAblationJudgment>,
+}
+
+/// Offline evaluation only: compare structured material outputs with and without each
+/// labelled atom. This function is not part of the production inference path.
+pub fn score_atom_ablation_jsonl(
+    observations_jsonl: &str,
+    evaluator_labels_jsonl: &str,
+) -> Result<AtomAblationScoreSummary, String> {
+    const OBSERVATION_SCHEMA: &str = "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1";
+    let mut observations = Vec::new();
+    let mut observation_keys = BTreeSet::new();
+
+    for (line_index, line) in observations_jsonl.lines().enumerate() {
+        let line_number = line_index + 1;
+        if line.trim().is_empty() {
+            return Err(format!("observation line {line_number} is blank"));
+        }
+        let observation: AtomAblationObservation = serde_json::from_str(line)
+            .map_err(|error| format!("observation line {line_number} invalid: {error}"))?;
+        if observation.schema_version != OBSERVATION_SCHEMA {
+            return Err(format!("unsupported observation schema on line {line_number}"));
+        }
+        require_trimmed("run_id", &observation.run_id)?;
+        require_trimmed("case_id", &observation.case_id)?;
+        require_trimmed("evidence_id", &observation.evidence_id)?;
+        require_trimmed("reader_revision", &observation.reader_revision)?;
+        if observation.ablated_context_tokens > observation.full_context_tokens {
+            return Err(format!("ablated context tokens exceed full context tokens on line {line_number}"));
+        }
+        validate_material_fields(&observation.full_fields, line_number, "full_fields")?;
+        validate_material_fields(&observation.ablated_fields, line_number, "ablated_fields")?;
+        if !observation_keys.insert((observation.case_id.clone(), observation.evidence_id.clone())) {
+            return Err(format!(
+                "duplicate ablation observation for case {:?} / evidence {:?}",
+                observation.case_id, observation.evidence_id
+            ));
+        }
+        observations.push(observation);
+    }
+    if observations.is_empty() {
+        return Err("at least one ablation observation is required".into());
+    }
+
+    let mut label_pairs = BTreeSet::new();
+    let mut targets = BTreeMap::<(String, String), AtomUseTarget>::new();
+    for (line_index, line) in evaluator_labels_jsonl.lines().enumerate() {
+        let line_number = line_index + 1;
+        if line.trim().is_empty() {
+            return Err(format!("evaluator-label line {line_number} is blank"));
+        }
+        let pair: EvaluatorLabelPair = serde_json::from_str(line)
+            .map_err(|error| format!("evaluator-label line {line_number} invalid: {error}"))?;
+        if pair.schema_version != COUNTERFACTUAL_LABEL_SCHEMA {
+            return Err(format!("unsupported evaluator label schema on line {line_number}"));
+        }
+        require_trimmed("label pair_id", &pair.pair_id)?;
+        if !label_pairs.insert(pair.pair_id.clone()) {
+            return Err(format!("duplicate evaluator label pair {:?}", pair.pair_id));
+        }
+        let mut case_ids = BTreeSet::new();
+        for case in pair.cases {
+            require_trimmed("label case_id", &case.case_id)?;
+            if !case_ids.insert(case.case_id.clone()) {
+                return Err(format!("duplicate labeled case {:?}", case.case_id));
+            }
+            for target in case.atom_use_targets {
+                validate_atom_target(&target)?;
+                let key = (case.case_id.clone(), target.evidence_id.clone());
+                if targets.insert(key.clone(), target).is_some() {
+                    return Err(format!("duplicate atom-use target for {key:?}"));
+                }
+            }
+        }
+    }
+    if targets.is_empty() {
+        return Err("evaluator labels contain no atom-use targets".into());
+    }
+
+    let observation_key_set: BTreeSet<_> = observation_keys.iter().cloned().collect();
+    let target_key_set: BTreeSet<_> = targets.keys().cloned().collect();
+    if observation_key_set != target_key_set {
+        let missing: Vec<_> = target_key_set.difference(&observation_key_set).cloned().collect();
+        let extra: Vec<_> = observation_key_set.difference(&target_key_set).cloned().collect();
+        return Err(format!(
+            "ablation observations must exactly match labelled atom targets; missing={missing:?}, extra={extra:?}"
+        ));
+    }
+
+    let run_id = observations[0].run_id.clone();
+    let reader_revision = observations[0].reader_revision.clone();
+    if observations.iter().any(|item| item.run_id != run_id || item.reader_revision != reader_revision) {
+        return Err("all observations in one score run must pin the same run_id and reader_revision".into());
+    }
+
+    let mut judgments = Vec::with_capacity(observations.len());
+    for observation in observations {
+        let key = (observation.case_id.clone(), observation.evidence_id.clone());
+        let target = targets.get(&key).expect("observation/target key equality validated");
+        let actual = changed_material_fields(&observation.full_fields, &observation.ablated_fields);
+        let required: BTreeSet<_> = target.must_change_fields.iter().cloned().collect();
+        let allowed: BTreeSet<_> = target.allowed_change_fields.iter().cloned().collect();
+        let missing_required_changes: Vec<_> = required.difference(&actual).cloned().collect();
+        let disallowed_changes: Vec<_> = actual.difference(&allowed).cloned().collect();
+        judgments.push(AtomAblationJudgment {
+            case_id: observation.case_id,
+            evidence_id: observation.evidence_id,
+            target_level: target.target_level.clone(),
+            actual_changed_fields: actual.into_iter().collect(),
+            overuse: !disallowed_changes.is_empty(),
+            underuse: !missing_required_changes.is_empty(),
+            missing_required_changes,
+            disallowed_changes,
+            context_tokens_removed: observation.full_context_tokens - observation.ablated_context_tokens,
+        });
+    }
+    judgments.sort_by(|left, right| {
+        left.case_id.cmp(&right.case_id).then_with(|| left.evidence_id.cmp(&right.evidence_id))
+    });
+
+    let count_level = |level: &str| judgments.iter().filter(|item| item.target_level == level).count();
+    let count_flag = |level: &str, flag: fn(&AtomAblationJudgment) -> bool| {
+        judgments.iter().filter(|item| item.target_level == level && flag(item)).count()
+    };
+    let rate = |numerator: usize, denominator: usize| {
+        (denominator > 0).then_some(numerator as f64 / denominator as f64)
+    };
+    let ignore_count = count_level("ignore");
+    let bound_count = count_level("bound");
+    let control_count = count_level("control");
+    let ignore_overuse_count = count_flag("ignore", |item| item.overuse);
+    let bound_overuse_count = count_flag("bound", |item| item.overuse);
+    let bound_underuse_count = count_flag("bound", |item| item.underuse);
+    let control_overuse_count = count_flag("control", |item| item.overuse);
+    let control_underuse_count = count_flag("control", |item| item.underuse);
+    let context_tokens_removed_total = judgments.iter().map(|item| item.context_tokens_removed).sum();
+
+    Ok(AtomAblationScoreSummary {
+        schema_version: "BROCA-MEMORY-ATOM-ABLATION-SCORE-V1".into(),
+        run_id,
+        reader_revision,
+        observation_count: judgments.len(),
+        ignore_count,
+        ignore_overuse_count,
+        ignore_overuse_rate: rate(ignore_overuse_count, ignore_count),
+        bound_count,
+        bound_overuse_count,
+        bound_overuse_rate: rate(bound_overuse_count, bound_count),
+        bound_underuse_count,
+        bound_underuse_rate: rate(bound_underuse_count, bound_count),
+        control_count,
+        control_overuse_count,
+        control_overuse_rate: rate(control_overuse_count, control_count),
+        control_underuse_count,
+        control_underuse_rate: rate(control_underuse_count, control_count),
+        context_tokens_removed_total,
+        judgments,
+    })
+}
+
+fn validate_material_fields(
+    fields: &BTreeMap<String, String>,
+    line_number: usize,
+    field_name: &str,
+) -> Result<(), String> {
+    for (field, value) in fields {
+        require_trimmed(&format!("{field_name} key"), field)?;
+        require_trimmed(&format!("{field_name}[{field:?}] value"), value)?;
+        if !["claim.", "action.", "decision."].iter().any(|prefix| field.starts_with(prefix)) {
+            return Err(format!("non-material output key {field:?} in {field_name} on line {line_number}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_atom_target(target: &AtomUseTarget) -> Result<(), String> {
+    require_trimmed("atom target evidence_id", &target.evidence_id)?;
+    match target.target_level.as_str() {
+        "ignore" if !target.must_change_fields.is_empty() || !target.allowed_change_fields.is_empty() => {
+            return Err("ignore targets must have empty must_change_fields and allowed_change_fields".into());
+        }
+        "ignore" | "bound" | "control" => {}
+        _ => return Err(format!("unsupported atom-use target level {:?}", target.target_level)),
+    }
+    let must: BTreeSet<_> = target.must_change_fields.iter().collect();
+    let allowed: BTreeSet<_> = target.allowed_change_fields.iter().collect();
+    if must.len() != target.must_change_fields.len() || allowed.len() != target.allowed_change_fields.len() {
+        return Err("atom target field lists must not contain duplicates".into());
+    }
+    for field in target.must_change_fields.iter().chain(target.allowed_change_fields.iter()) {
+        require_trimmed("atom target material field", field)?;
+        if !["claim.", "action.", "decision."].iter().any(|prefix| field.starts_with(prefix)) {
+            return Err(format!("atom target names non-material field {field:?}"));
+        }
+    }
+    if !must.is_subset(&allowed) {
+        return Err("must_change_fields must be a subset of allowed_change_fields".into());
+    }
+    if target.target_level == "control" && target.must_change_fields.is_empty() {
+        return Err("control targets require at least one must_change_field".into());
+    }
+    Ok(())
+}
+
+fn changed_material_fields(
+    full: &BTreeMap<String, String>,
+    ablated: &BTreeMap<String, String>,
+) -> BTreeSet<String> {
+    let keys: BTreeSet<_> = full.keys().chain(ablated.keys()).cloned().collect();
+    keys.into_iter().filter(|key| full.get(key) != ablated.get(key)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -399,32 +690,6 @@ mod tests {
     const FIXTURES: &str = include_str!("../tests/fixtures/counterfactual-evidence-audit-v1.jsonl");
     const LABELS: &str = include_str!("../tests/fixtures/evaluator-only/counterfactual-evidence-audit-labels-v1.jsonl");
 
-    #[derive(Debug, Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct GoldLabels {
-        schema_version: String,
-        pair_id: String,
-        cases: Vec<GoldCaseLabel>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct GoldCaseLabel {
-        case_id: String,
-        answerability: String,
-        expected_decision: String,
-        expected_claim: String,
-        supporting_evidence_ids: Vec<String>,
-        #[serde(default)]
-        atom_use_targets: Vec<GoldAtomUseTarget>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct GoldAtomUseTarget {
-        evidence_id: String,
-        target_level: String,
-    }
 
     #[test]
     fn counterfactual_fixture_corpus_obeys_the_pinned_pair_contract() {
@@ -464,7 +729,7 @@ mod tests {
         let mut seen_ids = BTreeSet::new();
         let mut label_pair_ids = BTreeSet::new();
         for (line_index, line) in LABELS.lines().enumerate() {
-            let labels: GoldLabels = serde_json::from_str(line)
+            let labels: EvaluatorLabelPair = serde_json::from_str(line)
                 .unwrap_or_else(|error| panic!("gold label line {} invalid: {error}", line_index + 1));
             assert_eq!(labels.schema_version, COUNTERFACTUAL_LABEL_SCHEMA);
             assert!(label_pair_ids.insert(labels.pair_id.clone()), "duplicate gold pair ID");
@@ -528,7 +793,7 @@ mod tests {
             .iter()
             .find(|pair| pair.family == "memory_influence")
             .expect("memory influence pair exists");
-        let labels: Vec<GoldLabels> = LABELS
+        let labels: Vec<EvaluatorLabelPair> = LABELS
             .lines()
             .map(|line| serde_json::from_str(line).expect("gold labels are valid"))
             .collect();
