@@ -138,6 +138,9 @@ fn validate_frozen_partition(bytes: &[u8]) -> Result<BTreeMap<String, String>> {
         || plan["train_percent"].as_u64() != Some(70)
         || plan["validation_percent"].as_u64() != Some(15)
         || plan["test_percent"].as_u64() != Some(15)
+        || plan["counts"]["train"].as_u64() != Some(260)
+        || plan["counts"]["validation"].as_u64() != Some(56)
+        || plan["counts"]["test"].as_u64() != Some(56)
         || plan["partition_digest_sha256"].as_str() != Some(EXPECTED_PARTITION_DIGEST)
     {
         bail!("frozen split plan differs from the registered PITB partition");
@@ -325,8 +328,12 @@ fn verify_receipt(
     if trust.schema_version != TRUST_SCHEMA {
         bail!("unsupported reviewer trust-store schema");
     }
+    if trust.reviewers.len() < 2 {
+        bail!("reviewer trust store must contain at least two trusted reviewers");
+    }
     let mut trusted_by_id = BTreeMap::new();
     let mut public_keys = BTreeSet::new();
+    let mut trusted_key_ids = BTreeSet::new();
     for reviewer in &trust.reviewers {
         if reviewer.reviewer_id.trim().is_empty()
             || reviewer.key_id.trim().is_empty()
@@ -337,8 +344,9 @@ fn verify_receipt(
         }
         if !is_sha256(&reviewer.public_key_hex)
             || !public_keys.insert(reviewer.public_key_hex.clone())
+            || !trusted_key_ids.insert(reviewer.key_id.as_str())
         {
-            bail!("trusted reviewer public keys must be valid and unique");
+            bail!("trusted reviewer key IDs and public keys must be valid and unique");
         }
         if trusted_by_id
             .insert(reviewer.reviewer_id.as_str(), reviewer)
