@@ -408,7 +408,14 @@ mod tests {
 
     #[test]
     fn incremental_cost_is_charged_for_each_promotion() {
-        let result = plan_promotions(&levels(), &observations(), 1, &policy()).unwrap();
+        let inputs = observations()
+            .into_iter()
+            .map(|mut observation| {
+                observation.fidelity_index = 1;
+                observation
+            })
+            .collect::<Vec<_>>();
+        let result = plan_promotions(&levels(), &inputs, 1, &policy()).unwrap();
         assert_eq!(result.promoted_candidate_ids.len(), 4);
         assert_eq!(result.estimated_incremental_cost_units, 240);
     }
