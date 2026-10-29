@@ -262,7 +262,7 @@ fn emit_report(reports: &[StrategyReport]) {
 
 fn emit_metrics_inline(metrics: &Metrics, lane: Lane) {
     print!(
-        "{{\"lane\":\"{}\",\"episodes\":{},\"false_alarm_episodes\":{},\"false_alarm_rate_per_1000_steps\":{:.6},\"pre_shift_false_alarm_episodes\":{},\"\"false_causal_diagnosis_episodes\":{},detection_episodes\":{},\"detection_rate\":{:.6},\"p50_detection_delay_steps\":",
+        "{{\"lane\":\"{}\",\"episodes\":{},\"false_alarm_episodes\":{},\"false_alarm_rate_per_1000_steps\":{:.6},\"pre_shift_false_alarm_episodes\":{},\"false_causal_diagnosis_episodes\":{},\"detection_episodes\":{},\"detection_rate\":{:.6},\"p50_detection_delay_steps\":",
         lane.name(),
         metrics.episodes,
         metrics.false_alarm_episodes,
