@@ -463,8 +463,9 @@ pub fn verify_search_exposure_match_report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::search_exposure::{SEARCH_RECEIPT_SCHEMA, SearchExposureEventV1};
-    use serde_json::json;
+    use crate::search_exposure::{
+        SEARCH_RECEIPT_SCHEMA, SearchExposureEventV1, event_hash, receipt_hash,
+    };
 
     const ZERO: &str =
         "0000000000000000000000000000000000000000000000000000000000000000";
@@ -480,30 +481,7 @@ mod tests {
             previous_event_sha256: ZERO.to_owned(),
             event_sha256: ZERO.to_owned(),
         };
-        // Use the public receipt verifier's hash profile through a tiny independent
-        // copy of the v1 event payload and domain framing.
-        let payload = serde_json::json!({
-            "sequence": event.sequence,
-            "event_kind": event.event_kind,
-            "decision": event.decision,
-            "request_sha256": event.request_sha256,
-            "host": event.host,
-            "response_sha256": event.response_sha256,
-            "previous_event_sha256": event.previous_event_sha256
-        });
-        let payload_bytes = serde_json::to_vec(&payload).unwrap();
-        let hash = {
-            let prefix = b"symthaea.science_bench_refresh.search_receipt.v1\0";
-            let domain = b"event.v1";
-            let mut hasher = Sha256::new();
-            hasher.update(prefix);
-            hasher.update((domain.len() as u64).to_be_bytes());
-            hasher.update(domain);
-            hasher.update((payload_bytes.len() as u64).to_be_bytes());
-            hasher.update(payload_bytes);
-            hex_digest(&hasher.finalize())
-        };
-        event.event_sha256 = hash.clone();
+        event.event_sha256 = event_hash(&event).unwrap();
         let mut receipt = SearchExposureReceiptV1 {
             schema: SEARCH_RECEIPT_SCHEMA.to_owned(),
             run_id: "match-test-run".to_owned(),
@@ -513,34 +491,11 @@ mod tests {
             network_policy: "isolated".to_owned(),
             allowed_hosts: vec![],
             expected_event_count: 1,
-            final_event_sha256: hash,
+            final_event_sha256: event.event_sha256.clone(),
             events: vec![event],
             receipt_commitment_sha256: ZERO.to_owned(),
         };
-        let context = serde_json::json!({
-            "schema": receipt.schema,
-            "run_id": receipt.run_id,
-            "generation_id": receipt.generation_id,
-            "policy_revision_sha256": receipt.policy_revision_sha256,
-            "task_ref_sha256": receipt.task_ref_sha256,
-            "network_policy": receipt.network_policy,
-            "allowed_hosts": receipt.allowed_hosts,
-            "expected_event_count": receipt.expected_event_count,
-            "final_event_sha256": receipt.final_event_sha256
-        });
-        let context_bytes = serde_json::to_vec(&context).unwrap();
-        let receipt_hash = {
-            let prefix = b"symthaea.science_bench_refresh.search_receipt.v1\0";
-            let domain = b"receipt.v1";
-            let mut hasher = Sha256::new();
-            hasher.update(prefix);
-            hasher.update((domain.len() as u64).to_be_bytes());
-            hasher.update(domain);
-            hasher.update((context_bytes.len() as u64).to_be_bytes());
-            hasher.update(context_bytes);
-            hex_digest(&hasher.finalize())
-        };
-        receipt.receipt_commitment_sha256 = receipt_hash;
+        receipt.receipt_commitment_sha256 = receipt_hash(&receipt).unwrap();
         receipt
     }
 
