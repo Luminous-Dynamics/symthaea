@@ -1781,6 +1781,34 @@ mod tests {
     }
 
     #[test]
+    fn deoverlap_performance_notes_keeps_lineage_with_the_surviving_duplicate() {
+        let mut notes = vec![note(0.0, 0.5), note(0.0, 0.3)];
+        let mut source_event_indices = vec![Some(10), Some(11)];
+        deoverlap_performance_notes_with_lineage(&mut notes, &mut source_event_indices);
+        assert_eq!(notes.len(), 1);
+        assert_eq!(source_event_indices, vec![Some(11)]);
+        assert!((notes[0].duration - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn strum_chords_moves_source_lineage_with_sorted_notes() {
+        let high = note(0.0, 0.5);
+        let mut low = note(0.0, 0.5);
+        low.frequency = 220.0;
+        let mut notes = vec![(0.0, high), (0.0, low)];
+        let mut source_event_indices = vec![Some(5), Some(4)];
+        strum_chords(
+            &mut notes,
+            &mut source_event_indices,
+            Instrument::AcousticGuitar,
+        );
+        assert_eq!(source_event_indices, vec![Some(4), Some(5)]);
+        assert_eq!(notes[0].1.frequency, 220.0);
+        assert_eq!(notes[1].1.frequency, 440.0);
+        assert!(notes[0].1.start_time < notes[1].1.start_time);
+    }
+
+    #[test]
     fn deoverlap_performance_notes_leaves_non_overlapping_notes_untouched() {
         let mut notes = vec![note(0.0, 0.5), note(0.6, 0.5)];
         deoverlap_performance_notes(&mut notes);
