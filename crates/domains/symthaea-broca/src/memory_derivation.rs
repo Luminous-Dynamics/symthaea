@@ -78,6 +78,53 @@ fn non_empty(value: &str, field: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Require a derived claim's valid-time interval to be contained in each
+/// derived premise's interval. A conclusion cannot be asserted for dates where
+/// one of its necessary derived premises does not apply. Source-event intervals
+/// are not checked here because this reference graph stores source IDs only.
+fn validate_dependency_interval(
+    child: &DerivedFactInput,
+    parent: &DerivedFactInput,
+) -> Result<(), String> {
+    let child_start = NaiveDate::parse_from_str(&child.valid_from, "%Y-%m-%d")
+        .map_err(|error| format!("child valid_from must be YYYY-MM-DD: {error}"))?;
+    let parent_start = NaiveDate::parse_from_str(&parent.valid_from, "%Y-%m-%d")
+        .map_err(|error| format!("parent valid_from must be YYYY-MM-DD: {error}"))?;
+
+    if child_start < parent_start {
+        return Err(format!(
+            "derived fact {:?} begins before dependency {:?} is valid",
+            child.fact_id, parent.fact_id
+        ));
+    }
+
+    match (parent.valid_to.as_deref(), child.valid_to.as_deref()) {
+        // An unbounded premise covers any later end date.
+        (None, _) => Ok(()),
+        // Both intervals are half-open: ending exactly at the parent's
+        // exclusive boundary is valid containment.
+        (Some(parent_end), Some(child_end)) => {
+            let parent_end = NaiveDate::parse_from_str(parent_end, "%Y-%m-%d")
+                .map_err(|error| format!("parent valid_to must be YYYY-MM-DD: {error}"))?;
+            let child_end = NaiveDate::parse_from_str(child_end, "%Y-%m-%d")
+                .map_err(|error| format!("child valid_to must be YYYY-MM-DD: {error}"))?;
+            if child_end <= parent_end {
+                Ok(())
+            } else {
+                Err(format!(
+                    "derived fact {:?} ends after dependency {:?} becomes invalid",
+                    child.fact_id, parent.fact_id
+                ))
+            }
+        }
+        // A finite premise cannot justify an unbounded conclusion.
+        (Some(_), None) => Err(format!(
+            "derived fact {:?} is unbounded but dependency {:?} has a finite valid interval",
+            child.fact_id, parent.fact_id
+        )),
+    }
+}
+
 fn validate_fact_input(fact: &DerivedFactInput) -> Result<(), String> {
     for (field, value) in [
         ("fact_id", fact.fact_id.as_str()),
@@ -187,6 +234,7 @@ impl DerivationGraph {
                     if record.status != DerivedStatus::Current {
                         return Err(format!("cannot derive from invalidated fact {parent_id:?}"));
                     }
+                    validate_dependency_interval(&fact, &record.fact)?;
                 }
             }
         }
@@ -455,6 +503,7 @@ impl DerivationGraph {
                                 "current fact {fact_id:?} depends on invalidated fact {parent_id:?}"
                             ));
                         }
+                        validate_dependency_interval(&record.fact, &parent.fact)?;
                     }
                 }
                 expected_reverse
@@ -631,6 +680,81 @@ mod tests {
             .derive(fact("D3", [DependencyRef::DerivedFact("D1".into())]))
             .unwrap_err()
             .contains("invalidated fact"));
+    }
+
+    #[test]
+    fn derived_validity_interval_must_fit_inside_parent_interval() {
+        let mut graph = DerivationGraph::default();
+        graph.register_source_event("E1").unwrap();
+
+        let mut parent = fact("P1", [DependencyRef::SourceEvent("E1".into())]);
+        parent.valid_from = "2026-01-01".into();
+        parent.valid_to = Some("2026-02-01".into());
+        graph.derive(parent).unwrap();
+
+        // A child may occupy a strict sub-interval or end exactly at the
+        // parent's exclusive valid_to boundary.
+        let mut contained = fact("C-contained", [DependencyRef::DerivedFact("P1".into())]);
+        contained.valid_from = "2026-01-15".into();
+        contained.valid_to = Some("2026-02-01".into());
+        graph.derive(contained).unwrap();
+
+        let mut before_parent = fact("C-before", [DependencyRef::DerivedFact("P1".into())]);
+        before_parent.valid_from = "2025-12-31".into();
+        before_parent.valid_to = Some("2026-01-15".into());
+        let before = graph.state_sha256().unwrap();
+        assert!(graph.derive(before_parent).unwrap_err().contains("begins before dependency"));
+        assert_eq!(graph.state_sha256().unwrap(), before);
+
+        let mut after_parent = fact("C-after", [DependencyRef::DerivedFact("P1".into())]);
+        after_parent.valid_from = "2026-01-15".into();
+        after_parent.valid_to = Some("2026-02-02".into());
+        assert!(graph.derive(after_parent).unwrap_err().contains("ends after dependency"));
+        assert_eq!(graph.state_sha256().unwrap(), before);
+
+        let mut unbounded_child = fact("C-unbounded", [DependencyRef::DerivedFact("P1".into())]);
+        unbounded_child.valid_from = "2026-01-15".into();
+        unbounded_child.valid_to = None;
+        assert!(graph.derive(unbounded_child).unwrap_err().contains("is unbounded"));
+        assert_eq!(graph.state_sha256().unwrap(), before);
+
+        graph.verify_consistency().unwrap();
+    }
+
+    #[test]
+    fn unbounded_parent_can_support_bounded_child_and_finite_parent_is_half_open() {
+        let mut graph = DerivationGraph::default();
+        graph.register_source_event("E1").unwrap();
+
+        let parent = fact("P-unbounded", [DependencyRef::SourceEvent("E1".into())]);
+        graph.derive(parent).unwrap();
+
+        let mut child = fact("C-bounded", [DependencyRef::DerivedFact("P-unbounded".into())]);
+        child.valid_from = "2027-01-01".into();
+        child.valid_to = Some("2027-01-02".into());
+        graph.derive(child).unwrap();
+        graph.verify_consistency().unwrap();
+    }
+
+    #[test]
+    fn consistency_verifier_detects_temporal_dependency_corruption() {
+        let mut graph = DerivationGraph::default();
+        graph.register_source_event("E1").unwrap();
+
+        let mut parent = fact("P1", [DependencyRef::SourceEvent("E1".into())]);
+        parent.valid_from = "2026-01-01".into();
+        parent.valid_to = Some("2026-02-01".into());
+        graph.derive(parent).unwrap();
+
+        let mut child = fact("C1", [DependencyRef::DerivedFact("P1".into())]);
+        child.valid_from = "2026-01-15".into();
+        child.valid_to = Some("2026-01-20".into());
+        graph.derive(child).unwrap();
+
+        // Simulate an invalid persisted/corrupted record for the verifier's
+        // negative control. The public derive API must never admit this state.
+        graph.facts.get_mut("C1").unwrap().fact.valid_to = Some("2026-03-01".into());
+        assert!(graph.verify_consistency().unwrap_err().contains("ends after dependency"));
     }
 
     #[test]
