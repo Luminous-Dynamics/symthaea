@@ -26,35 +26,35 @@ const FEAS_TOL: f64 = 1e-9;
 const GRID_N: usize = 160;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Vec2 {
-    x: f64,
-    y: f64,
+pub(crate) struct Vec2 {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
 }
 
 impl Vec2 {
-    fn new(x: f64, y: f64) -> Self { Self { x, y } }
+    pub(crate) fn new(x: f64, y: f64) -> Self { Self { x, y } }
     fn dot(self, other: Self) -> f64 { self.x * other.x + self.y * other.y }
     fn add(self, other: Self) -> Self { Self::new(self.x + other.x, self.y + other.y) }
     fn sub(self, other: Self) -> Self { Self::new(self.x - other.x, self.y - other.y) }
     fn scale(self, scalar: f64) -> Self { Self::new(self.x * scalar, self.y * scalar) }
-    fn finite(self) -> bool { self.x.is_finite() && self.y.is_finite() }
+    pub(crate) fn finite(self) -> bool { self.x.is_finite() && self.y.is_finite() }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Sym2 {
-    a00: f64,
-    a01: f64,
-    a11: f64,
+pub(crate) struct Sym2 {
+    pub(crate) a00: f64,
+    pub(crate) a01: f64,
+    pub(crate) a11: f64,
 }
 
 impl Sym2 {
-    fn quad(self, value: Vec2) -> f64 {
+    pub(crate) fn quad(self, value: Vec2) -> f64 {
         self.a00 * value.x * value.x
             + 2.0 * self.a01 * value.x * value.y
             + self.a11 * value.y * value.y
     }
 
-    fn bilinear(self, left: Vec2, right: Vec2) -> f64 {
+    pub(crate) fn bilinear(self, left: Vec2, right: Vec2) -> f64 {
         self.a00 * left.x * right.x
             + self.a01 * (left.x * right.y + left.y * right.x)
             + self.a11 * left.y * right.y
@@ -66,7 +66,7 @@ impl Sym2 {
 
     fn determinant(self) -> f64 { self.a00 * self.a11 - self.a01 * self.a01 }
 
-    fn is_psd(self) -> bool {
+    pub(crate) fn is_psd(self) -> bool {
         if !self.finite() || self.a00 < -PSD_TOL || self.a11 < -PSD_TOL {
             return false;
         }
@@ -76,15 +76,15 @@ impl Sym2 {
 }
 
 #[derive(Clone, Debug)]
-struct Optimum {
-    lambda: Vec2,
-    objective: f64,
-    active_constraints: Vec<&'static str>,
-    slack_lambda2: f64,
-    slack_sum: f64,
-    slack_weighted: f64,
-    stationary_point_considered: bool,
-    edge_candidates_considered: usize,
+pub(crate) struct Optimum {
+    pub(crate) lambda: Vec2,
+    pub(crate) objective: f64,
+    pub(crate) active_constraints: Vec<&'static str>,
+    pub(crate) slack_lambda2: f64,
+    pub(crate) slack_sum: f64,
+    pub(crate) slack_weighted: f64,
+    pub(crate) stationary_point_considered: bool,
+    pub(crate) edge_candidates_considered: usize,
 }
 
 fn objective(a: Sym2, b: Vec2, lambda: Vec2) -> f64 {
@@ -136,7 +136,7 @@ fn edge_maximum(a: Sym2, b: Vec2, start: Vec2, end: Vec2) -> Vec2 {
     start.add(direction.scale(t))
 }
 
-fn optimize(a: Sym2, b: Vec2, max_weight: f64) -> Result<Optimum, String> {
+pub(crate) fn optimize(a: Sym2, b: Vec2, max_weight: f64) -> Result<Optimum, String> {
     validate(a, b, max_weight)?;
 
     let mut candidates: Vec<Vec2> = Vec::with_capacity(10);
