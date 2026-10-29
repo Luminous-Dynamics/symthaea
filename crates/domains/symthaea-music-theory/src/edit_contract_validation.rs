@@ -273,22 +273,17 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         || source.channel_count > 64
         || source.duration_frames == 0
         || source.track_ids.is_empty()
-        || source.track_ids.iter().any(|id| id.trim().is_empty())
+        || source.track_ids.iter().any(|id| id.trim().is_empty() || id.trim() != id.as_str())
     {
         add_issue!(
             "SCHEMA_REJECT",
             "source metadata is missing, malformed, or outside the declared domain".to_owned(),
         );
     }
-    if source
-        .track_ids
-        .iter()
-        .any(|id| id.trim().is_empty())
-        || duplicate_strings(&source.track_ids)
-    {
+    if duplicate_strings(&source.track_ids) {
         add_issue!(
             "DUPLICATE_TRACK_ID",
-            "source track identifiers must be non-empty and unique".to_owned(),
+            "source track identifiers must be unique".to_owned(),
         );
     }
 
@@ -297,8 +292,9 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
 
     for region in &contract.authorization_mask {
         if region.region_id.trim().is_empty()
+            || region.region_id.trim() != region.region_id
             || region.track_ids.is_empty()
-            || region.track_ids.iter().any(|id| id.trim().is_empty())
+            || region.track_ids.iter().any(|id| id.trim().is_empty() || id.trim() != id.as_str())
         {
             add_issue!(
                 "SCHEMA_REJECT",
@@ -324,6 +320,12 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             add_issue!(
                 "REGION_OUT_OF_BOUNDS",
                 format!("region {} extends beyond source audio duration", region.region_id),
+            );
+        }
+        if duplicate_strings(&region.track_ids) {
+            add_issue!(
+                "DUPLICATE_TRACK_ID",
+                format!("region {} repeats a track identifier", region.region_id),
             );
         }
         for track in &region.track_ids {
@@ -368,6 +370,18 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
     }
 
     for change in &contract.requested_changes {
+        if change.region_ids.is_empty() {
+            add_issue!(
+                "SCHEMA_REJECT",
+                "requested changes must reference at least one authorized region".to_owned(),
+            );
+        }
+        if duplicate_strings(&change.region_ids) {
+            add_issue!(
+                "DUPLICATE_REGION_REFERENCE",
+                "a requested change must not repeat region IDs".to_owned(),
+            );
+        }
         for region_id in &change.region_ids {
             if !region_by_id.contains_key(region_id) {
                 add_issue!(
@@ -390,6 +404,12 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                 format!("operation {:?} has no supported semantics", change.operation),
             ),
             _ => {}
+        }
+
+        if let Some(tolerance) = &change.tolerance {
+            for (code, message) in tolerance_issues(change.axis, tolerance) {
+                add_issue!(code, message);
+            }
         }
 
         match validate_target(change.operation, &change.target) {
@@ -432,13 +452,16 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
     }
 
     for invariant in &contract.protected_invariants {
-        if !invariant.tolerance.max_deviation.is_finite()
-            || invariant.tolerance.max_deviation < 0.0
+        if invariant.region_ids.as_ref().is_some_and(Vec::is_empty)
+            || invariant.track_ids.as_ref().is_some_and(Vec::is_empty)
         {
             add_issue!(
-                "TOLERANCE_OUT_OF_DOMAIN",
-                "tolerance max_deviation must be finite and non-negative".to_owned(),
+                "SCHEMA_REJECT",
+                "explicit protected region/track sets must not be empty".to_owned(),
             );
+        }
+        for (code, message) in tolerance_issues(invariant.axis, &invariant.tolerance) {
+            add_issue!(code, message);
         }
         if let Some(region_ids) = &invariant.region_ids {
             for region_id in region_ids {
@@ -459,34 +482,6 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                     );
                 }
             }
-        }
-
-        let tolerance = &invariant.tolerance;
-        let missing_calibration = tolerance
-            .calibration_id
-            .as_deref()
-            .is_none_or(|id| id.trim().is_empty());
-        if matches!(
-            tolerance.metric,
-            ToleranceMetric::FeatureDistance | ToleranceMetric::AnnotatorCalibrated
-        ) && missing_calibration
-        {
-            add_issue!(
-                "CALIBRATION_ID_REQUIRED",
-                format!("axis {:?} uses a calibrated metric without calibration_id", invariant.axis),
-            );
-            if tolerance.metric == ToleranceMetric::AnnotatorCalibrated {
-                add_issue!(
-                    "SCHEMA_REJECT",
-                    "annotator_calibrated requires calibration_id by schema".to_owned(),
-                );
-            }
-        }
-        if !compatible_unit(invariant.axis, tolerance.unit.as_deref()) {
-            add_issue!(
-                "TOLERANCE_UNIT_AXIS_MISMATCH",
-                format!("unit {:?} is incompatible with axis {:?}", tolerance.unit, invariant.axis),
-            );
         }
 
         for change in &contract.requested_changes {
@@ -640,7 +635,107 @@ fn validate_target(operation: EditOperation, target: &ContractValue) -> TargetCh
     }
 }
 
-fn compatible_unit(axis: PropertyAxis, unit: Option<&str>) -> bool {
+fn tolerance_issues(axis: PropertyAxis, tolerance: &Tolerance) -> Vec<(&'static str, String)> {
+    let mut issues = Vec::new();
+    if !tolerance.max_deviation.is_finite() || tolerance.max_deviation < 0.0 {
+        issues.push((
+            "TOLERANCE_OUT_OF_DOMAIN",
+            "tolerance max_deviation must be finite and non-negative".to_owned(),
+        ));
+    }
+    if !compatible_metric(axis, tolerance.metric) {
+        issues.push((
+            "TOLERANCE_METRIC_AXIS_MISMATCH",
+            format!("metric {:?} is incompatible with axis {:?}", tolerance.metric, axis),
+        ));
+    }
+    if !compatible_unit(axis, tolerance.metric, tolerance.unit.as_deref()) {
+        issues.push((
+            "TOLERANCE_UNIT_AXIS_MISMATCH",
+            format!("unit {:?} is incompatible with metric {:?} and axis {:?}", tolerance.unit, tolerance.metric, axis),
+        ));
+    }
+    let missing_calibration = tolerance
+        .calibration_id
+        .as_deref()
+        .is_none_or(|id| id.trim().is_empty());
+    if matches!(
+        tolerance.metric,
+        ToleranceMetric::FeatureDistance | ToleranceMetric::AnnotatorCalibrated
+    ) && missing_calibration
+    {
+        issues.push((
+            "CALIBRATION_ID_REQUIRED",
+            format!("axis {:?} uses a calibrated metric without calibration_id", axis),
+        ));
+        if tolerance.metric == ToleranceMetric::AnnotatorCalibrated {
+            issues.push((
+                "SCHEMA_REJECT",
+                "annotator_calibrated requires calibration_id by schema".to_owned(),
+            ));
+        }
+    }
+    issues
+}
+
+fn compatible_metric(axis: PropertyAxis, metric: ToleranceMetric) -> bool {
+    use ToleranceMetric::{Absolute, AnnotatorCalibrated, CategoricalExact, FeatureDistance, LogRatio, Relative};
+    match axis {
+        PropertyAxis::Pitch => matches!(metric, Absolute | CategoricalExact | FeatureDistance | AnnotatorCalibrated),
+        PropertyAxis::Onset => matches!(metric, Absolute | Relative | FeatureDistance | AnnotatorCalibrated),
+        PropertyAxis::Duration => matches!(metric, Absolute | Relative | LogRatio | FeatureDistance | AnnotatorCalibrated),
+        PropertyAxis::Velocity => matches!(metric, Absolute | Relative | FeatureDistance | AnnotatorCalibrated),
+        PropertyAxis::NoteCount => matches!(metric, Absolute | Relative | CategoricalExact | FeatureDistance | AnnotatorCalibrated),
+        PropertyAxis::Instrumentation | PropertyAxis::Harmony | PropertyAxis::Rhythm | PropertyAxis::Structure | PropertyAxis::SourceAttribution => {
+            matches!(metric, CategoricalExact | FeatureDistance | AnnotatorCalibrated)
+        }
+        PropertyAxis::Timbre | PropertyAxis::SpectralEnvelope => {
+            matches!(metric, Absolute | Relative | FeatureDistance | AnnotatorCalibrated)
+        }
+        PropertyAxis::StereoImage | PropertyAxis::Dynamics | PropertyAxis::AccompanimentDensity | PropertyAxis::Transients => {
+            matches!(metric, Absolute | Relative | FeatureDistance | AnnotatorCalibrated)
+        }
+        PropertyAxis::Other => matches!(metric, FeatureDistance | AnnotatorCalibrated),
+    }
+}
+
+fn compatible_unit(axis: PropertyAxis, metric: ToleranceMetric, unit: Option<&str>) -> bool {
+    let Some(unit) = unit else {
+        return false;
+    };
+    if metric == ToleranceMetric::LogRatio {
+        return axis == PropertyAxis::Duration && unit == "log-ratio";
+    }
+    if metric == ToleranceMetric::CategoricalExact {
+        return match axis {
+            PropertyAxis::Pitch => unit == "MIDI-note",
+            PropertyAxis::NoteCount => unit == "events",
+            PropertyAxis::Instrumentation | PropertyAxis::Harmony | PropertyAxis::Rhythm
+            | PropertyAxis::Structure | PropertyAxis::SourceAttribution => unit == "categorical",
+            _ => false,
+        };
+    }
+    match axis {
+        PropertyAxis::Pitch => matches!(unit, "semitones" | "MIDI-note"),
+        PropertyAxis::Onset | PropertyAxis::Duration => {
+            matches!(unit, "microseconds" | "milliseconds")
+        }
+        PropertyAxis::NoteCount => unit == "events",
+        PropertyAxis::Velocity => unit == "MIDI-velocity",
+        PropertyAxis::Timbre | PropertyAxis::SpectralEnvelope => unit == "normalized-feature-distance",
+        PropertyAxis::StereoImage => unit == "normalized-stereo-position",
+        PropertyAxis::Dynamics => matches!(unit, "normalized-feature-distance" | "decibels" | "MIDI-velocity"),
+        PropertyAxis::AccompanimentDensity => matches!(unit, "events-per-beat" | "relative"),
+        PropertyAxis::Harmony | PropertyAxis::Rhythm | PropertyAxis::Structure => {
+            matches!(unit, "categorical" | "normalized-feature-distance")
+        }
+        PropertyAxis::Instrumentation | PropertyAxis::SourceAttribution => {
+            matches!(unit, "categorical" | "normalized-feature-distance")
+        }
+        PropertyAxis::Transients => matches!(unit, "microseconds" | "milliseconds" | "normalized-feature-distance"),
+        PropertyAxis::Other => unit == "normalized-feature-distance",
+    }
+}
     let Some(unit) = unit else {
         return false;
     };
