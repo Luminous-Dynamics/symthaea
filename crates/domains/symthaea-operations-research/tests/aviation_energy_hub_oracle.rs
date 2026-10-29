@@ -2,8 +2,8 @@ use symthaea_operations_research::aviation_energy_accounting::{EvidenceClass, Tr
 use symthaea_operations_research::aviation_energy_hub::{
     canonical_energy_hub_digest, seal_energy_hub_scenario, solve_exact_energy_hub_pareto,
     solve_renewable_first_greedy, verify_energy_hub_plan, verify_energy_hub_digest,
-    EnergyHubError, EnergyHubInterval, EnergyHubMetrics, EnergyHubPlan, EnergyHubStepAction,
-    EnergyStorageSpec, TimeIndexedEnergyHubScenario,
+    EnergyHubError, EnergyHubInterval, EnergyHubMetrics, EnergyStorageSpec,
+    TimeIndexedEnergyHubScenario,
 };
 
 fn storage(capacity: u32, charge: u32, discharge: u32, terminal: u32) -> EnergyStorageSpec {
@@ -143,7 +143,7 @@ fn storage_aware_exact_plan_succeeds_when_myopic_renewable_first_fails() {
     assert_eq!(best.metrics.renewable_generation_quanta, 2);
     assert_eq!(best.metrics.source_ledger.total_cost, 13.0);
     assert_eq!(best.metrics.source_ledger.accounted_lifecycle_co2e_kg, 24.0);
-    assert_eq!(verify_energy_hub_plan(&case, &best.plan).unwrap(), *best);
+    assert_eq!(verify_energy_hub_plan(&case, &best.plan).unwrap(), best.clone());
 
     assert_eq!(
         solve_renewable_first_greedy(&case).unwrap_err(),
