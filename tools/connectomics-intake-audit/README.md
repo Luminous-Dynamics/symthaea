@@ -21,7 +21,7 @@ For reproducible CI, generate and commit this crate's `Cargo.lock`, then add `--
 
 ## Query-specific stopping snapshot audit
 
-The `connectome-stopping-audit` binary validates a JSONL series against the initial versioned snapshot contract in `docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json`. It checks immutable dataset/query/profile identity, strictly increasing snapshot sequence, parent graph digest continuity, nondecreasing edit counts, operation-class totals, invariant names, query metric names/units, and digest formatting. It also emits a descriptive tail-range stability signal for graph invariants and declared query metrics.
+The `connectome-stopping-audit` binary validates a JSONL series against the initial versioned snapshot contract in `docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json`. It checks immutable dataset/query/profile identity, strictly increasing snapshot sequence, parent graph digest continuity, nondecreasing edit counts, operation-class totals, invariant names, query metric names/units, and digest formatting. It also emits a descriptive tail-range stability signal and walk-forward predictions for declared graph invariants and scientific-query metrics, comparing a fitted asymptotic curve with persistence and linear-trend baselines.
 
 ```sh
 cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
@@ -30,12 +30,13 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
   --tail-window 3 \
   --relative-tolerance 0.01 \
   --absolute-tolerance 1e-9 \
+  --forecast-min-training-snapshots 4 \
   --output stopping-audit.json
 ```
 
 Each JSONL record is one snapshot object conforming to `CONNECTOME_STOPPING_SNAPSHOT.schema.json`. Order records from oldest to newest. The first snapshot has sequence index 0 and no previous graph digest; each later snapshot names the immediately preceding snapshot's graph digest. Cumulative operation-class counts must sum to `cumulative_committed`. An illustrative three-snapshot fixture is at `docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl`; it intentionally shows graph invariants looking stable while a query metric changes, and uses fake data/digests only.
 
-**Important:** the tool always reports `CONTINUE_REVIEW`; its status is only `VALIDATED_NOT_STOPPED` when consistency checks pass. Tail stability is descriptive, not an asymptotic forecast or proof of reconstruction correctness. The schema contains no independently calibrated residual high-impact-error risk, and global graph invariants can stabilize while local scientific errors persist. A valid automatic stopping gate requires separate risk evidence and held-out evaluation; this binary does not make that decision.
+**Important:** the tool always recommends `CONTINUE_REVIEW`; its status is `VALIDATED_NOT_STOPPED` only when consistency checks pass. It now adds one-step-ahead walk-forward metric forecasts after at least four training snapshots. The asymptotic curve is fitted using prior snapshots only and compared with last-value persistence and a linear-trend baseline; summaries report held-out MAE and relative improvement. This comparison conditions on the target snapshot's cumulative edit count, available only retrospectively, so it does not yet forecast elapsed time or edits required to reach a quality threshold. No calibrated forecast intervals are implemented. Tail stability is descriptive, and neither stability nor curve fit proves biological correctness. The schema contains no independently calibrated residual high-impact-error risk, and global graph invariants can stabilize while local scientific errors persist. A valid automatic stopping gate requires separate risk evidence and held-out evaluation; this binary does not make that decision. The six-snapshot synthetic forecast fixture is `docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl`; the three-snapshot counterexample remains `docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl`.
 
 
 ## Run
