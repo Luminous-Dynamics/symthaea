@@ -1346,10 +1346,25 @@ mod tests {
     fn identical_content_aliases_within_one_split_are_counted_not_rejected() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fs::write(fixture.root.join("b.trace"), fs::read(fixture.root.join("a.trace")).unwrap())
-            .unwrap();
-        let digest = sha256_file(&fixture.root.join("b.trace")).unwrap();
-        fixture.rows[1][7] = digest;
+        fixture.add_row(
+            "s-train-attack-alias",
+            "g",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fs::write(
+            fixture.root.join("g.trace"),
+            fs::read(fixture.root.join("a.trace")).unwrap(),
+        )
+        .unwrap();
+        let digest = sha256_file(&fixture.root.join("g.trace")).unwrap();
+        let alias_row = fixture.rows.len() - 1;
+        fixture.rows[alias_row][7] = digest;
         let summary = fixture.audit().expect("same-split alias is not leakage");
         assert_eq!(summary.duplicate_content_aliases, 1);
     }
