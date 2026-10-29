@@ -159,9 +159,11 @@ def _check_receipt_bindings(
         raise ValueError("target manifest ID does not match decision receipt")
     if target_manifest.get("evidence_class") != contract["evidence_class"]:
         raise ValueError("target manifest evidence class mismatch")
-    if target_manifest.get("policy_source_sha256", "").lower() != contract["policy_source_sha256"].lower():
+    target_source = _sha256(target_manifest.get("policy_source_sha256"), "target policy_source_sha256")
+    target_config = _sha256(target_manifest.get("policy_config_sha256"), "target policy_config_sha256")
+    if target_source != contract["policy_source_sha256"].lower():
         raise ValueError("target manifest source digest mismatch")
-    if target_manifest.get("policy_config_sha256", "").lower() != contract["policy_config_sha256"].lower():
+    if target_config != contract["policy_config_sha256"].lower():
         raise ValueError("target manifest config digest mismatch")
 
     if not isinstance(validation, dict):
@@ -203,6 +205,29 @@ def _check_receipt_bindings(
         raise ValueError("task IDs must be unique in every manifest")
     if decision_ids != target_ids or decision_ids != validation_ids:
         raise ValueError("decision, target, and validation task IDs/order do not match")
+
+    # Verify the decision receipt actually reports the target predictions it
+    # claims to screen; a digest binds bytes but does not make their semantics true.
+    for index, (decision_task, target_task) in enumerate(zip(decisions, target_tasks)):
+        if decision_task.get("stratum") != target_task.get("stratum"):
+            raise ValueError(f"decision/target stratum mismatch at task index {index}")
+        if decision_task.get("task_family") != target_task.get("task_family"):
+            raise ValueError(f"decision/target task family mismatch at task index {index}")
+        selected = decision_task.get("candidates")
+        predictions = target_task.get("predictions")
+        if not isinstance(selected, list) or not isinstance(predictions, list) or len(selected) != len(predictions):
+            raise ValueError(f"decision/target candidate count mismatch at task index {index}")
+        for candidate_index, (decision_candidate, prediction) in enumerate(zip(selected, predictions)):
+            if not isinstance(decision_candidate, dict) or not isinstance(prediction, dict):
+                raise ValueError(f"decision/target candidate must be an object at task index {index}")
+            if decision_candidate.get("candidate_id") != prediction.get("candidate_id"):
+                raise ValueError(f"decision/target candidate ID mismatch at task index {index}")
+            decision_margin = _finite(decision_candidate.get("predicted_margin"), "decision predicted_margin")
+            target_margin = _finite(prediction.get("predicted_margin"), "target predicted_margin")
+            if decision_margin != target_margin:
+                raise ValueError(f"decision/target predicted margin mismatch at task index {index}")
+            if decision_candidate.get("action") not in {"recommend_feasible", "abstain"}:
+                raise ValueError(f"unrecognized decision action at task index {index}")
     return decisions, validation_tasks
 
 
