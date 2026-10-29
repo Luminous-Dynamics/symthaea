@@ -10,7 +10,7 @@ VIS-DVPC-041 tests exact path probability and endpoint chronology at horizon 8. 
 
 ## Reproducible design
 
-Use 2,000 sequences per DGP, horizon 512, with reported snapshots at 32, 128 and 512. The standard-library-only SplitMix64 PRNG has a fixed base seed and scenario/replicate mixing formula. No external datasets, dependencies or asynchronous workers are required.
+Use 2,000 sequences per DGP, horizon 512, with reported snapshots at 32, 128 and 512. The standard-library-only SplitMix64 PRNG has a fixed base seed and scenario/replicate mixing formula. No external datasets, dependencies or asynchronous workers are required. Per-method elapsed time is measured separately from the shared simulator; the MOPE figure deliberately includes the expensive direct-wealth certificates used in this audit and therefore must not be presented as optimized deployment throughput.
 
 | DGP | Logger P(A=1) | Reward means (A=0,A=1) | True value | W |
 |---|---:|---:|---:|---:|
@@ -40,7 +40,7 @@ At each horizon and for every method:
 - false promotion probability under each null DGP, where the lower endpoint ever exceeds tau=0.55;
 - promotion power under the true-value-0.65 alternative at the same threshold;
 - conditional median and 90th-percentile promotion time when promotion occurs;
-- MOPE root checks/failures and total runtime / samples per second.
+- MOPE root checks/failures, per-method elapsed seconds and method observations/second at each horizon, plus overall scenario wall time. The MOPE per-method timing includes direct root/wealth-certificate recomputation by the research harness, so it is conservative audit-path cost—not a pure production-kernel latency claim.
 
 A 2,000-sequence simulation cannot prove coverage. Its purpose is to quantify approximate operating characteristics with uncertainty bars, while the confidence-sequence validity argument and exact-path controls remain separate.
 
