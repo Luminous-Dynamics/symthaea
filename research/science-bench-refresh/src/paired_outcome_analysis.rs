@@ -252,8 +252,8 @@ fn endpoint_value(
             }
             match record.task_correctness {
                 TaskCorrectnessV1::Correct => Some(1.0),
-                TaskCorrectnessV1::Incorrect => Some(0.0),
-                TaskCorrectnessV1::Partial | TaskCorrectnessV1::NotEvaluated => None,
+                TaskCorrectnessV1::Incorrect | TaskCorrectnessV1::Partial => Some(0.0),
+                TaskCorrectnessV1::NotEvaluated => None,
             }
         }
         E::FullySupportedClaim => {
