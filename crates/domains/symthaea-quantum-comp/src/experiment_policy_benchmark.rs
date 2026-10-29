@@ -706,8 +706,8 @@ mod tests {
 
     #[test]
     fn ground_truth_candidate_mismatch_is_rejected() {
-        let (models, truth) = fixture_models();
-        truth = ActiveExperimentProblem::new(
+        let (models, _original_truth) = fixture_models();
+        let truth = ActiveExperimentProblem::new(
             vec!["H0".into(), "H1".into()],
             vec![0.5, 0.5],
             vec!["choose-H0".into(), "choose-H1".into()],
