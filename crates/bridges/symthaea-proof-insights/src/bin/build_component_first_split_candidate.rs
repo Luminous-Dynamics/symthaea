@@ -449,6 +449,19 @@ fn execute() -> Result<()> {
         .collect();
     let counts = |split: &str| new_assignments.values().filter(|value| value.as_str() == split).count();
     let component_counts = |split: &str| component_split.values().filter(|value| value.as_str() == split).count();
+    let family_share = |split: &str| counts(split) as f64 / new_assignments.len() as f64;
+    let component_share = |split: &str| component_counts(split) as f64 / units.len() as f64;
+    let target_component_counts = component_quotas(units.len());
+    let max_absolute_family_share_error = SPLITS
+        .iter()
+        .enumerate()
+        .map(|(index, split)| (family_share(split) - TARGET_SHARES[index]).abs())
+        .fold(0.0_f64, f64::max);
+    let max_absolute_component_share_error = SPLITS
+        .iter()
+        .enumerate()
+        .map(|(index, split)| (component_share(split) - TARGET_SHARES[index]).abs())
+        .fold(0.0_f64, f64::max);
     let result = json!({
         "schema_version": "pitb.component-first-split-candidate.v0",
         "status": "candidate_only",
@@ -471,6 +484,27 @@ fn execute() -> Result<()> {
             "train": component_counts("train"),
             "validation": component_counts("validation"),
             "test": component_counts("test")
+        },
+        "target_component_count_by_split": {
+            "train": target_component_counts[0],
+            "validation": target_component_counts[1],
+            "test": target_component_counts[2]
+        },
+        "allocation_diagnostics": {
+            "family_share_by_split": {
+                "train": family_share("train"),
+                "validation": family_share("validation"),
+                "test": family_share("test")
+            },
+            "component_share_by_split": {
+                "train": component_share("train"),
+                "validation": component_share("validation"),
+                "test": component_share("test")
+            },
+            "max_absolute_family_share_error": max_absolute_family_share_error,
+            "max_absolute_component_share_error": max_absolute_component_share_error,
+            "family_balance_objective": "sum over splits of squared relative deviation between achieved and target family counts",
+            "family_balance_optimum": "deterministic one-swap local optimum; not guaranteed globally optimal"
         },
         "source_v0_partition_digest_sha256": V0_PARTITION,
         "source_split_manifest_sha256": sha256(&split_bytes),
