@@ -5,7 +5,7 @@
 //! the exact trust-store digest, and the trust-store root must be managed outside
 //! the outcome-producing experiment.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use anyhow::{Context, Result, bail};
 use ed25519_dalek::{Signature, VerifyingKey};
@@ -83,6 +83,16 @@ struct TrustedReviewer {
     organization_id: String,
     role: String,
     public_key_hex: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedComponent {
+    pub component_id: String,
+    pub split_names: Vec<String>,
+    pub family_ids: Vec<String>,
+    pub hard_edge_ids: Vec<String>,
+    pub confirmed_edge_ids: Vec<String>,
+    pub unresolved_edge_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -248,6 +258,119 @@ fn canonical_edges_digest(edges: &[Edge], families: &BTreeMap<String, String>) -
     }
     canonical.sort_by(|left, right| left.edge_id.cmp(&right.edge_id));
     Ok(sha256_hex(&serde_json::to_vec(&canonical)?))
+}
+
+fn is_hard_relation(relation_kind: &str) -> bool {
+    matches!(
+        relation_kind,
+        "exact_duplicate"
+            | "shared_source_artifact"
+            | "formal_dependency"
+            | "reused_lemma"
+            | "equivalent_statement"
+    )
+}
+
+/// Independently reconstruct the exact connected-component partition and edge
+/// rollups from the authenticated relationship inventory. A manifest's own
+/// self-consistency is not enough: its components must match this graph.
+pub fn expected_components_from_inventory(
+    inventory_bytes: &[u8],
+    families: &BTreeMap<String, String>,
+) -> Result<Vec<ExpectedComponent>> {
+    let inventory: Inventory =
+        serde_json::from_slice(inventory_bytes).context("parse signed relationship inventory")?;
+    if inventory.schema_version != "pitb.family-leakage-edges.v0"
+        || inventory.source_partition_digest_sha256 != partition_digest(families)
+        || inventory.coverage_status != "independently_reviewed_complete"
+    {
+        bail!("component reconstruction requires the complete inventory for the exact frozen partition");
+    }
+    canonical_edges_digest(&inventory.edges, families)?;
+
+    let mut adjacency: BTreeMap<String, BTreeSet<String>> = families
+        .keys()
+        .map(|family_id| (family_id.clone(), BTreeSet::new()))
+        .collect();
+    for edge in &inventory.edges {
+        if is_hard_relation(&edge.relation_kind) && edge.assessment_status != "dismissed" {
+            adjacency
+                .get_mut(&edge.source_family_id)
+                .context("missing source family in component graph")?
+                .insert(edge.target_family_id.clone());
+            adjacency
+                .get_mut(&edge.target_family_id)
+                .context("missing target family in component graph")?
+                .insert(edge.source_family_id.clone());
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut expected = Vec::new();
+    for start in families.keys() {
+        if !seen.insert(start.clone()) {
+            continue;
+        }
+        let mut queue = VecDeque::from([start.clone()]);
+        let mut members = BTreeSet::from([start.clone()]);
+        while let Some(family_id) = queue.pop_front() {
+            for neighbor in &adjacency[&family_id] {
+                if seen.insert(neighbor.clone()) {
+                    members.insert(neighbor.clone());
+                    queue.push_back(neighbor.clone());
+                }
+            }
+        }
+
+        let family_ids: Vec<String> = members.into_iter().collect();
+        let split_names: Vec<String> = family_ids
+            .iter()
+            .map(|family_id| families[family_id].clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let member_set: BTreeSet<&str> = family_ids.iter().map(String::as_str).collect();
+        let related_edges: Vec<&Edge> = inventory
+            .edges
+            .iter()
+            .filter(|edge| {
+                is_hard_relation(&edge.relation_kind)
+                    && edge.assessment_status != "dismissed"
+                    && member_set.contains(edge.source_family_id.as_str())
+                    && member_set.contains(edge.target_family_id.as_str())
+            })
+            .collect();
+        let sorted_ids = |mut ids: Vec<String>| {
+            ids.sort();
+            ids
+        };
+        let mut material = family_ids.join("\n");
+        material.push('\n');
+        expected.push(ExpectedComponent {
+            component_id: format!("component-{}", sha256_hex(material.as_bytes())),
+            split_names,
+            family_ids,
+            hard_edge_ids: sorted_ids(
+                related_edges.iter().map(|edge| edge.edge_id.clone()).collect(),
+            ),
+            confirmed_edge_ids: sorted_ids(
+                related_edges
+                    .iter()
+                    .filter(|edge| edge.assessment_status == "confirmed")
+                    .map(|edge| edge.edge_id.clone())
+                    .collect(),
+            ),
+            unresolved_edge_ids: sorted_ids(
+                related_edges
+                    .iter()
+                    .filter(|edge| edge.assessment_status == "unresolved")
+                    .map(|edge| edge.edge_id.clone())
+                    .collect(),
+            ),
+        });
+    }
+    expected.sort_by(|left, right| left.family_ids.cmp(&right.family_ids));
+    Ok(expected)
 }
 
 fn signing_message(
