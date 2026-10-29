@@ -256,13 +256,19 @@ fn validate_record_contract(
                 ));
                 valid = false;
             }
-            if record.match_method == "exact_digest"
-                && record.match_score_micros != MAX_SCORE_MICROS
-            {
-                issues.push(format!(
-                    "records[{index}] exact_digest must carry score 1,000,000"
-                ));
-                valid = false;
+            if record.match_method == "exact_digest" {
+                if record.match_score_micros != MAX_SCORE_MICROS {
+                    issues.push(format!(
+                        "records[{index}] exact_digest must carry score 1,000,000"
+                    ));
+                    valid = false;
+                }
+                if record.protected_reference_sha256 != record.evidence_artifact_sha256 {
+                    issues.push(format!(
+                        "records[{index}] exact_digest requires evidence digest to equal protected reference digest"
+                    ));
+                    valid = false;
+                }
             }
         }
         "benchmark_metadata" | "question_context" | "explicit_answer" => {
@@ -602,14 +608,15 @@ mod tests {
     fn explicit_answer_match_blocks_and_records_evidence_digests() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
+        let exact_match_digest = sha256_hex(b"exact-matched-answer-snippet");
         let report = match_report(
             &receipt_bytes,
             "explicit_answer",
             "exact_digest",
             MAX_SCORE_MICROS,
             MAX_SCORE_MICROS,
-            Some(sha256_hex(b"protected-answer")),
-            Some(sha256_hex(b"evidence-snippet")),
+            Some(exact_match_digest.clone()),
+            Some(exact_match_digest),
         );
         let verified = verify_search_exposure_match_report(
             &receipt_bytes,
