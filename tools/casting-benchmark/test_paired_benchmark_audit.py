@@ -144,6 +144,12 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
         self.assertEqual(by_family["local_bias_island"]["auc_delta"]["n_paired_units"], 2)
         self.assertEqual(by_family["structural_discrepancy"]["auc_delta"]["n_paired_units"], 1)
 
+    def test_rejects_candidate_or_shift_rows_as_sampling_units(self):
+        doc = manifest()
+        doc["sampling_unit"] = "candidate_rows"
+        with self.assertRaisesRegex(ValueError, "sampling_unit must be unit_id"):
+            analyze_manifest(doc)
+
     def test_rejects_missing_policy_pair_instead_of_silently_dropping_unit(self):
         doc = manifest()
         doc["runs"] = [row for row in doc["runs"] if not (row["unit_id"] == "u3" and row["policy_id"] == "candidate")]
@@ -217,6 +223,7 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
             self.assertEqual(receipt["source_artifacts"]["raw_manifest_sha256"], source_digest)
             self.assertEqual(len(receipt["evaluator_sha256"]), 64)
             self.assertEqual(receipt["receipt_label"], "PAIRED_MATCHED_COST_COMPARISON_NOT_PHYSICAL_CERTIFICATION")
+            self.assertEqual(receipt["protocol_sha256"], "c" * 64)
 
     def test_cli_rejects_duplicate_json_keys_and_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
