@@ -107,7 +107,7 @@ jobs:
               for family_name in families
           }, sort_keys=True))
           PY
-- name: Run family-level held-out transfer panel
+      - name: Run family-level held-out transfer panel
         working-directory: research/cmaq-004
         run: cargo run --quiet --locked --bin family_transfer > /tmp/cmaq-004-family-transfer.json
       - name: Validate family-level transfer and lower-tail risk
