@@ -30,7 +30,10 @@ fn hard(s:&str)->bool{matches!(s,"exact_duplicate"|"shared_source_artifact"|"for
 fn deterministic(ids:&[String])->Result<BTreeMap<String,String>>{
  if ids.len()<3{bail!("at least three family IDs required")}let mut unique=BTreeSet::new();for id in ids{if id.trim().is_empty()||!unique.insert(id.clone()){bail!("family IDs must be unique and nonblank")}}
  let mut ranked:Vec<(String,String)>=ids.iter().map(|id|(sha(format!("{SEED}\0{id}").as_bytes()),id.clone())).collect();ranked.sort_unstable();let n=ranked.len();let tr=n*70/100;let va=n*85/100;
- Ok(ranked.into_iter().enumerate().map(|(i,(_,id))|(id,(if i<tr{"train"}else if i<va{"validation"}else{"test"}).to_owned())).collect())
+ Ok(ranked.into_iter().enumerate().map(|(i,(_,id))| {
+  let split = if i < tr { "train" } else if i < va { "validation" } else { "test" };
+  (id, split.to_owned())
+ }).collect())
 }
 fn partition_digest(m:&BTreeMap<String,String>)->String{let mut s=String::new();for(id,split)in m{s.push_str(id);s.push('\t');s.push_str(split);s.push('\n')}sha(s.as_bytes())}
 fn validate_splits(doc:&Value)->Result<(String,BTreeMap<String,String>)>{
@@ -58,15 +61,41 @@ fn components(splits:&BTreeMap<String,String>,edges:&[Edge])->Vec<Component>{
  let sort=|mut v:Vec<String>|{v.sort();v};let all=sort(rel.iter().map(|e|e.edge_id.clone()).collect());let conf=sort(rel.iter().filter(|e|e.assessment_status=="confirmed").map(|e|e.edge_id.clone()).collect());let unresolved=sort(rel.iter().filter(|e|e.assessment_status=="unresolved").map(|e|e.edge_id.clone()).collect());out.push(Component{component_id:component_id(&family_ids),split_names,family_ids,hard_edge_ids:all,confirmed_edge_ids:conf,unresolved_edge_ids:unresolved})}
  out.sort_by(|a,b|a.family_ids.cmp(&b.family_ids));out
 }
+fn qualification_state(coverage_complete: bool, cross_split_components: usize) -> (&'static str, bool) {
+ let status = if !coverage_complete {
+  "not_qualified_incomplete_inventory"
+ } else if cross_split_components > 0 {
+  "not_qualified_cross_split_hard_relationships"
+ } else {
+  "structurally_eligible_receipt_unverified"
+ };
+ // This version does not consume/authenticate the underlying coverage receipt.
+ (status, false)
+}
+
 fn build(doc:&Value,inv:&Inventory,raw:&[u8])->Result<Manifest>{
  let(d,splits)=validate_splits(doc)?;let receipt=validate_edges(inv,&d,&splits)?;let comps=components(&splits,&inv.edges);let mut ec=EdgeCounts{total_edges:inv.edges.len(),hard_edges_included:0,confirmed_hard_edges:0,unresolved_hard_edges:0,dismissed_hard_edges:0,soft_edges:0,cross_split_hard_edges:0,unresolved_cross_split_hard_edges:0};
  for e in &inv.edges{if !hard(&e.relation_kind){ec.soft_edges+=1;continue}match e.assessment_status.as_str(){"confirmed"=>ec.confirmed_hard_edges+=1,"unresolved"=>ec.unresolved_hard_edges+=1,"dismissed"=>ec.dismissed_hard_edges+=1,_=>unreachable!()}if e.assessment_status=="dismissed"{continue}ec.hard_edges_included+=1;if splits[&e.source_family_id]!=splits[&e.target_family_id]{ec.cross_split_hard_edges+=1;if e.assessment_status=="unresolved"{ec.unresolved_cross_split_hard_edges+=1}}}
- let cross=comps.iter().filter(|c|c.split_names.len()>1).count();let ok=false;let status=if inv.coverage_status!="independently_reviewed_complete"{"not_qualified_incomplete_inventory"}else if cross>0{"not_qualified_cross_split_hard_relationships"}else{"structurally_eligible_receipt_unverified"}.to_owned();
+ let cross=comps.iter().filter(|c|c.split_names.len()>1).count();
+ let (status, ok) = qualification_state(inv.coverage_status == "independently_reviewed_complete", cross);
  let mut counts=Counts{train:0,validation:0,test:0};let mut rows=Vec::new();for c in &comps{if c.split_names.len()==1{match c.split_names[0].as_str(){"train"=>counts.train+=1,"validation"=>counts.validation+=1,"test"=>counts.test+=1,_=>unreachable!()}}for id in &c.family_ids{rows.push(FamilyRow{family_id:id.clone(),split:splits[id].clone(),component_id:c.component_id.clone()})}}rows.sort_by(|a,b|a.family_id.cmp(&b.family_id));
  Ok(Manifest{schema_version:"pitb.independent-component-manifest.v0",upstream_commit:UPSTREAM.to_owned(),source_partition_digest_sha256:d,relationship_inventory_sha256:sha(raw),relationship_inventory_status:inv.coverage_status.clone(),coverage_receipt_sha256:receipt,total_family_count:splits.len(),total_component_count:comps.len(),independent_component_count_by_split:counts,cross_split_component_count:cross,edge_counts:ec,families:rows,components:comps,qualification_status:status,coverage_receipt_verification_status:"not_verified_receipt_bytes_not_supplied",qualified_for_confirmatory_resampling:ok,qualification_limitations:vec!["Only the digest was supplied; the underlying coverage receipt bytes and reviewer attestations were not verified, so this builder never authorizes confirmatory resampling.".into(),"Unresolved non-dismissed hard links are joined; any cross-split component blocks qualification.".into(),"Primary scorer, power planner, and test bootstrap must bind and consume this exact manifest digest before confirmatory qualification.".into()]})
 }
 fn main()->Result<()>{let a:Vec<String>=env::args().skip(1).collect();if a.len()!=3{bail!("usage: build_family_component_manifest <splits.json> <edges.json> <manifest.json>")}let sb=fs::read(&a[0]).with_context(||format!("cannot read {}",a[0]))?;let eb=fs::read(&a[1]).with_context(||format!("cannot read {}",a[1]))?;let doc:Value=serde_json::from_slice(&sb).context("invalid split JSON")?;let inv:Inventory=serde_json::from_slice(&eb).context("invalid relationship JSON")?;let m=build(&doc,&inv,&eb)?;fs::write(&a[2],serde_json::to_vec_pretty(&m)?).with_context(||format!("cannot write {}",a[2]))?;println!("PITB_COMPONENT_MANIFEST: qualification={} families={} components={} cross_split_components={} coverage={}",m.qualification_status,m.total_family_count,m.total_component_count,m.cross_split_component_count,m.relationship_inventory_status);Ok(())}
-#[cfg(test)]mod tests{use super::*;fn e(id:&str,a:&str,b:&str,k:&str,s:&str)->Edge{Edge{edge_id:id.into(),source_family_id:a.into(),target_family_id:b.into(),relation_kind:k.into(),assessment_status:s.into(),evidence_sha256:"a".repeat(64),reviewer_ids:if s=="unresolved"{vec![]}else{vec!["r1".into(),"r2".into()]}}}fn sm(p:&[(&str,&str)])->BTreeMap<String,String>{p.iter().map(|(a,b)|((*a).into(),(*b).into())).collect()}
+#[cfg(test)]mod tests{
+#[test]fn qualification_never_passes_without_receipt_verifier(){
+ assert_eq!(qualification_state(false,0),("not_qualified_incomplete_inventory",false));
+ assert_eq!(qualification_state(true,1),("not_qualified_cross_split_hard_relationships",false));
+ assert_eq!(qualification_state(true,0),("structurally_eligible_receipt_unverified",false));
+}
+#[test]fn deterministic_split_assignment_is_stable_and_balanced(){
+ let ids=vec!["a".to_owned(),"b".to_owned(),"c".to_owned(),"d".to_owned()];
+ let first=deterministic(&ids).expect("first split");
+ assert_eq!(first,deterministic(&ids).expect("repeat split"));
+ let counts=(first.values().filter(|x|*x=="train").count(),first.values().filter(|x|*x=="validation").count(),first.values().filter(|x|*x=="test").count());
+ assert_eq!(counts,(2,1,1));
+}
+use super::*;fn e(id:&str,a:&str,b:&str,k:&str,s:&str)->Edge{Edge{edge_id:id.into(),source_family_id:a.into(),target_family_id:b.into(),relation_kind:k.into(),assessment_status:s.into(),evidence_sha256:"a".repeat(64),reviewer_ids:if s=="unresolved"{vec![]}else{vec!["r1".into(),"r2".into()]}}}fn sm(p:&[(&str,&str)])->BTreeMap<String,String>{p.iter().map(|(a,b)|((*a).into(),(*b).into())).collect()}
 #[test]fn includes_singletons(){let s=sm(&[("001","train"),("002","train"),("003","validation"),("004","test")]);let c=components(&s,&[e("e1","001","002","formal_dependency","confirmed")]);assert_eq!(c.len(),3);assert_eq!(c.iter().map(|x|x.family_ids.len()).sum::<usize>(),4);assert!(c.iter().any(|x|x.family_ids==vec!["004".to_owned()]));}
 #[test]fn unresolved_hard_joins_soft_and_dismissed_do_not(){let s=sm(&[("001","train"),("002","train"),("003","train"),("004","train")]);let es=vec![e("e1","001","002","reused_lemma","unresolved"),e("e2","002","003","conceptual_similarity","confirmed"),e("e3","003","004","formal_dependency","dismissed")];let c=components(&s,&es);assert_eq!(c.len(),3);assert_eq!(c[0].family_ids,vec!["001".to_owned(),"002".to_owned()]);assert_eq!(c[0].unresolved_edge_ids,vec!["e1".to_owned()]);}
 #[test]fn cross_split_link_is_one_component(){let s=sm(&[("001","train"),("002","test"),("003","train")]);let c=components(&s,&[e("e1","001","002","formal_dependency","confirmed")]);assert!(c.iter().any(|x|x.family_ids==vec!["001".to_owned(),"002".to_owned()]&&x.split_names.len()==2));}

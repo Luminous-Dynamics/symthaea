@@ -768,6 +768,7 @@ jobs:
           from jsonschema import Draft202012Validator
           Draft202012Validator.check_schema(json.loads(Path(sys.argv[1]).read_text()))
           PY
+          cargo test --locked --bin build_family_component_manifest
           cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-components-incomplete-a.json"
           cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-components-incomplete-b.json"
           cmp "$RUNNER_TEMP/family-components-incomplete-a.json" "$RUNNER_TEMP/family-components-incomplete-b.json"
