@@ -262,7 +262,7 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
   verify-evidence-intervention-plan plan.json
 ```
 
-The plan binds the generation, frozen policy revision, configuration, prompt, tools, resource budget, analysis plan, and randomization commitment. Every task/world pair must include each declared condition exactly once, with unique trial IDs and a complete per-pair randomization-order permutation. Supported conditions are `natural_retrieval`, `network_isolated`, `gold_evidence_injected`, `gold_evidence_withheld`, `decoy_noise`, and `source_contradiction`. Policy inputs, evidence manifests, seeds, and task references are represented by digests/opaque IDs—not raw protected targets. Every condition within a pair must use a distinct, nonzero evidence-manifest digest; reusing a manifest across nominally different interventions fails closed. All-zero placeholder digests are rejected.
+The plan binds the generation, frozen policy revision, configuration, prompt, tools, resource budget, analysis plan, evaluator revision, decision-rule digest, and randomization commitment. The evaluator implementation and outcome-label rubric are fixed before the first trial; the post-run report must match those exact pins. Every task/world pair must include each declared condition exactly once, with unique trial IDs and a complete per-pair randomization-order permutation. Supported conditions are `natural_retrieval`, `network_isolated`, `gold_evidence_injected`, `gold_evidence_withheld`, `decoy_noise`, and `source_contradiction`. Policy inputs, evidence manifests, seeds, and task references are represented by digests/opaque IDs—not raw protected targets. Every condition within a pair must use a distinct, nonzero evidence-manifest digest; reusing a manifest across nominally different interventions fails closed. All-zero placeholder digests are rejected.
 
 The typed commitment is domain-separated and recomputed by the Rust verifier. The focused CI fixture independently creates it in Python and checks Rust parity, complete-plan acceptance, incomplete-pair rejection even with a recomputed commitment, and mutated-commitment rejection.
 
@@ -272,7 +272,7 @@ For interpretation, pre-register direction-specific outcomes rather than expecti
 
 ## Counterfactual evidence outcome receipts
 
-The outcome receipt validates what the evaluator says happened after running a paired intervention plan. It intentionally reuses the plan from `counterfactual_evidence.rs` and borrows full-denominator / missing-cell principles from the standalone paired-trial auditor in `research/scientific-tool-allocation-auditor`; it is not a replacement generic trial framework.
+The outcome receipt validates what the precommitted evaluator says happened after running a paired intervention plan. The report's evaluator revision and decision-rule digests must equal the values frozen in the plan; changing either after observing outcomes fails closed. It intentionally reuses the plan from `counterfactual_evidence.rs` and borrows full-denominator / missing-cell principles from the standalone paired-trial auditor in `research/scientific-tool-allocation-auditor`; it is not a replacement generic trial framework.
 
 Schemas:
 - `schema/evidence-outcome-report.schema.json`: complete evaluator-side report.
