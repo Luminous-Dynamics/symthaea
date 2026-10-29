@@ -19,12 +19,14 @@ from paired_benchmark_audit import analyze_manifest, canonical_json
 from promotion_risk_gate import clopper_pearson_upper_bound
 
 SCHEMA_VERSION = "1.0.0"
+CONTRACT_SCHEMA_VERSION = "1.1.0"
 CONTRACT_FIELDS = frozenset({
     "schema_version", "contract_id", "candidate_policy", "baseline_policy",
     "required_evidence_class", "benchmark_protocol_sha256", "validation_protocol_sha256",
     "minimum_independent_units", "minimum_units_per_critical_family",
-    "minimum_validation_units", "minimum_cost_target_pairs", "critical_task_families",
-    "minimum_median_relative_auc_improvement", "minimum_all_unit_win_rate",
+    "minimum_validation_units", "minimum_validation_units_per_critical_family",
+    "minimum_predicted_feasible_per_critical_family", "minimum_cost_target_pairs",
+    "critical_task_families", "minimum_median_relative_auc_improvement", "minimum_all_unit_win_rate",
     "maximum_critical_family_regression", "minimum_cost_to_target_reduction",
     "maximum_false_feasible_rate", "confidence", "require_complete_runs",
     "require_in_budget_runs",
@@ -106,8 +108,8 @@ def _quantile_interval(effect: dict[str, Any], key: str, label: str) -> tuple[fl
 
 def validate_contract(raw: Any) -> dict[str, Any]:
     contract = _strict_object(raw, CONTRACT_FIELDS, "contract")
-    if contract["schema_version"] != SCHEMA_VERSION:
-        raise ValueError(f"contract schema_version must be {SCHEMA_VERSION}")
+    if contract["schema_version"] != CONTRACT_SCHEMA_VERSION:
+        raise ValueError(f"contract schema_version must be {CONTRACT_SCHEMA_VERSION}")
     _nonblank(contract["contract_id"], "contract_id")
     _nonblank(contract["candidate_policy"], "candidate_policy")
     _nonblank(contract["baseline_policy"], "baseline_policy")
@@ -119,7 +121,8 @@ def validate_contract(raw: Any) -> dict[str, Any]:
     _sha256(contract["validation_protocol_sha256"], "validation_protocol_sha256")
     for field in (
         "minimum_independent_units", "minimum_units_per_critical_family",
-        "minimum_validation_units", "minimum_cost_target_pairs",
+        "minimum_validation_units", "minimum_validation_units_per_critical_family",
+        "minimum_predicted_feasible_per_critical_family", "minimum_cost_target_pairs",
     ):
         _integer(contract[field], field)
     families = contract["critical_task_families"]
@@ -452,6 +455,87 @@ def assess_promotion(
         if not risk_pass:
             failures.append({"check": "false_feasible_risk", "detail": detail})
 
+    # Pooled risk can hide a critical-family failure. Recompute a separate exact
+    # one-sided bound within each predeclared critical family. A family with too
+    # few predicted-feasible units is inconclusive, never silently pooled away.
+    family_validation_risk: dict[str, dict[str, Any]] = {}
+    for family in contract["critical_task_families"]:
+        family_records = [record for record in records if record["task_family"] == family]
+        family_predictions = [record for record in family_records if record["predicted_feasible"]]
+        family_false = sum(not record["observed_feasible"] for record in family_predictions)
+        family_units = len(family_records)
+        family_predicted = len(family_predictions)
+        family_observed_rate = family_false / family_predicted if family_predicted else None
+        family_upper: float | None = None
+        family_decision = "inconclusive"
+
+        if family_units < contract["minimum_validation_units_per_critical_family"]:
+            detail = (
+                f"family={family}; validation_units={family_units}; "
+                f"required={contract['minimum_validation_units_per_critical_family']}"
+            )
+            inconclusive.append({"check": f"critical_family_validation_units:{family}", "detail": detail})
+            checks.append({
+                "check": f"critical_family_validation_units:{family}", "passed": False, "detail": detail,
+            })
+        else:
+            checks.append({
+                "check": f"critical_family_validation_units:{family}", "passed": True,
+                "detail": (
+                    f"family={family}; validation_units={family_units}; "
+                    f"required={contract['minimum_validation_units_per_critical_family']}"
+                ),
+            })
+
+        if family_predicted == 0:
+            detail = f"family={family}; no predicted-feasible decisions in independent validation"
+            inconclusive.append({"check": f"critical_family_false_feasible_risk:{family}", "detail": detail})
+            checks.append({
+                "check": f"critical_family_false_feasible_risk:{family}", "passed": False, "detail": detail,
+            })
+        else:
+            family_upper = clopper_pearson_upper_bound(
+                family_false, family_predicted, contract["confidence"]
+            )
+            detail = (
+                f"family={family}; false_feasible={family_false}; "
+                f"predicted_feasible_trials={family_predicted}; "
+                f"observed_rate={family_observed_rate:.8g}; "
+                f"one_sided_{contract['confidence']:.4g}_upper_bound={family_upper:.8g}; "
+                f"minimum_predicted_feasible={contract['minimum_predicted_feasible_per_critical_family']}; "
+                f"maximum={contract['maximum_false_feasible_rate']}"
+            )
+            if family_predicted < contract["minimum_predicted_feasible_per_critical_family"]:
+                inconclusive.append({
+                    "check": f"critical_family_false_feasible_risk:{family}", "detail": detail,
+                })
+                checks.append({
+                    "check": f"critical_family_false_feasible_risk:{family}",
+                    "passed": False, "detail": detail + "; insufficient per-family denominator",
+                })
+            else:
+                family_pass = family_upper <= contract["maximum_false_feasible_rate"]
+                family_decision = "pass" if family_pass else "fail"
+                checks.append({
+                    "check": f"critical_family_false_feasible_risk:{family}",
+                    "passed": bool(family_pass), "detail": detail,
+                })
+                if not family_pass:
+                    failures.append({
+                        "check": f"critical_family_false_feasible_risk:{family}", "detail": detail,
+                    })
+
+        family_validation_risk[family] = {
+            "validation_units": family_units,
+            "predicted_feasible_trials": family_predicted,
+            "false_feasible_events": family_false,
+            "observed_false_feasible_rate": family_observed_rate,
+            "one_sided_upper_bound": family_upper,
+            "minimum_validation_units": contract["minimum_validation_units_per_critical_family"],
+            "minimum_predicted_feasible_trials": contract["minimum_predicted_feasible_per_critical_family"],
+            "decision": family_decision,
+        }
+
     if status != "wrong_evidence_class":
         # A known hard failure must never be masked by a separate missing-data
         # condition. Inconclusive applies only when no configured criterion has
@@ -480,6 +564,7 @@ def assess_promotion(
         "predicted_feasible_validation_trials": predicted_feasible,
         "false_feasible_validation_events": false_feasible,
         "false_feasible_one_sided_upper_bound": risk_upper,
+        "critical_family_false_feasible_risk": family_validation_risk,
         "maximum_false_feasible_rate": contract["maximum_false_feasible_rate"],
         "confidence": contract["confidence"],
         "checks": checks,
