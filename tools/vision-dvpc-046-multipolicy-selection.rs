@@ -23,7 +23,8 @@ const EPS: f64 = 1e-10;
 const PCRP_BET_STEPS: usize = 32;
 const PCRP_ROOT_ITERS: usize = 20;
 const ANYTIME_METHODS: usize = 6;
-const METHOD_COUNT: usize = 8;
+const METHOD_COUNT: usize = 9;
+const LS_LAMBDA_SCALES: [f64; 3] = [0.5, 1.0, 2.0];
 
 #[derive(Clone,Copy,Debug)]
 struct SplitMix64{state:u64}
@@ -280,10 +281,11 @@ fn pcrp_star_lcb_profile(profile: &ScoreProfile, delta: f64) -> Result<f64, Stri
     }
     Ok(hi.max(0.0).min(mean).min(1.0))
 }
-fn logarithmic_smoothing_lcb_profile(
+fn logarithmic_smoothing_lcb_profile_scaled(
     profile: &ScoreProfile,
     delta: f64,
     w_max: f64,
+    lambda_scale: f64,
 ) -> Result<f64, String> {
     if profile.n == 0 || !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
         return Err("invalid logarithmic-smoothing input".into());
@@ -291,9 +293,13 @@ fn logarithmic_smoothing_lcb_profile(
     if !w_max.is_finite() || w_max <= 0.0 {
         return Err("logarithmic smoothing requires positive finite W_max".into());
     }
+    if !lambda_scale.is_finite() || lambda_scale <= 0.0 {
+        return Err("logarithmic-smoothing lambda scale must be positive and finite".into());
+    }
     let n = profile.n as f64;
-    // Preregistered scale-aware lambda; not tuned on the evaluation replicates.
-    let lambda = (2.0 * (1.0 / delta).ln() / (n * w_max * w_max)).sqrt();
+    // Base scale depends only on n, delta and the known score ceiling. A multiplier
+    // from the preregistered grid is allowed only with an alpha split across grid points.
+    let lambda = lambda_scale * (2.0 * (1.0 / delta).ln() / (n * w_max * w_max)).sqrt();
     if !lambda.is_finite() || lambda <= 0.0 {
         return Err("logarithmic-smoothing lambda is invalid".into());
     }
@@ -310,6 +316,36 @@ fn logarithmic_smoothing_lcb_profile(
         return Err("logarithmic-smoothing lower bound is non-finite".into());
     }
     Ok(lower.clamp(0.0, profile.mean().min(1.0)))
+}
+
+fn logarithmic_smoothing_lcb_profile(
+    profile: &ScoreProfile,
+    delta: f64,
+    w_max: f64,
+) -> Result<f64, String> {
+    logarithmic_smoothing_lcb_profile_scaled(profile, delta, w_max, 1.0)
+}
+
+/// Selects the strongest LCB from a fixed lambda grid. The per-grid confidence
+/// budget is divided by K, so a union bound makes the max of K lower bounds valid
+/// at total delta. The same wrapper is applied independently to reward and its
+/// complement; no held-out-data lambda tuning is needed.
+fn logarithmic_smoothing_safe_grid_lcb_profile(
+    profile: &ScoreProfile,
+    delta_total: f64,
+    w_max: f64,
+) -> Result<f64, String> {
+    if LS_LAMBDA_SCALES.is_empty() {
+        return Err("lambda grid must be nonempty".into());
+    }
+    let delta_per_lambda = delta_total / LS_LAMBDA_SCALES.len() as f64;
+    let mut best = 0.0_f64;
+    for scale in LS_LAMBDA_SCALES {
+        best = best.max(logarithmic_smoothing_lcb_profile_scaled(
+            profile, delta_per_lambda, w_max, scale
+        )?);
+    }
+    Ok(best)
 }
 
 fn certified_best(bounds:&[Interval])->Option<usize>{
@@ -509,6 +545,16 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                     let lower_ls=logarithmic_smoothing_lcb_profile(&score_profiles[j],delta_tail,policies[j].w_max)?;
                     let lower_complement_ls=logarithmic_smoothing_lcb_profile(&complement_profiles[j],delta_tail,policies[j].w_max)?;
                     bounds[7][j]=Interval{lower:lower_ls.clamp(0.0,1.0),upper:(1.0-lower_complement_ls).clamp(0.0,1.0)};
+                    let lower_ls_grid=logarithmic_smoothing_safe_grid_lcb_profile(
+                        &score_profiles[j],delta_tail,policies[j].w_max
+                    )?;
+                    let lower_complement_ls_grid=logarithmic_smoothing_safe_grid_lcb_profile(
+                        &complement_profiles[j],delta_tail,policies[j].w_max
+                    )?;
+                    bounds[8][j]=Interval{
+                        lower:lower_ls_grid.clamp(0.0,1.0),
+                        upper:(1.0-lower_complement_ls_grid).clamp(0.0,1.0)
+                    };
                 }
             }
             for method in 0..METHOD_COUNT{
@@ -569,7 +615,7 @@ fn emit(out:&mut String,r:&SimResult,looks:&[usize]){
         let _=writeln!(out,"POLICY\t{}\tid\t{}\tpi_action1_context0\t{:.8}\tpi_action1_context1\t{:.8}\ttrue_value\t{:.8}\tW_max\t{:.8}\tis_best\t{}",
             r.name,policy.id,policy.pi1[0],policy.pi1[1],policy.value,policy.w_max,(policy.value-best_value).abs()<=EPS);
     }
-    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Empirical_Bernstein_CS_per_policy_alpha_0.05","Empirical_Bernstein_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4","pCRP_star_fixed_horizon_grid33","Logarithmic_Smoothing_fixed_horizon"];
+    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Empirical_Bernstein_CS_per_policy_alpha_0.05","Empirical_Bernstein_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4","pCRP_star_fixed_horizon_grid33","Logarithmic_Smoothing_fixed_horizon","Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon"];
     for method in 0..METHOD_COUNT{
         for (li,look) in looks.iter().copied().enumerate(){
             let a=&r.aggregates[method][li];
@@ -729,6 +775,25 @@ mod tests{
         let got=logarithmic_smoothing_lcb_profile(&profile,delta,w_max).unwrap();
         assert!((got-expected).abs()<1e-12,"got={got} expected={expected}");
         assert!(got >= 0.0 && got <= 0.4);
+    }
+
+    #[test]
+    fn safe_lambda_grid_is_at_least_as_strong_as_each_adjusted_grid_member() {
+        let mut profile=ScoreProfile::default();
+        for value in [0.0,0.1,0.1,0.4,0.8,0.8,1.2,1.2] {
+            profile.push(value).unwrap();
+        }
+        let delta=0.05;
+        let w_max=2.0;
+        let delta_per_lambda=delta/LS_LAMBDA_SCALES.len() as f64;
+        let expected=LS_LAMBDA_SCALES.iter()
+            .map(|scale| logarithmic_smoothing_lcb_profile_scaled(
+                &profile,delta_per_lambda,w_max,*scale
+            ).unwrap())
+            .fold(0.0_f64,f64::max);
+        let got=logarithmic_smoothing_safe_grid_lcb_profile(&profile,delta,w_max).unwrap();
+        assert!((got-expected).abs()<1e-12);
+        assert!(got>=0.0 && got<=profile.mean().min(1.0));
     }
 
     #[test]
