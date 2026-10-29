@@ -255,9 +255,19 @@ This is a public known-answer fixture for development and mutation testing—not
 
 Next: formalize the schema; add seeded mutation generators and at least 1,000 parameterized benign-control episodes; freeze a distinct evaluator manifest and qualification set; compute release digests over precisely specified canonical bytes; and ensure candidate inputs cannot read the evaluator-only labels during blind evaluation.
 
-### GCRB-2 — Isolated Rust reference runner
+### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-Build an isolated, deterministic Rust runner that validates manifests, runs candidate adapters, checks expected dispositions, calculates metrics, and emits a replayable receipt. Reuse existing repository conventions for exact digest and independent evaluator boundaries. Do not make a green local fixture result imply external truth or real-world effectiveness.
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and ten authored unit tests. The prototype:
+
+- validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
+- SHA-256 binds the candidate report to the exact fixture bytes, not a reserialized JSON object;
+- requires exactly one candidate result for each fixture case and rejects duplicate, missing, extra, malformed, or mismatched records;
+- calculates public known-answer disposition agreement by case/class/family, required-behavior report coverage, candidate-reported forbidden behaviors, false high-severity escalations over benign controls, and candidate-reported hard-gate violation counts;
+- emits a report with `qualification_eligible = false` and an explicit limitation list.
+
+This is a deliberately narrow initial evaluator, not an independent action-trace verifier. The expected dispositions are public, and several behavior/violation fields are candidate-reported; high scores therefore do not establish that the behaviors actually occurred or were independently detected. A raw hash establishes byte identity only. **No Rust compile, rustfmt, or test execution is claimed**: the available execution environment has no `cargo` or `rustc`, and exact-head GitHub workflow records were skipped. A lockfile and reproducible build receipt have not been generated.
+
+Next: run formatting/compilation/tests at an environment with the toolchain, fix concrete failures without relaxing checks, and then separate candidate output from evaluator-owned event traces and held-out known answers. Do not attach a production or real-world efficacy claim to this prototype.
 
 ### GCRB-3 — Cross-system adapters
 
