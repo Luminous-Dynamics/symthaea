@@ -3,10 +3,11 @@
 
 //! Certified adaptive screening for finite recovery candidate sets.
 //!
-//! The caller supplies a frozen finite candidate set, deterministic ranking
-//! priorities, and a lower bound for every candidate. The evaluation callback
-//! must return an independently checked exact feasible cost, an independently
-//! checked infeasibility result, or an explicit indeterminate result.
+//! The caller supplies a frozen finite candidate universe, deterministic ranking
+//! priorities, and an admissible lower bound for every candidate. The evaluation
+//! callback must return an independently checked exact feasible cost, an
+//! independently checked infeasibility result, or an explicit indeterminate
+//! result.
 //!
 //! A candidate being best among the evaluated subset is NOT an optimality
 //! certificate. The report may say `OptimalWithinTolerance` only when the best
@@ -22,6 +23,9 @@
 pub struct RecoveryScreenContext {
     pub scenario_id: String,
     pub scenario_sha256: String,
+    /// Digest of the complete candidate universe including stable IDs, ranking
+    /// scores, and per-candidate lower bounds, in a documented canonical order.
+    pub candidate_universe_sha256: String,
     pub screening_policy_sha256: String,
     pub ranking_artifact_sha256: String,
     pub screening_source_commit_sha: String,
@@ -71,7 +75,7 @@ pub enum AdaptiveScreenStatus {
     /// global lower bound over the entire frozen candidate universe.
     OptimalWithinTolerance,
     /// A feasible candidate exists, but the declared bound does not certify the
-    /// configured gap (or indeterminate evidence remains consequential).
+    /// configured gap.
     FeasibleUncertified,
     /// All candidates were conclusively evaluated and none is feasible.
     NoFeasiblePlan,
@@ -114,6 +118,7 @@ pub enum RemainingCandidateReason {
 pub struct AdaptiveScreenReport {
     pub scenario_id: String,
     pub scenario_sha256: String,
+    pub candidate_universe_sha256: String,
     pub screening_policy_sha256: String,
     pub ranking_artifact_sha256: String,
     pub screening_source_commit_sha: String,
@@ -276,12 +281,15 @@ where
         })
         .collect();
 
-    let indeterminate_remains = remaining_candidates
-        .iter()
-        .any(|candidate| matches!(&candidate.reason, RemainingCandidateReason::Indeterminate { .. }));
-    let unevaluated_remains = remaining_candidates
-        .iter()
-        .any(|candidate| matches!(&candidate.reason, RemainingCandidateReason::NotEvaluated));
+    let indeterminate_remains = remaining_candidates.iter().any(|candidate| {
+        matches!(
+            &candidate.reason,
+            RemainingCandidateReason::Indeterminate { .. }
+        )
+    });
+    let unevaluated_remains = remaining_candidates.iter().any(|candidate| {
+        matches!(&candidate.reason, RemainingCandidateReason::NotEvaluated)
+    });
 
     let status = match (best.as_ref(), gap) {
         (Some(_), Some(value)) if value <= options.max_absolute_optimality_gap => {
@@ -309,6 +317,7 @@ where
     Ok(AdaptiveScreenReport {
         scenario_id: context.scenario_id.clone(),
         scenario_sha256: context.scenario_sha256.clone(),
+        candidate_universe_sha256: context.candidate_universe_sha256.clone(),
         screening_policy_sha256: context.screening_policy_sha256.clone(),
         ranking_artifact_sha256: context.ranking_artifact_sha256.clone(),
         screening_source_commit_sha: context.screening_source_commit_sha.clone(),
@@ -358,7 +367,8 @@ fn summarize_bounds(
 
     match best.as_ref() {
         Some((_, best_cost)) => {
-            let lower_bound = unresolved_lower_bound.map_or(*best_cost, |bound| bound.min(*best_cost));
+            let lower_bound =
+                unresolved_lower_bound.map_or(*best_cost, |bound| bound.min(*best_cost));
             (best, Some(lower_bound), Some(*best_cost - lower_bound))
         }
         None => (best, unresolved_lower_bound, None),
@@ -371,7 +381,14 @@ fn validate_context(context: &RecoveryScreenContext) -> Result<(), AdaptiveScree
     }
     for (field, value) in [
         ("scenario_sha256", context.scenario_sha256.as_str()),
-        ("screening_policy_sha256", context.screening_policy_sha256.as_str()),
+        (
+            "candidate_universe_sha256",
+            context.candidate_universe_sha256.as_str(),
+        ),
+        (
+            "screening_policy_sha256",
+            context.screening_policy_sha256.as_str(),
+        ),
         ("ranking_artifact_sha256", context.ranking_artifact_sha256.as_str()),
     ] {
         if !is_lower_hex_digest(value, 64) {
