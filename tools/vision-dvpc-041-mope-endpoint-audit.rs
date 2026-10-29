@@ -193,6 +193,26 @@ fn certify_root(history: &[BetRecord], root: f64, level: f64) -> bool {
     true
 }
 
+fn positive_root_control() -> Result<f64, String> {
+    // A deliberately strong fixed-logger control creates a root without
+    // relying on the horizon-8 DGPs being informative enough to cross.
+    let mut fixed_stream = stream::StreamState::new(1.0, ALPHA_SIDE)?;
+    let mut history = Vec::new();
+    let level = (2.0 / ALPHA_SIDE).ln();
+    for _ in 0..24 {
+        let lambda = fixed_stream.current_lambda();
+        let report = fixed_stream.observe(1.0, 1.0)?;
+        history.push(BetRecord { w: 1.0, r: 1.0, lambda1: lambda.x, lambda2: lambda.y });
+        if let Some(root) = report.selected_safe_root {
+            if root > 0.0 && certify_root(&history, root, level) {
+                return Ok(root);
+            }
+        }
+        fixed_stream.choose_next_bet(0.0)?;
+    }
+    Err("positive root-certificate control failed to find a certified root".to_owned())
+}
+
 fn run_scenario(scenario: Scenario, horizon: usize) -> Result<ScenarioResult, String> {
     if horizon == 0 || horizon > 8 {
         return Err("exact path audit supports horizons 1 through 8".to_owned());
@@ -344,6 +364,8 @@ fn audit() -> Result<String, String> {
     let mut output = String::from(
         "record_type\tscenario\tlook_or_horizon\tmetric\tvalue\n"
     );
+    let control_root = positive_root_control()?;
+    let _ = writeln!(output, "ROOT_CERTIFICATE_CONTROL\tstatus\tOK\tcertified_root\t{control_root:.12}");
     for scenario in scenarios {
         let result = run_scenario(scenario, HORIZON)?;
         if result.path_count != PATH_COUNT { return Err(format!("wrong exact path count: {}", result.path_count)); }
@@ -360,6 +382,7 @@ fn audit() -> Result<String, String> {
             println_metric(&mut output, "LOOK_DETAIL", result.name, look, "pointwise_coverage", coverage);
             println_metric(&mut output, "LOOK_DETAIL", result.name, look, "mean_lower_endpoint", mean_lower);
             println_metric(&mut output, "LOOK_DETAIL", result.name, look, "mean_upper_endpoint", mean_upper);
+            println_metric(&mut output, "LOOK_DETAIL", result.name, look, "mean_interval_width", (mean_upper - mean_lower).max(0.0));
             println_metric(&mut output, "LOOK_DETAIL", result.name, look, "empty_or_reversed_interval_probability", reversed);
             println_metric(&mut output, "LOOK_DETAIL", result.name, look, "lower_monotonicity_violation_probability", lower_mono);
             println_metric(&mut output, "LOOK_DETAIL", result.name, look, "upper_monotonicity_violation_probability", upper_mono);
@@ -435,6 +458,12 @@ mod tests {
                 assert!(look.upper_monotonicity_violation_mass <= 1e-10);
             }
         }
+    }
+
+    #[test]
+    fn positive_root_control_exercises_the_certificate_path() {
+        let root = positive_root_control().unwrap();
+        assert!((0.0..=1.0).contains(&root));
     }
 
     #[test]
