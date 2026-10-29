@@ -1735,6 +1735,14 @@ fn read_arg(args: &BTreeMap<String, String>, key: &str) -> Result<Vec<u8>> {
     fs::read(path).with_context(|| format!("read {key} from {path}"))
 }
 
+fn validate_coverage_pin_set(pins: [Option<&str>; 4]) -> Result<bool> {
+    let supplied = pins.iter().filter(|pin| pin.is_some()).count();
+    if supplied != 0 && supplied != pins.len() {
+        bail!("coverage trust boundary requires all four artifact digests or none");
+    }
+    Ok(supplied == pins.len())
+}
+
 fn validate_config(
     config: &RunConfig,
     protocol_bytes: &[u8],
@@ -1774,10 +1782,7 @@ fn validate_config(
         config.coverage_trust_store_sha256.as_deref(),
         config.coverage_methodology_sha256.as_deref(),
     ];
-    let pin_count = coverage_pins.iter().filter(|pin| pin.is_some()).count();
-    if pin_count != 0 && pin_count != coverage_pins.len() {
-        bail!("coverage trust boundary requires all four artifact digests or none");
-    }
+    validate_coverage_pin_set(coverage_pins)?;
     for (field, value) in [
         ("relationship_inventory_sha256", config.relationship_inventory_sha256.as_deref()),
         ("coverage_receipt_sha256", config.coverage_receipt_sha256.as_deref()),
@@ -2024,6 +2029,11 @@ fn validate_component_manifest(
     }
     validate_sha256(&manifest.relationship_inventory_sha256)
         .context("invalid relationship inventory digest in component manifest")?;
+    if !receipt_verified
+        && manifest.coverage_receipt_verification_status != "not_verified_receipt_bytes_not_supplied"
+    {
+        bail!("manifest's receipt-verification status is not supported by independently supplied inputs");
+    }
     if manifest.coverage_receipt_verification_status == "verified_signature_set" && !receipt_verified {
         bail!("manifest claims verified coverage, but this analyzer did not independently verify receipt inputs");
     }
@@ -2177,8 +2187,11 @@ fn validate_component_manifest(
     } else {
         "structurally_eligible_receipt_unverified"
     };
+    let expected_qualified = receipt_verified
+        && manifest.relationship_inventory_status == "independently_reviewed_complete"
+        && cross_split_count == 0;
     if manifest.qualification_status != expected_status
-        || manifest.qualified_for_confirmatory_resampling != receipt_verified
+        || manifest.qualified_for_confirmatory_resampling != expected_qualified
     {
         bail!("component qualification status does not reconcile with authenticated coverage and split controls");
     }
@@ -4398,6 +4411,25 @@ mod tests {
                 treatment_rate_given_baseline_component(*family_rate, baseline, treatment);
             (0.0..=1.0).contains(&treatment_component_rate)
         }));
+    }
+
+    #[test]
+    fn coverage_artifact_pins_are_all_or_none() {
+        assert!(!validate_coverage_pin_set([None, None, None, None]).unwrap());
+        assert!(validate_coverage_pin_set([
+            Some("a".repeat(64).leak()),
+            Some("b".repeat(64).leak()),
+            Some("c".repeat(64).leak()),
+            Some("d".repeat(64).leak()),
+        ]).unwrap());
+        for pins in [
+            [Some("a"), None, None, None],
+            [None, Some("b"), None, None],
+            [None, None, Some("c"), None],
+            [None, None, None, Some("d")],
+        ] {
+            assert!(validate_coverage_pin_set(pins).is_err());
+        }
     }
 
     fn test_config() -> RunConfig {
