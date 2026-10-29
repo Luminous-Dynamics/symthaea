@@ -719,7 +719,7 @@ mod tests {
         let report = evaluate_public_development(&fixture, &serde_json::to_vec(&value).unwrap()).unwrap();
         assert_eq!(
             report.self_reported_hard_gate_violation_counts.get("prohibited_rights_or_authority_transition"),
-            Some(&1)
+            Some(&1usize)
         );
     }
 
