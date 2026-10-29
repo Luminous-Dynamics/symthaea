@@ -563,18 +563,18 @@ mod tests {
             label: &str,
         ) {
             self.add_row_with_capture(
-                sample_id,
-                artifact_name,
-                program_id,
-                execution_id,
-                attack_family_id,
-                device_config_id,
-                "capture-config-default",
-                "single-counter",
-                split_protocol,
-                split,
-                label,
-            );
+            sample_id,
+            artifact_name,
+            program_id,
+            execution_id,
+            attack_family_id,
+            device_config_id,
+            "capture-config-default",
+            "single-counter",
+            split_protocol,
+            split,
+            label,
+);
         }
 
         fn add_row_with_capture(
@@ -644,7 +644,7 @@ mod tests {
             "program_holdout",
             "train",
             "attack",
-        );
+);
         fixture.add_row(
             "s-train-benign",
             "b",
@@ -655,7 +655,7 @@ mod tests {
             "program_holdout",
             "train",
             "benign",
-        );
+);
         fixture.add_row(
             "s-val-attack",
             "c",
@@ -666,7 +666,7 @@ mod tests {
             "program_holdout",
             "validation",
             "attack",
-        );
+);
         fixture.add_row(
             "s-val-benign",
             "d",
@@ -677,7 +677,7 @@ mod tests {
             "program_holdout",
             "validation",
             "benign",
-        );
+);
         fixture.add_row(
             "s-test-attack",
             "e",
@@ -688,7 +688,7 @@ mod tests {
             "program_holdout",
             "test",
             "attack",
-        );
+);
         fixture.add_row(
             "s-test-benign",
             "f",
@@ -699,7 +699,7 @@ mod tests {
             "program_holdout",
             "test",
             "benign",
-        );
+);
     }
 
     impl Drop for Fixture {
@@ -729,33 +729,82 @@ mod tests {
     fn repeated_windows_from_one_artifact_are_allowed_within_one_split() {
         let mut fixture = Fixture::new();
         fixture.add_row(
-            "s-train-1", "a", "program-a", "run-a", "family-a", "board-a",
-            "program_holdout", "train", "attack",
-        );
+            "s-train-1",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+);
         fixture.add_row(
-            "s-train-2", "a", "program-a", "run-a", "family-a", "board-a",
-            "program_holdout", "train", "attack",
-        );
+            "s-train-2",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+);
         fixture.add_row(
-            "s-train-benign", "b", "program-b", "run-b", "NA", "board-a",
-            "program_holdout", "train", "benign",
-        );
+            "s-train-benign",
+            "b",
+            "program-b",
+            "run-b",
+            "NA",
+            "board-a",
+            "program_holdout",
+            "train",
+            "benign",
+);
         fixture.add_row(
-            "s-val-attack", "c", "program-c", "run-c", "family-c", "board-a",
-            "program_holdout", "validation", "attack",
-        );
+            "s-val-attack",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "attack",
+);
         fixture.add_row(
-            "s-val-benign", "d", "program-d", "run-d", "NA", "board-a",
-            "program_holdout", "validation", "benign",
-        );
+            "s-val-benign",
+            "d",
+            "program-d",
+            "run-d",
+            "NA",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+);
         fixture.add_row(
-            "s-test-attack", "e", "program-e", "run-e", "family-e", "board-a",
-            "program_holdout", "test", "attack",
-        );
+            "s-test-attack",
+            "e",
+            "program-e",
+            "run-e",
+            "family-e",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+);
         fixture.add_row(
-            "s-test-benign", "f", "program-f", "run-f", "NA", "board-a",
-            "program_holdout", "test", "benign",
-        );
+            "s-test-benign",
+            "f",
+            "program-f",
+            "run-f",
+            "NA",
+            "board-a",
+            "program_holdout",
+            "test",
+            "benign",
+);
         let summary = fixture.audit().expect("repeated windows should pass");
         assert_eq!(summary.samples, 7);
         assert_eq!(summary.artifacts, 6);
@@ -773,29 +822,71 @@ mod tests {
     fn attack_family_holdout_keeps_benign_programs_independently_grouped() {
         let mut fixture = Fixture::new();
         fixture.add_row(
-            "s-train-attack", "a", "program-a", "run-a", "family-a", "board-a",
-            "attack_family_holdout", "train", "attack",
-        );
+            "s-train-attack",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "attack_family_holdout",
+            "train",
+            "attack",
+);
         fixture.add_row(
-            "s-val-attack", "b", "program-b", "run-b", "family-b", "board-a",
-            "attack_family_holdout", "validation", "attack",
-        );
+            "s-val-attack",
+            "b",
+            "program-b",
+            "run-b",
+            "family-b",
+            "board-a",
+            "attack_family_holdout",
+            "validation",
+            "attack",
+);
         fixture.add_row(
-            "s-test-attack", "c", "program-c", "run-c", "family-c", "board-a",
-            "attack_family_holdout", "test", "attack",
-        );
+            "s-test-attack",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "attack_family_holdout",
+            "test",
+            "attack",
+);
         fixture.add_row(
-            "s-train-benign", "d", "benign-a", "run-d", "NA", "board-a",
-            "attack_family_holdout", "train", "benign",
-        );
+            "s-train-benign",
+            "d",
+            "benign-a",
+            "run-d",
+            "NA",
+            "board-a",
+            "attack_family_holdout",
+            "train",
+            "benign",
+);
         fixture.add_row(
-            "s-val-benign", "e", "benign-b", "run-e", "NA", "board-a",
-            "attack_family_holdout", "validation", "benign",
-        );
+            "s-val-benign",
+            "e",
+            "benign-b",
+            "run-e",
+            "NA",
+            "board-a",
+            "attack_family_holdout",
+            "validation",
+            "benign",
+);
         fixture.add_row(
-            "s-test-benign", "f", "benign-c", "run-f", "NA", "board-a",
-            "attack_family_holdout", "test", "benign",
-        );
+            "s-test-benign",
+            "f",
+            "benign-c",
+            "run-f",
+            "NA",
+            "board-a",
+            "attack_family_holdout",
+            "test",
+            "benign",
+);
         assert_eq!(fixture.audit().expect("valid family holdout").samples, 6);
     }
 
@@ -803,29 +894,83 @@ mod tests {
     fn capture_configuration_holdout_rejects_reuse_across_splits() {
         let mut fixture = Fixture::new();
         fixture.add_row_with_capture(
-            "s-train-attack", "a", "program-a", "run-a", "family-a", "board-a",
-            "capture-a", "counter-set-a", "capture_config_holdout", "train", "attack",
-        );
+            "s-train-attack",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "capture-a",
+            "counter-set-a",
+            "capture_config_holdout",
+            "train",
+            "attack",
+);
         fixture.add_row_with_capture(
-            "s-train-benign", "b", "benign-a", "run-b", "NA", "board-a",
-            "capture-a", "counter-set-a", "capture_config_holdout", "train", "benign",
-        );
+            "s-train-benign",
+            "b",
+            "benign-a",
+            "run-b",
+            "NA",
+            "board-a",
+            "capture-a",
+            "counter-set-a",
+            "capture_config_holdout",
+            "train",
+            "benign",
+);
         fixture.add_row_with_capture(
-            "s-val-attack", "c", "program-c", "run-c", "family-c", "board-a",
-            "capture-b", "counter-set-a", "capture_config_holdout", "validation", "attack",
-        );
+            "s-val-attack",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "capture-b",
+            "counter-set-a",
+            "capture_config_holdout",
+            "validation",
+            "attack",
+);
         fixture.add_row_with_capture(
-            "s-val-benign", "d", "benign-b", "run-d", "NA", "board-a",
-            "capture-b", "counter-set-a", "capture_config_holdout", "validation", "benign",
-        );
+            "s-val-benign",
+            "d",
+            "benign-b",
+            "run-d",
+            "NA",
+            "board-a",
+            "capture-b",
+            "counter-set-a",
+            "capture_config_holdout",
+            "validation",
+            "benign",
+);
         fixture.add_row_with_capture(
-            "s-test-attack", "e", "program-e", "run-e", "family-e", "board-a",
-            "capture-a", "counter-set-a", "capture_config_holdout", "test", "attack",
-        );
+            "s-test-attack",
+            "e",
+            "program-e",
+            "run-e",
+            "family-e",
+            "board-a",
+            "capture-a",
+            "counter-set-a",
+            "capture_config_holdout",
+            "test",
+            "attack",
+);
         fixture.add_row_with_capture(
-            "s-test-benign", "f", "benign-c", "run-f", "NA", "board-a",
-            "capture-a", "counter-set-a", "capture_config_holdout", "test", "benign",
-        );
+            "s-test-benign",
+            "f",
+            "benign-c",
+            "run-f",
+            "NA",
+            "board-a",
+            "capture-a",
+            "counter-set-a",
+            "capture_config_holdout",
+            "test",
+            "benign",
+);
         assert!(fixture.audit().unwrap_err().contains("crosses splits"));
     }
 
