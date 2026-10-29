@@ -57,6 +57,13 @@ Research on integrated flight/aircraft/crew recovery also models recovery as a s
 
 The aircraft-recovery literature emphasizes scenario definitions and the cost of robustness: overly conservative solutions can waste aircraft utilization or ground resources. See the 2025 study on robust airline scheduling and turnaround under uncertainty (DOI: https://doi.org/10.1016/j.tre.2025.104440) and the review of airline disruption management published in 2025 (DOI: https://doi.org/10.1016/j.cor.2024.106915).
 
+Two recent adjacent studies sharpen the evaluation design:
+
+- Cha and Kwon's September 2026 *Data-driven optimization for airline service quality improvement under delay and cancellation risk* reports 97.95%–99.60% of hindsight-oracle value for a leakage-controlled forecast-based allocation policy on a locked 2025 carrier-month panel. It explicitly separates measurement consistency, ex-ante forecast value, optimization value, and causal effects, and notes that an uncertainty-aware robust extension can incur an ex-post decision cost. This is not the same problem as aircraft recovery, so the numbers are methodological context, not a target for this solver (DOI: https://doi.org/10.3934/jimo.2026188).
+- A 19 October 2026 human-in-the-loop turnaround-coordination study tests 1,000 synthetic inbound cases across six regimes and reports monotonicity failures rather than hiding them. It explicitly says its synthetic regime frequencies are generator artifacts, not observed operational rates. This is a useful precedent for preregistered stress regimes, ablations, and retained negative results—not evidence of airline deployment (DOI: https://doi.org/10.3389/frai.2026.1977034).
+
+These findings suggest a stronger benchmark principle: robustness must be evaluated together with realized policy cost, and every result must state whether its scenario population is observed, reconstructed, or synthetic. Do not assume a robust policy automatically has more realized value.
+
 No comparison here establishes industry SOTA, operational savings, calibrated real-world probabilities, safety, or dispatch authority.
 
 ## Verification command
