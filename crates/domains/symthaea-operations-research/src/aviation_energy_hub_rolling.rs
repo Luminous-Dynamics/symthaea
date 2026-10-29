@@ -43,6 +43,7 @@ pub struct RollingHorizonStep {
     pub observation_available_at_epoch: i64,
     pub forecast_issued_at_epoch: i64,
     pub forecast_available_at_epoch: i64,
+    pub initial_soc_ledger_ref: String,
     pub forecast_digest: String,
     pub planning_scenario_digest: String,
     pub action: EnergyHubStepAction,
@@ -192,8 +193,9 @@ pub fn run_rolling_horizon(
         planning_scenario.scenario_id = format!("{}-rolling-stage-{}", realized.scenario_id, stage);
         planning_scenario.input_digest = "pending".to_owned();
         planning_scenario.storage.initial_soc_quanta = soc;
-        planning_scenario.storage.initial_soc_ledger_ref =
+        let initial_soc_ledger_ref =
             prefix_inventory_ledger_ref(&realized.storage.initial_soc_ledger_ref, &steps)?;
+        planning_scenario.storage.initial_soc_ledger_ref = initial_soc_ledger_ref.clone();
         planning_scenario.intervals.clear();
         planning_scenario.intervals.push(realized.intervals[stage].clone());
         planning_scenario.intervals.extend(forecast.future_intervals.iter().cloned());
@@ -285,6 +287,7 @@ pub fn run_rolling_horizon(
             observation_available_at_epoch: episode.observation_available_at_epoch[stage],
             forecast_issued_at_epoch: forecast.issued_at_epoch,
             forecast_available_at_epoch: forecast.available_at_epoch,
+            initial_soc_ledger_ref,
             forecast_digest,
             planning_scenario_digest: planning_digest,
             action,
@@ -350,6 +353,9 @@ fn prefix_inventory_ledger_ref(
     opening_ledger_ref: &str,
     prior_steps: &[RollingHorizonStep],
 ) -> Result<String, RollingHorizonError> {
+    if prior_steps.is_empty() {
+        return Ok(opening_ledger_ref.to_owned());
+    }
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"symthaea.clean-airline.storage-prefix-ledger.v1\0");
     put_string(&mut bytes, opening_ledger_ref);
