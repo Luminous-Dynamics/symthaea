@@ -284,7 +284,12 @@ pub fn expected_components_from_inventory(
         || inventory.source_partition_digest_sha256 != partition_digest(families)
         || inventory.coverage_status != "independently_reviewed_complete"
     {
-        bail!("component reconstruction requires the complete inventory for the exact frozen partition");
+        bail!(
+            concat!(
+                "component reconstruction requires the complete inventory ",
+                "for the exact frozen partition"
+            )
+        );
     }
     canonical_edges_digest(&inventory.edges, families)?;
 
