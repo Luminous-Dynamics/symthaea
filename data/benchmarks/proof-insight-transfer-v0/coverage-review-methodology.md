@@ -28,9 +28,9 @@ The review log must list each family, source artifacts examined, search procedur
 
 Every inventory edge uses a registered relation and a status. Evidence is content-addressed. A resolved assessment requires at least two reviewer IDs. The receipt verifier independently checks schema-level semantics, family membership, relationship-pair uniqueness, and the normalized edge digest.
 
-Relationship kinds \`exact_duplicate\`, \`shared_source_artifact\`, \`formal_dependency\`, \`reused_lemma\`, and \`equivalent_statement\` are hard links. \`conceptual_similarity\` and \`citation_only\` are not hard links by themselves. Unresolved hard links conservatively join components. Dismissed hard links do not join components, but their evidence and reviewer decision remain in the inventory.
+Relationship kinds `exact_duplicate`, `shared_source_artifact`, `formal_dependency`, `reused_lemma`, and `equivalent_statement` are hard links. `conceptual_similarity` and `citation_only` are not hard links by themselves. Unresolved hard links conservatively join components. Dismissed hard links do not join components, but their evidence and reviewer decision remain in the inventory.
 
-The canonical signed edge digest is SHA-256 over compact JSON serialization of edges sorted by \`edge_id\`, with each edge's \`reviewer_ids\` sorted lexicographically. This makes formatting, input row ordering, and reviewer-list ordering immaterial while preserving every signed semantic field. A change to any edge field changes this digest.
+The canonical signed edge digest is SHA-256 over compact JSON serialization of edges sorted by `edge_id`, with each edge's `reviewer_ids` sorted lexicographically. This makes formatting, input row ordering, and reviewer-list ordering immaterial while preserving every signed semantic field. A change to any edge field changes this digest.
 
 ## Trust root and signature message
 
@@ -38,14 +38,14 @@ The reviewer trust store must be provisioned and versioned outside the outcome-p
 
 Each reviewer signs the following exact UTF-8 message, with a newline after every field:
 
-\`PITB_COMPONENT_COVERAGE_RECEIPT_V1\`
-\`pitb.component-coverage-receipt.v1\`
-\`1581d4cbdd69a0faf34b2089614fe2a814316a6a\`
-\`{source_partition_digest_sha256}\`
-\`{relationship_inventory_edges_sha256}\`
-\`{review_methodology_sha256}\`
-\`{trust_store_sha256}\`
-\`complete_relationship_inventory\`
+`PITB_COMPONENT_COVERAGE_RECEIPT_V1`
+`pitb.component-coverage-receipt.v1`
+`1581d4cbdd69a0faf34b2089614fe2a814316a6a`
+`{source_partition_digest_sha256}`
+`{relationship_inventory_edges_sha256}`
+`{review_methodology_sha256}`
+`{trust_store_sha256}`
+`complete_relationship_inventory`
 
 The trust-store digest is the SHA-256 of its exact raw bytes. The review-methodology digest is the SHA-256 of this exact file's raw bytes. The receipt's own SHA-256 is stored in the inventory; the signed message does **not** include the receipt's own digest, avoiding a self-referential hash cycle.
 
