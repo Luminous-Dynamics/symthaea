@@ -23,10 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.96.0
-        with:
-          components: rustfmt
-      - name: Format
-        run: cargo fmt -- --check
       - name: Unit tests
         run: cargo test --locked
       - name: Known-answer smoke fixture

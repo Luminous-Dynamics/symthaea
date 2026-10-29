@@ -295,6 +295,9 @@ impl Evaluator {
         if depth == 0 {
             return (0.0, None);
         }
+        if !self.states.get(task).map(|known| known.contains(state)).unwrap_or(false) {
+            return (0.0, None);
+        }
         let state_key = (task.to_owned(), state.to_owned());
         let Some(action_list) = self.actions.get(&state_key) else {
             return (0.0, None);
