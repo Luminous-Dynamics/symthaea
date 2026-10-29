@@ -111,6 +111,9 @@ impl PredictiveObservationSet {
     /// Workload/scenario fingerprint.
     pub fn workload_fingerprint(&self) -> &str { &self.workload_fingerprint }
 
+    /// Digest of the raw holdout or frozen count artifact.
+    pub fn holdout_artifact_digest(&self) -> &str { &self.holdout_artifact_digest }
+
     /// Provenance class for holdout observations.
     pub fn source(&self) -> ObservationSource { self.source }
 
@@ -488,7 +491,8 @@ mod tests {
             SamplingAssumption::IidCategorical,
             ObservationSource::SyntheticFixture,
         );
-        let report = assess_predictive_adequacy(&input, policy(100, 1.0, 2.0, None)).unwrap();
+        // Impossible observed events reject even if the configured sample minimum is unmet.
+        let report = assess_predictive_adequacy(&input, policy(1000, 1.0, 2.0, None)).unwrap();
         assert_eq!(report.mean_log_loss, Some(PredictiveLogLoss::InfiniteDueToZeroProbability));
         assert!(report.observed_zero_probability_event);
         assert_eq!(report.status, PredictiveAdequacyStatus::Reject);
