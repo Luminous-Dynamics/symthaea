@@ -32,12 +32,12 @@ The implementation uses integer objective units for exact gap arithmetic. A futu
 
 ## Core definitions
 
-For a minimization objective:
+For a minimization objective, a valid gap statement first requires a **complete candidate-space cover**: every feasible recovery plan in the declared model must be represented by at least one candidate or by a search region assigned to a candidate. Candidates cannot merely be the convenient shortlist produced by the screen. The scenario, formal coverage contract, and canonical candidate-universe digests must be frozen together. A digest binds these declarations; it does not prove that the cover is complete.
 
-- (U): objective cost of the best independently verified feasible candidate.
-- (L_i): admissible lower bound for each unresolved candidate (i).
+- `U`: objective cost of the best independently verified feasible candidate.
+- `L_i`: admissible lower bound for each unresolved candidate `i`.
 - (L = \min(U, \min_i L_i)) when a feasible candidate is known.
-- Certified absolute gap: (G = U - L).
+- Certified absolute gap: `G = U - L`.
 - Acceptable stopping condition: (G \leq \varepsilon), where (arepsilon) is frozen in the run policy.
 
 A lower bound greater than a candidate's independently recomputed feasible cost is rejected. That check detects one class of invalid bound but does not prove the bound admissible for unexamined candidates.
@@ -101,6 +101,7 @@ Evidence from an earlier tier does not imply evidence for a later one.
 Every report must bind:
 
 - Scenario/input snapshot digest and stable scenario ID.
+- Candidate-space contract digest for the formal full-search-space coverage argument.
 - Complete candidate-universe digest over canonical candidate IDs, rank scores, and admissible lower bounds.
 - Candidate universe and stable IDs.
 - Screening policy digest and ranking artifact digest.
@@ -110,7 +111,7 @@ Every report must bind:
 - Best feasible cost, global lower bound, absolute gap, declared tolerance, and honest terminal status.
 - Evaluation budget and any timeout, expansion, fallback, or indeterminate reason.
 
-The current module validates digest encoding and echoes caller-supplied scenario, candidate-universe, policy, ranking-artifact, and source identities. The runner must calculate these digests from canonical frozen artifacts, and evidence-signing work must bind them to trusted receipts before any promotion gate consumes the report.
+The current module validates digest encoding and echoes caller-supplied scenario, candidate-space-contract, candidate-universe, policy, ranking-artifact, and source identities. The runner must calculate these digests from canonical frozen artifacts, and evidence-signing work must bind them to trusted receipts before any promotion gate consumes the report.
 
 ## Current scope and next integration steps
 
