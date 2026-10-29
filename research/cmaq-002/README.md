@@ -22,13 +22,13 @@ Each mechanism yields deterministic reward and safety outcomes for three actions
     cargo test --locked
     cargo run --locked -- --seed 4242 --probe-budget 2 --probe-cost 0.25
 
-The CLI prints a deterministic JSON report comparing no probe, fixed probes, seeded random probes, maximum expected information gain, expected value of information (EVoI), and an evaluator-only oracle that knows the true mechanism.
+The CLI prints a deterministic JSON report comparing no probe, fixed probes, seeded random probes, maximum expected information gain, expected value of information (EVoI), and an evaluator-only oracle that knows the true mechanism. A separate Python mirror of the small finite-state equations produced a preliminary calibration-panel result of mean net regret 0.9444 for EVoI versus 1.5833 for maximum information gain and 3.5278 for no probes. This is exploratory validation of the toy design only, not execution of the Rust binary, not statistical evidence, and not an external benchmark score.
 
 The oracle is an upper bound, never a deployable baseline. The report scores all nine possible true mechanisms, not a single lucky hidden draw. The seed changes the random-probe policy and is recorded in the report; it does not change mechanism outcomes.
 
 ## Decision and information semantics
 
-The candidate retains all hypotheses consistent with the observation history. A probe observation is the exact reward and safety tuple for one selected context/action. If a new observation matches no remaining hypothesis, the update fails closed with an explicit mechanism-change/contradiction signal; it does not silently create an empty belief.
+The candidate retains all hypotheses consistent with the observation history. A probe reveals only a binary positive/non-positive reward signal plus the safety bit for one selected context/action; exact reward magnitude remains evaluator-side and is used only for scoring. This deliberately makes information incomplete: multiple mechanisms can yield the same observed signal while having different utility. If a new signal matches no remaining hypothesis, the update fails closed with an explicit mechanism-change/contradiction signal; it does not silently create an empty belief.
 
 For each test context, the candidate may choose an action only if that action is safe in every remaining hypothesis. It then selects the action with the highest posterior mean reward, abstaining when no robustly safe action has positive expected reward. This is intentionally conservative and makes the safety assumptions explicit.
 
@@ -51,7 +51,7 @@ Do not assume EVoI will win. The goal is an auditable comparison whose output ca
 - No Symthaea HDC, CfC/LTC, production memory, learned world model, or planner is connected yet.
 - The simulator is deterministic and fully specified. It is a protocol unit test, not an external benchmark score.
 - The current family library has nine hand-defined hypotheses. It does not justify claims of general causal discovery.
-- The regime-shift signal detects an observation inconsistent with the current hypothesis set; a full change-point detector and adaptation benchmark are future work.
+- The regime-shift signal detects an observation inconsistent with the current hypothesis set; a full change-point detector and adaptation benchmark are future work. The Rust unit tests also require the fixed calibration panel to distinguish decision-value probing from information-only probing; this sanity check is specific to the nine hand-defined hypotheses and is not a general performance guarantee.
 - Rust CI must compile and run tests at the exact head before this is promoted beyond draft status.
 
 External benchmark alignment:
