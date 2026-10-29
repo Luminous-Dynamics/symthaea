@@ -26,7 +26,8 @@ TOP_FIELDS = frozenset({
 RUN_FIELDS = frozenset({
     "unit_id", "task_family", "constraint_family", "dimension", "severity",
     "seed", "policy_id", "budget_units", "cost_spent_units", "completed",
-    "decision", "curve", "shift_results", "run_receipt_sha256",
+    "decision", "curve", "shift_results", "run_receipt_sha256", "policy_source_sha256",
+    "policy_config_sha256", "environment_sha256", "suite_manifest_sha256",
 })
 CURVE_FIELDS = frozenset({"cost_units", "quality"})
 SHIFT_FIELDS = frozenset({
@@ -149,7 +150,9 @@ def validate_manifest(document: Any) -> dict[str, Any]:
         task_family = _nonblank(run["task_family"], f"runs[{index}].task_family")
         constraint_family = _nonblank(run["constraint_family"], f"runs[{index}].constraint_family")
         policy_id = _nonblank(run["policy_id"], f"runs[{index}].policy_id")
-        _sha256(run["run_receipt_sha256"], f"runs[{index}].run_receipt_sha256")
+        for digest_field in ("run_receipt_sha256", "policy_source_sha256", "policy_config_sha256",
+                             "environment_sha256", "suite_manifest_sha256"):
+            _sha256(run[digest_field], f"runs[{index}].{digest_field}")
         dimension = _integer(run["dimension"], f"runs[{index}].dimension", minimum=1)
         _integer(run["seed"], f"runs[{index}].seed")
         severity = _number(run["severity"], f"runs[{index}].severity", minimum=0.0)
