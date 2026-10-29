@@ -236,6 +236,39 @@ def _percentile(sorted_values: list[float], probability: float) -> float:
     return sorted_values[lower] * (1.0 - fraction) + sorted_values[upper] * fraction
 
 
+def exact_two_sided_sign_test_pvalue(wins: int, losses: int) -> float | None:
+    """Exact two-sided binomial sign test on non-tied task-cluster wins/losses.
+
+    This tests directional consistency, not the magnitude of the mean score
+    difference. No non-tied tasks means no estimable directional test.
+    """
+    if type(wins) is not int or type(losses) is not int or wins < 0 or losses < 0:
+        raise ValueError("wins and losses must be non-negative integers")
+    n = wins + losses
+    if n == 0:
+        return None
+    lower_tail = sum(math.comb(n, k) for k in range(min(wins, losses) + 1)) / (2 ** n)
+    return min(1.0, 2.0 * lower_tail)
+
+
+def holm_adjust_pvalues(pvalues: dict[str, float]) -> dict[str, float]:
+    """Return deterministic Holm step-down adjusted p-values for one family."""
+    for label, value in pvalues.items():
+        if not isinstance(label, str) or not label:
+            raise ValueError("p-value labels must be non-empty strings")
+        if not _is_number(value) or value < 0 or value > 1:
+            raise ValueError(f"p-value for {label!r} must be finite and in [0, 1]")
+    ordered = sorted(pvalues.items(), key=lambda item: (item[1], item[0]))
+    count = len(ordered)
+    adjusted: dict[str, float] = {}
+    running_max = 0.0
+    for index, (label, value) in enumerate(ordered):
+        step_down = min(1.0, (count - index) * value)
+        running_max = max(running_max, step_down)
+        adjusted[label] = running_max
+    return adjusted
+
+
 def analyze_manifest(
     manifest: Any,
     *,
@@ -376,7 +409,52 @@ def analyze_manifest(
             "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
             "intervals_are_simultaneous": False,
             "multiplicity_adjustment": "none; do not treat multiple arm comparisons as simultaneous confirmatory claims",
+        pairwise.append({
+            "reference_arm": reference,
+            "comparison_arm": arm_id,
+            "paired_task_cluster_count": len(task_ids),
+            "seeds_per_task": len(seeds),
+            "score_delta_pp": round(observed_delta, 6),
+            "task_clusters_won": won,
+            "task_clusters_lost": lost,
+            "task_clusters_tied": tied,
+            "effective_comparison_task_cluster_count": effective_task_clusters,
+            "effective_comparison_task_cluster_fraction_pct": round(100.0 * effective_task_clusters / len(task_ids), 6),
+            "paired_trial_cell_count": len(paired_trial_cells),
+            "both_success_cells": both_success_cells,
+            "reference_only_success_cells": reference_only_success_cells,
+            "comparison_only_success_cells": comparison_only_success_cells,
+            "both_non_success_cells": both_non_success_cells,
+            "success_disagreement_cells": reference_only_success_cells + comparison_only_success_cells,
+            "resolved_disagreement_cells": resolved_disagreement_cells,
+            "unresolved_pair_cells": unresolved_pair_cells,
+            "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
+            "intervals_are_simultaneous": False,
         })
+
+    raw_directional_pvalues = {
+        row["comparison_arm"]: exact_two_sided_sign_test_pvalue(
+            row["task_clusters_won"], row["task_clusters_lost"]
+        )
+        for row in pairwise
+    }
+    # Treat non-estimable comparisons (no non-tied task clusters) as p=1 for
+    # the familywise adjustment; keep their raw p-value null in the report.
+    holm_input = {
+        arm_id: value if value is not None else 1.0
+        for arm_id, value in raw_directional_pvalues.items()
+    }
+    holm_values = holm_adjust_pvalues(holm_input)
+    for row in pairwise:
+        row["task_win_sign_test"] = {
+            "hypothesis": "among non-tied task clusters, comparison-arm win probability equals 0.5",
+            "non_tied_task_clusters": row["task_clusters_won"] + row["task_clusters_lost"],
+            "p_value_two_sided": raw_directional_pvalues[row["comparison_arm"]],
+            "estimable": raw_directional_pvalues[row["comparison_arm"]] is not None,
+            "holm_adjusted_p_value": round(holm_values[row["comparison_arm"]], 8),
+            "family": "all non-reference arms frozen in this manifest",
+            "non_estimable_policy": "raw p-value is null; use p=1 conservatively for Holm family adjustment",
+        }
 
     return {
         "schema_version": "vleb-paired-comparison-report-v1",
@@ -408,7 +486,8 @@ def analyze_manifest(
         "limitations": [
             "The tool checks pairing, identity consistency, coverage and statistical calculations; it does not authenticate receipts or prove that outcomes were honestly measured.",
             "Unresolved scheduled trials remain in the denominator and count as non-successes for headline success rates.",
-            "Intervals are descriptive, percentile-bootstrap intervals and are not simultaneous across multiple comparisons.",
+            "Bootstrap intervals are descriptive and are not simultaneous across multiple comparisons; the separately reported sign test measures direction across non-tied tasks, not effect magnitude.",
+            "The task-cluster sign test assumes independent task clusters; non-estimable sign tests use a null raw p-value and a conservative p=1 for Holm adjustment.",
             "No external benchmark is directly comparable without matching task distribution, agent scaffold, budgets, environment and protocol.",
         ],
     }
