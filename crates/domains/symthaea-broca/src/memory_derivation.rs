@@ -184,7 +184,8 @@ impl DerivationGraph {
 
         let mut candidate = self.clone();
         candidate.retracted_source_events.insert(event_id.to_owned());
-        let mut queue = VecDeque::from([DependencyRef::SourceEvent(event_id.to_owned())]);
+        let mut queue = VecDeque::new();
+        queue.push_back(DependencyRef::SourceEvent(event_id.to_owned()));
         let mut affected = BTreeSet::new();
 
         while let Some(dependency) = queue.pop_front() {
@@ -521,6 +522,9 @@ mod tests {
         graph.derive(fact("D1", [DependencyRef::SourceEvent("E1".into())])).unwrap();
         graph.derive(fact("D2", [DependencyRef::DerivedFact("D1".into()), DependencyRef::SourceEvent("E2".into())])).unwrap();
         let before = graph.state_sha256().unwrap();
+        // Corrupt the materialized index to make this a real rebuild test.
+        graph.reverse_dependencies.clear();
+        assert!(graph.state_sha256().is_err());
         graph.rebuild_reverse_index().unwrap();
         assert_eq!(graph.state_sha256().unwrap(), before);
     }
