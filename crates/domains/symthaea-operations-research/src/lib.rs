@@ -21,6 +21,7 @@
 //! - [`aviation_energy_hub`]: time-indexed synthetic airport electricity, storage, and Pareto dispatch with independent verification.
 //! - [`aviation_energy_hub_rolling`]: forecast-as-of-decision rolling-horizon energy decisions with carried SOC and independent realized replay.
 //! - [`aviation_energy_hub_paired_benchmark`]: paired static, greedy, rolling-horizon and perfect-information policy evaluation with explicit coverage/regret.
+//! - [`aviation_paired_distributional_risk`]: bind paired policy outcomes to calibrated finite-support distributional risk without treating design weights as probabilities.
 //! - [`aviation_energy_hub_robustness`]: weighted stress replay, explicit feasibility coverage, and perfect-information recourse reference.
 //! - [`aviation_energy_hub_nonanticipativity`]: independent verification that scenarios with identical observed history take identical actions.
 //! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage, chronology checks, and a fail-closed guard against declared test-set tuning.
@@ -45,6 +46,7 @@ pub mod aviation_energy_dispatch;
 pub mod aviation_energy_hub;
 pub mod aviation_energy_hub_rolling;
 pub mod aviation_energy_hub_paired_benchmark;
+pub mod aviation_paired_distributional_risk;
 pub mod aviation_energy_hub_robustness;
 pub mod aviation_energy_hub_nonanticipativity;
 pub mod aviation_decision_readiness;
