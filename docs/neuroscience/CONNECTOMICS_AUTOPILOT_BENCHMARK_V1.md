@@ -38,6 +38,7 @@ References and scope notes:
 - H01 release: https://h01-release.storage.googleapis.com/landing.html
 - Google Neural Mapping datasets: https://sites.research.google/gr/neural-mapping/datasets/
 - ConnectomeBench2 paper (arXiv:2606.21116): https://arxiv.org/abs/2606.21116
+- Martinez et al., *Connectome quality converges predictably to reveal optimal stopping points during proofreading* (bioRxiv, 2026): https://doi.org/10.64898/2026.06.30.735414
 - ConnectomeBench2 official project page: https://synthneuro.org/publications/connectomebench2-a-unified-benchmark-for-automated-connectomic-proofreading/
 - ConnectomeBench2 training and data-generation code (MIT code license; upstream data licenses still apply): https://github.com/timfarkas/ConnectomeBench2
 - ConnectomeBench2 Hugging Face dataset card; pin `revision="v2"`, do not use `main` for paper replication: https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2
@@ -97,6 +98,21 @@ No biological-plausibility score may overrule image evidence or suppress an unus
 Choose which region to inspect next under an explicit review budget. Compare this decision policy to random review, uncertainty-only ranking, model-disagreement ranking, and morphology-rule ranking. Evaluate at matched reviewer minutes and matched compute; include the cost of generating suggestions.
 
 An uncertainty estimate is useful only to the extent that it predicts error and improves decisions. Uncalibrated model confidence must not be labeled probability.
+
+### 2b. From “proofread everything” to query-specific stopping
+
+A July 2026 preprint, *Connectome quality converges predictably to reveal optimal stopping points during proofreading* (Martinez et al., https://www.biorxiv.org/content/10.64898/2026.06.30.735414v1), reports that selected global graph invariants can converge as proofreading progresses and that their trajectories can help forecast remaining effort on zebrafish spinal-cord and Drosophila hemibrain datasets. This complements error ranking: a system should estimate not only which edit to review next, but also when further proofreading is unlikely to change a specified downstream result enough to justify its cost.
+
+Symthaea should test **query-specific stopping**, rather than treat a universal “connectome complete” score as biological truth:
+
+1. Track versioned graph snapshots and edit counts; compute a preregistered set of graph invariants and the actual scientific quantities the project intends to analyze.
+2. Fit candidate convergence curves using early snapshots only, then forecast later held-out snapshots without refitting on the future trajectory.
+3. Compare predicted remaining edits and uncertainty with the observed effort required to reach prespecified stability bands.
+4. Perturb the graph with held-out known split/merge errors to measure whether invariant stability can coexist with serious local or query-specific mistakes.
+5. Compare against fixed-edit-count stopping, fixed-budget stopping, and expert-chosen stopping. Report false-stop rate, forecast interval coverage, edit-effort error, query-result stability, and the cost of additional proofreading.
+6. Stop only for the declared analysis and declared stability tolerance; keep targeted review open for high-impact or rare pathways, and reopen the stopping decision when the scientific question or accepted graph state changes.
+
+**Critical limitation:** global invariants can stabilize while local errors remain, and a stable graph statistic is not proof of ground-truth reconstruction, synaptic completeness, or causal biological correctness. Treat convergence as a resource-allocation signal; combine it with direct error estimates, graph-delta checks, scientific-query sensitivity, and expert-reviewed evidence.
 
 ### 3. From isolated AI calls to correction-aware memory
 
@@ -247,7 +263,7 @@ Keep model version, prompts, preprocessing, compute, reviewer instructions, cand
 - lineage completeness and rate of duplicated/common-source evidence being incorrectly counted as independent;
 - hidden-oracle leakage and post-outcome rank rewriting (both must be zero).
 
-Use paired, cluster-aware uncertainty estimates (cluster on volume/region/neuron, as applicable), report denominators and missing labels, and publish per-dataset results. A pooled average cannot hide a failed dataset or error family. The frozen scorer now calculates classification, balanced-accuracy cluster-bootstrap intervals, item/minute review yield, and risk–coverage checkpoints separately for each declared group, using the same operating budgets as the pooled report. It also evaluates three matched-budget controls—uncertainty-only, predicted-error-probability-only, and a seeded deterministic-random queue—overall and per group. Treat per-group operating curves and baseline comparisons as primary evidence, not decorative breakdowns; if support is too small, retain the denominator and mark the claim not estimable.
+Use paired, cluster-aware uncertainty estimates (cluster on volume/region/neuron, as applicable), report denominators and missing labels, and publish per-dataset results. For budgeted queue comparisons, report paired cluster-bootstrap 95% intervals for submitted-policy minus each baseline at the same item/minute budgets (impact-weighted recall, error recall, and precision), not only separate point estimates. The scorer's intervals are conditional on frozen predictions and the declared cluster unit. A pooled average cannot hide a failed dataset or error family. The frozen scorer now calculates classification, balanced-accuracy cluster-bootstrap intervals, item/minute review yield, and risk–coverage checkpoints separately for each declared group, using the same operating budgets as the pooled report. It also evaluates three matched-budget controls—uncertainty-only, predicted-error-probability-only, and a seeded deterministic-random queue—overall and per group. Treat per-group operating curves and baseline comparisons as primary evidence, not decorative breakdowns; if support is too small, retain the denominator and mark the claim not estimable.
 
 ### Proposed promotion targets — targets, not results
 
