@@ -13,6 +13,12 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     verify_search_exposure_exact_match_report, ProtectedSearchArtifactIndexCommitmentInput,
 };
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
+use science_bench_refresh_validator::evidence_behavior_contracts::{
+    compute_evidence_behavior_contract_plan_commitment,
+    compute_evidence_behavior_contract_report_commitment,
+    verify_evidence_behavior_contract_plan,
+    verify_evidence_behavior_contract_report,
+};
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
@@ -36,6 +42,10 @@ fn usage(program: &str) {
             "  {program} verify-evidence-intervention-plan PLAN.json\n",
             "  {program} commit-evidence-outcomes PLAN.json OUTCOME_FIELDS.json\n",
             "  {program} verify-evidence-outcomes PLAN.json OUTCOME_REPORT.json\n",
+            "  {program} commit-evidence-behavior-contract-plan PLAN_FIELDS.json\n",
+            "  {program} verify-evidence-behavior-contract-plan PLAN.json\n",
+            "  {program} commit-evidence-behavior-contract-report PLAN.json REPORT_FIELDS.json\n",
+            "  {program} verify-evidence-behavior-contract-report PLAN.json REPORT.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
@@ -65,6 +75,122 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-evidence-behavior-contract-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "evidence behavior contract plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_evidence_behavior_contract_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_evidence_behavior_contract_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("evidence behavior contract plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-evidence-behavior-contract-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "evidence behavior contract plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_evidence_behavior_contract_plan(&plan_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("evidence behavior contract plan report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
+        "commit-evidence-behavior-contract-report" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "evidence behavior contract plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let fields_bytes = match read(&args[2], "evidence behavior contract report fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_evidence_behavior_contract_report_commitment(&plan_bytes, &fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_evidence_behavior_contract_report_commitment.v1",
+                            "report_commitment_sha256": commitment
+                        }))
+                        .expect("evidence behavior contract report commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-evidence-behavior-contract-report" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "evidence behavior contract plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report_bytes = match read(&args[2], "evidence behavior contract report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_evidence_behavior_contract_report(&plan_bytes, &report_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("evidence behavior contract report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
         "analyze-paired-evidence-outcomes" => {
             if args.len() != 4 {
                 usage("science-bench-refresh-validator");
