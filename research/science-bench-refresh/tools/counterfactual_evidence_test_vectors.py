@@ -112,14 +112,16 @@ def main() -> int:
     mutated["plan_commitment_sha256"] = "0" * 64
     write_json(output / "mutated-commitment-plan.json", mutated)
 
-    print(json.dumps({
+    summary = {
         "schema": "symthaea.counterfactual_evidence_test_vectors.v1",
         "expected_plan_commitment_sha256": commitment,
         "expected_pair_count": 1,
         "expected_trial_count": len(CONDITIONS),
         "expected_conditions_per_pair": len(CONDITIONS),
         "output_dir": str(output),
-    }, indent=2))
+    }
+    write_json(output / "summary.json", summary)
+    print(json.dumps(summary, indent=2))
     return 0
 
 
