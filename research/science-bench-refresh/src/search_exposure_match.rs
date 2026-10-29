@@ -265,7 +265,7 @@ fn validate_record_contract(
                 }
                 if record.protected_reference_sha256 != record.evidence_artifact_sha256 {
                     issues.push(format!(
-                        "records[{index}] exact_digest requires evidence digest to equal protected reference digest"
+                        "records[{index}] exact_digest evidence and reference digests differ"
                     ));
                     valid = false;
                 }
