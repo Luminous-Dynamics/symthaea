@@ -183,6 +183,7 @@ pub struct QueryEvidenceSetMember {
 ///
 /// The complete flag means all caller-declared roles have been covered by role
 /// annotations; it does not mean that evidence semantically entails an answer.
+/// Role extraction and query requirement planning must be independently source-
 /// grounded and evaluated. The final serialized context still needs a tokenizer
 /// budget check because token costs may not be additive across items.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
