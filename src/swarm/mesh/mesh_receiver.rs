@@ -792,6 +792,34 @@ mod tests {
         assert_eq!(receiver.stats().packets_recovered, 1);
     }
 
+    #[test]
+    fn receiver_does_not_recover_final_shard_without_exact_encoded_length() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(11, PEER_A, 0x93);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+        let final_data_index = frags.len() - 2;
+
+        for (index, raw) in wire.iter().enumerate() {
+            if index != final_data_index {
+                receiver.receive_fragment(PEER_A, raw);
+            }
+        }
+
+        // The fixed nominal WisdomPacket size is not an authenticated length
+        // bound for a compressed/enveloped datagram. Do not guess the final
+        // recovered tail length from it.
+        assert_eq!(receiver.stats().packets_complete, 0);
+        assert_eq!(receiver.stats().packets_recovered, 0);
+        assert_eq!(receiver.pending_count(), 1);
+
+        // A later actual final data shard makes exact assembly possible again.
+        let recovered = receiver.receive_fragment(PEER_A, &wire[final_data_index]);
+        assert!(recovered.is_some());
+        assert_eq!(receiver.stats().packets_complete, 1);
+        assert_eq!(receiver.pending_count(), 0);
+    }
+
     // -- Duplicate fragments --
 
     #[test]
