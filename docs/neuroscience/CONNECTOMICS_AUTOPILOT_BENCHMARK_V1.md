@@ -24,7 +24,7 @@ This document proposes a falsifiable benchmark. It does **not** report an implem
 Existing results establish both meaningful automation and a sharper new frontier:
 
 - **ConnectomeBench2 (2026)** reports more than 716,000 expert-labeled proofreading decisions and more than 4.5 million associated images across mouse, human, zebrafish, and fly connectomes. Its shared-encoder Vision Transformer reaches human-level accuracy in the paper's evaluated split/merge correction tasks, with within-distribution calibration, distribution-distance diagnostics, and preliminary benefits from connectomics-specific pretraining and active learning. This makes raw in-distribution accuracy an insufficient goal for Symthaea; we must target label efficiency, cross-region/species transfer, calibration under shift, reviewer utility, and downstream graph impact.
-- **Benchmarking Vision-Language Models on Synapse Detection and Proofreading in Connectomics (arXiv, 29 Sep 2026)** reports that most tested VLMs are near chance at zero-shot proofreading; a few-shot prompt helps some models, and LoRA adaptation on a few thousand labels can bring some open VLMs to specialist-model level. On unseen species, the best adapted VLMs reportedly outperform specialist models trained on the same data for merge-error identification. This suggests a strong comparison arm and a valuable challenge: match the accuracy with fewer labels or compute, better calibration/abstention, or stronger region-/species-held-out generalization.
+- **Benchmarking Vision-Language Models on Synapse and Neuron Proofreading in Connectomics (arXiv:2609.36492v2, 23 Oct 2026)** reports that most tested VLMs are near chance at zero-shot proofreading, while LoRA adaptation on a few thousand labels brings open VLMs close to specialist performance. On the full ConnectomeBench2 test, Gemma 4 12B LoRA reached 95.0% split-error and 90.9% merge-error balanced accuracy versus the dataset's EM-only ViT-B at 94.2% and 91.1%, respectively. In the paper's mouse/fly-to-unseen-human/zebrafish transfer setup, Gemma 4 12B reached 77.3% and 82.7% on merge-error identification, versus 66.9% and 74.7% for ConvNeXt-Tiny. These are preprint results on particular protocols, not universal rankings; split-error transfer did not show the same VLM win. The valuable target is to improve label/compute efficiency, calibration, human review utility, or OOD behavior—not just in-distribution accuracy.
 - **ConnectomeBench (NeurIPS 2025)** is still useful as a historical multimodal-LLM benchmark. Its reported models reached 52–82% balanced accuracy on segment identification and 75–85% on split-error tasks, while merge-error identification remained difficult. Do not compare these values directly to ConnectomeBench2 results without aligning task definitions, data versions, metrics, and splits.
 - **RoboEM (Nature Methods, 2024)** uses self-steering 3D tracing to correct difficult neurites. The authors report approximately 400-fold lower *computational annotation cost* than manual correction for evaluated cortical tasks—not a 400-fold end-to-end speedup for building a whole-brain connectome.
 - **NEURD (Nature, 2025)** decomposes neuron meshes into annotated graphs and applies morphological rules for proofreading. The paper reports nearly 150,000 high-confidence edits in MICrONS and more than a threefold speedup for a semi-supervised multi-soma splitting workflow. This is an important baseline, not something to ignore or relabel as Symthaea's contribution.
@@ -41,7 +41,7 @@ References and scope notes:
 - ConnectomeBench2 official project page: https://synthneuro.org/publications/connectomebench2-a-unified-benchmark-for-automated-connectomic-proofreading/
 - ConnectomeBench2 training and data-generation code (MIT code license; upstream data licenses still apply): https://github.com/timfarkas/ConnectomeBench2
 - ConnectomeBench2 Hugging Face dataset card; pin `revision="v2"`, do not use `main` for paper replication: https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2
-- VLM benchmark for synapse detection/proofreading (arXiv:2609.36492, submitted 29 Sep 2026): https://arxiv.org/abs/2609.36492
+- VLM benchmark for synapse detection/proofreading (arXiv:2609.36492v2, 23 Oct 2026): https://arxiv.org/abs/2609.36492
 - ConnectomeBench source code (MIT): https://github.com/jffbrwn2/ConnectomeBench
 - ConnectomeBench dataset card/files (MIT): https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench/tree/main
 
@@ -172,6 +172,9 @@ Do not compare an end-to-end system against a post-processing component as if th
 
 Splits must be grouped by source volume, spatial block, neuron/cell identity, and annotation lineage as appropriate. Never split adjacent crops or fragments of the same neuron across train and test and then call the result generalization. Keep the hidden test oracle separate from retrieval memory, prompts, model fitting, profile selection, and the live queue.
 
+**Rare OOD groups require a separate uncertainty gate.** The ConnectomeBench2 paper's natural test split reports only 60 human and 54 zebrafish merge-error operations, compared with thousands of split-error examples in each species. Cross-species merge-error point estimates can therefore be unstable and clustered samples further reduce effective sample size. Report exact positive/negative counts, cluster-aware confidence intervals, and both natural-prevalence and balanced challenge metrics. If a rare subgroup cannot support a preregistered precision or calibration claim, mark it not estimable rather than infer reliability from pooled accuracy. If a curated hidden OOD set is added, freeze its selection protocol in advance and report it separately from the untouched natural test.
+
+
 ### Comparator matrix
 
 1. **Published ConnectomeBench2 ViT baseline**, reproducing the pinned `v2` dataset, modality, and split protocol where possible.
@@ -212,6 +215,7 @@ Keep model version, prompts, preprocessing, compute, reviewer instructions, cand
 
 **Robustness and provenance**
 - results by volume, brain region, cell morphology, image quality, error type, and in-domain/OOD status;
+- results by exact species × error-family group, with positive/negative denominators and cluster-aware confidence intervals; never pool a tiny human/zebrafish merge subset into a broad cross-species claim;
 - degradation under section artifacts, missing slices, anisotropy, thin neurites, and rare morphologies;
 - deterministic replay of queue ordering from frozen inputs and profile;
 - lineage completeness and rate of duplicated/common-source evidence being incorrectly counted as independent;
