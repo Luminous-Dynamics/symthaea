@@ -76,6 +76,8 @@ The full CSV includes SF7/SF9/SF12 and the exact frame-length arithmetic. This i
 ## Tests authored (not executed)
 
 - Reconstruct boundary sizes through every single data-fragment erasure with parity available.
+- Reconstruct from all data shards when the parity shard is lost.
+- Verify a caller-owned output buffer matches Vec serialization and a short output is rejected without partial writes.
 - Confirm external AEAD-size accounting never exceeds 222 bytes.
 - Reject fragments from a different authenticated peer context, session generation or message sequence.
 - Poison the assembly on a conflicting duplicate.
