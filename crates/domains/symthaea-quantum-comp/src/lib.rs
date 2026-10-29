@@ -116,8 +116,8 @@ pub use phase_hdc::PhaseHypervector;
 pub use photonic_architecture::{
     BoundedCostInterval, LossIntervalDb, OpticalChannel, OpticalChannelInterval,
     OpticalLink, OpticalRoute, OpticalRouteObjective, PhotonicEnvelopeError,
-    PhotonicPrimitiveEnvelope, PhotonicPrimitiveUncertaintyEnvelope, PrimitiveEnvelopeEstimate,
-    ProbabilityInterval, RobustPrimitiveEnvelopeEstimate, find_optical_route,
+    PhotonicPrimitiveEnvelope, PhotonicPrimitiveUncertaintyEnvelope, PositiveInterval,
+    PrimitiveEnvelopeEstimate, ProbabilityInterval, RobustPrimitiveEnvelopeEstimate, find_optical_route,
     loss_budget_db_for_minimum_transmission, multiplexed_source_success_probability,
     route_fits_minimum_transmission, transmission_probability,
 };
