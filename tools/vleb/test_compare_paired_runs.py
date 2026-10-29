@@ -116,6 +116,11 @@ class PairedComparisonTests(unittest.TestCase):
     def test_valid_paired_cohort_reports_clustered_comparison_and_stays_analysis_only(self) -> None:
         result = self.fixture.analyze()
         self.assertTrue(result["valid"])
+        self.assertEqual(result["arm_profiles"], self.fixture.arms)
+        self.assertEqual(
+            result["arm_profiles"][1]["execution_profile_sha256"],
+            self.fixture.arms[1]["execution_profile_sha256"],
+        )
         self.assertEqual(result["task_cluster_count"], 8)
         self.assertEqual(result["seed_count_per_task"], 2)
         self.assertEqual(result["expected_trial_count_per_arm"], 16)
