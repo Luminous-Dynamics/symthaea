@@ -239,7 +239,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         ($code:expr, $message:expr) => {{
             let issue_code: &'static str = $code;
             if codes.insert(issue_code) {
-                issues.add_issue!(ContractIssue {
+                issues.push(ContractIssue {
                     code: issue_code,
                     message: $message,
                 });
@@ -248,7 +248,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
     }
 
     if contract.schema_version != EDIT_CONTRACT_SCHEMA_VERSION {
-        push(
+        add_issue!(
             "UNSUPPORTED_VERSION",
             format!(
                 "schema version {} is not supported by this validator",
@@ -257,7 +257,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         );
     }
     if !valid_contract_id(&contract.contract_id) {
-        push(
+        add_issue!(
             "INVALID_CONTRACT_ID",
             "contract_id must use the versioned MEL-MR-EVAL-005 identifier form".to_owned(),
         );
@@ -275,7 +275,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         || source.track_ids.is_empty()
         || source.track_ids.iter().any(|id| id.trim().is_empty())
     {
-        push(
+        add_issue!(
             "SCHEMA_REJECT",
             "source metadata is missing, malformed, or outside the declared domain".to_owned(),
         );
@@ -286,7 +286,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         .any(|id| id.trim().is_empty())
         || duplicate_strings(&source.track_ids)
     {
-        push(
+        add_issue!(
             "DUPLICATE_TRACK_ID",
             "source track identifiers must be non-empty and unique".to_owned(),
         );
@@ -300,19 +300,19 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             || region.track_ids.is_empty()
             || region.track_ids.iter().any(|id| id.trim().is_empty())
         {
-            push(
+            add_issue!(
                 "SCHEMA_REJECT",
                 format!("region {} has an empty identifier or track set", region.region_id),
             );
         }
         if region_by_id.insert(region.region_id.clone(), region).is_some() {
-            push(
+            add_issue!(
                 "DUPLICATE_REGION_ID",
                 format!("region ID {} is declared more than once", region.region_id),
             );
         }
         if region.end_us <= region.start_us {
-            push(
+            add_issue!(
                 "INVALID_REGION_INTERVAL",
                 format!("region {} must have end_us > start_us", region.region_id),
             );
@@ -321,14 +321,14 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         let left = u128::from(region.end_us) * u128::from(source.sample_rate_hz);
         let right = u128::from(source.duration_frames) * 1_000_000_u128;
         if left > right {
-            push(
+            add_issue!(
                 "REGION_OUT_OF_BOUNDS",
                 format!("region {} extends beyond source audio duration", region.region_id),
             );
         }
         for track in &region.track_ids {
             if !source_tracks.contains(track) {
-                push(
+                add_issue!(
                     "UNKNOWN_TRACK_ID",
                     format!("region {} references unknown track {}", region.region_id, track),
                 );
@@ -340,7 +340,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         || contract.requested_changes.is_empty()
         || contract.protected_invariants.is_empty()
     {
-        push(
+        add_issue!(
             "SCHEMA_REJECT",
             "mask, requested changes, and protected invariants must not be empty".to_owned(),
         );
@@ -356,7 +356,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                 .any(|track| right.track_ids.contains(track));
             let overlaps = left.start_us < right.end_us && right.start_us < left.end_us;
             if shares_track && overlaps {
-                push(
+                add_issue!(
                     "AMBIGUOUS_OVERLAPPING_MASKS",
                     format!(
                         "regions {} and {} overlap on at least one track",
@@ -370,7 +370,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
     for change in &contract.requested_changes {
         for region_id in &change.region_ids {
             if !region_by_id.contains_key(region_id) {
-                push(
+                add_issue!(
                     "UNKNOWN_REGION_ID",
                     format!("requested change references unknown region {}", region_id),
                 );
@@ -420,7 +420,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             if left.axis == right.axis
                 && left.region_ids.iter().any(|id| right.region_ids.contains(id))
             {
-                push(
+                add_issue!(
                     "AMBIGUOUS_OVERLAPPING_REQUESTS",
                     format!(
                         "requested changes {} and {} overlap on axis {:?} without composition order",
@@ -435,7 +435,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         if !invariant.tolerance.max_deviation.is_finite()
             || invariant.tolerance.max_deviation < 0.0
         {
-            push(
+            add_issue!(
                 "TOLERANCE_OUT_OF_DOMAIN",
                 "tolerance max_deviation must be finite and non-negative".to_owned(),
             );
@@ -443,7 +443,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         if let Some(region_ids) = &invariant.region_ids {
             for region_id in region_ids {
                 if !region_by_id.contains_key(region_id.as_str()) {
-                    push(
+                    add_issue!(
                         "UNKNOWN_REGION_ID",
                         format!("protected invariant references unknown region {}", region_id),
                     );
@@ -453,7 +453,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         if let Some(track_ids) = &invariant.track_ids {
             for track_id in track_ids {
                 if !source_tracks.contains(track_id) {
-                    push(
+                    add_issue!(
                         "UNKNOWN_TRACK_ID",
                         format!("protected invariant references unknown track {}", track_id),
                     );
@@ -471,19 +471,19 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             ToleranceMetric::FeatureDistance | ToleranceMetric::AnnotatorCalibrated
         ) && missing_calibration
         {
-            push(
+            add_issue!(
                 "CALIBRATION_ID_REQUIRED",
                 format!("axis {:?} uses a calibrated metric without calibration_id", invariant.axis),
             );
             if tolerance.metric == ToleranceMetric::AnnotatorCalibrated {
-                push(
+                add_issue!(
                     "SCHEMA_REJECT",
                     "annotator_calibrated requires calibration_id by schema".to_owned(),
                 );
             }
         }
         if !compatible_unit(invariant.axis, tolerance.unit.as_deref()) {
-            push(
+            add_issue!(
                 "TOLERANCE_UNIT_AXIS_MISMATCH",
                 format!("unit {:?} is incompatible with axis {:?}", tolerance.unit, invariant.axis),
             );
@@ -502,7 +502,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                     .is_none_or(|ids| ids.iter().any(|id| change.region_ids.contains(id))),
             };
             if scope_overlaps {
-                push(
+                add_issue!(
                     "REQUEST_PROTECTED_SCOPE_CONFLICT",
                     format!(
                         "requested {:?} change conflicts with a {:?} invariant",
@@ -524,7 +524,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         })
         .collect();
     if required.len() != 3 {
-        push(
+        add_issue!(
             "SCHEMA_REJECT",
             "required evidence must include symbolic, acoustic, and replay exactly once".to_owned(),
         );
@@ -532,7 +532,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
     if contract.abstention_policy.on_detector_out_of_domain != "abstain"
         || contract.abstention_policy.on_measurement_uncertainty != "abstain"
     {
-        push(
+        add_issue!(
             "SCHEMA_REJECT",
             "out-of-domain and uncertain measurement policies must fail closed to abstain".to_owned(),
         );
@@ -548,13 +548,13 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         || renderer.instrument_bank_sha256.as_deref().is_some_and(|v| !is_sha256(v))
         || renderer.effect_chain_sha256.as_deref().is_some_and(|v| !is_sha256(v))
     {
-        push(
+        add_issue!(
             "SCHEMA_REJECT",
             "renderer / verifier identity or output format is malformed".to_owned(),
         );
     }
     if !renderer.deterministic && required.contains(&RequiredEvidenceKey::Replay) {
-        push(
+        add_issue!(
             "REPLAY_NOT_REPRODUCIBLE",
             "deterministic replay is required but renderer is declared nondeterministic".to_owned(),
         );
