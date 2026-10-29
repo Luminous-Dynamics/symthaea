@@ -11,6 +11,10 @@ The 2025 Cogitate adversarial-collaboration study is not blocked by a complete a
 
 This clears the source-discovery gate, not the reproduction gate. No data bundle was downloaded in this audit, no binary artifact hash was captured, no environment was reproduced, and no empirical prediction was re-analyzed. A source link or license statement is not a replication receipt.
 
+## Preregistration access caveat
+
+The Nature article provides a detailed published summary of the three core theory comparisons (content decoding/task independence; temporal maintenance; interareal connectivity) and says the OSF record contains the full protocol, pass/fail criteria and agreed interpretation. However, the OSF page itself returned HTTP 403 to the research-browser open request during this audit. The exact OSF file/version and contents therefore remain to be captured directly before any analysis card is frozen. A link is identified; the preregistration content is not claimed as independently inspected here.
+
 ## Primary sources and provenance
 
 | Asset | Official source | What is established | What remains to verify locally |
