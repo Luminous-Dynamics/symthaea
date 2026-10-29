@@ -209,7 +209,7 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
     if !is_spdx_token(license)
         || ["UNKNOWN", "UNVERIFIED", "NOASSERTION"].contains(&license)
     {
-        return Err(fail("source_license_spdx must be a verified SPDX identifier, not an unknown placeholder"));
+        return Err(fail("source_license_spdx must be a non-placeholder SPDX-style identifier token"));
     }
 
     let license_url = required(fields, "source_license_evidence_url")?;
@@ -395,7 +395,7 @@ fn usage() {
     eprintln!("Usage:");
     eprintln!("  source-derived-drift-manifest validate MANIFEST");
     eprintln!("  source-derived-drift-manifest canonicalize INPUT OUTPUT");
-    eprintln!("  source-derived-drift-manifest validate-receipt MANIFEST RECEIPT OUTPUT");
+    eprintln!("  source-derived-drift-manifest validate-receipt MANIFEST RECEIPT ARTIFACT_ROOT");
 }
 
 fn execute(args: &[String]) -> Result<(), String> {
@@ -422,7 +422,7 @@ fn execute(args: &[String]) -> Result<(), String> {
             let digest = hash_file(Path::new(output_path))?;
             println!("PASS: canonicalized manifest manifest_sha256={digest}");
         }
-        [command, manifest_path, receipt_path, output_path] if command == "validate-receipt" => {
+        [command, manifest_path, receipt_path, artifact_root] if command == "validate-receipt" => {
             let manifest_text = fs::read_to_string(manifest_path)
                 .map_err(|error| fail(format!("cannot read manifest: {error}")))?;
             let manifest = parse_canonical(&manifest_text, MANIFEST_KEYS, "manifest")?;
@@ -435,9 +435,10 @@ fn execute(args: &[String]) -> Result<(), String> {
             if required(&receipt, "manifest_sha256")? != manifest_digest {
                 return Err(fail("receipt manifest_sha256 does not match the manifest bytes"));
             }
-            let output_digest = hash_file(Path::new(output_path))?;
+            let output_path = Path::new(artifact_root).join(required(&receipt, "artifact_path")?);
+            let output_digest = hash_file(&output_path)?;
             if required(&receipt, "output_sha256")? != output_digest {
-                return Err(fail("receipt output_sha256 does not match the output bytes"));
+                return Err(fail("receipt output_sha256 does not match the artifact at artifact_path"));
             }
             println!(
                 "PASS: receipt run_id={} manifest_sha256={} output_sha256={}",
@@ -549,7 +550,7 @@ mod tests {
     fn rejects_missing_or_unverified_license_and_bad_hashes() {
         let mut fields = valid_fields();
         set(&mut fields, "source_license_spdx", "UNVERIFIED");
-        assert!(validate_manifest(&fields).unwrap_err().contains("verified SPDX"));
+        assert!(validate_manifest(&fields).unwrap_err().contains("SPDX-style"));
         set(&mut fields, "source_license_spdx", "CC-BY-4.0");
         set(&mut fields, "source_sha256", "aaaaaaaa");
         assert!(validate_manifest(&fields).unwrap_err().contains("source_sha256"));
