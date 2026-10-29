@@ -29,6 +29,12 @@ const FIG1A_TPM: [f64; 24] = [
     0.8807970779778823, 0.23147521650098227, 0.8320183851339245, // 111
 ];
 
+const FIG1A_WEIGHTS: [f64; 9] = [
+    -0.2, 0.7, 0.2, // inputs A -> targets A, B, C
+    0.7, -0.2, 0.0, // inputs B -> targets A, B, C
+    0.0, -0.8, 0.2, // inputs C -> targets A, B, C
+];
+
 const FIG1A_CONNECTIVITY: [bool; 9] = [
     true, true, true, // A -> A, B, C
     true, true, false, // B -> A, B, no B -> C
@@ -57,6 +63,33 @@ fn published_fig1a_tpm_matches_pinned_logistic_fixture() {
             (actual - expected).abs() <= 1e-14,
             "TPM cell {index}: actual={actual:.17}, expected={expected:.17}"
         );
+    }
+}
+
+#[test]
+fn published_fig1a_tpm_is_reproducible_from_weights_and_logistic_rule() {
+    // The upstream example maps binary 0 -> spin -1 and 1 -> spin +1,
+    // then computes sigmoid(weighted_input / temperature) with T = 1/4.
+    // Recompute every table entry independently of the literal fixture.
+    for state_index in 0..8 {
+        for target in 0..3 {
+            let mut weighted_input = 0.0;
+            for source in 0..3 {
+                let spin = if ((state_index >> source) & 1) == 1 {
+                    1.0
+                } else {
+                    -1.0
+                };
+                weighted_input += FIG1A_WEIGHTS[source * 3 + target] * spin;
+            }
+            let generated = 1.0 / (1.0 + (-weighted_input / 0.25).exp());
+            let index = state_index * 3 + target;
+            assert!(
+                (generated - FIG1A_TPM[index]).abs() <= 1e-14,
+                "generated TPM cell {index}: generated={generated:.17}, pinned={:.17}",
+                FIG1A_TPM[index]
+            );
+        }
     }
 }
 
