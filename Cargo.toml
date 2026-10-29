@@ -2550,3 +2550,8 @@ name = "action_semantics_probe"
 [[example]]
 name = "hardsec_split_audit"
 required-features = ["hardsec-audit"]
+
+# HARDSEC-003: schema-agnostic exact-file inventory before dataset parsing.
+[[example]]
+name = "hardsec_corpus_inventory"
+required-features = ["hardsec-audit"]
