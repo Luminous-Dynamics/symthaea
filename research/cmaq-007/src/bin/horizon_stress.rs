@@ -595,7 +595,7 @@ mod tests {
     #[test]
     fn empirical_cvar95_uses_worst_five_percent_and_dominates_mean() {
         let values = (0..100).map(|value| value as f64).collect::<Vec<_>>();
-        assert!((cvar95(&values) - 94.0).abs() < 1e-12);
+        assert!((cvar95(&values) - 97.0).abs() < 1e-12);
         assert!(cvar95(&values) >= mean(&values));
         assert_eq!(cvar95(&[]), 0.0);
     }
