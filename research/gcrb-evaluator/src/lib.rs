@@ -784,6 +784,291 @@ pub fn generate_parameterized_controls(
     Ok(output)
 }
 
+
+const COMBINED_CAMPAIGN_SCHEMA: &str = "gcrb-combined-attack-campaign-v0.1";
+const COMBINED_CAMPAIGN_PATH: &str =
+    "docs/research/fixtures/governance-capture-resistance-v0.1.json";
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CombinedCampaign {
+    schema_version: String,
+    benchmark_id: String,
+    version: String,
+    status: String,
+    visibility: String,
+    source_fixture_path: String,
+    source_fixture_sha256: String,
+    purpose: String,
+    expected_case_count: usize,
+    expected_composite_attack_count: usize,
+    expected_composite_negative_control_count: usize,
+    limits: Vec<String>,
+    cases: Vec<CompositeCase>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompositeCase {
+    case_id: String,
+    class: String,
+    family: String,
+    severity: String,
+    component_case_ids: Vec<String>,
+    steps: Vec<CompositeStep>,
+    expected_disposition: String,
+    required_behaviors: Vec<String>,
+    forbidden_behaviors: Vec<String>,
+    hard_gates_triggered: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompositeStep {
+    sequence: u64,
+    attack_family: String,
+    operation: String,
+    actor_role: String,
+    expected_observable: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CombinedCampaignSummary {
+    pub benchmark_id: String,
+    pub campaign_schema_version: String,
+    pub source_fixture_sha256: String,
+    pub campaign_sha256: String,
+    pub case_count: usize,
+    pub composite_attack_count: usize,
+    pub composite_negative_control_count: usize,
+    pub unique_case_ids: usize,
+    pub component_reference_count: usize,
+    pub resolved_component_reference_count: usize,
+    pub valid_public_development_campaign: bool,
+    pub qualification_eligible: bool,
+    pub warning: String,
+}
+
+fn valid_case_id(value: &str, prefix: &str, digits: usize) -> bool {
+    value
+        .strip_prefix(prefix)
+        .is_some_and(|suffix| suffix.len() == digits && suffix.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+fn validate_combined_campaign(
+    source_fixture_bytes: &[u8],
+    campaign: &CombinedCampaign,
+) -> Result<(usize, usize, usize), String> {
+    if campaign.schema_version != COMBINED_CAMPAIGN_SCHEMA {
+        return Err(format!(
+            "unsupported combined campaign schema: {}",
+            campaign.schema_version
+        ));
+    }
+    if campaign.benchmark_id != BENCHMARK_ID || campaign.version != "0.1" {
+        return Err("unexpected combined campaign benchmark_id or version".to_owned());
+    }
+    if campaign.status != "public_development_not_qualified"
+        || campaign.visibility != "public_known_answers"
+    {
+        return Err("combined campaign must remain public development with public known answers".to_owned());
+    }
+    if campaign.source_fixture_path != COMBINED_CAMPAIGN_PATH {
+        return Err("combined campaign source fixture path is not the declared public fixture".to_owned());
+    }
+    let source_sha = sha256_hex(source_fixture_bytes);
+    if campaign.source_fixture_sha256 != source_sha {
+        return Err(format!(
+            "source fixture digest mismatch: campaign says {}, exact source bytes hash to {}",
+            campaign.source_fixture_sha256, source_sha
+        ));
+    }
+    if campaign.purpose.trim().is_empty() || campaign.limits.len() < 4 {
+        return Err("combined campaign must declare purpose and at least four limits".to_owned());
+    }
+    if campaign.cases.is_empty() {
+        return Err("combined campaign must contain cases".to_owned());
+    }
+
+    let source_fixture = parse_fixture(source_fixture_bytes)?;
+    let source_ids = source_fixture
+        .cases
+        .iter()
+        .map(|case| case.case_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut campaign_ids = BTreeSet::new();
+    let mut attack_count = 0usize;
+    let mut control_count = 0usize;
+    let mut component_reference_count = 0usize;
+    let mut resolved_reference_count = 0usize;
+
+    for case in &campaign.cases {
+        if !valid_case_id(&case.case_id, "GCRB-C", 2) {
+            return Err(format!("invalid combined case_id: {}", case.case_id));
+        }
+        if !campaign_ids.insert(case.case_id.clone()) {
+            return Err(format!("duplicate combined case_id: {}", case.case_id));
+        }
+        if case.family.trim().is_empty() || case.expected_disposition.trim().is_empty() {
+            return Err(format!("case {} has an empty family/disposition", case.case_id));
+        }
+        if !valid_severity(&case.severity) {
+            return Err(format!("case {} has unsupported severity {}", case.case_id, case.severity));
+        }
+        if case.component_case_ids.len() < 2 {
+            return Err(format!("case {} must reference at least two component cases", case.case_id));
+        }
+        let component_ids = case.component_case_ids.iter().collect::<BTreeSet<_>>();
+        if component_ids.len() != case.component_case_ids.len() {
+            return Err(format!("case {} repeats a component case reference", case.case_id));
+        }
+        component_reference_count += case.component_case_ids.len();
+        for component_id in &case.component_case_ids {
+            if !source_ids.contains(component_id.as_str()) {
+                return Err(format!(
+                    "case {} references unknown component case {}",
+                    case.case_id, component_id
+                ));
+            }
+            resolved_reference_count += 1;
+        }
+        if case.steps.len() < 2 {
+            return Err(format!("case {} must contain at least two ordered steps", case.case_id));
+        }
+        let mut prior_sequence = 0u64;
+        for step in &case.steps {
+            if step.sequence == 0 || step.sequence <= prior_sequence {
+                return Err(format!(
+                    "case {} step sequence must be positive and strictly increasing",
+                    case.case_id
+                ));
+            }
+            prior_sequence = step.sequence;
+            if step.attack_family.trim().is_empty()
+                || step.operation.trim().is_empty()
+                || step.expected_observable.trim().is_empty()
+            {
+                return Err(format!("case {} has an incomplete step", case.case_id));
+            }
+            if !matches!(
+                step.actor_role.as_str(),
+                "model" | "public_official" | "system" | "citizen" | "independent_reviewer" | "unknown"
+            ) {
+                return Err(format!(
+                    "case {} has an unsupported step actor role {}",
+                    case.case_id, step.actor_role
+                ));
+            }
+        }
+        if case.required_behaviors.is_empty() || case.forbidden_behaviors.is_empty() {
+            return Err(format!("case {} must declare required and forbidden behaviors", case.case_id));
+        }
+        if case.required_behaviors.iter().collect::<BTreeSet<_>>().len()
+            != case.required_behaviors.len()
+        {
+            return Err(format!("case {} repeats a required behavior", case.case_id));
+        }
+        if case.forbidden_behaviors.iter().collect::<BTreeSet<_>>().len()
+            != case.forbidden_behaviors.len()
+        {
+            return Err(format!("case {} repeats a forbidden behavior", case.case_id));
+        }
+        if case.hard_gates_triggered.iter().collect::<BTreeSet<_>>().len()
+            != case.hard_gates_triggered.len()
+        {
+            return Err(format!("case {} repeats a hard-gate label", case.case_id));
+        }
+        for gate in &case.hard_gates_triggered {
+            if !campaign
+                .cases
+                .iter()
+                .any(|candidate| candidate.case_id == case.case_id)
+                || !HARD_GATE_CODES.contains(&gate.as_str())
+            {
+                return Err(format!("case {} has unknown hard-gate label {}", case.case_id, gate));
+            }
+        }
+        match case.class.as_str() {
+            "composite_attack" => attack_count += 1,
+            "composite_negative_control" => {
+                if !case.hard_gates_triggered.is_empty() {
+                    return Err(format!(
+                        "negative-control case {} must not declare expected hard-gate triggers",
+                        case.case_id
+                    ));
+                }
+                control_count += 1;
+            }
+            other => return Err(format!("case {} has unknown class {}", case.case_id, other)),
+        }
+    }
+
+    if campaign.expected_case_count != campaign.cases.len() {
+        return Err(format!(
+            "expected_case_count={} but parsed {} cases",
+            campaign.expected_case_count,
+            campaign.cases.len()
+        ));
+    }
+    if campaign.expected_composite_attack_count != attack_count {
+        return Err(format!(
+            "expected_composite_attack_count={} but parsed {} attacks",
+            campaign.expected_composite_attack_count, attack_count
+        ));
+    }
+    if campaign.expected_composite_negative_control_count != control_count {
+        return Err(format!(
+            "expected_composite_negative_control_count={} but parsed {} controls",
+            campaign.expected_composite_negative_control_count, control_count
+        ));
+    }
+    if attack_count == 0 || control_count == 0 {
+        return Err("campaign must contain at least one composite attack and one benign control".to_owned());
+    }
+
+    Ok((attack_count, control_count, resolved_reference_count))
+}
+
+/// Validate a public composite-attack campaign against the exact source fixture.
+/// This validates structure, known references and sequence order; it does not
+/// run the attack, authenticate evidence, or qualify a candidate system.
+pub fn validate_combined_campaign_bytes(
+    source_fixture_bytes: &[u8],
+    campaign_bytes: &[u8],
+) -> Result<CombinedCampaignSummary, String> {
+    let campaign: CombinedCampaign = serde_json::from_slice(campaign_bytes)
+        .map_err(|error| format!("combined campaign JSON is invalid: {error}"))?;
+    let (attack_count, control_count, resolved_references) =
+        validate_combined_campaign(source_fixture_bytes, &campaign)?;
+    let unique_case_ids = campaign
+        .cases
+        .iter()
+        .map(|case| case.case_id.as_str())
+        .collect::<BTreeSet<_>>()
+        .len();
+    let component_reference_count = campaign
+        .cases
+        .iter()
+        .map(|case| case.component_case_ids.len())
+        .sum();
+
+    Ok(CombinedCampaignSummary {
+        benchmark_id: campaign.benchmark_id,
+        campaign_schema_version: campaign.schema_version,
+        source_fixture_sha256: sha256_hex(source_fixture_bytes),
+        campaign_sha256: sha256_hex(campaign_bytes),
+        case_count: campaign.cases.len(),
+        composite_attack_count: attack_count,
+        composite_negative_control_count: control_count,
+        unique_case_ids,
+        component_reference_count,
+        resolved_component_reference_count: resolved_references,
+        valid_public_development_campaign: true,
+        qualification_eligible: false,
+        warning: "Public composed scenarios are development known answers. Validation does not execute scenarios, establish real-world incidence, authenticate sources, or qualify a governance system.".to_owned(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1026,4 +1311,84 @@ mod tests {
         assert_eq!(generated_value, golden_value);
     }
 
+
+
+    #[test]
+    fn validates_combined_attack_campaign_and_all_component_references() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let campaign = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let summary = validate_combined_campaign_bytes(fixture, campaign).unwrap();
+        assert_eq!(summary.case_count, 13);
+        assert_eq!(summary.composite_attack_count, 11);
+        assert_eq!(summary.composite_negative_control_count, 2);
+        assert_eq!(summary.component_reference_count, summary.resolved_component_reference_count);
+        assert_eq!(summary.unique_case_ids, 13);
+        assert!(!summary.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_combined_campaign_source_fixture_digest_mismatch() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let source = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let mut campaign: serde_json::Value = serde_json::from_slice(source).unwrap();
+        campaign["source_fixture_sha256"] = serde_json::Value::String("00".repeat(32));
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&campaign).unwrap());
+        assert!(result.unwrap_err().contains("source fixture digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_unresolved_combined_component_reference() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let source = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let mut campaign: serde_json::Value = serde_json::from_slice(source).unwrap();
+        campaign["cases"][0]["component_case_ids"][0] = serde_json::Value::String("GCRB-A99".to_owned());
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&campaign).unwrap());
+        assert!(result.unwrap_err().contains("unknown component case"));
+    }
+
+    #[test]
+    fn rejects_non_monotonic_composite_step_sequence() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let source = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let mut campaign: serde_json::Value = serde_json::from_slice(source).unwrap();
+        campaign["cases"][0]["steps"][1]["sequence"] = serde_json::json!(1);
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&campaign).unwrap());
+        assert!(result.unwrap_err().contains("strictly increasing"));
+    }
+
+    #[test]
+    fn rejects_duplicate_combined_case_ids() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let source = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let mut campaign: serde_json::Value = serde_json::from_slice(source).unwrap();
+        campaign["cases"][1]["case_id"] = campaign["cases"][0]["case_id"].clone();
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&campaign).unwrap());
+        assert!(result.unwrap_err().contains("duplicate combined case_id"));
+    }
+
+    #[test]
+    fn rejects_control_cases_that_claim_hard_gate_triggers() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let source = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let mut campaign: serde_json::Value = serde_json::from_slice(source).unwrap();
+        campaign["cases"][11]["hard_gates_triggered"] = serde_json::json!(["zero_silent_commitment_rewrites"]);
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&campaign).unwrap());
+        assert!(result.unwrap_err().contains("must not declare expected hard-gate triggers"));
+    }
+
+    #[test]
+    fn rejects_duplicate_and_unknown_hard_gate_labels() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let source = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json");
+        let mut duplicate: serde_json::Value = serde_json::from_slice(source).unwrap();
+        duplicate["cases"][0]["hard_gates_triggered"] =
+            serde_json::json!(["unbounded_emergency_bypass", "unbounded_emergency_bypass"]);
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&duplicate).unwrap());
+        assert!(result.unwrap_err().contains("repeats a hard-gate label"));
+
+        let mut unknown: serde_json::Value = serde_json::from_slice(source).unwrap();
+        unknown["cases"][0]["hard_gates_triggered"] = serde_json::json!(["fake_gate"]);
+        let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&unknown).unwrap());
+        assert!(result.unwrap_err().contains("unknown hard-gate label"));
+    }
 }
