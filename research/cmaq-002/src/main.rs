@@ -43,6 +43,12 @@ struct Outcome {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Signal {
+    positive_reward: bool,
+    safe: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Query {
     context: usize,
     action: usize,
@@ -114,6 +120,14 @@ impl Mechanism {
             safe: !(query.action == self.unsafe_action && query.context == self.unsafe_context),
         }
     }
+
+    fn sense(&self, query: Query) -> Signal {
+        let outcome = self.observe(query);
+        Signal {
+            positive_reward: outcome.reward > 0,
+            safe: outcome.safe,
+        }
+    }
 }
 
 fn context_coordinates(context: usize) -> (i32, i32) {
@@ -143,12 +157,12 @@ fn update_posterior(
     worlds: &[Mechanism],
     posterior: &[usize],
     query: Query,
-    observation: Outcome,
+    observation: Signal,
 ) -> Result<Vec<usize>, String> {
     let next: Vec<usize> = posterior
         .iter()
         .copied()
-        .filter(|index| worlds[*index].observe(query) == observation)
+        .filter(|index| worlds[*index].sense(query) == observation)
         .collect();
     if next.is_empty() {
         return Err(format!(
@@ -246,10 +260,10 @@ fn expected_value_of_probe(worlds: &[Mechanism], posterior: &[usize], query: Que
         return 0.0;
     }
     let before = posterior_decision_value(worlds, posterior);
-    let mut groups: BTreeMap<Outcome, Vec<usize>> = BTreeMap::new();
+    let mut groups: BTreeMap<Signal, Vec<usize>> = BTreeMap::new();
     for index in posterior {
         groups
-            .entry(worlds[*index].observe(query))
+            .entry(worlds[*index].sense(query))
             .or_default()
             .push(*index);
     }
@@ -275,9 +289,9 @@ fn expected_information_gain(worlds: &[Mechanism], posterior: &[usize], query: Q
     if posterior.len() <= 1 {
         return 0.0;
     }
-    let mut groups: BTreeMap<Outcome, usize> = BTreeMap::new();
+    let mut groups: BTreeMap<Signal, usize> = BTreeMap::new();
     for index in posterior {
-        *groups.entry(worlds[*index].observe(query)).or_default() += 1;
+        *groups.entry(worlds[*index].sense(query)).or_default() += 1;
     }
     let before = entropy_from_count(posterior.len());
     let expected_after = groups
@@ -441,7 +455,7 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, probe_c
                     break;
                 };
                 used.insert(query);
-                let observed = true_world.observe(query);
+                let observed = true_world.sense(query);
                 match update_posterior(&worlds, &posterior, query, observed) {
                     Ok(next) => posterior = next,
                     Err(_) => {
@@ -601,7 +615,7 @@ mod tests {
         let initial: Vec<usize> = (0..worlds.len()).collect();
         for true_index in 0..worlds.len() {
             for query in all_queries() {
-                let observation = worlds[true_index].observe(query);
+                let observation = worlds[true_index].sense(query);
                 let posterior = update_posterior(&worlds, &initial, query, observation)
                     .expect("truth remains in the candidate set");
                 assert!(posterior.contains(&true_index));
@@ -621,7 +635,7 @@ mod tests {
             &worlds,
             &[0],
             query,
-            worlds[1].observe(query),
+            worlds[1].sense(query),
         )
         .expect_err("incompatible outcome must not silently empty posterior");
         assert!(error.contains("possible regime shift"));
