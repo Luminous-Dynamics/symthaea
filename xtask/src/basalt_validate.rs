@@ -73,6 +73,15 @@ struct ManifestTask {
     #[serde(default)]
     paired_transform_id: RequiredNullable<String>,
     quality_audit: QualityAudit,
+    required_checks: Vec<RequiredCheck>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RequiredCheck {
+    check_id: String,
+    kind: String,
+    blocking: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -577,11 +586,16 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
                 error(report, "E_TRIAL_DUPLICATE", &trial_path, "duplicate task_id × attempt_index × system_id cell");
             }
             actual_by_attempt.entry(trial.attempt_index).or_default().push(trial);
+            let required_checks = manifest_by_id
+                .get(&task.task_id)
+                .map(|declared| declared.required_checks.as_slice())
+                .unwrap_or(&[]);
             validate_trial(
                 report,
                 &trial_path,
                 trial,
                 &task.quality_audit,
+                required_checks,
                 &run.source.verifier_bundle_digest,
             );
         }
@@ -673,6 +687,22 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
             }
         }
         validate_digest(report, &format!("{task_path}.quality_audit.audit_digest"), &task.quality_audit.audit_digest);
+        if task.required_checks.is_empty() {
+            error(report, "E_MANIFEST_REQUIRED_CHECKS_EMPTY", format!("{task_path}.required_checks"), "every manifest task must declare at least one required verifier check");
+        }
+        let mut required_ids = BTreeSet::new();
+        for (check_index, check) in task.required_checks.iter().enumerate() {
+            let check_path = format!("{task_path}.required_checks[{check_index}]");
+            if check.check_id.trim().is_empty() || !required_ids.insert(check.check_id.as_str()) {
+                error(report, "E_MANIFEST_REQUIRED_CHECK_DUPLICATE", format!("{check_path}.check_id"), "required verifier check IDs must be non-empty and unique");
+            }
+            if !matches!(check.kind.as_str(), "build" | "test" | "typecheck" | "lint" | "security" | "scope" | "regression" | "oracle" | "other") {
+                error(report, "E_MANIFEST_REQUIRED_CHECK_KIND", format!("{check_path}.kind"), "unknown required verifier check kind");
+            }
+            if !check.blocking {
+                error(report, "E_MANIFEST_REQUIRED_CHECK_NONBLOCKING", format!("{check_path}.blocking"), "required verifier obligations must be blocking");
+            }
+        }
     }
 
     if manifest.tasks.len() != run.task_records.len() {
@@ -692,7 +722,8 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
                     && task.quality_audit.audit_digest == declared.quality_audit.audit_digest
                     && task.quality_audit.oracle_independent == declared.quality_audit.oracle_independent
                     && task.quality_audit.ambiguity == declared.quality_audit.ambiguity
-                    && task.quality_audit.notes == declared.quality_audit.notes;
+                    && task.quality_audit.notes == declared.quality_audit.notes
+                    && declared.required_checks.iter().all(|required| !required.check_id.trim().is_empty());
                 if !task_match {
                     error(report, "E_TASK_MANIFEST_MISMATCH", &task_path, "task specification or quality-audit disposition differs from the frozen manifest");
                 }
@@ -706,6 +737,7 @@ fn validate_trial(
     path: &str,
     trial: &Trial,
     task_audit: &QualityAudit,
+    required_checks: &[RequiredCheck],
     pinned_verifier_digest: &str,
 ) {
     validate_digest(report, &format!("{path}.trajectory_digest"), &trial.trajectory_digest);
@@ -750,13 +782,44 @@ fn validate_trial(
         if check.blocking {
             blocking_count += 1;
         }
-        if check.status == CheckStatus::Pass && check.evidence_digest.is_none() {
-            error(report, "E_CHECK_EVIDENCE_MISSING", format!("{check_path}.evidence_digest"), "a passing check requires a content digest for its evidence");
+        if check.status != CheckStatus::NotRun && check.evidence_digest.is_none() {
+            error(report, "E_CHECK_EVIDENCE_MISSING", format!("{check_path}.evidence_digest"), "an executed check requires a content digest for its evidence");
         }
         if trial.verifier.status == VerifierStatus::Pass && check.blocking && check.status != CheckStatus::Pass {
             error(report, "E_VERIFIER_BLOCKING_CHECK_FAILED", format!("{check_path}.status"), "verifier cannot pass while a blocking check is not pass");
         }
     }
+    if required_checks.is_empty() {
+        error(report, "E_REQUIRED_CHECKS_EMPTY", format!("{verifier_path}.checks"), "frozen manifest must declare at least one required verifier check");
+    }
+    let mut required_ids = BTreeSet::new();
+    for (required_index, required) in required_checks.iter().enumerate() {
+        let required_path = format!("{verifier_path}.required_checks[{required_index}]");
+        if required.check_id.trim().is_empty() || !required_ids.insert(required.check_id.as_str()) {
+            error(report, "E_REQUIRED_CHECK_DUPLICATE", format!("{required_path}.check_id"), "required check IDs must be non-empty and unique");
+        }
+        if !matches!(required.kind.as_str(), "build" | "test" | "typecheck" | "lint" | "security" | "scope" | "regression" | "oracle" | "other") {
+            error(report, "E_REQUIRED_CHECK_KIND", format!("{required_path}.kind"), "unknown required check kind");
+        }
+        if !required.blocking {
+            error(report, "E_REQUIRED_CHECK_NONBLOCKING", format!("{required_path}.blocking"), "required verifier obligations must be blocking");
+        }
+        match trial.verifier.checks.iter().find(|check| check.check_id == required.check_id) {
+            None => error(report, "E_REQUIRED_CHECK_MISSING", format!("{verifier_path}.checks"), format!("required verifier check {:?} is absent", required.check_id)),
+            Some(check) => {
+                if check.kind != required.kind {
+                    error(report, "E_REQUIRED_CHECK_KIND_MISMATCH", format!("{verifier_path}.checks"), format!("required check {:?} has a different kind", required.check_id));
+                }
+                if !check.blocking {
+                    error(report, "E_REQUIRED_CHECK_NOT_BLOCKING", format!("{verifier_path}.checks"), format!("required check {:?} is not marked blocking", required.check_id));
+                }
+                if trial.outcome == Outcome::Pass && check.status != CheckStatus::Pass {
+                    error(report, "E_REQUIRED_CHECK_NOT_PASSED", format!("{verifier_path}.checks"), format!("required check {:?} must pass for an outcome pass", required.check_id));
+                }
+            }
+        }
+    }
+
     if trial.verifier.status == VerifierStatus::NotRun && trial.verifier.checks.iter().any(|check| check.status != CheckStatus::NotRun) {
         error(report, "E_NOT_RUN_CHECK_CONTRADICTION", format!("{verifier_path}.checks"), "not_run verifier cannot contain checks reported as pass/fail/unresolved");
     }
@@ -1243,6 +1306,27 @@ mod tests {
         assert!(has_code(&report, "E_MANIFEST_DIGEST_MISMATCH"));
     }
 
+
+    #[test]
+    fn passing_trial_must_satisfy_every_manifest_required_check() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["verifier"]["checks"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|check| check["check_id"] != "scope");
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIRED_CHECK_MISSING"));
+    }
+
+    #[test]
+    fn required_check_cannot_be_downgraded_to_nonblocking() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["verifier"]["checks"][1]["blocking"] = Value::Bool(false);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIRED_CHECK_NOT_BLOCKING"));
+    }
 
     #[test]
     fn observed_usage_over_declared_budget_is_rejected() {
