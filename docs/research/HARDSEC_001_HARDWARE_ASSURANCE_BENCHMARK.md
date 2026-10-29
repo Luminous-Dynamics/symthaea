@@ -184,6 +184,28 @@ Require a real capture manifest, instrument calibration, trigger alignment, devi
 - **D — model replay integration:** connect Symtropy for trace/scenario orchestration and compare simulated predictions against held-out observations.
 - **E — cross-layer / physical qualification:** add RTL, firmware and laboratory lanes only when each has its own ground truth, tooling, authorized target and evidence contract.
 
+### Phase A implementation slice
+
+An opt-in Rust example is now proposed on the HARDSEC-001 branch:
+
+```bash
+cargo run --example hardsec_split_audit --features hardsec-audit -- \
+  --manifest /path/to/splits.tsv --root /path/to/dataset
+cargo test --example hardsec_split_audit --features hardsec-audit
+```
+
+The strict TSV header is:
+
+```text
+dataset_id domain source_artifact_id source_path source_sha256 sample_id program_id execution_id attack_family_id device_config_id split_protocol split label
+```
+
+These are tab-separated columns, not space-delimited. Supported domains are `physical_hpc`, `gem5_sim`, `rtl_netlist`, and `physical_em`; supported split protocols are `program_holdout`, `attack_family_holdout`, `execution_holdout`, and `device_config_holdout`. Each manifest must represent one dataset, one domain and one protocol. Use `NA` only for metadata that is genuinely unavailable and is not the selected grouping key.
+
+The auditor hashes each referenced regular source artifact with SHA-256 and fails closed on digest mismatch, malformed columns, duplicate sample IDs, duplicate identical artifacts under different identities, missing split groups, path traversal, symlinks, or a held-out group crossing splits. For attack-family holdout, attack rows are grouped by family and benign rows by program so a single generic benign label cannot accidentally collapse all benign controls into one group.
+
+**Scope limit:** this checks the metadata and file identities supplied to it; it does not prove that a program/family label is factually correct, that the data are licensed for the proposed use, or that an attack is exploitable. Those remain explicit data-audit and security-review tasks. Unit tests are authored with the example but have not yet been executed in this environment.
+
 Phase A is the first deliverable. The protocol intentionally does not depend on completion of runners to begin data and split audits; any execution claims still require retained exact-input and exact-code receipts.
 
 ## 12. Stop conditions and publication rule
