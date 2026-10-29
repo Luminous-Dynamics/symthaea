@@ -531,7 +531,7 @@ mod tests {
     #[test]
     fn selected_policy_error_rises_with_rollout_growth_and_breadth() {
         let report = run_benchmark();
-        let get = |size, horizon, growth, strategy: &str| {
+        let get = |size: usize, horizon: usize, growth: f64, strategy: &str| {
             report.iter().find(|row| {
                 row.search_size == size
                     && row.horizon == horizon
