@@ -242,3 +242,11 @@ These ambitions should be narrowed or revised only using baseline-only pilot evi
 ## 13. Claim ceiling
 
 This document is a protocol proposal with a deterministic synthetic generator/replayer implementation under review. It does not show that the evaluated runner can keep an evaluator-held secret inaccessible, that the synthetic task distribution is scientifically representative, that constructors have passed exact-head CI, or that Symthaea exceeds any state-of-the-art baseline. The first qualifying result is successful independent generator/evaluator validation; a model win is a later and separate claim.
+
+## Follow-on: cross-set overlap preflight (prototype; not yet CI-verified)
+
+[SCI-BENCH-LEAKAGE-001 / issue #8842](https://github.com/Luminous-Dynamics/symthaea/issues/8842) tracks the required lineage-aware audit. This branch adds an initial Rust command, `audit-overlap LEFT_LABEL LEFT_TASK_SET RIGHT_LABEL RIGHT_TASK_SET`, to compare canonical policy inputs across two task-set artifacts before scoring.
+
+The first pass reports exact policy-input collisions as blocking and three-significant-digit numeric fingerprints as **manual-review candidates**. It is designed not to call a numeric near-match confirmed leakage. Reports bind the exact input-file bytes and include bounded task-ID samples, but no evaluator-only target values. Split labels are supplied by the caller and are not evidence that the runner actually enforced those boundaries.
+
+This prototype is deliberately narrower than issue #8842: lineage/parent-world sidecars, domain-aware semantic equivalence, exposure history, and runtime oracle isolation are not implemented here. It must be tested against committed positive and negative fixtures and reviewed for false positives before any model score is admitted. The focused workflow has not yet provided exact-head evidence for this increment, so no test, formatting, or Clippy pass is claimed.
