@@ -109,13 +109,16 @@ impl Interval{
     fn covers(self,v:f64)->bool{self.lower<=self.upper+EPS&&self.lower<=v+EPS&&self.upper>=v-EPS}
     fn intersect(self,other:Self)->Self{Self{lower:self.lower.max(other.lower),upper:self.upper.min(other.upper)}}
 }
-fn ipcw_hoeffding_cs(sum:f64,n:usize,bound:f64,previous:Interval)->Interval{
+fn ipcw_hoeffding_raw(sum:f64,n:usize,bound:f64)->Interval{
     if n==0{return Interval::full();}
     let t=n as f64;
     let delta=ALPHA/(2.0*t*(t+1.0));
     let mean=sum/t;
     let radius=bound*((1.0/delta).ln()/(2.0*t)).sqrt();
-    previous.intersect(Interval{lower:(mean-radius).max(0.0).min(1.0),upper:(mean+radius).max(0.0).min(1.0)})
+    Interval{lower:(mean-radius).max(0.0).min(1.0),upper:(mean+radius).max(0.0).min(1.0)}
+}
+fn ipcw_hoeffding_cs(sum:f64,n:usize,bound:f64,previous:Interval)->Interval{
+    previous.intersect(ipcw_hoeffding_raw(sum,n,bound))
 }
 fn seed_for(rep:usize)->u64{
     0x8b8b_8b8b_0480_0048 ^ (rep as u64).wrapping_mul(0xA076_1D64_78BD_642F)
@@ -136,7 +139,7 @@ const IPCW_NAMES:[&str;8]=[
     "ipcw_estimate",
     "ipcw_bias",
     "ipcw_absolute_error",
-    "ipcw_cs_point_coverage",
+    "ipcw_pointwise_hoeffding_coverage",
     "ipcw_cs_sequence_coverage",
     "ipcw_cs_width",
     "ipcw_effective_sample_size",
@@ -179,7 +182,7 @@ fn simulate(f:Fixture,reps:usize,looks:&[usize])->Result<ResultFixture,String>{
         let mut available_sum=0.0;let mut available_sq=0.0;let mut mature_count=0usize;
         let mut zero_fill_sum=0.0;let mut target_seen=0usize;let mut target_matured=0usize;
         let mut ipcw_sum=0.0;let mut ipcw_weight_sum=0.0;let mut ipcw_weight_sq_sum=0.0;
-        let mut cs=Interval::full();let mut cs_sequence_coverage=true;
+        let mut cs=Interval::full();let mut current_raw_cs=Interval::full();let mut cs_sequence_coverage=true;
         let mut look_i=0usize;
         for n in 1..=max_n{
             let o=draw_observation(f,&mut rng);
@@ -199,6 +202,7 @@ fn simulate(f:Fixture,reps:usize,looks:&[usize])->Result<ResultFixture,String>{
                     let w=IPS_BOUND/f.q[o.context][o.action];
                     ipcw_weight_sum+=w;ipcw_weight_sq_sum+=w*w;
                 }
+                current_raw_cs=ipcw_hoeffding_raw(ipcw_sum,n,bound.unwrap());
                 cs=ipcw_hoeffding_cs(ipcw_sum,n,bound.unwrap(),cs);
                 cs_sequence_coverage&=cs.covers(true_value());
             }
@@ -226,7 +230,7 @@ fn simulate(f:Fixture,reps:usize,looks:&[usize])->Result<ResultFixture,String>{
                         ipcw_est,
                         ipcw_est-true_value(),
                         (ipcw_est-true_value()).abs(),
-                        cs.covers(true_value()) as u8 as f64,
+                        current_raw_cs.covers(true_value()) as u8 as f64,
                         cs_sequence_coverage as u8 as f64,
                         cs.width(),
                         ess,
