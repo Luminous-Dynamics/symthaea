@@ -9,6 +9,11 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - schema/evidence-behavior-contract-plan.schema.json and schema/evidence-behavior-contract-report.schema.json: strict draft schemas for pre-run obligations and terminal adjudications.
 - fixtures/evidence-behavior-contract-plan.example.json and fixtures/evidence-behavior-contract-report.example.json: seven-family illustrative fixtures with placeholder digests; not eligible for scoring.
 - tools/evidence_behavior_contract_test_vectors.py: test-only end-to-end CLI fixture generator and hostile-input checks; emits synthetic accounting only, never an empirical model result.
+- docs/research/EVAL-JUDGE-METROLOGY-001.md: judge-as-measurement-instrument protocol, perturbation design, metrics and acceptance targets.
+- Judge scorecard includes baseline Brier score and fixed 10-bin expected calibration error alongside accuracy, coverage, prompt/order/repeat flips, and trusted-verdict rate.
+- src/judge_reliability.rs: typed plan/report commitments, exact trial accounting, baseline accuracy, prompt/order/repeat flip metrics, and correctness-plus-invariance trusted-verdict rate.
+- schema/judge-reliability-plan.schema.json and schema/judge-reliability-report.schema.json plus four-case/16-trial non-scoring fixtures.
+- tools/judge_reliability_test_vectors.py: test-only synthetic CLI positive controls and hostile mutations; no real model is called.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.

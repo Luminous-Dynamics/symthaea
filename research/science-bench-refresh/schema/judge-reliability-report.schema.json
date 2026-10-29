@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-reliability-report.schema.json",
+  "title": "Symthaea Judge Reliability Audit Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "judge_source_revision",
+    "scoring_rules_sha256",
+    "records",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_reliability_report.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_rules_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500000,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trial_id",
+        "case_id",
+        "terminal_status",
+        "verdict",
+        "confidence_millionths",
+        "request_receipt_sha256",
+        "response_artifact_sha256",
+        "evaluator_record_sha256"
+      ],
+      "properties": {
+        "trial_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "terminal_status": {
+          "enum": [
+            "completed",
+            "abstained",
+            "error",
+            "missing",
+            "invalid_receipt"
+          ]
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            null
+          ]
+        },
+        "confidence_millionths": {
+          "description": "Probability the verdict is correct, in millionths; this is not probability that the verdict label is pass. Baseline values feed Brier and fixed 10-bin expected calibration error.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "request_receipt_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "response_artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evaluator_record_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}

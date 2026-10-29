@@ -1,0 +1,171 @@
+{
+  "schema": "symthaea.science_bench_refresh_judge_reliability_report.v1",
+  "purpose": "example_only",
+  "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "plan_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "judge_source_revision": "NOT_IMPLEMENTED_YET",
+  "scoring_rules_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "records": [
+    {
+      "trial_id": "stable-correct-baseline",
+      "case_id": "stable-correct",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-correct-prompt",
+      "case_id": "stable-correct",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-correct-order",
+      "case_id": "stable-correct",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-correct-repeat",
+      "case_id": "stable-correct",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-wrong-baseline",
+      "case_id": "stable-wrong",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-wrong-prompt",
+      "case_id": "stable-wrong",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-wrong-order",
+      "case_id": "stable-wrong",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "stable-wrong-repeat",
+      "case_id": "stable-wrong",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "position-biased-baseline",
+      "case_id": "position-biased",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "position-biased-prompt",
+      "case_id": "position-biased",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "position-biased-order",
+      "case_id": "position-biased",
+      "terminal_status": "completed",
+      "verdict": "fail",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "position-biased-repeat",
+      "case_id": "position-biased",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "prompt-fragile-baseline",
+      "case_id": "prompt-fragile",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "prompt-fragile-prompt",
+      "case_id": "prompt-fragile",
+      "terminal_status": "completed",
+      "verdict": "fail",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "prompt-fragile-order",
+      "case_id": "prompt-fragile",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "trial_id": "prompt-fragile-repeat",
+      "case_id": "prompt-fragile",
+      "terminal_status": "completed",
+      "verdict": "pass",
+      "confidence_millionths": 950000,
+      "request_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "report_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

@@ -1,0 +1,216 @@
+{
+  "schema": "symthaea.science_bench_refresh_judge_reliability_plan.v1",
+  "purpose": "example_only",
+  "audit_id": "JRM-EXAMPLE-NOT-FOR-SCORING",
+  "judge": {
+    "provider": "synthetic",
+    "model_id": "synthetic-judge",
+    "model_revision": "known-behavior-fixture-v1",
+    "api_version": null,
+    "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "rubric_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "settings_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "evaluator_source_revision": "NOT_IMPLEMENTED_YET"
+  },
+  "reference": {
+    "label_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "source": "deterministic_programmatic",
+    "blinded_from_judge": true
+  },
+  "perturbation_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "scoring_rules_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "plan_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "items": [
+    {
+      "case_id": "stable-correct",
+      "contract_family": "update_compliance",
+      "difficulty": "easy",
+      "reference_label": "pass",
+      "reference_evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "stable-wrong",
+      "contract_family": "conflict_disclosure",
+      "difficulty": "hard",
+      "reference_label": "fail",
+      "reference_evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "position-biased",
+      "contract_family": "tool_workflow",
+      "difficulty": "medium",
+      "reference_label": "pass",
+      "reference_evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "prompt-fragile",
+      "contract_family": "evidence_force_monotonicity",
+      "difficulty": "adversarial",
+      "reference_label": "pass",
+      "reference_evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "trials": [
+    {
+      "trial_id": "stable-correct-baseline",
+      "case_id": "stable-correct",
+      "perturbation_kind": "baseline",
+      "variant_id": "canonical",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": false
+    },
+    {
+      "trial_id": "stable-correct-prompt",
+      "case_id": "stable-correct",
+      "perturbation_kind": "prompt_variant",
+      "variant_id": "paraphrase-1",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "stable-correct-order",
+      "case_id": "stable-correct",
+      "perturbation_kind": "order_swap",
+      "variant_id": "swap-ab",
+      "replicate_index": 0,
+      "presentation_order": "b_then_a",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "stable-correct-repeat",
+      "case_id": "stable-correct",
+      "perturbation_kind": "repeat",
+      "variant_id": "repeat-1",
+      "replicate_index": 1,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "stable-wrong-baseline",
+      "case_id": "stable-wrong",
+      "perturbation_kind": "baseline",
+      "variant_id": "canonical",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": false
+    },
+    {
+      "trial_id": "stable-wrong-prompt",
+      "case_id": "stable-wrong",
+      "perturbation_kind": "prompt_variant",
+      "variant_id": "paraphrase-1",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "stable-wrong-order",
+      "case_id": "stable-wrong",
+      "perturbation_kind": "order_swap",
+      "variant_id": "swap-ab",
+      "replicate_index": 0,
+      "presentation_order": "b_then_a",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "stable-wrong-repeat",
+      "case_id": "stable-wrong",
+      "perturbation_kind": "repeat",
+      "variant_id": "repeat-1",
+      "replicate_index": 1,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "position-biased-baseline",
+      "case_id": "position-biased",
+      "perturbation_kind": "baseline",
+      "variant_id": "canonical",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": false
+    },
+    {
+      "trial_id": "position-biased-prompt",
+      "case_id": "position-biased",
+      "perturbation_kind": "prompt_variant",
+      "variant_id": "paraphrase-1",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "position-biased-order",
+      "case_id": "position-biased",
+      "perturbation_kind": "order_swap",
+      "variant_id": "swap-ab",
+      "replicate_index": 0,
+      "presentation_order": "b_then_a",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "position-biased-repeat",
+      "case_id": "position-biased",
+      "perturbation_kind": "repeat",
+      "variant_id": "repeat-1",
+      "replicate_index": 1,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "prompt-fragile-baseline",
+      "case_id": "prompt-fragile",
+      "perturbation_kind": "baseline",
+      "variant_id": "canonical",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": false
+    },
+    {
+      "trial_id": "prompt-fragile-prompt",
+      "case_id": "prompt-fragile",
+      "perturbation_kind": "prompt_variant",
+      "variant_id": "paraphrase-1",
+      "replicate_index": 0,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "prompt-fragile-order",
+      "case_id": "prompt-fragile",
+      "perturbation_kind": "order_swap",
+      "variant_id": "swap-ab",
+      "replicate_index": 0,
+      "presentation_order": "b_then_a",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    },
+    {
+      "trial_id": "prompt-fragile-repeat",
+      "case_id": "prompt-fragile",
+      "perturbation_kind": "repeat",
+      "variant_id": "repeat-1",
+      "replicate_index": 1,
+      "presentation_order": "a_then_b",
+      "prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "expected_invariant_to_baseline": true
+    }
+  ]
+}

@@ -25,6 +25,7 @@ pub mod counterfactual_evidence;
 pub mod evidence_outcomes;
 pub mod paired_outcome_analysis;
 pub mod evidence_behavior_contracts;
+pub mod judge_reliability;
 pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
 
