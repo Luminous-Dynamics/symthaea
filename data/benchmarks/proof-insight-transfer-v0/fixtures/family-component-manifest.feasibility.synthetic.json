@@ -1,0 +1,115 @@
+{
+  "schema_version": "pitb.independent-component-manifest.v0",
+  "dataset_kind": "synthetic_fixture",
+  "upstream_commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+  "source_partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+  "relationship_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "total_family_count": 6,
+  "total_component_count": 6,
+  "families": [
+    {
+      "family_id": "a",
+      "split": "train",
+      "component_id": "component-a"
+    },
+    {
+      "family_id": "b",
+      "split": "train",
+      "component_id": "component-b"
+    },
+    {
+      "family_id": "c",
+      "split": "train",
+      "component_id": "component-c"
+    },
+    {
+      "family_id": "d",
+      "split": "train",
+      "component_id": "component-d"
+    },
+    {
+      "family_id": "e",
+      "split": "validation",
+      "component_id": "component-e"
+    },
+    {
+      "family_id": "f",
+      "split": "test",
+      "component_id": "component-f"
+    }
+  ],
+  "components": [
+    {
+      "component_id": "component-a",
+      "split_names": [
+        "train"
+      ],
+      "family_ids": [
+        "a"
+      ],
+      "hard_edge_ids": [],
+      "confirmed_edge_ids": [],
+      "unresolved_edge_ids": []
+    },
+    {
+      "component_id": "component-b",
+      "split_names": [
+        "train"
+      ],
+      "family_ids": [
+        "b"
+      ],
+      "hard_edge_ids": [],
+      "confirmed_edge_ids": [],
+      "unresolved_edge_ids": []
+    },
+    {
+      "component_id": "component-c",
+      "split_names": [
+        "train"
+      ],
+      "family_ids": [
+        "c"
+      ],
+      "hard_edge_ids": [],
+      "confirmed_edge_ids": [],
+      "unresolved_edge_ids": []
+    },
+    {
+      "component_id": "component-d",
+      "split_names": [
+        "train"
+      ],
+      "family_ids": [
+        "d"
+      ],
+      "hard_edge_ids": [],
+      "confirmed_edge_ids": [],
+      "unresolved_edge_ids": []
+    },
+    {
+      "component_id": "component-e",
+      "split_names": [
+        "validation"
+      ],
+      "family_ids": [
+        "e"
+      ],
+      "hard_edge_ids": [],
+      "confirmed_edge_ids": [],
+      "unresolved_edge_ids": []
+    },
+    {
+      "component_id": "component-f",
+      "split_names": [
+        "test"
+      ],
+      "family_ids": [
+        "f"
+      ],
+      "hard_edge_ids": [],
+      "confirmed_edge_ids": [],
+      "unresolved_edge_ids": []
+    }
+  ]
+}
