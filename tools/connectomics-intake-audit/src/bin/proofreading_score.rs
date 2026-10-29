@@ -160,6 +160,26 @@ struct PolicyEvaluation {
     policy: &'static str,
     item_budget_results: Vec<ReviewYield>,
     review_time_budget_results: Vec<ReviewYield>,
+    /// Paired cluster-bootstrap intervals for submitted-priority minus this baseline.
+    submitted_minus_baseline_cluster_bootstrap_95: Vec<PairedReviewDelta>,
+}
+
+#[derive(Debug, Serialize)]
+struct PairedReviewDelta {
+    budget_kind: &'static str,
+    requested_budget: f64,
+    requested_item_fraction: Option<f64>,
+    impact_weight_recall_delta: DeltaInterval,
+    error_recall_delta: DeltaInterval,
+    precision_delta: DeltaInterval,
+}
+
+#[derive(Debug, Serialize)]
+struct DeltaInterval {
+    requested_replicates: usize,
+    valid_replicates: usize,
+    minimum_valid_replicates_for_interval: usize,
+    interval_95: Option<Interval>,
 }
 
 #[derive(Debug, Serialize)]
@@ -688,15 +708,128 @@ fn evaluate_group(
             rows,
             item_fractions,
             minute_budgets,
+            bootstrap_replicates,
             seed_material,
         ),
     }
+}
+
+fn percentile_interval(mut values: Vec<f64>, replicates: usize) -> DeltaInterval {
+    values.sort_by(f64::total_cmp);
+    let valid = values.len();
+    let minimum_valid = ((replicates as f64) * 0.8).ceil() as usize;
+    let interval_95 = if valid >= minimum_valid {
+        Some(Interval {
+            lower: percentile(&values, 0.025).unwrap_or(0.0),
+            upper: percentile(&values, 0.975).unwrap_or(1.0),
+        })
+    } else {
+        None
+    };
+    DeltaInterval {
+        requested_replicates: replicates,
+        valid_replicates: valid,
+        minimum_valid_replicates_for_interval: minimum_valid,
+        interval_95,
+    }
+}
+
+fn paired_delta_bootstrap(
+    rows: &[&Prediction],
+    baseline: RankingPolicy,
+    budget_kind: &'static str,
+    requested_budget: f64,
+    item_fraction: Option<f64>,
+    replicates: usize,
+    seed_material: &str,
+) -> PairedReviewDelta {
+    let mut clusters: BTreeMap<String, Vec<&Prediction>> = BTreeMap::new();
+    for row in rows {
+        clusters.entry(row.cluster_id.clone()).or_default().push(*row);
+    }
+    let cluster_rows: Vec<Vec<&Prediction>> = clusters.into_values().collect();
+    let mut impact_deltas = Vec::with_capacity(replicates);
+    let mut recall_deltas = Vec::with_capacity(replicates);
+    let mut precision_deltas = Vec::with_capacity(replicates);
+
+    if cluster_rows.len() >= 2 && replicates > 0 {
+        let digest = sha256(seed_material.as_bytes());
+        let mut state = u64::from_str_radix(&digest[..16], 16).unwrap_or(1);
+        if state == 0 { state = 1; }
+
+        for _ in 0..replicates {
+            // Resample dependency clusters as paired units; both policies see exactly the same sample.
+            let mut sample = Vec::with_capacity(rows.len());
+            for _ in 0..cluster_rows.len() {
+                let index = (next_u64(&mut state) % cluster_rows.len() as u64) as usize;
+                sample.extend(cluster_rows[index].iter().copied());
+            }
+
+            let budget = if budget_kind == "items" {
+                (item_fraction.unwrap_or(0.0) * sample.len() as f64).ceil().max(1.0)
+            } else {
+                requested_budget
+            };
+            let primary = review_yield_for_policy(
+                &sample, budget, item_fraction, budget_kind,
+                RankingPolicy::PriorityScore, seed_material,
+            );
+            let comparator = review_yield_for_policy(
+                &sample, budget, item_fraction, budget_kind, baseline, seed_material,
+            );
+
+            if let (Some(a), Some(b)) = (primary.impact_weight_recall, comparator.impact_weight_recall) {
+                impact_deltas.push(a - b);
+            }
+            if let (Some(a), Some(b)) = (primary.error_recall, comparator.error_recall) {
+                recall_deltas.push(a - b);
+            }
+            if let (Some(a), Some(b)) = (primary.precision, comparator.precision) {
+                precision_deltas.push(a - b);
+            }
+        }
+    }
+
+    PairedReviewDelta {
+        budget_kind,
+        requested_budget,
+        requested_item_fraction: item_fraction,
+        impact_weight_recall_delta: percentile_interval(impact_deltas, replicates),
+        error_recall_delta: percentile_interval(recall_deltas, replicates),
+        precision_delta: percentile_interval(precision_deltas, replicates),
+    }
+}
+
+fn paired_deltas_for_policy(
+    rows: &[&Prediction],
+    baseline: RankingPolicy,
+    item_fractions: &[f64],
+    minute_budgets: &[f64],
+    replicates: usize,
+    seed_prefix: &str,
+) -> Vec<PairedReviewDelta> {
+    let mut results = Vec::with_capacity(item_fractions.len() + minute_budgets.len());
+    for fraction in item_fractions {
+        let count = (*fraction * rows.len() as f64).ceil().max(1.0);
+        results.push(paired_delta_bootstrap(
+            rows, baseline, "items", count, Some(*fraction), replicates,
+            &format!("{seed_prefix}:{}:items", baseline.id()),
+        ));
+    }
+    for minutes in minute_budgets {
+        results.push(paired_delta_bootstrap(
+            rows, baseline, "minutes", *minutes, None, replicates,
+            &format!("{seed_prefix}:{}:minutes", baseline.id()),
+        ));
+    }
+    results
 }
 
 fn baseline_policy_results(
     rows: &[&Prediction],
     item_fractions: &[f64],
     minute_budgets: &[f64],
+    bootstrap_replicates: usize,
     seed_prefix: &str,
 ) -> Vec<PolicyEvaluation> {
     let policies = [
@@ -720,6 +853,9 @@ fn baseline_policy_results(
             policy: policy.id(),
             item_budget_results,
             review_time_budget_results,
+            submitted_minus_baseline_cluster_bootstrap_95: paired_deltas_for_policy(
+                rows, *policy, item_fractions, minute_budgets, bootstrap_replicates, seed_prefix,
+            ),
         }
     }).collect()
 }
@@ -782,7 +918,7 @@ fn run() -> Result<i32, String> {
     let risk_coverage_results = risk_coverage(&refs, &coverage_targets);
 
     let report = Report {
-        schema_version: 3,
+        schema_version: 4,
         scorer: "proofreading-score",
         scorer_version: env!("CARGO_PKG_VERSION"),
         dataset_id: DATASET_ID,
@@ -810,6 +946,7 @@ fn run() -> Result<i32, String> {
             &refs,
             &item_fractions,
             &minute_budgets,
+            args.bootstrap_replicates,
             &format!("{input_hash}:overall"),
         ),
         scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
@@ -905,6 +1042,54 @@ mod tests {
             &rows, 1.0, Some(1.0 / 3.0), "items", RankingPolicy::DeterministicRandom, "run-a",
         );
         assert_eq!(first_yield.selection_policy, "deterministic_random");
+    }
+
+    #[test]
+    fn paired_bootstrap_reports_positive_policy_delta_against_uncertainty() {
+        let mut rows = Vec::new();
+        for i in 0..4 {
+            let mut r = row(&format!("err-{i}"), true, 0.9, 0.9, 1.0, 2.0, "mouse:merge");
+            r.cluster_id = format!("cluster-err-{i}");
+            rows.push(r);
+        }
+        for i in 0..4 {
+            let mut r = row(&format!("ok-{i}"), false, 0.49, 0.1, 1.0, 0.0, "mouse:merge");
+            r.cluster_id = format!("cluster-ok-{i}");
+            rows.push(r);
+        }
+        let refs: Vec<&Prediction> = rows.iter().collect();
+        let delta = paired_delta_bootstrap(
+            &refs,
+            RankingPolicy::UncertaintyOnly,
+            "items",
+            1.0,
+            Some(0.1),
+            500,
+            "unit-test:paired-delta",
+        );
+        assert!(delta.error_recall_delta.valid_replicates >= 400);
+        let interval = delta.error_recall_delta.interval_95.expect("supported interval");
+        assert!(interval.lower > 0.0, "expected submitted ranker to beat uncertainty: {interval:?}");
+        assert_eq!(delta.precision_delta.interval_95, Some(Interval { lower: 1.0, upper: 1.0 }));
+    }
+
+    #[test]
+    fn paired_bootstrap_marks_one_cluster_not_estimable() {
+        let mut a = row("a", true, 0.9, 0.9, 1.0, 1.0, "mouse:merge");
+        let mut b = row("b", false, 0.1, 0.1, 1.0, 0.0, "mouse:merge");
+        a.cluster_id = "one".into();
+        b.cluster_id = "one".into();
+        let delta = paired_delta_bootstrap(
+            &[&a, &b],
+            RankingPolicy::UncertaintyOnly,
+            "items",
+            1.0,
+            Some(0.5),
+            500,
+            "unit-test:one-cluster",
+        );
+        assert_eq!(delta.error_recall_delta.valid_replicates, 0);
+        assert_eq!(delta.error_recall_delta.interval_95, None);
     }
 
     #[test]
