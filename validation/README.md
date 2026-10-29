@@ -1,34 +1,31 @@
 # Validation
 
-Cross-validation with external implementations.
+Research validation utilities and external-reference comparisons.
 
-## PyPhi Cross-Validation
+## PyPhi comparison scaffold — currently not qualified
 
-`pyphi_crossvalidation.py` validates our Φ calculations against the reference PyPhi implementation.
+`pyphi_crossvalidation.py` is an exploratory comparison scaffold, **not a qualified validation of IIT Phi**.
+
+The current paths do not establish a common causal model: the HDC calculation uses node representations, while the PyPhi calculation constructs a transition-probability matrix from an OR-of-neighbours rule. The PyPhi formalism and package version are also not explicitly pinned by this script. A high correlation between these outputs would not make them equivalent measurements.
+
+The script therefore reports descriptive values only and always marks the result `NOT_QUALIFIED`. Failed process runs, timeouts, invalid JSON, missing fields, and non-finite values remain failures; there are no topology-based numeric fallbacks.
 
 ### Usage
 
+Run in the Python research shell:
+
 ```bash
-# Enter the Python research shell
 nix develop .#python-research
-
-# Run validation
-python validation/pyphi_crossvalidation.py
-
-# Run the lightweight package smoke lane
-./scripts/ci_check_lanes.sh python-research
-
-# Results output to results/pyphi_validation_results.csv
+python validation/pyphi_crossvalidation.py --output PYPHI_COMPARISON_REPORT.md
+python -m unittest validation.test_pyphi_crossvalidation
 ```
 
-### What It Tests
+### Current acceptance blockers
 
-1. **Φ values** - Compare our algebraic connectivity Φ with PyPhi's exact IIT Φ
-2. **Topology consistency** - Verify topologies produce expected patterns
-3. **Edge cases** - Test boundary conditions
+1. Define one explicit causal transition model, including its TPM and analysed state, and use it on both sides.
+2. Pin the exact PyPhi package version and named IIT formalism/configuration.
+3. Make the Rust adapter emit a verifiable model/state digest and a versioned metric contract.
+4. Add deterministic known-result fixtures and independent reviewers for the mapping between the HDC quantity and the PyPhi quantity.
+5. Only report a correlation when both finite series vary and at least three paired cases exist; correlation remains descriptive and cannot independently qualify the method.
 
-### Results
-
-See `results/pyphi_validation_results.csv` for comparison data.
-
-Our implementation uses algebraic connectivity as a Φ proxy, which correlates with but differs from PyPhi's exact computation.
+Do not cite generated descriptive metrics as evidence that an HDC proxy is IIT Phi. This scaffold can help expose integration failures; a qualified scientific comparison requires the acceptance blockers above to be resolved first.
