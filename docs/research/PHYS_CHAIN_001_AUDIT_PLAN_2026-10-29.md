@@ -56,6 +56,33 @@ Comparisons using the paper's listed measurements and stated standard uncertaint
 
 These arithmetic checks independently evaluate the **published formula only**. They do not reproduce the record enumeration, prove the formula from the axiom, establish the Photon Conjecture, or constitute an independent experimental reanalysis. CODATA 2022 remains the latest CODATA recommended set listed by NIST as of this protocol date; its adjustment considers data available through 31 December 2022. See https://physics.nist.gov/cuu/Reference/versioncon.shtml and https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf.
 
+## Preliminary Table S5 formula-level check
+
+I separately evaluated the **printed algebraic expressions** in Supplementary Table S5 at high decimal precision and computed each inverse and relative difference from the candidate. This cross-check reproduces the table's inverse values to the reported three decimal places. It does not independently regenerate records or verify why a particular variant is admissible.
+
+| Table S5 variant | Recomputed inverse | Relative difference from candidate |
+|---|---:|---:|
+| Published construction | 137.035999189566… | 0.000% |
+| Ends swapped | 135.894237394993… | −0.833% |
+| Both exchanges at qubit end | 146.523997544819… | +6.924% |
+| Both exchanges at qutrit end | 127.535742249095… | −6.933% |
+| Exchange at letter slots | 139.030085458579… | +1.455% |
+| Qubit–qubit records moved by link exchange | 134.485471804938… | −1.861% |
+| Shared qutrit copies separate | 112.422696872027… | −17.961% |
+| Ignore record's own sign | 139.712642717695… | +1.953% |
+| Commutators survive X only | 138.347888396726… | +0.957% |
+| Commutator sums and differences retained | 132.738534413909… | −3.136% |
+| No commutator records | 141.621038703585… | +3.346% |
+| Born weights \(k\), rather than \(\sqrt{k}\) | 97.504702194357… | −28.847% |
+| Count read ends | 70.189827511636… | −48.780% |
+| Normalize by 172 records | 0.757786518152… | −99.447% |
+| No weights | 180.837209302326… | +31.963% |
+| Smallest readable \((2,2)\) configuration | 3.534622398917… | −97.421% |
+
+This reproduces the paper's statement that exactly two of its *listed evaluated alternatives* fall within 1% of the candidate: swapped ends (−0.833%) and commutator records surviving X alone (+0.957%). The paper supplies rule-based reasons for excluding both. The open question is whether those reasons are independently entailed and consistently applied across the complete definition/configuration space—not whether the alternatives were listed or whether their arithmetic is correct.
+
+The table is a **finite author-curated variant set**, not an estimate of the probability of a chance match over all possible theories. Any broader model-space or selection-effect conclusion needs a preregistered, justified proposal space, complete denominator, and independently defined admissibility criteria.
+
 ## Main falsifiable questions
 
 1. Does an independent implementation derive the 169 product records plus three commutator records, their exchange sectors, weights, normalization, and final expression from the prose/definitions rather than copying the provided intermediate values?
