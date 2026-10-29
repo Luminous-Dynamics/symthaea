@@ -114,6 +114,19 @@ impl DirectedSystemPartition {
     pub fn is_total_cut(&self) -> bool { self.total_cut }
 }
 
+/// Errors while applying a directed partition to a causal model.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum PartitionApplyError {
+    #[error(transparent)]
+    Model(#[from] ModelError),
+
+    #[error("partition candidate system contains unit {unit}, outside model range 0..{unit_count}")]
+    CandidateUnitOutOfRange { unit: usize, unit_count: usize },
+
+    #[error("partition cut matrix length mismatch: expected {expected}, got {actual}")]
+    CutMatrixShapeMismatch { expected: usize, actual: usize },
+}
+
 /// Failures from directed system-partition enumeration.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PartitionEnumerationError {
@@ -683,6 +696,71 @@ impl BinaryCausalModel {
             seen[unit] = true;
         }
         Ok(())
+    }
+
+
+    /// Apply the severance matrix using maximum-entropy interventions on cut inputs.
+    ///
+    /// For each severed source -> target link, the target's TPM column is averaged
+    /// over the two values of the source bit, keeping all other bits fixed. Applying
+    /// multiple cuts in sequence is equivalent to averaging over all combinations
+    /// of severed input bits because each operation is linear averaging. This yields
+    /// a factored TPM for a system with those causal influences severed.
+    ///
+    /// Only links whose source and target both belong to the partition candidate
+    /// system are cut; links to units outside that candidate are left intact so
+    /// those external units can be marginalized by repertoire operations.
+    ///
+    /// This transformation follows the maximum-entropy intervention interpretation
+    /// and is still only a TPM transform. It does not compute any IIT quantity.
+    pub fn apply_partition(
+        &self,
+        partition: &DirectedSystemPartition,
+    ) -> Result<Self, PartitionApplyError> {
+        let candidate = partition.candidate_system();
+        let n_candidate = candidate.len();
+        let expected_cut_len = n_candidate * n_candidate;
+        if partition.cut_matrix().len() != expected_cut_len {
+            return Err(PartitionApplyError::CutMatrixShapeMismatch {
+                expected: expected_cut_len,
+                actual: partition.cut_matrix().len(),
+            });
+        }
+        for unit in candidate.iter().copied() {
+            if unit >= self.n_units {
+                return Err(PartitionApplyError::CandidateUnitOutOfRange {
+                    unit,
+                    unit_count: self.n_units,
+                });
+            }
+        }
+
+        let mut tpm = self.transition_probabilities.clone();
+        let mut connectivity = self.connectivity.clone();
+
+        for local_source in 0..n_candidate {
+            let source = candidate[local_source];
+            for local_target in 0..n_candidate {
+                if !partition.cut_matrix()[local_source * n_candidate + local_target] {
+                    continue;
+                }
+                let target = candidate[local_target];
+                for state_without_source in 0..self.n_states() {
+                    if ((state_without_source >> source) & 1) != 0 {
+                        continue;
+                    }
+                    let state_with_source = state_without_source | (1usize << source);
+                    let without_offset = state_without_source * self.n_units + target;
+                    let with_offset = state_with_source * self.n_units + target;
+                    let average = (tpm[without_offset] + tpm[with_offset]) * 0.5;
+                    tpm[without_offset] = average;
+                    tpm[with_offset] = average;
+                }
+                connectivity[source * self.n_units + target] = false;
+            }
+        }
+
+        Self::new(self.n_units, tpm, connectivity).map_err(PartitionApplyError::from)
     }
 
     /// SHA-256 of the v0.1 canonical binary model encoding.
@@ -1514,6 +1592,77 @@ mod tests {
             enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_862),
             Err(PartitionEnumerationError::BudgetExceeded { max_combinations: 1_862 })
         ));
+    }
+
+    #[test]
+    fn applying_partition_averages_only_the_cut_causal_input() {
+        // A drives both its own next state and B's next state. B does not
+        // influence A or itself in this TPM; its declared self-edge is extra.
+        let model = BinaryCausalModel::new(
+            2,
+            vec![
+                0.1, 0.2,
+                0.9, 0.8,
+                0.1, 0.2,
+                0.9, 0.8,
+            ],
+            vec![
+                true, true,
+                false, true,
+            ],
+        ).unwrap();
+        let partitions = enumerate_iit4_system_partitions(&[0, 1], 2, false, 100).unwrap();
+        let a_to_b = partitions.iter().find(|p| {
+            p.cut_matrix() == [false, true, false, false]
+        }).unwrap();
+
+        let cut = model.apply_partition(a_to_b).unwrap();
+        assert!(!cut.has_edge(0, 1).unwrap());
+        assert!((cut.probability_next_one(&[false, false], 1).unwrap() - 0.5).abs() < 1e-12);
+        assert!((cut.probability_next_one(&[true, false], 1).unwrap() - 0.5).abs() < 1e-12);
+        assert!((cut.probability_next_one(&[false, true], 1).unwrap() - 0.5).abs() < 1e-12);
+        assert!((cut.probability_next_one(&[true, true], 1).unwrap() - 0.5).abs() < 1e-12);
+        assert_eq!(cut.probability_next_one(&[false, false], 0).unwrap(), 0.1);
+        assert_eq!(cut.probability_next_one(&[true, false], 0).unwrap(), 0.9);
+    }
+
+    #[test]
+    fn total_cut_averages_all_candidate_inputs_including_self_loops() {
+        let model = two_unit_model();
+        let total = enumerate_iit4_system_partitions(&[0, 1], 2, true, 100).unwrap()
+            .into_iter().find(|p| p.is_total_cut()).unwrap();
+        let cut = model.apply_partition(&total).unwrap();
+        for current in [&[false, false][..], &[true, false][..], &[false, true][..], &[true, true][..]] {
+            assert!((cut.probability_next_one(current, 0).unwrap() - 0.5).abs() < 1e-12);
+            assert!((cut.probability_next_one(current, 1).unwrap() - 0.5).abs() < 1e-12);
+        }
+        assert!(cut.connectivity().iter().all(|edge| !edge));
+    }
+
+    #[test]
+    fn partition_application_keeps_external_unit_edges_unmodified() {
+        let model = BinaryCausalModel::new(
+            3,
+            vec![
+                0.1, 0.2, 0.3,  0.9, 0.2, 0.3,
+                0.1, 0.8, 0.3,  0.9, 0.8, 0.3,
+                0.1, 0.2, 0.7,  0.9, 0.2, 0.7,
+                0.1, 0.8, 0.7,  0.9, 0.8, 0.7,
+            ],
+            vec![
+                true, true, false,
+                false, true, false,
+                false, false, true,
+            ],
+        ).unwrap();
+        let total_a = enumerate_iit4_system_partitions(&[0], 3, false, 0).unwrap()
+            .into_iter().next().unwrap();
+        let cut = model.apply_partition(&total_a).unwrap();
+        assert!(!cut.has_edge(0, 0).unwrap());
+        assert!(cut.has_edge(0, 1).unwrap());
+        assert!((cut.probability_next_one(&[false, false, false], 1).unwrap() - 0.2).abs() < 1e-12);
+        assert!((cut.probability_next_one(&[true, false, false], 1).unwrap() - 0.2).abs() < 1e-12);
+        assert_eq!(cut.probability_next_one(&[false, false, false], 2).unwrap(), 0.3);
     }
 
 }
