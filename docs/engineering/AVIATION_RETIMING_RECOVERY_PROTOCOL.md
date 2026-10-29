@@ -33,13 +33,13 @@ All times and objective calculations use checked integer arithmetic. No fraction
 
 ## Why the lower bound is admissible
 
-For a partial search node, the implementation sums the costs of all actions already committed. Unresolved flights contribute zero:
+For a partial search node, the implementation sums the costs of committed actions and adds an independent optimistic minimum for every unresolved flight:
 
 \[
-L(n) = \sum_{f \in \text{committed actions}} C_f
+L(n) = C_{\mathrm{committed}}(n) + \sum_{f \in \mathrm{unresolved}(n)} \ell_f
 \]
 
-Because all remaining action costs are non-negative, no completion of node n can cost less than L(n). This lower bound is specific to this model. It cannot be re-used for an objective containing negative rewards, offsets, rebates, or future decisions that reduce already committed cost without changing the proof.
+For each unresolved flight, \(\ell_f\) is the minimum of its cancellation penalty and its least delay cost required to meet any declared aircraft's individual availability boundary (if that delay is within the flight's maximum). The relaxation ignores conflicts among unresolved flights and between unresolved and committed flights. Ignoring those conflicts can underestimate the true completion cost, but cannot overestimate it; every valid completion must pay at least the independent per-flight minimum. The lower bound is specific to this non-negative delay/cancellation objective. It cannot be re-used for an objective containing negative rewards, offsets, rebates, or future decisions that reduce already committed cost without a new proof.
 
 The solver explores the full declared action universe: every aircraft and every integer delay from zero through the flight's maximum, plus cancellation. It checks partial availability/turnaround constraints before enqueueing a node. Stable priority/sequence ordering makes runs deterministic.
 
@@ -55,7 +55,7 @@ If a generated-node cap cannot fit all children for an expansion, the parent is 
 
 The production verifier resolves stable flight and aircraft IDs, recomputes delayed intervals, checks availability and turnaround, and independently recomputes delay/cancellation cost. It rejects missing/duplicate/unknown IDs, stale scenario identity, over-maximum delay, nonzero delay on cancelled flights, time/cost overflow, constraint violations, and tampered objective totals.
 
-The integration oracle independently enumerates each aircraft/delay/cancel choice directly from raw scenario fields. It does not call the production search's partial-feasibility or cost functions. Required future property tests include:
+The integration oracle independently enumerates each aircraft/delay/cancel choice directly from raw scenario fields. It does not call the production search's partial-feasibility or cost functions. Its partial-budget cases also compare the reported relaxed frontier lower bound to the independent full optimum and include an availability boundary designed to force a nonzero lower bound. Required future property tests include:
 
 - zero-disruption/non-conflicting cases;
 - same-start conflicts requiring a delayed assignment;
