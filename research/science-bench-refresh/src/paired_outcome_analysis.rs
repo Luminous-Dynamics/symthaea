@@ -296,6 +296,72 @@ fn endpoint_value(
     }
 }
 
+fn terminal_status_label(status: OutcomeTerminalStatusV1) -> &'static str {
+    match status {
+        OutcomeTerminalStatusV1::Completed => "completed",
+        OutcomeTerminalStatusV1::Contaminated => "contaminated",
+        OutcomeTerminalStatusV1::BudgetViolation => "budget_violation",
+        OutcomeTerminalStatusV1::Timeout => "timeout",
+        OutcomeTerminalStatusV1::Blocked => "blocked",
+        OutcomeTerminalStatusV1::InvalidReceipt => "invalid_receipt",
+        OutcomeTerminalStatusV1::RunnerError => "runner_error",
+        OutcomeTerminalStatusV1::NotStarted => "not_started",
+    }
+}
+
+fn endpoint_unavailable_reason(
+    record: &crate::evidence_outcomes::EvidenceOutcomeRecordV1,
+    endpoint: AnalysisEndpointV1,
+    expected_response: Option<ExpectedResponseV1>,
+) -> String {
+    if endpoint.is_resource() {
+        return if record.terminal_status == OutcomeTerminalStatusV1::NotStarted {
+            "not_started_resource_unobserved".to_owned()
+        } else {
+            "resource_metric_missing".to_owned()
+        };
+    }
+    if record.terminal_status != OutcomeTerminalStatusV1::Completed {
+        return format!("terminal_{}", terminal_status_label(record.terminal_status));
+    }
+    match endpoint {
+        AnalysisEndpointV1::StrictCorrectness => {
+            if record.response_status != OutcomeResponseStatusV1::Answered {
+                "response_not_answered".to_owned()
+            } else {
+                "correctness_not_evaluated".to_owned()
+            }
+        }
+        AnalysisEndpointV1::FullySupportedClaim => {
+            if record.response_status != OutcomeResponseStatusV1::Answered {
+                "response_not_answered".to_owned()
+            } else {
+                "claim_support_not_evaluated".to_owned()
+            }
+        }
+        AnalysisEndpointV1::RelevantEvidenceUse => {
+            if record.response_status != OutcomeResponseStatusV1::Answered {
+                "response_not_answered".to_owned()
+            } else {
+                "evidence_use_not_evaluable".to_owned()
+            }
+        }
+        AnalysisEndpointV1::ExpectedResponse => {
+            if expected_response.is_none() {
+                "expected_response_rule_missing".to_owned()
+            } else {
+                "expected_response_not_evaluable".to_owned()
+            }
+        }
+        AnalysisEndpointV1::WallClockMs
+        | AnalysisEndpointV1::ToolCalls
+        | AnalysisEndpointV1::ExperimentCount
+        | AnalysisEndpointV1::InputTokens
+        | AnalysisEndpointV1::OutputTokens
+        | AnalysisEndpointV1::CostMicroUsd => "resource_metric_missing".to_owned(),
+    }
+}
+
 fn wilson_interval(successes: u64, trials: u64) -> Option<(f64, f64, f64)> {
     if trials == 0 {
         return None;
@@ -393,6 +459,20 @@ fn build_contrast(
             contrast.endpoint,
             expected.get(&reference_key).copied(),
         );
+        let treatment_reason = treatment_value.is_none().then(|| {
+            endpoint_unavailable_reason(
+                treatment_record,
+                contrast.endpoint,
+                expected.get(&treatment_key).copied(),
+            )
+        });
+        let reference_reason = reference_value.is_none().then(|| {
+            endpoint_unavailable_reason(
+                reference_record,
+                contrast.endpoint,
+                expected.get(&reference_key).copied(),
+            )
+        });
         let (delta, eligibility_reason) = match (reference_value, treatment_value) {
             (Some(reference), Some(treatment)) => {
                 eligible_pair_count = eligible_pair_count
@@ -414,18 +494,31 @@ fn build_contrast(
             }
             (None, None) => {
                 incomplete_pair_count += 1;
-                increment(&mut ineligible_reason_counts, "both_endpoint_unavailable")?;
-                (None, Some("both_endpoint_unavailable".to_owned()))
+                let reason = format!(
+                    "reference:{};treatment:{}",
+                    reference_reason.unwrap_or_else(|| "unknown".to_owned()),
+                    treatment_reason.unwrap_or_else(|| "unknown".to_owned())
+                );
+                increment(&mut ineligible_reason_counts, &reason)?;
+                (None, Some(reason))
             }
             (None, Some(_)) => {
                 incomplete_pair_count += 1;
-                increment(&mut ineligible_reason_counts, "reference_endpoint_unavailable")?;
-                (None, Some("reference_endpoint_unavailable".to_owned()))
+                let reason = format!(
+                    "reference:{}",
+                    reference_reason.unwrap_or_else(|| "unknown".to_owned())
+                );
+                increment(&mut ineligible_reason_counts, &reason)?;
+                (None, Some(reason))
             }
             (Some(_), None) => {
                 incomplete_pair_count += 1;
-                increment(&mut ineligible_reason_counts, "treatment_endpoint_unavailable")?;
-                (None, Some("treatment_endpoint_unavailable".to_owned()))
+                let reason = format!(
+                    "treatment:{}",
+                    treatment_reason.unwrap_or_else(|| "unknown".to_owned())
+                );
+                increment(&mut ineligible_reason_counts, &reason)?;
+                (None, Some(reason))
             }
         };
         pair_results.push(PairContrastResultV1 {
