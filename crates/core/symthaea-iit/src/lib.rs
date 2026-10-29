@@ -67,6 +67,20 @@ pub enum ModelError {
     IncompatibleQuantity { quantity: &'static str, formalism: &'static str },
 }
 
+
+/// Errors in probability-repertoire construction.
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum RepertoireError {
+    #[error(transparent)]
+    Model(#[from] ModelError),
+
+    #[error("subset {subset} contains duplicate unit {unit}")]
+    DuplicateSubsetUnit { subset: &'static str, unit: usize },
+
+    #[error("cause repertoire has zero or non-finite likelihood mass")]
+    UndefinedCauseRepertoire,
+}
+
 /// Dense, binary, factored transition-probability model.
 ///
 /// transition_probabilities[state_index * n_units + unit] stores the probability
@@ -186,6 +200,115 @@ impl BinaryCausalModel {
             if *next_on { p_on } else { 1.0 - p_on }
         }).product();
         Ok(probability)
+    }
+
+
+    /// Compute an effect repertoire under a uniform maximum-entropy background.
+    ///
+    /// Mechanism units are fixed to their values in the complete current state.
+    /// All other current units are averaged uniformly. The result indexes future
+    /// purview states with the first listed purview unit as the least-significant
+    /// bit. This is a repertoire primitive only; it does not compute mechanism phi.
+    pub fn effect_repertoire(
+        &self,
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        self.check_state(current_state)?;
+        self.validate_subset(mechanism, "mechanism")?;
+        self.validate_subset(purview, "purview")?;
+
+        let purview_state_count = 1usize << purview.len();
+        let unconstrained_count = 1usize << (self.n_units - mechanism.len());
+        let background_weight = 1.0 / unconstrained_count as f64;
+        let mut repertoire = vec![0.0; purview_state_count];
+
+        for past_index in 0..self.n_states() {
+            let mechanism_matches = mechanism.iter().all(|unit| {
+                (((past_index >> *unit) & 1) != 0) == current_state[*unit]
+            });
+            if !mechanism_matches {
+                continue;
+            }
+
+            for future_purview_state in 0..purview_state_count {
+                let mut probability = 1.0;
+                for (slot, unit) in purview.iter().copied().enumerate() {
+                    let p_on = self.transition_probabilities[past_index * self.n_units + unit];
+                    let next_on = ((future_purview_state >> slot) & 1) != 0;
+                    probability *= if next_on { p_on } else { 1.0 - p_on };
+                }
+                repertoire[future_purview_state] += background_weight * probability;
+            }
+        }
+
+        Ok(repertoire)
+    }
+
+    /// Compute a cause repertoire using a uniform prior over full past states.
+    ///
+    /// For each candidate past state of the purview, sum the likelihood that the
+    /// observed current mechanism state would follow from all compatible full past
+    /// states. Normalize those likelihood masses across the purview. If the observed
+    /// mechanism state has zero total likelihood, return an error rather than NaN.
+    /// The result indexes past purview states with the first listed purview unit as
+    /// the least-significant bit.
+    pub fn cause_repertoire(
+        &self,
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        self.check_state(current_state)?;
+        self.validate_subset(mechanism, "mechanism")?;
+        self.validate_subset(purview, "purview")?;
+
+        let purview_state_count = 1usize << purview.len();
+        let mut repertoire = vec![0.0; purview_state_count];
+
+        for past_index in 0..self.n_states() {
+            let purview_state = purview.iter().copied().enumerate().fold(
+                0usize,
+                |state_index, (slot, unit)| {
+                    if ((past_index >> unit) & 1) != 0 {
+                        state_index | (1usize << slot)
+                    } else {
+                        state_index
+                    }
+                },
+            );
+
+            let mechanism_likelihood = mechanism.iter().copied().fold(
+                1.0,
+                |likelihood, unit| {
+                    let p_on = self.transition_probabilities[past_index * self.n_units + unit];
+                    likelihood * if current_state[unit] { p_on } else { 1.0 - p_on }
+                },
+            );
+            repertoire[purview_state] += mechanism_likelihood;
+        }
+
+        let mass: f64 = repertoire.iter().sum();
+        if !mass.is_finite() || mass <= 0.0 {
+            return Err(RepertoireError::UndefinedCauseRepertoire);
+        }
+        for probability in &mut repertoire {
+            *probability /= mass;
+        }
+        Ok(repertoire)
+    }
+
+    fn validate_subset(&self, subset: &[usize], name: &'static str) -> Result<(), RepertoireError> {
+        let mut seen = vec![false; self.n_units];
+        for unit in subset.iter().copied() {
+            self.check_unit(unit)?;
+            if seen[unit] {
+                return Err(RepertoireError::DuplicateSubsetUnit { subset: name, unit });
+            }
+            seen[unit] = true;
+        }
+        Ok(())
     }
 
     /// SHA-256 of the v0.1 canonical binary model encoding.
@@ -565,6 +688,70 @@ mod tests {
         ).unwrap();
         assert_ne!(req_2023.request_sha256(&model), req_2026.request_sha256(&model));
         assert_ne!(req_2023.request_sha256(&model), req_structure.request_sha256(&model));
+    }
+
+    #[test]
+    fn identity_model_has_point_mass_cause_and_effect_repertoires() {
+        let model = BinaryCausalModel::new(1, vec![0.0, 1.0], vec![true]).unwrap();
+        let effect = model.effect_repertoire(&[0], &[true], &[0]).unwrap();
+        let cause = model.cause_repertoire(&[0], &[true], &[0]).unwrap();
+        assert_eq!(effect, vec![0.0, 1.0]);
+        assert_eq!(cause, vec![0.0, 1.0]);
+
+        let effect_off = model.effect_repertoire(&[0], &[false], &[0]).unwrap();
+        let cause_off = model.cause_repertoire(&[0], &[false], &[0]).unwrap();
+        assert_eq!(effect_off, vec![1.0, 0.0]);
+        assert_eq!(cause_off, vec![1.0, 0.0]);
+    }
+
+    #[test]
+    fn effect_repertoire_averages_unconstrained_units_uniformly() {
+        // Unit B's next-state probability is 0.3 for every past state, independently of A.
+        let model = BinaryCausalModel::new(
+            2,
+            vec![0.1, 0.3, 0.9, 0.3, 0.1, 0.3, 0.9, 0.3],
+            vec![false, true, false, false],
+        ).unwrap();
+        let repertoire = model.effect_repertoire(&[0], &[true, false], &[1]).unwrap();
+        assert!((repertoire[0] - 0.7).abs() < 1e-12);
+        assert!((repertoire[1] - 0.3).abs() < 1e-12);
+        assert!((repertoire.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn cause_repertoire_is_uniform_when_past_purview_is_irrelevant() {
+        // A's next probability depends on past A but not past B; conditioning on current A
+        // therefore leaves the B purview at its uniform prior.
+        let model = BinaryCausalModel::new(
+            2,
+            vec![0.1, 0.3, 0.9, 0.3, 0.1, 0.3, 0.9, 0.3],
+            vec![false, true, false, false],
+        ).unwrap();
+        let repertoire = model.cause_repertoire(&[0], &[true, false], &[1]).unwrap();
+        assert!((repertoire[0] - 0.5).abs() < 1e-12);
+        assert!((repertoire[1] - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn repertoire_rejects_duplicate_subset_units() {
+        let model = two_unit_model();
+        assert!(matches!(
+            model.effect_repertoire(&[0, 0], &[true, false], &[1]),
+            Err(RepertoireError::DuplicateSubsetUnit { subset: "mechanism", unit: 0 })
+        ));
+        assert!(matches!(
+            model.cause_repertoire(&[0], &[true, false], &[1, 1]),
+            Err(RepertoireError::DuplicateSubsetUnit { subset: "purview", unit: 1 })
+        ));
+    }
+
+    #[test]
+    fn cause_repertoire_fails_closed_for_zero_likelihood() {
+        let model = BinaryCausalModel::new(1, vec![0.0, 0.0], vec![true]).unwrap();
+        assert!(matches!(
+            model.cause_repertoire(&[0], &[true], &[0]),
+            Err(RepertoireError::UndefinedCauseRepertoire)
+        ));
     }
 
 }
