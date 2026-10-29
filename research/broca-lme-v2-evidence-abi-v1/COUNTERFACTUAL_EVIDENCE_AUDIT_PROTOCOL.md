@@ -111,7 +111,7 @@ Implement a positive control and a minimally changed negative/alternate case for
 | Qualifier truncation | Keep a matching phrase but remove surrounding negation, condition, exception, or attribution | Isolated lexical match must not override semantics carried by the omitted qualifier |
 | Memory influence | Add a high-overlap but non-decisive proposition to an otherwise answerable context | The answer should remain stable; the added atom should receive an Ignore target rather than changing a material conclusion |
 
-Integrity/lifecycle mutations remain mandatory **structural invariant tests**, but they are not counted as a semantic counterfactual family in the ten-pair fixture corpus. Test payload/digest corruption, source mapping, expiry, revocation and authorization directly against the responsible resolver/verifier; zero forbidden emissions and zero silent integrity fallbacks are hard gates.
+Integrity/lifecycle mutations remain mandatory **structural invariant tests**, but they are not counted as one of the ten semantic counterfactual families in the current JSONL schema. Test payload/digest corruption, source mapping, expiry, revocation and authorization directly against the responsible resolver/verifier; zero forbidden emissions and zero silent integrity fallbacks are hard gates.
 
 Each semantic family should include (a) clear answerable controls, (b) structurally complete but semantically unsupported cases, and (c) cases where abstention is correct. Always-abstain and always-answer policies are mandatory diagnostics so neither abstention nor answering everything can masquerade as robust performance.
 
@@ -126,6 +126,8 @@ Report over-use and under-use separately. Do not combine them into a single accu
 The offline scoring contract is implemented in `score_atom_ablation_jsonl` and the `broca-memory-influence-score` binary. It binds each observation to the exact fixture digest and pins prompt, tokenizer, reader and system commit; each (case ID, evidence ID) target must have exactly one observation. The scorer compares structured material output fields and reports over-use and under-use separately by target level. It is not an entailment evaluator and must not use free-form answer-string similarity as an influence signal. A real reader adapter must create the structured observations before the scorer can support empirical claims.
 
 For lifecycle diagnosis, also consider [MemOps](https://arxiv.org/abs/2607.12893). Its operation traces specify trigger, target, scope, state transition and supporting evidence for remembering, forgetting, updating, reflecting and composed operations. A MemOps-style extension should score memory-operation/state-transition correctness separately from downstream answer correctness, so a lucky answer cannot conceal a broken memory update.
+
+When a compatible MemCalib reader/judge protocol is used, report the paper's six metrics using its exact definitions: SCS and Exact (higher is better), plus sMOS, sMUS, AOR, and AUR (lower is better). Record the judge/model version and report results over three or more independent seeds, as the reference paper does. Do not reuse these metric names for ad hoc calculations. On this 10-pair synthetic smoke corpus, report fixture correctness and individual pair outcomes only; the sample is far too small to claim benchmark-level memory-use performance. A scaled held-out evaluation should aim for at least 100 reviewed pairs per mutation family, with source-family-disjoint development/test partitions and adjudicated target-use labels. This is a proposed Symthaea qualification target, not an established industry standard.
 
 ## 5. Test levels
 
@@ -189,6 +191,7 @@ For selective answering, publish risk–coverage curves and compare at matched c
 |---|---|
 | No-memory | Detect whether stored memory adds value |
 | Score-prefix retrieval | Ordinary relevance baseline |
+| Budgeted Flat Reconstruction (BFR) | Direct research comparator for requirement decomposition plus complementary evidence discovery; reproduce on the paper's original LongMemEval-S setup separately, never as a LongMemEval-V2 score |
 | Role-set selection | Isolate gains from explicit coverage annotations |
 | Payload-span witnesses | Isolate payload byte integrity and source-digest association; not raw-source offset mapping or semantic correctness |
 | Semantic support/contradiction gate | Test the semantic hypothesis when independently implemented |
@@ -215,6 +218,7 @@ If the support gate fails to distinguish the minimal pairs, report the failure m
 ## 9. Reference points and limits
 
 - QEMem, *From Relevant Memories to Sufficient Evidence*: https://arxiv.org/abs/2610.22668
+- Budgeted Flat Reconstruction (BFR), *Relevance Is Not Sufficiency: What Actually Closes the Evidence Gap in Long-Term Memory QA*: https://arxiv.org/abs/2610.09348
 - MemCalib, *Benchmarking and Optimizing Memory Use in LLM Agents*: https://arxiv.org/abs/2609.24259
 - LongMemEval-V2 official backend contract, evaluation harness and baselines: https://github.com/xiaowu0162/LongMemEval-V2
 - MemoryAgentBench: https://arxiv.org/abs/2507.05257
