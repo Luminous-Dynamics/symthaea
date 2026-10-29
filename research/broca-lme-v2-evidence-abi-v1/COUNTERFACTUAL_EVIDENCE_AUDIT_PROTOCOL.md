@@ -110,9 +110,10 @@ Implement a positive control and a minimally changed negative/alternate case for
 | Ordered transition | Swap or remove an intermediate state/action while leaving endpoints similar | Workflow/transition answer must respect order and cannot infer an unobserved transition |
 | Qualifier truncation | Keep a matching phrase but remove surrounding negation, condition, exception, or attribution | Isolated lexical match must not override semantics carried by the omitted qualifier |
 | Memory influence | Add a high-overlap but non-decisive proposition to an otherwise answerable context | The answer should remain stable; the added atom should receive an Ignore target rather than changing a material conclusion |
-| Integrity/lifecycle | Mutate payload bytes, source mapping, digest, lifecycle or authorization metadata | The responsible integrity/eligibility gate rejects or surfaces the failure; no silent fallback |
 
-Each family should include (a) clear answerable controls, (b) structurally complete but semantically unsupported cases, and (c) cases where abstention is correct. Always-abstain and always-answer policies are mandatory diagnostics so neither abstention nor answering everything can masquerade as robust performance.
+Integrity/lifecycle mutations remain mandatory **structural invariant tests**, but they are not counted as one of the ten semantic counterfactual families in the current JSONL schema. Test payload/digest corruption, source mapping, expiry, revocation and authorization directly against the responsible resolver/verifier; zero forbidden emissions and zero silent integrity fallbacks are hard gates.
+
+Each semantic family should include (a) clear answerable controls, (b) structurally complete but semantically unsupported cases, and (c) cases where abstention is correct. Always-abstain and always-answer policies are mandatory diagnostics so neither abstention nor answering everything can masquerade as robust performance.
 
 ### Memory-influence calibration (MemCalib-inspired)
 
@@ -186,6 +187,7 @@ For selective answering, publish risk–coverage curves and compare at matched c
 |---|---|
 | No-memory | Detect whether stored memory adds value |
 | Score-prefix retrieval | Ordinary relevance baseline |
+| Budgeted Flat Reconstruction (BFR) | Direct research comparator for requirement decomposition plus complementary evidence discovery; reproduce on the paper's original LongMemEval-S setup separately, never as a LongMemEval-V2 score |
 | Role-set selection | Isolate gains from explicit coverage annotations |
 | Payload-span witnesses | Isolate payload byte integrity and source-digest association; not raw-source offset mapping or semantic correctness |
 | Semantic support/contradiction gate | Test the semantic hypothesis when independently implemented |
@@ -212,6 +214,7 @@ If the support gate fails to distinguish the minimal pairs, report the failure m
 ## 9. Reference points and limits
 
 - QEMem, *From Relevant Memories to Sufficient Evidence*: https://arxiv.org/abs/2610.22668
+- Budgeted Flat Reconstruction (BFR), *Relevance Is Not Sufficiency: What Actually Closes the Evidence Gap in Long-Term Memory QA*: https://arxiv.org/abs/2610.09348
 - MemCalib, *Benchmarking and Optimizing Memory Use in LLM Agents*: https://arxiv.org/abs/2609.24259
 - LongMemEval-V2 official backend contract, evaluation harness and baselines: https://github.com/xiaowu0162/LongMemEval-V2
 - MemoryAgentBench: https://arxiv.org/abs/2507.05257
