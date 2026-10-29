@@ -108,7 +108,10 @@ fn parse_v0_splits(doc: &Value) -> Result<BTreeMap<String, String>> {
     Ok(assignments)
 }
 
-fn parse_component_units(doc: &Value, frozen: &BTreeMap<String, String>) -> Result<Vec<ComponentUnit>> {
+fn parse_component_units(
+    doc: &Value,
+    frozen: &BTreeMap<String, String>,
+) -> Result<Vec<ComponentUnit>> {
     if required_str(doc, "schema_version")? != "pitb.independent-component-manifest.v0"
         || required_str(doc, "upstream_commit")? != UPSTREAM
         || required_str(doc, "source_partition_digest_sha256")? != V0_PARTITION
@@ -266,7 +269,9 @@ fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>
         bail!("cannot allocate an empty component set");
     }
     if units.len() < 4 {
-        bail!("at least four independent components are required to populate all three floor-based candidate splits");
+        bail!(
+            "at least four independent components are required to populate all three floor-based candidate splits"
+        );
     }
     let mut component_ids = BTreeSet::new();
     let mut family_ids = BTreeSet::new();
@@ -459,8 +464,18 @@ fn execute() -> Result<()> {
             })
         })
         .collect();
-    let counts = |split: &str| new_assignments.values().filter(|value| value.as_str() == split).count();
-    let component_counts = |split: &str| component_split.values().filter(|value| value.as_str() == split).count();
+    let counts = |split: &str| {
+        new_assignments
+            .values()
+            .filter(|value| value.as_str() == split)
+            .count()
+    };
+    let component_counts = |split: &str| {
+        component_split
+            .values()
+            .filter(|value| value.as_str() == split)
+            .count()
+    };
     let family_share = |split: &str| counts(split) as f64 / new_assignments.len() as f64;
     let component_share = |split: &str| component_counts(split) as f64 / units.len() as f64;
     let target_component_counts = component_quotas(units.len());
