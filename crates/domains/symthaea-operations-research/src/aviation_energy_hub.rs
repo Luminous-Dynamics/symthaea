@@ -59,6 +59,9 @@ pub struct EnergyStorageSpec {
     pub capacity_quanta: u32,
     /// Physically carried state of charge at the start of this planning horizon.
     pub initial_soc_quanta: u32,
+    /// Identity of the external/prefix ledger that already attributes this inventory's
+    /// upstream cost and emissions. Use an explicit no-opening-inventory sentinel at SOC 0.
+    pub initial_soc_ledger_ref: String,
     pub max_charge_input_quanta_per_interval: u32,
     pub max_discharge_output_quanta_per_interval: u32,
     pub charge_efficiency_ppm: u32,
@@ -101,7 +104,8 @@ pub struct EnergyHubPlan {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnergyHubMetrics {
-    /// Lifecycle cost/emissions of declared energy entering the airport bus.
+    /// Accounting ledger. The source-energy aggregate includes secondary storage-output
+    /// flow records; use the separate generation/import counters for primary inputs.
     pub source_ledger: AccountingSummary,
     pub renewable_generation_quanta: u32,
     pub renewable_direct_quanta: u32,
@@ -215,6 +219,7 @@ pub fn canonical_energy_hub_digest(
 
     put_u32(&mut bytes, scenario.storage.capacity_quanta);
     put_u32(&mut bytes, scenario.storage.initial_soc_quanta);
+    put_string(&mut bytes, &scenario.storage.initial_soc_ledger_ref);
     put_u32(&mut bytes, scenario.storage.max_charge_input_quanta_per_interval);
     put_u32(&mut bytes, scenario.storage.max_discharge_output_quanta_per_interval);
     put_u32(&mut bytes, scenario.storage.charge_efficiency_ppm);
@@ -753,6 +758,7 @@ fn validate_scenario(
         return Err(EnergyHubError::TooManyIntervals);
     }
     let storage = &scenario.storage;
+    require_identifier(&storage.initial_soc_ledger_ref, "opening SOC inventory ledger reference")?;
     if storage.capacity_quanta > MAX_QUANTA_PER_INTERVAL
         || storage.initial_soc_quanta > storage.capacity_quanta
         || storage.max_charge_input_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
