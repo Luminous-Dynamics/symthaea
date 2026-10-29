@@ -589,7 +589,14 @@ mod tests {
         let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["research-lab-a", "research-lab-b"]);
         let report = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &sha256_hex(&method), &partition_digest, &families,
+            &inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
         )
         .unwrap();
         assert!(report.cryptographically_verified);
@@ -606,7 +613,14 @@ mod tests {
         let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["same-org", "same-org"]);
         let error = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &sha256_hex(&method), &partition_digest, &families,
+            &inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("distinct organizations"));
@@ -639,7 +653,14 @@ mod tests {
             signed_fixture(["org-a", "org-b"]);
         trust.push(b' ');
         let error = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &sha256_hex(&method), &partition_digest, &families,
+            &inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("trust store does not match"));
