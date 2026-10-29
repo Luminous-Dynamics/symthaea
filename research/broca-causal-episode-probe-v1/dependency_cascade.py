@@ -199,6 +199,11 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         if item["is_latest_revision"] and state == "current":
             current_claims.append(item)
 
+    latest_statuses = {
+        item["claim_id"]: item["status"]
+        for item in evaluations
+        if item["is_latest_revision"]
+    }
     return {
         "snapshot_id": snapshot_id,
         "claim_version_count": len(versions),
@@ -210,16 +215,10 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             {
                 "claim_id": claim_id,
                 "latest_revision": revision,
-                "status": next(
-                    item["status"] for item in evaluations
-                    if item["claim_id"] == claim_id and item["revision"] == revision
-                ),
+                "status": latest_statuses[claim_id],
             }
             for claim_id, revision in sorted(latest.items())
-            if next(
-                item["status"] for item in evaluations
-                if item["claim_id"] == claim_id and item["revision"] == revision
-            ) != "current"
+            if latest_statuses[claim_id] != "current"
         ],
         "claim_ceiling": (
             "synthetic dependency-consistency reference evaluator; not a production truth "
