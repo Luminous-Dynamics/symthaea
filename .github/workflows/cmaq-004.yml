@@ -219,6 +219,17 @@ jobs:
           print(json.dumps({
               lane: {
                   "family_count": by_key[(lane, "additive_model", 0.04)]["family_count"],
+                  "margin_gates_at_cost_0_04": {
+                      gate: {
+                          "action_override_rate": by_key[(lane, gate, 0.04)]["action_override_rate"],
+                          "mean_gross_lift": by_key[(lane, gate, 0.04)]["mean_gross_lift_vs_direct"],
+                          "mean_break_even_query_cost": by_key[(lane, gate, 0.04)]["mean_break_even_query_cost"],
+                          "mean_net_lift": by_key[(lane, gate, 0.04)]["mean_net_lift_vs_direct"],
+                          "harmed_family_rate": by_key[(lane, gate, 0.04)]["harmed_family_rate"],
+                          "lower_cvar05_lift": by_key[(lane, gate, 0.04)]["lower_cvar05_net_lift"],
+                      }
+                      for gate in gate_names
+                  },
                   "cost_frontier": {
                       str(cost): {
                           "mean_gross_lift": by_key[(lane, "additive_model", round(cost, 4))]["mean_gross_lift_vs_direct"],
