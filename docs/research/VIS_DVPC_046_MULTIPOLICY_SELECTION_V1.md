@@ -52,6 +52,20 @@ where `delta_{j,t} = alpha_policy / [2 t(t+1)]`. Because ∑_{t>=1} 1/[t(t+1)] =
 
 The portfolio certificate is conservative by design: even if one policy looks promising, the system abstains unless the entire interval family separates a unique best candidate.
 
+## Fixed-horizon COLT and LS baselines
+
+At the three preregistered looks, the benchmark also evaluates the following methods on the same logged prefix:
+
+- **pCRP-star fixed-grid LCB.** This is based on the penalized best constant-rebalanced-portfolio LCB in Ryu et al., *Improved Offline Contextual Bandits with Second-Order Bounds: Betting and Freezing* (COLT 2025). It uses a fixed set of 33 feasible bets and monotone root bisection. A finite grid's maximum wealth is no larger than the continuous-bet supremum, so the induced LCB is conservative relative to the exact pCRP-star bound, potentially at a cost in width. This is *not* an exact reproduction of the paper's continuous optimization or its separate freezing-based learning algorithm. Reference: https://proceedings.mlr.press/v291/ryu25a.html
+
+- **Logarithmic Smoothing (LS) fixed-horizon LCB.** This is based on Sakhi et al., *Logarithmic Smoothing for Pessimistic Off-Policy Evaluation, Selection and Learning* (NeurIPS 2024), Corollary 5 / equations (12)–(14). With nonnegative reward scores `Y=wR` and their complement `Yc=w(1-R)`, it computes `L(Y)` and `U(V)=1-L(Yc)`. The registered, scale-aware parameter is `lambda = sqrt(2 ln(1/delta_tail)/(n W_j^2))`; it is fixed by n, the error allocation and the known policy-specific weight ceiling, never tuned on test outcomes. The 2024 bound applies for fixed-horizon inputs; this implementation does not call it a confidence sequence. Reference: https://proceedings.neurips.cc/paper_files/paper/2024/hash/9379ea6ba7a61a402c7750833848b99f-Abstract-Conference.html
+
+Each one-sided bound uses `delta_tail = 0.05/(2M)` for that registered horizon. At each horizon this allocates the full 0.05 risk budget across the lower/upper tails and M policy candidates. Because there are multiple registered horizons, this is a per-look fixed-horizon claim—not a simultaneous guarantee across all three horizons and not an optional-stopping guarantee. A future sequential LS implementation must use the theorem and protocol of the separate 2026 sequential LS + online PAC-Bayes work: https://proceedings.mlr.press/v300/haddouche26a.html.
+
+To keep the new methods computationally tractable for 1,024 replicates through n=4,096, the Rust harness compresses exactly repeated nonnegative IPS scores into (score, multiplicity) bins as data arrive. This leaves the logged stream and mathematical objective unchanged. Tests compare the compressed log wealth against an observation-level calculation, check the analytical pCRP constant-stream root, verify LS's constant-stream formula, and verify the identity `E[w(1-R)] = 1 - V(pi)` under both registered loggers.
+
+Fixed-horizon methods intentionally emit a `FIXED_HORIZON_ONLY` status at the registered looks. They do not emit `familywise_sequence_coverage` or certificate-time metrics.
+
 ## Paired experiment
 
 Each logger/replicate has a fixed SplitMix64 seed. Candidate counts M=4,8,32 re-use the same logged context/action/reward prefix within a logger condition. At every look n in {256,1024,4096}, the benchmark records:
