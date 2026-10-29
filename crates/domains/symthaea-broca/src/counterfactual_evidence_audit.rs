@@ -442,6 +442,8 @@ pub struct AtomAblationObservation {
     pub fixture_sha256: String,
     pub prompt_sha256: String,
     pub tokenizer_sha256: String,
+    /// SHA-256 of canonical generation/decoding/tool policy configuration (no secrets).
+    pub generation_config_sha256: String,
     pub system_commit_sha: String,
     /// Evidence IDs present in the exact canonical runtime projection, in fixture order.
     pub full_context_evidence_ids: Vec<String>,
@@ -478,6 +480,7 @@ pub struct AtomAblationScoreSummary {
     pub fixture_sha256: String,
     pub prompt_sha256: String,
     pub tokenizer_sha256: String,
+    pub generation_config_sha256: String,
     pub system_commit_sha: String,
     pub observation_count: usize,
     pub ignore_count: usize,
@@ -555,6 +558,7 @@ pub fn score_atom_ablation_jsonl(
         }
         validate_hex_digest("prompt_sha256", &observation.prompt_sha256, 64)?;
         validate_hex_digest("tokenizer_sha256", &observation.tokenizer_sha256, 64)?;
+        validate_hex_digest("generation_config_sha256", &observation.generation_config_sha256, 64)?;
         validate_hex_digest("system_commit_sha", &observation.system_commit_sha, 40)?;
         validate_hex_digest("full_runtime_case_sha256", &observation.full_runtime_case_sha256, 64)?;
         validate_hex_digest("ablated_runtime_case_sha256", &observation.ablated_runtime_case_sha256, 64)?;
@@ -715,6 +719,7 @@ pub fn score_atom_ablation_jsonl(
     let fixture_sha256 = observations[0].fixture_sha256.clone();
     let prompt_sha256 = observations[0].prompt_sha256.clone();
     let tokenizer_sha256 = observations[0].tokenizer_sha256.clone();
+    let generation_config_sha256 = observations[0].generation_config_sha256.clone();
     let system_commit_sha = observations[0].system_commit_sha.clone();
     if observations.iter().any(|item| {
         item.run_id != run_id
@@ -722,6 +727,7 @@ pub fn score_atom_ablation_jsonl(
             || item.fixture_sha256 != fixture_sha256
             || item.prompt_sha256 != prompt_sha256
             || item.tokenizer_sha256 != tokenizer_sha256
+            || item.generation_config_sha256 != generation_config_sha256
             || item.system_commit_sha != system_commit_sha
     }) {
         return Err("all observations in one score run must pin identical run, reader, fixture, prompt, tokenizer, and code revisions".into());
@@ -801,6 +807,7 @@ pub fn score_atom_ablation_jsonl(
         fixture_sha256,
         prompt_sha256,
         tokenizer_sha256,
+        generation_config_sha256,
         system_commit_sha,
         observation_count: judgments.len(),
         ignore_count,
@@ -1099,6 +1106,7 @@ mod tests {
                 "fixture_sha256": fixture_sha256,
                 "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "generation_config_sha256": "abababababababababababababababababababababababababababababababab",
                 "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
                 "full_context_evidence_ids": full_context_evidence_ids,
                 "ablated_context_evidence_ids": ablated_context_evidence_ids,
@@ -1200,6 +1208,16 @@ mod tests {
     }
 
     #[test]
+    fn atom_ablation_scorer_rejects_generation_configuration_drift() {
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let mut rows = synthetic_ablation_rows(&fixture_sha256);
+        rows[4]["generation_config_sha256"] =
+            serde_json::json!("cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd");
+        let mixed_configs = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&mixed_configs, FIXTURES, LABELS).is_err());
+    }
+
+    #[test]
     fn atom_ablation_scorer_binds_fixture_digest_and_allows_signed_token_delta() {
         let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
         let mut rows = synthetic_ablation_rows(&fixture_sha256);
@@ -1234,6 +1252,7 @@ mod tests {
             "fixture_sha256": fixture_sha256,
             "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "generation_config_sha256": "abababababababababababababababababababababababababababababababab",
             "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
             "full_context_evidence_ids": [],
             "ablated_context_evidence_ids": [],
