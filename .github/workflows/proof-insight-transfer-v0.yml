@@ -3635,9 +3635,9 @@ jobs:
           if Draft202012Validator(census_schema).is_valid(bad):
               raise SystemExit("census schema accepted outcome-derived eligibility")
           bad = copy.deepcopy(census_fixture)
-          bad["families"][0]["eligibility_status"] = "excluded"
+          bad["families"][0]["eligibility_status"] = "not_a_registered_status"
           if Draft202012Validator(census_schema).is_valid(bad):
-              raise SystemExit("census schema accepted an unregistered or malformed family classification")
+              raise SystemExit("census schema accepted an unregistered family classification")
           print("PITB_ELIGIBLE_COMPONENT_FEASIBILITY_PASS: underpowered_case_detected=true confirmatory=false")
           PY
       - name: Upload exact-source index and receipts
