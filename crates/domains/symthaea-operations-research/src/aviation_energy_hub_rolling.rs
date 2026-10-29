@@ -193,7 +193,7 @@ pub fn run_rolling_horizon(
         let _ = canonical_forecast_digest(forecast)?;
     }
 
-    let episode_digest = canonical_episode_digest(episode)?;
+    let episode_digest = canonical_rolling_episode_digest(episode)?;
     let mut soc = realized.storage.initial_soc_quanta;
     let mut actions = Vec::with_capacity(horizon);
     let mut steps = Vec::with_capacity(horizon);
@@ -349,7 +349,7 @@ pub fn run_rolling_horizon(
     })
 }
 
-fn canonical_episode_digest(
+pub fn canonical_rolling_episode_digest(
     episode: &RollingHorizonEpisode,
 ) -> Result<String, RollingHorizonError> {
     let realized_digest = canonical_energy_hub_digest(&episode.realized_scenario)
