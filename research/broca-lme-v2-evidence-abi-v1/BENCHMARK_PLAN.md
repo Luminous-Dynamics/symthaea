@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, an opt-in trajectory-diversity selector, and a token-budget packing policy are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, an opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, and audited evidence-floor resolver are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -146,6 +146,29 @@ Report accuracy separately for static state recall, dynamic state tracking, work
 **Hard gates:** no state-index jumping across missing steps; no cross-trajectory or cross-scope expansion; no inactive or invalid neighbor; no invented relevance score; deterministic expansion from the same snapshot and ranking; final serialized context always remains within budget. Test lifecycle mutations (revoke/delete/supersede/expire) and restart/snapshot restoration.
 
 **Decision rule:** keep expansion opt-in unless a held-out, paired comparison improves dynamic-state/workflow outcomes or offers a quality–cost improvement without an unacceptable static-state regression. Freeze the acceptable static-regression margin and cost criterion before inspecting held-out results. These are experiment acceptance rules, not current measured outcomes or an industry standard.
+
+### Audited evidence coverage and abstention boundary (new opt-in contract)
+
+The resolver now has an opt-in audited path that emits the selected, provenance-bearing context plus one disposition for each input HDC hit. Decisions distinguish emitted evidence, duplicate IDs, unknown IDs, invalid records, inactive lifecycle, cross-scope evidence, not-yet-valid evidence, expired evidence, and otherwise eligible evidence excluded by the output limit. Corrupt eligible payloads remain hard errors; they are not converted into an empty result.
+
+An EvidenceFloorPolicy can require a minimum emitted-item count and a minimum number of distinct source trajectories. The resulting audit reports observed counts and whether the configured **operational coverage floor** was met. It explicitly does *not* claim semantic sufficiency, entailment, contradiction detection, or answer correctness. Two correlated records can satisfy the floor yet fail to support the question; a single authoritative record may be enough for some questions and still fail a two-source policy. Treat the floor only as a calibrated abstention/escalation feature, not a truth detector.
+
+Evaluate this alongside [Memora / FAMA](https://github.com/geniesinc/Memora), whose Forgetting-Aware Memory Accuracy penalizes reuse of obsolete or invalidated memories, and [AgentAbstain](https://agentabstain.github.io/), which evaluates paired near-identical tasks where the agent should act in one case and abstain in the other. AgentAbstain's public summary reports 263 paired tasks across 42 environments and a best paired accuracy of 59.5% across 17 evaluated models; these are broad agent-abstention reference points, not memory-resolver scores or a directly comparable benchmark.
+
+Build memory-specific paired cases where a tiny change flips the correct decision:
+- sufficient, current, in-scope evidence versus one missing critical state;
+- unique evidence versus two conflicting active records;
+- current claim versus a superseded/expired predecessor;
+- exact environment/scope versus a near-match from a different namespace;
+- authorized candidate set versus only unknown, corrupt, or tombstoned evidence.
+
+The no-evidence and insufficient-evidence cases must be paired with solvable near-twins so "always abstain" cannot score well. Report **coverage**, task accuracy conditional on proceeding, paired act/abstain accuracy, false-action rate on should-abstain cases, false-abstention rate on solvable cases, obsolete-memory reuse (FAMA-style), and quality–cost curves. If a calibrated probability model is later added, report Brier score/ECE and risk–coverage curves with confidence intervals; do not pretend the count-based floor is a probability estimator.
+
+Compare at least: (1) resolver without audit/floor, (2) audit only, (3) configured count/diversity floor, (4) an independently evaluated semantic support/contradiction gate once one exists, and (5) always-answer / always-abstain controls. Keep integrity failures separate from ordinary low evidence coverage. Record the exact candidate dispositions and floor outcome per example.
+
+**Hard gates:** a rejected, invalid, stale, or cross-scope candidate must never be emitted; an eligible but corrupt payload must produce an explicit integrity error; failed floor must be visible to the caller; no empty-result fallback may disguise integrity failure. The downstream policy must not proceed on a failed floor unless the application explicitly chooses and audits a separate escalation path.
+
+**Decision rule:** treat floor compliance and decision quality as separate axes. First achieve zero policy bypasses in adversarial fixtures; then require held-out paired improvement in act/abstain accuracy without unacceptable loss of solveable-task coverage. The operational floor's threshold is tuned only on development data. No semantic sufficiency or SOTA claim is implied by this resolver.
 
 ## Required baseline arms
 
