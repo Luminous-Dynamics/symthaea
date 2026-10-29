@@ -224,7 +224,9 @@ pub enum CheckedGeneralizedEigenError {
         residual: f64,
         limit: f64,
     },
-    NonFiniteTransformedMatrix { index: usize },
+    NonFiniteTransformedMatrix {
+        index: usize,
+    },
     NonFiniteIntermediate,
     Eigen(SymmetricEigenError),
     EigensolverNotConverged(CheckedSymmetricEigenResult),
@@ -237,19 +239,31 @@ pub enum CheckedGeneralizedEigenError {
 impl std::fmt::Display for CheckedGeneralizedEigenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ZeroBasisDimension => write!(f, "generalized eigenproblem has zero basis dimension"),
-            Self::ZeroIndependentDimension => write!(f, "generalized eigenproblem has zero retained dimension"),
+            Self::ZeroBasisDimension => {
+                write!(f, "generalized eigenproblem has zero basis dimension")
+            }
+            Self::ZeroIndependentDimension => {
+                write!(f, "generalized eigenproblem has zero retained dimension")
+            }
             Self::IndependentDimensionExceedsBasis => {
                 write!(f, "retained dimension exceeds basis dimension")
             }
-            Self::MatrixLengthMismatch { matrix, expected, actual } => write!(
+            Self::MatrixLengthMismatch {
+                matrix,
+                expected,
+                actual,
+            } => write!(
                 f,
                 "{matrix} matrix expected {expected} entries, received {actual}"
             ),
             Self::NonFiniteInput { matrix, index } => {
                 write!(f, "{matrix} input entry {index} is non-finite")
             }
-            Self::NonsymmetricFockMatrix { row, column, normalized_difference } => write!(
+            Self::NonsymmetricFockMatrix {
+                row,
+                column,
+                normalized_difference,
+            } => write!(
                 f,
                 "Fock matrix is not symmetric at ({row}, {column}); normalized difference is {normalized_difference}"
             ),
@@ -261,15 +275,17 @@ impl std::fmt::Display for CheckedGeneralizedEigenError {
                 f,
                 "overlap matrix is not symmetric at ({row}, {column}); normalized difference is {normalized_difference}"
             ),
-            Self::OrthogonalizationResidualExceeded { residual, limit } => write!(
-                f,
-                "Xᵀ S X residual {residual} exceeds limit {limit}"
-            ),
+            Self::OrthogonalizationResidualExceeded { residual, limit } => {
+                write!(f, "Xᵀ S X residual {residual} exceeds limit {limit}")
+            }
             Self::NonFiniteTransformedMatrix { index } => {
                 write!(f, "transformed Fock matrix entry {index} is non-finite")
             }
             Self::NonFiniteIntermediate => {
-                write!(f, "generalized eigensolver produced a non-finite intermediate")
+                write!(
+                    f,
+                    "generalized eigensolver produced a non-finite intermediate"
+                )
             }
             Self::Eigen(error) => write!(f, "transformed Fock eigensolver rejected input: {error}"),
             Self::EigensolverNotConverged(result) => write!(
@@ -336,24 +352,33 @@ impl std::fmt::Display for ScfSolveError {
             Self::ElectronCountOverflow => {
                 write!(f, "electron count cannot be represented on this target")
             }
-            Self::UnsupportedMultiplicity { method, multiplicity } => write!(
-                f,
-                "{method} does not support multiplicity {multiplicity}"
-            ),
+            Self::UnsupportedMultiplicity {
+                method,
+                multiplicity,
+            } => write!(f, "{method} does not support multiplicity {multiplicity}"),
             Self::InvalidMultiplicity { multiplicity } => write!(
                 f,
                 "multiplicity {multiplicity} is invalid; multiplicity must be at least one"
             ),
-            Self::InconsistentElectronicState { electron_count, multiplicity } => write!(
+            Self::InconsistentElectronicState {
+                electron_count,
+                multiplicity,
+            } => write!(
                 f,
                 "{electron_count} electrons are inconsistent with multiplicity {multiplicity}"
             ),
-            Self::InvalidCharge { charge, nuclear_charge } => write!(
+            Self::InvalidCharge {
+                charge,
+                nuclear_charge,
+            } => write!(
                 f,
                 "molecule charge {charge} exceeds total nuclear charge {nuclear_charge}"
             ),
             Self::NoElectrons => {
-                write!(f, "zero-electron systems are unsupported by the molecular SCF solver")
+                write!(
+                    f,
+                    "zero-electron systems are unsupported by the molecular SCF solver"
+                )
             }
             Self::EmptyIntegrationGrid => {
                 write!(f, "DFT integration grid contains no usable points")
@@ -367,8 +392,15 @@ impl std::fmt::Display for ScfSolveError {
             Self::NonFiniteNumericValue { stage, index } => {
                 write!(f, "SCF numeric value {stage}[{index}] is non-finite")
             }
-            Self::InvalidNumericInput { stage, index, value } => {
-                write!(f, "SCF numeric input {stage}[{index}] has invalid value {value}")
+            Self::InvalidNumericInput {
+                stage,
+                index,
+                value,
+            } => {
+                write!(
+                    f,
+                    "SCF numeric input {stage}[{index}] has invalid value {value}"
+                )
             }
             Self::InsufficientBasisForOccupiedOrbitals {
                 occupied_orbitals,
@@ -455,11 +487,9 @@ pub fn solve_generalized_eigen_checked(
     let fock_scale = if fock_scale == 0.0 { 1.0 } else { fock_scale };
     for row in 0..n_basis {
         for column in (row + 1)..n_basis {
-            let normalized_difference = (
-                f_matrix[row * n_basis + column] / fock_scale
-                    - f_matrix[column * n_basis + row] / fock_scale
-            )
-            .abs();
+            let normalized_difference = (f_matrix[row * n_basis + column] / fock_scale
+                - f_matrix[column * n_basis + row] / fock_scale)
+                .abs();
             if normalized_difference > CHECKED_SYMMETRY_RELATIVE_TOLERANCE {
                 return Err(CheckedGeneralizedEigenError::NonsymmetricFockMatrix {
                     row,
@@ -473,14 +503,16 @@ pub fn solve_generalized_eigen_checked(
     let overlap_scale = s_matrix
         .iter()
         .fold(0.0_f64, |scale, value| scale.max(value.abs()));
-    let overlap_scale = if overlap_scale == 0.0 { 1.0 } else { overlap_scale };
+    let overlap_scale = if overlap_scale == 0.0 {
+        1.0
+    } else {
+        overlap_scale
+    };
     for row in 0..n_basis {
         for column in (row + 1)..n_basis {
-            let normalized_difference = (
-                s_matrix[row * n_basis + column] / overlap_scale
-                    - s_matrix[column * n_basis + row] / overlap_scale
-            )
-            .abs();
+            let normalized_difference = (s_matrix[row * n_basis + column] / overlap_scale
+                - s_matrix[column * n_basis + row] / overlap_scale)
+                .abs();
             if normalized_difference > CHECKED_SYMMETRY_RELATIVE_TOLERANCE {
                 return Err(CheckedGeneralizedEigenError::NonsymmetricOverlapMatrix {
                     row,
@@ -496,10 +528,12 @@ pub fn solve_generalized_eigen_checked(
         return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
     }
     if orthogonality_residual > CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT {
-        return Err(CheckedGeneralizedEigenError::OrthogonalizationResidualExceeded {
-            residual: orthogonality_residual,
-            limit: CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT,
-        });
+        return Err(
+            CheckedGeneralizedEigenError::OrthogonalizationResidualExceeded {
+                residual: orthogonality_residual,
+                limit: CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT,
+            },
+        );
     }
 
     let f_prime = xtax(x_matrix, f_matrix, n_basis, n_independent);
@@ -509,7 +543,9 @@ pub fn solve_generalized_eigen_checked(
     let eigensolver = symmetric_eigen_checked(&f_prime, n_independent, max_iterations)
         .map_err(CheckedGeneralizedEigenError::Eigen)?;
     if !eigensolver.converged {
-        return Err(CheckedGeneralizedEigenError::EigensolverNotConverged(eigensolver));
+        return Err(CheckedGeneralizedEigenError::EigensolverNotConverged(
+            eigensolver,
+        ));
     }
 
     let mut indices: Vec<usize> = (0..n_independent).collect();
@@ -544,7 +580,11 @@ pub fn solve_generalized_eigen_checked(
         return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
     }
     let residual_scale = fock_scale.max(rhs_scale);
-    let residual_scale = if residual_scale == 0.0 { 1.0 } else { residual_scale };
+    let residual_scale = if residual_scale == 0.0 {
+        1.0
+    } else {
+        residual_scale
+    };
     let mut max_residual = 0.0_f64;
     for column in 0..n_independent {
         let energy = sorted_eigenvalues[column];
@@ -632,8 +672,13 @@ pub struct CheckedSymmetricEigenResult {
 pub enum SymmetricEigenError {
     ZeroDimension,
     DimensionOverflow,
-    MatrixLengthMismatch { expected: usize, actual: usize },
-    NonFiniteInput { index: usize },
+    MatrixLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteInput {
+        index: usize,
+    },
     NonFiniteIntermediate,
     NonsymmetricInput {
         row: usize,
@@ -657,7 +702,10 @@ impl std::fmt::Display for SymmetricEigenError {
                 write!(f, "symmetric eigensolver input entry {index} is non-finite")
             }
             Self::NonFiniteIntermediate => {
-                write!(f, "symmetric eigensolver produced a non-finite intermediate")
+                write!(
+                    f,
+                    "symmetric eigensolver produced a non-finite intermediate"
+                )
             }
             Self::NonsymmetricInput {
                 row,
@@ -692,7 +740,9 @@ pub fn symmetric_eigen_checked(
     if n == 0 {
         return Err(SymmetricEigenError::ZeroDimension);
     }
-    let expected = n.checked_mul(n).ok_or(SymmetricEigenError::DimensionOverflow)?;
+    let expected = n
+        .checked_mul(n)
+        .ok_or(SymmetricEigenError::DimensionOverflow)?;
     if matrix.len() != expected {
         return Err(SymmetricEigenError::MatrixLengthMismatch {
             expected,
@@ -700,7 +750,10 @@ pub fn symmetric_eigen_checked(
         });
     }
     if matrix.iter().any(|value| !value.is_finite()) {
-        let index = matrix.iter().position(|value| !value.is_finite()).unwrap_or(0);
+        let index = matrix
+            .iter()
+            .position(|value| !value.is_finite())
+            .unwrap_or(0);
         return Err(SymmetricEigenError::NonFiniteInput { index });
     }
 
@@ -709,13 +762,16 @@ pub fn symmetric_eigen_checked(
         .fold(0.0_f64, |scale, value| scale.max(value.abs()));
     // Keep relative checks meaningful for tiny matrices while avoiding division
     // by zero for an exactly-zero matrix.
-    let matrix_scale = if matrix_scale == 0.0 { 1.0 } else { matrix_scale };
+    let matrix_scale = if matrix_scale == 0.0 {
+        1.0
+    } else {
+        matrix_scale
+    };
     for row in 0..n {
         for column in (row + 1)..n {
-            let normalized_difference =
-                (matrix[row * n + column] / matrix_scale
-                    - matrix[column * n + row] / matrix_scale)
-                    .abs();
+            let normalized_difference = (matrix[row * n + column] / matrix_scale
+                - matrix[column * n + row] / matrix_scale)
+                .abs();
             if normalized_difference > CHECKED_SYMMETRY_RELATIVE_TOLERANCE {
                 return Err(SymmetricEigenError::NonsymmetricInput {
                     row,
@@ -745,10 +801,8 @@ pub fn symmetric_eigen_checked(
         // apq is nonzero in this loop, so the scale remains positive even
         // for subnormal matrices; flooring at MIN_POSITIVE would distort them.
         let rotation_scale = app.abs().max(aqq.abs()).max(apq.abs());
-        let theta = 0.5
-            * (2.0 * (apq / rotation_scale)).atan2(
-                app / rotation_scale - aqq / rotation_scale,
-            );
+        let theta =
+            0.5 * (2.0 * (apq / rotation_scale)).atan2(app / rotation_scale - aqq / rotation_scale);
         let cosine = theta.cos();
         let sine = theta.sin();
 
@@ -763,10 +817,8 @@ pub fn symmetric_eigen_checked(
                 next[q * n + i] = next[i * n + q];
             }
         }
-        next[p * n + p] =
-            cosine * cosine * app + 2.0 * cosine * sine * apq + sine * sine * aqq;
-        next[q * n + q] =
-            sine * sine * app - 2.0 * cosine * sine * apq + cosine * cosine * aqq;
+        next[p * n + p] = cosine * cosine * app + 2.0 * cosine * sine * apq + sine * sine * aqq;
+        next[q * n + q] = sine * sine * app - 2.0 * cosine * sine * apq + cosine * cosine * aqq;
         next[p * n + q] = 0.0;
         next[q * n + p] = 0.0;
 
@@ -852,8 +904,7 @@ fn max_relative_eigenpair_residual(
         for row in 0..n {
             let mut product = 0.0;
             for k in 0..n {
-                product += (matrix[row * n + k] / matrix_scale)
-                    * eigenvectors[k * n + column];
+                product += (matrix[row * n + k] / matrix_scale) * eigenvectors[k * n + column];
             }
             let residual = (product - eigenvalue * eigenvectors[row * n + column]).abs();
             maximum = maximum.max(residual);
@@ -902,7 +953,10 @@ pub enum CanonicalOrthogonalizationError {
     },
     NoIndependentBasisFunctions,
     NonFiniteTransform,
-    OrthogonalityResidualExceeded { residual: f64, limit: f64 },
+    OrthogonalityResidualExceeded {
+        residual: f64,
+        limit: f64,
+    },
 }
 
 impl std::fmt::Display for CanonicalOrthogonalizationError {
@@ -960,7 +1014,9 @@ pub fn canonical_orthogonalization_checked(
     let eigensolver = symmetric_eigen_checked(s_matrix, n, max_iterations)
         .map_err(CanonicalOrthogonalizationError::Eigen)?;
     if !eigensolver.converged {
-        return Err(CanonicalOrthogonalizationError::EigensolverNotConverged(eigensolver));
+        return Err(CanonicalOrthogonalizationError::EigensolverNotConverged(
+            eigensolver,
+        ));
     }
 
     // Tiny negative modes within the configured rank threshold can arise from
@@ -1002,20 +1058,17 @@ pub fn canonical_orthogonalization_checked(
     if transformation.iter().any(|value| !value.is_finite()) {
         return Err(CanonicalOrthogonalizationError::NonFiniteTransform);
     }
-    let residual = max_overlap_orthogonality_residual(
-        s_matrix,
-        &transformation,
-        n,
-        n_independent,
-    );
+    let residual = max_overlap_orthogonality_residual(s_matrix, &transformation, n, n_independent);
     if !residual.is_finite() {
         return Err(CanonicalOrthogonalizationError::NonFiniteTransform);
     }
     if residual > CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT {
-        return Err(CanonicalOrthogonalizationError::OrthogonalityResidualExceeded {
-            residual,
-            limit: CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT,
-        });
+        return Err(
+            CanonicalOrthogonalizationError::OrthogonalityResidualExceeded {
+                residual,
+                limit: CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT,
+            },
+        );
     }
 
     Ok(CheckedCanonicalOrthogonalization {
@@ -1307,12 +1360,8 @@ mod tests {
         assert_eq!(diagonal.stopping_reason, EigenStoppingReason::Converged);
         assert_eq!(diagonal.max_off_diagonal, 0.0);
 
-        let degenerate = symmetric_eigen_checked(
-            &[2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0],
-            3,
-            0,
-        )
-        .unwrap();
+        let degenerate =
+            symmetric_eigen_checked(&[2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0], 3, 0).unwrap();
         assert!(degenerate.converged);
         assert_eq!(degenerate.eigenvalues, vec![2.0, 2.0, 2.0]);
         assert!(degenerate.max_orthogonality_residual <= CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT);
@@ -1333,10 +1382,7 @@ mod tests {
         assert!((eigenvalues[0] - 1.5).abs() < 1e-12);
         assert!((eigenvalues[1] - 2.5).abs() < 1e-12);
         assert!(converged.max_relative_eigenpair_residual <= CHECKED_EIGENPAIR_RESIDUAL_LIMIT);
-        assert!(
-            converged.max_orthogonality_residual
-                <= CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT
-        );
+        assert!(converged.max_orthogonality_residual <= CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT);
 
         // Relative scaling must remain correct below f64::MIN_POSITIVE.
         let subnormal = [1e-310, 0.5e-310, 0.5e-310, 1e-310];
@@ -1378,8 +1424,7 @@ mod tests {
         assert!(result.orthogonality_residual <= CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT);
 
         let near_dependent = [1.0, 0.9999999, 0.9999999, 1.0];
-        let reduced =
-            canonical_orthogonalization_checked(&near_dependent, 2, 1e-6, 100).unwrap();
+        let reduced = canonical_orthogonalization_checked(&near_dependent, 2, 1e-6, 100).unwrap();
         assert_eq!(reduced.n_independent, 1);
         assert_eq!(reduced.n_discarded, 1);
         assert!(reduced.orthogonality_residual <= CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT);

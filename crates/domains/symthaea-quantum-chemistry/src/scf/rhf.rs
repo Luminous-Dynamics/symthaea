@@ -24,8 +24,7 @@
 
 use crate::basis::BasisSet;
 use crate::constants::{
-    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD,
-    SCF_ENERGY_THRESHOLD,
+    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD, SCF_ENERGY_THRESHOLD,
 };
 use crate::integrals::eri::{compute_eri_tensor, compute_schwarz_bounds};
 use crate::integrals::kinetic::kinetic_matrix;
@@ -222,8 +221,9 @@ fn try_restricted_hartree_fock_with_eigensolver_budget(
         CANONICAL_ORTH_THRESHOLD,
         overlap_iterations,
     )?;
-    let mut solver_diagnostics =
-        ScfSolverDiagnostics::from_overlap_residual(checked_orthogonalization.orthogonality_residual);
+    let mut solver_diagnostics = ScfSolverDiagnostics::from_overlap_residual(
+        checked_orthogonalization.orthogonality_residual,
+    );
     let x_mat = checked_orthogonalization.transformation;
     let n_ind = checked_orthogonalization.n_independent;
     let eigensolver_iterations = eigensolver_iteration_budget
@@ -250,14 +250,8 @@ fn try_restricted_hartree_fock_with_eigensolver_budget(
     };
 
     // Step 4: Initial guess — a required checked generalized eigensolve.
-    let initial = solve_generalized_eigen_checked(
-        &h_core,
-        &s_mat,
-        &x_mat,
-        n,
-        n_ind,
-        eigensolver_iterations,
-    )?;
+    let initial =
+        solve_generalized_eigen_checked(&h_core, &s_mat, &x_mat, n, n_ind, eigensolver_iterations)?;
     solver_diagnostics.record_generalized_solve(&initial);
     let mut coefficients = initial.generalized.coefficients;
     let mut orbital_energies = initial.generalized.eigenvalues;
@@ -391,22 +385,15 @@ mod tests {
         let odd_electron_singlet = Molecule::new(vec![hydrogen]);
         let odd_basis = Sto3g::build(&odd_electron_singlet);
         assert!(matches!(
-            try_restricted_hartree_fock(
-                &odd_electron_singlet,
-                &odd_basis,
-                &RhfConfig::default()
-            ),
+            try_restricted_hartree_fock(&odd_electron_singlet, &odd_basis, &RhfConfig::default()),
             Err(ScfSolveError::InconsistentElectronicState {
                 electron_count: 1,
                 multiplicity: 1
             })
         ));
 
-        let zero_electron = Molecule::with_charge(
-            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
-            1,
-            1,
-        );
+        let zero_electron =
+            Molecule::with_charge(vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)], 1, 1);
         let zero_electron_basis = Sto3g::build(&zero_electron);
         assert!(matches!(
             try_restricted_hartree_fock(
@@ -431,11 +418,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "invalid molecule: charge")]
     fn test_legacy_rhf_keeps_invalid_charge_panic_contract() {
-        let molecule = Molecule::with_charge(
-            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
-            2,
-            1,
-        );
+        let molecule =
+            Molecule::with_charge(vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)], 2, 1);
         let basis = Sto3g::build(&molecule);
         let _ = restricted_hartree_fock(&molecule, &basis, &RhfConfig::default());
     }
@@ -457,7 +441,12 @@ mod tests {
         assert!(!legacy.converged);
         assert!(legacy.total_energy.is_nan());
         assert!(legacy.electronic_energy.is_nan());
-        assert!(legacy.solver_error.as_deref().is_some_and(|message| message.contains("non-finite")));
+        assert!(
+            legacy
+                .solver_error
+                .as_deref()
+                .is_some_and(|message| message.contains("non-finite"))
+        );
         assert!(legacy.solver_diagnostics.is_none());
     }
 
