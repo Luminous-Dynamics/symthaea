@@ -5,9 +5,7 @@
 //! never claims that a digest authenticates the runner or that a label proves
 //! scientific truth. Inference/calibration uncertainty is a separate analysis.
 
-use crate::counterfactual_evidence::{
-    EvidenceInterventionPlanV1, verify_evidence_intervention_plan,
-};
+use crate::counterfactual_evidence::{EvidenceInterventionPlanV1, verify_evidence_intervention_plan};
 use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
