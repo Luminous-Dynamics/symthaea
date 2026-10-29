@@ -19,6 +19,7 @@ const MANIFEST_KEYS: &[&str] = &[
     "source_version",
     "source_license_spdx",
     "source_license_evidence_url",
+    "intended_use",
     "source_sha256",
     "row_order_semantics",
     "feature_columns",
@@ -210,6 +211,23 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
         || ["UNKNOWN", "UNVERIFIED", "NOASSERTION"].contains(&license)
     {
         return Err(fail("source_license_spdx must be a non-placeholder SPDX-style identifier token"));
+    }
+
+    let intended_use = required(fields, "intended_use")?;
+    if !matches!(intended_use, "research_only" | "commercial_compatible") {
+        return Err(fail("intended_use must be research_only or commercial_compatible"));
+    }
+    let license_terms: Vec<String> = license
+        .split('-')
+        .map(|part| part.to_ascii_lowercase())
+        .collect();
+    let restricts_commercial_use = license_terms
+        .iter()
+        .any(|part| matches!(part.as_str(), "nc" | "noncommercial"));
+    if intended_use == "commercial_compatible"
+        && (restricts_commercial_use || license.starts_with("LicenseRef-"))
+    {
+        return Err(fail("commercial_compatible use is not allowed by a known non-commercial or unreviewed LicenseRef identifier"));
     }
 
     let license_url = required(fields, "source_license_evidence_url")?;
@@ -489,6 +507,7 @@ mod tests {
             ("source_version", "2026-01"),
             ("source_license_spdx", "CC-BY-4.0"),
             ("source_license_evidence_url", "https://example.org/fixture-license"),
+            ("intended_use", "commercial_compatible"),
             ("source_sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             ("row_order_semantics", "temporal"),
             ("feature_columns", "demand,price,temperature"),
@@ -563,6 +582,20 @@ mod tests {
         set(&mut fields, "source_license_spdx", "CC-BY-4.0");
         set(&mut fields, "source_sha256", "aaaaaaaa");
         assert!(validate_manifest(&fields).unwrap_err().contains("source_sha256"));
+    }
+
+    #[test]
+    fn commercial_use_rejects_noncommercial_or_unreviewed_license_refs() {
+        let mut fields = valid_fields();
+        set(&mut fields, "source_license_spdx", "CC-BY-NC-4.0");
+        assert!(validate_manifest(&fields).unwrap_err().contains("commercial_compatible"));
+        set(&mut fields, "source_license_spdx", "LicenseRef-ResearchOnly");
+        assert!(validate_manifest(&fields).unwrap_err().contains("commercial_compatible"));
+        set(&mut fields, "source_license_spdx", "CC-BY-4.0");
+        validate_manifest(&fields).unwrap();
+        set(&mut fields, "intended_use", "research_only");
+        set(&mut fields, "source_license_spdx", "CC-BY-NC-4.0");
+        validate_manifest(&fields).unwrap();
     }
 
     #[test]
