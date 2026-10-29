@@ -767,7 +767,7 @@ jobs:
           jq -e '.structural_valid == true and .plan_commitment_matches == false and .valid == false' \
             /tmp/sbr-counterfactual-evidence/mutated-commitment-report.json >/dev/null
           ! grep -Eq 'raw target|gold answer text|hidden oracle' /tmp/sbr-counterfactual-evidence/valid-report.json
-- name: Evaluator-side counterfactual outcome receipt controls
+      - name: Evaluator-side counterfactual outcome receipt controls
         shell: bash
         run: |
           set -euo pipefail
@@ -844,7 +844,7 @@ jobs:
           # Reports may contain hashes/labels, never evaluator-private source text.
           ! grep -Eiq 'gold answer text|hidden oracle|protected source passage' \
             /tmp/sbr-evidence-outcomes/verified.json
-- name: Preregistered paired outcome analysis controls
+      - name: Preregistered paired outcome analysis controls
         shell: bash
         run: |
           set -euo pipefail
