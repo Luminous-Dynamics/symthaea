@@ -9,7 +9,6 @@ use std::env;
 use std::fmt::Write as _;
 
 const PROB_SUM_TOL: f64 = 1e-9;
-const SUPPORT_MASS_TOL: f64 = 1e-12;
 const NUMERIC_TOL: f64 = 1e-9;
 const WEAK_MAX_RATIO: f64 = 20.0;
 const WEAK_MIN_POPULATION_ESS_FRACTION: f64 = 0.05;
@@ -116,7 +115,9 @@ impl SupportAudit {
             .filter_map(|(&h, &pi)| if h == 0.0 { Some(pi) } else { None })
             .sum();
 
-        if unsupported_target_mass > SUPPORT_MASS_TOL {
+        let any_unsupported_target_mass = behavior.iter().zip(target.iter())
+            .any(|(&h, &pi)| h == 0.0 && pi > 0.0);
+        if any_unsupported_target_mass {
             return Self {
                 status: SupportStatus::NotIdentified,
                 decision: DecisionStatus::SuppressValueAndInterval,
