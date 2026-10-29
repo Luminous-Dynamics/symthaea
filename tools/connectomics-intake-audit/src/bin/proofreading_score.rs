@@ -616,7 +616,7 @@ mod tests {
         let a = row("a", true, 0.9, 0.9, 5.0, 4.0, "mouse:merge");
         let b = row("b", true, 0.8, 0.8, 2.0, 2.0, "mouse:merge");
         let c = row("c", false, 0.1, 0.7, 1.0, 0.0, "mouse:merge");
-        let out = review_yield(&[&a, &b, &c], 3.0, "minutes");
+        let out = review_yield(&[&a, &b, &c], 3.0, None, "minutes");
         assert_eq!(out.selected_count, 2);
         assert_eq!(out.true_errors_found, 1);
         assert_eq!(out.actual_review_minutes, 3.0);
