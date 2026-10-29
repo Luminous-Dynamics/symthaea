@@ -55,6 +55,9 @@ class DependencyCascadeTests(unittest.TestCase):
                 "S1_upstream_updated",
                 "S2_service_refreshed_worker_stale",
                 "S3_dependency_chain_refreshed",
+                "S4_dependency_value_reverts_without_refresh",
+                "S5_service_refreshed_after_reversion_worker_stale",
+                "S6_dependency_chain_refreshed_after_reversion",
             ],
         )
 
@@ -115,6 +118,49 @@ class DependencyCascadeTests(unittest.TestCase):
             [],
         )
         self.assertEqual(report["absence_claims"][0]["claim_id"], "service_dsn")
+
+    def test_aba_value_reversion_does_not_resurrect_old_dependencies(self) -> None:
+        report = self.reports["S4_dependency_value_reverts_without_refresh"]
+        endpoint = by_key(report, "db_endpoint")
+        service = by_key(report, "service_dsn")
+        worker = by_key(report, "worker_dsn")
+        self.assertEqual(endpoint["value"], "db-primary-a.internal")
+        self.assertEqual(endpoint["status"], "current")
+        self.assertEqual(service["value"], "postgres://db-primary-b.internal/service")
+        self.assertEqual(service["status"], "stale_dependency")
+        self.assertEqual(worker["status"], "stale_dependency")
+        self.assertNotIn(
+            "service_dsn",
+            {row["claim_id"] for row in report["current_claims"]},
+        )
+        self.assertNotIn(
+            "worker_dsn",
+            {row["claim_id"] for row in report["current_claims"]},
+        )
+
+    def test_aba_partial_refresh_still_leaves_transitive_worker_stale(self) -> None:
+        report = self.reports["S5_service_refreshed_after_reversion_worker_stale"]
+        self.assertEqual(by_key(report, "db_endpoint")["value"], "db-primary-a.internal")
+        self.assertEqual(by_key(report, "service_dsn")["value"], "postgres://db-primary-a.internal/service")
+        self.assertEqual(by_key(report, "service_dsn")["status"], "current")
+        self.assertEqual(by_key(report, "worker_dsn")["status"], "stale_dependency")
+        self.assertNotIn(
+            "worker_dsn",
+            {row["claim_id"] for row in report["current_claims"]},
+        )
+
+    def test_same_value_is_not_enough_without_current_dependency_revision(self) -> None:
+        report = self.reports["S6_dependency_chain_refreshed_after_reversion"]
+        old_worker = by_key(report, "worker_dsn", 1)
+        current_worker = by_key(report, "worker_dsn", 3)
+        self.assertEqual(old_worker["value"], current_worker["value"])
+        self.assertEqual(old_worker["status"], "historical")
+        self.assertFalse(old_worker["is_latest_revision"])
+        self.assertEqual(current_worker["status"], "current")
+        self.assertEqual(
+            {row["claim_id"] for row in report["current_claims"]},
+            {"db_endpoint", "service_dsn", "worker_dsn", "alert_threshold"},
+        )
 
     def test_duplicate_claim_revision_fails_closed(self) -> None:
         snapshot = {
