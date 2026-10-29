@@ -466,8 +466,8 @@ Observed data and forecast data remain separate. A future forecast is usable onl
 
 ### State and execution contract
 
-- The initial state of charge is explicit and bound into the energy-hub scenario digest.
-- State of charge carried from the previous committed interval becomes the initial state of the next suffix optimization.
+- The initial state of charge and a non-empty opening-inventory ledger reference are explicit and bound into the energy-hub scenario digest. Positive opening SOC cannot use the no-opening-inventory sentinel.
+- State of charge carried from the previous committed interval becomes the initial state of the next suffix optimization. Its inventory-ledger reference becomes a canonical digest over the verified committed prefix, actions, and realized source-cost/emissions summaries.
 - At each stage, the exact solver returns a Pareto frontier and the reference policy selects its first cost-ordered point; this is one deterministic baseline policy, not a proof that cost is the only objective.
 - The first action is independently verified against the current actual interval and carried SOC before the trace advances.
 - Every committed action remains immutable; later observations only affect later actions.
