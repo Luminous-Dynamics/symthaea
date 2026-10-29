@@ -217,8 +217,31 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(result["reference_tree_integrity"]["valid"])
         self.assertTrue(any("test bundle file changed" in issue for issue in result["issues"]))
 
+    def test_undeclared_untracked_file_during_test_invalidates_gate(self) -> None:
+        bundle = zip_bytes([
+            ("test_contract.py", b"""import pathlib
+import unittest
+import app
+
+class ContractTest(unittest.TestCase):
+    def test_expected_behavior(self):
+        self.assertEqual(app.VALUE, 1)
+        pathlib.Path("rogue-output.py").write_text("SHOULD_NOT_EXIST" + chr(10), encoding="utf-8")
+""")
+        ])
+        result = self.run_controls(bundle_raw=bundle, evidence_root=self.root / "untracked-evidence")
+        self.assertFalse(result["two_sided_gate_passed"])
+        self.assertFalse(result["reference_tree_integrity"]["valid"])
+        self.assertTrue(any("untracked-file inventory changed" in issue for issue in result["issues"]))
+
     def test_reference_that_does_not_fix_behavior_fails_gate(self) -> None:
-        wrong_patch = self.patch_raw.replace(b"VALUE = 1", b"VALUE = 2")
+        (self.repo / "app.py").write_text("VALUE = 2\\n", encoding="utf-8")
+        wrong_patch = self.run_git(self.repo, "diff", "--", "app.py").stdout.encode("utf-8")
+        self.run_git(self.repo, "checkout", "--", "app.py")
+        self.assertEqual(
+            self.run_git(self.repo, "status", "--porcelain=v1", "--untracked-files=all").stdout,
+            "",
+        )
         result = self.run_controls(
             patch_raw=wrong_patch,
             evidence_root=self.root / "wrong-patch-evidence",
