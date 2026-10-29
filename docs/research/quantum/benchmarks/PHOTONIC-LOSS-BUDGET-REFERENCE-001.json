@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "example_only": true,
+  "id": "QARCH-LOSS-BUDGET-REF-001",
+  "title": "Architecture-specific optical-loss budget from the 2026 quantum-dot time-bin fusion blueprint",
+  "evidence_class": "paper-derived-threshold-plus-paper-reported-component-values",
+  "architecture_family": "emitter-driven time-bin fusion-based photonic quantum computing",
+  "code_architecture": "synchronous foliated Floquet colour-code fusion network (sFFCC)",
+  "source": {
+    "title": "Practical blueprint for low-depth photonic quantum computing with quantum dots",
+    "publication": "npj Quantum Information 12 (2026)",
+    "doi": "10.1038/s41534-026-01258-3",
+    "url": "https://doi.org/10.1038/s41534-026-01258-3"
+  },
+  "threshold_model": {
+    "photon_loss_threshold_probability": 0.08,
+    "minimum_survival_probability": 0.92,
+    "derived_maximum_total_loss_db": 0.3621217265444471,
+    "derivation": "loss_db = -10 * log10(1 - photon_loss_threshold_probability)",
+    "interpretation": "Maximum total path loss under this paper's declared threshold model; not a universal photonic threshold."
+  },
+  "paper_reported_component_values": [
+    {
+      "name": "emission into broad phonon sideband",
+      "value": 0.223,
+      "unit": "dB",
+      "boundary": "within emitter photon source unit",
+      "evidence": "paper-reported component value cited by the blueprint"
+    },
+    {
+      "name": "coupling loss into optical fibre",
+      "value": 3,
+      "unit": "dB",
+      "boundary": "emitter source to optical fibre",
+      "evidence": "paper-reported component value cited by the blueprint"
+    },
+    {
+      "name": "fibre-to-chip coupling",
+      "value": 0.13,
+      "unit": "dB",
+      "boundary": "fibre-to-chip interface",
+      "evidence": "paper-reported component value cited by the blueprint"
+    },
+    {
+      "name": "active phase-shifter insertion loss",
+      "value": 0.53,
+      "unit": "dB/cm",
+      "boundary": "active phase shifter; multiply only by path length actually traversed",
+      "evidence": "paper-reported component value cited by the blueprint"
+    },
+    {
+      "name": "waveguide propagation loss",
+      "value": 2,
+      "unit": "dB/m",
+      "boundary": "waveguide; multiply only by path length actually traversed",
+      "evidence": "paper-reported component value cited by the blueprint"
+    }
+  ],
+  "derived_checks": {
+    "three_db_coupling_transmission": 0.5011872336272722,
+    "three_db_coupling_exceeds_threshold_budget": true,
+    "warning": "These listed component values do not necessarily belong to one identical optical path or one configuration. Do not sum them into a claimed system loss without an explicit route/path manifest."
+  },
+  "caveats": [
+    "The threshold is model-dependent on code, decoder, error model, topology, and the paper's assumptions.",
+    "Component loss figures and the theoretical threshold must remain separate evidence classes.",
+    "The 3 dB coupling value alone is numerically much larger than the derived 0.362 dB total-path budget if that coupling is on the modeled path; this highlights a component target, not a demonstration that the architecture is feasible with that component.",
+    "This is a literature-derived scenario fixture, not an empirical Symthaea benchmark result."
+  ]
+}
