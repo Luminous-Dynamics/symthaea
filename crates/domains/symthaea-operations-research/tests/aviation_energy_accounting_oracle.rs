@@ -6,6 +6,7 @@ use symthaea_operations_research::aviation_energy_accounting::{
 fn service() -> TransportService {
     TransportService {
         period_id: "2026-W01".to_owned(),
+        lifecycle_boundary_id: "well-to-wake-v1".to_owned(),
         completed_passenger_km: 1_000.0,
         available_seat_km: 2_000.0,
     }
@@ -24,6 +25,7 @@ fn record(
     EnergyRecord {
         id: id.to_owned(),
         boundary_id: boundary_id.to_owned(),
+        lifecycle_boundary_id: "well-to-wake-v1".to_owned(),
         period_id: "2026-W01".to_owned(),
         evidence_ref: format!("evidence:{id}"),
         evidence_class: EvidenceClass::Synthetic,
@@ -73,6 +75,10 @@ fn known_answer_ledger_aggregates_only_declared_fields() {
     let summary = account_energy_ledger(&known_records(), &service()).unwrap();
 
     assert_eq!(summary.currency_code, "USD");
+    assert_eq!(summary.lifecycle_boundary_id, "well-to-wake-v1");
+    assert_eq!(summary.record_evidence.len(), 2);
+    assert_eq!(summary.record_evidence[0].record_id, "electricity");
+    assert_eq!(summary.record_evidence[0].evidence_class, EvidenceClass::Synthetic);
     assert_eq!(summary.total_source_energy_kwh, 120.0);
     assert_eq!(summary.total_delivered_energy_kwh, 113.0);
     assert_eq!(summary.upstream_co2e_kg, 25.0);
@@ -211,6 +217,16 @@ fn period_mismatch_is_rejected() {
     assert_eq!(
         account_energy_ledger(&records, &service()).unwrap_err(),
         AccountingError::PeriodMismatch
+    );
+}
+
+#[test]
+fn lifecycle_boundary_mismatch_is_rejected() {
+    let mut records = known_records();
+    records[0].lifecycle_boundary_id = "different-boundary-v2".to_owned();
+    assert_eq!(
+        account_energy_ledger(&records, &service()).unwrap_err(),
+        AccountingError::LifecycleBoundaryMismatch
     );
 }
 
