@@ -1,6 +1,6 @@
 # GOV-CAP-001: Governance Capture-Resistance Benchmark
 
-**Status:** research specification / documentation-only proposal  
+**Status:** research specification plus public synthetic development fixture; no executable runner  
 **Version:** 0.1  
 **Owner:** Luminous Dynamics research  
 **Intended consumers:** Symthaea, Mycelix, Symtropy  
@@ -241,7 +241,11 @@ Freeze definitions, scope, attack families, negative controls, metrics, and clai
 
 ### GCRB-1 — Machine-readable synthetic protocol
 
-Add versioned scenario and evaluator-manifest fixtures with stable IDs, schema validation, evaluator-owned truth labels, known answers, and seeded negative controls. Include mutations for stale hashes, post-hoc metric changes, wrong evidence classes, missing counterevidence, unauthorized authority, and simulated-as-observed claims.
+The initial public-development fixture is now committed at `docs/research/fixtures/governance-capture-resistance-v0.1.json`. It contains 18 synthetic attack cases and eight benign hard negatives, with stable IDs, declared severity, deterministic seeds, expected dispositions, required behaviors, and forbidden behaviors.
+
+This is a public known-answer fixture for development and mutation testing—not a blind qualification corpus and not an empirical finding. Its embedded expected dispositions are intentionally public. It does not yet provide schema validation, a parameterized corpus large enough to support the proposed statistical targets, a separately controlled evaluator manifest, or an independent Rust runner.
+
+Next: formalize the schema; add seeded mutation generators and at least 1,000 parameterized benign-control episodes; freeze a distinct evaluator manifest and qualification set; compute release digests over precisely specified canonical bytes; and ensure candidate inputs cannot read the evaluator-only labels during blind evaluation.
 
 ### GCRB-2 — Isolated Rust reference runner
 
