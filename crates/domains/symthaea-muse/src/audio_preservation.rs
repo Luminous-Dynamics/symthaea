@@ -463,6 +463,344 @@ fn audio_digest(view: AudioView<'_>) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+
+/// Configuration for an independent spectral-flux onset-preservation check.
+///
+/// Time tolerances are milliseconds and are converted using the input sample
+/// rate. Thresholds require calibration on the intended renderer/domain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnsetPreservationConfig {
+    pub frame_size: usize,
+    pub hop_size: usize,
+    /// Normalized positive spectral flux threshold in [0, 1].
+    pub novelty_threshold: f32,
+    pub minimum_separation_ms: u32,
+    pub onset_time_tolerance_ms: u32,
+    pub boundary_guard_frames: usize,
+    pub minimum_protected_duration_ms: u32,
+    pub calibration_id: Option<String>,
+}
+
+impl Default for OnsetPreservationConfig {
+    fn default() -> Self {
+        Self {
+            frame_size: 1024,
+            hop_size: 256,
+            novelty_threshold: 0.15,
+            minimum_separation_ms: 80,
+            onset_time_tolerance_ms: 20,
+            boundary_guard_frames: 0,
+            minimum_protected_duration_ms: 250,
+            calibration_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnsetEvent {
+    pub channel: usize,
+    /// Approximate onset time in audio-frame coordinates.
+    pub frame: usize,
+    pub novelty: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnsetPreservationReport {
+    pub verifier_version: String,
+    pub calibration_id: Option<String>,
+    pub reference_audio_sha256: String,
+    pub candidate_audio_sha256: String,
+    pub protected_duration_frames: usize,
+    pub onset_time_tolerance_frames: usize,
+    pub matched_events: usize,
+    pub missing_reference_events: Vec<OnsetEvent>,
+    pub extra_candidate_events: Vec<OnsetEvent>,
+    pub maximum_matched_displacement_frames: usize,
+    pub verdict: PreservationVerdict,
+    pub reasons: Vec<String>,
+    pub reference_onsets: Vec<OnsetEvent>,
+    pub candidate_onsets: Vec<OnsetEvent>,
+}
+
+/// Compare detected onset events independently by channel.
+///
+/// The detector uses normalized positive spectral flux. Events inside the
+/// edit mask expanded by the explicit boundary guard are excluded from both
+/// sides. Matching is one-to-one: a candidate onset cannot satisfy two
+/// reference events. An event outside the timing tolerance is conservatively
+/// represented as a missing reference event plus an extra candidate event.
+pub fn audit_onset_preservation(
+    reference: AudioView<'_>,
+    candidate: AudioView<'_>,
+    authorized_edits: &[FrameInterval],
+    config: &OnsetPreservationConfig,
+) -> Result<OnsetPreservationReport, AudioAuditInputError> {
+    validate_view(reference)?;
+    validate_view(candidate)?;
+    if reference.sample_rate_hz != candidate.sample_rate_hz
+        || reference.channels != candidate.channels
+    {
+        return Err(AudioAuditInputError::FormatMismatch);
+    }
+    if reference.interleaved_samples.len() != candidate.interleaved_samples.len() {
+        return Err(AudioAuditInputError::LengthMismatch);
+    }
+    validate_onset_config(config)?;
+
+    let total_frames = reference.interleaved_samples.len() / reference.channels;
+    for interval in authorized_edits {
+        if interval.start_frame >= interval.end_frame || interval.end_frame > total_frames {
+            return Err(AudioAuditInputError::InvalidEditInterval);
+        }
+    }
+    let masks = merged_guarded_masks(
+        authorized_edits,
+        config.boundary_guard_frames,
+        total_frames,
+    );
+    let protected_duration_frames = total_frames.saturating_sub(
+        masks.iter().map(|mask| mask.end_frame - mask.start_frame).sum::<usize>(),
+    );
+    let tolerance_frames = ((config.onset_time_tolerance_ms as u128
+        * reference.sample_rate_hz as u128)
+        / 1000)
+        .min(usize::MAX as u128) as usize;
+    let separation_frames = ((config.minimum_separation_ms as u128
+        * reference.sample_rate_hz as u128)
+        / 1000)
+        .max(1)
+        .min(usize::MAX as u128) as usize;
+
+    let mut reference_onsets = Vec::new();
+    let mut candidate_onsets = Vec::new();
+    for channel in 0..reference.channels {
+        let reference_samples = mono_channel(reference, channel);
+        let candidate_samples = mono_channel(candidate, channel);
+        reference_onsets.extend(detect_spectral_flux_onsets(
+            &reference_samples,
+            channel,
+            config,
+            separation_frames,
+        ));
+        candidate_onsets.extend(detect_spectral_flux_onsets(
+            &candidate_samples,
+            channel,
+            config,
+            separation_frames,
+        ));
+    }
+    reference_onsets.retain(|event| !masks.iter().any(|mask| contains_frame(*mask, event.frame)));
+    candidate_onsets.retain(|event| !masks.iter().any(|mask| contains_frame(*mask, event.frame)));
+    reference_onsets.sort_by_key(|event| (event.channel, event.frame));
+    candidate_onsets.sort_by_key(|event| (event.channel, event.frame));
+
+    let mut candidate_matched = vec![false; candidate_onsets.len()];
+    let mut missing_reference_events = Vec::new();
+    let mut matched_events = 0usize;
+    let mut maximum_matched_displacement_frames = 0usize;
+
+    for reference_event in &reference_onsets {
+        let nearest = candidate_onsets
+            .iter()
+            .enumerate()
+            .filter(|(index, event)| {
+                !candidate_matched[*index] && event.channel == reference_event.channel
+            })
+            .min_by_key(|(_, event)| event.frame.abs_diff(reference_event.frame));
+
+        if let Some((index, candidate_event)) = nearest {
+            let displacement = candidate_event.frame.abs_diff(reference_event.frame);
+            if displacement <= tolerance_frames {
+                candidate_matched[index] = true;
+                matched_events += 1;
+                maximum_matched_displacement_frames =
+                    maximum_matched_displacement_frames.max(displacement);
+            } else {
+                missing_reference_events.push(reference_event.clone());
+            }
+        } else {
+            missing_reference_events.push(reference_event.clone());
+        }
+    }
+    let extra_candidate_events: Vec<OnsetEvent> = candidate_onsets
+        .iter()
+        .enumerate()
+        .filter_map(|(index, event)| (!candidate_matched[index]).then_some(event.clone()))
+        .collect();
+
+    let minimum_protected_frames = ((config.minimum_protected_duration_ms as u128
+        * reference.sample_rate_hz as u128)
+        .div_ceil(1000))
+        .min(usize::MAX as u128) as usize;
+
+    let mut reasons = Vec::new();
+    if !missing_reference_events.is_empty() || !extra_candidate_events.is_empty() {
+        reasons.push(
+            "protected-region onset events are missing, added, or outside the timing tolerance"
+                .to_owned(),
+        );
+    }
+    if config.calibration_id.is_none() {
+        reasons.push("no calibration ID supplied; a non-violating run cannot be accepted".to_owned());
+    }
+    if protected_duration_frames < minimum_protected_frames {
+        reasons.push(format!(
+            "only {protected_duration_frames} protected frames were available; \
+             {minimum_protected_frames} required"
+        ));
+    }
+
+    let verdict = if !missing_reference_events.is_empty() || !extra_candidate_events.is_empty() {
+        PreservationVerdict::Fail
+    } else if config.calibration_id.is_none()
+        || protected_duration_frames < minimum_protected_frames
+    {
+        PreservationVerdict::Abstain
+    } else {
+        PreservationVerdict::Pass
+    };
+
+    Ok(OnsetPreservationReport {
+        verifier_version: format!("{AUDIO_PRESERVATION_VERIFIER_VERSION}+spectral-flux-onset-v0.1"),
+        calibration_id: config.calibration_id.clone(),
+        reference_audio_sha256: audio_digest(reference),
+        candidate_audio_sha256: audio_digest(candidate),
+        protected_duration_frames,
+        onset_time_tolerance_frames: tolerance_frames,
+        matched_events,
+        missing_reference_events,
+        extra_candidate_events,
+        maximum_matched_displacement_frames,
+        verdict,
+        reasons,
+        reference_onsets,
+        candidate_onsets,
+    })
+}
+
+fn validate_onset_config(config: &OnsetPreservationConfig) -> Result<(), AudioAuditInputError> {
+    if config.frame_size < 16 {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "onset frame_size must be at least 16",
+        ));
+    }
+    if config.hop_size == 0 || config.hop_size > config.frame_size {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "onset hop_size must be in 1..=frame_size",
+        ));
+    }
+    if !config.novelty_threshold.is_finite()
+        || !(0.0..=1.0).contains(&config.novelty_threshold)
+    {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "novelty_threshold must be finite and in 0..=1",
+        ));
+    }
+    if config.minimum_separation_ms == 0 {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "minimum_separation_ms must be non-zero",
+        ));
+    }
+    if config.minimum_protected_duration_ms == 0 {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "minimum_protected_duration_ms must be non-zero",
+        ));
+    }
+    if config.onset_time_tolerance_ms > 10_000
+        || config.minimum_separation_ms > 10_000
+        || config.minimum_protected_duration_ms > 600_000
+    {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "onset time parameters exceed bounded limits",
+        ));
+    }
+    if config.calibration_id.as_ref().is_some_and(|id| id.trim().is_empty()) {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "calibration_id must be non-empty when present",
+        ));
+    }
+    Ok(())
+}
+
+fn mono_channel(view: AudioView<'_>, channel: usize) -> Vec<f32> {
+    (0..view.interleaved_samples.len() / view.channels)
+        .map(|frame| view.interleaved_samples[frame * view.channels + channel])
+        .collect()
+}
+
+fn contains_frame(interval: FrameInterval, frame: usize) -> bool {
+    interval.start_frame <= frame && frame < interval.end_frame
+}
+
+fn detect_spectral_flux_onsets(
+    samples: &[f32],
+    channel: usize,
+    config: &OnsetPreservationConfig,
+    minimum_separation_frames: usize,
+) -> Vec<OnsetEvent> {
+    if samples.len() < config.frame_size {
+        return Vec::new();
+    }
+    let window = hann_window(config.frame_size);
+    let mut planner = FftPlanner::<f32>::new();
+    let fft = planner.plan_fft_forward(config.frame_size);
+    let mut previous_magnitudes: Option<Vec<f32>> = None;
+    let mut novelty_points: Vec<(usize, f32)> = Vec::new();
+    let bins = config.frame_size / 2 + 1;
+    let mut start = 0usize;
+
+    while start <= samples.len() - config.frame_size {
+        let mut spectrum: Vec<Complex<f32>> = samples[start..start + config.frame_size]
+            .iter()
+            .zip(&window)
+            .map(|(sample, weight)| Complex::new(sample * weight, 0.0))
+            .collect();
+        fft.process(&mut spectrum);
+        let magnitudes: Vec<f32> = spectrum[..bins].iter().map(|value| value.norm()).collect();
+        let novelty = if let Some(previous) = &previous_magnitudes {
+            let positive_flux: f64 = magnitudes
+                .iter()
+                .zip(previous)
+                .map(|(current, prior)| (*current - *prior).max(0.0) as f64)
+                .sum();
+            let current_energy: f64 = magnitudes.iter().map(|value| *value as f64).sum();
+            if current_energy <= f64::EPSILON {
+                0.0
+            } else {
+                (positive_flux / current_energy).clamp(0.0, 1.0) as f32
+            }
+        } else {
+            let current_energy: f64 = magnitudes.iter().map(|value| *value as f64).sum();
+            if current_energy <= f64::EPSILON { 0.0 } else { 1.0 }
+        };
+        novelty_points.push((start + config.frame_size / 2, novelty));
+        previous_magnitudes = Some(magnitudes);
+        start = match start.checked_add(config.hop_size) {
+            Some(next) => next,
+            None => break,
+        };
+    }
+
+    let mut detected = Vec::new();
+    for index in 0..novelty_points.len() {
+        let current = novelty_points[index].1;
+        let previous = index.checked_sub(1).map(|i| novelty_points[i].1).unwrap_or(0.0);
+        let next = novelty_points.get(index + 1).map(|point| point.1).unwrap_or(0.0);
+        let frame = novelty_points[index].0;
+        if current < config.novelty_threshold || current < previous || current <= next {
+            continue;
+        }
+        if detected.last().is_some_and(|event: &OnsetEvent| {
+            frame.saturating_sub(event.frame) < minimum_separation_frames
+        }) {
+            continue;
+        }
+        detected.push(OnsetEvent { channel, frame, novelty: current });
+    }
+    detected
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -679,4 +1017,94 @@ mod tests {
             measurement.end_frame <= 960 || measurement.start_frame >= 2112
         }));
     }
+
+    fn onset_config() -> OnsetPreservationConfig {
+        OnsetPreservationConfig {
+            frame_size: 128,
+            hop_size: 32,
+            novelty_threshold: 0.12,
+            minimum_separation_ms: 8,
+            onset_time_tolerance_ms: 4,
+            boundary_guard_frames: 0,
+            minimum_protected_duration_ms: 100,
+            calibration_id: Some("synthetic-onset-calibration-v0".to_owned()),
+        }
+    }
+
+    fn burst(frames: usize, start: usize, end: usize, sample_rate: u32) -> Vec<f32> {
+        (0..frames)
+            .map(|index| {
+                if (start..end).contains(&index) {
+                    (std::f32::consts::TAU * 440.0 * index as f32 / sample_rate as f32).sin()
+                } else {
+                    0.0
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn onset_audit_passes_identical_audio_with_calibration() {
+        let samples = burst(8192, 1024, 3072, 16_000);
+        let report = audit_onset_preservation(
+            view(&samples),
+            view(&samples),
+            &[],
+            &onset_config(),
+        )
+        .expect("valid identical audio");
+        assert_eq!(report.verdict, PreservationVerdict::Pass);
+        assert_eq!(report.reference_audio_sha256, report.candidate_audio_sha256);
+        assert_eq!(report.missing_reference_events.len(), 0);
+        assert_eq!(report.extra_candidate_events.len(), 0);
+    }
+
+    #[test]
+    fn onset_audit_detects_a_delayed_protected_transient() {
+        let reference = burst(8192, 1024, 3072, 16_000);
+        let candidate = burst(8192, 1536, 3584, 16_000);
+        let report = audit_onset_preservation(
+            view(&reference),
+            view(&candidate),
+            &[],
+            &onset_config(),
+        )
+        .expect("valid delayed audio");
+        assert_eq!(report.verdict, PreservationVerdict::Fail);
+        assert!(!report.missing_reference_events.is_empty());
+        assert!(!report.extra_candidate_events.is_empty());
+    }
+
+    #[test]
+    fn onset_audit_excludes_events_inside_the_authorized_mask() {
+        let reference = burst(8192, 1024, 3072, 16_000);
+        let candidate = burst(8192, 1536, 3584, 16_000);
+        let report = audit_onset_preservation(
+            view(&reference),
+            view(&candidate),
+            &[FrameInterval { start_frame: 512, end_frame: 4096 }],
+            &onset_config(),
+        )
+        .expect("valid mask");
+        assert_eq!(report.verdict, PreservationVerdict::Pass);
+        assert!(report.reference_onsets.is_empty());
+        assert!(report.candidate_onsets.is_empty());
+    }
+
+    #[test]
+    fn onset_audit_abstains_without_calibration() {
+        let samples = burst(8192, 1024, 3072, 16_000);
+        let mut config = onset_config();
+        config.calibration_id = None;
+        let report = audit_onset_preservation(
+            view(&samples),
+            view(&samples),
+            &[],
+            &config,
+        )
+        .expect("valid audio");
+        assert_eq!(report.verdict, PreservationVerdict::Abstain);
+        assert!(report.reasons.iter().any(|reason| reason.contains("no calibration ID")));
+    }
+
 }
