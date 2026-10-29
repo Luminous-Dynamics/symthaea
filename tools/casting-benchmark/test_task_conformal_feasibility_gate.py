@@ -231,8 +231,8 @@ class TaskConformalFeasibilityGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "overlaps calibration task"):
             evaluate(config(), cal, tgt)
         tgt = target(predictions=[
-            {"candidate_id": "dup", "predicted_margin": 0.25},
-            {"candidate_id": "dup", "predicted_margin": 0.30},
+            {"candidate_id": "dup", "design": [0.0, 0.5], "predicted_margin": 0.25},
+            {"candidate_id": "dup", "design": [1.0, 0.5], "predicted_margin": 0.30},
         ])
         with self.assertRaisesRegex(ValueError, "duplicate target candidate_id"):
             evaluate(config(), calibration(), tgt)
