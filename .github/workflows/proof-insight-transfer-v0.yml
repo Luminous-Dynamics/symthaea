@@ -9,6 +9,8 @@ on:
       - "data/benchmarks/proof-insight-transfer-v0/**"
       - "docs/research/proof-insight-transfer-2026.md"
       - "scripts/research/pitb_component_allocation_sensitivity_v0.py"
+      - "scripts/research/pitb_missingness_bounds_v0.py"
+      - "docs/research/pitb-missingness-bounds-2026-10-29.md"
       - "docs/research/pitb-eligible-target-component-feasibility-2026-10-29.md"
       - ".github/workflows/proof-insight-transfer-v0.yml"
   workflow_dispatch:
@@ -3680,6 +3682,51 @@ jobs:
           if Draft202012Validator(report_schema).is_valid(bad_report):
               raise SystemExit("report schema accepted a synthetic candidate paired with a reviewed census")
           print("PITB_ELIGIBLE_COMPONENT_FEASIBILITY_PASS: underpowered_case_detected=true universe_pin=true confirmatory=false")
+          PY
+      - name: Test paired-outcome missingness bounds diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$GITHUB_WORKSPACE/scripts/research/pitb_missingness_bounds_v0.py"
+          fixture="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/paired-outcome-ledger.missingness.synthetic.json"
+          report="$RUNNER_TEMP/pitb-missingness-bounds-report.synthetic.json"
+          python3 -m py_compile "$script"
+          python3 "$script" --self-test
+          python3 "$script" "$fixture" "$report"
+          python3 - "$report" "$script" "$fixture" <<'PY'
+          import copy, json, subprocess, sys
+          from pathlib import Path
+
+          report_path, script_path, fixture_path = map(Path, sys.argv[1:])
+          report = json.loads(report_path.read_text())
+          fixture = json.loads(fixture_path.read_text())
+          bounds = report["sharp_finite_cohort_identification_bounds"]
+          if report["confirmatory_eligible"] is not False:
+              raise SystemExit("missingness diagnostic must never authorize confirmatory use")
+          if report["confirmatory_status"] != "blocked_unknown_outcomes":
+              raise SystemExit("synthetic ledger with unknown outcomes was not blocked")
+          if report["target_count"] != 8 or report["complete_pair_count"] != 3:
+              raise SystemExit("synthetic fixture denominator/pair count mismatch")
+          if abs(bounds["lower"] - (-0.375)) > 1e-12 or abs(bounds["upper"] - 0.5) > 1e-12:
+              raise SystemExit("sharp finite-cohort bounds did not match the reviewed example")
+          qhalf = next(row for row in report["sensitivity_grid"]
+                       if row["assumed_treatment_success_probability_among_unknown"] == 0.5
+                       and row["assumed_control_success_probability_among_unknown"] == 0.5)
+          if abs(qhalf["implied_effect"] if "implied_effect" in qhalf else
+                 qhalf["implied_target_weighted_effect"] - 0.0625) > 1e-12:
+              raise SystemExit("tipping-grid midpoint assumption changed unexpectedly")
+          bad = copy.deepcopy(fixture)
+          bad["rows"] = bad["rows"][:-1]
+          bad_path = report_path.with_name("pitb-missingness-bounds-missing-row.negative.json")
+          bad_path.write_text(json.dumps(bad))
+          rejected = subprocess.run(
+              [sys.executable, str(script_path), str(bad_path),
+               str(report_path.with_name("should-not-exist.json"))],
+              capture_output=True, text=True
+          )
+          if rejected.returncode == 0:
+              raise SystemExit("missing frozen target row was accepted")
+          print("PITB_MISSINGNESS_BOUNDS_PASS: sharp bounds, fixed denominator, 7 unit tests, confirmatory blocked")
           PY
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
