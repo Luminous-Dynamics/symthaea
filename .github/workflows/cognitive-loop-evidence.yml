@@ -427,6 +427,9 @@ jobs:
             .sensitivity_grid_summary.candidate_favoring_at_every_registered_point == false and
             .sensitivity_grid_summary.candidate_favoring_point_count > 0 and
             .sensitivity_grid_summary.reference_favoring_point_count > 0 and
+            .sensitivity_tipping_point != null and
+            (.sensitivity_tipping_point.max_abs_sensitivity_delta >= 0.249 and .sensitivity_tipping_point.max_abs_sensitivity_delta < 0.251) and
+            (.sensitivity_tipping_point.candidate_minus_reference_loss >= -1e-12 and .sensitivity_tipping_point.candidate_minus_reference_loss <= 1e-12) and
             (.sensitivity_surface | length) == 16 and
             (.source_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64 and
