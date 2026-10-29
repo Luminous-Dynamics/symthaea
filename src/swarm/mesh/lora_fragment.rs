@@ -188,7 +188,8 @@ impl LoRaFragment {
         if is_final_index && payload_len as usize != PAYLOAD_SIZE {
             return None;
         }
-        if buf.len() < HEADER_SIZE + payload_len as usize {
+        let expected_wire_len = HEADER_SIZE.checked_add(payload_len as usize)?;
+        if buf.len() != expected_wire_len {
             return None;
         }
 
@@ -387,7 +388,8 @@ impl FragmentAssembler {
     }
 
     fn layout_is_valid(&self) -> bool {
-        self.total_fragments >= 2
+        self.expected_payload_size > 0
+            && self.total_fragments >= 2
             && self.data_count > 0
             && self.data_count <= 254
             && self.total_fragments as usize == self.data_count as usize + 1
@@ -836,9 +838,18 @@ mod tests {
     }
 
     #[test]
-    fn truncated_buffer_rejected() {
+    fn truncated_and_trailing_wire_bytes_rejected() {
         assert!(LoRaFragment::from_bytes(&[0; 4]).is_none());
         assert!(LoRaFragment::from_bytes(&[]).is_none());
+
+        let frags = fragment(123, &[0x1a, 0x2b, 0x3c]);
+        let mut wire = [0u8; LORA_MTU];
+        let len = frags[0].to_bytes(&mut wire);
+        assert!(LoRaFragment::from_bytes(&wire[..len - 1]).is_none());
+
+        let mut with_trailing = wire[..len].to_vec();
+        with_trailing.push(0);
+        assert!(LoRaFragment::from_bytes(&with_trailing).is_none());
     }
 
     #[test]
