@@ -223,9 +223,9 @@ pub fn generate_file(
     );
     let policy_tick_input = generated.policy_tick_input(policy_tick);
     let mut policy_bytes = serde_json::to_vec_pretty(&policy_tick_input)?;
-    policy_bytes.push(b'\\n');
+    policy_bytes.push(b'\n');
     let mut evaluator_bytes = serde_json::to_vec_pretty(&generated.evaluator_schedule)?;
-    evaluator_bytes.push(b'\\n');
+    evaluator_bytes.push(b'\n');
     fs::write(policy_output_path, &policy_bytes)
         .with_context(|| format!("writing policy tick input {}", policy_output_path.display()))?;
     fs::write(evaluator_output_path, &evaluator_bytes)
@@ -513,7 +513,7 @@ fn policy_message_key(message: &PolicyVisibleMessage) -> (u64, u8, &str) {
 
 fn opaque_policy_event_id(seed: u64, source_event_id: &str) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"symthaea-policy-event-id-v1\\0");
+    digest.update(b"symthaea-policy-event-id-v1\0");
     digest.update(seed.to_le_bytes());
     digest.update([0]);
     digest.update(source_event_id.as_bytes());
