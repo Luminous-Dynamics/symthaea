@@ -262,6 +262,11 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         ("validation".to_owned(), 0usize),
         ("test".to_owned(), 0usize),
     ]);
+    let mut labels_by_split: BTreeMap<String, BTreeSet<String>> = BTreeMap::from([
+        ("train".to_owned(), BTreeSet::new()),
+        ("validation".to_owned(), BTreeSet::new()),
+        ("test".to_owned(), BTreeSet::new()),
+    ]);
 
     for (index, sample) in samples.iter().enumerate() {
         let line_number = index + 2;
@@ -307,6 +312,10 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         *split_counts
             .get_mut(&sample.split)
             .expect("split was validated above") += 1;
+        labels_by_split
+            .get_mut(&sample.split)
+            .expect("split was validated above")
+            .insert(sample.label.clone());
 
         let relative = Path::new(&sample.source_path);
         if relative.is_absolute()
@@ -383,6 +392,14 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     for split in ["train", "validation", "test"] {
         if split_counts.get(split).copied().unwrap_or_default() == 0 {
             return Err(format!("split {split:?} is empty"));
+        }
+    }
+    for split in ["validation", "test"] {
+        let labels = labels_by_split.get(split).expect("split map is complete");
+        if !labels.contains("benign") || !labels.contains("attack") {
+            return Err(format!(
+                "split {split:?} must contain both benign and attack labels to score binary detection"
+            ));
         }
     }
 
@@ -596,6 +613,15 @@ mod tests {
         }
     }
 
+    fn add_balanced_program_holdout(fixture: &mut Fixture) {
+        fixture.add_row("s-train-attack", "a", "program-a", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
+        fixture.add_row("s-train-benign", "b", "program-b", "run-b", "NA", "board-a", "program_holdout", "train", "benign");
+        fixture.add_row("s-val-attack", "c", "program-c", "run-c", "family-c", "board-a", "program_holdout", "validation", "attack");
+        fixture.add_row("s-val-benign", "d", "program-d", "run-d", "NA", "board-a", "program_holdout", "validation", "benign");
+        fixture.add_row("s-test-attack", "e", "program-e", "run-e", "family-e", "board-a", "program_holdout", "test", "attack");
+        fixture.add_row("s-test-benign", "f", "program-f", "run-f", "NA", "board-a", "program_holdout", "test", "benign");
+    }
+
     impl Drop for Fixture {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
@@ -613,132 +639,53 @@ mod tests {
     #[test]
     fn valid_program_holdout_passes() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "s-train",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
-        );
-        fixture.add_row(
-            "s-val",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "program_holdout",
-            "validation",
-            "benign",
-        );
-        fixture.add_row(
-            "s-test",
-            "c",
-            "program-c",
-            "run-c",
-            "family-c",
-            "board-a",
-            "program_holdout",
-            "test",
-            "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
         let result = fixture.audit().expect("valid manifest should pass");
-        assert_eq!(result.samples, 3);
-        assert_eq!(result.artifacts, 3);
+        assert_eq!(result.samples, 6);
+        assert_eq!(result.artifacts, 6);
     }
 
     #[test]
     fn repeated_windows_from_one_artifact_are_allowed_within_one_split() {
         let mut fixture = Fixture::new();
         fixture.add_row(
-            "s-train-1",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
+            "s-train-1", "a", "program-a", "run-a", "family-a", "board-a",
+            "program_holdout", "train", "attack",
         );
         fixture.add_row(
-            "s-train-2",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
+            "s-train-2", "a", "program-a", "run-a", "family-a", "board-a",
+            "program_holdout", "train", "attack",
         );
         fixture.add_row(
-            "s-val",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "program_holdout",
-            "validation",
-            "benign",
+            "s-train-benign", "b", "program-b", "run-b", "NA", "board-a",
+            "program_holdout", "train", "benign",
         );
         fixture.add_row(
-            "s-test",
-            "c",
-            "program-c",
-            "run-c",
-            "family-c",
-            "board-a",
-            "program_holdout",
-            "test",
-            "attack",
+            "s-val-attack", "c", "program-c", "run-c", "family-c", "board-a",
+            "program_holdout", "validation", "attack",
+        );
+        fixture.add_row(
+            "s-val-benign", "d", "program-d", "run-d", "NA", "board-a",
+            "program_holdout", "validation", "benign",
+        );
+        fixture.add_row(
+            "s-test-attack", "e", "program-e", "run-e", "family-e", "board-a",
+            "program_holdout", "test", "attack",
+        );
+        fixture.add_row(
+            "s-test-benign", "f", "program-f", "run-f", "NA", "board-a",
+            "program_holdout", "test", "benign",
         );
         let summary = fixture.audit().expect("repeated windows should pass");
-        assert_eq!(summary.samples, 4);
-        assert_eq!(summary.artifacts, 3);
+        assert_eq!(summary.samples, 7);
+        assert_eq!(summary.artifacts, 6);
     }
 
     #[test]
     fn same_program_cannot_cross_splits() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "s-train",
-            "a",
-            "program-shared",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
-        );
-        fixture.add_row(
-            "s-val",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "program_holdout",
-            "validation",
-            "benign",
-        );
-        fixture.add_row(
-            "s-test",
-            "c",
-            "program-shared",
-            "run-c",
-            "family-c",
-            "board-a",
-            "program_holdout",
-            "test",
-            "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[4][6] = "program-a".into();
         assert!(fixture.audit().unwrap_err().contains("crosses splits"));
     }
 
@@ -746,70 +693,28 @@ mod tests {
     fn attack_family_holdout_keeps_benign_programs_independently_grouped() {
         let mut fixture = Fixture::new();
         fixture.add_row(
-            "s-train-attack",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "attack_family_holdout",
-            "train",
-            "attack",
+            "s-train-attack", "a", "program-a", "run-a", "family-a", "board-a",
+            "attack_family_holdout", "train", "attack",
         );
         fixture.add_row(
-            "s-val-attack",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "attack_family_holdout",
-            "validation",
-            "attack",
+            "s-val-attack", "b", "program-b", "run-b", "family-b", "board-a",
+            "attack_family_holdout", "validation", "attack",
         );
         fixture.add_row(
-            "s-test-attack",
-            "c",
-            "program-c",
-            "run-c",
-            "family-c",
-            "board-a",
-            "attack_family_holdout",
-            "test",
-            "attack",
+            "s-test-attack", "c", "program-c", "run-c", "family-c", "board-a",
+            "attack_family_holdout", "test", "attack",
         );
         fixture.add_row(
-            "s-train-benign",
-            "d",
-            "benign-a",
-            "run-d",
-            "NA",
-            "board-a",
-            "attack_family_holdout",
-            "train",
-            "benign",
+            "s-train-benign", "d", "benign-a", "run-d", "NA", "board-a",
+            "attack_family_holdout", "train", "benign",
         );
         fixture.add_row(
-            "s-val-benign",
-            "e",
-            "benign-b",
-            "run-e",
-            "NA",
-            "board-a",
-            "attack_family_holdout",
-            "validation",
-            "benign",
+            "s-val-benign", "e", "benign-b", "run-e", "NA", "board-a",
+            "attack_family_holdout", "validation", "benign",
         );
         fixture.add_row(
-            "s-test-benign",
-            "f",
-            "benign-c",
-            "run-f",
-            "NA",
-            "board-a",
-            "attack_family_holdout",
-            "test",
-            "benign",
+            "s-test-benign", "f", "benign-c", "run-f", "NA", "board-a",
+            "attack_family_holdout", "test", "benign",
         );
         assert_eq!(fixture.audit().expect("valid family holdout").samples, 6);
     }
@@ -818,16 +723,28 @@ mod tests {
     fn capture_configuration_holdout_rejects_reuse_across_splits() {
         let mut fixture = Fixture::new();
         fixture.add_row_with_capture(
-            "s-train", "a", "program-a", "run-a", "family-a", "board-a",
+            "s-train-attack", "a", "program-a", "run-a", "family-a", "board-a",
             "capture-a", "counter-set-a", "capture_config_holdout", "train", "attack",
         );
         fixture.add_row_with_capture(
-            "s-val", "b", "program-b", "run-b", "family-b", "board-a",
+            "s-train-benign", "b", "benign-a", "run-b", "NA", "board-a",
+            "capture-a", "counter-set-a", "capture_config_holdout", "train", "benign",
+        );
+        fixture.add_row_with_capture(
+            "s-val-attack", "c", "program-c", "run-c", "family-c", "board-a",
+            "capture-b", "counter-set-a", "capture_config_holdout", "validation", "attack",
+        );
+        fixture.add_row_with_capture(
+            "s-val-benign", "d", "benign-b", "run-d", "NA", "board-a",
             "capture-b", "counter-set-a", "capture_config_holdout", "validation", "benign",
         );
         fixture.add_row_with_capture(
-            "s-test", "c", "program-c", "run-c", "family-c", "board-a",
+            "s-test-attack", "e", "program-e", "run-e", "family-e", "board-a",
             "capture-a", "counter-set-a", "capture_config_holdout", "test", "attack",
+        );
+        fixture.add_row_with_capture(
+            "s-test-benign", "f", "benign-c", "run-f", "NA", "board-a",
+            "capture-a", "counter-set-a", "capture_config_holdout", "test", "benign",
         );
         assert!(fixture.audit().unwrap_err().contains("crosses splits"));
     }
@@ -835,18 +752,10 @@ mod tests {
     #[test]
     fn one_source_artifact_cannot_be_assigned_to_two_splits() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "s-train", "a", "program-a", "run-a", "family-a", "board-a",
-            "program_holdout", "train", "attack",
-        );
-        fixture.add_row(
-            "s-val", "b", "program-b", "run-b", "family-b", "board-a",
-            "program_holdout", "validation", "benign",
-        );
-        fixture.add_row(
-            "s-test", "a", "program-a", "run-a", "family-a", "board-a",
-            "program_holdout", "test", "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
+        for field in [2usize, 3, 4, 6, 7, 8, 9, 10, 11] {
+            fixture.rows[4][field] = fixture.rows[0][field].clone();
+        }
         assert!(fixture.audit().unwrap_err().contains("inconsistent path, digest, or split"));
     }
 
@@ -854,18 +763,7 @@ mod tests {
     #[test]
     fn source_symlinks_are_rejected() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "s-train", "a", "program-a", "run-a", "family-a", "board-a",
-            "program_holdout", "train", "attack",
-        );
-        fixture.add_row(
-            "s-val", "b", "program-b", "run-b", "family-b", "board-a",
-            "program_holdout", "validation", "benign",
-        );
-        fixture.add_row(
-            "s-test", "c", "program-c", "run-c", "family-c", "board-a",
-            "program_holdout", "test", "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
         let manifest = fixture.write_manifest();
         let target = fixture.root.join("target.trace");
         fs::write(&target, "fixture:a").unwrap();
@@ -879,39 +777,7 @@ mod tests {
     #[test]
     fn altered_source_bytes_fail_hash_check() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "s-train",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
-        );
-        fixture.add_row(
-            "s-val",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "program_holdout",
-            "validation",
-            "benign",
-        );
-        fixture.add_row(
-            "s-test",
-            "c",
-            "program-c",
-            "run-c",
-            "family-c",
-            "board-a",
-            "program_holdout",
-            "test",
-            "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
         let _ = fixture.write_manifest();
         fs::write(fixture.root.join("a.trace"), "tampered-after-freeze").unwrap();
         assert!(fixture.audit().unwrap_err().contains("SHA-256 mismatch"));
@@ -920,39 +786,7 @@ mod tests {
     #[test]
     fn path_traversal_fails_closed() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "s-train",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
-        );
-        fixture.add_row(
-            "s-val",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "program_holdout",
-            "validation",
-            "benign",
-        );
-        fixture.add_row(
-            "s-test",
-            "c",
-            "program-c",
-            "run-c",
-            "family-c",
-            "board-a",
-            "program_holdout",
-            "test",
-            "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
         let path = fixture.write_manifest();
         let mut text = fs::read_to_string(&path).unwrap();
         text = text.replace("a.trace", "../a.trace");
@@ -963,39 +797,9 @@ mod tests {
     #[test]
     fn duplicate_sample_ids_are_rejected() {
         let mut fixture = Fixture::new();
-        fixture.add_row(
-            "same-id",
-            "a",
-            "program-a",
-            "run-a",
-            "family-a",
-            "board-a",
-            "program_holdout",
-            "train",
-            "attack",
-        );
-        fixture.add_row(
-            "s-val",
-            "b",
-            "program-b",
-            "run-b",
-            "family-b",
-            "board-a",
-            "program_holdout",
-            "validation",
-            "benign",
-        );
-        fixture.add_row(
-            "same-id",
-            "c",
-            "program-c",
-            "run-c",
-            "family-c",
-            "board-a",
-            "program_holdout",
-            "test",
-            "attack",
-        );
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[5][5] = fixture.rows[0][5].clone();
         assert!(fixture.audit().unwrap_err().contains("duplicate sample_id"));
     }
+
 }
