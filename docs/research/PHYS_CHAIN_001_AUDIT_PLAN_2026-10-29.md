@@ -56,6 +56,8 @@ Comparisons using the paper's listed measurements and stated standard uncertaint
 
 These arithmetic checks independently evaluate the **published formula only**. They do not reproduce the record enumeration, prove the formula from the axiom, establish the Photon Conjecture, or constitute an independent experimental reanalysis. CODATA 2022 remains the latest CODATA recommended set listed by NIST as of this protocol date; its adjustment considers data available through 31 December 2022. See https://physics.nist.gov/cuu/Reference/versioncon.shtml and https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf.
 
+**Dependence caveat:** these are not four independent confirmations. NIST's CODATA 2022 adjustment incorporates the electron g−2, rubidium-recoil, and cesium-recoil determinations among its key inputs and expanded the uncertainties by a factor of 2.5 to account for inconsistency. The comparison must therefore preserve the provenance and dependence structure, rather than count “CODATA agrees” plus agreement with component inputs as separate successes. Source: https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf.
+
 ## Preliminary Table S5 formula-level check
 
 I separately evaluated the **printed algebraic expressions** in Supplementary Table S5 at high decimal precision and computed each inverse and relative difference from the candidate. This cross-check reproduces the table's inverse values to the reported three decimal places. It does not independently regenerate records or verify why a particular variant is admissible.
