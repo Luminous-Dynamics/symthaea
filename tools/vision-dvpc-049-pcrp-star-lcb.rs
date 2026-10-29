@@ -148,18 +148,30 @@ fn policy_score_stream(
     Ok(scores)
 }
 
-fn complement_scores(values: &[f64], upper_bound: f64) -> Result<Vec<f64>, String> {
-    if !upper_bound.is_finite() || upper_bound < 0.0 {
-        return Err("score upper bound must be finite and nonnegative".into());
+fn policy_complement_score_stream(
+    observations: &[Observation],
+    logger_p1: f64,
+    target_p1: f64,
+) -> Result<Vec<f64>, String> {
+    if !support_complete(logger_p1, target_p1) {
+        return Err("NOT_IDENTIFIED_ZERO_SUPPORT".into());
     }
-    let mut out = Vec::with_capacity(values.len());
-    for &value in values {
-        if !value.is_finite() || value < -EPS || value > upper_bound + EPS {
-            return Err("score violates the declared [0, W] range".into());
+    let logger = [1.0 - logger_p1, logger_p1];
+    let target = [1.0 - target_p1, target_p1];
+    let mut scores = Vec::with_capacity(observations.len());
+    for obs in observations {
+        let h = logger[obs.action];
+        let pi = target[obs.action];
+        if h <= 0.0 && pi > 0.0 {
+            return Err("NOT_IDENTIFIED_ZERO_SUPPORT".into());
         }
-        out.push((upper_bound - value).clamp(0.0, upper_bound));
+        let score = if pi == 0.0 { 0.0 } else { (pi / h) * (1.0 - obs.reward) };
+        if !score.is_finite() || score < 0.0 {
+            return Err("complement importance-weighted score must be finite and nonnegative".into());
+        }
+        scores.push(score);
     }
-    Ok(out)
+    Ok(scores)
 }
 
 fn log_add_exp(a: f64, b: f64) -> f64 {
@@ -444,6 +456,10 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                 .iter()
                 .map(|&p| policy_score_stream(&observations, scenario.logger_p1, p))
                 .collect::<Result<Vec<_>, _>>()?;
+            let complement_streams: Vec<Vec<f64>> = POLICY_P1
+                .iter()
+                .map(|&p| policy_complement_score_stream(&observations, scenario.logger_p1, p))
+                .collect::<Result<Vec<_>, _>>()?;
 
             for (horizon_index, &horizon) in horizons.iter().enumerate() {
                 for (method_index, method) in METHODS.iter().enumerate() {
@@ -452,22 +468,24 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     let mut upper_bounds = Vec::with_capacity(POLICY_P1.len());
                     for (policy_index, &target_p1) in POLICY_P1.iter().enumerate() {
                         let scores = &streams[policy_index][..horizon];
+                        // Appendix B.6 of Ryu et al. uses W_t = w_t(1-r_t), not W_max - w_t r_t.
+                        // Under support and normalized propensities, E[W_t] = 1 - V(pi).
+                        let complement = &complement_streams[policy_index][..horizon];
                         let score_bound = max_importance_weight(scenario.logger_p1, target_p1)?;
-                        let complement = complement_scores(scores, score_bound)?;
                         let (lower_lcb, complement_lcb) = match *method {
                             "pCRP_star" => (
                                 pcrp_star_lcb(scores, delta_per_tail)?,
-                                pcrp_star_lcb(&complement, delta_per_tail)?,
+                                pcrp_star_lcb(complement, delta_per_tail)?,
                             ),
                             "Hoeffding_fixed_horizon" => (
                                 hoeffding_lcb(scores, delta_per_tail, score_bound)?,
-                                hoeffding_lcb(&complement, delta_per_tail, score_bound)?,
+                                hoeffding_lcb(complement, delta_per_tail, score_bound)?,
                             ),
                             _ => return Err("unknown method".into()),
                         };
-                        // The target-policy reward value is known to lie in [0,1].
+                        // Reward R lies in [0,1]; reflect the LCB of w(1-R) into a UCB for V(pi).
                         lower_bounds.push(lower_lcb.clamp(0.0, 1.0));
-                        upper_bounds.push((score_bound - complement_lcb).clamp(0.0, 1.0));
+                        upper_bounds.push((1.0 - complement_lcb).clamp(0.0, 1.0));
                     }
                     elapsed_seconds[horizon_index][method_index] += started.elapsed().as_secs_f64();
 
@@ -730,6 +748,19 @@ mod tests {
                 let expectation = h[0] * (pi[0] / h[0]) * MU0
                     + h[1] * (pi[1] / h[1]) * MU1;
                 close(expectation, true_value(target), 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn reward_complement_has_exact_value_identity_under_registered_logger() {
+        for &logger in &[0.5_f64, 0.99] {
+            for &target in &POLICY_P1 {
+                let h = [1.0 - logger, logger];
+                let pi = [1.0 - target, target];
+                let expectation = h[0] * (pi[0] / h[0]) * (1.0 - MU0)
+                    + h[1] * (pi[1] / h[1]) * (1.0 - MU1);
+                close(expectation, 1.0 - true_value(target), 1.0e-12);
             }
         }
     }
