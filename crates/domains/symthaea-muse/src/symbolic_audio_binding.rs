@@ -630,7 +630,28 @@ pub fn create_full_score_render_binding(
             "onset mask must preserve edited-note attacks; only request-conditioned operations may authorize onset exclusions",
         ));
     }
-    let projected_binding = create_symbolic_audio_render_binding(
+    // This audio gate currently makes a calibrated claim only for pitch edits
+    // and transposition: spectral content may change, but the edit's amplitude
+    // envelope and all note attacks must remain. Duration/onset edits require a
+    // request-conditioned temporal oracle and fail closed until implemented.
+    if !matches!(
+        symbolic_evidence.request.operation,
+        symthaea_music_theory::edit_locality::EditOperation::Transpose { .. }
+            | symthaea_music_theory::edit_locality::EditOperation::PitchAt { .. }
+    ) {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "full-score audio binding currently supports pitch edits/transposition only",
+        ));
+    }
+    let expected_region_measurements =
+        expected_acoustic_mask.len().saturating_mul(source_audio.channels);
+    if acoustic_evidence.authorized_region_rms.len() != expected_region_measurements {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "authorized-region RMS evidence does not cover every edited region and channel",
+        ));
+    }
+
+    let mut projected_binding = create_symbolic_audio_render_binding(
         &source_events,
         &target_events,
         symbolic_evidence,
@@ -640,6 +661,24 @@ pub fn create_full_score_render_binding(
         onset_evidence,
         renderer_manifest,
     )?;
+
+    let envelope_violations = acoustic_evidence
+        .authorized_region_rms
+        .iter()
+        .filter(|measurement| {
+            !measurement.rms_delta_db.is_finite()
+                || measurement.rms_delta_db > acoustic_evidence.config.rms_delta_db_tolerance
+        })
+        .count();
+    if envelope_violations > 0 {
+        projected_binding.overall_verdict = PreservationVerdict::Fail;
+        projected_binding.reasons.push(format!(
+            "{envelope_violations} edited-region/channel RMS envelopes exceeded the preserved-energy threshold"
+        ));
+        projected_binding.binding_receipt_sha256.clear();
+        projected_binding.binding_receipt_sha256 =
+            binding_receipt_sha256(&projected_binding)?;
+    }
 
     let mut binding = FullScoreRenderBinding {
         binding_version: format!("{SYMBOLIC_AUDIO_BINDING_VERSION}+full-score-v0.1"),
@@ -1012,6 +1051,56 @@ mod tests {
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest, &tampered,
         ).expect("modified full-score digest should be rejected as a verdict"));
+    }
+
+
+    #[test]
+    fn full_score_binding_rejects_removed_edited_note_inside_authorized_mask() {
+        let (_source_events, _target_events, _symbolic, source_audio, mut target_audio, _acoustic, _onset, manifest) =
+            build_fixture();
+        let source_score = full_score_source();
+        let target_score = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
+        target_audio[4096..5120].fill(0.0);
+        let mask = [FrameInterval { start_frame: 4096, end_frame: 5120 }];
+        let acoustic = audit_protected_audio(
+            audio_view(&source_audio), audio_view(&target_audio), &mask,
+            &PreservationConfig {
+                frame_size: 128,
+                hop_size: 64,
+                boundary_guard_frames: 0,
+                rms_delta_db_tolerance: 0.5,
+                spectral_distance_tolerance: 0.08,
+                minimum_protected_windows: 4,
+                calibration_id: Some("removed-note-fixture".to_owned()),
+            },
+        ).expect("outside-mask acoustic checks alone can pass");
+        let onset = audit_onset_preservation(
+            audio_view(&source_audio), audio_view(&target_audio), &[],
+            &OnsetPreservationConfig {
+                frame_size: 128,
+                hop_size: 32,
+                novelty_threshold: 0.12,
+                minimum_separation_ms: 8,
+                onset_time_tolerance_ms: 4,
+                boundary_guard_frames: 0,
+                minimum_protected_duration_ms: 100,
+                calibration_id: Some("removed-note-fixture".to_owned()),
+            },
+        ).expect("unmasked onset channel reports the missing attack");
+        assert!(
+            acoustic.authorized_region_rms.iter().any(|measurement|
+                measurement.rms_delta_db > acoustic.config.rms_delta_db_tolerance
+            ),
+            "the edited-region envelope must detect the removed note"
+        );
+        let result = create_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest,
+        ).expect("a failed edit result should be represented by a fail verdict");
+        assert_eq!(result.projected_binding.overall_verdict, PreservationVerdict::Fail);
+        assert!(result.projected_binding.reasons.iter().any(|reason| reason.contains("RMS envelopes")));
     }
 
     #[test]
