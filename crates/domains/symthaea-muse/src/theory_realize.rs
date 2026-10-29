@@ -2547,7 +2547,16 @@ mod tests {
             mk(220.0, 0.0),
             mk(330.0, 2.0),
         ];
-        strum_chords(&mut notes, Instrument::AcousticGuitar);
+        let mut source_event_indices = vec![Some(0), Some(1), Some(2), Some(3)];
+        strum_chords(
+            &mut notes,
+            &mut source_event_indices,
+            Instrument::AcousticGuitar,
+        );
+        assert_eq!(
+            source_event_indices,
+            vec![Some(2), Some(1), Some(0), Some(3)]
+        );
         // Chord now ordered low-to-high with increasing onsets.
         assert_eq!(notes[0].1.frequency, 220.0);
         assert_eq!(notes[1].1.frequency, 440.0);
