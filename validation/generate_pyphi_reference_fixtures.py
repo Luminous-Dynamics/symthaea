@@ -21,10 +21,20 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import pyphi
 
 
 PINNED_PYPHI_VERSION = "2.0.0rc4"
+EXPECTED_EXAMPLE = "pyphi.examples.iit4_2023_fig1a_substrate()"
+EXPECTED_FORMALISM = "IIT_4_0_2023"
+EXPECTED_STATE = (0, 1, 1)
+EXPECTED_QUANTITY_IDS = {
+    "system-phi-s-A": "iit4_system_phi_s",
+    "system-phi-s-AB": "iit4_system_phi_s",
+    "AB-cause-phi": "iit4_cause_phi_c",
+    "AB-effect-phi": "iit4_effect_phi_e",
+    "AB-structure-Phi": "iit4_structure_big_phi",
+    "system-phi-s-ABC": "iit4_system_phi_s",
+}
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "pyphi-iit4-2023-fig1a-reference-v0.1.json"
 
 
@@ -128,12 +138,40 @@ def run(output_path: Path) -> dict[str, Any]:
         )
 
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
-    reference = fixture["reference"]
-    if reference["exact_version"] != PINNED_PYPHI_VERSION:
+    reference = fixture.get("reference", {})
+    if reference.get("exact_version") != PINNED_PYPHI_VERSION:
         raise RuntimeError("fixture and runner version pins disagree")
-    formalism = reference["formalism"]
-    state = tuple(int(bit) for bit in reference["state"])
+    if reference.get("api_example") != EXPECTED_EXAMPLE:
+        raise RuntimeError("fixture points to an unrecognized PyPhi reference example")
+    if reference.get("formalism") != EXPECTED_FORMALISM:
+        raise RuntimeError("fixture formalism differs from the runner's reviewed reference profile")
+    state = tuple(reference.get("state", ()))
+    if state != EXPECTED_STATE:
+        raise RuntimeError("fixture evaluation state differs from the reviewed Fig. 1A state")
 
+    quantities = fixture.get("quantities")
+    if not isinstance(quantities, list) or len(quantities) != len(EXPECTED_QUANTITY_IDS):
+        raise RuntimeError("fixture must contain exactly the six reviewed reference quantities")
+    ids = [item.get("id") for item in quantities if isinstance(item, dict)]
+    if len(ids) != len(quantities) or len(set(ids)) != len(ids):
+        raise RuntimeError("fixture quantity IDs are missing, malformed, or duplicated")
+    if set(ids) != set(EXPECTED_QUANTITY_IDS):
+        raise RuntimeError("fixture quantity set differs from the six reviewed reference quantities")
+    for item in quantities:
+        if item.get("quantity_id") != EXPECTED_QUANTITY_IDS[item["id"]]:
+            raise RuntimeError(f"quantity id mismatch for {item['id']}")
+        tolerance = item.get("absolute_tolerance")
+        expected = item.get("expected")
+        if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
+            raise RuntimeError(f"invalid absolute tolerance for {item['id']}")
+        if not isinstance(expected, (int, float)) or not math.isfinite(expected):
+            raise RuntimeError(f"invalid expected anchor for {item['id']}")
+
+    try:
+        import pyphi
+    except ImportError as exc:
+        raise RuntimeError("PyPhi is unavailable; install the pinned pyphi==2.0.0rc4 artifact") from exc
+    formalism = EXPECTED_FORMALISM
     pyphi.config.progress_bars = False
     substrate = pyphi.examples.iit4_2023_fig1a_substrate()
     model_sha256, evaluation_sha256, reference_manifest_sha256, canonical_model, model_bytes = _model_digest(
