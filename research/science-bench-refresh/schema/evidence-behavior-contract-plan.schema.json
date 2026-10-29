@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/evidence-behavior-contract-plan.schema.json",
+  "title": "Symthaea Evidence Behavior Contract Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "contract_set_id",
+    "evaluator_source_revision",
+    "source_authority_policy_sha256",
+    "decision_rules_sha256",
+    "items",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_evidence_behavior_contract_plan.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "contract_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "evaluator_source_revision": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full source commit SHA for qualified runs; the example fixture intentionally uses NOT_IMPLEMENTED_YET."
+    },
+    "source_authority_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "decision_rules_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 digest; zero digests are reserved for non-scoring examples and must be rejected for qualified runs."
+    },
+    "family": {
+      "enum": [
+        "update_compliance",
+        "conflict_disclosure",
+        "decoy_invariance",
+        "deletion_calibration",
+        "permutation_invariance",
+        "evidence_force_monotonicity",
+        "claim_evidence_completeness"
+      ]
+    },
+    "intervention": {
+      "enum": [
+        "coherent_update",
+        "source_conflict",
+        "irrelevant_decoy",
+        "key_evidence_deletion",
+        "evidence_permutation",
+        "evidence_strength_reduction",
+        "joint_claim_evidence_audit"
+      ]
+    },
+    "behavior": {
+      "enum": [
+        "dependent_claims_update_without_unrelated_drift",
+        "explicit_conflict_and_provenance",
+        "supported_claims_stable",
+        "claim_strength_tracks_remaining_support",
+        "semantic_answer_invariant",
+        "weaker_evidence_not_stronger_claim",
+        "all_material_claims_warranted"
+      ]
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "pair_id",
+        "family",
+        "intervention",
+        "baseline_condition",
+        "intervention_condition",
+        "expected_behavior",
+        "force_axis",
+        "decision_rule_id",
+        "evidence_manifest_sha256",
+        "evaluator_gold_sha256"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "family": {
+          "$ref": "#/$defs/family"
+        },
+        "intervention": {
+          "$ref": "#/$defs/intervention"
+        },
+        "baseline_condition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "intervention_condition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expected_behavior": {
+          "$ref": "#/$defs/behavior"
+        },
+        "force_axis": {
+          "enum": [
+            "not_applicable",
+            "relation",
+            "modality",
+            "scope",
+            "temporal_validity",
+            "numeric_specificity"
+          ]
+        },
+        "decision_rule_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidence_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evaluator_gold_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evaluator_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ],
+            "description": "Must match the inspected exact source revision."
+          },
+          "source_authority_policy_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "decision_rules_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
