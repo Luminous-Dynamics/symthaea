@@ -322,7 +322,10 @@ impl MeshReceiver {
 
         // Get or create the assembler for this stream
         let assembly = self.pending.entry(key).or_insert_with(|| PendingAssembly {
-            assembler: FragmentAssembler::new(
+            // Legacy frames do not carry exact encoded length. The configured
+            // payload size is nominal for compressed envelopes, so never infer
+            // a lost final shard's true length from it.
+            assembler: FragmentAssembler::new_without_final_fragment_recovery(
                 frag.thought_id,
                 frag.total_fragments,
                 self.expected_payload_size,
