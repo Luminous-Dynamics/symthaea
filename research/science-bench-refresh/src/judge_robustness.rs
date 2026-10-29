@@ -669,7 +669,7 @@ pub fn verify_judge_robustness_plan(
     if !matches {
         issues.push("judge plan commitment mismatch".to_owned());
     }
-    let structural_valid = !issues.iter().any(|issue| issue == "judge plan commitment mismatch");
+    let structural_valid = validate_plan_fields(&fields).is_empty();
     let planned_observations = u64::try_from(plan.cases.len())
         .unwrap_or(u64::MAX)
         .saturating_mul(u64::from(plan.repeats_per_condition))
@@ -972,13 +972,33 @@ fn family_summaries(
             accumulator.observed_observations.saturating_add(outcome.observations.len() as u64);
         let normalized = normalized_by_condition(outcome);
 
-        for condition in [
-            JudgeAuditConditionV1::Baseline,
-            JudgeAuditConditionV1::Variant,
-        ] {
-            let decisions: Vec<SemanticDecisionV1> = (0..plan.repeats_per_condition)
-                .filter_map(|repeat| normalized.get(&(condition, repeat)).copied())
-                .collect();
+        let decision_groups: Vec<Vec<SemanticDecisionV1>> =
+            if case.family == JudgeAuditFamilyV1::Repeatability {
+                // Both conditions are byte-identical for this family, so pool every
+                // repeat into one same-input group and count cross-condition pairs too.
+                vec![outcome
+                    .observations
+                    .iter()
+                    .map(|observation| {
+                        observation
+                            .raw_decision
+                            .normalize(observation.candidate_order)
+                    })
+                    .collect::<Vec<_>>()]
+            } else {
+                [
+                    JudgeAuditConditionV1::Baseline,
+                    JudgeAuditConditionV1::Variant,
+                ]
+                .into_iter()
+                .map(|condition| {
+                    (0..plan.repeats_per_condition)
+                        .filter_map(|repeat| normalized.get(&(condition, repeat)).copied())
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+            };
+        for decisions in decision_groups {
             for left_index in 0..decisions.len() {
                 for right_index in (left_index + 1)..decisions.len() {
                     accumulator.repeat_comparable_pairs += 1;
@@ -1137,26 +1157,30 @@ pub fn verify_judge_robustness_report(
     let missing_observation_count = planned_observation_count.saturating_sub(
         observed_observation_count.min(planned_observation_count),
     );
-    let scorecard = Some(JudgeRobustnessScorecardV1 {
-        schema: "symthaea.science_bench_refresh_judge_robustness_scorecard.v1".to_owned(),
-        plan_sha256: sha256_hex(plan_bytes),
-        plan_commitment_sha256: plan.plan_commitment_sha256.clone(),
-        report_sha256: sha256_hex(report_bytes),
-        report_commitment_sha256: report.report_commitment_sha256.clone(),
-        planned_case_count: plan.cases.len() as u64,
-        observed_case_count: report.cases.len() as u64,
-        missing_case_count,
-        planned_observation_count,
-        observed_observation_count,
-        missing_observation_count,
-        blind_to_system_identity: report.blind_to_system_identity,
-        family_summaries: family_summaries(&plan, &report),
-        fixed_audit_only: true,
-        generalized_accuracy_estimated: false,
-        runner_execution_proven: false,
-        external_anchor_required: true,
-        claim_boundary: "Judge stability, intervention consistency and agreement with reference labels are distinct; a digest does not prove execution, independent adjudication, truth or generalization.".to_owned(),
-    });
+    let scorecard = if valid {
+        Some(JudgeRobustnessScorecardV1 {
+            schema: "symthaea.science_bench_refresh_judge_robustness_scorecard.v1".to_owned(),
+            plan_sha256: sha256_hex(plan_bytes),
+            plan_commitment_sha256: plan.plan_commitment_sha256.clone(),
+            report_sha256: sha256_hex(report_bytes),
+            report_commitment_sha256: report.report_commitment_sha256.clone(),
+            planned_case_count: plan.cases.len() as u64,
+            observed_case_count: report.cases.len() as u64,
+            missing_case_count,
+            planned_observation_count,
+            observed_observation_count,
+            missing_observation_count,
+            blind_to_system_identity: report.blind_to_system_identity,
+            family_summaries: family_summaries(&plan, &report),
+            fixed_audit_only: true,
+            generalized_accuracy_estimated: false,
+            runner_execution_proven: false,
+            external_anchor_required: true,
+            claim_boundary: "Judge stability, intervention consistency and agreement with reference labels are distinct; a digest does not prove execution, independent adjudication, truth or generalization.".to_owned(),
+        })
+    } else {
+        None
+    };
     let plan_binding_valid = fields.plan_sha256 == sha256_hex(plan_bytes)
         && fields.plan_commitment_sha256 == plan.plan_commitment_sha256
         && fields.judge_source_revision == plan.judge_source_revision
