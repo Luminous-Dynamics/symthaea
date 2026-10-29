@@ -350,11 +350,27 @@ mod tests {
     }
 
     #[test]
-    fn promotes_highest_conservative_scores_with_stable_ties() {
+    fn promotes_highest_conservative_scores() {
         let result = plan_promotions(&levels(), &observations(), 0, &policy()).unwrap();
         assert_eq!(result.promoted_candidate_ids, vec!["candidate-7", "candidate-6", "candidate-5", "candidate-4"]);
         assert_eq!(result.exploitation_count, 4);
         assert_eq!(result.exploration_count, 0);
+    }
+
+    #[test]
+    fn score_ties_are_broken_by_candidate_id() {
+        let inputs = observations()
+            .into_iter()
+            .map(|mut observation| {
+                observation.mean_score = 1.0;
+                observation
+            })
+            .collect::<Vec<_>>();
+        let result = plan_promotions(&levels(), &inputs, 0, &policy()).unwrap();
+        assert_eq!(
+            result.promoted_candidate_ids,
+            vec!["candidate-0", "candidate-1", "candidate-2", "candidate-3"]
+        );
     }
 
     #[test]
