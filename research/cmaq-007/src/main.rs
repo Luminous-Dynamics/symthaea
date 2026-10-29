@@ -2,6 +2,7 @@ use std::process;
 
 const REPORT_SCHEMA: &str = "cmaq-007-exploitability-report-v0.3";
 const EPISODES: usize = 256;
+const RISK_EPISODES: usize = 2048;
 const SEARCH_SIZES: [usize; 4] = [8, 32, 128, 512];
 const MAX_ACTIONS: usize = 512;
 const BASELINE_UTILITY: f64 = 0.35;
@@ -12,6 +13,7 @@ const RISK_THRESHOLDS: [f64; 6] = [0.40, 0.55, 0.75, 0.90, 0.97, 1.01];
 const UNSUPPORTED_RISK_TARGET: f64 = 0.05;
 const FALLBACK_DOWNSIDE_RISK_TARGET: f64 = 0.05;
 const FAMILYWISE_ALPHA: f64 = 0.05;
+const UTILITY_LIFT_RANGE: f64 = 0.50; // Candidate utility minus fallback lies in [-0.30, +0.20].
 
 
 #[derive(Clone, Copy, Debug)]
@@ -316,10 +318,12 @@ struct RiskControlSummary {
     search_size: usize,
     target_unsupported_risk: f64,
     target_fallback_downside_risk: f64,
+    target_utility_lift_lower_bound: f64,
     familywise_alpha: f64,
     alpha_per_bound: f64,
     threshold_count: usize,
     bound_count: usize,
+    model_gate_certified: bool,
     selected_threshold: f64,
     calibration_episode_count: usize,
     calibration_unsupported_count: usize,
@@ -328,12 +332,15 @@ struct RiskControlSummary {
     calibration_downside_count: usize,
     calibration_downside_rate: f64,
     calibration_downside_upper_bound: f64,
+    calibration_mean_utility_lift_vs_fallback: f64,
+    calibration_utility_lift_lower_bound: f64,
     calibration_coverage_rate: f64,
     qualification_episode_count: usize,
     qualification_unsupported_count: usize,
     qualification_unsupported_rate: f64,
     qualification_downside_count: usize,
     qualification_downside_rate: f64,
+    qualification_mean_utility_lift_vs_fallback: f64,
     qualification_coverage_rate: f64,
     qualification_mean_regret: f64,
     direct_fallback_mean_regret: f64,
@@ -403,18 +410,20 @@ fn clopper_pearson_upper(k: usize, n: usize, alpha: f64) -> f64 {
 
 fn risk_control_summaries() -> Vec<RiskControlSummary> {
     // Bonferroni covers both risk constraints across all thresholds.
-    let alpha_per_bound = FAMILYWISE_ALPHA / (RISK_THRESHOLDS.len() * 2) as f64;
+    // Simultaneous bounds cover three criteria per threshold: unsupported risk,
+    // fallback-downside risk, and positive mean utility lift.
+    let alpha_per_bound = FAMILYWISE_ALPHA / (RISK_THRESHOLDS.len() * 3) as f64;
     let mut output = Vec::with_capacity(SEARCH_SIZES.len());
 
     for search_size in SEARCH_SIZES {
         let mut calibration_by_threshold: Vec<Vec<EpisodeMetrics>> = RISK_THRESHOLDS
             .iter()
-            .map(|_| Vec::with_capacity(EPISODES))
+            .map(|_| Vec::with_capacity(RISK_EPISODES))
             .collect();
 
         // This seed stream is separate from both the descriptive panel and
         // the held-out qualification stream.
-        for episode in 0..EPISODES {
+        for episode in 0..RISK_EPISODES {
             let seed = CALIBRATION_SEED
                 ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
             let catalog = candidate_catalog(seed);
@@ -425,7 +434,7 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
             }
         }
 
-        let threshold_stats: Vec<(usize, usize, f64, f64, usize, f64, f64, f64)> = calibration_by_threshold
+        let threshold_stats: Vec<(usize, usize, f64, f64, usize, f64, f64, f64, f64, f64)> = calibration_by_threshold
             .iter()
             .enumerate()
             .map(|(index, samples)| {
@@ -433,35 +442,47 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
                     .iter()
                     .filter(|sample| sample.unsupported_selected > 0.0)
                     .count();
-                let unsupported_rate = unsupported_count as f64 / EPISODES as f64;
+                let unsupported_rate = unsupported_count as f64 / RISK_EPISODES as f64;
                 let unsupported_upper_bound = clopper_pearson_upper(
                     unsupported_count,
-                    EPISODES,
+                    RISK_EPISODES,
                     alpha_per_bound,
                 );
                 let downside_count = samples
                     .iter()
                     .filter(|sample| sample.coverage > 0.0 && sample.realized_utility <= BASELINE_UTILITY)
                     .count();
-                let downside_rate = downside_count as f64 / EPISODES as f64;
+                let downside_rate = downside_count as f64 / RISK_EPISODES as f64;
                 let downside_upper_bound = clopper_pearson_upper(
                     downside_count,
-                    EPISODES,
+                    RISK_EPISODES,
                     alpha_per_bound,
                 );
                 let coverage_rate = samples.iter().map(|sample| sample.coverage).sum::<f64>()
-                    / EPISODES as f64;
+                    / RISK_EPISODES as f64;
+                let mean_utility_lift = samples
+                    .iter()
+                    .map(|sample| sample.realized_utility - BASELINE_UTILITY)
+                    .sum::<f64>() / RISK_EPISODES as f64;
+                // Hoeffding's one-sided lower bound is distribution-free for the
+                // known utility-lift range and remains valid after threshold selection
+                // when paired with the family-wise Bonferroni correction above.
+                let utility_lift_lower_bound = mean_utility_lift
+                    - UTILITY_LIFT_RANGE
+                        * ((1.0 / alpha_per_bound).ln() / (2.0 * RISK_EPISODES as f64)).sqrt();
                 (index, unsupported_count, unsupported_rate, unsupported_upper_bound,
-                    downside_count, downside_rate, downside_upper_bound, coverage_rate)
+                    downside_count, downside_rate, downside_upper_bound, coverage_rate,
+                    mean_utility_lift, utility_lift_lower_bound)
             })
             .collect();
 
         // Select the highest-coverage threshold whose simultaneous upper
         // confidence bound clears the target; ties prefer the stricter gate.
         let mut selected: Option<(usize, f64)> = None;
-        for (index, _, _, unsupported_upper_bound, _, _, downside_upper_bound, coverage_rate) in &threshold_stats {
+        for (index, _, _, unsupported_upper_bound, _, _, downside_upper_bound, coverage_rate, _, utility_lift_lower_bound) in &threshold_stats {
             if *unsupported_upper_bound > UNSUPPORTED_RISK_TARGET
                 || *downside_upper_bound > FALLBACK_DOWNSIDE_RISK_TARGET
+                || *utility_lift_lower_bound <= 0.0
             {
                 continue;
             }
@@ -476,18 +497,20 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
                 selected = Some((*index, *coverage_rate));
             }
         }
-        let selected_index = selected
-            .expect("the 1.01 threshold must force fallback and meet both risk targets")
-            .0;
+        let model_gate_certified = selected.is_some();
+        // Fail closed to a threshold above the score range if no threshold
+        // satisfies all preregistered risk and utility criteria.
+        let selected_index = selected.map(|(index, _)| index).unwrap_or(RISK_THRESHOLDS.len() - 1);
         let selected_threshold = RISK_THRESHOLDS[selected_index];
         let (_, calibration_unsupported_count, calibration_unsupported_rate,
             calibration_unsupported_upper_bound, calibration_downside_count,
             calibration_downside_rate, calibration_downside_upper_bound,
-            calibration_coverage_rate) = threshold_stats[selected_index];
+            calibration_coverage_rate, calibration_mean_utility_lift_vs_fallback,
+            calibration_utility_lift_lower_bound) = threshold_stats[selected_index];
 
-        let mut qualification_samples = Vec::with_capacity(EPISODES);
-        let mut fallback_samples = Vec::with_capacity(EPISODES);
-        for episode in 0..EPISODES {
+        let mut qualification_samples = Vec::with_capacity(RISK_EPISODES);
+        let mut fallback_samples = Vec::with_capacity(RISK_EPISODES);
+        for episode in 0..RISK_EPISODES {
             let seed = QUALIFICATION_SEED
                 ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
             let catalog = candidate_catalog(seed);
@@ -504,50 +527,59 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
             .filter(|sample| sample.unsupported_selected > 0.0)
             .count();
         let qualification_unsupported_rate =
-            qualification_unsupported_count as f64 / EPISODES as f64;
+            qualification_unsupported_count as f64 / RISK_EPISODES as f64;
         let qualification_downside_count = qualification_samples
             .iter()
             .filter(|sample| sample.coverage > 0.0 && sample.realized_utility <= BASELINE_UTILITY)
             .count();
-        let qualification_downside_rate = qualification_downside_count as f64 / EPISODES as f64;
+        let qualification_downside_rate = qualification_downside_count as f64 / RISK_EPISODES as f64;
         let qualification_coverage_rate = qualification_samples
             .iter()
             .map(|sample| sample.coverage)
             .sum::<f64>()
-            / EPISODES as f64;
+            / RISK_EPISODES as f64;
+        let qualification_mean_utility_lift_vs_fallback = qualification_samples
+            .iter()
+            .map(|sample| sample.realized_utility - BASELINE_UTILITY)
+            .sum::<f64>() / RISK_EPISODES as f64;
         let qualification_mean_regret = qualification_samples
             .iter()
             .map(|sample| sample.regret)
             .sum::<f64>()
-            / EPISODES as f64;
+            / RISK_EPISODES as f64;
         let direct_fallback_mean_regret = fallback_samples
             .iter()
             .map(|sample| sample.regret)
             .sum::<f64>()
-            / EPISODES as f64;
+            / RISK_EPISODES as f64;
 
         output.push(RiskControlSummary {
             search_size,
             target_unsupported_risk: UNSUPPORTED_RISK_TARGET,
             target_fallback_downside_risk: FALLBACK_DOWNSIDE_RISK_TARGET,
+            target_utility_lift_lower_bound: 0.0,
             familywise_alpha: FAMILYWISE_ALPHA,
             alpha_per_bound,
             threshold_count: RISK_THRESHOLDS.len(),
-            bound_count: RISK_THRESHOLDS.len() * 2,
+            bound_count: RISK_THRESHOLDS.len() * 3,
+            model_gate_certified,
             selected_threshold,
-            calibration_episode_count: EPISODES,
+            calibration_episode_count: RISK_EPISODES,
             calibration_unsupported_count,
             calibration_unsupported_rate,
             calibration_unsupported_upper_bound,
             calibration_downside_count,
             calibration_downside_rate,
             calibration_downside_upper_bound,
+            calibration_mean_utility_lift_vs_fallback,
+            calibration_utility_lift_lower_bound,
             calibration_coverage_rate,
-            qualification_episode_count: EPISODES,
+            qualification_episode_count: RISK_EPISODES,
             qualification_unsupported_count,
             qualification_unsupported_rate,
             qualification_downside_count,
             qualification_downside_rate,
+            qualification_mean_utility_lift_vs_fallback,
             qualification_coverage_rate,
             qualification_mean_regret,
             direct_fallback_mean_regret,
@@ -643,10 +675,12 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
                 "    {{\"search_size\": {}, ",
                 "\"target_unsupported_risk\": {:.6}, ",
                 "\"target_fallback_downside_risk\": {:.6}, ",
+                "\"target_utility_lift_lower_bound\": {:.6}, ",
                 "\"familywise_alpha\": {:.6}, ",
                 "\"alpha_per_bound\": {:.8}, ",
                 "\"threshold_count\": {}, ",
                 "\"bound_count\": {}, ",
+                "\"model_gate_certified\": {}, ",
                 "\"selected_threshold\": {:.4}, ",
                 "\"calibration_episode_count\": {}, ",
                 "\"calibration_unsupported_count\": {}, ",
@@ -655,12 +689,15 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
                 "\"calibration_downside_count\": {}, ",
                 "\"calibration_downside_rate\": {:.8}, ",
                 "\"calibration_downside_upper_bound\": {:.8}, ",
+                "\"calibration_mean_utility_lift_vs_fallback\": {:.8}, ",
+                "\"calibration_utility_lift_lower_bound\": {:.8}, ",
                 "\"calibration_coverage_rate\": {:.8}, ",
                 "\"qualification_episode_count\": {}, ",
                 "\"qualification_unsupported_count\": {}, ",
                 "\"qualification_unsupported_rate\": {:.8}, ",
                 "\"qualification_downside_count\": {}, ",
                 "\"qualification_downside_rate\": {:.8}, ",
+                "\"qualification_mean_utility_lift_vs_fallback\": {:.8}, ",
                 "\"qualification_coverage_rate\": {:.8}, ",
                 "\"qualification_mean_regret\": {:.8}, ",
                 "\"direct_fallback_mean_regret\": {:.8}}}"
@@ -668,10 +705,12 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
             row.search_size,
             row.target_unsupported_risk,
             row.target_fallback_downside_risk,
+            row.target_utility_lift_lower_bound,
             row.familywise_alpha,
             row.alpha_per_bound,
             row.threshold_count,
             row.bound_count,
+            row.model_gate_certified,
             row.selected_threshold,
             row.calibration_episode_count,
             row.calibration_unsupported_count,
@@ -680,12 +719,15 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
             row.calibration_downside_count,
             row.calibration_downside_rate,
             row.calibration_downside_upper_bound,
+            row.calibration_mean_utility_lift_vs_fallback,
+            row.calibration_utility_lift_lower_bound,
             row.calibration_coverage_rate,
             row.qualification_episode_count,
             row.qualification_unsupported_count,
             row.qualification_unsupported_rate,
             row.qualification_downside_count,
             row.qualification_downside_rate,
+            row.qualification_mean_utility_lift_vs_fallback,
             row.qualification_coverage_rate,
             row.qualification_mean_regret,
             row.direct_fallback_mean_regret
@@ -792,11 +834,13 @@ mod tests {
         let rows = risk_control_summaries();
         assert_eq!(rows.len(), SEARCH_SIZES.len());
         for row in rows {
-            assert_eq!(row.calibration_episode_count, EPISODES);
-            assert_eq!(row.qualification_episode_count, EPISODES);
+            assert_eq!(row.calibration_episode_count, RISK_EPISODES);
+            assert_eq!(row.qualification_episode_count, RISK_EPISODES);
             assert!(RISK_THRESHOLDS.contains(&row.selected_threshold));
             assert!(row.calibration_unsupported_upper_bound <= UNSUPPORTED_RISK_TARGET);
             assert!(row.calibration_downside_upper_bound <= FALLBACK_DOWNSIDE_RISK_TARGET);
+            assert!(!row.model_gate_certified || row.calibration_utility_lift_lower_bound > 0.0);
+            assert_eq!(row.model_gate_certified, row.selected_threshold < 1.0);
             assert!((0.0..=1.0).contains(&row.qualification_unsupported_rate));
             assert!((0.0..=1.0).contains(&row.qualification_downside_rate));
             assert!((0.0..=1.0).contains(&row.qualification_coverage_rate));
