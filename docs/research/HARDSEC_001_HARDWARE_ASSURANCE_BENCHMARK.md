@@ -46,6 +46,12 @@ At first, the research question is whether telemetry supports robust behavioral 
 
 Do not merge these datasets into one headline score. Agreement across independent domains is evidence of transfer; it is not permission to obscure domain differences.
 
+### Measurement provenance is part of the threat model
+
+The physical HARPY-V study reports that recording several counters together changed some measured values by over 300% in an example, attributing this to `perf` instrumentation effects. The researchers therefore collected each event in isolation to avoid obscuring measurements. This has direct consequences for our benchmark: we must not join counters from separate invocations into a fictional synchronized time series, and we must not train/test split counter-specific variants of the same logical program as if they were independent programs. Preserve capture/run identity, counter-set semantics, sampling interval and instrumentation version; compare raw versus normalized features as separate preregistered arms. Instrumentation cost and fidelity are part of the deployment trade-off, not merely preprocessing details. [HARPY-V study, instrumentation discussion](https://link.springer.com/article/10.1186/s42400-026-00662-8)
+
+This suggests a second, distinctive benchmark dimension: **security gain per monitoring burden**. For each monitor, report detection delay and held-out recall alongside capture overhead, counter coverage, data loss, and any measured perturbation caused by observation. Never claim an energy or overhead result when that sensor was unavailable or not measured.
+
 ## 4. Preregistered hypotheses
 
 - **H1 — Leakage-resistant generalization:** at least one evaluated arm transfers better to held-out programs or attack families than a random-window evaluation would suggest.
@@ -197,12 +203,12 @@ cargo test --example hardsec_split_audit --features hardsec-audit
 The strict TSV header is:
 
 ```text
-dataset_id domain source_artifact_id source_path source_sha256 sample_id program_id execution_id attack_family_id device_config_id split_protocol split label
+dataset_id domain source_artifact_id source_path source_sha256 sample_id program_id execution_id attack_family_id device_config_id capture_config_id counter_set_id split_protocol split label
 ```
 
-These are tab-separated columns, not space-delimited. Supported domains are `physical_hpc`, `gem5_sim`, `rtl_netlist`, and `physical_em`; supported split protocols are `program_holdout`, `attack_family_holdout`, `execution_holdout`, and `device_config_holdout`. Each manifest must represent one dataset, one domain and one protocol. Use `NA` only for metadata that is genuinely unavailable and is not the selected grouping key.
+These are tab-separated columns, not space-delimited. Supported domains are `physical_hpc`, `gem5_sim`, `rtl_netlist`, and `physical_em`; supported split protocols are `program_holdout`, `attack_family_holdout`, `execution_holdout`, `device_config_holdout`, and `capture_config_holdout`. Preserve `capture_config_id` (acquisition command/tool/settings) and `counter_set_id` (exact counter set captured together); these distinguish monitoring configurations and simultaneous measurements from separate runs. Each manifest must represent one dataset, one domain and one protocol. Use `NA` only for metadata that is genuinely unavailable and is not the selected grouping key.
 
-The auditor hashes each referenced regular source artifact with SHA-256 and fails closed on digest mismatch, malformed columns, duplicate sample IDs, duplicate identical artifacts under different identities, missing split groups, path traversal, symlinks, or a held-out group crossing splits. For attack-family holdout, attack rows are grouped by family and benign rows by program so a single generic benign label cannot accidentally collapse all benign controls into one group.
+The auditor hashes each referenced regular source artifact with SHA-256 and fails closed on digest mismatch, malformed columns, duplicate sample IDs, duplicate identical artifacts under different identities, missing split groups, path traversal, symlinks, inconsistent source-artifact metadata, or a held-out group crossing splits. For attack-family holdout, attack rows are grouped by family and benign rows by program so a single generic benign label cannot accidentally collapse all benign controls into one group. Capture-configuration holdout is separately supported so evaluation can ask whether a monitor generalizes beyond a particular acquisition setup.
 
 **Scope limit:** this checks the metadata and file identities supplied to it; it does not prove that a program/family label is factually correct, that the data are licensed for the proposed use, or that an attack is exploitable. Those remain explicit data-audit and security-review tasks. Unit tests are authored with the example but have not yet been executed in this environment.
 
