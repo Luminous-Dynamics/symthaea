@@ -65,7 +65,7 @@ PYTHONPATH=validation python huber_identifiability_frontier.py \
   --output /tmp/huber-identifiability-witness.json
 ```
 
-Local execution of the exact authored source: **9/9 tests passed**. Witness JSON SHA-256: `ad29b13614d0e1e4801be3bd49aeceb314a690b330deb6b9ef829917b0c2da60`. Source SHA-256: `66f6e21d5730f92bcb960970553f17f7876b4c4cc89b0854ff48f18d1fe9591b`. Test SHA-256: `14a8cea34d0f96db633ae737d2e450a4144dd9b42e4a6b7de201eef37fa7283d`.
+Local execution of the exact authored source: **9/9 tests passed**. Witness JSON SHA-256: `ad29b13614d0e1e4801be3bd49aeceb314a690b330deb6b9ef829917b0c2da60`. Source SHA-256: `66f6e21d5730f92bcb960970553f17f7876b4c4cc89b0854ff48f18d1fe9591b`. Test SHA-256: `11cfe6e2f9f8385dd1fbe82484c14eea6bef658300e022eb30d03c5b76f01507`.
 
 ## Research connection and positioning
 
