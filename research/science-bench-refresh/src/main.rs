@@ -13,6 +13,12 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
     match_search_exposure_exact, verify_search_exposure_exact_match_report,
 };
+use science_bench_refresh_validator::judge_reliability::{
+    compute_judge_reliability_plan_commitment,
+    compute_judge_reliability_report_commitment,
+    verify_judge_reliability_plan,
+    verify_judge_reliability_report,
+};
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
@@ -45,6 +51,10 @@ fn usage(program: &str) {
             "  {program} verify-evidence-behavior-contract-plan PLAN.json\n",
             "  {program} commit-evidence-behavior-contract-report PLAN.json REPORT_FIELDS.json\n",
             "  {program} verify-evidence-behavior-contract-report PLAN.json REPORT.json\n",
+            "  {program} commit-judge-reliability-plan PLAN_FIELDS.json\n",
+            "  {program} verify-judge-reliability-plan PLAN.json\n",
+            "  {program} commit-judge-reliability-report PLAN.json REPORT_FIELDS.json\n",
+            "  {program} verify-judge-reliability-report PLAN.json REPORT.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
@@ -75,6 +85,122 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-judge-reliability-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "judge reliability plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_judge_reliability_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_judge_reliability_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("judge plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-judge-reliability-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge reliability plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_judge_reliability_plan(&plan_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("judge plan verification report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
+        "commit-judge-reliability-report" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge reliability plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let fields_bytes = match read(&args[2], "judge reliability report fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_judge_reliability_report_commitment(&plan_bytes, &fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_judge_reliability_report_commitment.v1",
+                            "report_commitment_sha256": commitment
+                        }))
+                        .expect("judge report commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-judge-reliability-report" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge reliability plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report_bytes = match read(&args[2], "judge reliability report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_judge_reliability_report(&plan_bytes, &report_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("judge reliability verification serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
         "commit-evidence-behavior-contract-plan" => {
             if args.len() != 2 {
                 usage("science-bench-refresh-validator");

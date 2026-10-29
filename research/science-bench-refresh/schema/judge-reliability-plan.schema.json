@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-reliability-plan.schema.json",
+  "title": "Symthaea Judge Reliability Audit Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "audit_id",
+    "judge",
+    "reference",
+    "perturbation_policy_sha256",
+    "scoring_rules_sha256",
+    "items",
+    "trials",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_reliability_plan.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model_id",
+        "model_revision",
+        "api_version",
+        "prompt_sha256",
+        "rubric_sha256",
+        "settings_sha256",
+        "evaluator_source_revision"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rubric_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "settings_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evaluator_source_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label_set_sha256",
+        "protocol_sha256",
+        "source",
+        "blinded_from_judge"
+      ],
+      "properties": {
+        "label_set_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "protocol_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source": {
+          "enum": [
+            "deterministic_programmatic",
+            "dual_human_adjudicated",
+            "expert_adjudicated",
+            "mixed_adjudicated"
+          ]
+        },
+        "blinded_from_judge": {
+          "type": "boolean"
+        }
+      }
+    },
+    "perturbation_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "scoring_rules_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "trials": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500000,
+      "items": {
+        "$ref": "#/$defs/trial"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "contract_family",
+        "difficulty",
+        "reference_label",
+        "reference_evidence_sha256"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contract_family": {
+          "enum": [
+            "update_compliance",
+            "conflict_disclosure",
+            "decoy_invariance",
+            "deletion_calibration",
+            "permutation_invariance",
+            "evidence_force_monotonicity",
+            "claim_evidence_completeness",
+            "tool_workflow",
+            "other"
+          ]
+        },
+        "difficulty": {
+          "enum": [
+            "easy",
+            "medium",
+            "hard",
+            "adversarial"
+          ]
+        },
+        "reference_label": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_evaluable"
+          ],
+          "description": "Evaluator-only label; never expose the plan to the judge before verdicts are sealed."
+        },
+        "reference_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trial_id",
+        "case_id",
+        "perturbation_kind",
+        "variant_id",
+        "replicate_index",
+        "presentation_order",
+        "prompt_sha256",
+        "expected_invariant_to_baseline"
+      ],
+      "properties": {
+        "trial_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "perturbation_kind": {
+          "enum": [
+            "baseline",
+            "prompt_variant",
+            "order_swap",
+            "repeat"
+          ]
+        },
+        "variant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "replicate_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "presentation_order": {
+          "enum": [
+            "a_then_b",
+            "b_then_a",
+            "not_applicable"
+          ]
+        },
+        "prompt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "expected_invariant_to_baseline": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
