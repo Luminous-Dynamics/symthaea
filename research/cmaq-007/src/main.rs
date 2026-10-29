@@ -102,6 +102,8 @@ impl Strategy {
             Self::SupportGate(0.75),
             Self::SupportGate(0.90),
             Self::SupportGate(0.97),
+            Self::ShuffledSupportGate(0.55),
+            Self::ShuffledSupportGate(0.97),
             Self::Oracle,
         ]
     }
