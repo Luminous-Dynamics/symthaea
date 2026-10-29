@@ -277,6 +277,17 @@ fn parse_jsonl(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
     if records.is_empty() {
         return Err("input contains no prediction records".into());
     }
+    let total_review_minutes: f64 = records.iter().map(|row| row.review_minutes).sum();
+    if !total_review_minutes.is_finite() {
+        return Err("sum of review_minutes overflows finite f64; check units and input values".into());
+    }
+    let total_positive_impact: f64 = records.iter()
+        .filter(|row| row.label_is_error)
+        .map(|row| row.impact_weight)
+        .sum();
+    if !total_positive_impact.is_finite() {
+        return Err("sum of positive-class impact_weight overflows finite f64; check units and input values".into());
+    }
     Ok(records)
 }
 
