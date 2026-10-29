@@ -469,6 +469,8 @@ impl FormalismProfile {
 pub enum AnalysisQuantity {
     Iit3SystemPhi,
     Iit4SystemPhiS,
+    Iit4CausePhiC,
+    Iit4EffectPhiE,
     Iit4CauseEffectStructure,
     Iit4StructureBigPhi,
 }
@@ -479,6 +481,8 @@ impl AnalysisQuantity {
         match self {
             Self::Iit3SystemPhi => "iit3_system_phi",
             Self::Iit4SystemPhiS => "iit4_system_phi_s",
+            Self::Iit4CausePhiC => "iit4_cause_phi_c",
+            Self::Iit4EffectPhiE => "iit4_effect_phi_e",
             Self::Iit4CauseEffectStructure => "iit4_cause_effect_structure",
             Self::Iit4StructureBigPhi => "iit4_structure_big_phi",
         }
@@ -489,6 +493,8 @@ impl AnalysisQuantity {
             (Self::Iit3SystemPhi, FormalismProfile::Iit3_0) => true,
             (
                 Self::Iit4SystemPhiS
+                | Self::Iit4CausePhiC
+                | Self::Iit4EffectPhiE
                 | Self::Iit4CauseEffectStructure
                 | Self::Iit4StructureBigPhi,
                 FormalismProfile::Iit4_0_2023 | FormalismProfile::Iit4_0_2026,
@@ -755,6 +761,8 @@ mod tests {
             AnalysisQuantity::Iit4SystemPhiS.id(),
             AnalysisQuantity::Iit4StructureBigPhi.id()
         );
+        assert_eq!(AnalysisQuantity::Iit4CausePhiC.id(), "iit4_cause_phi_c");
+        assert_eq!(AnalysisQuantity::Iit4EffectPhiE.id(), "iit4_effect_phi_e");
         assert!(matches!(
             AnalysisRequest::new(
                 &model,
