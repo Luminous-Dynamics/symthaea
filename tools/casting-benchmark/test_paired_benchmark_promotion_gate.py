@@ -306,6 +306,16 @@ class PairedPromotionGateTests(unittest.TestCase):
         self.assertEqual(family_b["decision"], "inconclusive")
         self.assertEqual(result["decision"], "inconclusive")
 
+    def test_family_total_sample_floor_is_required_for_a_risk_pass(self):
+        ct = contract()
+        ct["minimum_validation_units_per_critical_family"] = 100
+        result = assess(ct=ct, val=validation_manifest(count=120))
+        family_a = result["critical_family_false_feasible_risk"]["alloy_a"]
+        self.assertEqual(family_a["validation_units"], 60)
+        self.assertEqual(family_a["predicted_feasible_trials"], 60)
+        self.assertEqual(family_a["decision"], "inconclusive")
+        self.assertEqual(result["decision"], "inconclusive")
+
     def test_rejects_validation_policy_source_or_config_mismatch(self):
         val = validation_manifest()
         val["policy_source_sha256"] = "9" * 64
