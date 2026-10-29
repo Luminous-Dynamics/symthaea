@@ -121,6 +121,23 @@ BETA_A = 0.5
 BETA_B = 0.5
 
 
+ANYTIME_NULL_LOWER = 0.48
+ANYTIME_NULL_UPPER = 0.52
+ANYTIME_UPWARD_ALTERNATIVES = (0.55, 0.60, 0.70, 0.80, 0.90)
+ANYTIME_DOWNWARD_ALTERNATIVES = (0.45, 0.40, 0.30, 0.20, 0.10)
+ANYTIME_CHANGE_HAZARDS = (0.04, 0.01, 0.0025)
+ANYTIME_PROBE_FIELDS = (
+    "trace_id", "scenario", "scenario_class", "horizon", "change_after", "schedule_policy", "pre_rate", "post_rate",
+    "alpha", "log_threshold", "component_count", "first_alarm_step", "alarm_phase", "final_log_e_value",
+    "upward_alternatives", "downward_alternatives", "change_hazards",
+)
+U64_MASK = (1 << 64) - 1
+U64_GAMMA = 0x9E3779B97F4A7C15
+U64_MULTIPLIER = 0xD6E8FEB86659FD93
+U64_MIX1 = 0xBF58476D1CE4E5B9
+U64_MIX2 = 0x94D049BB133111EB
+
+
 def scenario_class(scenario):
     if scenario == "stationary_null":
         return "stationary_null"
@@ -1237,6 +1254,261 @@ def cusum_self_test():
     print("PASS: matched-edge threshold, both directions, alternating and feedback nulls, mass conservation, selection-bias negative control, and matched-FPR power gates")
 
 
+def log_add_exp(left, right):
+    if left == -math.inf:
+        return right
+    if right == -math.inf:
+        return left
+    maximum = max(left, right)
+    return maximum + math.log(math.exp(left - maximum) + math.exp(right - maximum))
+
+
+class AnytimeChangeMixtureReference:
+    def __init__(self):
+        self.steps = 0
+        self.components = []
+        for hazard in ANYTIME_CHANGE_HAZARDS:
+            for alternative in ANYTIME_UPWARD_ALTERNATIVES:
+                self.components.append(self._component(hazard, alternative, ANYTIME_NULL_UPPER))
+            for alternative in ANYTIME_DOWNWARD_ALTERNATIVES:
+                self.components.append(self._component(hazard, alternative, ANYTIME_NULL_LOWER))
+
+    @staticmethod
+    def _component(hazard, alternative, null_edge):
+        return {
+            "log_active": -math.inf,
+            "log_tail": 0.0,
+            "log_hazard": math.log(hazard),
+            "log_survival": math.log1p(-hazard),
+            "log_lr_success": math.log(alternative / null_edge),
+            "log_lr_failure": math.log((1.0 - alternative) / (1.0 - null_edge)),
+        }
+
+    def clone(self):
+        other = object.__new__(AnytimeChangeMixtureReference)
+        other.steps = self.steps
+        other.components = [dict(component) for component in self.components]
+        return other
+
+    def log_e_value(self):
+        values = [
+            log_add_exp(component["log_active"], component["log_tail"])
+            for component in self.components
+        ]
+        maximum = max(values)
+        return maximum + math.log(sum(math.exp(value - maximum) for value in values)) - math.log(len(values))
+
+    def observe(self, event):
+        self.steps += 1
+        for component in self.components:
+            log_start_weight = (
+                component["log_hazard"] + (self.steps - 1) * component["log_survival"]
+            )
+            log_prior_active = log_add_exp(component["log_active"], log_start_weight)
+            log_lr = component["log_lr_success"] if event else component["log_lr_failure"]
+            component["log_active"] = log_lr + log_prior_active
+            component["log_tail"] = self.steps * component["log_survival"]
+        return self.log_e_value()
+
+    def crossed(self, alpha):
+        return self.log_e_value() >= -math.log(alpha)
+
+
+def anytime_probe_bernoulli(seed, step, probability):
+    if probability == 0.0:
+        return False
+    if probability == 1.0:
+        return True
+    value = seed ^ ((step * U64_MULTIPLIER) & U64_MASK)
+    value = (value + U64_GAMMA) & U64_MASK
+    value = ((value ^ (value >> 30)) * U64_MIX1) & U64_MASK
+    value = ((value ^ (value >> 27)) * U64_MIX2) & U64_MASK
+    value ^= value >> 31
+    cutoff = int(probability * float(U64_MASK))
+    return value <= cutoff
+
+
+ANYTIME_PROBE_SPECS = (
+    ("stationary_p050", "stationary_null", 0.50, None, 0),
+    ("stable_edge_p048", "stationary_null", 0.48, None, 0),
+    ("stable_edge_p052", "stationary_null", 0.52, None, 0),
+    ("selection_bias_p074", "selection_bias_control", 0.74, None, 0),
+    ("within_band_alternating", "within_band_transition_control", 0.50, None, 0),
+    ("within_band_feedback", "within_band_transition_control", 0.50, None, 0),
+    ("step_up_055", "target_shift", 0.50, 0.55, 100),
+    ("step_up_060", "target_shift", 0.50, 0.60, 100),
+    ("step_up_080", "target_shift", 0.50, 0.80, 100),
+    ("step_down_045", "target_shift", 0.50, 0.45, 100),
+    ("step_down_040", "target_shift", 0.50, 0.40, 100),
+    ("step_down_020", "target_shift", 0.50, 0.20, 100),
+    ("all_ones_adversarial", "extreme_path_control", 1.0, None, 0),
+    ("all_zeros_adversarial", "extreme_path_control", 0.0, None, 0),
+)
+
+
+def anytime_mixture_reference_rows():
+    horizon = 1000
+    alpha = PER_CELL_ALPHA
+    log_threshold = -math.log(alpha)
+    rows = []
+    for index, (name, kind, pre_p, post_p, change_after) in enumerate(ANYTIME_PROBE_SPECS):
+        seed = 0xA11CE5EED ^ (((index + 1) * U64_GAMMA) & U64_MASK)
+        monitor = AnytimeChangeMixtureReference()
+        first_alarm = None
+        for step in range(1, horizon + 1):
+            if name == "all_ones_adversarial":
+                conditional_p = 1.0
+            elif name == "all_zeros_adversarial":
+                conditional_p = 0.0
+            elif name == "within_band_alternating":
+                conditional_p = ANYTIME_NULL_UPPER if step % 2 == 0 else ANYTIME_NULL_LOWER
+            elif name == "within_band_feedback":
+                conditional_p = (
+                    ANYTIME_NULL_UPPER
+                    if monitor.log_e_value() < log_threshold / 2.0
+                    else ANYTIME_NULL_LOWER
+                )
+            elif name.startswith("step_") and step > change_after:
+                conditional_p = post_p
+            else:
+                conditional_p = pre_p
+            log_e_value = monitor.observe(anytime_probe_bernoulli(seed, step, conditional_p))
+            if first_alarm is None and log_e_value >= log_threshold:
+                first_alarm = step
+
+        if post_p is not None:
+            alarm_phase = (
+                "pre_change" if first_alarm is not None and first_alarm <= change_after
+                else "post_change" if first_alarm is not None
+                else "not_detected"
+            )
+        elif first_alarm is not None:
+            alarm_phase = "alarm_on_control"
+        else:
+            alarm_phase = "no_alarm"
+        schedule_policy = (
+            "alternating_band_endpoints" if name == "within_band_alternating"
+            else "previsible_e_value_feedback" if name == "within_band_feedback"
+            else "single_step_after_100" if name.startswith("step_")
+            else "all_ones_extreme_path" if name == "all_ones_adversarial"
+            else "all_zeros_extreme_path" if name == "all_zeros_adversarial"
+            else "constant_probability"
+        )
+        pre_rate_text = (
+            "NA" if name in ("within_band_alternating", "within_band_feedback")
+            else f"{pre_p:.12f}"
+        )
+        rows.append({
+            "trace_id": str(index + 1),
+            "scenario": name,
+            "scenario_class": kind,
+            "horizon": str(horizon),
+            "change_after": str(change_after) if post_p is not None else "NA",
+            "schedule_policy": schedule_policy,
+            "pre_rate": pre_rate_text,
+            "post_rate": f"{post_p:.12f}" if post_p is not None else "NA",
+            "alpha": f"{alpha:.12f}",
+            "log_threshold": f"{log_threshold:.12f}",
+            "component_count": str(len(monitor.components)),
+            "first_alarm_step": str(first_alarm) if first_alarm is not None else "NA",
+            "alarm_phase": alarm_phase,
+            "final_log_e_value": f"{monitor.log_e_value():.12e}",
+            "upward_alternatives": ";".join(f"{p:.2f}" for p in ANYTIME_UPWARD_ALTERNATIVES),
+            "downward_alternatives": ";".join(f"{p:.2f}" for p in ANYTIME_DOWNWARD_ALTERNATIVES),
+            "change_hazards": ";".join(f"{h:.4f}" for h in ANYTIME_CHANGE_HAZARDS),
+        })
+    return rows
+
+
+def anytime_mixture_self_test():
+    monitor = AnytimeChangeMixtureReference()
+    if len(monitor.components) != 30 or abs(monitor.log_e_value()) > 1e-12:
+        raise ValueError("anytime mixture must initialize at e=1 with 30 fixed components")
+
+    def recurse(state, depth, max_depth):
+        current = math.exp(state.log_e_value())
+        for probability in (
+            ANYTIME_NULL_LOWER, 0.49, 0.50, 0.51, ANYTIME_NULL_UPPER,
+        ):
+            zero = state.clone()
+            one = state.clone()
+            e_zero = math.exp(zero.observe(False))
+            e_one = math.exp(one.observe(True))
+            expected = (1.0 - probability) * e_zero + probability * e_one
+            if expected > current + 1e-10 * max(current, 1.0):
+                raise ValueError(
+                    f"anytime-mixture conditional expectation exceeded current e-value at p={probability}"
+                )
+        if depth == max_depth:
+            return
+        zero = state.clone()
+        zero.observe(False)
+        recurse(zero, depth + 1, max_depth)
+        one = state.clone()
+        one.observe(True)
+        recurse(one, depth + 1, max_depth)
+
+    recurse(AnytimeChangeMixtureReference(), 0, 8)
+    for hazard in ANYTIME_CHANGE_HAZARDS:
+        cumulative = 0.0
+        for step in range(1, 1001):
+            cumulative += hazard * (1.0 - hazard) ** (step - 1)
+            tail = (1.0 - hazard) ** step
+            if abs(cumulative + tail - 1.0) > 1e-10:
+                raise ValueError("anytime-mixture change-time prior lost mass")
+
+    for event in (True, False):
+        extreme = AnytimeChangeMixtureReference()
+        crossing = None
+        for step in range(1, 201):
+            if crossing is None and extreme.observe(event) >= -math.log(PER_CELL_ALPHA):
+                crossing = step
+            elif crossing is not None:
+                extreme.observe(event)
+            # Continue to the common horizon to guard log-space stability.
+        if crossing is None:
+            raise ValueError(f"persistent extreme event={event} failed to cross the anytime threshold")
+
+    print("PASS: 30-component mixture, exhaustive short-history conditional supermartingale checks, normalized start prior, and extreme-path threshold controls")
+
+
+def check_anytime_mixture_probe_csv(path):
+    expected = anytime_mixture_reference_rows()
+    try:
+        with open(path, newline="", encoding="utf-8") as source:
+            reader = csv.DictReader(source)
+            if tuple(reader.fieldnames or ()) != ANYTIME_PROBE_FIELDS:
+                raise ValueError(f"anytime-mixture probe header mismatch: {reader.fieldnames}")
+            actual = list(reader)
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise ValueError(f"cannot read anytime-mixture probe CSV: {exc}") from exc
+    if len(actual) != len(expected):
+        raise ValueError(f"anytime-mixture probe row count mismatch: expected {len(expected)}, got {len(actual)}")
+    text_fields = (
+        "trace_id", "scenario", "scenario_class", "horizon", "change_after", "schedule_policy",
+        "pre_rate", "post_rate", "component_count", "first_alarm_step", "alarm_phase", "upward_alternatives",
+        "downward_alternatives", "change_hazards",
+    )
+    numeric_fields = ("alpha", "log_threshold", "final_log_e_value")
+    for line, (got, want) in enumerate(zip(actual, expected), 2):
+        for field in text_fields:
+            if got[field] != want[field]:
+                raise ValueError(
+                    f"anytime-mixture {field} mismatch on line {line}: {got[field]} != {want[field]}"
+                )
+        for field in numeric_fields:
+            try:
+                value = float(got[field])
+                target = float(want[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid anytime-mixture numeric {field} on line {line}") from exc
+            if not math.isfinite(value) or abs(value - target) > 5e-9:
+                raise ValueError(
+                    f"anytime-mixture {field} mismatch on line {line}: {value} != {target}"
+                )
+    print(f"PASS: independently recomputed all {len(expected)} anytime-mixture deterministic traces")
+
+
 def main(argv):
     try:
         if len(argv) == 2 and argv[1] == "--self-test":
@@ -1260,6 +1532,12 @@ def main(argv):
         if len(argv) == 3 and argv[1] == "--cusum":
             check_cusum_csv(argv[2])
             return 0
+        if len(argv) == 2 and argv[1] == "--anytime-mixture-self-test":
+            anytime_mixture_self_test()
+            return 0
+        if len(argv) == 3 and argv[1] == "--anytime-mixture-probes":
+            check_anytime_mixture_probe_csv(argv[2])
+            return 0
         if len(argv) == 2 and argv[1] not in ("-h", "--help"):
             check_csv(argv[1])
             return 0
@@ -1271,6 +1549,8 @@ def main(argv):
         print("       reference_check.py --eprocess-family-self-test")
         print("       reference_check.py --cusum OUTPUT.csv")
         print("       reference_check.py --cusum-self-test")
+        print("       reference_check.py --anytime-mixture-probes OUTPUT.csv")
+        print("       reference_check.py --anytime-mixture-self-test")
         return 2
     except (OSError, UnicodeError, csv.Error, ValueError, AssertionError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)

@@ -8,6 +8,8 @@
 
 use std::{env, process::ExitCode};
 
+mod anytime_change_mixture;
+
 const ALPHA: f64 = 0.05;
 const CELLS: f64 = 12.0;
 const PER_CELL_ALPHA: f64 = ALPHA / CELLS;
@@ -1206,6 +1208,240 @@ fn print_sentinel_budget_csv() {
     }
 }
 
+#[derive(Clone, Copy)]
+struct AnytimeMixtureProbe {
+    name: &'static str,
+    class: &'static str,
+    pre_p: f64,
+    post_p: Option<f64>,
+    change_after: usize,
+}
+
+const ANYTIME_MIXTURE_PROBES: [AnytimeMixtureProbe; 14] = [
+    AnytimeMixtureProbe {
+        name: "stationary_p050",
+        class: "stationary_null",
+        pre_p: 0.50,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "stable_edge_p048",
+        class: "stationary_null",
+        pre_p: 0.48,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "stable_edge_p052",
+        class: "stationary_null",
+        pre_p: 0.52,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "selection_bias_p074",
+        class: "selection_bias_control",
+        pre_p: 0.74,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "within_band_alternating",
+        class: "within_band_transition_control",
+        pre_p: 0.50,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "within_band_feedback",
+        class: "within_band_transition_control",
+        pre_p: 0.50,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "step_up_055",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.55),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_up_060",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.60),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_up_080",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.80),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_down_045",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.45),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_down_040",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.40),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "step_down_020",
+        class: "target_shift",
+        pre_p: 0.50,
+        post_p: Some(0.20),
+        change_after: 100,
+    },
+    AnytimeMixtureProbe {
+        name: "all_ones_adversarial",
+        class: "extreme_path_control",
+        pre_p: 1.0,
+        post_p: None,
+        change_after: 0,
+    },
+    AnytimeMixtureProbe {
+        name: "all_zeros_adversarial",
+        class: "extreme_path_control",
+        pre_p: 0.0,
+        post_p: None,
+        change_after: 0,
+    },
+];
+
+fn print_anytime_mixture_probe_csv() {
+    use anytime_change_mixture::{
+        probe_bernoulli, AnytimeChangeMixture, CHANGE_HAZARDS, DOWNWARD_ALTERNATIVES,
+        UPWARD_ALTERNATIVES,
+    };
+
+    let horizon = FAMILY_HORIZON;
+    let alpha = PER_CELL_ALPHA;
+    let log_threshold = -alpha.ln();
+    println!(
+        "trace_id,scenario,scenario_class,horizon,change_after,schedule_policy,pre_rate,post_rate,alpha,log_threshold,component_count,first_alarm_step,alarm_phase,final_log_e_value,upward_alternatives,downward_alternatives,change_hazards"
+    );
+
+    for (index, scenario) in ANYTIME_MIXTURE_PROBES.iter().enumerate() {
+        let seed = 0xA11C_E5EED_u64
+            ^ (index as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let mut monitor = AnytimeChangeMixture::new();
+        let mut first_alarm = None;
+
+        for step in 1..=horizon {
+            let conditional_p = if scenario.name == "all_ones_adversarial" {
+                1.0
+            } else if scenario.name == "all_zeros_adversarial" {
+                0.0
+            } else if scenario.name == "within_band_alternating" {
+                if step % 2 == 0 {
+                    anytime_change_mixture::NULL_UPPER
+                } else {
+                    anytime_change_mixture::NULL_LOWER
+                }
+            } else if scenario.name == "within_band_feedback" {
+                if monitor.log_e_value() < log_threshold / 2.0 {
+                    anytime_change_mixture::NULL_UPPER
+                } else {
+                    anytime_change_mixture::NULL_LOWER
+                }
+            } else if scenario.name.starts_with("step_") && step > scenario.change_after {
+                scenario.post_p.unwrap()
+            } else {
+                scenario.pre_p
+            };
+            let event = probe_bernoulli(seed, step as u64, conditional_p);
+            monitor.observe(event);
+            if first_alarm.is_none() && monitor.crossed(alpha) {
+                first_alarm = Some(step);
+            }
+        }
+
+        let alarm_step_text = first_alarm
+            .map(|step| step.to_string())
+            .unwrap_or_else(|| "NA".to_owned());
+        let schedule_policy = if scenario.name == "within_band_alternating" {
+            "alternating_band_endpoints"
+        } else if scenario.name == "within_band_feedback" {
+            "previsible_e_value_feedback"
+        } else if scenario.name.starts_with("step_") {
+            "single_step_after_100"
+        } else if scenario.name == "all_ones_adversarial" {
+            "all_ones_extreme_path"
+        } else if scenario.name == "all_zeros_adversarial" {
+            "all_zeros_extreme_path"
+        } else {
+            "constant_probability"
+        };
+        let pre_rate_text = if scenario.name == "within_band_alternating"
+            || scenario.name == "within_band_feedback"
+        {
+            "NA".to_owned()
+        } else {
+            format!("{:.12}", scenario.pre_p)
+        };
+        let alarm_phase = match (scenario.post_p, first_alarm) {
+            (Some(_), Some(step)) if step <= scenario.change_after => "pre_change",
+            (Some(_), Some(_)) => "post_change",
+            (Some(_), None) => "not_detected",
+            (None, Some(_)) => "alarm_on_control",
+            (None, None) => "no_alarm",
+        };
+        let post_p_text = scenario
+            .post_p
+            .map(|p| format!("{p:.12}"))
+            .unwrap_or_else(|| "NA".to_owned());
+        let up_text = UPWARD_ALTERNATIVES
+            .iter()
+            .map(|p| format!("{p:.2}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        let down_text = DOWNWARD_ALTERNATIVES
+            .iter()
+            .map(|p| format!("{p:.2}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        let hazard_text = CHANGE_HAZARDS
+            .iter()
+            .map(|h| format!("{h:.4}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        println!(
+            "{},{},{},{},{},{},{},{},{:.12},{:.12},{},{},{},{:.12e},{},{},{}",
+            index + 1,
+            scenario.name,
+            scenario.class,
+            monitor.steps(),
+            if scenario.post_p.is_some() {
+                scenario.change_after.to_string()
+            } else {
+                "NA".to_owned()
+            },
+            schedule_policy,
+            pre_rate_text,
+            post_p_text,
+            alpha,
+            log_threshold,
+            monitor.component_count(),
+            alarm_step_text,
+            alarm_phase,
+            monitor.log_e_value(),
+            up_text,
+            down_text,
+            hazard_text
+        );
+    }
+}
+
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
     match args.next() {
@@ -1225,8 +1461,12 @@ fn main() -> ExitCode {
             print_cusum_baseline_csv();
             ExitCode::SUCCESS
         }
+        Some(argument) if argument == "--anytime-mixture-probes-csv" => {
+            print_anytime_mixture_probe_csv();
+            ExitCode::SUCCESS
+        }
         Some(argument) if argument == "--help" || argument == "-h" => {
-            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv|--eprocess-family-csv|--cusum-baseline-csv]");
+            eprintln!("Usage: cargo run --bin active-evidence-shift-monitor -- [--sentinel-budget-csv|--eprocess-family-csv|--cusum-baseline-csv|--anytime-mixture-probes-csv]");
             ExitCode::SUCCESS
         }
         Some(argument) => {
