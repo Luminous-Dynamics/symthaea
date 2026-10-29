@@ -5,6 +5,7 @@ source_url=https://example.org/fixture-stream
 source_version=fixture-1
 source_license_spdx=CC-BY-4.0
 source_license_evidence_url=https://example.org/fixture-license
+intended_use=commercial_compatible
 source_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 row_order_semantics=source_ordered
 feature_columns=feature_a,feature_b
