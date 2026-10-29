@@ -111,6 +111,14 @@ def main() -> int:
     )
     parser.add_argument("--timeout-seconds", type=float, default=60.0)
     parser.add_argument("--output", required=True, type=Path, help="output prediction JSONL path")
+    parser.add_argument(
+        "--trajectory-fixture", type=Path,
+        help="optional JSONL trajectory fixture (defaults to the bundled causal probe)",
+    )
+    parser.add_argument(
+        "--question-fixture", type=Path,
+        help="optional JSONL question fixture (defaults to the bundled causal probe)",
+    )
     args = parser.parse_args()
 
     worker = args.worker.expanduser().resolve()
@@ -124,8 +132,8 @@ def main() -> int:
     if not 0.1 <= args.timeout_seconds <= 3600:
         raise SystemExit("--timeout-seconds must be in [0.1, 3600]")
 
-    trajectory_path = FIXTURE_DIR / "trajectories.jsonl"
-    question_path = FIXTURE_DIR / "questions.jsonl"
+    trajectory_path = (args.trajectory_fixture or (FIXTURE_DIR / "trajectories.jsonl")).expanduser().resolve()
+    question_path = (args.question_fixture or (FIXTURE_DIR / "questions.jsonl")).expanduser().resolve()
     trajectories = read_jsonl(trajectory_path)
     questions = read_jsonl(question_path)
     if len({row.get("id") for row in trajectories}) != len(trajectories):

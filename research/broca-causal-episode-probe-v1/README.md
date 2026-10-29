@@ -27,7 +27,12 @@ This is not a causal graph and does not solve currentness. The stale-address adv
 - `fixtures/trajectories.jsonl`: five small web-agent trajectories with explicit action and observation fields.
 - `fixtures/questions.jsonl`: paired queries annotated with required support, stale/forbidden support, and plausible distractors using source JSON Pointers.
 - `run_probe.py`: feeds the fixtures to the actual Rust `broca-lme-worker`, collects its ranked audit records, and writes a worker/config/dataset receipt.
-- `score_probe.py`: strict, dependency-free scoring for complete-chain retrieval, support recall, first-support reciprocal rank, stale-support hits, and distractor retrieval.
+- `score_probe.py`: strict, dependency-free scoring for required-support recall, ordinary and stale-aware complete chains, first-support reciprocal rank, stale-support hits, and distractor retrieval.
+- `fixtures/mutations/eligibility-ledger.jsonl` and `eligibility_filter.py`: digest-bound eligibility-first ablation with an annotated-intent upper-bound mode and a transparent keyword baseline; unknown source pointers fail closed.
+- `test_eligibility_filter.py`: tests for eligibility policy, the oracle/heuristic distinction, fixed-budget selection, abstention, fail-closed behavior, and receipt integrity.
+- `test_mutation_fixtures.py`: tests for pointer coverage, currentness negatives, provenance reversions, and the synthetic causal/temporal labels.
+- `fixtures/mutations/dependency_snapshots.jsonl` and `dependency_cascade.py`: seven synthetic snapshots of a dependency graph and a reference truth-maintenance evaluator that classifies historical, stale-dependent, unknown-dependent, and current claims.
+- `test_dependency_cascade.py`: 17 tests covering direct/transitive invalidation, partial downstream refresh, stale-value absence, A → B → A provenance, full-chain restoration, historical auditability, a 1,500-node dependency chain, order invariance, and fail-closed graph validation.
 - `test_score_probe.py`: offline unit tests for scoring and fail-closed dataset matching.
 
 The worker must be built from the exact Symthaea checkout under test. A probe run is not a substitute for the official LongMemEval-V2 harness.
@@ -59,6 +64,8 @@ From the Symthaea repository root, after the worker compiles:
     python3 research/broca-causal-episode-probe-v1/test_episode_expand.py
     python3 research/broca-causal-episode-probe-v1/test_lifecycle_probe.py
     python3 research/broca-causal-episode-probe-v1/test_analyze_paired_runs.py
+    python3 research/broca-causal-episode-probe-v1/test_mutation_fixtures.py
+    python3 research/broca-causal-episode-probe-v1/test_eligibility_filter.py
 
     # Verify the explicit supersede operation through two clean worker processes:
     python3 research/broca-causal-episode-probe-v1/run_lifecycle_probe.py \
@@ -70,7 +77,8 @@ The runner writes a sibling `.manifest.json` containing the worker SHA-256, fixt
 ## Metrics and interpretation
 
 - **Required-support recall@k:** fraction of annotated required source pointers present in the top-k audit.
-- **Complete-chain rate@k:** fraction of questions for which every required support pointer appears in the top-k audit. This is the primary probe metric.
+- **Complete-chain rate@k:** fraction of questions for which every required support pointer appears in the top-k audit, even if stale/forbidden evidence is also present.
+- **Stale-aware complete-chain rate@k:** fraction of questions for which every required pointer is present and no annotated forbidden pointer appears in the same top-k audit. This is the primary diagnostic metric; report ordinary complete-chain rate as well so the cost of stale evidence remains visible. This local metric is not the official FAMA score.
 - **First-support MRR@k:** reciprocal rank of the first required support item, averaged across questions.
 - **Forbidden/stale hit rate@k:** fraction of annotated stale pointers retrieved in top-k; also report the fraction of questions with any stale hit.
 - **Distractor retrieval rate@k:** fraction of annotated plausible-but-non-supporting pointers retrieved in top-k. These are reported, not automatically treated as critical failures: a useful verifier may retrieve a decoy in order to refute it.
@@ -84,6 +92,65 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 3. Add an explicit typed transition graph only after the episode-expansion ablation is measured.
 4. Compare the arms on official LongMemEval-V2 and one independent action-oriented benchmark (e.g. AMA-Bench or Mem2ActBench); do not average their scores together.
 5. Run the mutation lane separately: supersede a fact, save/load memory, rebuild the index, and prove the old pointer is no longer eligible. That is a governance test, not a causal-chain score.
+
+## Dependency cascade and absence probe
+
+MEME: Multi-entity & Evolving Memory Evaluation isolates dependency cascade and absence—capabilities that static fact-recall metrics can miss. Its authors report very low default average accuracy on those tasks in their 100-episode study; the result is benchmark-specific, but it motivates our separate probe: https://arxiv.org/abs/2605.12477
+
+The new reference evaluator checks seven snapshots: an initial current dependency chain; an upstream endpoint revision; partial service refresh; complete refresh; an A → B → A endpoint reversion; direct-dependent refresh while the worker remains stale; and final full-chain refresh. It computes a current view only from the latest revisions whose dependency references all point to latest/current dependencies. Stale values remain auditable and are excluded from the current view; missing dependencies become `unknown_dependency`; dependency cycles and duplicate revisions fail closed. The implementation uses iterative topological processing rather than recursion, and the report binds the input and evaluator-source SHA-256. A 1,500-node chain test guards against recursion-limit failures.
+
+```sh
+python3 research/broca-causal-episode-probe-v1/dependency_cascade.py \
+  --input research/broca-causal-episode-probe-v1/fixtures/mutations/dependency_snapshots.jsonl \
+  --output /tmp/broca-dependency-cascade-report.json
+python3 research/broca-causal-episode-probe-v1/test_dependency_cascade.py
+```
+
+This is a reference semantics and synthetic diagnostic, not a production worker integration or a benchmark score. Next, port the semantics into a Rust truth-maintenance implementation and test update transactions, rollback, persisted event replay, and index rebuilds against these expected transitions.
+
+## New benchmark lanes to plan for
+
+- **MEME Cascade / Absence / Deletion** is the immediate dependency-validity lane. The MEME authors evaluate six memory systems on 100 controlled episodes, using GPT-4.1-mini as the internal and answering model with approximately 32K filler tokens; they report 3% average Cascade accuracy and 1% Absence accuracy across tested defaults. This is a benchmark-specific result, not a universal field average. The tlc research page separately reports its own MEME results of 0.628 Cascade, 0.42 Absence and 0.574 overall; treat those as provider-reported and reproduce against the official harness before setting a definitive baseline.
+- **COLLABMEM (EMNLP 2026)** evaluates collaborative memory operations: which role gets information, provenance, access control, routing, conflict resolution and retention. Its released description includes 58 hand-authored scenarios / 1,118 core probes and a scaled split of 174 scenarios / 3,359 probes. This is a natural future lane for Mycelix-integrated, scope-aware Broca memory.
+- **MemoryArena (ICML 2026)** evaluates memory in interdependent multi-session agent-environment loops, connecting memory formation with later action.
+- **MemoryAgentBench (ICLR 2026)** covers accurate retrieval, test-time learning, long-range understanding and selective forgetting.
+- **Memory-R1 (ACL 2026)** is the comparator for learned ADD / UPDATE / DELETE / NOOP memory-management policies. Any learned writer must remain subordinate to provenance, scope, revocation and dependency invariants.
+- **Mem-Gallery** and **DMV-Bench (EMNLP 2026)** extend the research toward multimodal long-term memory and incidental visual cues. They belong after the existing worker's visual retrieval limitations are explicitly addressed.
+
+Do not blend scores from these benchmarks into one mean. Use their native evaluation protocols and fixed reader/settings.
+
+## Eligibility-first currentness ablation
+
+The mutation suite includes a versioned policy ledger covering all 107 string-valued source pointers exactly once and a 13th composite query that asks for both current and prior state. The CLI verifies that coverage against the source trajectories. Each question has a manually annotated retrieval intent, including `current_and_history` for questions that request both present and historical state. The filter runs after BM25 candidate generation but **before final top-k selection**, preserves the BM25 order among eligible candidates, fails closed for unannotated pointers, and emits a receipt binding the candidate manifest, worker hash, fixture hashes, policy-ledger hash, filter-code SHA-256, intent mode, policy and output digest.
+
+Run both modes against the same candidate pool:
+
+```sh
+# Oracle upper bound: use the manually annotated retrieval intent.
+python3 research/broca-causal-episode-probe-v1/eligibility_filter.py \
+  --predictions /tmp/broca-mutation-candidates.jsonl \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --trajectories research/broca-causal-episode-probe-v1/fixtures/mutations/trajectories.jsonl \
+  --ledger research/broca-causal-episode-probe-v1/fixtures/mutations/eligibility-ledger.jsonl \
+  --intent-source annotated --k 5 --output /tmp/broca-mutation-eligible.jsonl
+
+# Transparent keyword baseline; an unknown intent abstains with an empty context.
+python3 research/broca-causal-episode-probe-v1/eligibility_filter.py \
+  --predictions /tmp/broca-mutation-candidates.jsonl \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --trajectories research/broca-causal-episode-probe-v1/fixtures/mutations/trajectories.jsonl \
+  --ledger research/broca-causal-episode-probe-v1/fixtures/mutations/eligibility-ledger.jsonl \
+  --intent-source heuristic --k 5 --output /tmp/broca-mutation-heuristic.jsonl
+
+python3 research/broca-causal-episode-probe-v1/score_probe.py \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --predictions /tmp/broca-mutation-eligible.jsonl --k 5
+python3 research/broca-causal-episode-probe-v1/score_probe.py \
+  --questions research/broca-causal-episode-probe-v1/fixtures/mutations/questions.jsonl \
+  --predictions /tmp/broca-mutation-heuristic.jsonl --k 5
+```
+
+The annotated mode is an **oracle-intent upper bound**; it is not a production-system win. The heuristic mode uses simple keyword rules and records the matched rule, per-question intent predictions, accuracy, and unknowns in the receipt. The rules were authored against this tiny fixture, so the current 13 prompts are not held out. Even perfect intent accuracy on these prompts would only be a fixture smoke check, not generalization evidence. The filter never reads required/forbidden support labels to select candidates. Next, evaluate intent prediction on independently authored, held-out queries and report per-class precision/recall, confusion matrix, abstention, policy coverage, retained candidate count, stale-aware quality, latency and lifecycle cost.
 
 ## Paired official-run decision analysis
 

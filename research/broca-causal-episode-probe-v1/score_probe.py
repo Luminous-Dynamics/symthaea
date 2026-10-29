@@ -44,7 +44,7 @@ def _rate(numerator: int, denominator: int) -> float | None:
 
 
 def _metrics(rows: list[dict[str, Any]], k: int) -> dict[str, Any]:
-    required_total = required_hits = complete = reciprocal_sum = 0
+    required_total = required_hits = complete = safe_complete = reciprocal_sum = 0
     forbidden_total = forbidden_hits = forbidden_questions = 0
     distractor_total = distractor_hits = 0
 
@@ -58,8 +58,14 @@ def _metrics(rows: list[dict[str, Any]], k: int) -> dict[str, Any]:
         hit_count = len(required & rank_set)
         required_total += len(required)
         required_hits += hit_count
-        if required and required <= rank_set:
+        complete_chain = bool(required) and required <= rank_set
+        if complete_chain:
             complete += 1
+        # A chain is valid only when every required item is retrieved and no
+        # annotated obsolete/forbidden item appears in the same top-k context.
+        # This intentionally does not replace the separate error-rate metrics.
+        if complete_chain and not (forbidden & rank_set):
+            safe_complete += 1
         first_rank = next((index + 1 for index, key in enumerate(rank) if key in required), None)
         reciprocal_sum += 0.0 if first_rank is None else 1.0 / first_rank
 
@@ -77,6 +83,7 @@ def _metrics(rows: list[dict[str, Any]], k: int) -> dict[str, Any]:
         "required_support_items": required_total,
         "required_support_recall_at_k": _rate(required_hits, required_total),
         "complete_chain_rate_at_k": _rate(complete, question_count),
+        "safe_complete_chain_rate_at_k": _rate(safe_complete, question_count),
         "first_required_support_mrr_at_k": _rate(round(reciprocal_sum, 9), question_count),
         "forbidden_support_items": forbidden_total,
         "forbidden_support_hit_rate_at_k": _rate(forbidden_hits, forbidden_total),
@@ -181,18 +188,21 @@ def score_dataset(
             "required_support_count": len(required),
             "required_support_hits_at_k": len(required & top),
             "complete_chain_at_k": required <= top,
+            "safe_complete_chain_at_k": required <= top and not (forbidden & top),
             "forbidden_hits_at_k": len(forbidden & top),
             "distractor_hits_at_k": len(distractors & top),
         })
 
     return {
-        "schema": "broca-causal-episode-probe-score-v1",
+        "schema": "broca-causal-episode-probe-score-v2",
         "k": k,
         "overall": overall,
         "by_category": by_category,
         "per_question": per_question,
         "interpretation": {
-            "primary_metric": "complete_chain_rate_at_k",
+            "primary_metric": "safe_complete_chain_rate_at_k",
+            "unconstrained_metric": "complete_chain_rate_at_k",
+            "safe_metric_definition": "all required support retrieved at k and zero annotated forbidden support retrieved at k",
             "claim_ceiling": "synthetic evidence retrieval diagnostic only; not answer accuracy, causal truth, task success, or SOTA",
             "compare_only_when": "identical fixtures, questions, context budget, and disclosed method configuration",
         },
