@@ -717,3 +717,57 @@ jobs:
           mutated_report_exit=$?
           set -e
           test "$mutated_report_exit" -eq 11
+
+- name: Counterfactual evidence intervention plan controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          python3 research/science-bench-refresh/tools/counterfactual_evidence_test_vectors.py /tmp/sbr-counterfactual-evidence
+
+          # Independent Python and Rust typed commitments must agree.
+          rust_commitment="$(cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            commit-evidence-intervention-plan /tmp/sbr-counterfactual-evidence/plan-fields.json \
+            | jq -r '.plan_commitment_sha256')"
+          expected_commitment="$(jq -r '.expected_plan_commitment_sha256' /tmp/sbr-counterfactual-evidence/summary.json 2>/dev/null || true)"
+          if [ -n "$expected_commitment" ]; then
+            test "$rust_commitment" = "$expected_commitment"
+          else
+            # The generator's independent expected digest also appears in the
+            # full plan; compare to the commitment already committed there.
+            expected_commitment="$(jq -r '.plan_commitment_sha256' /tmp/sbr-counterfactual-evidence/valid-plan.json)"
+            test "$rust_commitment" = "$expected_commitment"
+          fi
+
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-intervention-plan /tmp/sbr-counterfactual-evidence/valid-plan.json \
+            > /tmp/sbr-counterfactual-evidence/valid-report.json
+          jq -e '.valid == true and .structural_valid == true and .plan_commitment_matches == true' \
+            /tmp/sbr-counterfactual-evidence/valid-report.json >/dev/null
+          jq -e '.pair_count == 1 and .planned_trial_count == 6 and .conditions_per_pair == 6' \
+            /tmp/sbr-counterfactual-evidence/valid-report.json >/dev/null
+          jq -e '.external_anchor_required == true and .runner_execution_proven == false' \
+            /tmp/sbr-counterfactual-evidence/valid-report.json >/dev/null
+
+          # A correctly re-committed but incomplete pair must fail structurally.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-intervention-plan /tmp/sbr-counterfactual-evidence/missing-condition-plan.json \
+            > /tmp/sbr-counterfactual-evidence/missing-condition-report.json
+          missing_exit=$?
+          set -e
+          test "$missing_exit" -eq 11
+          jq -e '.structural_valid == false and .valid == false' \
+            /tmp/sbr-counterfactual-evidence/missing-condition-report.json >/dev/null
+
+          # A complete plan with a mutated commitment must fail independently.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-intervention-plan /tmp/sbr-counterfactual-evidence/mutated-commitment-plan.json \
+            > /tmp/sbr-counterfactual-evidence/mutated-commitment-report.json
+          mutation_exit=$?
+          set -e
+          test "$mutation_exit" -eq 11
+          jq -e '.structural_valid == true and .plan_commitment_matches == false and .valid == false' \
+            /tmp/sbr-counterfactual-evidence/mutated-commitment-report.json >/dev/null
+          ! grep -Eq 'raw target|gold answer text|hidden oracle' /tmp/sbr-counterfactual-evidence/valid-report.json
