@@ -6,7 +6,7 @@ A test suite that passes ordinary positive and negative fixtures may still fail 
 
 ## Frozen sentinel set
 
-The current catalog contains 13 reviewed bypass mutations across five guardrail families:
+The current catalog contains 13 reviewed bypass mutations across six guardrail families:
 
 - trusted input pins: protocol, raw manifest and verifier-source pins;
 - scenario identity: scenario digest and condition-specific task-contract bindings;
