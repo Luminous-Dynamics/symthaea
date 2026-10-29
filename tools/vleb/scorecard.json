@@ -245,6 +245,18 @@
         "missing or ambiguous logs remain unresolved and cannot be dropped from the denominator"
       ]
     },
+    "oracle_control_verifier_mutation_kill_rate_pct": {
+      "target": 100,
+      "status": "target_not_measured",
+      "definition": "Percentage of frozen, reviewed oracle-control verifier guard-bypass mutations that compile and cause their designated adversarial test to fail after the unmodified suite passes.",
+      "requirements": [
+        "the unmodified two-sided oracle-control suite must pass first",
+        "each mutation anchor must occur exactly once and the mutated verifier must compile",
+        "the suite must start and the designated test protecting the mutated guard must fail",
+        "syntax/import/startup failures, timeouts, unrelated failures and surviving sentinels are not killed mutations",
+        "report kill rate by guardrail family; any invalid or surviving mutation blocks a complete campaign"
+      ]
+    },
     "two_sided_oracle_control_replay_coverage_pct": {
       "target": 100,
       "status": "target_not_measured",
@@ -365,6 +377,12 @@
       "eligible": false,
       "status": "not_measured",
       "reason": "Per-test baseline expectations are implemented in draft PR #8801, but the exact-head suite has not passed and no locked confirmatory cohort has been evaluated."
+    },
+    "oracle_control_verifier_mutation_kill_rate_pct": {
+      "value": null,
+      "eligible": false,
+      "status": "not_measured",
+      "reason": "The verifier self-mutation campaign and tests are draft work in a stacked PR; no exact-head run has measured the frozen sentinel catalog."
     },
     "two_sided_oracle_control_replay_coverage_pct": {
       "value": null,
@@ -487,6 +505,23 @@
         "freeze expected status values before observing the candidate outcome",
         "unknown, missing, ambiguous, or mismatched test results remain unresolved or failed and cannot be dropped",
         "report overall two-sided baseline/reference gate separately from per-test alignment",
+        "composite_weighted_score is false"
+      ],
+      "composite_weighted_score": false
+    },
+    "oracle_control_verifier_mutation_kill_rate": {
+      "formula": "reviewed, compilable verifier mutations whose designated guard test fails / all frozen verifier mutations",
+      "pass_requirements": [
+        "the unmodified two-sided control test suite passes before any mutations",
+        "every reviewed mutation anchor appears exactly once and the mutated verifier compiles",
+        "the test suite starts and the specifically assigned test fails against the mutated verifier",
+        "no mutation is counted killed for syntax/import failure, timeout, startup failure or unrelated test failure",
+        "the output reports per-family killed, survived, invalid and not-run counts"
+      ],
+      "denominator_rules": [
+        "freeze mutation IDs, families and designated failure tests before running the campaign",
+        "do not drop a surviving or invalid mutation after seeing results",
+        "100% mutation kill rate is a verifier-test sensitivity target, not a candidate-agent success score",
         "composite_weighted_score is false"
       ],
       "composite_weighted_score": false
