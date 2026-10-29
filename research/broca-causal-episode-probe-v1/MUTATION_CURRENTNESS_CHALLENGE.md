@@ -110,7 +110,7 @@ Do not collapse these into a single accuracy number. A method that raises ordina
 ## Research gates
 
 1. **Integrity:** every gold pointer resolves; no missing/duplicate predictions; worker/fixtures/config/predictions are receipt-bound.
-2. **Quality:** use grouped paired tests on a larger, independently reviewed set; the current 12-question fixture is diagnostic only.
+2. **Quality:** use grouped paired tests on a larger, independently reviewed set; the current 13-question mutation fixture is diagnostic only.
 3. **Currentness:** zero forbidden-hit observations in this small suite is only a smoke test, never a zero-risk claim.
 4. **Efficiency:** compare at matched context budgets and publish the entire lifecycle cost, not just query latency.
 5. **Generalization:** freeze a held-out set before tuning; test natural-language updates, contradictory sources, delayed updates, and A → B → A reversions separately.
