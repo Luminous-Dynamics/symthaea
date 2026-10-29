@@ -201,6 +201,151 @@ fn upstream_counterexample() -> Result<(Audit,Bet,f64),String> {
     Ok((a,bet,factor))
 }
 
+#[derive(Clone,Copy,Debug)]
+struct Constraint { a:f64, b:f64, c:f64 }
+#[derive(Clone,Copy,Debug,Default)]
+struct QuadraticStats { a00:f64, a01:f64, a11:f64, b0:f64, b1:f64 }
+#[derive(Clone,Copy,Debug)]
+struct Sample { w:f64, r:f64, c:f64 }
+#[derive(Clone,Copy,Debug)]
+struct Optimum { bet:Bet, objective:f64, candidates:usize }
+
+fn action_specific_constraints(audit:&Audit)->Vec<Constraint>{
+    let mut out=Vec::with_capacity(audit.actions.len()+3);
+    // lambda_2 >= 0.
+    out.push(Constraint{a:0.0,b:-1.0,c:0.0});
+    for action in &audit.actions{
+        // lambda_1(w-1)+lambda_2(y_min-1) >= -1/2
+        // is equivalent to (1-w)lambda_1+(c+1)lambda_2 <= 1/2.
+        out.push(Constraint{a:1.0-action.w,b:action.c+1.0,c:WEALTH_FLOOR});
+    }
+    if audit.actions.iter().all(|a|close(a.w,1.0,1e-10)){
+        // lambda_1 has no wealth effect when all importance weights equal one.
+        // Pin it to zero to eliminate an otherwise flat/unbounded direction.
+        out.push(Constraint{a:1.0,b:0.0,c:0.0});
+        out.push(Constraint{a:-1.0,b:0.0,c:0.0});
+    }
+    out
+}
+
+fn feasible_constraints(bet:Bet,constraints:&[Constraint])->bool{
+    bet.x.is_finite() && bet.y.is_finite()
+        && constraints.iter().all(|c|c.a*bet.x+c.b*bet.y<=c.c+1e-8)
+}
+fn qstats(samples:&[Sample],value:f64)->QuadraticStats{
+    let mut s=QuadraticStats::default();
+    for sample in samples{
+        let x=sample.w-1.0;
+        let y=sample.w*sample.r-sample.c-value;
+        s.a00+=x*x; s.a01+=x*y; s.a11+=y*y; s.b0+=x; s.b1+=y;
+    }
+    s
+}
+fn objective(stats:QuadraticStats,bet:Bet)->f64{
+    let psi=2.0-4.0*std::f64::consts::LN_2;
+    psi*(stats.a00*bet.x*bet.x+2.0*stats.a01*bet.x*bet.y+stats.a11*bet.y*bet.y)
+        +stats.b0*bet.x+stats.b1*bet.y
+}
+fn feasible_vertices(constraints:&[Constraint])->Vec<Bet>{
+    let mut vertices=Vec::new();
+    for i in 0..constraints.len(){
+        for j in (i+1)..constraints.len(){
+            let p=constraints[i]; let q=constraints[j];
+            let det=p.a*q.b-p.b*q.a;
+            if det.abs()<=1e-12{continue;}
+            let x=(p.c*q.b-p.b*q.c)/det;
+            let y=(p.a*q.c-p.c*q.a)/det;
+            let candidate=Bet{x,y};
+            if feasible_constraints(candidate,constraints)
+                && !vertices.iter().any(|v:&Bet|close(v.x,x,1e-8)&&close(v.y,y,1e-8)){
+                vertices.push(candidate);
+            }
+        }
+    }
+    vertices
+}
+fn optimize_support_polytope(stats:QuadraticStats,constraints:&[Constraint])->Result<Optimum,String>{
+    let vertices=feasible_vertices(constraints);
+    if vertices.is_empty(){return Err("support-aware feasible polygon has no enumerated vertices".into());}
+    let mut candidates=vertices.clone();
+
+    // Include the unconstrained stationary point when the matrix is well-conditioned.
+    let scale=stats.a00.abs().max(stats.a01.abs()).max(stats.a11.abs());
+    if scale>0.0{
+        let (a00,a01,a11)=(stats.a00/scale,stats.a01/scale,stats.a11/scale);
+        let det=a00*a11-a01*a01;
+        if det>1e-10{
+            let psi=2.0-4.0*std::f64::consts::LN_2;
+            let den=2.0*psi*scale*det;
+            let stationary=Bet{
+                x:-(a11*stats.b0-a01*stats.b1)/den,
+                y:-(-a01*stats.b0+a00*stats.b1)/den,
+            };
+            if feasible_constraints(stationary,constraints){candidates.push(stationary);}
+        }
+    }
+
+    // Each edge optimum is its exact 1-D stationary point clamped to the feasible segment.
+    let psi=2.0-4.0*std::f64::consts::LN_2;
+    for constraint in constraints{
+        let normal_sq=constraint.a*constraint.a+constraint.b*constraint.b;
+        if normal_sq<=1e-16{continue;}
+        let on_edge:Vec<Bet>=vertices.iter().copied()
+            .filter(|v|(constraint.a*v.x+constraint.b*v.y-constraint.c).abs()<=1e-7).collect();
+        if on_edge.len()<2{continue;}
+        let direction=Bet{x:-constraint.b,y:constraint.a};
+        let direction_sq=direction.x*direction.x+direction.y*direction.y;
+        let mut low=f64::INFINITY; let mut high=f64::NEG_INFINITY;
+        for v in &on_edge{
+            let t=(v.x*direction.x+v.y*direction.y)/direction_sq;
+            low=low.min(t); high=high.max(t);
+        }
+        if !(low.is_finite()&&high.is_finite())||low>high{continue;}
+        let origin=Bet{x:constraint.a*constraint.c/normal_sq,y:constraint.b*constraint.c/normal_sq};
+        let a_dir=stats.a00*direction.x*direction.x
+            +2.0*stats.a01*direction.x*direction.y+stats.a11*direction.y*direction.y;
+        let quad=psi*a_dir;
+        let origin_a_dir=stats.a00*origin.x*direction.x
+            +stats.a01*(origin.x*direction.y+origin.y*direction.x)
+            +stats.a11*origin.y*direction.y;
+        let linear=2.0*psi*origin_a_dir+stats.b0*direction.x+stats.b1*direction.y;
+        let t=if quad < -1e-14 {(-linear/(2.0*quad)).clamp(low,high)}
+            else if linear>0.0 {high} else {low};
+        let edge=Bet{x:origin.x+t*direction.x,y:origin.y+t*direction.y};
+        if feasible_constraints(edge,constraints){candidates.push(edge);}
+    }
+
+    let (bet,obj)=candidates.iter().copied()
+        .filter(|candidate|feasible_constraints(*candidate,constraints))
+        .map(|candidate|(candidate,objective(stats,candidate)))
+        .max_by(|a,b|a.1.total_cmp(&b.1))
+        .ok_or_else(||"no feasible optimizer candidate survived validation".to_owned())?;
+    if !obj.is_finite(){return Err("non-finite support-aware objective".into());}
+    Ok(Optimum{bet,objective:obj,candidates:candidates.len()})
+}
+
+fn cv_samples(audit:&Audit)->Vec<Sample>{
+    let mut samples=Vec::new();
+    for action in &audit.actions{
+        for reward in [0.0,1.0]{
+            samples.push(Sample{w:action.w,r:reward,c:action.c});
+        }
+    }
+    samples
+}
+fn dense_grid_best(stats:QuadraticStats,constraints:&[Constraint])->f64{
+    let mut best=f64::NEG_INFINITY;
+    for ix in -100..=300{
+        let x=ix as f64/200.0; // [-0.5, 1.5] in 0.005 steps.
+        for iy in 0..=200{
+            let y=iy as f64/200.0; // [0,1] in 0.005 steps.
+            let bet=Bet{x,y};
+            if feasible_constraints(bet,constraints){best=best.max(objective(stats,bet));}
+        }
+    }
+    best
+}
+
 fn frozen_cases()->Vec<Dgp>{
     vec![Dgp::healthy_oracle(),Dgp::healthy_constant(),Dgp::weak_oracle(),Dgp::weak_reversed(),Dgp::weak_constant()]
 }
@@ -236,6 +381,7 @@ fn run()->Result<String,String>{
     let _=writeln!(out,"LEGACY_WITNESS\tviolates_half_wealth_floor\t{}",factor<WEALTH_FLOOR);
     let _=writeln!(out,"SAFE_REGION\twitness_rejected\t{}",!support_aware_feasible(bet,&a));
     let mut checked=0usize;
+    let constraints=action_specific_constraints(&a);
     for xi in -200..=100 {
         let x=xi as f64/200.0;
         for yi in 0..=100 {
@@ -250,7 +396,23 @@ fn run()->Result<String,String>{
             }
         }
     }
+    let samples=cv_samples(&a);
+    let stats=qstats(&samples,0.5);
+    let optimum=optimize_support_polytope(stats,&constraints)?;
+    if !support_aware_feasible(optimum.bet,&a)
+        || !support_aware_corners_hold(optimum.bet,&a) {
+        return Err("support-aware optimizer returned a bet that violates the factor floor".into());
+    }
+    let dense=dense_grid_best(stats,&constraints);
+    if optimum.objective+1e-7<dense{
+        return Err(format!("support-aware optimizer underperformed dense feasible grid: {} < {}",optimum.objective,dense));
+    }
     let _=writeln!(out,"SAFE_REGION\tfeasible_grid_points_checked\t{checked}");
+    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tlambda1\t{:.12}",optimum.bet.x);
+    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tlambda2\t{:.12}",optimum.bet.y);
+    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tobjective\t{:.12}",optimum.objective);
+    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tdense_grid_best\t{:.12}",dense);
+    let _=writeln!(out,"SAFE_BET_OPTIMIZER\tminimum_factor\t{:.12}",support_aware_minimum_factor(optimum.bet,&a));
     Ok(out)
 }
 
@@ -304,6 +466,24 @@ mod tests{
                 }
             }
         }
+    }
+
+    #[test]
+    fn support_aware_polygon_optimizer_returns_safe_bet_no_worse_than_dense_grid(){
+        let dgp=Dgp{
+            name:"optimizer_control",
+            h:vec![0.01,0.99],pi:vec![0.5,0.5],
+            reward_mean:vec![0.2,0.8],predictor:vec![0.999,0.001],max_weight:50.0,
+        };
+        let a=audit(&dgp).unwrap();
+        let constraints=action_specific_constraints(&a);
+        let samples=cv_samples(&a);
+        let stats=qstats(&samples,0.5);
+        let optimum=optimize_support_polytope(stats,&constraints).unwrap();
+        assert!(support_aware_feasible(optimum.bet,&a));
+        assert!(support_aware_corners_hold(optimum.bet,&a));
+        assert!(support_aware_minimum_factor(optimum.bet,&a)>=WEALTH_FLOOR-TOL);
+        assert!(optimum.objective+1e-7>=dense_grid_best(stats,&constraints));
     }
 
     #[test]
