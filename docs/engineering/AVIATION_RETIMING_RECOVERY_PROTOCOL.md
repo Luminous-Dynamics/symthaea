@@ -78,7 +78,7 @@ Report separately:
 - exact-oracle best cost, greedy best cost, and branch-and-bound best cost;
 - best feasible total cost, delay minutes and cancellations;
 - global lower bound, absolute gap, and terminal state;
-- expanded/generated nodes, complete assignments examined, partial-feasibility prunes, objective-bound prunes, lower-bound evaluations, availability-relaxation checks, and peak frontier;
+- expanded/generated nodes, candidate actions considered, partial-feasibility checks/rejections, complete assignments examined, objective-bound prunes, lower-bound evaluations, availability-relaxation checks, and peak frontier;
 - time to first independently verified feasible plan (in the current future runner; node counts are available now);
 - greedy candidate actions considered and how many were feasible;
 - end-to-end latency p50/p95/p99 over repeated runs on a named hardware/toolchain profile;
