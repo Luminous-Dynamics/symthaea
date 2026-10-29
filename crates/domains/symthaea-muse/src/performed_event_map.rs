@@ -20,11 +20,13 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub const PERFORMED_EVENT_MAP_VERSION: &str = "mel-mr-eval-014-performed-event-map-v0.1";
 pub const MAX_PERFORMED_EVENT_MAP_EVENTS: usize = 100_000;
 const MAX_SAMPLE_RATE_HZ: u32 = 768_000;
+const MIDI_LINEAGE_MARKER_MAGIC: &[u8; 3] = b"LDM";
+const MIDI_LINEAGE_MARKER_VERSION: u8 = 1;
 
 /// One performed MIDI note and its declared ancestry from a target-score event.
 ///
@@ -69,6 +71,17 @@ pub struct PerformedEventMap {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PerformedEventMapError {
     UnsupportedVersion,
+    InvalidMidiBytes,
+    UnsupportedMidiTiming,
+    InvalidTempoMap,
+    MidiTickOverflow,
+    InvalidLineageMarker,
+    DuplicateLineageMarker,
+    OrphanLineageMarker,
+    LineageMarkerTickMismatch,
+    AmbiguousNotePairing,
+    OrphanNoteOff,
+    UnclosedMidiNote,
     InvalidSha256(&'static str),
     InvalidField(&'static str),
     TooManyEvents,
@@ -104,6 +117,51 @@ pub fn score_event_id(index: usize) -> String {
     format!("score_event_index:{index}")
 }
 
+/// Encode a sequencer-specific MIDI marker. The marker is written immediately
+/// before its NoteOn in the same track and at the same tick, so parsing does
+/// not need nearest-onset matching or a heuristic note correspondence.
+pub(crate) fn encode_midi_lineage_marker_payload(
+    source_event_index: usize,
+    descendant_ordinal: u32,
+) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(16);
+    payload.extend_from_slice(MIDI_LINEAGE_MARKER_MAGIC);
+    payload.push(MIDI_LINEAGE_MARKER_VERSION);
+    payload.extend_from_slice(&(source_event_index as u64).to_be_bytes());
+    payload.extend_from_slice(&descendant_ordinal.to_be_bytes());
+    payload
+}
+
+fn decode_midi_lineage_marker_payload(
+    payload: &[u8],
+) -> Result<Option<(usize, u32)>, PerformedEventMapError> {
+    if !payload.starts_with(MIDI_LINEAGE_MARKER_MAGIC) {
+        return Ok(None);
+    }
+    if payload.len() != 16 || payload[3] != MIDI_LINEAGE_MARKER_VERSION {
+        return Err(PerformedEventMapError::InvalidLineageMarker);
+    }
+    let raw_index = u64::from_be_bytes(
+        payload[4..12]
+            .try_into()
+            .map_err(|_| PerformedEventMapError::InvalidLineageMarker)?,
+    );
+    let source_index =
+        usize::try_from(raw_index).map_err(|_| PerformedEventMapError::InvalidSourceEventId)?;
+    let descendant_ordinal = u32::from_be_bytes(
+        payload[12..16]
+            .try_into()
+            .map_err(|_| PerformedEventMapError::InvalidLineageMarker)?,
+    );
+    Ok(Some((source_index, descendant_ordinal)))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
 fn parse_score_event_id(value: &str) -> Option<usize> {
     let suffix = value.strip_prefix("score_event_index:")?;
     if suffix.is_empty() || (suffix.len() > 1 && suffix.starts_with('0')) {
@@ -137,7 +195,285 @@ pub fn frame_for_time_micros(
     Ok(scaled / 1_000_000)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PendingMidiNote {
+    midi_track_index: u16,
+    note_on_ordinal: u32,
+    midi_channel: u8,
+    midi_note: u8,
+    onset_tick: u64,
+    source: Option<(usize, u32)>,
+}
+
+fn midi_tick_to_micros(
+    tick: u64,
+    ticks_per_beat: u64,
+    tempo_changes: &[(u64, u32)],
+) -> Result<u64, PerformedEventMapError> {
+    let mut previous_tick = 0u64;
+    let mut tempo = 500_000u64;
+    let mut scaled_micros = 0u128;
+    for &(change_tick, usec_per_beat) in tempo_changes {
+        if change_tick > tick {
+            break;
+        }
+        if change_tick > previous_tick {
+            let segment = u128::from(change_tick - previous_tick)
+                .checked_mul(u128::from(tempo))
+                .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+            scaled_micros = scaled_micros
+                .checked_add(segment)
+                .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+            previous_tick = change_tick;
+        }
+        tempo = u64::from(usec_per_beat);
+    }
+    if tick > previous_tick {
+        let segment = u128::from(tick - previous_tick)
+            .checked_mul(u128::from(tempo))
+            .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+        scaled_micros = scaled_micros
+            .checked_add(segment)
+            .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+    }
+    let rounded = scaled_micros
+        .checked_add(u128::from(ticks_per_beat / 2))
+        .ok_or(PerformedEventMapError::MidiTickOverflow)?
+        / u128::from(ticks_per_beat);
+    u64::try_from(rounded).map_err(|_| PerformedEventMapError::MidiTickOverflow)
+}
+
+fn close_midi_note(
+    open_notes: &mut HashMap<(u8, u8), PendingMidiNote>,
+    channel: u8,
+    midi_note: u8,
+    end_tick: u64,
+    ticks_per_beat: u64,
+    tempo_changes: &[(u64, u32)],
+    sample_rate_hz: u32,
+    output: &mut Vec<PerformedEventLineage>,
+) -> Result<(), PerformedEventMapError> {
+    let note = open_notes
+        .remove(&(channel, midi_note))
+        .ok_or(PerformedEventMapError::OrphanNoteOff)?;
+    if end_tick <= note.onset_tick {
+        return Err(PerformedEventMapError::InvalidTimeInterval);
+    }
+    if let Some((source_index, descendant_ordinal)) = note.source {
+        let onset_micros =
+            midi_tick_to_micros(note.onset_tick, ticks_per_beat, tempo_changes)?;
+        let end_micros = midi_tick_to_micros(end_tick, ticks_per_beat, tempo_changes)?;
+        output.push(PerformedEventLineage {
+            source_event_id: score_event_id(source_index),
+            descendant_ordinal,
+            midi_track_index: note.midi_track_index,
+            note_on_ordinal: note.note_on_ordinal,
+            midi_channel: note.midi_channel,
+            midi_note: note.midi_note,
+            onset_frame: frame_for_time_micros(onset_micros, sample_rate_hz)?,
+            end_frame: frame_for_time_micros(end_micros, sample_rate_hz)?,
+            onset_micros,
+            end_micros,
+        });
+    }
+    Ok(())
+}
+
 impl PerformedEventMap {
+    /// Build lineage from the exact serialized MIDI bytes. The caller supplies
+    /// the target Score digest and the output WAV's sample rate/frame count.
+    /// Only notes that contain a valid in-band lineage marker become mapped
+    /// rows; missing source events are caught by verify_for_score.
+    ///
+    /// Markers are accepted only when immediately followed by a positive
+    /// NoteOn at the same absolute tick. Note pairing ambiguity, malformed
+    /// markers and incomplete MIDI note lifetimes fail closed.
+    pub fn from_midi_bytes(
+        midi_bytes: &[u8],
+        target_score_sha256: &str,
+        sample_rate_hz: u32,
+        total_frames: u64,
+    ) -> Result<Self, PerformedEventMapError> {
+        if !is_lower_hex_sha256(target_score_sha256) {
+            return Err(PerformedEventMapError::InvalidSha256("target_score_sha256"));
+        }
+        if sample_rate_hz == 0 || sample_rate_hz > MAX_SAMPLE_RATE_HZ || total_frames == 0 {
+            return Err(PerformedEventMapError::InvalidField("audio_context"));
+        }
+        let smf = midly::Smf::parse(midi_bytes)
+            .map_err(|_| PerformedEventMapError::InvalidMidiBytes)?;
+        let ticks_per_beat = match &smf.header.timing {
+            midly::Timing::Metrical(ticks) => u64::from(ticks.as_int()),
+            midly::Timing::Timecode(_, _) => {
+                return Err(PerformedEventMapError::UnsupportedMidiTiming);
+            }
+        };
+        if ticks_per_beat == 0 {
+            return Err(PerformedEventMapError::UnsupportedMidiTiming);
+        }
+
+        // MIDI tempo applies across tracks. Gather absolute-tick changes and
+        // reject conflicting tempo values at one tick rather than guess order.
+        let mut raw_tempos: Vec<(u64, u32, usize, usize)> = Vec::new();
+        for (track_index, track) in smf.tracks.iter().enumerate() {
+            let mut tick = 0u64;
+            for (event_index, event) in track.iter().enumerate() {
+                tick = tick
+                    .checked_add(u64::from(event.delta.as_int()))
+                    .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+                if let midly::TrackEventKind::Meta(midly::MetaMessage::Tempo(value)) = &event.kind {
+                    let tempo = value.as_int();
+                    if tempo == 0 {
+                        return Err(PerformedEventMapError::InvalidTempoMap);
+                    }
+                    raw_tempos.push((tick, tempo, track_index, event_index));
+                }
+            }
+        }
+        raw_tempos.sort_by_key(|(tick, _, track, event)| (*tick, *track, *event));
+        let mut tempo_changes: Vec<(u64, u32)> = Vec::new();
+        for (tick, tempo, _, _) in raw_tempos {
+            if let Some((last_tick, last_tempo)) = tempo_changes.last() {
+                if *last_tick == tick {
+                    if *last_tempo != tempo {
+                        return Err(PerformedEventMapError::InvalidTempoMap);
+                    }
+                    continue;
+                }
+            }
+            tempo_changes.push((tick, tempo));
+        }
+
+        let mut events = Vec::new();
+        for (raw_track_index, track) in smf.tracks.iter().enumerate() {
+            let mut tick = 0u64;
+            let mut next_note_on_ordinal = 0u32;
+            let mut pending_marker: Option<(usize, u32, u64)> = None;
+            let mut open_notes: HashMap<(u8, u8), PendingMidiNote> = HashMap::new();
+            let track_index = u16::try_from(raw_track_index)
+                .map_err(|_| PerformedEventMapError::InvalidField("midi_track_index"))?;
+
+            for event in track {
+                tick = tick
+                    .checked_add(u64::from(event.delta.as_int()))
+                    .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+                let is_marker = matches!(
+                    &event.kind,
+                    midly::TrackEventKind::Meta(midly::MetaMessage::SequencerSpecific(payload))
+                        if payload.starts_with(MIDI_LINEAGE_MARKER_MAGIC)
+                );
+                let is_positive_note_on = matches!(
+                    &event.kind,
+                    midly::TrackEventKind::Midi {
+                        message: midly::MidiMessage::NoteOn { vel, .. },
+                        ..
+                    } if vel.as_int() > 0
+                );
+                if let Some((_, _, marker_tick)) = pending_marker {
+                    if is_marker {
+                        return Err(PerformedEventMapError::DuplicateLineageMarker);
+                    }
+                    if !is_positive_note_on {
+                        return Err(PerformedEventMapError::OrphanLineageMarker);
+                    }
+                    if tick != marker_tick {
+                        return Err(PerformedEventMapError::LineageMarkerTickMismatch);
+                    }
+                }
+
+                match &event.kind {
+                    midly::TrackEventKind::Meta(
+                        midly::MetaMessage::SequencerSpecific(payload),
+                    ) if payload.starts_with(MIDI_LINEAGE_MARKER_MAGIC) => {
+                        if pending_marker.is_some() {
+                            return Err(PerformedEventMapError::DuplicateLineageMarker);
+                        }
+                        let (source_index, descendant_ordinal) =
+                            decode_midi_lineage_marker_payload(payload)?
+                                .ok_or(PerformedEventMapError::InvalidLineageMarker)?;
+                        pending_marker = Some((source_index, descendant_ordinal, tick));
+                    }
+                    midly::TrackEventKind::Midi { channel, message } => {
+                        let channel = channel.as_int();
+                        match message {
+                            midly::MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
+                                let source = pending_marker
+                                    .take()
+                                    .map(|(index, ordinal, _)| (index, ordinal));
+                                let note_on_ordinal = next_note_on_ordinal;
+                                next_note_on_ordinal = next_note_on_ordinal
+                                    .checked_add(1)
+                                    .ok_or(PerformedEventMapError::MidiTickOverflow)?;
+                                let midi_note = key.as_int();
+                                if open_notes.contains_key(&(channel, midi_note)) {
+                                    return Err(PerformedEventMapError::AmbiguousNotePairing);
+                                }
+                                open_notes.insert(
+                                    (channel, midi_note),
+                                    PendingMidiNote {
+                                        midi_track_index: track_index,
+                                        note_on_ordinal,
+                                        midi_channel: channel,
+                                        midi_note,
+                                        onset_tick: tick,
+                                        source,
+                                    },
+                                );
+                            }
+                            midly::MidiMessage::NoteOff { key, .. } => {
+                                close_midi_note(
+                                    &mut open_notes,
+                                    channel,
+                                    key.as_int(),
+                                    tick,
+                                    ticks_per_beat,
+                                    &tempo_changes,
+                                    sample_rate_hz,
+                                    &mut events,
+                                )?;
+                            }
+                            midly::MidiMessage::NoteOn { key, .. } => {
+                                // MIDI permits NoteOn with velocity zero as
+                                // a NoteOff encoding.
+                                close_midi_note(
+                                    &mut open_notes,
+                                    channel,
+                                    key.as_int(),
+                                    tick,
+                                    ticks_per_beat,
+                                    &tempo_changes,
+                                    sample_rate_hz,
+                                    &mut events,
+                                )?;
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if pending_marker.is_some() {
+                return Err(PerformedEventMapError::OrphanLineageMarker);
+            }
+            if !open_notes.is_empty() {
+                return Err(PerformedEventMapError::UnclosedMidiNote);
+            }
+        }
+
+        let mut map = Self {
+            map_version: PERFORMED_EVENT_MAP_VERSION.into(),
+            target_score_sha256: target_score_sha256.into(),
+            performed_midi_sha256: sha256_hex(midi_bytes),
+            sample_rate_hz,
+            total_frames,
+            events,
+            unresolved_source_event_ids: Vec::new(),
+            receipt_sha256: String::new(),
+        };
+        map.seal()?;
+        Ok(map)
+    }
+
     /// Canonicalize and seal a map. This checks structure and timing but does
     /// not establish that the caller's event rows actually occur in the MIDI.
     pub fn seal(&mut self) -> Result<(), PerformedEventMapError> {
@@ -423,6 +759,88 @@ mod tests {
         };
         map.seal().unwrap();
         map
+    }
+
+    fn minimal_marked_midi() -> Vec<u8> {
+        let mut track = Vec::new();
+        // Track name.
+        track.extend_from_slice(&[0, 0xFF, 0x03, 4, b'T', b'e', b's', b't']);
+        // 120 BPM tempo map.
+        track.extend_from_slice(&[0, 0xFF, 0x51, 3, 0x07, 0xA1, 0x20]);
+        let payload = encode_midi_lineage_marker_payload(0, 0);
+        track.extend_from_slice(&[0, 0xFF, 0x7F, payload.len() as u8]);
+        track.extend_from_slice(&payload);
+        // C4 at tick 0, with a half-second gate (480 ticks at 120 BPM).
+        track.extend_from_slice(&[0, 0x90, 60, 100]);
+        track.extend_from_slice(&[0x83, 0x60, 0x80, 60, 0]);
+        track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+
+        let mut midi = Vec::new();
+        midi.extend_from_slice(b"MThd");
+        midi.extend_from_slice(&6u32.to_be_bytes());
+        midi.extend_from_slice(&0u16.to_be_bytes());
+        midi.extend_from_slice(&1u16.to_be_bytes());
+        midi.extend_from_slice(&480u16.to_be_bytes());
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        midi.extend_from_slice(&track);
+        midi
+    }
+
+    #[test]
+    fn midi_parser_recovers_exact_source_note_identity_and_performed_time() {
+        let midi = minimal_marked_midi();
+        let midi_sha256 = sha256_hex(&midi);
+        let map = PerformedEventMap::from_midi_bytes(
+            &midi,
+            &digest('a'),
+            48_000,
+            48_000,
+        )
+        .unwrap();
+        assert_eq!(map.performed_midi_sha256, midi_sha256);
+        assert_eq!(map.events.len(), 1);
+        let event = &map.events[0];
+        assert_eq!(event.source_event_id, score_event_id(0));
+        assert_eq!(event.descendant_ordinal, 0);
+        assert_eq!(event.midi_track_index, 0);
+        assert_eq!(event.note_on_ordinal, 0);
+        assert_eq!(event.midi_channel, 0);
+        assert_eq!(event.midi_note, 60);
+        assert_eq!(event.onset_micros, 0);
+        assert_eq!(event.end_micros, 500_000);
+        assert_eq!(event.onset_frame, 0);
+        assert_eq!(event.end_frame, 24_000);
+        map.verify_for_score_and_pitches(
+            &digest('a'),
+            &midi_sha256,
+            48_000,
+            48_000,
+            1,
+            &[60],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn midi_parser_rejects_an_orphaned_lineage_marker() {
+        let mut midi = minimal_marked_midi();
+        // In this fixture, the marker starts after the 7-byte track name and
+        // 7-byte tempo events. Replace the NoteOn with a second metadata event.
+        let marker_payload = encode_midi_lineage_marker_payload(0, 0);
+        let marker = [0xFF, 0x7F, marker_payload.len() as u8];
+        let needle = [0x00, 0x90, 60, 100];
+        let position = midi
+            .windows(needle.len())
+            .position(|window| window == needle)
+            .unwrap();
+        let mut replacement = vec![0, 0xFF, 0x01, 1, b'x'];
+        midi.splice(position..position + needle.len(), replacement.drain(..));
+        let _ = marker;
+        assert_eq!(
+            PerformedEventMap::from_midi_bytes(&midi, &digest('a'), 48_000, 48_000),
+            Err(PerformedEventMapError::OrphanLineageMarker)
+        );
     }
 
     #[test]
