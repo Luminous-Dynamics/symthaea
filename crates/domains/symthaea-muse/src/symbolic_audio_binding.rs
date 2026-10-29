@@ -1360,11 +1360,11 @@ mod tests {
                     critical: true,
                 },
                 preservation("onset", EditAttribute::Onset, ObligationScope::ScoreWide,
-                    "onset-preservation-v1", "seconds", 10_000),
+                    "onset-preservation-v1", "seconds", 4_000),
                 preservation("duration", EditAttribute::Duration, ObligationScope::ScoreWide,
                     "score-duration-exact-v1", "beats", 0),
                 preservation("edited-envelope", EditAttribute::RmsEnvelope, rms_scope,
-                    "rms-envelope-delta-v1", "db", 1_000_000),
+                    "rms-envelope-delta-v1", "db", 500_000),
                 preservation("protected-rms", EditAttribute::NeighboringContent,
                     ObligationScope::ProtectedRemainder, "protected-region-rms-v1", "db", 500_000),
                 preservation("protected-spectrum", EditAttribute::NeighboringContent,
@@ -1452,6 +1452,61 @@ mod tests {
         );
         assert!(validate_frozen_edit_contract_for_rendering(
             &contract, &digest(b"edit something else"), &source, &target, &symbolic, &manifest, &profile,
+        ).is_err());
+    }
+
+    #[test]
+    fn frozen_contract_rejects_profile_tolerance_escalation_even_after_resealing() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let mut contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        for obligation in &mut contract.obligations {
+            if let ObligationRequirement::PreserveWithin { comparator_id, tolerance } =
+                &mut obligation.requirement
+            {
+                if comparator_id == "rms-envelope-delta-v1" {
+                    tolerance.value_microunits = 1_500_000;
+                }
+            }
+        }
+        let contract = contract.seal().expect("weakened threshold is still structurally sealable");
+        assert!(validate_frozen_edit_contract_for_rendering(
+            &contract, &instruction, &source, &target, &symbolic, &manifest, &profile,
+        ).is_err());
+    }
+
+    #[test]
+    fn frozen_contract_rejects_a_consistently_retargeted_wrong_event() {
+        let source = full_score_source();
+        let target = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source, &target);
+        let manifest = renderer_manifest();
+        let profile = fixture_profile();
+        let instruction = digest(b"raise the second note by five semitones");
+        let mut contract = complete_contract_for_full_score(
+            &instruction, &source, &target, &symbolic, &manifest, &profile,
+        );
+        for obligation in &mut contract.obligations {
+            if let ObligationScope::Event { event_id } = &mut obligation.scope {
+                if event_id == "score_event_index:1" {
+                    *event_id = "score_event_index:0".to_string();
+                }
+            }
+            if obligation.attribute == EditAttribute::Pitch {
+                if let ObligationScope::Event { event_id } = &mut obligation.scope {
+                    *event_id = "score_event_index:0".to_string();
+                }
+            }
+        }
+        let contract = contract.seal().expect("a self-consistent but incorrectly targeted contract seals");
+        assert!(validate_frozen_edit_contract_for_rendering(
+            &contract, &instruction, &source, &target, &symbolic, &manifest, &profile,
         ).is_err());
     }
 
