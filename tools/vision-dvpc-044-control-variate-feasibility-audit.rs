@@ -383,7 +383,7 @@ fn run()->Result<String,String>{
     let _=writeln!(out,"LEGACY_WITNESS\tlambda2\t{:.12}",bet.y);
     let _=writeln!(out,"LEGACY_WITNESS\tactual_minimum_factor\t{:.12}",factor);
     let _=writeln!(out,"LEGACY_WITNESS\tviolates_half_wealth_floor\t{}",factor<WEALTH_FLOOR);
-    let _=writeln!(out,"SAFE_REGION\twitness_rejected\t{}",!support_aware_feasible(bet,&a));
+    let _=writeln!(out,"SAFE_REGION\twitness_rejected\t{}",!support_aware_feasible(bet,&a,false));
     let mut checked=0usize;
     let constraints=action_specific_constraints(&a,false);
     for xi in -100..=300 {
@@ -391,7 +391,7 @@ fn run()->Result<String,String>{
         for yi in 0..=200 {
             let y=yi as f64/200.0;
             let bet=Bet{x,y};
-            if support_aware_feasible(bet,&a){
+            if support_aware_feasible(bet,&a,false){
                 checked+=1;
                 if support_aware_minimum_factor(bet,&a,false)<WEALTH_FLOOR-TOL
                     || !support_aware_corners_hold(bet,&a,false) {
@@ -458,7 +458,7 @@ mod tests{
     #[test]
     fn action_specific_constraints_reject_legacy_witness_and_preserve_half_wealth_floor(){
         let (a,bet,_)=upstream_counterexample().unwrap();
-        assert!(!support_aware_feasible(bet,&a));
+        assert!(!support_aware_feasible(bet,&a,false));
         let checked=run().unwrap();
         assert!(checked.contains("SAFE_REGION\tfeasible_grid_points_checked"));
         for x_i in -100..=300{
@@ -480,13 +480,13 @@ mod tests{
             reward_mean:vec![0.2,0.8],predictor:vec![0.999,0.001],max_weight:50.0,
         };
         let a=audit(&dgp).unwrap();
-        let constraints=action_specific_constraints(&a);
+        let constraints=action_specific_constraints(&a,false);
         let samples=cv_samples(&a);
-        let stats=qstats(&samples,0.5);
+        let stats=qstats(&samples,0.5,false);
         let optimum=optimize_support_polytope(stats,&constraints).unwrap();
-        assert!(support_aware_feasible(optimum.bet,&a));
-        assert!(support_aware_corners_hold(optimum.bet,&a));
-        assert!(support_aware_minimum_factor(optimum.bet,&a)>=WEALTH_FLOOR-TOL);
+        assert!(support_aware_feasible(optimum.bet,&a,false));
+        assert!(support_aware_corners_hold(optimum.bet,&a,false));
+        assert!(support_aware_minimum_factor(optimum.bet,&a,false)>=WEALTH_FLOOR-TOL);
         assert!(optimum.objective+1e-7>=dense_grid_best(stats,&constraints));
     }
 
