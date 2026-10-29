@@ -8,7 +8,7 @@
 //! estimator, dispatcher, or operational decision authority. Callers must ensure
 //! all records share the declared lifecycle boundary and planning period.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 /// Evidence maturity for an input record. This metadata does not make a claim true.
@@ -62,6 +62,7 @@ pub enum NonCo2Evidence {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnergyRecord {
     pub id: String,
+    pub source_id: String,
     pub boundary_id: String,
     pub lifecycle_boundary_id: String,
     pub period_id: String,
@@ -108,10 +109,23 @@ pub enum NonCo2ObservationKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordEvidence {
     pub record_id: String,
+    pub source_id: String,
     pub boundary_id: String,
     pub evidence_ref: String,
     pub evidence_class: EvidenceClass,
     pub carrier: EnergyCarrier,
+}
+
+/// Source-level totals preserve the energy-source mix rather than collapsing all carriers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnergySourceTotals {
+    pub source_id: String,
+    pub carrier: EnergyCarrier,
+    pub source_energy_kwh: f64,
+    pub delivered_energy_kwh: f64,
+    pub upstream_co2e_kg: f64,
+    pub direct_operational_co2e_kg: f64,
+    pub cost_amount: f64,
 }
 
 /// Independently recomputable aggregates. `accounted_lifecycle_co2e_kg` is only
@@ -123,6 +137,7 @@ pub struct AccountingSummary {
     pub lifecycle_boundary_id: String,
     pub currency_code: String,
     pub record_evidence: Vec<RecordEvidence>,
+    pub energy_by_source: Vec<EnergySourceTotals>,
     pub total_source_energy_kwh: f64,
     pub total_delivered_energy_kwh: f64,
     pub upstream_co2e_kg: f64,
@@ -214,9 +229,12 @@ pub fn account_energy_ledger(
     let mut non_co2_not_assessed_record_ids = Vec::new();
     let mut non_co2_observations = Vec::new();
     let mut record_evidence = Vec::new();
+    let mut energy_by_source: BTreeMap<(EnergyCarrier, String), EnergySourceTotals> =
+        BTreeMap::new();
 
     for record in records {
         require_identifier(&record.id, "record id")?;
+        require_identifier(&record.source_id, "energy source id")?;
         require_identifier(&record.boundary_id, "accounting boundary id")?;
         require_identifier(&record.period_id, "record period id")?;
         require_identifier(&record.lifecycle_boundary_id, "record lifecycle boundary id")?;
@@ -272,6 +290,27 @@ pub fn account_energy_ledger(
         add_finite(&mut direct_operational_co2e_kg, record.direct_operational_co2e_kg)?;
         add_finite(&mut total_cost, record.cost_amount)?;
 
+        let source_key = (record.carrier.clone(), record.source_id.clone());
+        let source_total = energy_by_source.entry(source_key).or_insert_with(|| {
+            EnergySourceTotals {
+                source_id: record.source_id.clone(),
+                carrier: record.carrier.clone(),
+                source_energy_kwh: 0.0,
+                delivered_energy_kwh: 0.0,
+                upstream_co2e_kg: 0.0,
+                direct_operational_co2e_kg: 0.0,
+                cost_amount: 0.0,
+            }
+        });
+        add_finite(&mut source_total.source_energy_kwh, record.source_energy_kwh)?;
+        add_finite(&mut source_total.delivered_energy_kwh, record.delivered_energy_kwh)?;
+        add_finite(&mut source_total.upstream_co2e_kg, record.upstream_co2e_kg)?;
+        add_finite(
+            &mut source_total.direct_operational_co2e_kg,
+            record.direct_operational_co2e_kg,
+        )?;
+        add_finite(&mut source_total.cost_amount, record.cost_amount)?;
+
         match &record.non_co2 {
             NonCo2Evidence::NotAssessed => {
                 non_co2_not_assessed_record_ids.push(record.id.clone());
@@ -312,6 +351,7 @@ pub fn account_energy_ledger(
         }
         record_evidence.push(RecordEvidence {
             record_id: record.id.clone(),
+            source_id: record.source_id.clone(),
             boundary_id: record.boundary_id.clone(),
             evidence_ref: record.evidence_ref.clone(),
             evidence_class: record.evidence_class,
@@ -342,6 +382,7 @@ pub fn account_energy_ledger(
     non_co2_not_assessed_record_ids.sort();
     non_co2_observations.sort_by(|left, right| left.record_id.cmp(&right.record_id));
     record_evidence.sort_by(|left, right| left.record_id.cmp(&right.record_id));
+    let energy_by_source: Vec<EnergySourceTotals> = energy_by_source.into_values().collect();
 
     let currency_code = currency.ok_or(AccountingError::MissingIdentifier("currency code"))?;
     Ok(AccountingSummary {
@@ -349,6 +390,7 @@ pub fn account_energy_ledger(
         lifecycle_boundary_id: service.lifecycle_boundary_id.clone(),
         currency_code: currency_code.to_owned(),
         record_evidence,
+        energy_by_source,
         total_source_energy_kwh,
         total_delivered_energy_kwh,
         upstream_co2e_kg,
