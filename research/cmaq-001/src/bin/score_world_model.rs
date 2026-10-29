@@ -236,7 +236,7 @@ fn score(key: &Table, predictions: &Table) -> Result<Report, String> {
 
         for action in 0..3 {
             rewards[action] = integer(
-                key.get(key_row, &action_field("reward", action).replace("reward_", "reward_"), "answer key")?,
+                key.get(key_row, &format!("reward_a{action}_milli"), "answer key")?,
                 "reward",
                 case_id,
             )? as f64;
