@@ -8,6 +8,8 @@ It does not make decisions about people, public officials, legal guilt, rights, 
 
 - The isolated Rust CLI/library is authored with 25 core evaluator tests and seven trace-auditor tests (32 authored total). None has been compiled or executed.
 - The fixture and its expected dispositions are public known answers, so this is **not blind qualification**.
+
+The current cross-system source audit is published at `docs/research/fixtures/governance-capture-resistance-adapter-map-v0.1.json`. It records the real Mycelix Justice Cases `Case/Evidence/Decision/Appeal` owner, the separate DeSci signed-event/receipt/checkpoint pattern, Symtropy's transient `SimSnapshot/SimEvent` interface, and the fact that the standalone Symtropy–Mycelix simulation bridge is not wired as a default dependency. These are source references and an integration plan—not working runtime adapters.
 - Candidate behavior observations and hard-gate violation fields are currently supplied by the candidate report. A trace-derived rule auditor exists, but recorder authentication, independent capture-completeness attestation, and a hidden qualification oracle are not implemented.
 - No Rust compile, formatter, or unit-test run is claimed in this environment.
 - A matching SHA-256 digest proves exact input bytes only; it does not establish source truth or legitimacy.
@@ -69,6 +71,13 @@ Evaluate and save a report:
     cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate docs/research/fixtures/governance-capture-resistance-v0.1.json candidate-report.json evaluation-report.json
 
 The report includes exact-disposition agreement, per-class and per-family agreement, required-behavior report coverage, candidate-reported forbidden behaviors, self-reported hard-gate flags, and false high-severity escalations on benign controls. All numbers describe the public fixture only.
+
+## Cross-system integration boundary
+
+- Mycelix Justice Cases remains the owner of human-authorized case, evidence, decision, remedy, and appeal lifecycle.
+- Mycelix DeSci credential-governance event payloads must not be reused as civic-event semantics. Their canonical envelope, receipt-time acceptance signature, and transparency-checkpoint patterns can inform a separate GCRB event profile.
+- Symtropy `SimSnapshot`/`SimEvent` outputs are simulated/transient. An adapter must bind simulator build, scenario/config, seed, horizon, input/output digests, and limitations, and preserve evidence class `simulated`.
+- The standalone Symtropy repository documents its Mycelix simulation bridge as not wired into the default dependency graph. No live three-project integration is claimed.
 
 ## Structured action-trace audit
 
