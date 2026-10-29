@@ -17,7 +17,6 @@ use std::fmt::Write as _;
 use std::time::Instant;
 
 const ALPHA: f64 = 0.05;
-const ALPHA_SIDE: f64 = 0.025;
 const MAX_HORIZON: usize = 512;
 const REPLICATES: usize = 2_000;
 const HORIZONS: [usize; 3] = [32, 128, 512];
@@ -122,8 +121,8 @@ struct MopePair {
 impl MopePair {
     fn new(max_weight: f64, capacity: usize) -> Result<Self, String> {
         Ok(Self {
-            lower_stream: stream::StreamState::new(max_weight, ALPHA_SIDE)?,
-            complement_stream: stream::StreamState::new(max_weight, ALPHA_SIDE)?,
+            lower_stream: stream::StreamState::new(max_weight, ALPHA)?,
+            complement_stream: stream::StreamState::new(max_weight, ALPHA)?,
             lower_endpoint: 0.0, complement_endpoint: 0.0,
             lower_history: Vec::with_capacity(capacity),
             complement_history: Vec::with_capacity(capacity),
@@ -137,7 +136,7 @@ impl MopePair {
         let hi_report = self.complement_stream.observe(w, 1.0 - r)?;
         self.lower_history.push(BetRecord { w, r, lambda1: lo_lambda.x, lambda2: lo_lambda.y });
         self.complement_history.push(BetRecord { w, r: 1.0-r, lambda1: hi_lambda.x, lambda2: hi_lambda.y });
-        let level = (2.0 / ALPHA_SIDE).ln();
+        let level = (2.0 / ALPHA).ln();
 
         if let Some(root) = lo_report.selected_safe_root {
             if root > self.lower_endpoint + ENDPOINT_TOL {
@@ -193,8 +192,8 @@ impl MopeGridPair {
             .map(|i| i as f64 / (GRID_SIZE - 1) as f64)
             .collect();
         Ok(Self {
-            lower_stream: stream::StreamState::new(max_weight, ALPHA_SIDE)?,
-            complement_stream: stream::StreamState::new(max_weight, ALPHA_SIDE)?,
+            lower_stream: stream::StreamState::new(max_weight, ALPHA)?,
+            complement_stream: stream::StreamState::new(max_weight, ALPHA)?,
             lower_log_wealth: vec![0.5_f64.ln(); GRID_SIZE],
             complement_log_wealth: vec![0.5_f64.ln(); GRID_SIZE],
             values,
@@ -222,7 +221,7 @@ impl MopeGridPair {
             self.complement_log_wealth[i] += factor_hi.ln();
         }
 
-        let log_threshold = (1.0/ALPHA_SIDE).ln();
+        let log_threshold = (1.0/ALPHA).ln();
         let grid_lower = self.lower_log_wealth.iter()
             .position(|wealth| *wealth < log_threshold)
             .unwrap_or(0);
@@ -269,8 +268,8 @@ impl MopeBoundGridPair {
     fn new(max_weight: f64) -> Result<Self, String> {
         let values: Vec<f64>=(0..GRID_SIZE).map(|i|i as f64/(GRID_SIZE-1) as f64).collect();
         Ok(Self {
-            lower_stream:stream::StreamState::new(max_weight,ALPHA_SIDE)?,
-            complement_stream:stream::StreamState::new(max_weight,ALPHA_SIDE)?,
+            lower_stream:stream::StreamState::new(max_weight,ALPHA)?,
+            complement_stream:stream::StreamState::new(max_weight,ALPHA)?,
             lower_bound:vec![0.0;GRID_SIZE],
             complement_bound:vec![0.0;GRID_SIZE],
             values,
@@ -295,7 +294,7 @@ impl MopeBoundGridPair {
             let contribution_c=hi.x*z+hi.y*dc+PSI*(hi.x*hi.x*z*z+2.0*hi.x*hi.y*z*dc+hi.y*hi.y*dc*dc);
             self.complement_bound[i]+=contribution_c;
         }
-        let level=(2.0/ALPHA_SIDE).ln();
+        let level=(2.0/ALPHA).ln();
         let lower_index=self.lower_bound.iter().position(|p|*p<level).unwrap_or(0);
         let complement_index=self.complement_bound.iter().position(|p|*p<level).unwrap_or(0);
         let proposed_lower=self.lower_endpoint.max(self.values[lower_index]);
