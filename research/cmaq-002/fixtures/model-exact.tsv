@@ -1,0 +1,7 @@
+task_id	state_id	action_id	predicted_next_state_id	predicted_reward_milli	predicted_safe_ppm	predicted_done
+smoke	s0	0	s1	1000	1000000	false
+smoke	s0	1	s2	2000	1000000	false
+smoke	s1	0	goal	5000	1000000	true
+smoke	s1	1	goal	1000	1000000	true
+smoke	s2	0	goal	500	1000000	true
+smoke	s2	1	goal	600	1000000	true
