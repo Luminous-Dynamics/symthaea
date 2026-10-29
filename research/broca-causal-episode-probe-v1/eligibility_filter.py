@@ -115,6 +115,81 @@ def load_ledger(records: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str
     return ledger
 
 
+def resolve_json_pointer(root: Any, pointer: str) -> Any:
+    """Resolve an RFC 6901 pointer with canonical array indexes."""
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise ValueError(f"invalid absolute source pointer: {pointer!r}")
+    current = root
+    for raw in pointer.split("/")[1:]:
+        if "~" in raw.replace("~0", "").replace("~1", ""):
+            raise ValueError(f"malformed JSON Pointer escape: {pointer}")
+        token = raw.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and str(int(token)) == token:
+            index = int(token)
+            if index >= len(current):
+                raise ValueError(f"JSON Pointer array index out of range: {pointer}")
+            current = current[index]
+        else:
+            raise ValueError(f"JSON Pointer does not resolve: {pointer}")
+    return current
+
+
+def iter_string_pointers(value: Any, prefix: str = "") -> list[str]:
+    """Return all JSON Pointers to string-valued leaves in deterministic traversal order."""
+    if isinstance(value, str):
+        return [prefix]
+    if isinstance(value, list):
+        return [
+            pointer
+            for index, child in enumerate(value)
+            for pointer in iter_string_pointers(child, f"{prefix}/{index}")
+        ]
+    if isinstance(value, dict):
+        pointers: list[str] = []
+        for key, child in value.items():
+            escaped = str(key).replace("~", "~0").replace("/", "~1")
+            pointers.extend(iter_string_pointers(child, f"{prefix}/{escaped}"))
+        return pointers
+    return []
+
+
+def validate_ledger_coverage(
+    trajectories: list[dict[str, Any]],
+    ledger_records: list[dict[str, Any]],
+) -> None:
+    """Require exact coverage of every source string leaf and reject dangling pointers."""
+    indexed: dict[str, dict[str, Any]] = {}
+    for index, trajectory in enumerate(trajectories):
+        trajectory_id = trajectory.get("id")
+        if not isinstance(trajectory_id, str) or not trajectory_id:
+            raise ValueError(f"trajectory {index}: id must be a non-empty string")
+        if trajectory_id in indexed:
+            raise ValueError(f"duplicate trajectory id: {trajectory_id}")
+        indexed[trajectory_id] = trajectory
+
+    ledger_keys = set(load_ledger(ledger_records))
+    expected = {
+        (trajectory["id"], pointer)
+        for trajectory in trajectories
+        for pointer in iter_string_pointers(trajectory)
+    }
+    missing = expected - ledger_keys
+    extra = ledger_keys - expected
+    if missing:
+        raise ValueError(f"eligibility ledger omits source string pointers: {sorted(missing)[:5]}")
+    if extra:
+        raise ValueError(f"eligibility ledger has dangling source pointers: {sorted(extra)[:5]}")
+    for trajectory_id, pointer in ledger_keys:
+        try:
+            value = resolve_json_pointer(indexed[trajectory_id], pointer)
+        except ValueError as error:
+            raise ValueError(f"eligibility ledger pointer does not resolve: {trajectory_id}{pointer}") from error
+        if not isinstance(value, str):
+            raise ValueError(f"eligibility ledger target is not a string: {trajectory_id}{pointer}")
+
+
 def _index_questions(questions: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     indexed: dict[str, dict[str, Any]] = {}
     for index, question in enumerate(questions):
@@ -302,9 +377,12 @@ def verify_input_manifest(
         raise ValueError("trajectory IDs must be unique")
     if len(set(question_ids)) != len(questions):
         raise ValueError("question IDs must be unique")
-    if set(row.get("question_id") for row in prediction_rows) != set(
-        row.get("question_id") for row in questions
-    ):
+    prediction_ids = [row.get("question_id") for row in prediction_rows]
+    if any(not isinstance(value, str) or not value for value in prediction_ids):
+        raise ValueError("candidate prediction IDs must be non-empty strings")
+    if len(set(prediction_ids)) != len(prediction_ids):
+        raise ValueError("candidate prediction IDs must be unique")
+    if set(prediction_ids) != set(question_ids):
         raise ValueError("candidate prediction question IDs do not match the fixture")
     return manifest, prediction_bytes, question_bytes, trajectory_bytes
 
@@ -330,14 +408,19 @@ def main() -> int:
     trajectories_path = args.trajectories.expanduser().resolve()
     ledger_path = args.ledger.expanduser().resolve()
     output_path = args.output.expanduser().resolve()
-    if output_path == predictions_path:
-        raise SystemExit("output path must differ from input candidate predictions")
+    manifest_input_path = predictions_path.with_suffix(predictions_path.suffix + ".manifest.json")
+    output_manifest_path = output_path.with_suffix(output_path.suffix + ".manifest.json")
+    input_paths = {predictions_path, questions_path, trajectories_path, ledger_path, manifest_input_path}
+    if output_path in input_paths or output_manifest_path in input_paths:
+        raise SystemExit("output paths must not overwrite predictions, manifests, fixtures, or the policy ledger")
     input_manifest, prediction_bytes, question_bytes, trajectory_bytes = verify_input_manifest(
         predictions_path, questions_path, trajectories_path, args.k
     )
     predictions, _ = read_jsonl_bytes(predictions_path)
     questions, _ = read_jsonl_bytes(questions_path)
     ledger_records, ledger_bytes = read_jsonl_bytes(ledger_path)
+    trajectories, _ = read_jsonl_bytes(trajectories_path)
+    validate_ledger_coverage(trajectories, ledger_records)
     filtered, metrics = filter_dataset(
         questions, predictions, ledger_records, args.k, intent_source=args.intent_source
     )
@@ -354,6 +437,7 @@ def main() -> int:
         "candidate_manifest_sha256": sha256_bytes(
             predictions_path.with_suffix(predictions_path.suffix + ".manifest.json").read_bytes()
         ),
+        "filter_code_sha256": sha256_bytes(Path(__file__).resolve().read_bytes()),
         "candidate_prediction_sha256": sha256_bytes(prediction_bytes),
         "worker_sha256": input_manifest["worker_sha256"],
         "question_fixture_sha256": sha256_bytes(question_bytes),
@@ -398,6 +482,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, json.JSONDecodeError, UnicodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         raise SystemExit(2)
