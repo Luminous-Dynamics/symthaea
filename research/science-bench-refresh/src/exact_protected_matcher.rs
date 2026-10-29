@@ -161,7 +161,7 @@ fn validate_protected_index_bytes(
         );
         if previous_key.is_some_and(|previous| previous >= key) {
             return Err(
-                "protected index artifacts must be sorted by content digest, classification, and reference digest"
+                "protected artifacts are not in canonical order"
                     .to_owned(),
             );
         }
@@ -328,7 +328,7 @@ pub fn verify_search_exposure_exact_match_report(
     let supplied_value: Value = serde_json::to_value(&supplied)
         .map_err(|error| format!("cannot serialize supplied match report: {error}"))?;
     if expected_value != supplied_value {
-        return Err("match report does not equal exact-digest matcher output for this receipt/index".to_owned());
+        return Err("match report differs from exact matcher output".to_owned());
     }
     if supplied.protected_index_sha256 != sha256_hex(protected_index_bytes) {
         return Err("match report does not bind exact protected index bytes".to_owned());
