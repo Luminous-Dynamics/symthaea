@@ -7,8 +7,8 @@
 //! Every returned incumbent is also run through the stable-ID plan verifier.
 
 use symthaea_operations_research::aviation_enterprise::{
-    reference_scenario, solve_branch_and_bound, solve_exact, verify_plan, Aircraft,
-    Flight, PartSource, ProductionOption, Scenario, BranchAndBoundOptions,
+    reference_scenario, solve_branch_and_bound, solve_exact, verify_plan, Flight,
+    PartSource, Scenario, BranchAndBoundOptions,
     BranchAndBoundStatus, VerificationStatus,
 };
 
@@ -109,9 +109,6 @@ fn oracle_evaluate(scenario: &Scenario, source: PartSource, choices: &[Option<us
         });
         let turnaround = scenario.aircraft[aircraft_index].turnaround;
         for pair in assigned.windows(2) {
-            if pair[0].checked_add(0).is_none() {
-                return None;
-            }
             let earliest_next = scenario.flights[pair[0]].end.checked_add(turnaround)?;
             if scenario.flights[pair[1]].start < earliest_next {
                 return None;
