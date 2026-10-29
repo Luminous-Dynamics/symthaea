@@ -49,11 +49,12 @@ fn run() -> Result<(), String> {
             fs::write(output_path, &generated)
                 .map_err(|error| format!("cannot write {output_path}: {error}"))?;
             eprintln!(
-                "wrote {} public synthetic cases ({} attacks, {} negative controls) to {}; qualification_eligible=false",
+                "wrote {} public synthetic cases ({} attacks, {} negative controls) to {}; output_sha256={}; qualification_eligible=false",
                 summary.case_count,
                 summary.attack_count,
                 summary.negative_control_count,
-                output_path
+                output_path,
+                summary.fixture_sha256
             );
             Ok(())
         }
