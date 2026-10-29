@@ -30,6 +30,8 @@
 //!   not dispatch, maintenance-release, or airworthiness authority.
 //! - [`aviation_retiming_recovery`]: delay-aware synthetic aircraft recovery with
 //!   integer retiming choices, independently verified plans, and anytime bounds.
+//! - [`aviation_retiming_ensemble`]: paired greedy/search recovery evaluation across
+//!   a frozen probability-weighted disruption ensemble with TV-robust deltas.
 //!
 //! ## Example
 //!
@@ -45,6 +47,7 @@ pub mod aviation_decision_readiness;
 pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
 pub mod aviation_retiming_recovery;
+pub mod aviation_retiming_ensemble;
 pub mod aviation_robustness;
 pub mod aviation_network_externalities;
 pub mod aviation_network_robustness;
