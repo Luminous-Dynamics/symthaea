@@ -36,6 +36,18 @@ This is a promotion-readiness gate, not physical safety certification. It relies
 3. Run a larger multi-fidelity bake-off against reproducible MF-SCBO, out-of-the-loop historical multi-fidelity BO, RESCUE/causal-prior methods, descriptor nearest-neighbor transfer, and low-fidelity-only baselines under equal simulator-call and wall-clock budgets.
 4. After synthetic and public-analytic adversarial tests, repeat with simulator-backed evidence and then prospective physical castings. Keep each evidence class separately labeled and do not let synthetic sample count stand in for physical validation.
 
+## Competitive baseline sources
+
+These references are the minimum credible external comparison set, not evidence that Symthaea currently wins:
+
+- [Out-Of-The-Loop Multi-Fidelity Bayesian Optimization (2026)](https://arxiv.org/abs/2608.04113): historical high-fidelity outcomes plus task descriptors when the target high-fidelity function cannot be queried in-loop.
+- [RESCUE: Multi-Objective Multi-Fidelity Bayesian Optimization with Causal Priors (2026)](https://arxiv.org/abs/2602.00788): causal priors and multi-objective acquisition for fidelity/task mismatch.
+- [MF-SCBO: Multi-fidelity Scalable Constrained Bayesian Optimization (2026)](https://arxiv.org/abs/2609.29941): constrained, multi-fidelity search with non-nested samples and multiple fidelities.
+- [COCO performance assessment](https://numbbo.github.io/coco-doc/perf-assessment/): evaluate anytime performance by cost/function calls needed to hit prespecified quality targets, not final score alone.
+- [MAGMASOFT autonomous engineering](https://www.magmasoft.com/en/solutions/magmasoft/): commercial reference for virtual DOE, autonomous optimization, multi-objective casting quality and robust process windows. A direct performance comparison requires access to comparable inputs/outputs and licensing; marketing claims alone are not a benchmark.
+
+A valid bake-off should freeze the target task suite and budgets first; compare target-family holdouts, not random candidate rows; include low-fidelity-only, pooled residual transfer, descriptor KNN, the strongest reproducible published methods, and a commercial engineering baseline where access allows. Report full-lifecycle cost and amortized archive cost separately. Keep task-level performance sample size distinct from safety/feasibility validation denominators.
+
 ## Claim ceiling
 
 This change improves evidence stratification and promotion gating. It does not demonstrate better casting quality, lower foundry cost, superiority to commercial optimization, or physical validity. Those claims require a preregistered, independently held-out benchmark and measured simulator/physical outcomes.
