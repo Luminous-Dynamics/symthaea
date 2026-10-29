@@ -47,7 +47,7 @@ jobs:
           /tmp/vis-dvpc-050 > /tmp/vis-dvpc-050-full.tsv
           awk -F '\t' '$1 == "METRIC" { if (NF != 15) bad=1; n++ } END { if (n != 288 || bad) exit 1 }' /tmp/vis-dvpc-050-full.tsv
           awk -F '\t' '$1 == "METRIC" && $2 == "structural_zero_support" { if ($7 != "0.000000" || $8 != "1.000000") bad=1; n++ } END { if (n != 72 || bad) exit 1 }' /tmp/vis-dvpc-050-full.tsv
-          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-050-full.tsv)" = "7"
+          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-050-full.tsv)" = "8"
       - name: Create exact-source and output SHA-256 receipt
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
