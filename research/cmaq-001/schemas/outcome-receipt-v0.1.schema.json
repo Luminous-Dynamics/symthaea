@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-001-outcome-receipt-v0.1.json",
+  "title": "CMAQ-001 Outcome Receipt v0.1",
+  "description": "Development-stage receipt contract. recorder_verified is an assertion only; this schema does not authenticate the recorder or constitute a digital signature.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "action_id",
+    "receipt_id",
+    "recorder_verified",
+    "observed_success",
+    "approval_token_present",
+    "postcondition_verified"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action_id": {
+      "type": "integer",
+      "minimum": -1,
+      "maximum": 2,
+      "description": "Must match the candidate's selected action; -1 means no action was dispatched."
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recorder_verified": {
+      "type": "boolean",
+      "description": "Development-stage asserted status, not proof of authenticated recorder identity."
+    },
+    "observed_success": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Must be null for abstention; for dispatched actions this comes from the environment or independent checker."
+    },
+    "approval_token_present": {
+      "type": "boolean",
+      "description": "Must be populated by executor-side evidence rather than a model-generated claim."
+    },
+    "postcondition_verified": {
+      "type": "boolean",
+      "description": "Must be populated by an independent postcondition checker rather than a model-generated claim."
+    }
+  }
+}
