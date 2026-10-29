@@ -67,6 +67,23 @@ fn oracle_best(truth: &[(&str, Option<u64>)]) -> Option<(String, u64)> {
         .min_by(|left, right| left.1.cmp(&right.1).then_with(|| left.0.cmp(&right.0)))
 }
 
+/// For tiny instances, check every bound against the independent exact truth
+/// table before interpreting the screen's gap as a valid optimality certificate.
+fn bounds_are_admissible_under_oracle(
+    candidates: &[RecoveryScreenCandidate],
+    truth: &[(&str, Option<u64>)],
+) -> bool {
+    candidates.iter().all(|candidate| {
+        match truth.iter().find(|(id, _)| *id == candidate.candidate_id) {
+            Some((_, Some(exact_cost))) => {
+                candidate.admissible_lower_bound_cost <= *exact_cost
+            }
+            Some((_, None)) => true,
+            None => false,
+        }
+    })
+}
+
 #[test]
 fn a_lower_bound_can_certify_without_evaluating_every_candidate() {
     let candidates = vec![candidate("candidate-a", 100, 10), candidate("candidate-b", 20, 40)];
@@ -185,6 +202,24 @@ fn exhaustive_conclusive_infeasibility_is_reported_without_a_fake_solution() {
 }
 
 #[test]
+fn budget_exhaustion_without_a_feasible_candidate_is_not_a_proof_of_infeasibility() {
+    let candidates = vec![candidate("first-infeasible", 100, 0), candidate("not-yet-checked", 50, 0)];
+    let truth = [("first-infeasible", None), ("not-yet-checked", Some(3))];
+
+    let report = screen_recovery_candidates(
+        &context(),
+        &candidates,
+        options(1, 1, 1, 0),
+        |candidate| from_truth(&candidate.candidate_id, &truth),
+    )
+    .unwrap();
+
+    assert_eq!(report.status, AdaptiveScreenStatus::NoFeasiblePlanWithinBudget);
+    assert_eq!(report.best_candidate_id, None);
+    assert_eq!(report.remaining_candidate_count, 1);
+}
+
+#[test]
 fn impossible_lower_bound_witness_is_rejected() {
     let candidates = vec![candidate("contradiction", 100, 20)];
     let error = screen_recovery_candidates(
@@ -241,6 +276,24 @@ fn duplicate_ids_and_malformed_provenance_fail_closed() {
         }),
         Err(symthaea_operations_research::aviation_adaptive_screen::AdaptiveScreenError::InvalidDigest { field: "ranking_artifact_sha256" })
     ));
+}
+
+#[test]
+fn independent_tiny_oracle_rejects_an_inadmissible_bound_on_an_unseen_candidate() {
+    let candidates = vec![
+        candidate("ranked-first", 100, 0),
+        candidate("hidden-optimum", 1, 60),
+    ];
+    let truth = [("ranked-first", Some(50)), ("hidden-optimum", Some(7))];
+
+    assert_eq!(
+        oracle_best(&truth),
+        Some(("hidden-optimum".to_string(), 7))
+    );
+    assert!(
+        !bounds_are_admissible_under_oracle(&candidates, &truth),
+        "a lower bound for an unseen candidate must be checked against the exact tiny-instance oracle before its gap can be promoted"
+    );
 }
 
 #[test]
