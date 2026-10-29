@@ -254,10 +254,17 @@ fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>
         bail!("component set contains no families");
     }
     let targets = TARGET_SHARES.map(|share| share * family_count as f64);
+    // Largest-first allocation prevents a late giant component from being
+    // assigned to whichever split happens to have the largest fractional
+    // deficit after many smaller components have already been placed. The hash
+    // ordering remains the deterministic tie-breaker, never an outcome signal.
     let mut ranked = units.to_vec();
     ranked.sort_by(|left, right| {
-        rank_digest(&left.component_id)
-            .cmp(&rank_digest(&right.component_id))
+        right
+            .family_ids
+            .len()
+            .cmp(&left.family_ids.len())
+            .then_with(|| rank_digest(&left.component_id).cmp(&rank_digest(&right.component_id)))
             .then_with(|| left.component_id.cmp(&right.component_id))
     });
 
@@ -267,7 +274,8 @@ fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>
         let size = unit.family_ids.len();
         let best_split = (0..3)
             .max_by(|left, right| {
-                let left_deficit = (targets[*left] - counts[*left] as f64) / targets[*left].max(1.0);
+                let left_deficit =
+                    (targets[*left] - counts[*left] as f64) / targets[*left].max(1.0);
                 let right_deficit =
                     (targets[*right] - counts[*right] as f64) / targets[*right].max(1.0);
                 left_deficit
@@ -361,7 +369,7 @@ fn execute() -> Result<()> {
         "status": "candidate_only",
         "upstream_commit": UPSTREAM,
         "candidate_seed": CANDIDATE_SEED,
-        "allocation_algorithm": "order components by SHA-256(seed || NUL || component_id); assign each whole component to the split with the largest remaining fraction of target family capacity; tie order train, validation, test",
+        "allocation_algorithm": "order components by descending family count, then SHA-256(seed || NUL || component_id), then component ID; assign each whole component to the split with the largest remaining fraction of target family capacity; tie order train, validation, test",
         "target_family_shares": {
             "train": TARGET_SHARES[0],
             "validation": TARGET_SHARES[1],
@@ -488,6 +496,28 @@ mod tests {
             assignments.values().filter(|split| *split == "test").count(),
         ];
         assert_eq!(counts, [70, 15, 15]);
+    }
+
+    #[test]
+    fn largest_components_are_placed_before_smaller_components() {
+        // Total families = 372: target counts are approximately 260/56/56.
+        // The second and third components are larger than either validation or
+        // test target; placing them first avoids filling train with tiny units
+        // before those indivisible components can be assigned.
+        let source = units(&[200, 80, 50, 42]);
+        let assignments = assign_components(&source).expect("valid skewed components allocate");
+
+        assert_eq!(assignments["family-0001"], "train");
+        assert_eq!(assignments["family-0201"], "validation");
+        assert_eq!(assignments["family-0281"], "test");
+        assert_eq!(assignments["family-0331"], "train");
+
+        let counts = [
+            assignments.values().filter(|split| *split == "train").count(),
+            assignments.values().filter(|split| *split == "validation").count(),
+            assignments.values().filter(|split| *split == "test").count(),
+        ];
+        assert_eq!(counts, [242, 80, 50]);
     }
 
     #[test]
