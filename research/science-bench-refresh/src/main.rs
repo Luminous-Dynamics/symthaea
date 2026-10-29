@@ -12,6 +12,7 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     compute_protected_index_commitment, match_search_exposure_exact,
     verify_search_exposure_exact_match_report, ProtectedSearchArtifactIndexCommitmentInput,
 };
+use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
@@ -35,6 +36,7 @@ fn usage(program: &str) {
             "  {program} verify-evidence-intervention-plan PLAN.json\n",
             "  {program} commit-evidence-outcomes PLAN.json OUTCOME_FIELDS.json\n",
             "  {program} verify-evidence-outcomes PLAN.json OUTCOME_REPORT.json\n",
+            "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
             "  {program} verify-search-exact-matches RECEIPT.json\n",
@@ -63,6 +65,45 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "analyze-paired-evidence-outcomes" => {
+            if args.len() != 4 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "counterfactual evidence plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let outcome_bytes = match read(&args[2], "evidence outcome report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let analysis_bytes = match read(&args[3], "paired analysis plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let verification = match analyze_paired_evidence_outcomes(
+                &plan_bytes,
+                &outcome_bytes,
+                &analysis_bytes,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&verification)
+                    .expect("paired analysis verification serializes")
+            );
+            if verification.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
         "commit-evidence-outcomes" => {
             if args.len() != 3 {
                 usage("science-bench-refresh-validator");

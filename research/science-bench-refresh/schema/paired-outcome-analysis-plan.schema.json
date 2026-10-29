@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/paired-outcome-analysis-plan.schema.json",
+  "title": "Symthaea Preregistered Paired Outcome Analysis Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analysis_implementation_revision",
+    "multiplicity_policy",
+    "pair_dependence_policy",
+    "dependence_justification_sha256",
+    "contrasts",
+    "expected_responses"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_paired_analysis_plan.v1"
+    },
+    "analysis_implementation_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "not": { "pattern": "^0{40}$" },
+      "description": "Full source commit SHA of the analyzer. Must match the source revision embedded in the inspected build."
+    },
+    "multiplicity_policy": {
+      "enum": [
+        "holm_across_binary_contrasts",
+        "unadjusted_exploratory",
+        "descriptive_no_p_values"
+      ]
+    },
+    "pair_dependence_policy": {
+      "enum": [
+        "exact_conditional_independent_pairs",
+        "descriptive_only_dependence_unknown"
+      ]
+    },
+    "dependence_justification_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "not": { "pattern": "^0{64}$" },
+      "description": "Digest of the evaluator-side rationale for the declared pair-dependence policy. It must be fixed before outcomes are revealed."
+    },
+    "contrasts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/contrast" }
+    },
+    "expected_responses": {
+      "type": "array",
+      "maxItems": 300000,
+      "items": { "$ref": "#/$defs/expected_response" },
+      "description": "Evaluator-side target actions frozen before outcome reveal. Required exactly once per planned pair/condition when an expected_response endpoint is used. Never expose this artifact to the evaluated policy."
+    }
+  },
+  "$defs": {
+    "condition": {
+      "enum": [
+        "natural_retrieval",
+        "network_isolated",
+        "gold_evidence_injected",
+        "gold_evidence_withheld",
+        "decoy_noise",
+        "source_contradiction"
+      ]
+    },
+    "contrast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contrast_id",
+        "treatment_condition",
+        "reference_condition",
+        "endpoint",
+        "directional_hypothesis"
+      ],
+      "properties": {
+        "contrast_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "treatment_condition": { "$ref": "#/$defs/condition" },
+        "reference_condition": { "$ref": "#/$defs/condition" },
+        "endpoint": {
+          "enum": [
+            "strict_correctness",
+            "fully_supported_claim",
+            "relevant_evidence_use",
+            "expected_response",
+            "wall_clock_ms",
+            "tool_calls",
+            "experiment_count",
+            "input_tokens",
+            "output_tokens",
+            "cost_micro_usd"
+          ]
+        },
+        "directional_hypothesis": {
+          "enum": ["treatment_higher", "treatment_lower", "no_directional_claim"]
+        }
+      }
+    },
+    "expected_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair_id", "condition", "expected_response"],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "condition": { "$ref": "#/$defs/condition" },
+        "expected_response": {
+          "enum": ["answered", "abstained"]
+        }
+      }
+    }
+  },
+  "description": "The exact bytes of this artifact must match analysis_plan_sha256 committed in the counterfactual intervention plan. The analyzer reports fixed-benchmark paired effects only; exact tests do not establish generalized performance."
+}
