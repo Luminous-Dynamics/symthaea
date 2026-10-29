@@ -985,3 +985,12 @@ jobs:
           jq -e '.valid == false and .scoring_eligible_declared == false and .external_anchor_required == true' \
             /tmp/sbr-evidence-contract-example-verification.json >/dev/null
 
+      - name: Evidence behavior contract end-to-end CLI controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 research/science-bench-refresh/tools/evidence_behavior_contract_test_vectors.py \
+            /tmp/sbr-evidence-behavior-contracts
+          jq -e '.synthetic_positive_control == true and .planned_cases == 7 and .pass_count == 4 and .violation_count == 2 and .not_evaluable_count == 1 and .repeat_verification_deterministic == true and .tampered_plan_rejected == true and .wrong_revision_rejected == true and .duplicate_and_missing_records_rejected == true and .tampered_report_rejected == true and .runner_execution_proven == false and .external_anchor_required == true and .empirical_system_result == false' \
+            /tmp/sbr-evidence-behavior-contracts/summary.json >/dev/null
+
