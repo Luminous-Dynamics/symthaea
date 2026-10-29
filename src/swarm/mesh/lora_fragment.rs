@@ -942,26 +942,43 @@ mod tests {
         let data = vec![0x8d; 2048];
         let frags = fragment(10, &data);
 
-        // If every data fragment arrives, observed fragment lengths suffice
-        // even when the caller's nominal length is stale (e.g. compression).
-        let mut all_data = FragmentAssembler::new(10, frags.len() as u8, 100);
+        // Exact-size mode rejects a payload-size/count mismatch before state advances.
+        let mut wrong_exact_size = FragmentAssembler::new(10, frags.len() as u8, 100);
+        for frag in &frags {
+            assert!(!wrong_exact_size.feed(frag));
+        }
+        assert!(!wrong_exact_size.is_complete());
+        assert!(wrong_exact_size.assemble().is_none());
+
+        // Legacy compatibility mode relies on observed lengths when every data
+        // shard arrives, because compressed/enveloped payload sizes may differ.
+        let mut all_data =
+            FragmentAssembler::new_without_final_fragment_recovery(10, frags.len() as u8, 100);
         for frag in &frags {
             all_data.feed(frag);
         }
         assert!(all_data.is_complete());
         assert_eq!(all_data.assemble().as_deref(), Some(data.as_slice()));
 
-        // Even a nonsensical local capacity hint cannot trigger an unbounded
-        // allocation; output storage is capped by the number of shards.
-        let mut huge_nominal = FragmentAssembler::new(10, frags.len() as u8, usize::MAX);
+        // Even a nonsensical nominal hint cannot trigger an unbounded allocation;
+        // allocation is capped by the representable shard layout.
+        let mut huge_nominal = FragmentAssembler::new_without_final_fragment_recovery(
+            10,
+            frags.len() as u8,
+            usize::MAX,
+        );
         for frag in &frags {
             huge_nominal.feed(frag);
         }
         assert_eq!(huge_nominal.assemble().as_deref(), Some(data.as_slice()));
 
-        // If the final data shard is missing, an inconsistent nominal length
-        // cannot safely determine how much of the recovered shard is valid.
-        let mut missing_final = FragmentAssembler::new(10, frags.len() as u8, 100);
+        // If the final data shard is missing, compatibility mode cannot safely
+        // infer the encoded tail length from a nominal packet-size hint.
+        let mut missing_final = FragmentAssembler::new_without_final_fragment_recovery(
+            10,
+            frags.len() as u8,
+            100,
+        );
         for (index, frag) in frags.iter().enumerate() {
             if index != frags.len() - 2 {
                 missing_final.feed(frag);
