@@ -53,7 +53,7 @@ def config(**overrides):
     return value
 
 
-def calibration(count=20, *, rows_per_task=1, stratum="known_process"):
+def calibration(count=20, *, rows_per_task=2, stratum="known_process"):
     tasks = []
     for i in range(count):
         rows = []
