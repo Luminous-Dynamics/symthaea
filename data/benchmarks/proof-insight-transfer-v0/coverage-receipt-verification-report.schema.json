@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.coverage-receipt-verification-report.v1.json",
+  "title": "PITB Coverage Receipt Verification Report",
+  "description": "Signature verification is not equivalent to component-manifest or statistical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "verification_status",
+    "cryptographically_verified",
+    "resampling_qualification",
+    "upstream_commit",
+    "source_partition_digest_sha256",
+    "relationship_inventory_edges_sha256",
+    "relationship_inventory_sha256",
+    "coverage_receipt_sha256",
+    "review_methodology_sha256",
+    "trust_store_sha256",
+    "verified_reviewer_ids",
+    "distinct_reviewer_organization_count",
+    "limitation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.coverage-receipt-verification.v1"
+    },
+    "verification_status": {
+      "const": "verified_signature_set"
+    },
+    "cryptographically_verified": {
+      "const": true
+    },
+    "resampling_qualification": {
+      "const": "requires_component_and_analyzer_validation"
+    },
+    "upstream_commit": {
+      "const": "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+    },
+    "source_partition_digest_sha256": {
+      "const": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970"
+    },
+    "relationship_inventory_edges_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "relationship_inventory_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "coverage_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "review_methodology_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trust_store_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "verified_reviewer_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "distinct_reviewer_organization_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "limitation": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
