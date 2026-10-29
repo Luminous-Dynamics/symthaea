@@ -6,8 +6,8 @@ research engine.
 ## Current scope: v0.1 causal-model substrate
 
 This crate currently provides a validated dense binary factored TPM, cause/effect
-repertoire primitives, a bounded IIT 4.x directed-system-partition enumerator,
-typed formalism/quantity identities, and stable model, evaluation, and
+repertoire primitives, a validated pointwise GID measure primitive, a bounded IIT 4.x
+directed-system-partition enumerator, typed formalism/quantity identities, and stable model, evaluation, and
 analysis-request digests. It does not yet compute IIT system
 integrated information (phi_s), mechanism-level phi, a complete cause-effect
 structure, structure-level Phi, or any consciousness result.
@@ -40,7 +40,7 @@ evaluation state, time grain, or formalism.
 
 1. Run the v0.1 model/repertoire unit tests and pin TPM/state/connectivity semantics
    against a documented PyPhi fixture.
-2. Compare cause/effect repertoire distributions and directed cut matrices against
+2. Compare cause/effect repertoire distributions, GID point measures, and directed cut matrices against
    the reference on identical model, state, subsystem, and partition-profile inputs,
    including deterministic, independent, and zero-likelihood negative controls.
 3. Add IIT 4.0 (2023) system phi_s with a versioned formalism profile, documented
@@ -104,6 +104,25 @@ separately canonicalized JSON hash, before it can be used to verify Rust request
 identity. Golden digest vectors are a release gate before claiming cross-language
 parity.
 
+
+## Generalized intrinsic difference (GID) primitive
+
+The crate includes a validated pointwise GID operation as specified in PyPhi's
+IIT 4.0 implementation:
+
+    selectivity[state] * log2(forward[state] / partitioned[state])
+
+For either zero forward or zero partitioned probability, the undefined-ratio
+contribution is zero, matching PyPhi's pointwise convention. The function rejects
+non-finite/out-of-range probabilities, distribution-length mismatches, unnormalized
+input distributions, and invalid state indices; negative pointwise GID values are
+preserved rather than silently clamped.
+
+This is one pointwise component of the system-phi pipeline. It is not a repertoire
+distance over the whole distribution, a minimum-information partition score, or
+system phi_s by itself.
+
+Reference formula: https://github.com/wmayner/pyphi/blob/main/pyphi/measures/distribution.py
 
 ## Directed system-partition enumeration
 
