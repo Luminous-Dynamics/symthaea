@@ -774,19 +774,22 @@ pub fn solve_retiming_greedy(
     Ok(RetimingGreedyReport { plan, stats })
 }
 
-/// Validate only the already decided prefix, rejecting unavailable flights and
-/// any pair of committed intervals that violate an aircraft's turnaround.
+/// Validate chosen actions among the first `considered_count` flight indices,
+/// skipping undecided entries. Reject unavailable flights and any pair of
+/// committed intervals that violate an aircraft's turnaround. Branch-and-bound
+/// passes its fully decided prefix; the greedy baseline passes all flight slots
+/// while some later slots are still undecided.
 fn partial_retiming_is_feasible(
     scenario: &RetimingScenario,
     choices: &[Option<RetimingChoice>],
-    decided_count: usize,
+    considered_count: usize,
 ) -> bool {
-    if choices.len() != scenario.flights.len() || decided_count > scenario.flights.len() {
+    if choices.len() != scenario.flights.len() || considered_count > scenario.flights.len() {
         return false;
     }
     let mut by_aircraft: Vec<Vec<(u32, u32, usize)>> =
         vec![Vec::new(); scenario.aircraft.len()];
-    for flight_index in 0..decided_count {
+    for flight_index in 0..considered_count {
         match choices[flight_index] {
             None => continue,
             Some(RetimingChoice::Cancel) => {}
@@ -814,7 +817,6 @@ fn partial_retiming_is_feasible(
                 }
                 by_aircraft[aircraft_index].push((actual_start, actual_end, flight_index));
             }
-            None => return false,
         }
     }
 
