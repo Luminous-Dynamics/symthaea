@@ -502,7 +502,10 @@ fn validate_receipt(fields: &Fields, manifest: &Fields) -> Result<(), String> {
 fn validate_intervention_config(manifest_path: &Path, manifest: &Fields) -> Result<(), String> {
     let relative_path = required(manifest, "intervention_config_path")?;
     validate_safe_relative_path(relative_path, "intervention_config_path")?;
-    let manifest_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let manifest_dir = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let root = manifest_dir
         .canonicalize()
         .map_err(|error| fail(format!("cannot resolve manifest directory: {error}")))?;
