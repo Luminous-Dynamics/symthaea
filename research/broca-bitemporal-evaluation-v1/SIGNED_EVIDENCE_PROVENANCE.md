@@ -21,7 +21,7 @@ The branch adds crates/domains/symthaea-broca/src/memory_attestation.rs, exporte
 - **Source signature:** binds a domain-separated, normalized event payload to signer_key_id and verifies that the key is registered for the event's claimed source and event-signing role.
 - **Trusted-ingress receipt:** a separately provisioned ingestion key signs the event ID, source signer ID, digest of the source signature, and accepted_at. The receipt signer must have the separate ingestion-receipt role.
 
-The verified event's transaction time is overwritten with the signed accepted_at value before it enters PolicyPinnedLedger. The source-provided timestamp is therefore not used as the query cutoff time. The source key must also be valid at the trusted acceptance time, not merely at the timestamp the source claims.
+The verified event's transaction time is overwritten with the signed accepted_at value before it enters PolicyPinnedLedger. The source-provided timestamp is therefore not used as the query cutoff time. The policy/event receipt digests cover the normalized signed envelopes, including source signatures and ingress-receipt signatures, in stable ID/version order. The source key must also be valid at the trusted acceptance time, not merely at the timestamp the source claims.
 
 SignedAuthorityPolicy separately verifies policy changes under an explicitly provisioned policy-signing key. Policy records are normalized and sorted for signing so a harmless reorder of policy sources does not change the signature payload.
 
@@ -38,7 +38,8 @@ The module includes 19 authored unit tests covering:
 - source-claimed time cannot override trusted ingress time in a query;
 - canonical policy source ordering;
 - strict schema rejection;
-- verified batch to ledger constructor flow; and
+- verified batch to ledger constructor flow;
+- deterministic digest across envelope ordering, with receipt-time changes altering the digest; and
 - malformed key, duplicate key ID and missing signing-role checks.
 
 Run when the Rust workspace is available:
