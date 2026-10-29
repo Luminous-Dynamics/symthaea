@@ -328,9 +328,16 @@ fn emit_optional_float(value: Option<f64>) {
 
 fn emit_report() {
     print!(
-        "{{\"schema_version\":\"{}\",\"seed\":{},\"support_contexts\":[0,1,2],\"heldout_context\":{},\"support_samples_per_context_action\":{},\"evaluation_episodes\":{},\"model_query_cost_levels\":[0.0,0.02,0.04,0.08,0.12,0.16],\"families\":[",
+        "{{\"schema_version\":\"{}\",\"seed\":{},\"support_contexts\":[0,1,2],\"heldout_context\":{},\"support_samples_per_context_action\":{},\"evaluation_episodes\":{},\"model_query_cost_levels\":[",
         REPORT_SCHEMA, SEED, HELDOUT_CONTEXT, SUPPORT_SAMPLES, EVALUATION_EPISODES
     );
+    for (index, cost) in MODEL_QUERY_COST_LEVELS.iter().copied().enumerate() {
+        if index > 0 {
+            print!(",");
+        }
+        print!("{cost:.2}");
+    }
+    print!("],\"families\":[");
     for (world_index, world) in WorldFamily::ALL.iter().copied().enumerate() {
         if world_index > 0 {
             print!(",");
