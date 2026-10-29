@@ -120,7 +120,7 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-004-family-transfer.json").read_text())
-          assert report["schema_version"] == "cmaq-004-family-transfer-v0.2"
+          assert report["schema_version"] == "cmaq-004-family-transfer-v0.3"
           assert report["family_count"] == 256
           assert report["support_samples_per_context_action"] == 256
           assert report["support_contexts"] == [0, 1, 2]
@@ -129,14 +129,15 @@ jobs:
           assert report["model_queries_per_decision"] == 2
 
           rows = report["summary"]
-          assert len(rows) == 80
+          assert len(rows) == 128
           by_key = {
               (row["lane"], row["strategy"], round(row["query_cost_per_query"], 4)): row
               for row in rows
           }
           assert len(by_key) == len(rows)
           strategies = {
-              "direct_nearest_context", "additive_model", "shuffled_model_control",
+              "direct_nearest_context", "additive_model", "margin_gate_005",
+              "margin_gate_020", "margin_gate_050", "shuffled_model_control",
               "stale_model_control", "oracle_evaluator_only",
           }
           lanes = {"all", "additive", "interaction", "holdout_shift"}
@@ -154,7 +155,7 @@ jobs:
                           "mean_net_utility", "mean_gross_lift_vs_direct", "mean_break_even_query_cost",
                           "beneficial_family_rate_before_cost", "mean_net_lift_vs_direct", "lift_ci95_low",
                           "lift_ci95_high", "lower_cvar05_net_lift", "minimum_family_net_lift",
-                          "harmed_family_rate", "mean_additive_prediction_mae", "action_one_rate",
+                          "harmed_family_rate", "mean_additive_prediction_mae", "action_one_rate", "action_override_rate",
                       ):
                           assert math.isfinite(row[key]), (key, row)
                       assert row["lift_ci95_low"] <= row["lift_ci95_high"]
@@ -163,6 +164,7 @@ jobs:
                       assert 0.0 <= row["harmed_family_rate"] <= 1.0
                       assert 0.0 <= row["beneficial_family_rate_before_cost"] <= 1.0
                       assert 0.0 <= row["action_one_rate"] <= 1.0
+                      assert 0.0 <= row["action_override_rate"] <= 1.0
 
           for lane in lanes:
               for cost in costs:
@@ -191,10 +193,29 @@ jobs:
                   assert abs(row["mean_break_even_query_cost"] - gross / 2.0) < 1e-8
                   assert abs(row["mean_net_lift_vs_direct"] - (gross - 2.0 * cost)) < 1e-8
 
+          # Every gated policy still pays inference cost because the margin is derived
+          # from model outputs. Cost must not quietly disappear when it falls back to direct.
+          gate_names = ["margin_gate_005", "margin_gate_020", "margin_gate_050"]
+          for lane in lanes:
+              for gate in gate_names:
+                  baseline = by_key[(lane, gate, 0.0)]
+                  gross = baseline["mean_gross_lift_vs_direct"]
+                  for cost in costs:
+                      row = by_key[(lane, gate, round(cost, 4))]
+                      assert abs(row["mean_gross_lift_vs_direct"] - gross) < 1e-8
+                      assert abs(row["mean_break_even_query_cost"] - gross / 2.0) < 1e-8
+                      assert abs(row["mean_net_lift_vs_direct"] - (gross - 2.0 * cost)) < 1e-8
+                      assert abs(row["action_override_rate"] - baseline["action_override_rate"]) < 1e-8
+              for cost in costs:
+                  loose = by_key[(lane, "margin_gate_005", round(cost, 4))]["action_override_rate"]
+                  medium = by_key[(lane, "margin_gate_020", round(cost, 4))]["action_override_rate"]
+                  strict = by_key[(lane, "margin_gate_050", round(cost, 4))]["action_override_rate"]
+                  assert loose + 1e-8 >= medium >= strict - 1e-8
+
           assert by_key[("interaction", "additive_model", 0.04)]["harmed_family_rate"] > 0.0
           assert by_key[("holdout_shift", "additive_model", 0.04)]["harmed_family_rate"] > 0.0
           assert by_key[("all", "additive_model", 0.04)]["mean_additive_prediction_mae"] > 0.0
-          print("CMAQ-004 family transfer schema, family-level uncertainty, gross/net lift, break-even price, tail-risk and cost controls validated")
+          print("CMAQ-004 family transfer schema, family-level uncertainty, gross/net lift, break-even price, margin-gate takeover, tail-risk and cost controls validated")
           print(json.dumps({
               lane: {
                   "family_count": by_key[(lane, "additive_model", 0.04)]["family_count"],
