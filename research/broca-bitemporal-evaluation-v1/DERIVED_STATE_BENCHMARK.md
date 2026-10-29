@@ -8,7 +8,7 @@ A long-term memory system is not merely a search index or a collection of summar
 
 **raw events → admitted evidence → retrieved evidence → derived state → answer**
 
-A change to one upstream event can invalidate several downstream conclusions without any new record explicitly stating those conclusions. Therefore every derived claim should be treated as a versioned computation with an inspectable dependency set, not as an independent fact. Retrieval, state maintenance, and answer synthesis must be scored separately.
+A change to one upstream event can invalidate several downstream conclusions without any new record explicitly stating those conclusions. Therefore every derived claim should be treated as a versioned computation with an inspectable support structure, not as an independent fact. Retrieval, state maintenance, and answer synthesis must be scored separately. The current reference graph models a derived fact's dependency set as conjunctive support; it does not yet encode multiple alternative sufficient justifications for the same conclusion. Do not infer OR-support semantics from the existing dependency set. Alternative justifications and explicit open-world/closed-world handling are tracked separately in [issue #9048](https://github.com/Luminous-Dynamics/symthaea/issues/9048).
 
 This follows a recent diagnostic result. **MemDerive** defines symbolic ground truth and derivation DAGs over 10 scenarios, 4,692 events and 1,503 queries. In its reported protocol, evaluated memory systems scored 30.41–48.30% on derived-state queries versus 58.28% for BM25; using the whole history yielded 79.84%, and supplying the gold supporting events yielded 96.01%. Systems refreshed 82.4% of explicit changes but only 41.1% of implicit dependency changes. This separates evidence-acquisition failure from state-maintenance and reasoning failure. These values are specific to the paper's system/model/protocol configuration, not universal rankings.
 
@@ -42,7 +42,14 @@ Create versioned, human-readable episodes with a symbolic oracle and gold deriva
 | D11: duplicate/replay | Replay an identical event, then an event ID with changed payload | Idempotence for exact replay; fail-closed rejection for ID collision |
 | D12: order and restart | Permute independent event arrival and restart between writes | Stable state, derivation digests, and replay/rebuild parity |
 
-The seed suite is a diagnostic fixture, not a statistically representative dataset. Do not tune the implementation to it and report it as held-out quality. Extend it with programmatically generated, seeded trajectories and hidden test seeds after the executor and oracle are stable.
+### Proposed extension cases (not part of the current 12-case seed suite)
+
+| Case | Mutation or challenge | Required diagnostic |
+|---|---|---|
+| D13: alternative justifications | A conclusion has support sets `(A AND B) OR D`; retract A, then D | Keep the conclusion current while D remains eligible; transition to unknown/unsupported only after all sufficient supports are gone |
+| D14: absence vs closed-world negation | No record establishes P; compare open-world evaluation with an explicitly scoped completeness witness | Absence alone remains unknown; derive not-P only under a versioned closed-world rule with a valid completeness proof |
+
+These extensions require a versioned support schema and oracle; they are not claims about what the current graph implementation already supports. The original seed suite remains a diagnostic fixture, not a statistically representative dataset. Do not tune the implementation to it and report it as held-out quality. Extend with programmatically generated, seeded trajectories and hidden test seeds after the executor and oracle are stable.
 
 ## 4. Gold format and oracle
 
@@ -81,6 +88,9 @@ Use paired episodes and retain per-case outputs. Do not pool incompatible benchm
 - **Derivation DAG precision/recall/F1:** correctness of dependency edges and gold supporting leaves.
 - **Staleness rate:** fraction of queries whose returned derived value depends on an invalid, superseded, retracted, unauthorized, or post-cutoff event.
 - **Invalidation recall and false-invalidation rate:** affected descendants invalidated, versus unaffected descendants incorrectly invalidated.
+- **Alternative-support retention (proposed extension):** the fraction of conclusions retained while at least one complete, eligible sufficient justification survives; report false invalidations when a redundant proof remains.
+- **Unsupported-current-state rate (proposed extension):** conclusions still marked current after all sufficient justifications are withdrawn.
+- **Absence-to-negation error rate (proposed extension):** cases in which missing evidence is incorrectly converted to false without an explicit scoped completeness witness and closed-world rule.
 - **Evidence acquisition recall:** fraction of gold supporting leaves retrieved; include precision and evidence-set size.
 - **Temporal leakage rate:** number of as-known queries influenced by events received after the cutoff.
 - **Conflict safety and abstention:** arbitrary-winner rate, correct conflict rate, correct unknown rate, and useful-answer coverage.
@@ -109,6 +119,8 @@ A system that returns unknown for everything can meet some safety metrics; there
 Use each benchmark for the question it actually measures:
 
 - **MemDerive** — derived-state truth, gold derivation DAGs and temporal change propagation: https://arxiv.org/abs/2610.25373
+- **MEME** — six tasks across exact recall, aggregation, state tracking, deletion, dependency cascade and absence. In its reported 100-episode setup, Cascade and Absence accuracy averaged 3% and 1% under the default configuration; this is a paper-specific result and a strong motivation for explicit justification/absence diagnostics: https://arxiv.org/abs/2605.12477
+- **AMA-Bench** — long-horizon agent trajectories and causal/state reasoning. AMA-Agent reports 57.22% accuracy, 11.16 percentage points above its strongest baseline within that benchmark's protocol: https://proceedings.mlr.press/v306/zhao26bs.html
 - **FEB-30** — fact evolution across multi-author artifacts, with intrinsic memory-state evaluation distinct from downstream QA: https://arxiv.org/abs/2610.22209
 - **UtilMem (EMNLP 2026)** — evidence use after retrieval, including dense-history reasoning, implicit relevance, synthesis and distractor resistance: https://aclanthology.org/2026.emnlp-main.1639/
 - **TrustMem (EMNLP Findings 2026)** — memory update/consolidation faithfulness, coverage, preservation and transition errors: https://aclanthology.org/2026.findings-emnlp.2419/
