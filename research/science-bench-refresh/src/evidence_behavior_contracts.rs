@@ -273,7 +273,7 @@ fn valid_digest(value: &str, allow_zero: bool) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        && (allow_zero || value != "0".repeat(64))
+        && (allow_zero || value.bytes().any(|byte| byte != b'0'))
 }
 
 fn valid_revision(value: &str) -> bool {
@@ -281,7 +281,7 @@ fn valid_revision(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        && value != "0".repeat(40)
+        && value.bytes().any(|byte| byte != b'0')
 }
 
 fn digest_domain_framed(domain: &[u8], payload: &[u8]) -> Result<String, String> {
@@ -909,8 +909,8 @@ pub fn verify_evidence_behavior_contract_report(
         runner_execution_proven: false,
         external_anchor_required: true,
         claim_boundary: concat!(
-            "Adjudication is conditional on the frozen contract, evidence-authority policy and rubric; ",
-            "a digest does not prove runner execution, evaluator independence, truth or generalization."
+            "Adjudication is scoped to the frozen contract, authority policy and rubric; ",
+            "digests do not prove execution, evaluator independence, truth or generalization."
         )
         .to_owned(),
     });
