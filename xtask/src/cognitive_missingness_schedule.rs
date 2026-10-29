@@ -566,7 +566,7 @@ mod tests {
     }
 
     #[test]
-    fn policy_feed_has_no_hidden_outcome_or_future_schedule_fields() {
+    fn policy_tick_input_has_no_hidden_outcome_or_future_schedule_fields() {
         let generated = generate(
             &fixture(MissingnessMechanism::MnarHighLoss, MissingnessDeclarationMode::Explicit),
             b"policy-boundary",
@@ -692,7 +692,7 @@ mod tests {
         input.config.base_missing_probability = 0.0;
         input.config.delay = DelayPattern::HeterogeneousBounded { max_ticks: 24 };
         let generated = generate(&input, b"arrival-order").unwrap();
-        let messages = &generated.policy_feed.messages;
+        let messages = &generated.delivery_messages;
         for pair in messages.windows(2) {
             let (left_tick, left_priority, left_id) = policy_message_key(&pair[0]);
             let (right_tick, right_priority, right_id) = policy_message_key(&pair[1]);
