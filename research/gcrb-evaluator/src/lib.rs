@@ -248,6 +248,16 @@ fn validate_fixture(fixture: &Fixture) -> Result<(), String> {
                 case.case_id
             ));
         }
+        if case.required_behaviors.iter().collect::<BTreeSet<_>>().len()
+            != case.required_behaviors.len()
+        {
+            return Err(format!("case {} repeats a required behavior label", case.case_id));
+        }
+        if case.forbidden_behaviors.iter().collect::<BTreeSet<_>>().len()
+            != case.forbidden_behaviors.len()
+        {
+            return Err(format!("case {} repeats a forbidden behavior label", case.case_id));
+        }
         match case.class.as_str() {
             "attack" => attacks += 1,
             "negative_control" => negative_controls += 1,
@@ -357,6 +367,21 @@ pub fn evaluate_public_development(
                 "case {} has unsupported observed severity {}",
                 result.case_id, result.observed_severity
             ));
+        }
+        if result.observed_required_behaviors.iter().collect::<BTreeSet<_>>().len()
+            != result.observed_required_behaviors.len()
+        {
+            return Err(format!("case {} repeats an observed required behavior", result.case_id));
+        }
+        if result.observed_forbidden_behaviors.iter().collect::<BTreeSet<_>>().len()
+            != result.observed_forbidden_behaviors.len()
+        {
+            return Err(format!("case {} repeats an observed forbidden behavior", result.case_id));
+        }
+        if result.hard_gate_violations.iter().collect::<BTreeSet<_>>().len()
+            != result.hard_gate_violations.len()
+        {
+            return Err(format!("case {} repeats a hard-gate violation code", result.case_id));
         }
         for code in &result.hard_gate_violations {
             if !HARD_GATE_CODES.contains(&code.as_str()) {
@@ -715,5 +740,15 @@ mod tests {
         value["cases"][0]["observed_disposition"] = serde_json::json!("   ");
         let result = evaluate_public_development(&fixture, &serde_json::to_vec(&value).unwrap());
         assert!(result.unwrap_err().contains("empty observed disposition"));
+    }
+
+
+    #[test]
+    fn rejects_duplicate_candidate_behavior_labels() {
+        let fixture = fixture_bytes();
+        let mut value: serde_json::Value = serde_json::from_slice(&candidate_bytes(&fixture, "low", false)).unwrap();
+        value["cases"][0]["observed_required_behaviors"] = serde_json::json!(["retain_baseline", "retain_baseline"]);
+        let result = evaluate_public_development(&fixture, &serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("repeats an observed required behavior"));
     }
 }
