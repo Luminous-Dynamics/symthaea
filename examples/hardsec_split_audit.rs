@@ -778,6 +778,8 @@ mod tests {
                 NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
             ));
             fs::create_dir_all(&root).expect("create fixture root");
+            fs::write(root.join("source-corpus.csv"), "immutable-source-corpus-fixture")
+                .expect("write shared source corpus");
             Self { root, rows: Vec::new() }
         }
 
@@ -827,9 +829,15 @@ mod tests {
                 .expect("write source fixture");
             let source_sha256 =
                 sha256_file(&self.root.join(&source_path)).expect("hash fixture");
+            let source_corpus_path = "source-corpus.csv".to_owned();
+            let source_corpus_sha256 = sha256_file(&self.root.join(&source_corpus_path))
+                .expect("hash shared source corpus");
             self.rows.push(vec![
                 "dataset-test".into(),
                 "physical_hpc".into(),
+                "corpus-test".into(),
+                source_corpus_path,
+                source_corpus_sha256,
                 artifact_name.into(),
                 source_path,
                 source_sha256,
