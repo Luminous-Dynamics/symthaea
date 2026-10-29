@@ -730,10 +730,11 @@ fn valid_run_id(value: &str) -> bool {
 
 fn valid_rfc3339(value: &str) -> bool {
     let bytes = value.as_bytes();
-    if bytes.len() < 20
+    if !bytes.is_ascii()
+        || bytes.len() < 20
         || bytes.get(4) != Some(&b'-')
         || bytes.get(7) != Some(&b'-')
-        || !matches!(bytes.get(10), Some(b'T' | b't'))
+        || !matches!(bytes.get(10), Some(&b'T') | Some(&b't'))
         || bytes.get(13) != Some(&b':')
         || bytes.get(16) != Some(&b':')
     {
@@ -806,8 +807,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn error(report: &mut ValidationReport, code: &'static str, path: impl Into<String>, message: impl Into<String>) {
-    push_error(&mut report.errors, code, path, message);
+fn error(report: &mut ValidationReport, code: &'static str, path: impl AsRef<str>, message: impl Into<String>) {
+    push_error(&mut report.errors, code, path.as_ref(), message);
 }
 
 fn push_error(errors: &mut Vec<ValidationError>, code: &'static str, path: impl Into<String>, message: impl Into<String>) {
