@@ -172,6 +172,7 @@ fn acoustic_case(
                 "violating_channel_windows": report.violating_channel_windows,
                 "worst_rms_delta_db": report.worst_rms_delta_db,
                 "worst_spectral_distance": report.worst_spectral_distance,
+                "authorized_region_rms": report.authorized_region_rms,
                 "calibration_id": report.calibration_id,
                 "reference_audio_sha256": report.reference_audio_sha256,
                 "candidate_audio_sha256": report.candidate_audio_sha256,
