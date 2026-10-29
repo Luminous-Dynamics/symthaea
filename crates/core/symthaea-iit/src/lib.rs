@@ -321,6 +321,83 @@ pub enum RepertoireError {
 
     #[error("cause repertoire has zero or non-finite likelihood mass")]
     UndefinedCauseRepertoire,
+
+    #[error("GID distribution lengths differ: forward={forward}, partitioned={partitioned}, selectivity={selectivity}")]
+    DistributionLengthMismatch { forward: usize, partitioned: usize, selectivity: usize },
+
+    #[error("GID input distribution {name} has invalid probability at index {index}: {value}")]
+    InvalidDistributionProbability { name: &'static str, index: usize, value: f64 },
+
+    #[error("GID input distribution {name} sums to {sum}, outside normalization tolerance")]
+    DistributionNotNormalized { name: &'static str, sum: f64 },
+
+    #[error("GID state index {index} outside distribution of length {length}")]
+    DistributionStateOutOfRange { index: usize, length: usize },
+}
+
+/// Evaluate one point of PyPhi's IIT 4.0 generalized intrinsic difference (GID).
+///
+/// Formula at selected state i:
+/// selectivity[i] * log2(forward[i] / partitioned[i]).
+///
+/// If either forward or partitioned probability is exactly zero, the pointwise
+/// ratio is undefined and PyPhi defines that term to be zero. This function
+/// validates all inputs as normalized distributions; it does not infer a formal
+/// IIT quantity, choose a partition, or compute system phi_s.
+pub fn generalized_intrinsic_difference_at_state(
+    forward_repertoire: &[f64],
+    partitioned_forward_repertoire: &[f64],
+    selectivity_repertoire: &[f64],
+    state_index: usize,
+) -> Result<f64, RepertoireError> {
+    if forward_repertoire.len() != partitioned_forward_repertoire.len()
+        || forward_repertoire.len() != selectivity_repertoire.len()
+    {
+        return Err(RepertoireError::DistributionLengthMismatch {
+            forward: forward_repertoire.len(),
+            partitioned: partitioned_forward_repertoire.len(),
+            selectivity: selectivity_repertoire.len(),
+        });
+    }
+    let length = forward_repertoire.len();
+    if state_index >= length {
+        return Err(RepertoireError::DistributionStateOutOfRange {
+            index: state_index,
+            length,
+        });
+    }
+
+    validate_probability_distribution(forward_repertoire, "forward")?;
+    validate_probability_distribution(partitioned_forward_repertoire, "partitioned")?;
+    validate_probability_distribution(selectivity_repertoire, "selectivity")?;
+
+    let forward = forward_repertoire[state_index];
+    let partitioned = partitioned_forward_repertoire[state_index];
+    if forward == 0.0 || partitioned == 0.0 {
+        return Ok(0.0);
+    }
+    Ok(selectivity_repertoire[state_index] * (forward / partitioned).log2())
+}
+
+fn validate_probability_distribution(
+    distribution: &[f64],
+    name: &'static str,
+) -> Result<(), RepertoireError> {
+    let mut sum = 0.0;
+    for (index, value) in distribution.iter().copied().enumerate() {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(RepertoireError::InvalidDistributionProbability {
+                name,
+                index,
+                value,
+            });
+        }
+        sum += value;
+    }
+    if (sum - 1.0).abs() > 1e-10 {
+        return Err(RepertoireError::DistributionNotNormalized { name, sum });
+    }
+    Ok(())
 }
 
 /// Dense, binary, factored transition-probability model.
@@ -1356,6 +1433,70 @@ mod tests {
         let with_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, true, 54).unwrap();
         assert_eq!(with_total.len(), 23);
         assert!(with_total[0].is_total_cut());
+    }
+
+    #[test]
+    fn generalized_intrinsic_difference_matches_published_gid_formula() {
+        let gid = generalized_intrinsic_difference_at_state(
+            &[0.1, 0.4, 0.5],
+            &[0.2, 0.2, 0.6],
+            &[0.25, 0.5, 0.25],
+            1,
+        ).unwrap();
+        assert!((gid - 0.5).abs() < 1e-12); // 0.5 * log2(0.4 / 0.2)
+    }
+
+    #[test]
+    fn generalized_intrinsic_difference_preserves_negative_values() {
+        let gid = generalized_intrinsic_difference_at_state(
+            &[0.1, 0.9],
+            &[0.2, 0.8],
+            &[0.2, 0.8],
+            0,
+        ).unwrap();
+        assert!((gid + 0.2).abs() < 1e-12); // 0.2 * log2(0.1 / 0.2)
+    }
+
+    #[test]
+    fn generalized_intrinsic_difference_returns_zero_for_undefined_zero_ratios() {
+        assert_eq!(
+            generalized_intrinsic_difference_at_state(
+                &[0.0, 1.0],
+                &[0.0, 1.0],
+                &[0.4, 0.6],
+                0,
+            ).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            generalized_intrinsic_difference_at_state(
+                &[0.5, 0.5],
+                &[0.0, 1.0],
+                &[0.5, 0.5],
+                0,
+            ).unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn generalized_intrinsic_difference_rejects_invalid_distributions_and_state() {
+        assert!(matches!(
+            generalized_intrinsic_difference_at_state(&[0.5], &[0.5, 0.5], &[1.0], 0),
+            Err(RepertoireError::DistributionLengthMismatch { .. })
+        ));
+        assert!(matches!(
+            generalized_intrinsic_difference_at_state(&[0.5, 0.5], &[0.5, 0.5], &[0.5, 0.5], 2),
+            Err(RepertoireError::DistributionStateOutOfRange { index: 2, length: 2 })
+        ));
+        assert!(matches!(
+            generalized_intrinsic_difference_at_state(&[0.6, 0.6], &[0.5, 0.5], &[0.5, 0.5], 0),
+            Err(RepertoireError::DistributionNotNormalized { name: "forward", .. })
+        ));
+        assert!(matches!(
+            generalized_intrinsic_difference_at_state(&[f64::NAN, 1.0], &[0.0, 1.0], &[0.0, 1.0], 0),
+            Err(RepertoireError::InvalidDistributionProbability { name: "forward", index: 0, .. })
+        ));
     }
 
 }
