@@ -486,9 +486,28 @@ fn route_candidate_is_better(candidate: &RouteCandidate, current: &RouteCandidat
         std::cmp::Ordering::Less => true,
         std::cmp::Ordering::Greater => false,
         std::cmp::Ordering::Equal => {
-            candidate.nodes.len() < current.nodes.len()
-                || (candidate.nodes.len() == current.nodes.len()
-                    && candidate.nodes < current.nodes)
+            if candidate.nodes.len() != current.nodes.len() {
+                return candidate.nodes.len() < current.nodes.len();
+            }
+            if candidate.nodes != current.nodes {
+                return candidate.nodes < current.nodes;
+            }
+            // Parallel links can yield the same node sequence and objective cost.
+            // Resolve those ties by conservative then nominal loss, independent of
+            // the order in which the caller supplied the links.
+            match candidate.loss.upper_db.total_cmp(&current.loss.upper_db) {
+                std::cmp::Ordering::Less => true,
+                std::cmp::Ordering::Greater => false,
+                std::cmp::Ordering::Equal => {
+                    match candidate.loss.nominal_db.total_cmp(&current.loss.nominal_db) {
+                        std::cmp::Ordering::Less => true,
+                        std::cmp::Ordering::Greater => false,
+                        std::cmp::Ordering::Equal =>
+                            candidate.loss.lower_db.total_cmp(&current.loss.lower_db)
+                                == std::cmp::Ordering::Less,
+                    }
+                }
+            }
         }
     }
 }
@@ -733,6 +752,25 @@ mod tests {
         near(nominal.total_loss_db.upper_db, 6.0);
         near(robust.total_loss_db.upper_db, 2.4);
         assert!(robust.transmission_probability.lower > nominal.transmission_probability.lower);
+    }
+
+    #[test]
+    fn parallel_link_ties_are_independent_of_input_order() {
+        let conservative = OpticalLink {
+            from: 0, to: 1,
+            loss_db: LossIntervalDb::new(0.5, 1.0, 2.0).unwrap(),
+        };
+        let fragile = OpticalLink {
+            from: 0, to: 1,
+            loss_db: LossIntervalDb::new(0.1, 1.0, 5.0).unwrap(),
+        };
+        for links in [vec![fragile, conservative], vec![conservative, fragile]] {
+            let route = find_optical_route(
+                2, &links, 0, 1, OpticalRouteObjective::MinimumNominalLoss,
+            ).unwrap().unwrap();
+            near(route.total_loss_db.upper_db, 2.0);
+            near(route.total_loss_db.lower_db, 0.5);
+        }
     }
 
     #[test]
