@@ -10,9 +10,9 @@ This is not a claim to have invented e-detectors. Shin, Ramdas, and Rinaldo's fr
 
 ## Formal contract
 
-Assume each outcome (X_t\in\{0,1\}) has a predictable conditional event probability (p_t\in[\ell,u]=[0.48,0.52]). The conditional rate may depend on the full observed history; the null is not IID.
+Assume each outcome $X_t\in\{0,1\}$ has a predictable conditional event probability $p_t\in[\ell,u]=[0.48,0.52]$. The conditional rate may depend on the full observed history; the null is not IID.
 
-For an upward alternative (q>u), define the Bernoulli likelihood-ratio increment against the least-favourable edge (u):
+For an upward alternative $q>u$, define the Bernoulli likelihood-ratio increment against the least-favourable edge $u$:
 
 \[
 L_t(q)=\begin{cases}
@@ -21,20 +21,20 @@ q/u,& X_t=1,\\
 \end{cases}
 \]
 
-For every accepted (p_t\le u), (\mathbb E[L_t(q)\mid\mathcal F_{t-1}]\le1). For a downward alternative (q<\ell), use the same ratio against (\ell); its conditional expectation is at most one whenever (p_t\ge\ell). Each component therefore preserves the nonnegative-supermartingale property under the declared conditional null.
+For every accepted $p_t\le u$, $\mathbb E[L_t(q)\mid\mathcal F_{t-1}]\le1$. For a downward alternative $q<\ell$, use the same ratio against $\ell$; its conditional expectation is at most one whenever $p_t\ge\ell$. Each component therefore preserves the nonnegative-supermartingale property under the declared conditional null.
 
-For a hazard (h\in(0,1)), mix all possible change starts with (\pi_k=h(1-h)^{k-1}). Let (A_t) be active suffix wealth. The component recurrence is:
+For a hazard $h\in(0,1)$, mix all possible change starts with $\pi_k=h(1-h)^{k-1}$. Let $A_t$ be active suffix wealth. The component recurrence is:
 
 \[
 A_t=L_t(q)(A_{t-1}+\pi_t),\qquad E_t=A_t+(1-h)^t.
 \]
 
-The final term is the mass of change times that have not occurred yet. It ensures (E_0=1) and keeps the component a nonnegative supermartingale. A fixed equal-weight mixture across both directions, five alternatives per direction and three hazards remains an e-process. Ville's inequality then controls the probability of crossing (1/\alpha) at any time by (\alpha), under this exact null contract.
+The final term is the mass of change times that have not occurred yet. It ensures $E_0=1$ and keeps the component a nonnegative supermartingale. A fixed equal-weight mixture across both directions, five alternatives per direction and three hazards remains an e-process. Ville's inequality then controls the probability of crossing $1/\alpha$ at any time by $\alpha$, under this exact null contract.
 
 The implementation uses 30 components:
-- upward alternatives: (q\in\{0.55,0.60,0.70,0.80,0.90\}), null edge (u=0.52);
-- downward alternatives: (q\in\{0.45,0.40,0.30,0.20,0.10\}), null edge (\ell=0.48);
-- change-time hazards: (h\in\{0.04,0.01,0.0025\}), with geometric prior mean start times 25, 100 and 400 observations;
+- upward alternatives: $q\in\{0.55,0.60,0.70,0.80,0.90\}$, null edge $u=0.52$;
+- downward alternatives: $q\in\{0.45,0.40,0.30,0.20,0.10\}$, null edge $\ell=0.48$;
+- change-time hazards: $h\in\{0.04,0.01,0.0025\}$, with geometric prior mean start times 25, 100 and 400 observations;
 - log-space recursion; threshold (\log E_t\ge-\log(0.05/12)\).
 
 **Scope limit:** the guarantee only applies when every predictable conditional event rate remains within the declared band. It does not automatically apply to arbitrary high-dimensional feature-distribution shift, and it cannot make an incorrectly chosen null band scientifically valid.
@@ -42,8 +42,8 @@ The implementation uses 30 components:
 ## Deterministic qualification suite
 
 The Rust CLI emits 14 deterministic trace probes:
-1. stationary (p=0.50) and both accepted-null edges (p=0.48,0.52);
-2. a selection-bias control at (p=0.74), deliberately outside the null band;
+1. stationary $p=0.50$ and both accepted-null edges $p=0.48,0.52$;
+2. a selection-bias control at $p=0.74$, deliberately outside the null band;
 3. alternating in-band endpoints and a predictable feedback schedule that selects the next rate based on the current e-value before observing the next outcome;
 4. upward and downward step shifts, change after observation 100;
 5. all-one and all-zero extreme paths.
@@ -78,7 +78,7 @@ In the previous exact-DP pilot, the never-reset composite-band betting process d
 ## Next benchmark gates
 
 1. Exact-head Rust tests, formatting and independent Python probe parity must pass.
-2. Freeze (\alpha=0.05/12), alternatives, hazards, and scenarios before evaluation; no post-hoc tuning to the test traces.
+2. Freeze $\alpha=0.05/12$, alternatives, hazards, and scenarios before evaluation; no post-hoc tuning to the test traces.
 3. Benchmark false alarms with enough null-run exposure to estimate stringent error rates; report confidence upper bounds when no alarms are observed.
 4. Compare to a faithful e-detector implementation, FOCuS/mixFOCuS where their assumptions fit, the current finite-horizon CUSUM, ADWIN, EWMA and Page–Hinkley.
 5. Evaluate source-held-out real streams, dependence, gradual/recurring shifts, selection-mechanism changes, sparse multi-stream shifts, runtime and memory. Report detection probability plus conditional median/P90 delays; do not let missed detections disappear from the latency metrics.
