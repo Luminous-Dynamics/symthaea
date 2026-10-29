@@ -1,0 +1,5 @@
+case_id	initial_observation	max_probes	probe_budget_milli
+q7	high_context	1	100
+n2	high_context	1	100
+w5	low_context	1	100
+b9	low_context	1	100

@@ -1,0 +1,17 @@
+case_id	policy_id	action_id
+q7	adaptive	0
+n2	adaptive	1
+w5	adaptive	0
+b9	adaptive	0
+q7	static_a0	0
+n2	static_a0	0
+w5	static_a0	0
+b9	static_a0	0
+q7	probe_all	0
+n2	probe_all	1
+w5	probe_all	0
+b9	probe_all	1
+q7	forged	1
+n2	forged	0
+w5	forged	0
+b9	forged	0

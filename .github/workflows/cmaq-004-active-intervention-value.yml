@@ -1,0 +1,31 @@
+name: CMAQ-004 active intervention value
+
+on:
+  pull_request:
+    paths:
+      - 'research/cmaq-004/**'
+      - '.github/workflows/cmaq-004-active-intervention-value.yml'
+  push:
+    paths:
+      - 'research/cmaq-004/**'
+      - '.github/workflows/cmaq-004-active-intervention-value.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  active-intervention-value:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/cmaq-004
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Rust unit tests
+        run: cargo test --locked
+      - name: Known-answer active intervention fixture
+        run: |
+          cargo run --locked -- --cases fixtures/cases.tsv --actions fixtures/action-key.tsv --probes fixtures/probe-key.tsv --trace fixtures/probe-trace.tsv --decisions fixtures/decision-trace.tsv > /tmp/cmaq-004-actual.tsv
+          diff -u fixtures/expected.tsv /tmp/cmaq-004-actual.tsv

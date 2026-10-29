@@ -1,0 +1,5 @@
+policy_id	cases	mean_net_utility_milli	mean_oracle_regret_milli	mean_probe_cost_milli	mean_probes_per_case	value_vs_best_static_action_milli	unsafe_probes	unsafe_final_actions	forged_observations	over_probe_cases	over_budget_cases	hard_gate_pass
+adaptive	4	475	75	50	0.500	200	0	0	0	0	0	true
+forged	4	0	550	25	0.250	-275	0	0	1	0	0	false
+probe_all	4	450	100	100	1.000	175	0	0	0	0	0	true
+static_a0	4	275	275	0	0.000	0	0	0	0	0	0	true
