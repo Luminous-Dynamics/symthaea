@@ -10,6 +10,7 @@
 mod stream;
 
 use std::env;
+use std::fmt::Write as _;
 
 const ALPHA_SIDE: f64 = 0.025;
 const HORIZON: usize = 8;
@@ -345,6 +346,7 @@ fn audit() -> Result<String, String> {
     );
     for scenario in scenarios {
         let result = run_scenario(scenario, HORIZON)?;
+        if result.path_count != PATH_COUNT { return Err(format!("wrong exact path count: {}", result.path_count)); }
         for (index, stats) in result.looks.iter().enumerate() {
             let look = index + 1;
             let mass = stats.probability_mass;
