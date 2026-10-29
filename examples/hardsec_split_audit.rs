@@ -258,6 +258,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         "execution_holdout",
         "device_config_holdout",
         "capture_config_holdout",
+        "counter_set_holdout",
     ]
     .contains(&split_protocol.as_str())
     {
@@ -494,6 +495,7 @@ fn held_out_group(sample: &Sample, protocol: &str, line_number: usize) -> Result
         "execution_holdout" => ("execution", sample.execution_id.as_str()),
         "device_config_holdout" => ("device_config", sample.device_config_id.as_str()),
         "capture_config_holdout" => ("capture_config", sample.capture_config_id.as_str()),
+        "counter_set_holdout" => ("counter_set", sample.counter_set_id.as_str()),
         _ => return Err(format!("line {line_number}: unsupported split protocol")),
     };
     if is_missing(value) {
@@ -1090,6 +1092,36 @@ mod tests {
         fixture.rows[1][4] = digest;
         let summary = fixture.audit().expect("same-split alias is not leakage");
         assert_eq!(summary.duplicate_content_aliases, 1);
+    }
+
+    #[test]
+    fn counter_set_holdout_rejects_counter_sets_crossing_splits() {
+        let mut fixture = Fixture::new();
+        fixture.add_row_with_capture(
+            "s-train-attack", "a", "program-a", "run-a", "family-a", "board-a",
+            "capture-a", "counter-train", "counter_set_holdout", "train", "attack",
+        );
+        fixture.add_row_with_capture(
+            "s-train-benign", "b", "benign-a", "run-b", "NA", "board-a",
+            "capture-a", "counter-train", "counter_set_holdout", "train", "benign",
+        );
+        fixture.add_row_with_capture(
+            "s-val-attack", "c", "program-c", "run-c", "family-c", "board-a",
+            "capture-b", "counter-val", "counter_set_holdout", "validation", "attack",
+        );
+        fixture.add_row_with_capture(
+            "s-val-benign", "d", "benign-b", "run-d", "NA", "board-a",
+            "capture-b", "counter-val", "counter_set_holdout", "validation", "benign",
+        );
+        fixture.add_row_with_capture(
+            "s-test-attack", "e", "program-e", "run-e", "family-e", "board-a",
+            "capture-c", "counter-train", "counter_set_holdout", "test", "attack",
+        );
+        fixture.add_row_with_capture(
+            "s-test-benign", "f", "benign-c", "run-f", "NA", "board-a",
+            "capture-c", "counter-test", "counter_set_holdout", "test", "benign",
+        );
+        assert!(fixture.audit().unwrap_err().contains("counter_set"));
     }
 
     #[test]
