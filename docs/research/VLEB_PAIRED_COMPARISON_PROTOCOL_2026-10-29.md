@@ -31,7 +31,7 @@ Intervals are descriptive percentile-bootstrap intervals. This v1 does not calcu
 
 ## Integrity boundary
 
-The CLI requires evaluator-supplied pins for the raw manifest SHA-256, protocol SHA-256 and analyzer source SHA-256. This binds the run to named inputs and the intended analyzer, but the analysis program does not authenticate the receipt or audit-report bytes referenced by those digests, run the candidate, verify signatures, or prove that the declared outcomes were honestly measured. The trusted evaluator must create and pin the manifest from independently verified receipts and audit reports. Hashes alone are not signatures or execution attestations.
+The CLI requires evaluator-supplied pins for the raw manifest SHA-256, protocol SHA-256 and analyzer source SHA-256. Its synthetic test suite also exercises the positive CLI path, persisted report equality and fail-closed behavior for a wrong external manifest pin. This binds the run to named inputs and the intended analyzer, but the analysis program does not authenticate the receipt or audit-report bytes referenced by those digests, run the candidate, verify signatures, or prove that the declared outcomes were honestly measured. The trusted evaluator must create and pin the manifest from independently verified receipts and audit reports. Hashes alone are not signatures or execution attestations.
 
 Output permanently declares analysis_only=true and score_eligible=false. Synthetic tests validate math and rejection behavior only; they are not benchmark measurements.
 
