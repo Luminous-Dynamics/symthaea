@@ -149,7 +149,8 @@ class PairedComparisonTests(unittest.TestCase):
             sum(row["direction"] == "tie" for row in task_rows),
             result["pairwise_comparisons"][0]["task_clusters_tied"],
         )
-        self.assertEqual(result["bootstrap"]["cluster_unit"], "task_id; each draw carries all paired seed outcomes and all comparison arms")
+        self.assertEqual(result["bootstrap"]["cluster_unit"], "task_id; each primary draw carries all paired seed outcomes and all comparison arms")
+        self.assertIn("seed labels", result["bootstrap"]["sensitivity_cluster_unit"])
         self.assertTrue(result["analysis_only"])
         self.assertFalse(result["score_eligible"])
         self.assertTrue(result["warnings"])
@@ -215,6 +216,17 @@ class PairedComparisonTests(unittest.TestCase):
         second = self.fixture.analyze()
         self.assertEqual(first["arm_summaries"], second["arm_summaries"])
         self.assertEqual(first["pairwise_comparisons"], second["pairwise_comparisons"])
+
+    def test_single_seed_report_warns_that_seed_variability_is_not_estimable(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        manifest["seeds"] = [101]
+        manifest["results"] = [row for row in manifest["results"] if row["seed"] == 101]
+        result = self.fixture.analyze(manifest)
+        self.assertTrue(result["valid"])
+        self.assertIn(
+            "single declared seed; crossed bootstrap cannot reveal between-seed variability",
+            result["warnings"],
+        )
 
     def test_crossed_bootstrap_exposes_seed_sensitivity_hidden_by_task_only_interval(self) -> None:
         manifest = copy.deepcopy(self.fixture.manifest)
