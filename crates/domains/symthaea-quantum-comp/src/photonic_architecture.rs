@@ -441,6 +441,181 @@ pub fn multiplexed_source_success_probability(
     Ok((at_least_one_source * switch_transmission).clamp(0.0, 1.0))
 }
 
+/// Objective for choosing an optical route through a directed connectivity graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpticalRouteObjective {
+    /// Minimize hop count, then use deterministic lexicographic path tie-breaking.
+    FewestHops,
+    /// Minimize the sum of nominal insertion losses in dB.
+    MinimumNominalLoss,
+    /// Minimize the sum of upper-bound insertion losses in dB.
+    MinimumWorstCaseLoss,
+}
+
+/// Directed optical interconnect with a declared insertion-loss interval.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OpticalLink {
+    /// Directed source node identifier.
+    pub from: usize,
+    /// Directed destination node identifier.
+    pub to: usize,
+    /// Insertion-loss interval for this interconnect, in dB.
+    pub loss_db: LossIntervalDb,
+}
+
+/// Result of routing one photon path under a declared route objective.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpticalRoute {
+    /// Node sequence, including source and destination.
+    pub nodes: Vec<usize>,
+    /// Sum of link losses along the selected route.
+    pub total_loss_db: LossIntervalDb,
+    /// Transmission interval implied by the route loss interval.
+    pub transmission_probability: ProbabilityInterval,
+}
+
+#[derive(Debug, Clone)]
+struct RouteCandidate {
+    nodes: Vec<usize>,
+    cost: f64,
+    loss: LossIntervalDb,
+}
+
+fn route_candidate_is_better(candidate: &RouteCandidate, current: &RouteCandidate) -> bool {
+    match candidate.cost.total_cmp(&current.cost) {
+        std::cmp::Ordering::Less => true,
+        std::cmp::Ordering::Greater => false,
+        std::cmp::Ordering::Equal => {
+            candidate.nodes.len() < current.nodes.len()
+                || (candidate.nodes.len() == current.nodes.len()
+                    && candidate.nodes < current.nodes)
+        }
+    }
+}
+
+fn link_cost(link: &OpticalLink, objective: OpticalRouteObjective) -> f64 {
+    match objective {
+        OpticalRouteObjective::FewestHops => 1.0,
+        OpticalRouteObjective::MinimumNominalLoss => link.loss_db.nominal_db,
+        OpticalRouteObjective::MinimumWorstCaseLoss => link.loss_db.upper_db,
+    }
+}
+
+/// Find a deterministic, loop-free route through a directed optical connectivity graph.
+///
+/// This is a topology-level first-order router. It minimizes hop count, nominal total
+/// loss, or worst-case loss according to the chosen objective; it does not optimize
+/// interference, crosstalk, wavelength conflicts, detector noise, fusion schedule,
+/// code constraints, or multi-commodity congestion.
+pub fn find_optical_route(
+    node_count: usize,
+    links: &[OpticalLink],
+    source: usize,
+    destination: usize,
+    objective: OpticalRouteObjective,
+) -> Result<Option<OpticalRoute>, PhotonicEnvelopeError> {
+    if node_count == 0 {
+        return Err(PhotonicEnvelopeError::InvalidNodeCount);
+    }
+    if source >= node_count {
+        return Err(PhotonicEnvelopeError::OpticalNodeOutOfRange(source));
+    }
+    if destination >= node_count {
+        return Err(PhotonicEnvelopeError::OpticalNodeOutOfRange(destination));
+    }
+    for link in links {
+        if link.from >= node_count {
+            return Err(PhotonicEnvelopeError::OpticalNodeOutOfRange(link.from));
+        }
+        if link.to >= node_count {
+            return Err(PhotonicEnvelopeError::OpticalNodeOutOfRange(link.to));
+        }
+        if link.from == link.to {
+            return Err(PhotonicEnvelopeError::SelfLoopOpticalLink(link.from));
+        }
+        LossIntervalDb::new(
+            link.loss_db.lower_db,
+            link.loss_db.nominal_db,
+            link.loss_db.upper_db,
+        )?;
+    }
+
+    if source == destination {
+        return Ok(Some(OpticalRoute {
+            nodes: vec![source],
+            total_loss_db: LossIntervalDb { lower_db: 0.0, nominal_db: 0.0, upper_db: 0.0 },
+            transmission_probability: ProbabilityInterval { lower: 1.0, nominal: 1.0, upper: 1.0 },
+        }));
+    }
+
+    let zero_loss = LossIntervalDb { lower_db: 0.0, nominal_db: 0.0, upper_db: 0.0 };
+    let mut best: Vec<Option<RouteCandidate>> = vec![None; node_count];
+    let mut settled = vec![false; node_count];
+    best[source] = Some(RouteCandidate { nodes: vec![source], cost: 0.0, loss: zero_loss });
+
+    for _ in 0..node_count {
+        let mut chosen: Option<usize> = None;
+        for node in 0..node_count {
+            if settled[node] || best[node].is_none() {
+                continue;
+            }
+            if let Some(current) = chosen {
+                let candidate = best[node].as_ref().expect("candidate checked above");
+                let incumbent = best[current].as_ref().expect("chosen candidate exists");
+                if route_candidate_is_better(candidate, incumbent) {
+                    chosen = Some(node);
+                }
+            } else {
+                chosen = Some(node);
+            }
+        }
+        let Some(node) = chosen else { break };
+        if node == destination {
+            break;
+        }
+        settled[node] = true;
+        let current = best[node].as_ref().expect("chosen node has a route").clone();
+
+        for link in links.iter().filter(|link| link.from == node) {
+            if settled[link.to] || current.nodes.contains(&link.to) {
+                continue;
+            }
+            let loss = LossIntervalDb::new(
+                current.loss.lower_db + link.loss_db.lower_db,
+                current.loss.nominal_db + link.loss_db.nominal_db,
+                current.loss.upper_db + link.loss_db.upper_db,
+            )?;
+            let mut nodes = current.nodes.clone();
+            nodes.push(link.to);
+            let cost = current.cost + link_cost(link, objective);
+            if !cost.is_finite() {
+                return Err(PhotonicEnvelopeError::InvalidRouteCost);
+            }
+            let candidate = RouteCandidate { nodes, cost, loss };
+            let should_replace = best[link.to]
+                .as_ref()
+                .is_none_or(|incumbent| route_candidate_is_better(&candidate, incumbent));
+            if should_replace {
+                best[link.to] = Some(candidate);
+            }
+        }
+    }
+
+    let Some(route) = best[destination].take() else {
+        return Ok(None);
+    };
+    let transmission_probability = ProbabilityInterval::new(
+        transmission_probability(route.loss.upper_db)?,
+        transmission_probability(route.loss.nominal_db)?,
+        transmission_probability(route.loss.lower_db)?,
+    )?;
+    Ok(Some(OpticalRoute {
+        nodes: route.nodes,
+        total_loss_db: route.loss,
+        transmission_probability,
+    }))
+}
+
 /// Errors returned by component-envelope calculations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhotonicEnvelopeError {
@@ -475,6 +650,14 @@ impl fmt::Display for PhotonicEnvelopeError {
                 write!(f, "probability interval must satisfy lower <= nominal <= upper"),
             Self::InvalidOpticalLoss(loss) =>
                 write!(f, "optical loss must be finite and nonnegative, got {loss} dB"),
+            Self::InvalidNodeCount =>
+                write!(f, "optical topology must have at least one node"),
+            Self::OpticalNodeOutOfRange(node) =>
+                write!(f, "optical node {node} is out of range"),
+            Self::SelfLoopOpticalLink(node) =>
+                write!(f, "optical link self-loop at node {node} is not supported"),
+            Self::InvalidRouteCost =>
+                write!(f, "optical route cost is not finite"),
             Self::InvalidAttemptRate(rate) =>
                 write!(f, "attempt rate must be finite and positive, got {rate} Hz"),
             Self::InvalidLossInterval =>
@@ -511,6 +694,68 @@ mod tests {
             attempts_per_second: 1_000.0,
             photons_per_attempt: 2,
         }
+    }
+
+    #[test]
+    fn route_objectives_choose_shortest_nominal_loss_or_robust_loss_paths() {
+        let links = vec![
+            OpticalLink {
+                from: 0, to: 1,
+                loss_db: LossIntervalDb::new(0.1, 0.2, 3.0).unwrap(),
+            },
+            OpticalLink {
+                from: 1, to: 3,
+                loss_db: LossIntervalDb::new(0.1, 0.2, 3.0).unwrap(),
+            },
+            OpticalLink {
+                from: 0, to: 2,
+                loss_db: LossIntervalDb::new(0.8, 1.0, 1.2).unwrap(),
+            },
+            OpticalLink {
+                from: 2, to: 3,
+                loss_db: LossIntervalDb::new(0.8, 1.0, 1.2).unwrap(),
+            },
+        ];
+        let fewest = find_optical_route(
+            4, &links, 0, 3, OpticalRouteObjective::FewestHops,
+        ).unwrap().unwrap();
+        let nominal = find_optical_route(
+            4, &links, 0, 3, OpticalRouteObjective::MinimumNominalLoss,
+        ).unwrap().unwrap();
+        let robust = find_optical_route(
+            4, &links, 0, 3, OpticalRouteObjective::MinimumWorstCaseLoss,
+        ).unwrap().unwrap();
+
+        assert_eq!(fewest.nodes, vec![0, 1, 3]);
+        assert_eq!(nominal.nodes, vec![0, 1, 3]);
+        assert_eq!(robust.nodes, vec![0, 2, 3]);
+        near(nominal.total_loss_db.nominal_db, 0.4);
+        near(nominal.total_loss_db.upper_db, 6.0);
+        near(robust.total_loss_db.upper_db, 2.4);
+        assert!(robust.transmission_probability.lower > nominal.transmission_probability.lower);
+    }
+
+    #[test]
+    fn optical_route_handles_identity_disconnection_and_invalid_topology() {
+        assert_eq!(
+            find_optical_route(2, &[], 0, 1, OpticalRouteObjective::MinimumNominalLoss)
+                .unwrap(),
+            None
+        );
+        let identity = find_optical_route(
+            2, &[], 1, 1, OpticalRouteObjective::MinimumNominalLoss,
+        ).unwrap().unwrap();
+        assert_eq!(identity.nodes, vec![1]);
+        near(identity.transmission_probability.lower, 1.0);
+        assert!(find_optical_route(0, &[], 0, 0, OpticalRouteObjective::FewestHops).is_err());
+        assert!(find_optical_route(2, &[], 2, 0, OpticalRouteObjective::FewestHops).is_err());
+        let self_loop = [OpticalLink {
+            from: 0, to: 0, loss_db: LossIntervalDb::new(0.0, 0.0, 0.0).unwrap()
+        }];
+        assert!(matches!(
+            find_optical_route(1, &self_loop, 0, 0, OpticalRouteObjective::FewestHops),
+            Err(PhotonicEnvelopeError::SelfLoopOpticalLink(0))
+        ));
     }
 
     #[test]
