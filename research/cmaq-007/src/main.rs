@@ -42,6 +42,7 @@ struct CandidateAction {
 
 fn candidate_catalog(seed: u64) -> Vec<CandidateAction> {
     let mut rng = SplitMix64::new(seed);
+    let mut shuffled_score_rng = SplitMix64::new(seed ^ 0xC07A_7EED_55AA_0011);
     (0..MAX_ACTIONS)
         .map(|index| {
             // Four-percent structural blind spots in expectation. Their model
@@ -74,7 +75,7 @@ fn candidate_catalog(seed: u64) -> Vec<CandidateAction> {
                 predicted_utility,
                 predicted_uncertainty,
                 support_score,
-                shuffled_support_score: rng.unit(),
+                shuffled_support_score: shuffled_score_rng.unit(),
                 supported: !unsupported,
             }
         })
