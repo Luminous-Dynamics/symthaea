@@ -38,11 +38,42 @@ SOURCE_TASKS = (
     {"task_id": "source-ceramic-1", "family": "mold_ceramic", "descriptor": [0.60, 0.85, 0.70]},
     {"task_id": "source-ceramic-2", "family": "mold_ceramic", "descriptor": [0.70, 0.75, 0.65]},
 )
+# Four related-but-distinct task instances per held-out family. Families are
+# categorically absent from the historical source archive; within-family variants
+# are reported as nested cases rather than pretending they are independent families.
 TARGET_TASKS = (
-    {"task_id": "target-gamma", "family": "unseen_alloy_gamma", "descriptor": [0.42, 0.35, 0.45]},
-    {"task_id": "target-investment", "family": "unseen_investment_geometry", "descriptor": [0.55, 0.78, 0.90]},
-    {"task_id": "target-thermal-ood", "family": "out_of_domain_thermal", "descriptor": [0.98, 0.95, 0.25]},
-    {"task_id": "target-new-mold", "family": "unseen_mold_system", "descriptor": [0.30, 0.90, 0.55]},
+    {"task_id": "target-gamma-1", "family": "unseen_alloy_gamma", "descriptor": [0.42, 0.35, 0.45]},
+    {"task_id": "target-gamma-2", "family": "unseen_alloy_gamma", "descriptor": [0.38, 0.30, 0.40]},
+    {"task_id": "target-gamma-3", "family": "unseen_alloy_gamma", "descriptor": [0.46, 0.40, 0.48]},
+    {"task_id": "target-gamma-4", "family": "unseen_alloy_gamma", "descriptor": [0.40, 0.45, 0.42]},
+    {"task_id": "target-investment-1", "family": "unseen_investment_geometry", "descriptor": [0.55, 0.78, 0.90]},
+    {"task_id": "target-investment-2", "family": "unseen_investment_geometry", "descriptor": [0.52, 0.72, 0.84]},
+    {"task_id": "target-investment-3", "family": "unseen_investment_geometry", "descriptor": [0.58, 0.82, 0.94]},
+    {"task_id": "target-investment-4", "family": "unseen_investment_geometry", "descriptor": [0.50, 0.75, 0.98]},
+    {"task_id": "target-thermal-ood-1", "family": "out_of_domain_thermal", "descriptor": [0.98, 0.95, 0.25]},
+    {"task_id": "target-thermal-ood-2", "family": "out_of_domain_thermal", "descriptor": [0.95, 0.90, 0.20]},
+    {"task_id": "target-thermal-ood-3", "family": "out_of_domain_thermal", "descriptor": [0.99, 0.99, 0.32]},
+    {"task_id": "target-thermal-ood-4", "family": "out_of_domain_thermal", "descriptor": [0.92, 0.96, 0.15]},
+    {"task_id": "target-new-mold-1", "family": "unseen_mold_system", "descriptor": [0.30, 0.90, 0.55]},
+    {"task_id": "target-new-mold-2", "family": "unseen_mold_system", "descriptor": [0.25, 0.85, 0.48]},
+    {"task_id": "target-new-mold-3", "family": "unseen_mold_system", "descriptor": [0.32, 0.95, 0.60]},
+    {"task_id": "target-new-mold-4", "family": "unseen_mold_system", "descriptor": [0.28, 0.88, 0.64]},
+    {"task_id": "target-titanium-1", "family": "unseen_alloy_titanium", "descriptor": [0.72, 0.42, 0.56]},
+    {"task_id": "target-titanium-2", "family": "unseen_alloy_titanium", "descriptor": [0.68, 0.38, 0.62]},
+    {"task_id": "target-titanium-3", "family": "unseen_alloy_titanium", "descriptor": [0.78, 0.48, 0.50]},
+    {"task_id": "target-titanium-4", "family": "unseen_alloy_titanium", "descriptor": [0.75, 0.45, 0.66]},
+    {"task_id": "target-pressure-die-1", "family": "unseen_pressure_die_casting", "descriptor": [0.80, 0.30, 0.92]},
+    {"task_id": "target-pressure-die-2", "family": "unseen_pressure_die_casting", "descriptor": [0.76, 0.35, 0.86]},
+    {"task_id": "target-pressure-die-3", "family": "unseen_pressure_die_casting", "descriptor": [0.86, 0.25, 0.96]},
+    {"task_id": "target-pressure-die-4", "family": "unseen_pressure_die_casting", "descriptor": [0.82, 0.40, 0.90]},
+    {"task_id": "target-sand-core-1", "family": "unseen_sand_core_complexity", "descriptor": [0.32, 0.68, 0.82]},
+    {"task_id": "target-sand-core-2", "family": "unseen_sand_core_complexity", "descriptor": [0.28, 0.62, 0.75]},
+    {"task_id": "target-sand-core-3", "family": "unseen_sand_core_complexity", "descriptor": [0.38, 0.72, 0.90]},
+    {"task_id": "target-sand-core-4", "family": "unseen_sand_core_complexity", "descriptor": [0.35, 0.66, 0.86]},
+    {"task_id": "target-thin-wall-1", "family": "unseen_thin_wall_geometry", "descriptor": [0.62, 0.58, 0.08]},
+    {"task_id": "target-thin-wall-2", "family": "unseen_thin_wall_geometry", "descriptor": [0.66, 0.52, 0.12]},
+    {"task_id": "target-thin-wall-3", "family": "unseen_thin_wall_geometry", "descriptor": [0.58, 0.64, 0.05]},
+    {"task_id": "target-thin-wall-4", "family": "unseen_thin_wall_geometry", "descriptor": [0.70, 0.60, 0.15]},
 )
 POLICY_IDS = (
     "low_fidelity_only",
@@ -472,6 +503,90 @@ def run_benchmark(
             "paired_task_results": paired_task_rows,
         }
 
+    # Report family-macro metrics separately from task-macro metrics. Four
+    # parameter variants inside one held-out family are not four independent
+    # demonstrations of cross-family generalization.
+    target_families = sorted({row["held_out_task_family"] for row in target_results})
+    rows_by_family = {
+        family: [row for row in target_results if row["held_out_task_family"] == family]
+        for family in target_families
+    }
+    family_aggregation: dict[str, Any] = {}
+    family_comparisons: dict[str, Any] = {}
+    for policy in POLICY_IDS:
+        family_metrics: dict[str, Any] = {}
+        for family, family_rows in rows_by_family.items():
+            family_metrics[family] = {
+                metric: statistics.fmean(
+                    row["policy_metrics"][policy][metric] for row in family_rows
+                )
+                for metric in (
+                    "objective_mae", "objective_f0_mae", "objective_f1_mae",
+                    "constraint_margin_mae", "feasibility_accuracy", "feasibility_f1",
+                    "pareto_membership_f1",
+                )
+            }
+            family_metrics[family]["task_count_nested_within_family"] = len(family_rows)
+        family_aggregation[policy] = {
+            "family_count": len(family_metrics),
+            "family_metrics": family_metrics,
+            "macro_mean_over_families": {
+                metric: statistics.fmean(row[metric] for row in family_metrics.values())
+                for metric in (
+                    "objective_mae", "objective_f0_mae", "objective_f1_mae",
+                    "constraint_margin_mae", "feasibility_accuracy", "feasibility_f1",
+                    "pareto_membership_f1",
+                )
+            },
+            "worst_family_objective_mae": max(
+                row["objective_mae"] for row in family_metrics.values()
+            ),
+            "independent_generalization_unit": "held_out_task_family; task variants are nested",
+        }
+
+        if policy == "low_fidelity_only":
+            continue
+        by_family = {}
+        for family, family_rows in rows_by_family.items():
+            baseline_mae = statistics.fmean(
+                row["policy_metrics"]["low_fidelity_only"]["objective_mae"]
+                for row in family_rows
+            )
+            candidate_mae = statistics.fmean(
+                row["policy_metrics"][policy]["objective_mae"] for row in family_rows
+            )
+            reduction = baseline_mae - candidate_mae
+            by_family[family] = {
+                "task_count_nested_within_family": len(family_rows),
+                "baseline_mean_objective_mae": baseline_mae,
+                "candidate_mean_objective_mae": candidate_mae,
+                "objective_mae_reduction": reduction,
+                "relative_objective_mae_reduction": (
+                    reduction / baseline_mae if baseline_mae > 0 else None
+                ),
+            }
+        defined_family_effects = [
+            row["relative_objective_mae_reduction"] for row in by_family.values()
+            if row["relative_objective_mae_reduction"] is not None
+        ]
+        family_comparisons[policy] = {
+            "held_out_family_units": len(by_family),
+            "mean_relative_objective_mae_reduction_macro_over_families": (
+                statistics.fmean(defined_family_effects) if defined_family_effects else None
+            ),
+            "families_with_lower_objective_mae": sum(
+                row["objective_mae_reduction"] > 0 for row in by_family.values()
+            ),
+            "families_with_tied_objective_mae": sum(
+                abs(row["objective_mae_reduction"]) <= 1e-12 for row in by_family.values()
+            ),
+            "families_with_higher_objective_mae": sum(
+                row["objective_mae_reduction"] < 0 for row in by_family.values()
+            ),
+            "by_family": by_family,
+            "independent_generalization_unit": "held_out_task_family",
+        }
+
     return {
         "schema_version": SCHEMA_VERSION,
         "benchmark_id": BENCHMARK_ID,
@@ -481,6 +596,11 @@ def run_benchmark(
         "split": "leave_task_family_out",
         "source_task_count": len(SOURCE_TASKS),
         "target_task_count": len(TARGET_TASKS),
+        "target_family_count": len({task["family"] for task in TARGET_TASKS}),
+        "task_variants_per_target_family": {
+            family: sum(task["family"] == family for task in TARGET_TASKS)
+            for family in sorted({task["family"] for task in TARGET_TASKS})
+        },
         "history_points_per_source_task": history_points,
         "history_pair_count": source_pairs,
         "target_points_per_task": test_points,
@@ -504,12 +624,16 @@ def run_benchmark(
             "cost_assumptions": "Illustrative normalized units. Includes one low+high source pair per archive point and the target low scan; excludes target audit truth from policy costs. Replace with measured solver/runtime/hardware/engineering costs for real comparisons.",
         },
         "aggregate_metrics_macro_averaged_over_target_tasks": aggregation,
+        "aggregate_metrics_macro_averaged_over_target_families": family_aggregation,
         "comparisons_vs_low_fidelity_only": comparison,
+        "comparisons_vs_low_fidelity_only_macro_by_target_family": family_comparisons,
         "target_task_results": target_results,
         "claim_ceiling": (
-            "Deterministic synthetic prediction-transfer audit only. Four target task units are too few "
-            "for broad statistical claims. Does not benchmark an optimizer, prove descriptor availability, "
-            "show transfer superiority on physical casting, calibrate uncertainty, or certify feasibility."
+            "Deterministic synthetic prediction-transfer audit over 32 task variants in eight held-out families. "
+            "Family-macro summaries avoid treating variants as independent evidence of cross-family generalization. "
+            "Eight synthetic families remain insufficient for broad SOTA or physical claims. Does not benchmark "
+            "an optimizer, prove descriptor availability, show transfer superiority on physical casting, "
+            "calibrate uncertainty, or certify feasibility."
         ),
         "source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
     }
