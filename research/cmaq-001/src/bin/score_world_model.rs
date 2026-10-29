@@ -221,7 +221,11 @@ fn score(key: &Table, predictions: &Table) -> Result<Report, String> {
     }
 
     let mut report = Report { cases: key_by_id.len(), hard_gate_pass: true, ..Report::default() };
-    for (case_id, pred_row) in &prediction_by_id {
+    // Deterministic accumulation order makes serialized reports byte-stable.
+    let mut ordered_case_ids: Vec<&String> = prediction_by_id.keys().collect();
+    ordered_case_ids.sort();
+    for case_id in ordered_case_ids {
+        let pred_row = prediction_by_id.get(case_id).ok_or("internal prediction lookup failure")?;
         let key_row = key_by_id.get(case_id).ok_or("internal answer-key lookup failure")?;
         let mut rewards = [0.0_f64; 3];
         let mut safe = [false; 3];
