@@ -145,7 +145,7 @@ jobs:
 
           report = json.loads(Path("/tmp/cmaq-007-horizon-stress.json").read_text())
           assert report["schema_version"] == "cmaq-007-horizon-stress-v0.1"
-          assert report["seed_count"] == 128
+          assert report["seed_count"] == 256
           assert report["search_sizes"] == [8, 32, 128, 512]
           assert report["horizons"] == [1, 4, 16]
           assert report["rollout_growth_values"] == [0.0, 0.2]
@@ -172,7 +172,7 @@ jobs:
                       for row in (by_key[(size, horizon, round(growth, 2), s)] for s in strategies):
                           for key in (
                               "mean_prediction_mae", "mean_realized_utility",
-                              "mean_selected_optimism_gap", "mean_selected_decision_score_gap", "mean_regret",
+                              "mean_selected_optimism_gap", "mean_selected_decision_score_gap", "mean_regret", "cvar95_regret", "max_regret",
                               "unsupported_selection_rate", "unsupported_rate_given_model_action",
                               "model_action_coverage", "paired_regret_reduction_vs_greedy",
                               "paired_regret_reduction_ci95_low", "paired_regret_reduction_ci95_high",
@@ -180,6 +180,8 @@ jobs:
                               assert math.isfinite(row[key]), (key, row)
                           assert row["mean_prediction_mae"] >= 0
                           assert row["mean_regret"] >= -1e-9
+                          assert row["cvar95_regret"] >= row["mean_regret"] - 1e-8
+                          assert row["max_regret"] >= row["cvar95_regret"] - 1e-8
                           for key in ("unsupported_selection_rate", "unsupported_rate_given_model_action", "model_action_coverage"):
                               assert 0.0 <= row[key] <= 1.0
                           assert row["paired_regret_reduction_ci95_low"] <= row["paired_regret_reduction_ci95_high"]
@@ -194,7 +196,7 @@ jobs:
           assert deep["mean_selected_optimism_gap"] > shallow["mean_selected_optimism_gap"]
           no_growth = by_key[(512, 16, 0.0, "predicted_greedy")]
           assert deep["mean_prediction_mae"] > no_growth["mean_prediction_mae"]
-          print("CMAQ-007 v0.5 horizon stress schema, paired policies, oracle/fallback controls, and search/depth falsification checks validated")
+          print("CMAQ-007 v0.5 horizon stress schema, paired policies, empirical tail-risk metrics, oracle/fallback controls, and search/depth falsification checks validated")
           print(json.dumps({
               "search_pressure": {
                   "size_8_unsupported_rate": greedy_8["unsupported_selection_rate"],
