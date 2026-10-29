@@ -130,6 +130,26 @@ pub struct AudioPreservationReport {
     pub measurements: Vec<ProtectedWindowMeasurement>,
 }
 
+/// Audio-only composition of the independent acoustic and onset channels.
+/// This is deliberately not a whole-edit verdict: symbolic contract evidence
+/// must be checked by its own verifier before an edit is accepted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompositeAudioPreservationReport {
+    pub verifier_version: String,
+    pub sample_rate_hz: u32,
+    pub channels: usize,
+    pub total_frames: usize,
+    pub reference_audio_sha256: String,
+    pub candidate_audio_sha256: String,
+    pub acoustic_receipt_sha256: String,
+    pub onset_receipt_sha256: String,
+    pub acoustic_calibration_id: Option<String>,
+    pub onset_calibration_id: Option<String>,
+    pub verdict: PreservationVerdict,
+    pub reasons: Vec<String>,
+    pub receipt_sha256: String,
+}
+
 /// Invalid inputs are errors rather than implicit passes or heuristic fixes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AudioAuditInputError {
@@ -142,6 +162,8 @@ pub enum AudioAuditInputError {
     LengthMismatch,
     InvalidEditInterval,
     SerializationFailure,
+    InvalidReceipt,
+    EvidenceInputMismatch,
     InvalidConfig(&'static str),
 }
 
@@ -159,6 +181,8 @@ impl std::fmt::Display for AudioAuditInputError {
             Self::LengthMismatch => write!(f, "reference and candidate frame counts differ"),
             Self::InvalidEditInterval => write!(f, "edit interval is empty or outside the audio"),
             Self::SerializationFailure => write!(f, "could not serialize preservation receipt"),
+            Self::InvalidReceipt => write!(f, "an evidence report has an invalid receipt digest"),
+            Self::EvidenceInputMismatch => write!(f, "audio evidence reports refer to different content or formats"),
             Self::InvalidConfig(reason) => write!(f, "invalid preservation config: {reason}"),
         }
     }
@@ -341,6 +365,87 @@ pub fn verify_audio_preservation_receipt(
 /// Onset-report counterpart to the audio-preservation receipt verifier.
 pub fn verify_onset_preservation_receipt(
     report: &OnsetPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    let expected = report.receipt_sha256.clone();
+    if expected.is_empty() {
+        return Ok(false);
+    }
+    let mut unsealed = report.clone();
+    unsealed.receipt_sha256.clear();
+    Ok(receipt_sha256(&unsealed)? == expected)
+}
+
+
+/// Combine the acoustic and onset channels only when both receipts are intact
+/// and both reports refer to exactly the same source/output buffers and format.
+/// Any component failure dominates; otherwise abstention dominates pass.
+pub fn compose_audio_preservation_evidence(
+    acoustic: &AudioPreservationReport,
+    onset: &OnsetPreservationReport,
+) -> Result<CompositeAudioPreservationReport, AudioAuditInputError> {
+    if !verify_audio_preservation_receipt(acoustic)?
+        || !verify_onset_preservation_receipt(onset)?
+    {
+        return Err(AudioAuditInputError::InvalidReceipt);
+    }
+    if acoustic.reference_audio_sha256 != onset.reference_audio_sha256
+        || acoustic.candidate_audio_sha256 != onset.candidate_audio_sha256
+        || acoustic.sample_rate_hz != onset.sample_rate_hz
+        || acoustic.channels != onset.channels
+        || acoustic.total_frames != onset.total_frames
+    {
+        return Err(AudioAuditInputError::EvidenceInputMismatch);
+    }
+
+    let mut reasons = Vec::new();
+    let verdict = if acoustic.verdict == PreservationVerdict::Fail
+        || onset.verdict == PreservationVerdict::Fail
+    {
+        if acoustic.verdict == PreservationVerdict::Fail {
+            reasons.push("acoustic preservation channel failed".to_owned());
+        }
+        if onset.verdict == PreservationVerdict::Fail {
+            reasons.push("onset/timing preservation channel failed".to_owned());
+        }
+        PreservationVerdict::Fail
+    } else if acoustic.verdict == PreservationVerdict::Abstain
+        || onset.verdict == PreservationVerdict::Abstain
+    {
+        if acoustic.verdict == PreservationVerdict::Abstain {
+            reasons.push("acoustic preservation channel abstained".to_owned());
+        }
+        if onset.verdict == PreservationVerdict::Abstain {
+            reasons.push("onset/timing preservation channel abstained".to_owned());
+        }
+        PreservationVerdict::Abstain
+    } else {
+        PreservationVerdict::Pass
+    };
+
+    let mut report = CompositeAudioPreservationReport {
+        verifier_version: format!(
+            "{AUDIO_PRESERVATION_VERIFIER_VERSION}+composite-audio-gate-v0.1"
+        ),
+        sample_rate_hz: acoustic.sample_rate_hz,
+        channels: acoustic.channels,
+        total_frames: acoustic.total_frames,
+        reference_audio_sha256: acoustic.reference_audio_sha256.clone(),
+        candidate_audio_sha256: acoustic.candidate_audio_sha256.clone(),
+        acoustic_receipt_sha256: acoustic.receipt_sha256.clone(),
+        onset_receipt_sha256: onset.receipt_sha256.clone(),
+        acoustic_calibration_id: acoustic.calibration_id.clone(),
+        onset_calibration_id: onset.calibration_id.clone(),
+        verdict,
+        reasons,
+        receipt_sha256: String::new(),
+    };
+    report.receipt_sha256 = receipt_sha256(&report)?;
+    Ok(report)
+}
+
+/// Verify that the composite decision still binds to the same two child receipts.
+pub fn verify_composite_audio_preservation_receipt(
+    report: &CompositeAudioPreservationReport,
 ) -> Result<bool, AudioAuditInputError> {
     let expected = report.receipt_sha256.clone();
     if expected.is_empty() {
@@ -1296,6 +1401,77 @@ mod tests {
         assert!(report.worst_rms_delta_db.is_finite());
         assert!(report.worst_spectral_distance.is_finite());
         assert!(verify_audio_preservation_receipt(&report).expect("finite receipt serializes"));
+    }
+
+    #[test]
+    fn composite_gate_passes_only_on_matching_valid_receipts() {
+        let samples = sine(4096, 16_000, 440.0);
+        let acoustic = audit_protected_audio(
+            view(&samples), view(&samples), &[], &calibrated_config(),
+        ).expect("acoustic report");
+        let onset = audit_onset_preservation(
+            view(&samples), view(&samples), &[], &onset_config(),
+        ).expect("onset report");
+
+        let composite = compose_audio_preservation_evidence(&acoustic, &onset)
+            .expect("matching receipts compose");
+        assert_eq!(composite.verdict, PreservationVerdict::Pass);
+        assert!(verify_composite_audio_preservation_receipt(&composite)
+            .expect("composite receipt serializes"));
+        assert_eq!(composite.reference_audio_sha256, acoustic.reference_audio_sha256);
+        assert_eq!(composite.candidate_audio_sha256, onset.candidate_audio_sha256);
+    }
+
+    #[test]
+    fn composite_gate_rejects_cross_input_reports() {
+        let reference = sine(4096, 16_000, 440.0);
+        let other_candidate = sine(4096, 16_000, 880.0);
+        let acoustic = audit_protected_audio(
+            view(&reference), view(&reference), &[], &calibrated_config(),
+        ).expect("acoustic report");
+        let onset = audit_onset_preservation(
+            view(&reference), view(&other_candidate), &[], &onset_config(),
+        ).expect("onset report");
+
+        assert_eq!(
+            compose_audio_preservation_evidence(&acoustic, &onset)
+                .expect_err("different candidate hashes must not compose"),
+            AudioAuditInputError::EvidenceInputMismatch
+        );
+    }
+
+    #[test]
+    fn composite_gate_rejects_a_tampered_child_receipt() {
+        let samples = sine(4096, 16_000, 440.0);
+        let mut acoustic = audit_protected_audio(
+            view(&samples), view(&samples), &[], &calibrated_config(),
+        ).expect("acoustic report");
+        let onset = audit_onset_preservation(
+            view(&samples), view(&samples), &[], &onset_config(),
+        ).expect("onset report");
+        acoustic.config.spectral_distance_tolerance = 0.99;
+
+        assert_eq!(
+            compose_audio_preservation_evidence(&acoustic, &onset)
+                .expect_err("tampered child receipt must not compose"),
+            AudioAuditInputError::InvalidReceipt
+        );
+    }
+
+    #[test]
+    fn composite_gate_does_not_let_abstention_become_pass() {
+        let samples = vec![0.0; 4096];
+        let acoustic = audit_protected_audio(
+            view(&samples), view(&samples), &[], &calibrated_config(),
+        ).expect("acoustic report");
+        let onset = audit_onset_preservation(
+            view(&samples), view(&samples), &[], &onset_config(),
+        ).expect("onset report");
+
+        let composite = compose_audio_preservation_evidence(&acoustic, &onset)
+            .expect("valid abstaining reports compose conservatively");
+        assert_eq!(composite.verdict, PreservationVerdict::Abstain);
+        assert!(composite.reasons.iter().any(|reason| reason.contains("abstained")));
     }
 
 }
