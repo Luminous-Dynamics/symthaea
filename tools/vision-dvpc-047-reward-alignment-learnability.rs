@@ -172,7 +172,7 @@ fn evaluation_seed_for(replicate:usize)->u64{
         ^ (replicate as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
 }
 
-const METRIC_NAMES:[&str;13]=[
+const METRIC_NAMES:[&str;15]=[
     "online_north_star_value",
     "online_north_star_regret_per_decision",
     "online_proxy_reward_value",
