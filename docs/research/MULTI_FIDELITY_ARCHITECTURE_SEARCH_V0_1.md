@@ -63,6 +63,7 @@ Create known-oracle landscapes where every candidate has a full-fidelity ground-
 - **Heteroscedastic uncertainty:** low-fidelity uncertainty differs across candidate families.
 - **Misleading proxy:** a feature-only prior appears useful on development instances but drifts or reverses on held-out instances.
 - **Hard feasibility boundary:** candidates can fail/OOM/time out, and failures have nonzero cost.
+- **Miscalibrated uncertainty:** reported standard errors are deliberately too small relative to injected score perturbations; the benchmark must detect under-coverage rather than blindly trust the confidence penalty.
 - **Multi-objective fidelity:** quality, latency, memory, and energy proxies have different fidelity errors and Pareto-front shapes.
 
 Freeze the generation formulas and objective oracles for the development suite. Freeze the policy source SHA and config before generating prospective challenge seeds. The challenge results become development data once they have been used to tune the policy; make a new challenge version for replication.
@@ -159,9 +160,14 @@ The CLI is:
 cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep rank_preserving 100
 cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep rank_reversal 100
 cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep late_emerging_quality 100
+cargo run -p symthaea-architecture-engineering -- multi-fidelity-sweep miscalibrated_uncertainty 100
 ```
 
-The JSON report contains paired per-seed runs, promotion and random-baseline regret, optimum hit rates, F0-versus-oracle Spearman correlation, cost totals, and an aggregate of paired regret improvements. Seven unit tests are authored for deterministic output, equal cost accounting, rank-reversal controls, and paired aggregation. **The Rust implementation and these tests remain uncompiled and unexecuted.** An independent Python arithmetic mirror (not Rust execution) checked the intended F0 rank-correlation signs at one seed: rank-preserving 0.9909, rank-reversal −0.9896, and late-emerging −0.9875. These are generator sanity checks, not benchmark performance results.
+The JSON report includes an auditable candidate/fidelity trace for both experiment arms: candidate ID, rung, observed score, reported standard error, synthetic expected score, oracle quality for post-hoc scoring only, noise scale, incremental cost units, and promotion decision. The promotion policy only receives the current fidelity's candidate ID, observed score, and declared standard error; oracle fields are added after that decision and must never be used as policy input.
+
+It also reports F0-to-oracle rank correlation, empirical nominal-95% uncertainty-band coverage, mean absolute standardized residual, paired promotion-versus-random regret, optimum-hit rates and exact trace-cost reconciliation. These are synthetic diagnostics; empirical interval coverage is not a formal confidence guarantee. Nine unit tests are authored, including checks that trace costs exactly reconcile to each arm's budget and that deliberately under-reported uncertainty is detectable. **The Rust implementation and tests remain uncompiled and unexecuted.**
+
+A separate Python arithmetic mirror (not Rust execution) checked the intended F0 rank-correlation signs at one seed for the original three regimes: rank-preserving 0.9909, rank-reversal −0.9896, and late-emerging −0.9875. These are generator sanity checks, not search-performance results.
 
 This pilot compares the cost-aware scheduler to full-fidelity random search only. It does not establish an advantage over Hyperband, MF-NAS, TPE/Bayesian optimization, or model-training systems. Those comparisons remain necessary before making general search-policy claims.
 
