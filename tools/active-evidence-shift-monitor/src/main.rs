@@ -1270,7 +1270,7 @@ fn print_anytime_mixture_probe_csv() {
             };
             let event = probe_bernoulli(seed, step as u64, conditional_p);
             let log_e_value = monitor.observe(event);
-            if first_alarm.is_none() && log_e_value >= log_threshold {
+            if first_alarm.is_none() && monitor.crossed(alpha) {
                 first_alarm = Some(step);
             }
         }
@@ -1312,7 +1312,7 @@ fn print_anytime_mixture_probe_csv() {
             index + 1,
             scenario.name,
             scenario.class,
-            horizon,
+            monitor.steps(),
             if scenario.post_p.is_some() { scenario.change_after.to_string() } else { "NA".to_owned() },
             schedule_policy,
             pre_rate_text,
