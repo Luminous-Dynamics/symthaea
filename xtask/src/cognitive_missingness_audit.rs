@@ -402,7 +402,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cognitive_missingness_schedule::{self, DelayPattern, HiddenOutcomeEvent, MissingnessScheduleConfig, ScheduleInput};
+    use crate::cognitive_missingness_schedule;
 
     fn fixture() -> (ScheduleInput, Vec<u8>) {
         let events = (0..64)
