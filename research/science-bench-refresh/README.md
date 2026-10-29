@@ -200,3 +200,37 @@ For confirmed leakage classes, the record must carry a matcher method, a nonzero
 Exit codes: 0 means event coverage and the evaluator-side report contract pass without a detected match or review requirement; 9 means the network policy was violated and no confirmed match took priority; 10 means receipt-integrity verification failed; 11 means the match-report commitment, receipt binding, event coverage, or classification contract failed; 12 means protected benchmark information was classified as exposed; 13 means manual review is required. The printed report distinguishes confirmed exposures from review-required events and keeps every event in the denominator.
 
 **This is a report-contract verifier, not the semantic matcher itself.** An independent evaluator process must inspect protected benchmark metadata/context/answers against response artifacts, produce these classifications, and keep the evidence store/report out of the policy-visible environment. Hashes bind what was reported; they do not prove the matcher correctly recognized semantic equivalence. The matcher and thresholds require independent qualification. A valid report also does not establish absence of pretraining contamination or unlogged network channels.
+
+
+## Exact protected retrieval matcher
+
+The exact-match baseline is tracked under [SCI-BENCH-SEARCH-EXPOSURE-001 / #8865](https://github.com/Luminous-Dynamics/symthaea/issues/8865). It turns the prior report-contract verifier into an executable, deterministic first-pass matcher while keeping a hard boundary around what it can claim.
+
+The evaluator-only protected index is defined by `schema/search-protected-artifact-index.schema.json`. Each record contains:
+- an opaque reference-ID digest;
+- a severity class (`benchmark_metadata`, `question_context`, or `explicit_answer`);
+- SHA-256 of the exact protected artifact bytes.
+
+The index records must be sorted by `(content_sha256, classification, reference_id_sha256)` and carry a domain-separated index commitment. The index, protected content, reference map, and report must never be mounted into the evaluated policy environment. Anchor the index commitment before the scored run through the frozen protocol/analysis-plan receipt or an independent append-only channel; a self-consistent hash generated after evaluation does not establish immutability.
+
+Generate an exact-match report:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  match-search-exact retrieval-receipt.json protected-index.json > match-report.json
+```
+
+The command verifies the receipt's internal chain, requires the index generation to match the receipt generation, validates the index schema/order/commitment, and creates one classification for every receipt event. It compares each response digest to the protected artifact content digests. If one response digest matches several protected classes, the most severe class wins in this order: explicit answer, question context, benchmark metadata. A deterministic opaque reference ID is used as the protected-reference handle.
+
+`verify-search-exact-matches RECEIPT INDEX REPORT` recomputes the exact matcher output and rejects a report that was edited, relabeled, rebound to different receipt/index bytes, or generated under a different matcher/rules digest.
+
+Exit behavior:
+- 0: no exact protected match was detected; blocked/no-response events remain `not_evaluable`, not negative content matches.
+- 12: one or more exact matches detected; inspect the emitted report and treat the run as contaminated for the applicable severity.
+- 11: an exact report fails deterministic recomputation/binding.
+- 2: malformed receipt/index or invalid index commitment/generation.
+- 9/10/13 retain the downstream verifier's network-policy, receipt-integrity, and manual-review gates.
+
+For privacy, the match report does not emit protected content or the protected content digest. `protected_reference_sha256` is the hash of an opaque reference identifier; `evidence_artifact_sha256` is a domain-separated event/evidence binding, not the raw response hash. The input receipt still contains its own response digest, so receipt publication and access controls need a separate privacy review.
+
+**Claim limit:** this matcher catches byte-identical protected artifacts only. It does not detect a protected answer embedded within a larger web page, snippets with altered whitespace, paraphrases, semantic equivalents, cached derivatives, or unlogged tools. It is a high-precision positive control and a conservative baseline—not a completeness guarantee. The next matcher milestone should add separately measured canonicalized-span and semantic candidate tiers, with exact positives, benign-related negatives, blinded adjudication, and precision/recall reported independently. Do not merge the tiers into one unexplained leakage score.
