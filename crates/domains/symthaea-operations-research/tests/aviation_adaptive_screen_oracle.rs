@@ -17,6 +17,7 @@ fn context() -> RecoveryScreenContext {
     RecoveryScreenContext {
         scenario_id: "synthetic-recovery-001".into(),
         scenario_sha256: "a".repeat(64),
+        candidate_space_contract_sha256: "e".repeat(64),
         candidate_universe_sha256: "d".repeat(64),
         screening_policy_sha256: "b".repeat(64),
         ranking_artifact_sha256: "c".repeat(64),
