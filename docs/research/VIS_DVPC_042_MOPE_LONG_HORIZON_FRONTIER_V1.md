@@ -15,6 +15,7 @@ Use 2,000 sequences per DGP, horizon 512, with reported snapshots at 32, 128 and
 | DGP | Logger P(A=1) | Reward means (A=0,A=1) | True value | W |
 |---|---:|---:|---:|---:|
 | healthy null | 0.50 | (0.20, 0.80) | 0.50 | 1 |
+| healthy alternative | 0.50 | (0.50, 0.80) | 0.65 | 1 |
 | weak-overlap null | 0.99 | (0.20, 0.80) | 0.50 | 50 |
 | weak-overlap alternative | 0.99 | (0.50, 0.80) | 0.65 | 50 |
 
