@@ -1012,4 +1012,15 @@ mod tests {
         assert!(result.unwrap_err().contains("not a previous generated stress fixture"));
     }
 
+
+    #[test]
+    fn generator_matches_committed_stress_fixture_semantically() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let golden = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-stress-1000-v0.1.json");
+        let generated = generate_parameterized_controls(fixture, 1_000, 20_261_029).unwrap();
+        let golden_value: serde_json::Value = serde_json::from_slice(golden).unwrap();
+        let generated_value: serde_json::Value = serde_json::from_slice(&generated).unwrap();
+        assert_eq!(generated_value, golden_value);
+    }
+
 }
