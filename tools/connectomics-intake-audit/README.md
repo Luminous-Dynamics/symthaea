@@ -4,7 +4,7 @@ Small, standalone Rust gate for the ConnectomeBench2 V2 intake process described
 
 ## Scope
 
-This tool validates the declared manifest, checks task/label/input-mode consistency, rejects known EM-view leakage fields, hashes every declared local artifact with SHA-256, checks byte sizes and split declarations, and writes a deterministic JSON report.
+This tool validates the declared manifest, checks task/label/input-mode consistency, rejects known EM-view leakage fields, requires the correct single-/dual-segment geometry preprocessing profile, hashes every declared local artifact with SHA-256, checks byte sizes and split declarations, and writes a deterministic JSON report.
 
 It does **not** parse Parquet schemas, prove label correctness, validate the upstream commit contents, prove samples are independent, or measure model accuracy. A passing report only means the manifest and local bytes satisfy these checks.
 
