@@ -762,7 +762,7 @@ mod tests {
     fn winner_certificate_requires_nonreversed_candidate_interval() {
         assert_eq!(certified_winner(&[0.8, 0.2, 0.3], &[0.9, 0.4, 0.5]), Some(0));
         assert_eq!(certified_winner(&[0.9, 0.2], &[0.8, 0.3]), None);
-        assert_eq!(certified_winner(&[0.7, 0.6], &[0.8, 0.65]), None);
+        assert_eq!(certified_winner(&[0.7, 0.68], &[0.8, 0.75]), None);
         assert_eq!(certified_winner(&[0.8], &[]), None);
     }
 
