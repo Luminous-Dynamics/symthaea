@@ -45,7 +45,7 @@ For factor IDs left and right, the pair is held out when:
 
     (left + right) % factor_count == 0
 
-Every factor still appears in multiple support compositions. For each supported pair, all feature-grid contexts are emitted and exactly one action is intervened upon per row. The qualification set enumerates all feature-grid contexts for each withheld pair. The feature grid is synthetic and bounded; it is not a claim about any real environment.
+Every factor still appears in multiple support compositions. For each supported pair, all feature-grid contexts are emitted and exactly one action is intervened upon per row. A seed-separated intervention stream shuffles the contexts per pair, then allocates actions round-robin; this prevents the fixed feature-to-action formula from systematically aliasing action identity with context, while keeping per-pair action counts within one. The qualification set enumerates all feature-grid contexts for each withheld pair. The feature grid is synthetic and bounded; it is not a claim about any real environment.
 
 The reward law for action a is:
 
@@ -80,4 +80,4 @@ Use paired evaluation cases and identical action/context/runtime budgets. Report
 
 ## Tests and qualification boundary
 
-The unit tests cover deterministic generation, seed sensitivity, the official SHA-256 test vector, the withheld-composition split, factor/action support coverage, counterfactual-label separation, and scorer-compatible answer-key columns. These tests qualify the data-generation interface only. They do not qualify any cognitive architecture, and they do not establish state of the art.
+The unit tests cover deterministic generation, seed sensitivity, the SHA-256 test vector, the withheld-composition split, factor/action support coverage, balanced per-pair intervention assignment, counterfactual-label separation, candidate/evaluator output isolation, overwrite refusal, and scorer-compatible answer-key columns. These tests qualify the data-generation interface only. They do not qualify any cognitive architecture, and they do not establish state of the art.
