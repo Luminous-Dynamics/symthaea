@@ -65,6 +65,41 @@ jobs:
           python3 tools/casting-benchmark/test_forecast_event_journal.py
           python3 tools/casting-benchmark/test_paired_benchmark_audit.py
           python3 tools/casting-benchmark/test_paired_benchmark_promotion_gate.py
+          python3 tools/casting-benchmark/test_historical_transfer_benchmark.py
+          python3 tools/casting-benchmark/test_baseline_lock_manifest.py
+
+          # Synthetic leave-task-family-out historical transfer smoke. The
+          # transfer receipt is predictive diagnostics, not optimizer/SOTA evidence.
+          python3 tools/casting-benchmark/historical_transfer_benchmark.py \
+            --history-points 2 --test-points 8 --nearest-k 3 --reuse-count 10 \
+            --output /tmp/casting-history-transfer.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("/tmp/casting-history-transfer.json").read_text())
+          assert receipt["receipt_label"] == "HISTORICAL_TRANSFER_SYNTHETIC_PREDICTION_AUDIT_NOT_OPTIMIZER_SOTA_EVIDENCE"
+          assert receipt["evidence_class"] == "synthetic"
+          assert receipt["source_task_count"] == 8
+          assert receipt["target_task_count"] == 32
+          assert receipt["target_family_count"] == 8
+          assert all(count == 4 for count in receipt["task_variants_per_target_family"].values())
+          assert set(receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"]) == {
+              "pooled_residual_transfer", "descriptor_x_knn_transfer", "shuffled_descriptor_control"
+          }
+          assert "descriptor_x_knn_distance_abstention" in receipt["policy_ids"]
+          assert all(
+              len(row["bootstrap_95pct_ci_macro_mean_relative_objective_mae_reduction"]) == 2
+              for row in receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"].values()
+          )
+          guarded = receipt["aggregate_metrics_macro_averaged_over_target_tasks"]["descriptor_x_knn_distance_abstention"]["selective_prediction"]
+          assert guarded["nearest_distance_threshold"] == 0.9
+          assert len(receipt["policy_config_sha256"]) == 64
+          assert receipt["policy_configuration"]["nearest_k"] == 3
+          assert 0.0 <= guarded["macro_coverage_over_target_tasks"] <= 1.0
+          assert receipt["target_high_fidelity_used_by_predictor"] is False
+          assert receipt["history_pair_count"] == 16
+          print("historical transfer synthetic receipt validated")
+          PY
 
           # End-to-end synthetic diagnostic: runner -> frozen selection/shift
           # manifests -> hash-checking adapter -> independent receipt evaluator.
