@@ -1367,6 +1367,16 @@ mod tests {
     }
 
     #[test]
+    fn required_check_kind_must_match_frozen_manifest() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["verifier"]["checks"][1]["kind"] =
+                Value::String("other".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIRED_CHECK_KIND_MISMATCH"));
+    }
+
+    #[test]
     fn required_check_cannot_be_downgraded_to_nonblocking() {
         let report = validate_value(|v| {
             v["task_records"][0]["trials"][1]["verifier"]["checks"][1]["blocking"] = Value::Bool(false);
