@@ -130,3 +130,13 @@ jobs:
             echo "validator accepted a malformed intervention configuration digest" >&2
             exit 1
           fi
+
+          symlink_dir="$temp_dir/config-symlink"
+          mkdir -p "$symlink_dir"
+          cp "$manifest" "$symlink_dir/manifest"
+          cp tools/source-derived-drift-manifest/fixtures/zero-shift-intervention.conf "$temp_dir/outside-config.conf"
+          ln -s "$temp_dir/outside-config.conf" "$symlink_dir/zero-shift-intervention.conf"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$symlink_dir/manifest"; then
+            echo "validator accepted an intervention config symlink escaping manifest directory" >&2
+            exit 1
+          fi
