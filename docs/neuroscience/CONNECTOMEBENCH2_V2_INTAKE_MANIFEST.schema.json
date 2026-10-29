@@ -15,6 +15,7 @@
     "task",
     "task_route_value",
     "label_column",
+    "label_true_semantics",
     "label_mapping_reference",
     "split",
     "input_mode",
