@@ -15,7 +15,7 @@ MeshReceiver::receive_fragment previously updated `last_fragment_at` and `last_f
 
 The receiver now refreshes time and progress index only after the assembler confirms the shard index is stored. The tests inspect the timestamp directly after a duplicate, and also after an individually CRC-valid fragment advertises a conflicting total count.
 
-It also applies a configurable encoded-envelope size cap (default `WISDOM_PACKET_SIZE + 92`) and rejects a valid-CRC but implausibly large advertised fragment count before allocating pending state. This prevents a spoofed first frame from requesting 254 shard slots for the default ~2 KB profile. The `fragments_oversize` metric separates these events from CRC corruption.
+It also applies a configurable encoded-envelope size cap (default `WISDOM_PACKET_SIZE + 30` = 2,134 bytes) and rejects a valid-CRC but implausibly large advertised fragment count before allocating pending state. The +30 budget covers a compression prefix, optional key-version prefix, 12-byte nonce and 16-byte AEAD tag. The `fragments_oversize` metric separates these events from CRC corruption.
 
 ### 2. Legacy parser accepted impossible FEC metadata
 
@@ -46,11 +46,12 @@ This is a correctness-first compatibility tradeoff until the versioned length-bo
 - Preserve normal full reassembly, middle-shard recovery, last-shard recovery for callers with a truly exact payload size, lost-parity behavior, and legal reordering.
 - Ensure duplicate and CRC-valid but count-mismatched receiver frames do not refresh last_fragment_at or last_fragment_index.
 - Ensure a valid-CRC frame advertising 255 fragments is rejected before any pending state is allocated under the default packet-size cap.
+- Default max encoded envelope is 2,134 bytes: 10 data shards plus parity are admitted; a valid-CRC 255-shard offer is rejected before allocation.
 - Ensure MeshReceiver does not claim success when only the legacy final data fragment is missing, and completes if that actual shard later arrives.
 
 ## Validation boundary
 
-The source changes were reviewed for line lengths; no modified Rust source line exceeds 100 characters. This is not a rustfmt result. Local tooling check finds no cargo, rustc or rustfmt. Draft PR [#8856](https://github.com/Luminous-Dynamics/symthaea/pull/8856) is open. At the last exact-head check, hosted workflows concluded `skipped`, not passed; the Rust tests remain unexecuted. No test PASS is claimed.
+For the default maximum encoded size of 2,134 bytes and the legacy 214-byte shard capacity, the receiver now admits at most 10 data shards plus parity (11 total) rather than a peer-selected 254 data shards. Raw payload storage for data slots plus parity is therefore capped at 2,354 bytes per pending stream instead of 54,570 bytes; across 64 pending streams this is 150,656 bytes instead of 3,492,480 bytes, roughly 23.2× less payload storage (ignoring allocator and `Option` metadata). The ceiling is configurable for deployments with larger payloads. The source changes were reviewed for line lengths; no modified Rust source line exceeds 100 characters. This is not a rustfmt result. Local tooling check finds no cargo, rustc or rustfmt. Draft PR [#8856](https://github.com/Luminous-Dynamics/symthaea/pull/8856) is open. At the last exact-head check, hosted workflows concluded `skipped`, not passed; the Rust tests remain unexecuted. No test PASS is claimed.
 
 ## Follow-on
 
