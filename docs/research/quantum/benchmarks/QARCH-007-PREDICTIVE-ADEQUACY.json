@@ -1,0 +1,143 @@
+{
+  "schema_version": "qarch-007-predictive-adequacy/1",
+  "description": "Frozen analytic fixtures for testing categorical predictive adequacy metrics. These are not quantum-device measurements.",
+  "policy": {
+    "min_observations": 100,
+    "confidence_level": 0.95,
+    "max_total_variation_upper_bound": 0.25,
+    "max_brier_score": 0.6,
+    "max_mean_log_loss": 1,
+    "sampling_assumption": "iid_categorical"
+  },
+  "cases": [
+    {
+      "id": "exact-match-balanced",
+      "source": "analytic_reference",
+      "predicted_probabilities": [
+        0.5,
+        0.5
+      ],
+      "observed_counts": [
+        50,
+        50
+      ],
+      "expected": {
+        "total_observations": 100,
+        "empirical_frequencies": [
+          0.5,
+          0.5
+        ],
+        "observed_total_variation": 0,
+        "total_variation_sampling_radius": 0.13581015157406193,
+        "total_variation_upper_bound": 0.13581015157406193,
+        "brier_score": 0.5,
+        "mean_log_loss_nats": 0.6931471805599453,
+        "status": "pass"
+      }
+    },
+    {
+      "id": "systematic-model-bias",
+      "source": "measured_physical_fixture_placeholder",
+      "predicted_probabilities": [
+        0.9,
+        0.1
+      ],
+      "observed_counts": [
+        10,
+        90
+      ],
+      "expected": {
+        "total_observations": 100,
+        "empirical_frequencies": [
+          0.1,
+          0.9
+        ],
+        "observed_total_variation": 0.8,
+        "total_variation_sampling_radius": 0.13581015157406193,
+        "total_variation_upper_bound": 0.935810151574062,
+        "brier_score": 1.46,
+        "mean_log_loss_nats": 2.0828626352604234,
+        "status": "reject"
+      },
+      "note": "The source label marks the fixture's intended test class. These values are synthetic; it is not an actual hardware observation."
+    },
+    {
+      "id": "zero-probability-observed-event",
+      "source": "synthetic_fixture",
+      "predicted_probabilities": [
+        1,
+        0
+      ],
+      "observed_counts": [
+        99,
+        1
+      ],
+      "expected": {
+        "observed_total_variation": 0.01,
+        "mean_log_loss": "infinite_due_to_zero_probability",
+        "status": "reject"
+      }
+    },
+    {
+      "id": "too-few-observations",
+      "source": "synthetic_fixture",
+      "predicted_probabilities": [
+        0.5,
+        0.5
+      ],
+      "observed_counts": [
+        4,
+        6
+      ],
+      "expected": {
+        "total_observations": 10,
+        "status": "insufficient_evidence"
+      }
+    },
+    {
+      "id": "unknown-non-iid-sampling",
+      "source": "synthetic_fixture",
+      "sampling_assumption": "unknown_or_non_iid",
+      "predicted_probabilities": [
+        0.5,
+        0.5
+      ],
+      "observed_counts": [
+        50,
+        50
+      ],
+      "expected": {
+        "total_variation_sampling_radius": null,
+        "status": "insufficient_evidence"
+      }
+    },
+    {
+      "id": "single-category",
+      "source": "analytic_reference",
+      "predicted_probabilities": [
+        1
+      ],
+      "observed_counts": [
+        100
+      ],
+      "expected": {
+        "observed_total_variation": 0,
+        "total_variation_sampling_radius": 0,
+        "brier_score": 0,
+        "mean_log_loss_nats": 0,
+        "status": "pass"
+      },
+      "policy_override": {
+        "max_total_variation_upper_bound": 0,
+        "max_brier_score": 0,
+        "max_mean_log_loss": 0
+      }
+    }
+  ],
+  "prohibited_claims": [
+    "A passing analytic or synthetic fixture qualifies a physical model.",
+    "A passing holdout proves the model is globally correct.",
+    "A passing check proves quantum advantage.",
+    "IID categorical bounds remain valid for correlated, adaptive, shifted, or post-selected data without additional justification."
+  ]
+}
