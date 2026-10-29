@@ -8,7 +8,6 @@ import unittest
 from pathlib import Path
 
 from eligibility_filter import (
-    FILTER_SCHEMA,
     LEDGER_SCHEMA,
     RUNNER_SCHEMA,
     filter_dataset,
