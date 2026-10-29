@@ -923,7 +923,7 @@ jobs:
             > /tmp/sbr-paired-analysis/unknown-dependence-verification.json
           jq -e '.valid == true and .report.body.pair_dependence_policy == "descriptive_only_dependence_unknown"' \
             /tmp/sbr-paired-analysis/unknown-dependence-verification.json >/dev/null
-          jq -e '[.report.body.contrast_results[] | select(.exact_mcnemar_two_sided_p != null or .holm_adjusted_p != null or .discordant_win_rate_wilson_95_low != null or .discordant_win_rate_wilson_95_high != null)] | length == 0' \
+          jq -e '[.report.body.contrast_results[] | select(.exact_mcnemar_two_sided_p != null or .exact_mcnemar_log10_p != null or .mcnemar_p_value_numerically_floored != null or .holm_adjusted_p != null or .discordant_win_rate_wilson_95_low != null or .discordant_win_rate_wilson_95_high != null)] | length == 0' \
             /tmp/sbr-paired-analysis/unknown-dependence-verification.json >/dev/null
           jq -e '.report.body.contrast_results[] | select(.endpoint == "strict_correctness") | .paired_risk_difference == 0 and .eligible_pair_count == 1' \
             /tmp/sbr-paired-analysis/unknown-dependence-verification.json >/dev/null
