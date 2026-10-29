@@ -3662,6 +3662,15 @@ jobs:
           bad = copy.deepcopy(census_fixture)
           bad["dataset_kind"] = "reviewed_census"
           bad["family_universe_sha256"] = "0" * 64
+          bad["families"] = [
+              {
+                  "family_id": f"synthetic-for-negative-control-{index:03d}",
+                  "eligibility_status": "excluded",
+                  "candidate_target_ids": [],
+                  "eligibility_receipt_sha256": "c" * 64,
+              }
+              for index in range(372)
+          ]
           if Draft202012Validator(census_schema).is_valid(bad):
               raise SystemExit("reviewed census schema accepted a non-pinned family-universe digest")
           bad_report = copy.deepcopy(report)
