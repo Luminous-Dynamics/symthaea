@@ -16,6 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const EVIDENCE_MANIFEST_SCHEMA_VERSION: u32 = 1;
 pub const VERIFIER_RECEIPT_SCHEMA_VERSION: u32 = 1;
+pub const EVIDENCE_BUNDLE_REPORT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -62,6 +63,7 @@ impl EvidenceRole {
 /// Digest fields are lowercase SHA-256 hex except source_commit_sha, which
 /// accepts a 40-character SHA-1 Git object ID or a 64-character SHA-256 Git ID.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceManifest {
     pub schema_version: u32,
     pub run_id: String,
@@ -84,6 +86,7 @@ pub struct EvidenceManifest {
 /// Signed role-specific verifier evidence. The signature covers every field
 /// except signature_hex; see canonical_receipt_signing_bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VerifierReceipt {
     pub schema_version: u32,
     pub receipt_id: String,
@@ -102,6 +105,7 @@ pub struct VerifierReceipt {
 /// Trust entry supplied independently of the evidence bundle. Production trust
 /// stores should be versioned, controlled, reviewed, and provisioned out-of-band.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TrustAnchor {
     pub key_id: String,
     pub role: String,
@@ -118,7 +122,7 @@ pub struct TrustAnchor {
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceBundleStatus {
     Blocked,
-    EligibleForHumanReview,
+    Verified,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +141,7 @@ pub enum EvidenceBundleBlocker {
     ReceiptManifestMismatch { receipt_id: String },
     ReceiptSubjectMismatch { receipt_id: String, role: String },
     ReceiptInvalidTimeRange { receipt_id: String },
+    ReceiptIssuedBeforeManifest { receipt_id: String },
     ReceiptIssuedInFuture { receipt_id: String },
     ReceiptExpired { receipt_id: String },
     ReceiptLifetimeTooLong { receipt_id: String },
@@ -151,6 +156,7 @@ pub enum EvidenceBundleBlocker {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceBundleReport {
+    pub schema_version: u32,
     pub status: EvidenceBundleStatus,
     pub manifest_sha256: String,
     pub blockers: Vec<EvidenceBundleBlocker>,
@@ -167,6 +173,7 @@ pub struct EvidenceBundleReport {
 /// Field order is fixed and independent of JSON serialization or key ordering.
 pub fn canonical_manifest_bytes(manifest: &EvidenceManifest) -> Vec<u8> {
     let mut out = Vec::with_capacity(1_400);
+    field(&mut out, "domain", "luminous-dynamics.aviation-evidence-manifest.v1");
     field(&mut out, "schema_version", &manifest.schema_version.to_string());
     field(&mut out, "run_id", &manifest.run_id);
     field(&mut out, "created_at_epoch_seconds", &manifest.created_at_epoch_seconds.to_string());
@@ -194,6 +201,7 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 /// Canonical Ed25519 receipt payload; signature_hex is intentionally excluded.
 pub fn canonical_receipt_signing_bytes(receipt: &VerifierReceipt) -> Vec<u8> {
     let mut out = Vec::with_capacity(700);
+    field(&mut out, "domain", "luminous-dynamics.aviation-verifier-receipt.v1");
     field(&mut out, "schema_version", &receipt.schema_version.to_string());
     field(&mut out, "receipt_id", &receipt.receipt_id);
     field(&mut out, "role", &receipt.role);
@@ -297,14 +305,22 @@ pub fn verify_evidence_bundle(
 
     blockers.sort_by_key(|blocker| format!("{blocker:?}"));
     blockers.dedup();
-    let verified_roles: Vec<EvidenceRole> = locally_verified
+    let verified_roles: Vec<EvidenceRole> = ordered
+        .iter()
+        .filter_map(|receipt| {
+            let role = EvidenceRole::parse(&receipt.role)?;
+            let unique_receipt_id = receipt_id_counts.get(&receipt.receipt_id).copied() == Some(1);
+            let unique_role = role_counts.get(&role).copied() == Some(1);
+            (unique_receipt_id && unique_role && locally_verified.contains(&role)).then_some(role)
+        })
+        .collect::<BTreeSet<_>>()
         .into_iter()
-        .filter(|role| role_counts.get(role).copied() == Some(1))
         .collect();
 
     EvidenceBundleReport {
+        schema_version: EVIDENCE_BUNDLE_REPORT_SCHEMA_VERSION,
         status: if blockers.is_empty() {
-            EvidenceBundleStatus::EligibleForHumanReview
+            EvidenceBundleStatus::Verified
         } else {
             EvidenceBundleStatus::Blocked
         },
@@ -431,6 +447,9 @@ fn verify_one_receipt(
     {
         blockers.push(EvidenceBundleBlocker::ReceiptInvalidTimeRange { receipt_id: id.clone() });
     } else {
+        if receipt.issued_at_epoch_seconds < manifest.created_at_epoch_seconds {
+            blockers.push(EvidenceBundleBlocker::ReceiptIssuedBeforeManifest { receipt_id: id.clone() });
+        }
         if receipt.issued_at_epoch_seconds > now {
             blockers.push(EvidenceBundleBlocker::ReceiptIssuedInFuture { receipt_id: id.clone() });
         }
@@ -630,11 +649,11 @@ mod tests {
     }
 
     #[test]
-    fn valid_bundle_is_eligible_only_for_human_review() {
+    fn valid_bundle_is_verified_without_authorizing_a_decision() {
         let manifest = manifest();
         let (receipts, anchors) = signed_receipts(&manifest);
         let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
-        assert_eq!(report.status, EvidenceBundleStatus::EligibleForHumanReview);
+        assert_eq!(report.status, EvidenceBundleStatus::Verified);
         assert!(report.blockers.is_empty());
         assert_eq!(report.verified_roles, EvidenceRole::REQUIRED.to_vec());
         assert_eq!(report.receipt_count, EvidenceRole::REQUIRED.len());
@@ -716,7 +735,8 @@ mod tests {
     fn tampered_signature_is_rejected() {
         let manifest = manifest();
         let (mut receipts, anchors) = signed_receipts(&manifest);
-        receipts[0].signature_hex.replace_range(0..2, "ff");
+        let replacement = if receipts[0].signature_hex.starts_with("00") { "01" } else { "00" };
+        receipts[0].signature_hex.replace_range(0..2, replacement);
         let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::InvalidSignature { .. })));
@@ -732,6 +752,16 @@ mod tests {
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::FutureManifestTimestamp { .. })));
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptIssuedInFuture { .. })));
+    }
+
+    #[test]
+    fn receipt_must_not_predate_manifest() {
+        let manifest = manifest();
+        let (mut receipts, anchors) = signed_receipts(&manifest);
+        receipts[0].issued_at_epoch_seconds = manifest.created_at_epoch_seconds - 1;
+        let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
+        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ReceiptIssuedBeforeManifest { .. })));
     }
 
     #[test]

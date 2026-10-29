@@ -8,7 +8,7 @@
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use symthaea_operations_research::aviation_evidence_bundle::{
-    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, EvidenceRole, TrustAnchor,
+    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, TrustAnchor,
     VerifierReceipt, EVIDENCE_MANIFEST_SCHEMA_VERSION, VERIFIER_RECEIPT_SCHEMA_VERSION,
 };
 
@@ -35,6 +35,7 @@ fn independent_field(out: &mut Vec<u8>, key: &str, value: &str) {
 
 fn independent_manifest_bytes(m: &EvidenceManifest) -> Vec<u8> {
     let mut out = Vec::new();
+    independent_field(&mut out, "domain", "luminous-dynamics.aviation-evidence-manifest.v1");
     independent_field(&mut out, "schema_version", &m.schema_version.to_string());
     independent_field(&mut out, "run_id", &m.run_id);
     independent_field(&mut out, "created_at_epoch_seconds", &m.created_at_epoch_seconds.to_string());
@@ -56,6 +57,7 @@ fn independent_manifest_bytes(m: &EvidenceManifest) -> Vec<u8> {
 
 fn independent_receipt_bytes(r: &VerifierReceipt) -> Vec<u8> {
     let mut out = Vec::new();
+    independent_field(&mut out, "domain", "luminous-dynamics.aviation-verifier-receipt.v1");
     independent_field(&mut out, "schema_version", &r.schema_version.to_string());
     independent_field(&mut out, "receipt_id", &r.receipt_id);
     independent_field(&mut out, "role", &r.role);
@@ -184,7 +186,7 @@ fn independent_byte_contract_matches_canonical_api_and_accepts_signed_bundle() {
         );
     }
     let report = verify_evidence_bundle(&manifest, &receipts, &anchors, NOW);
-    assert_eq!(report.status, EvidenceBundleStatus::EligibleForHumanReview);
+    assert_eq!(report.status, EvidenceBundleStatus::Verified);
     assert!(report.blockers.is_empty());
 }
 
@@ -205,4 +207,31 @@ fn independent_oracle_detects_mutated_snapshot_and_permutation_is_irrelevant() {
     assert!(blocked.blockers.iter().any(|b| {
         matches!(b, symthaea_operations_research::aviation_evidence_bundle::EvidenceBundleBlocker::ReceiptManifestMismatch { .. })
     }));
+}
+
+
+#[test]
+fn unrecognized_wire_fields_are_rejected_on_security_boundaries() {
+    let manifest = fixture_manifest();
+    let manifest_json = serde_json::to_value(&manifest).unwrap();
+    let mut manifest_object = manifest_json.as_object().unwrap().clone();
+    manifest_object.insert("unexpected_override".into(), serde_json::Value::Bool(true));
+    assert!(serde_json::from_value::<EvidenceManifest>(
+        serde_json::Value::Object(manifest_object)
+    ).is_err());
+
+    let (receipts, anchors) = signed_bundle(&manifest);
+    let receipt_json = serde_json::to_value(&receipts[0]).unwrap();
+    let mut receipt_object = receipt_json.as_object().unwrap().clone();
+    receipt_object.insert("skip_signature_check".into(), serde_json::Value::Bool(true));
+    assert!(serde_json::from_value::<VerifierReceipt>(
+        serde_json::Value::Object(receipt_object)
+    ).is_err());
+
+    let anchor_json = serde_json::to_value(&anchors[0]).unwrap();
+    let mut anchor_object = anchor_json.as_object().unwrap().clone();
+    anchor_object.insert("implicitly_trusted".into(), serde_json::Value::Bool(true));
+    assert!(serde_json::from_value::<TrustAnchor>(
+        serde_json::Value::Object(anchor_object)
+    ).is_err());
 }
