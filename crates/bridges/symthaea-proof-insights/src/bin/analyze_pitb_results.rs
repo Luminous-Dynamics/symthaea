@@ -341,7 +341,7 @@ struct ComponentTargetCount {
 struct PowerScenario {
     status: String,
     true_treatment_effect_percentage_points: f64,
-    assumed_family_icc: f64,
+    assumed_component_icc: f64,
     pair_association_fraction: f64,
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
@@ -366,7 +366,7 @@ struct PowerScenario {
 struct WeakNullScenario {
     status: String,
     true_target_weighted_mean_effect_percentage_points: f64,
-    assumed_family_icc: f64,
+    assumed_component_icc: f64,
     pair_association_fraction: f64,
     requested_component_effect_heterogeneity_sd_percentage_points: f64,
     study_simulations: usize,
@@ -384,7 +384,7 @@ struct WeakNullScenario {
     false_claim_probability_upper_95: Option<f64>,
     false_claim_probability_upper_simultaneous_95: Option<f64>,
     mean_observed_effect_percentage_points: Option<f64>,
-    mean_realized_family_effect_heterogeneity_sd_percentage_points: Option<f64>,
+    mean_realized_component_effect_heterogeneity_sd_percentage_points: Option<f64>,
     interpretation: String,
 }
 
@@ -410,7 +410,7 @@ struct PowerReport {
     eligible_validation_component_count: usize,
     validation_baseline_semantic_success_rate: f64,
     component_target_counts: Vec<ComponentTargetCount>,
-    assumed_family_icc_grid: Vec<f64>,
+    assumed_component_icc_grid: Vec<f64>,
     pair_association_fraction_grid: Vec<f64>,
     true_effect_grid_percentage_points: Vec<f64>,
     study_simulations: usize,
@@ -436,7 +436,7 @@ struct PowerReport {
     interpretation: String,
 }
 
-struct SimulatedFamily {
+struct SimulatedComponent {
     target_count: usize,
     paired_delta_sum: i64,
 }
@@ -561,7 +561,7 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
     let interpretation = if !component_manifest.qualified_for_confirmatory_resampling {
         "The component mapping was structurally validated, but the underlying relationship-coverage receipt has not been verified; this is diagnostic-only and no confirmatory utility claim is permitted."
     } else if passed {
-        "The paired, family-clustered estimate met the preregistered effect and informative-interval gates on this test partition. This is within-benchmark utility only; it is not external/SOTA evidence."
+        "The paired, component-clustered estimate met the preregistered effect and informative-interval gates on this test partition. This is within-benchmark utility only; it is not external/SOTA evidence."
     } else if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
         "The eligible independent-family count is below the v0 floor of 20. Treat this as an underpowered pilot; the floor itself is not evidence of adequate power, so simulation-based power planning is still required."
     } else if !interval_informative {
@@ -814,7 +814,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         .iter()
         .filter(|scenario| {
             (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
-                && (scenario.assumed_family_icc - 0.20).abs() < f64::EPSILON
+                && (scenario.assumed_component_icc - 0.20).abs() < f64::EPSILON
         })
         .collect();
     let all_worst_case_associations_estimated =
@@ -871,9 +871,9 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     let interpretation = if statistical_power_gate_passed && !component_manifest.qualified_for_confirmatory_resampling {
         "The numerical design simulations meet their thresholds, but confirmatory use is blocked because the component coverage receipt is unverified."
     } else if power_gate_passed {
-        "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20, the strict-null scenarios, and the family-heterogeneous weak-null grid. This is a design-planning result, not evidence that insight transfer succeeds."
+        "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20, the strict-null scenarios, and the component-heterogeneous weak-null grid. This is a design-planning result, not evidence that insight transfer succeeds."
     } else if component_target_counts.len() < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
-        "The validation-derived eligible sample has fewer than 20 independent families. The design is underpowered by the frozen project floor and cannot support a confirmatory claim."
+        "The validation-derived eligible sample has fewer than 20 independent connected components. The design is underpowered by the frozen project floor and cannot support a confirmatory claim."
     } else {
         "The simulated design did not meet the power gate, strict-null calibration, or family-heterogeneous weak-null false-claim gate, or the +20pp scenario was infeasible at the observed baseline. Expand the separately sourced eligible set or report the eventual experiment as a pilot; do not lower the gates."
     }
@@ -888,6 +888,8 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         validation_results_sha256: sha256_hex(&validation_bytes),
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
         split_manifest_sha256: config.split_manifest_sha256,
+        component_manifest_sha256: config.component_manifest_sha256.clone(),
+        component_manifest_qualified_for_confirmatory_resampling: component_manifest.qualified_for_confirmatory_resampling,
         partition_digest_sha256: config.partition_digest_sha256,
         analyzer_source_sha256: sha256_hex(include_bytes!("analyze_pitb_results.rs")),
         upstream_commit: split_manifest.upstream.commit,
@@ -899,7 +901,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         eligible_validation_component_count: component_target_counts.len(),
         validation_baseline_semantic_success_rate: baseline_rate,
         component_target_counts,
-        assumed_family_icc_grid: icc_grid.to_vec(),
+        assumed_component_icc_grid: icc_grid.to_vec(),
         pair_association_fraction_grid: pair_association_grid.to_vec(),
         true_effect_grid_percentage_points: effect_grid.map(|value| value * 100.0).to_vec(),
         study_simulations: simulations,
@@ -922,13 +924,13 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         power_gate_passed,
         scenarios,
         model_assumptions: vec![
-            "Family sizes are taken from eligible validation outcomes and reused as the projected evaluation-family-size distribution; test eligibility may differ.".to_string(),
-            "A beta-binomial family random effect induces the specified baseline Bernoulli ICC; treatment success shares the same latent family difficulty with its marginal success rate shifted by the scenario effect.".to_string(),
+            "Component sizes are aggregated from eligible validation targets and reused as the projected evaluation-component-size distribution; test eligibility may differ.".to_string(),
+            "A beta-binomial component random effect induces the specified baseline Bernoulli ICC; treatment success shares the same latent family difficulty with its marginal success rate shifted by the scenario effect.".to_string(),
             "The strict-null and positive-effect power grid samples paired outcomes using the same bivariate Bernoulli coupling as the weak-null grid. Its association-fraction levels are 0, 0.5, and 0.9; zero gives conditional independence and higher values approach the Frechet upper bound. This is a scenario grid, not an empirically estimated correlation.".to_string(),
-            "A separate weak-null grid assigns normally generated family-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points, ICC grid is 0, 0.05, 0.10, 0.20, and pair-association fractions are 0, 0.5, 0.9; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
-            "Weak-null paired outcomes use a bivariate Bernoulli coupling with the prescribed marginal success rates; the association fraction interpolates joint-success probability from independence to the Frechet upper bound and is not a Pearson correlation. The 36-cell weak-null grid tests false-claim probability when positive and negative family effects cancel on average, under those explicit pair-association and ICC values.".to_string(),
+            "A separate weak-null grid assigns normally generated component-level treatment-effect offsets, recenters them to exactly zero target-weighted mean within each simulated study, and uniformly scales them only as needed to keep both arm probabilities in [0,1]. The requested effect SD grid is 5, 10, and 20 percentage points, ICC grid is 0, 0.05, 0.10, 0.20, and pair-association fractions are 0, 0.5, 0.9; boundary scaling can reduce realized heterogeneity and is reported.".to_string(),
+            "Weak-null paired outcomes use a bivariate Bernoulli coupling with the prescribed marginal success rates; the association fraction interpolates joint-success probability from independence to the Frechet upper bound and is not a Pearson correlation. The 36-cell weak-null grid tests false-claim probability when positive and negative component effects cancel on average, under those explicit pair-association and ICC values.".to_string(),
             "This finite family-size stress model does not cover selective missingness, alternative family-size mechanisms, or every dependence structure and is not proof of nominal coverage universally.".to_string(),
-            "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
+            "Each simulated study uses the same target-weighted paired effect, component-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
             "Power estimates and their Monte Carlo standard errors are design simulations only. The strict null has 4 ICCs × 3 association fractions = 12 cells; the heterogeneous weak null has 3 effect SDs × 4 ICCs × 3 association fractions = 36 cells. The one-sided Wilson upper bound uses z=3.08 across all 48 registered null cells, conservatively exceeding the Bonferroni critical value for alpha=0.05/48. The +20pp/ICC .20 design gate uses the minimum two-sided 95% Bonferroni Wilson lower bound (z=2.394) across all three preregistered association settings. These are model-conditional design diagnostics, not measured proof-insight utility or an SOTA comparison.".to_string(),
         ],
         interpretation,
@@ -1045,7 +1047,7 @@ fn simulate_power_scenario(
         return Ok(PowerScenario {
             status: "infeasible_effect_above_ceiling".to_string(),
             true_treatment_effect_percentage_points: true_effect * 100.0,
-            assumed_family_icc: icc,
+            assumed_component_icc: icc,
             pair_association_fraction,
             study_simulations: simulations,
             bootstrap_replicates_per_simulated_study: bootstrap_replicates,
@@ -1127,7 +1129,7 @@ fn simulate_power_scenario(
     Ok(PowerScenario {
         status: "estimated".to_string(),
         true_treatment_effect_percentage_points: true_effect * 100.0,
-        assumed_family_icc: icc,
+        assumed_component_icc: icc,
         pair_association_fraction,
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
@@ -1150,7 +1152,7 @@ fn simulate_power_scenario(
         mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
         mean_lower_95ci_percentage_points: Some(sum_lower / simulations as f64 * 100.0),
         interpretation: if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
-            "Power is structurally zero for the confirmatory gate because the eligible validation design contains fewer than 20 independent family clusters.".to_string()
+            "Power is structurally zero for the confirmatory gate because the eligible validation design contains fewer than 20 independent component clusters.".to_string()
         } else {
             "Estimated fraction of synthetic matched studies passing the complete primary utility gate under the declared baseline, effect, ICC, and validation-derived family sizes.".to_string()
         },
@@ -1261,7 +1263,7 @@ fn simulate_weak_null_scenario(
     Ok(WeakNullScenario {
         status: "estimated".to_string(),
         true_target_weighted_mean_effect_percentage_points: 0.0,
-        assumed_family_icc: icc,
+        assumed_component_icc: icc,
         pair_association_fraction,
         requested_component_effect_heterogeneity_sd_percentage_points: requested_effect_sd * 100.0,
         study_simulations: simulations,
@@ -1284,7 +1286,7 @@ fn simulate_weak_null_scenario(
             simultaneous_null_upper_bound(false_claims, simulations),
         ),
         mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
-        mean_realized_family_effect_heterogeneity_sd_percentage_points: Some(
+        mean_realized_component_effect_heterogeneity_sd_percentage_points: Some(
             sum_realized_effect_sd / simulations as f64 * 100.0,
         ),
         interpretation: "Weak-null calibration: treatment effects vary by family but are recentered to exactly zero target-weighted mean within each simulated study. The paired Bernoulli coupling varies from independent potential outcomes to the Frechet upper bound per the registered association fraction. This does not cover every dependence, selective-missingness, or family-size-generating mechanism.".to_string(),
@@ -1298,10 +1300,10 @@ fn simulate_weak_null_matched_study(
     icc: f64,
     pair_association_fraction: f64,
     rng: &mut SplitMix64,
-) -> Result<(Vec<SimulatedFamily>, f64)> {
+) -> Result<(Vec<SimulatedComponent>, f64)> {
     let baseline_rates: Vec<f64> = component_target_counts
         .iter()
-        .map(|_| sample_family_rate(baseline_rate, icc, rng))
+        .map(|_| sample_component_rate(baseline_rate, icc, rng))
         .collect();
     let treatment_effects = sample_centered_weak_null_family_effects(
         component_target_counts,
@@ -1312,29 +1314,29 @@ fn simulate_weak_null_matched_study(
     let realized_effect_sd = weighted_component_effect_sd(&treatment_effects, component_target_counts);
     let mut families = Vec::with_capacity(component_target_counts.len());
 
-    for ((family, baseline_family_rate), effect) in component_target_counts
+    for ((family, baseline_component_rate), effect) in component_target_counts
         .iter()
         .zip(baseline_rates)
         .zip(treatment_effects)
     {
-        let treatment_family_rate = (baseline_family_rate + effect).clamp(0.0, 1.0);
+        let treatment_component_rate = (baseline_component_rate + effect).clamp(0.0, 1.0);
         let joint_success_probability = joint_success_probability_at_association(
-            baseline_family_rate,
-            treatment_family_rate,
+            baseline_component_rate,
+            treatment_component_rate,
             pair_association_fraction,
         )?;
         let mut paired_delta_sum = 0_i64;
         for _ in 0..family.eligible_target_count {
             let (baseline_success, treatment_success) = sample_paired_bernoulli_from_joint_probability(
-                baseline_family_rate,
-                treatment_family_rate,
+                baseline_component_rate,
+                treatment_component_rate,
                 joint_success_probability,
                 rng,
             );
             paired_delta_sum += (if treatment_success { 1_i64 } else { 0_i64 })
                 - (if baseline_success { 1_i64 } else { 0_i64 });
         }
-        families.push(SimulatedFamily {
+        families.push(SimulatedComponent {
             target_count: family.eligible_target_count,
             paired_delta_sum,
         });
@@ -1397,12 +1399,12 @@ fn sample_paired_bernoulli_from_joint_probability(
 
 fn sample_centered_weak_null_family_effects(
     component_target_counts: &[ComponentTargetCount],
-    baseline_family_rates: &[f64],
+    baseline_component_rates: &[f64],
     requested_effect_sd: f64,
     rng: &mut SplitMix64,
 ) -> Result<Vec<f64>> {
     if component_target_counts.is_empty()
-        || component_target_counts.len() != baseline_family_rates.len()
+        || component_target_counts.len() != baseline_component_rates.len()
         || component_target_counts
             .iter()
             .any(|family| family.eligible_target_count == 0)
@@ -1412,7 +1414,7 @@ fn sample_centered_weak_null_family_effects(
     if !requested_effect_sd.is_finite() || requested_effect_sd < 0.0 {
         bail!("requested weak-null effect SD must be finite and nonnegative");
     }
-    if baseline_family_rates
+    if baseline_component_rates
         .iter()
         .any(|rate| !rate.is_finite() || !(0.0..=1.0).contains(rate))
     {
@@ -1450,7 +1452,7 @@ fn sample_centered_weak_null_family_effects(
     // realized effect SD is reported because boundary constraints can shrink
     // the requested heterogeneity.
     let mut feasible_scale = 1.0_f64;
-    for (standard_effect, baseline_rate) in standardized.iter().zip(baseline_family_rates) {
+    for (standard_effect, baseline_rate) in standardized.iter().zip(baseline_component_rates) {
         let proposed_effect = standard_effect * requested_effect_sd;
         if proposed_effect > 0.0 {
             feasible_scale = feasible_scale.min((1.0 - baseline_rate) / proposed_effect);
@@ -1504,34 +1506,34 @@ fn simulate_matched_study(
     icc: f64,
     pair_association_fraction: f64,
     rng: &mut SplitMix64,
-) -> Result<Vec<SimulatedFamily>> {
+) -> Result<Vec<SimulatedComponent>> {
     component_target_counts
         .iter()
         .map(|family| {
-            let baseline_family_rate = sample_family_rate(baseline_rate, icc, rng);
-            let treatment_family_rate = treatment_rate_given_baseline_family(
-                baseline_family_rate,
+            let baseline_component_rate = sample_component_rate(baseline_rate, icc, rng);
+            let treatment_component_rate = treatment_rate_given_baseline_component(
+                baseline_component_rate,
                 baseline_rate,
                 treatment_rate,
             );
             let joint_success_probability = joint_success_probability_at_association(
-                baseline_family_rate,
-                treatment_family_rate,
+                baseline_component_rate,
+                treatment_component_rate,
                 pair_association_fraction,
             )?;
             let mut delta_sum = 0_i64;
             for _ in 0..family.eligible_target_count {
                 let (baseline_success, treatment_success) =
                     sample_paired_bernoulli_from_joint_probability(
-                        baseline_family_rate,
-                        treatment_family_rate,
+                        baseline_component_rate,
+                        treatment_component_rate,
                         joint_success_probability,
                         rng,
                     );
                 delta_sum += (if treatment_success { 1_i64 } else { 0_i64 })
                     - (if baseline_success { 1_i64 } else { 0_i64 });
             }
-            Ok(SimulatedFamily {
+            Ok(SimulatedComponent {
                 target_count: family.eligible_target_count,
                 paired_delta_sum: delta_sum,
             })
@@ -1539,7 +1541,7 @@ fn simulate_matched_study(
         .collect()
 }
 
-fn sample_family_rate(mean: f64, icc: f64, rng: &mut SplitMix64) -> f64 {
+fn sample_component_rate(mean: f64, icc: f64, rng: &mut SplitMix64) -> f64 {
     if mean <= 0.0 || mean >= 1.0 || icc <= 0.0 {
         return mean;
     }
@@ -1571,22 +1573,22 @@ fn sample_gamma(shape: f64, rng: &mut SplitMix64) -> f64 {
     }
 }
 
-fn treatment_rate_given_baseline_family(
-    baseline_family_rate: f64,
+fn treatment_rate_given_baseline_component(
+    baseline_component_rate: f64,
     baseline_rate: f64,
     treatment_rate: f64,
 ) -> f64 {
     if treatment_rate >= baseline_rate && baseline_rate < 1.0 {
-        1.0 - (1.0 - baseline_family_rate) * (1.0 - treatment_rate) / (1.0 - baseline_rate)
+        1.0 - (1.0 - baseline_component_rate) * (1.0 - treatment_rate) / (1.0 - baseline_rate)
     } else if treatment_rate < baseline_rate && baseline_rate > 0.0 {
-        baseline_family_rate * treatment_rate / baseline_rate
+        baseline_component_rate * treatment_rate / baseline_rate
     } else {
         treatment_rate
     }
 }
 
 fn simulated_cluster_bootstrap_interval(
-    families: &[SimulatedFamily],
+    families: &[SimulatedComponent],
     replicates: usize,
     rng: &mut SplitMix64,
 ) -> [f64; 2] {
@@ -2314,9 +2316,9 @@ fn validate_power_report(
             .iter()
             .zip(expected_effects)
             .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
-        || report.assumed_family_icc_grid.len() != expected_iccs.len()
+        || report.assumed_component_icc_grid.len() != expected_iccs.len()
         || report
-            .assumed_family_icc_grid
+            .assumed_component_icc_grid
             .iter()
             .zip(expected_iccs)
             .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
@@ -2342,13 +2344,13 @@ fn validate_power_report(
             })
             || !expected_iccs
                 .iter()
-                .any(|icc| (scenario.assumed_family_icc - icc).abs() <= 1e-12)
+                .any(|icc| (scenario.assumed_component_icc - icc).abs() <= 1e-12)
             || !expected_pair_associations
                 .iter()
                 .any(|association| (scenario.pair_association_fraction - association).abs() <= 1e-12)
             || !observed_scenarios.insert((
                 (scenario.true_treatment_effect_percentage_points * 1000.0).round() as i32,
-                (scenario.assumed_family_icc * 1000.0).round() as i32,
+                (scenario.assumed_component_icc * 1000.0).round() as i32,
                 (scenario.pair_association_fraction * 1000.0).round() as i32,
             ))
         {
@@ -2462,7 +2464,7 @@ fn validate_power_report(
                     .iter()
                     .find(|scenario| {
                         (scenario.true_treatment_effect_percentage_points - effect_pp).abs() <= 1e-12
-                            && (scenario.assumed_family_icc - icc).abs() <= 1e-12
+                            && (scenario.assumed_component_icc - icc).abs() <= 1e-12
                             && (scenario.pair_association_fraction - association).abs() <= 1e-12
                     })
                     .context("power report lacks a required effect/ICC/pair-association scenario")?;
@@ -2582,7 +2584,7 @@ fn validate_power_report(
             .mean_observed_effect_percentage_points
             .context("weak-null scenario lacks its mean observed effect")?;
         let realized_sd = scenario
-            .mean_realized_family_effect_heterogeneity_sd_percentage_points
+            .mean_realized_component_effect_heterogeneity_sd_percentage_points
             .context("weak-null scenario lacks its realized heterogeneity diagnostic")?;
         let informative_trials = report.study_simulations
             .saturating_sub(scenario.degenerate_interval_trials);
@@ -2611,14 +2613,14 @@ fn validate_power_report(
             })
             || !expected_iccs
                 .iter()
-                .any(|icc| (scenario.assumed_family_icc - icc).abs() <= 1e-12)
+                .any(|icc| (scenario.assumed_component_icc - icc).abs() <= 1e-12)
             || !expected_pair_associations.iter().any(|association| {
                 (scenario.pair_association_fraction - association).abs() <= 1e-12
             })
             || !observed_weak_null_scenarios.insert((
                 (scenario.requested_component_effect_heterogeneity_sd_percentage_points * 1000.0)
                     .round() as i32,
-                (scenario.assumed_family_icc * 1000.0).round() as i32,
+                (scenario.assumed_component_icc * 1000.0).round() as i32,
                 (scenario.pair_association_fraction * 1000.0).round() as i32,
             ))
             || scenario.false_claims > report.study_simulations
@@ -2685,7 +2687,7 @@ fn validate_power_report(
                             - requested_sd_pp)
                             .abs()
                             <= 1e-12
-                            && (scenario.assumed_family_icc - icc).abs() <= 1e-12
+                            && (scenario.assumed_component_icc - icc).abs() <= 1e-12
                             && (scenario.pair_association_fraction - pair_association_fraction).abs()
                                 <= 1e-12
                     })
@@ -2744,8 +2746,8 @@ fn validate_power_report(
                         expected.mean_observed_effect_percentage_points,
                     )
                     || !same_optional_probability(
-                        observed.mean_realized_family_effect_heterogeneity_sd_percentage_points,
-                        expected.mean_realized_family_effect_heterogeneity_sd_percentage_points,
+                        observed.mean_realized_component_effect_heterogeneity_sd_percentage_points,
+                        expected.mean_realized_component_effect_heterogeneity_sd_percentage_points,
                     )
                 {
                     bail!(
@@ -2803,7 +2805,7 @@ fn validate_power_report(
         .iter()
         .filter(|scenario| {
             (scenario.true_treatment_effect_percentage_points - 20.0).abs() <= 1e-12
-                && (scenario.assumed_family_icc - 0.20).abs() <= 1e-12
+                && (scenario.assumed_component_icc - 0.20).abs() <= 1e-12
         })
         .collect();
     let all_worst_case_associations_estimated =
@@ -3387,7 +3389,7 @@ fn paired_cluster_bootstrap(
     seed: u64,
 ) -> Result<(f64, f64, f64, usize, usize)> {
     if families.is_empty() {
-        bail!("no family clusters available for bootstrap");
+        bail!("no component clusters available for bootstrap");
     }
     if replicates != EXPECTED_BOOTSTRAP_REPLICATES {
         bail!(
@@ -3725,7 +3727,7 @@ mod tests {
         assert_eq!(aggregates[0].paired_effect_percentage_points, 100.0);
 
         let left = paired_cluster_bootstrap(&aggregates, EXPECTED_BOOTSTRAP_REPLICATES, 20261020)
-            .expect("valid family bootstrap");
+            .expect("valid component bootstrap");
         let right = paired_cluster_bootstrap(&aggregates, EXPECTED_BOOTSTRAP_REPLICATES, 20261020)
             .expect("same seed is repeatable");
         assert_eq!(left, right);
@@ -3891,8 +3893,8 @@ mod tests {
 
     #[test]
     fn simulated_cluster_bootstrap_reports_both_endpoints_and_detects_degeneracy() {
-        let families: Vec<SimulatedFamily> = (0..MIN_CONFIRMATORY_COMPONENT_CLUSTERS)
-            .map(|_| SimulatedFamily {
+        let families: Vec<SimulatedComponent> = (0..MIN_CONFIRMATORY_COMPONENT_CLUSTERS)
+            .map(|_| SimulatedComponent {
                 target_count: 1,
                 paired_delta_sum: 1,
             })
@@ -4052,11 +4054,11 @@ mod tests {
             right.mean_observed_effect_percentage_points
         );
         assert_eq!(
-            left.mean_realized_family_effect_heterogeneity_sd_percentage_points,
-            right.mean_realized_family_effect_heterogeneity_sd_percentage_points
+            left.mean_realized_component_effect_heterogeneity_sd_percentage_points,
+            right.mean_realized_component_effect_heterogeneity_sd_percentage_points
         );
         assert!(left.false_claims <= 64 - left.degenerate_interval_trials);
-        assert!(left.mean_realized_family_effect_heterogeneity_sd_percentage_points
+        assert!(left.mean_realized_component_effect_heterogeneity_sd_percentage_points
             .is_some_and(|sd| sd > 0.0 && sd <= 10.0 + 1e-8));
         assert!(left.estimated_false_claim_probability
             .is_some_and(|rate| (0.0..=1.0).contains(&rate)));
@@ -4211,15 +4213,15 @@ mod tests {
         let mean_treatment = latent_baseline_rates
             .iter()
             .map(|family_rate| {
-                treatment_rate_given_baseline_family(*family_rate, baseline, treatment)
+                treatment_rate_given_baseline_component(*family_rate, baseline, treatment)
             })
             .sum::<f64>()
             / latent_baseline_rates.len() as f64;
         assert!((mean_treatment - treatment).abs() < 1e-12);
         assert!(latent_baseline_rates.iter().all(|family_rate| {
-            let treatment_family_rate =
-                treatment_rate_given_baseline_family(*family_rate, baseline, treatment);
-            (0.0..=1.0).contains(&treatment_family_rate)
+            let treatment_component_rate =
+                treatment_rate_given_baseline_component(*family_rate, baseline, treatment);
+            (0.0..=1.0).contains(&treatment_component_rate)
         }));
     }
 

@@ -164,7 +164,7 @@
         }
       }
     },
-    "assumed_family_icc_grid": {
+    "assumed_component_icc_grid": {
       "const": [
         0,
         0.05,
@@ -260,7 +260,7 @@
             "type": "number",
             "const": 0
           },
-          "assumed_family_icc": {
+          "assumed_component_icc": {
             "enum": [
               0,
               0.05,
@@ -319,7 +319,7 @@
           "mean_observed_effect_percentage_points": {
             "type": "number"
           },
-          "mean_realized_family_effect_heterogeneity_sd_percentage_points": {
+          "mean_realized_component_effect_heterogeneity_sd_percentage_points": {
             "type": "number",
             "minimum": 0
           },
@@ -477,7 +477,7 @@
             "minimum": 0,
             "maximum": 100
           },
-          "assumed_family_icc": {
+          "assumed_component_icc": {
             "enum": [
               0,
               0.05,

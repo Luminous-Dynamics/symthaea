@@ -191,8 +191,8 @@ jobs:
           associations = {0.0, 0.5, 0.9}
           if fixture["pair_association_fraction_grid"] != [0, 0.5, 0.9]:
               raise SystemExit("strict/power association grid differs from the registered values")
-          strict_keys = {(row["true_treatment_effect_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["scenarios"]}
-          weak_keys = {(row["requested_component_effect_heterogeneity_sd_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["weak_null_scenarios"]}
+          strict_keys = {(row["true_treatment_effect_percentage_points"], row["assumed_component_icc"], row["pair_association_fraction"]) for row in fixture["scenarios"]}
+          weak_keys = {(row["requested_component_effect_heterogeneity_sd_percentage_points"], row["assumed_component_icc"], row["pair_association_fraction"]) for row in fixture["weak_null_scenarios"]}
           if strict_keys != {(effect, icc, association) for effect in effects for icc in iccs for association in associations}:
               raise SystemExit("fixture strict grid has missing or duplicate effect/ICC/association cells")
           if weak_keys != {(sd, icc, association) for sd in (5.0, 10.0, 20.0) for icc in iccs for association in associations}:
@@ -259,7 +259,7 @@ jobs:
               raise SystemExit("weak-null false-claim summary does not match its grid")
           if abs(fixture["weak_null_false_claim_probability_upper_simultaneous_95_max"] - expected_weak_upper) > 1e-12:
               raise SystemExit("weak-null simultaneous summary does not match its grid")
-          worst_power_rows = [row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2]
+          worst_power_rows = [row for row in fixture["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_component_icc"] == 0.2]
           expected_power = min(row["estimated_utility_gate_power"] for row in worst_power_rows)
           expected_power_lower = min(row["estimated_power_lower_95"] for row in worst_power_rows)
 
@@ -274,7 +274,7 @@ jobs:
               return max(0.0, center - half)
 
           def expected_simultaneous_power_lower(report):
-              rows = [row for row in report["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_family_icc"] == 0.2]
+              rows = [row for row in report["scenarios"] if row["true_treatment_effect_percentage_points"] == 20.0 and row["assumed_component_icc"] == 0.2]
               if len(rows) != 3:
                   return None
               # Two-sided 95% Bonferroni-adjusted Wilson lower bound across three

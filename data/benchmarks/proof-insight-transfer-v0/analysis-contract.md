@@ -154,3 +154,8 @@ For each estimated scenario, report both `informative_interval_trials` and `dege
 The frozen config pins the SHA-256 digest of the complete component manifest. Both validation power planning and held-out test analysis validate the same bytes, verify one deterministic component assignment for every frozen family, recompute content-addressed component IDs, and use component IDs and component-size vectors as the resampling units. Family counts remain a separate descriptive denominator.
 
 The current builder does not verify the underlying coverage-receipt bytes or authenticated reviewer attestations, so its manifest always has `qualified_for_confirmatory_resampling=false`. The analyzer permits no confirmatory pass until a receipt verifier is implemented. Known hard-link components that cross frozen splits are blocked before scoring. A hypothetical pass-shaped v4 schema fixture is synthetic contract evidence, not an actual builder output.
+
+
+### Component-level calibration vocabulary
+
+Power-report v4 names its ICC grid and effect-heterogeneity diagnostics at the connected-component level. Original theorem family IDs remain source identifiers and descriptive denominators; they are not treated as independent bootstrap units after the relationship graph joins them.
