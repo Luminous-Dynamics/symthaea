@@ -84,6 +84,8 @@ Research-level and repository-scale tasks also probe different capabilities:
 
 PITB should use such sources as **distinct, pinned cohorts**, not merge their percentages. The distinctive contribution remains the causal transfer contrast: whether a typed insight improves exact-target, semantic-gate verified proof success under matched compute, after source availability, target eligibility, dependency leakage, and statistical uncertainty are independently qualified.
 
+A second important guardrail is that **temporal novelty is not a standalone contamination detector**. The ACL 2026 paper *Test of Time: Rethinking Temporal Signal of Benchmark Contamination* finds that temporal performance patterns change substantially with task construction even when the underlying source material is unchanged. PITB's temporal track should therefore combine chronology with source/dependency ancestry, hidden future-artifact quarantine, mutation controls, and multiple semantics-preserving formulations of the same target. A post-cutoff score drop alone must not be reported as proof of non-contamination, and a lack of score drop must not be reported as proof of memorization. Source exposure remains an explicitly bounded, partially unobservable risk.
+
 ## Acceptance gates before any confirmatory claim
 
 - The actual Rust diagnostic and its tests pass on the exact commit.
