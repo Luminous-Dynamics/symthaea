@@ -47,7 +47,10 @@ pub enum ObligationScope {
     ProtectedRemainder,
 }
 
-/// Explicitly scaled values avoid ambiguous floating-point thresholds in receipts.
+/// Numeric values are integer millionths of the named base unit.
+ /// Example: value_microunits=600_000_000 with unit=cent means 600 cents.
+ /// Do not use scale-prefixed unit labels such as micro_cent or micro_db:
+ /// this field already applies the millionth scale.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "value_type", rename_all = "snake_case")]
 pub enum AttributeValue {
@@ -82,6 +85,8 @@ pub struct QuantizedTolerance {
 #[serde(tag = "requirement", rename_all = "snake_case")]
 pub enum ObligationRequirement {
     ChangeTo { expected: AttributeValue },
+    /// For operations whose result is expressed as a delta, e.g. transposition.
+    ChangeBy { delta: AttributeValue },
     ExactlyMatches { expected: AttributeValue },
     PreserveWithin {
         comparator_id: String,
@@ -132,6 +137,12 @@ pub enum EditContractError {
     DuplicateObligationId,
     InvalidScope(&'static str),
     InvalidRequirement(&'static str),
+    InvalidReceipt,
+    UnsupportedOperation,
+    MissingRequiredObligation(&'static str),
+    DuplicateRequiredObligation(&'static str),
+    InvalidOperationObligation(&'static str),
+    UnsupportedAttribute(&'static str),
     SerializationFailure,
 }
 
@@ -153,6 +164,12 @@ impl std::fmt::Display for EditContractError {
             Self::InvalidRequirement(reason) => {
                 write!(f, "invalid edit-obligation requirement: {reason}")
             }
+            Self::InvalidReceipt => write!(f, "edit-contract digest did not verify"),
+            Self::UnsupportedOperation => write!(f, "unsupported edit operation for frozen contract policy"),
+            Self::MissingRequiredObligation(name) => write!(f, "missing required critical obligation: {name}"),
+            Self::DuplicateRequiredObligation(name) => write!(f, "duplicate obligation for required dimension: {name}"),
+            Self::InvalidOperationObligation(name) => write!(f, "invalid operation-specific obligation: {name}"),
+            Self::UnsupportedAttribute(name) => write!(f, "attribute is outside the supported operation policy: {name}"),
             Self::SerializationFailure => write!(f, "could not serialize edit-contract receipt"),
         }
     }
@@ -172,6 +189,19 @@ fn valid_label(value: &str, max_bytes: usize) -> bool {
         && value.len() <= max_bytes
         && !value.chars().any(char::is_control)
 }
+
+/// Operation families whose minimum obligation sets are defined by the current gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SupportedEditOperation {
+    PitchAt,
+    Transpose,
+}
+
+const ONSET_COMPARATOR_ID: &str = "onset-preservation-v1";
+const DURATION_COMPARATOR_ID: &str = "score-duration-exact-v1";
+const RMS_ENVELOPE_COMPARATOR_ID: &str = "rms-envelope-delta-v1";
+const PROTECTED_RMS_COMPARATOR_ID: &str = "protected-region-rms-v1";
+const PROTECTED_SPECTRAL_COMPARATOR_ID: &str = "protected-region-spectral-v1";
 
 impl FrozenEditContract {
     #[allow(clippy::too_many_arguments)]
@@ -286,6 +316,207 @@ impl FrozenEditContract {
         Ok(())
     }
 
+    /// Validate that the sealed contract satisfies the minimum obligation set
+    /// for an operation supported by the current audio gate.
+    ///
+    /// This is a structural policy check only. The caller must still resolve
+    /// the profile from a trusted registry, validate actual Score contents,
+    /// verify the target event identity, and compare the renderer digest to
+    /// the execution-bound manifest.
+    pub fn validate_supported_operation(
+        &self,
+    ) -> Result<SupportedEditOperation, EditContractError> {
+        if !self.verify()? {
+            return Err(EditContractError::InvalidReceipt);
+        }
+        let operation = match self.operation_id.as_str() {
+            "pitch-at" => SupportedEditOperation::PitchAt,
+            "transpose" => SupportedEditOperation::Transpose,
+            _ => return Err(EditContractError::UnsupportedOperation),
+        };
+
+        // Keep the initial policy deliberately narrow. Additional attributes
+        // require an operation-specific comparator and tests before admission.
+        for obligation in &self.obligations {
+            match obligation.attribute {
+                EditAttribute::Pitch
+                | EditAttribute::Onset
+                | EditAttribute::Duration
+                | EditAttribute::RmsEnvelope
+                | EditAttribute::NeighboringContent
+                | EditAttribute::RendererConfig => {}
+                EditAttribute::Timbre => return Err(EditContractError::UnsupportedAttribute("timbre")),
+                EditAttribute::Harmony => return Err(EditContractError::UnsupportedAttribute("harmony")),
+                EditAttribute::Rhythm => return Err(EditContractError::UnsupportedAttribute("rhythm")),
+                EditAttribute::Structure => return Err(EditContractError::UnsupportedAttribute("structure")),
+                EditAttribute::Tempo => return Err(EditContractError::UnsupportedAttribute("tempo")),
+                EditAttribute::Meter => return Err(EditContractError::UnsupportedAttribute("meter")),
+                EditAttribute::EventIdentity => return Err(EditContractError::UnsupportedAttribute("event_identity")),
+            }
+        }
+
+        self.require_attribute_count(EditAttribute::Pitch, 1, "pitch change")?;
+        self.require_attribute_count(EditAttribute::Onset, 1, "onset preservation")?;
+        self.require_attribute_count(EditAttribute::Duration, 1, "duration preservation")?;
+        self.require_attribute_count(EditAttribute::RmsEnvelope, 1, "RMS envelope preservation")?;
+        self.require_attribute_count(EditAttribute::NeighboringContent, 2, "protected-region preservation")?;
+        self.require_attribute_count(EditAttribute::RendererConfig, 1, "renderer configuration digest")?;
+
+        let pitch = self.obligations.iter()
+            .find(|o| o.attribute == EditAttribute::Pitch)
+            .ok_or(EditContractError::MissingRequiredObligation("pitch change"))?;
+        if !pitch.critical {
+            return Err(EditContractError::InvalidOperationObligation("pitch change must be critical"));
+        }
+
+        let target_event_id = match (operation, &pitch.scope, &pitch.requirement) {
+            (
+                SupportedEditOperation::PitchAt,
+                ObligationScope::Event { event_id },
+                ObligationRequirement::ChangeTo {
+                    expected: AttributeValue::Numeric { unit, .. },
+                },
+            ) if unit == "cent" => Some(event_id.as_str()),
+            (
+                SupportedEditOperation::Transpose,
+                ObligationScope::ScoreWide,
+                ObligationRequirement::ChangeBy {
+                    delta: AttributeValue::Numeric { value_microunits, unit },
+                },
+            ) if unit == "cent" && *value_microunits != 0 => None,
+            (SupportedEditOperation::Transpose, _, ObligationRequirement::ChangeBy { .. }) => {
+                return Err(EditContractError::InvalidOperationObligation(
+                    "transpose requires a nonzero score-wide pitch delta in base cent units",
+                ));
+            }
+            (SupportedEditOperation::PitchAt, _, _) => {
+                return Err(EditContractError::InvalidOperationObligation(
+                    "pitch-at requires one event-scoped ChangeTo pitch value in base cent units",
+                ));
+            }
+            (SupportedEditOperation::Transpose, _, _) => {
+                return Err(EditContractError::InvalidOperationObligation(
+                    "transpose requires one score-wide nonzero ChangeBy pitch delta",
+                ));
+            }
+        };
+
+        self.require_preservation(
+            EditAttribute::Onset,
+            |scope| matches!(scope, ObligationScope::ScoreWide),
+            ONSET_COMPARATOR_ID,
+            "seconds",
+            None,
+            "score-wide onset preservation",
+        )?;
+        self.require_preservation(
+            EditAttribute::Duration,
+            |scope| matches!(scope, ObligationScope::ScoreWide),
+            DURATION_COMPARATOR_ID,
+            "beats",
+            Some(0),
+            "exact score duration preservation",
+        )?;
+        self.require_preservation(
+            EditAttribute::RmsEnvelope,
+            |scope| match (operation, scope) {
+                (SupportedEditOperation::PitchAt, ObligationScope::Event { event_id }) => {
+                    Some(event_id.as_str()) == target_event_id
+                }
+                (SupportedEditOperation::Transpose, ObligationScope::ScoreWide) => true,
+                _ => false,
+            },
+            RMS_ENVELOPE_COMPARATOR_ID,
+            "db",
+            None,
+            "edited-region RMS envelope preservation",
+        )?;
+        self.require_preservation(
+            EditAttribute::NeighboringContent,
+            |scope| matches!(scope, ObligationScope::ProtectedRemainder),
+            PROTECTED_RMS_COMPARATOR_ID,
+            "db",
+            None,
+            "protected-region RMS preservation",
+        )?;
+        self.require_preservation(
+            EditAttribute::NeighboringContent,
+            |scope| matches!(scope, ObligationScope::ProtectedRemainder),
+            PROTECTED_SPECTRAL_COMPARATOR_ID,
+            "normalized_distance",
+            None,
+            "protected-region spectral preservation",
+        )?;
+
+        let renderer = self.obligations.iter()
+            .find(|o| o.attribute == EditAttribute::RendererConfig)
+            .ok_or(EditContractError::MissingRequiredObligation("renderer configuration digest"))?;
+        match (&renderer.scope, &renderer.requirement, renderer.critical) {
+            (ObligationScope::ScoreWide, ObligationRequirement::BindDigest { .. }, true) => {}
+            _ => return Err(EditContractError::InvalidOperationObligation(
+                "renderer configuration must be a critical score-wide digest obligation",
+            )),
+        }
+        Ok(operation)
+    }
+
+    fn require_attribute_count(
+        &self,
+        attribute: EditAttribute,
+        expected_count: usize,
+        label: &'static str,
+    ) -> Result<(), EditContractError> {
+        let count = self.obligations.iter().filter(|o| o.attribute == attribute).count();
+        if count < expected_count {
+            return Err(EditContractError::MissingRequiredObligation(label));
+        }
+        if count > expected_count {
+            return Err(EditContractError::DuplicateRequiredObligation(label));
+        }
+        Ok(())
+    }
+
+    fn require_preservation<F>(
+        &self,
+        attribute: EditAttribute,
+        scope_matches: F,
+        comparator_id: &str,
+        required_unit: &str,
+        required_tolerance: Option<u64>,
+        label: &'static str,
+    ) -> Result<(), EditContractError>
+    where
+        F: Fn(&ObligationScope) -> bool,
+    {
+        let matching: Vec<&EditObligation> = self.obligations.iter()
+            .filter(|o| o.attribute == attribute && scope_matches(&o.scope))
+            .filter(|o| matches!(
+                &o.requirement,
+                ObligationRequirement::PreserveWithin { comparator_id: actual, .. }
+                    if actual == comparator_id
+            ))
+            .collect();
+        if matching.is_empty() {
+            return Err(EditContractError::MissingRequiredObligation(label));
+        }
+        if matching.len() != 1 {
+            return Err(EditContractError::DuplicateRequiredObligation(label));
+        }
+        let obligation = matching[0];
+        let valid = match &obligation.requirement {
+            ObligationRequirement::PreserveWithin { comparator_id: actual, tolerance } => {
+                actual == comparator_id
+                    && tolerance.unit == required_unit
+                    && required_tolerance.is_none_or(|value| tolerance.value_microunits == value)
+            }
+            _ => false,
+        };
+        if !obligation.critical || !valid {
+            return Err(EditContractError::InvalidOperationObligation(label));
+        }
+        Ok(())
+    }
+
     fn validate_scope(scope: &ObligationScope) -> Result<(), EditContractError> {
         match scope {
             ObligationScope::Event { event_id } => {
@@ -315,6 +546,9 @@ impl FrozenEditContract {
             ObligationRequirement::ChangeTo { expected }
             | ObligationRequirement::ExactlyMatches { expected } => {
                 Self::validate_attribute_value(expected)
+            }
+            ObligationRequirement::ChangeBy { delta } => {
+                Self::validate_attribute_value(delta)
             }
             ObligationRequirement::PreserveWithin {
                 comparator_id,
@@ -399,7 +633,7 @@ mod tests {
             requirement: ObligationRequirement::ChangeTo {
                 expected: AttributeValue::Numeric {
                     value_microunits: 600_000_000,
-                    unit: "micro_cent".to_string(),
+                    unit: "cent".to_string(),
                 },
             },
             critical: true,
@@ -418,7 +652,7 @@ mod tests {
                 comparator_id: "rms-envelope-delta-v1".to_string(),
                 tolerance: QuantizedTolerance {
                     value_microunits: 1_000_000,
-                    unit: "micro_db".to_string(),
+                    unit: "db".to_string(),
                 },
             },
             critical: true,
