@@ -78,7 +78,7 @@ This suite measures retrieval support selection against manually authored synthe
 
 ### Eligibility-first ablation and its limits
 
-The eligibility arm uses the same BM25 candidate pool as the baseline, then filters before truncating to the same final top-k. The ledger contains policy metadata for every string-valued source pointer; missing entries are rejected rather than passed through. Its receipt binds the original candidate receipt, worker hash, source fixture hashes, eligibility-ledger digest, policy version, and output digest.
+The eligibility arm uses the same BM25 candidate pool as the baseline, then filters before truncating to the same final top-k. The ledger contains policy metadata for every string-valued source pointer; the CLI verifies exact one-to-one coverage of source string leaves, and missing, duplicate or dangling records fail closed. Its receipt binds the original candidate receipt, worker hash, source fixture hashes, versioned eligibility-ledger digest, filter-code SHA-256, policy version, intent mode, and output digest.
 
 Question `retrieval_intent` is manually annotated and therefore an **oracle input** in annotated mode. This isolates whether a correct temporal/epistemic eligibility policy can prevent stale evidence from consuming the answer budget; it is an upper bound, not evidence that Broca can infer intent correctly. Do not compare its result to BM25 as a production-system win.
 
