@@ -634,6 +634,11 @@ pub fn audit_onset_preservation(
         .min(usize::MAX as u128) as usize;
 
     let mut reasons = Vec::new();
+    if reference_onsets.is_empty() {
+        reasons.push(
+            "no protected reference onsets were detected; onset preservation is unmeasurable".to_owned(),
+        );
+    }
     if !missing_reference_events.is_empty() || !extra_candidate_events.is_empty() {
         reasons.push(
             "protected-region onset events are missing, added, or outside the timing tolerance"
@@ -652,7 +657,8 @@ pub fn audit_onset_preservation(
 
     let verdict = if !missing_reference_events.is_empty() || !extra_candidate_events.is_empty() {
         PreservationVerdict::Fail
-    } else if config.calibration_id.is_none()
+    } else if reference_onsets.is_empty()
+        || config.calibration_id.is_none()
         || protected_duration_frames < minimum_protected_frames
     {
         PreservationVerdict::Abstain
@@ -1105,6 +1111,21 @@ mod tests {
         .expect("valid audio");
         assert_eq!(report.verdict, PreservationVerdict::Abstain);
         assert!(report.reasons.iter().any(|reason| reason.contains("no calibration ID")));
+    }
+
+
+    #[test]
+    fn onset_audit_abstains_when_no_reference_onsets_are_measurable() {
+        let silence = vec![0.0; 8192];
+        let report = audit_onset_preservation(
+            view(&silence),
+            view(&silence),
+            &[],
+            &onset_config(),
+        )
+        .expect("valid silent buffers");
+        assert_eq!(report.verdict, PreservationVerdict::Abstain);
+        assert!(report.reasons.iter().any(|reason| reason.contains("no protected reference onsets")));
     }
 
 }
