@@ -113,13 +113,14 @@ impl SupportMeans {
         }
     }
 
-    fn marginal_action_values(self) -> [f64; 2] {
-        let mut values = [0.0_f64; 2];
-        for action in 0..2 {
-            values[action] = self.by_context_action.iter().map(|row| row[action]).sum::<f64>()
-                / TRAIN_CONTEXTS.len() as f64;
-        }
-        values
+    fn nearest_context_action_values(self) -> [f64; 2] {
+        // Held-out 11 is one factor flip away from the observed contexts 01 and 10.
+        // This is a strong non-model baseline: nearest-context fallback without fitting
+        // a compositional reward law.
+        [
+            (self.by_context_action[1][0] + self.by_context_action[2][0]) / 2.0,
+            (self.by_context_action[1][1] + self.by_context_action[2][1]) / 2.0,
+        ]
     }
 
     // An additive model has p(x,y) = intercept + x_effect*x + y_effect*y.
@@ -159,7 +160,7 @@ impl Strategy {
 
     fn name(self) -> &'static str {
         match self {
-            Self::DirectTabular => "direct_tabular_fallback",
+            Self::DirectTabular => "direct_nearest_context",
             Self::LearnedAdditiveModel => "learned_additive_model",
             Self::ShuffledModel => "shuffled_model_control",
             Self::StaleAdditiveModel => "stale_model_control",
@@ -190,7 +191,7 @@ fn choose_action(values: [f64; 2]) -> usize {
 fn decide(world: WorldFamily, support: SupportMeans, strategy: Strategy) -> Decision {
     let model_prediction = support.additive_prediction_at_heldout();
     let (action, predictions) = match strategy {
-        Strategy::DirectTabular => (choose_action(support.marginal_action_values()), None),
+        Strategy::DirectTabular => (choose_action(support.nearest_context_action_values()), None),
         Strategy::LearnedAdditiveModel => (choose_action(model_prediction), Some(model_prediction)),
         Strategy::ShuffledModel => {
             let shuffled = [model_prediction[1], model_prediction[0]];
@@ -243,17 +244,8 @@ fn nearest_model_mae(predictions: Option<[f64; 2]>, world: WorldFamily) -> Optio
             reward_probability(world, HELDOUT_CONTEXT, 0),
             reward_probability(world, HELDOUT_CONTEXT, 1),
         ];
-        (values[0] - truth[0]).abs().add((values[1] - truth[1]).abs()) / 2.0
+        ((values[0] - truth[0]).abs() + (values[1] - truth[1]).abs()) / 2.0
     })
-}
-
-trait AddF64 {
-    fn add(self, other: f64) -> f64;
-}
-impl AddF64 for f64 {
-    fn add(self, other: f64) -> f64 {
-        self + other
-    }
 }
 
 fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direct_net: f64, seed: u64) -> StrategyResult {
