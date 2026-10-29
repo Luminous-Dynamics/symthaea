@@ -21,7 +21,7 @@ ALLOWED_NORMALIZATION_SOURCES = {"predeclared_bounds", "training_archive_only"}
 FIDELITIES = ("low", "medium", "high")
 CONTRACT_FIELDS = frozenset({
     "schema_version", "contract_id", "upstream_repository", "upstream_commit_sha",
-    "task_suite_sha256", "evidence_class", "objective_directions",
+    "task_suite_path", "task_suite_sha256", "evidence_class", "objective_directions",
     "normalization_offset", "normalization_scale", "normalization_source",
     "normalization_frozen_before_unseal", "scalarization_weights",
     "scalarization_frozen_before_unseal", "constraint_fidelity_invariant",
@@ -87,6 +87,18 @@ def canonical_json(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
 
 
+def _safe_repo_file(relative: object, label: str) -> Path:
+    name = _nonblank(relative, label)
+    candidate = Path(name)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError(f"{label} must be a repository-relative path without parent traversal")
+    root = Path(__file__).resolve().parents[2]
+    resolved = (root / candidate).resolve()
+    if root not in resolved.parents or not resolved.is_file():
+        raise ValueError(f"{label} must resolve to an existing file inside the repository")
+    return resolved
+
+
 def _load_lock() -> tuple[dict[str, Any], bytes]:
     path = Path(__file__).with_name("baselines") / "mf_scbo_lock_v1.json"
     raw = path.read_bytes()
@@ -115,7 +127,11 @@ def validate_contract(raw: Any) -> dict[str, Any]:
     if contract["upstream_commit_sha"] != lock.get("upstream_commit_sha"):
         raise ValueError("upstream_commit_sha does not match the pinned MF-SCBO source lock")
 
-    _sha256(contract["task_suite_sha256"], "task_suite_sha256")
+    declared_suite_digest = _sha256(contract["task_suite_sha256"], "task_suite_sha256")
+    suite_path = _safe_repo_file(contract["task_suite_path"], "task_suite_path")
+    actual_suite_digest = hashlib.sha256(suite_path.read_bytes()).hexdigest()
+    if declared_suite_digest != actual_suite_digest:
+        raise ValueError("task_suite_sha256 does not match the referenced suite file bytes")
     _sha256(contract["constraint_definition_sha256"], "constraint_definition_sha256")
     if contract["evidence_class"] not in ALLOWED_EVIDENCE:
         raise ValueError("evidence_class is unsupported")
@@ -271,7 +287,9 @@ def evaluate_contract_receipt(contract_bytes: bytes, validated_contract: dict[st
         "upstream_repository": lock["upstream_repository"],
         "upstream_commit_sha": lock["upstream_commit_sha"],
         "evidence_class": validated_contract["evidence_class"],
+        "task_suite_path": validated_contract["task_suite_path"],
         "task_suite_sha256": validated_contract["task_suite_sha256"],
+        "constraint_definition_sha256": validated_contract["constraint_definition_sha256"],
         "scalarization_weight_count": len(validated_contract["scalarization_weights"]),
         "constraint_fidelity_invariant": validated_contract["constraint_fidelity_invariant"],
         "fidelity_cost_units": validated_contract["fidelity_cost_units"],
@@ -283,10 +301,15 @@ def evaluate_contract_receipt(contract_bytes: bytes, validated_contract: dict[st
             "mf_scbo_lock_sha256": hashlib.sha256(lock_bytes).hexdigest(),
             "preflight_evaluator_sha256": source_digest,
         },
+        "holdout_truth_limit": (
+            "The preflight validates a declared independent_held_out split and freeze-before-unseal flags, "
+            "but cannot prove independence, source/target family disjointness, or holdout secrecy from the manifest alone."
+        ),
         "claim_ceiling": (
-            "The preflight contract passed schema, source-pin, scalarization, constraint-compatibility, "
-            "holdout-separation, and initialization-cost checks. This is not an MF-SCBO execution, "
-            "benchmark result, reproduced baseline, SOTA comparison, or physical-safety certification."
+            "The preflight verified the referenced task-suite file digest and passed schema, source-pin, "
+            "scalarization, constraint-compatibility and initialization-cost checks. Holdout timing and independence "
+            "remain assertions. This is not an MF-SCBO execution, benchmark result, reproduced baseline, "
+            "SOTA comparison, or physical-safety certification."
         ),
     }
 
