@@ -698,7 +698,12 @@ mod tests {
             vec![vec![0.5, 0.5], vec![0.5, 0.5]],
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         );
-        let report = run_experiment_policy_bakeoff("truth-with-unseen-outcome", &truth, &[nominal, alternative]).unwrap();
+        let report = run_experiment_policy_bakeoff(
+            "truth-with-unseen-outcome",
+            &truth,
+            &[nominal, alternative],
+        )
+        .unwrap();
         let candidate = report.candidate_results.iter()
             .find(|result| result.experiment_id == "A-nominal-perfect").unwrap();
         assert!((candidate.unsupported_outcome_probability - 0.5).abs() < 1e-12);
