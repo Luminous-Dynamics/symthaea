@@ -231,7 +231,9 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
             issues.push(format!("duplicate pair_id: {}", pair.pair_id));
         }
         if !valid_digest(&pair.task_ref_sha256) {
-            issues.push(format!("{pair_prefix}.task_ref_sha256 must be a lowercase SHA-256 digest"));
+            issues.push(format!(
+                "{pair_prefix}.task_ref_sha256 must be a lowercase SHA-256 digest"
+            ));
         }
         if pair.task_family_id.trim().is_empty() || pair.task_family_id.len() > 128 {
             issues.push(format!("{pair_prefix}.task_family_id must be 1..=128 characters"));
@@ -267,17 +269,24 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
                 ));
             }
             if !valid_digest(&trial.policy_input_sha256) {
-                issues.push(format!("{trial_prefix}.policy_input_sha256 must be a lowercase SHA-256 digest"));
+                issues.push(format!(
+                    "{trial_prefix}.policy_input_sha256 must be a lowercase SHA-256 digest"
+                ));
             }
             if !valid_digest(&trial.evidence_manifest_sha256) {
-                issues.push(format!("{trial_prefix}.evidence_manifest_sha256 must be a nonzero lowercase SHA-256 digest"));
+                issues.push(format!(
+                    "{trial_prefix}.evidence_manifest_sha256 must be a nonzero lowercase SHA-256 digest"
+                ));
             } else if !evidence_manifest_digests.insert(trial.evidence_manifest_sha256.as_str()) {
                 issues.push(format!(
-                    "{pair_prefix} reuses evidence_manifest_sha256 across conditions; condition-specific evidence/provenance manifests must have distinct commitments"
+                    "{pair_prefix} reuses evidence_manifest_sha256 across conditions; condition-specific \
+                     evidence/provenance manifests must have distinct commitments"
                 ));
             }
             if !valid_digest(&trial.seed_commitment_sha256) {
-                issues.push(format!("{trial_prefix}.seed_commitment_sha256 must be a lowercase SHA-256 digest"));
+                issues.push(format!(
+                    "{trial_prefix}.seed_commitment_sha256 must be a lowercase SHA-256 digest"
+                ));
             }
             if trial.randomization_order as usize >= fields.required_conditions.len() {
                 issues.push(format!(
@@ -319,8 +328,8 @@ pub fn compute_evidence_intervention_plan_commitment(
     if !issues.is_empty() {
         return Err(format!("plan fields invalid: {}", issues.join("; ")));
     }
-    let payload =
-        serde_json::to_vec(&fields).map_err(|error| format!("cannot serialize plan fields: {error}"))?;
+    let payload = serde_json::to_vec(&fields)
+        .map_err(|error| format!("cannot serialize plan fields: {error}"))?;
     digest_domain_framed(b"plan.v1", &payload)
 }
 
@@ -393,7 +402,10 @@ mod tests {
     }
 
     fn fields() -> EvidenceInterventionPlanFieldsV1 {
-        let required_conditions = CONDITIONS.iter().map(|value| (*value).to_owned()).collect::<Vec<_>>();
+        let required_conditions = CONDITIONS
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect::<Vec<_>>();
         let trials = CONDITIONS.iter().enumerate().map(|(index, condition)| {
             EvidenceInterventionTrialV1 {
                 trial_id: format!("trial-{index}"),
