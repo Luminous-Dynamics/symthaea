@@ -42,8 +42,8 @@
       "const": "https://github.com/timfarkas/ConnectomeBench2"
     },
     "upstream_commit": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{40}$"
+      "const": "5679b39aa2641d8d0afeed88b441e696f87a66df",
+      "description": "Exact ConnectomeBench2 source commit whose route_row and derive_task_routing semantics were reviewed. Change this pin only alongside a new source audit and corresponding tool contract update."
     },
     "task": {
       "enum": [
