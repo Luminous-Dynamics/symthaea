@@ -75,7 +75,7 @@ def load_ledger(records: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str
         key = evidence_key(row, f"ledger row {index}")
         status = row.get("status")
         reason = row.get("reason")
-        if status not in ALLOWED_STATUSES:
+        if not isinstance(status, str) or status not in ALLOWED_STATUSES:
             raise ValueError(f"ledger row {index}: unsupported status {status!r}")
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError(f"ledger row {index}: reason must be a non-empty string")
@@ -94,7 +94,7 @@ def _index_questions(questions: list[dict[str, Any]]) -> dict[str, dict[str, Any
         if question_id in indexed:
             raise ValueError(f"duplicate question_id: {question_id}")
         intent = question.get("retrieval_intent")
-        if intent not in ELIGIBLE_BY_INTENT:
+        if not isinstance(intent, str) or intent not in ELIGIBLE_BY_INTENT:
             raise ValueError(f"{question_id}: unknown or missing retrieval_intent {intent!r}")
         indexed[question_id] = question
     if not indexed:
@@ -234,9 +234,15 @@ def verify_input_manifest(
         raise ValueError("candidate receipt question_count mismatch")
     if manifest.get("trajectory_count") != len(trajectories):
         raise ValueError("candidate receipt trajectory_count mismatch")
-    if len({row.get("id") for row in trajectories}) != len(trajectories):
+    trajectory_ids = [row.get("id") for row in trajectories]
+    question_ids = [row.get("question_id") for row in questions]
+    if any(not isinstance(value, str) or not value for value in trajectory_ids):
+        raise ValueError("trajectory IDs must be non-empty strings")
+    if any(not isinstance(value, str) or not value for value in question_ids):
+        raise ValueError("question IDs must be non-empty strings")
+    if len(set(trajectory_ids)) != len(trajectories):
         raise ValueError("trajectory IDs must be unique")
-    if len({row.get("question_id") for row in questions}) != len(questions):
+    if len(set(question_ids)) != len(questions):
         raise ValueError("question IDs must be unique")
     if set(row.get("question_id") for row in prediction_rows) != set(
         row.get("question_id") for row in questions
