@@ -39,14 +39,19 @@ impl Violation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ValidationReport {
-    pub valid: bool,
+    /// True only when the LEP schema and implemented semantic consistency
+    /// checks accept the input. This is not a claim that the evidence is true.
+    pub conforms: bool,
+    /// Explicitly narrows what this report attests to.
+    pub scope: &'static str,
     pub violations: Vec<Violation>,
 }
 
 impl ValidationReport {
     fn from_violations(violations: Vec<Violation>) -> Self {
         Self {
-            valid: violations.is_empty(),
+            conforms: violations.is_empty(),
+            scope: "LEP_SCHEMA_AND_SEMANTIC_CHECKS_ONLY",
             violations,
         }
     }
@@ -802,7 +807,7 @@ mod tests {
     #[test]
     fn valid_synthetic_statement_is_accepted() {
         let report = verify_statement(&minimal_statement());
-        assert!(report.valid, "{:?}", report.violations);
+        assert!(report.conforms, "{:?}", report.violations);
     }
 
     #[test]
@@ -811,7 +816,7 @@ mod tests {
         statement["predicate"]["execution"]["status"] = json!("queued");
         statement["predicate"]["execution"]["result"] = json!("passed");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "EXECUTION_STATUS_RESULT_CONFLICT"));
         assert!(has_code(&report, "PASSED_VERIFICATION_WITHOUT_PASSED_EXECUTION"));
     }
@@ -822,7 +827,7 @@ mod tests {
         statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
             json!("deadbeef1234567");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "LEP_TARGET_MISMATCH"));
     }
 
@@ -833,7 +838,7 @@ mod tests {
         statement["predicate"]["verification"]["checkedTarget"]["configurationDigest"]["sha256"] =
             json!("deadbeef");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "INVALID_DIGEST_VALUE"));
     }
 
@@ -848,7 +853,7 @@ mod tests {
         statement["predicate"]["verification"]["checkedTarget"] = Value::Null;
         statement["predicate"]["verification"]["checks"] = json!([]);
         let report = verify_statement(&statement);
-        assert!(report.valid, "{:?}", report.violations);
+        assert!(report.conforms, "{:?}", report.violations);
     }
 
     #[test]
@@ -859,7 +864,7 @@ mod tests {
         statement["predicate"]["execution"]["runId"] = Value::Null;
         statement["predicate"]["verification"]["outcome"] = json!("not_run");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "UNRUN_VERIFICATION_HAS_VERIFIER"));
         assert!(has_code(&report, "UNRUN_VERIFICATION_HAS_TARGET"));
         assert!(has_code(&report, "UNRUN_VERIFICATION_HAS_CHECKS"));
@@ -871,7 +876,7 @@ mod tests {
             "../../../docs/research/fixtures/luminous-evidence-v0.1/semantic-stale-target.json"
         )).expect("stale-target fixture must be valid JSON");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "LEP_TARGET_MISMATCH"), "{:?}", report.violations);
     }
 
@@ -881,7 +886,7 @@ mod tests {
             "../../../docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json"
         )).expect("valid fixture must be valid JSON");
         let report = verify_statement(&statement);
-        assert!(report.valid, "{:?}", report.violations);
+        assert!(report.conforms, "{:?}", report.violations);
     }
 
     #[test]
@@ -890,7 +895,7 @@ mod tests {
             "../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-queued-but-passed.json"
         )).expect("queued-but-passed fixture must be valid JSON");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "EXECUTION_STATUS_RESULT_CONFLICT"), "{:?}", report.violations);
     }
 
@@ -900,7 +905,7 @@ mod tests {
             "../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-missing-target.json"
         )).expect("missing-target fixture must be valid JSON");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "MISSING_TARGET"), "{:?}", report.violations);
     }
 
@@ -911,7 +916,7 @@ mod tests {
         statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
             json!("main");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "SOURCE_REVISION_NOT_IMMUTABLE"));
     }
 
@@ -920,7 +925,7 @@ mod tests {
         let mut statement = minimal_statement();
         statement["predicate"]["verification"]["checks"] = json!([]);
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "EXECUTED_VERIFICATION_HAS_NO_CHECKS"));
     }
 
@@ -929,7 +934,7 @@ mod tests {
         let mut statement = minimal_statement();
         statement["predicate"]["verification"]["outcome"] = json!("failed");
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "FAILED_VERIFICATION_WITHOUT_FAILED_CHECK"));
     }
 
@@ -941,7 +946,7 @@ mod tests {
             {"id": "check", "outcome": "failed"}
         ]);
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "INCONCLUSIVE_VERIFICATION_CHECK_CONFLICT"));
     }
 
@@ -953,7 +958,7 @@ mod tests {
             {"id": "same", "outcome": "passed"}
         ]);
         let report = verify_statement(&statement);
-        assert!(!report.valid);
+        assert!(!report.conforms);
         assert!(has_code(&report, "DUPLICATE_CHECK_ID"));
     }
 }
