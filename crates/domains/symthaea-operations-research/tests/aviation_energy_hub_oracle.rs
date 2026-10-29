@@ -217,6 +217,16 @@ fn initial_soc_is_bound_to_scenario_identity() {
 }
 
 #[test]
+fn positive_opening_soc_requires_a_non_sentinel_inventory_ledger_reference() {
+    let mut case = frontier_scenario();
+    case.storage.initial_soc_quanta = 1;
+    assert_eq!(
+        solve_exact_energy_hub_pareto(&case, 100_000).unwrap_err(),
+        EnergyHubError::MissingIdentifier("opening SOC inventory ledger reference")
+    );
+}
+
+#[test]
 fn opening_storage_inventory_can_serve_demand_without_rebooking_upstream_impacts() {
     let case = seal(TimeIndexedEnergyHubScenario {
         scenario_id: "hub-opening-inventory-synthetic-v1".to_owned(),
