@@ -224,7 +224,7 @@ fn validate_pair(pair: &CounterfactualPairFixture) -> Result<(), String> {
     }
     let expected_path = expected_mutation_path(&pair.family)
         .ok_or_else(|| format!("no pinned changed-field path for family {:?}", pair.family))?;
-    if actual_changes.as_slice() != [expected_path] {
+    if actual_changes.len() != 1 || actual_changes[0] != expected_path {
         return Err(format!(
             "mutation family {:?} requires changed path {:?}, observed {:?}",
             pair.family, expected_path, actual_changes
