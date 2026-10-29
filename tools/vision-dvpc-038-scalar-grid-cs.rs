@@ -166,14 +166,12 @@ fn evaluate(s: &Scenario) -> Result<Evaluation, String> {
 
     for path in 0..PATHS {
         let mut code = path;
-        let mut events = [0_u8; HORIZON];
         let mut samples = [0.0_f64; HORIZON];
         let mut complements = [0.0_f64; HORIZON];
         let mut path_probability = 1.0;
         for look in 0..s.horizon {
             let event = (code % 4) as u8;
             code /= 4;
-            events[look] = event;
             path_probability *= event_probs[event as usize];
             match event {
                 0 => { samples[look] = 0.0; complements[look] = weight_a; }
