@@ -257,9 +257,11 @@ fn simulate(f:Fixture,reps:usize,looks:&[usize])->Result<ResultFixture,String>{
     Ok(ResultFixture{fixture:f,true_value:true_value(),qualification:qualification(f),bound,common,ipcw,elapsed:start.elapsed().as_secs_f64()})
 }
 fn emit(out:&mut String,r:&ResultFixture,looks:&[usize]){
-    let qmin=target_q_min(r.fixture);
     let model=if r.fixture.model==CensorModel::RewardDependent{"reward_dependent"}else{"independent_cell"};
-    let _=writeln!(out,"FIXTURE\t{}\tqualification\t{}\ttrue_value\t{:.8}\tcensor_model\t{}\tmin_target_maturity_probability\t{:.8}\tipcw_score_bound\t{}",
+    let qmin=if r.fixture.model==CensorModel::RewardDependent{
+        "NOT_APPLICABLE_MNAR".to_owned()
+    }else{format!("{:.8}",target_q_min(r.fixture))};
+    let _=writeln!(out,"FIXTURE\t{}\tqualification\t{}\ttrue_value\t{:.8}\tcensor_model\t{}\tmin_target_maturity_probability\t{}\tipcw_score_bound\t{}",
         r.fixture.name,r.qualification,r.true_value,model,qmin,r.bound.map(|x|format!("{x:.8}")).unwrap_or_else(||"SUPPRESSED".into()));
     for (li,n) in looks.iter().copied().enumerate(){
         for (i,name) in COMMON_NAMES.iter().enumerate(){
