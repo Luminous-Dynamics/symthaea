@@ -19,6 +19,7 @@
 //! - [`aviation_energy_accounting`]: fail-closed energy, CO2e, cost and transport-service accounting.
 //! - [`aviation_energy_dispatch`]: bounded exact/greedy energy sourcing with Pareto results and independent plan verification.
 //! - [`aviation_energy_hub`]: time-indexed synthetic airport electricity, storage, and Pareto dispatch with independent verification.
+//! - [`aviation_energy_hub_rolling`]: forecast-as-of-decision rolling-horizon energy decisions with carried SOC and independent realized replay.
 //! - [`aviation_energy_hub_robustness`]: weighted stress replay, explicit feasibility coverage, and perfect-information recourse reference.
 //! - [`aviation_energy_hub_nonanticipativity`]: independent verification that scenarios with identical observed history take identical actions.
 //! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage,
@@ -48,6 +49,7 @@ pub mod aviation_data_contract;
 pub mod aviation_energy_accounting;
 pub mod aviation_energy_dispatch;
 pub mod aviation_energy_hub;
+pub mod aviation_energy_hub_rolling;
 pub mod aviation_energy_hub_robustness;
 pub mod aviation_energy_hub_nonanticipativity;
 pub mod aviation_decision_readiness;
