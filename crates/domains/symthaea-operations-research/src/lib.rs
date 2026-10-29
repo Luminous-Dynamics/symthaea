@@ -20,21 +20,15 @@
 //! - [`aviation_energy_dispatch`]: bounded exact/greedy energy sourcing with Pareto results and independent plan verification.
 //! - [`aviation_energy_hub`]: time-indexed synthetic airport electricity, storage, and Pareto dispatch with independent verification.
 //! - [`aviation_energy_hub_rolling`]: forecast-as-of-decision rolling-horizon energy decisions with carried SOC and independent realized replay.
+//! - [`aviation_energy_hub_paired_benchmark`]: paired static, greedy, rolling-horizon and perfect-information policy evaluation with explicit coverage/regret.
 //! - [`aviation_energy_hub_robustness`]: weighted stress replay, explicit feasibility coverage, and perfect-information recourse reference.
 //! - [`aviation_energy_hub_nonanticipativity`]: independent verification that scenarios with identical observed history take identical actions.
-//! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage,
-//!   chronology checks, and a fail-closed guard against declared test-set tuning.
-//! - [`aviation_probability_calibration`]: conservative finite-sample TV-radius calibration
-//!   from frozen calibration-partition frequencies, with explicit sampling allowance.
-//! - [`aviation_online_drift`]: frozen-reference, anytime-valid likelihood-ratio monitoring
-//!   for predeclared categorical alternatives, with a separate out-of-support alarm.
-//! - [`aviation_decision_readiness`]: composed fail-closed human-review gate over feature,
-//!   split, plan verification, active calibration, drift and robust-cost assessments.
-//! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
-//!   over paired candidate/baseline costs, with read-only reports and robust gates.
-//! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
-//!   with a separately implemented plan verifier and negative controls. This is
-//!   not dispatch, maintenance-release, or airworthiness authority.
+//! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage, chronology checks, and a fail-closed guard against declared test-set tuning.
+//! - [`aviation_probability_calibration`]: conservative finite-sample TV-radius calibration from frozen calibration-partition frequencies, with explicit sampling allowance.
+//! - [`aviation_online_drift`]: frozen-reference, anytime-valid likelihood-ratio monitoring for predeclared categorical alternatives, with a separate out-of-support alarm.
+//! - [`aviation_decision_readiness`]: composed fail-closed human-review gate over feature, split, plan verification, active calibration, drift and robust-cost assessments.
+//! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation over paired candidate/baseline costs, with read-only reports and robust gates.
+//! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture, with a separately implemented plan verifier and negative controls. This is not dispatch, maintenance-release, or airworthiness authority.
 //!
 //! ## Example
 //!
@@ -50,6 +44,7 @@ pub mod aviation_energy_accounting;
 pub mod aviation_energy_dispatch;
 pub mod aviation_energy_hub;
 pub mod aviation_energy_hub_rolling;
+pub mod aviation_energy_hub_paired_benchmark;
 pub mod aviation_energy_hub_robustness;
 pub mod aviation_energy_hub_nonanticipativity;
 pub mod aviation_decision_readiness;

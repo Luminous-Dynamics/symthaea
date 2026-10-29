@@ -504,3 +504,89 @@ Required next gates:
 - separately report infeasible and unresolved weight, runtime, P50/P95/P99, and work counters.
 
 No real airport saving, robust probability claim, or SOTA result follows from the synthetic runner.
+
+
+## 17. P3 paired policy bake-off — static versus rolling versus clairvoyant (2026-10-29)
+
+The paired benchmark evaluator runs four policies over one weighted, fixed scenario panel:
+
+1. **Static plan:** actions from a separately verified frozen baseline are replayed unchanged against every realized scenario; each replay is independently re-verified.
+2. **Greedy baseline:** the existing deterministic renewable-first/grid-second/battery-last policy is evaluated on each realized scenario.
+3. **Rolling horizon:** the timestamped forecast-as-of-decision policy is replayed on that scenario, carrying state of charge and source-flow accounting forward.
+4. **Perfect-information exact:** the exact energy-hub solver sees the full realized scenario. This is an optimistic reference, not an implementable policy.
+
+### Paired evaluation contract
+
+- Scenario weights are positive integer ppm and sum exactly to 1,000,000. Treat them as design weights unless empirically calibrated.
+- Every scenario binds a canonical digest and must share currency, energy quantum, service/lifecycle accounting denominator, physical storage/opening-inventory configuration, and ordered interval grid with the frozen baseline.
+- A single baseline plan is verified against its source scenario, then its action sequence is rebound to each realized scenario and independently verified there.
+- Static, greedy, rolling and exact results carry independent feasibility verification. Search-budget exhaustion is unresolved, not infeasible. An actual no-plan result is separate from unresolved solver failure.
+- Each policy reports feasible, infeasible and unresolved weight; conditional mean cost/CO2e is accompanied by its feasible-weight denominator. Missing scenarios are never assigned zero cost.
+- Paired delta statistics are calculated only on scenarios where both compared policies have verified feasible plans. The report includes rolling cost regret relative to the perfect-information reference, static-minus-rolling cost and greedy-minus-rolling cost.
+- If rolling's cost is lower than the exact perfect-information minimum beyond tolerance on any scenario with the same objective and constraints, the bake-off fails closed with a comparator-dominance error; inspect accounting, scenario identity or solver correctness before reporting a gain.
+- The canonical benchmark digest binds the frozen baseline identity/actions, weighted scenario/forecast episode digests, policy statuses and evaluated output metrics/actions.
+
+### Required interpretation
+
+Feasibility gains and cost gains are separate. If the frozen schedule is infeasible under a stress case but rolling dispatch succeeds, report the avoided infeasibility by scenario/weight; do not hide that case by calculating cost only on successful static cases. Conversely, if rolling remains more expensive than the clairvoyant reference under an inaccurate forecast, report the regret as the observable cost of forecast error and delayed information.
+
+A paired synthetic fixture holds identical service and storage configuration. One realized scenario has cheap future grid energy; a second has a first-interval grid-capacity outage. The frozen plan becomes infeasible in the outage while rolling recourse uses the opening inventory and then buys later grid energy. The exact full-information cost is a lower bound; rolling regret is computed only on the jointly feasible subset. All inputs are synthetic.
+
+### Claim ceiling
+
+This evaluator is a small synthetic benchmark harness. It does not imply calibrated scenario probabilities, real-world dispatch savings, causal operational impact, aircraft feasibility or SOTA outperformance. The next benchmark stage must reproduce a published charging/microgrid baseline on matched data/formulation and then compare paired held-out scenarios with identical inputs and compute budgets.
+
+
+## 18. P3 paired policy bake-off — coverage, recourse value and regret (2026-10-29)
+
+The paired benchmark module consumes one verified frozen baseline plan and a weighted panel of realized scenarios with forecast histories. It evaluates four policy families on the same panel:
+
+- **Static:** replay the same actions against each scenario, without changing the plan.
+- **Greedy:** run the renewable-first/grid-second/battery-last benchmark on each realized scenario.
+- **Rolling:** run the information-time-constrained policy with its supplied forecast history and state carryover.
+- **Perfect information:** exact solve on the complete realized scenario, reported only as an optimistic reference.
+
+### Required outputs
+
+For each policy, report feasible, infeasible and unresolved weight separately; mean cost and accounted lifecycle CO2e conditional on feasible weight; and worst feasible cost/emissions. Pairwise deltas only use the scenarios where both policies have independently verified feasible results.
+
+The evaluator reports:
+- rolling cost regret relative to the perfect-information minimum;
+- static-minus-rolling cost, where positive means rolling recourse was cheaper;
+- greedy-minus-rolling cost, where positive means rolling recourse was cheaper;
+- comparable weight for each paired delta, so the denominator is never implicit.
+
+An exact comparator dominance guard fails the evaluation if a feasible rolling plan is cheaper than the exact perfect-information minimum beyond numeric tolerance under the same scenario, objective and hard constraints. Such a result is a solver/accounting/comparator defect until independently resolved, not evidence of a breakthrough.
+
+### Reproducibility
+
+The paired benchmark digest binds the baseline scenario digest and actions, sorted weighted scenario IDs, scenario/forecast episode digests, per-policy statuses, verified actions/metrics, rolling timestamps and planning digests, and the search budget. The panel's integer weights must sum exactly to 1,000,000 ppm. These weights are scenario-design weights unless calibrated; they must not be reported as empirical probabilities by default.
+
+### Synthetic result interpretation
+
+The paired fixture contains a regular low-future-price scenario and a first-interval grid-capacity outage. One frozen schedule is feasible in the regular case but fails the outage; rolling recourse succeeds in both. The clairvoyant exact policy is the cost floor, and rolling regret reflects the information available when each action was committed. These figures are synthetic and are a falsifier demonstration, not an airport savings estimate.
+
+The evaluator does not prove SOTA. A credible superiority claim still requires protocol parity, identical input/data/compute budgets, chronological holdout, exact-oracle parity on tractable cases, and independent physical/lifecycle data where the claim requires them.
+
+
+## 19. Multi-energy airport benchmark target — electricity, hydrogen and heat (research update 2026-10-29)
+
+A January 2026 study formulates an integrated electricity-thermal-hydrogen airport microgrid for electric, hybrid hydrogen-electric and hydrogen-powered aircraft. It combines PV, hydrogen fuel cells, electrolysers, battery/hydrogen/thermal storage and flight-schedule-linked demand. Its Manchester Airport case study reports a 29.4% increase in grid flexibility and a 63.2% reduction in the study's operational-risk measure under its proposed coordinated-dispatch strategy. The article says its underlying data are available on request, so exact reproduction depends on obtaining the data and complete formulation. Source: https://www.sciencedirect.com/science/article/pii/S259011682500092X (DOI 10.1016/j.etran.2025.100485).
+
+**Benchmark rule:** these percentages are literature claims under that paper's particular model and scenarios, not Symthaea performance. Before comparison, recover its operational-risk definition, flexibility metric, baseline scenario, energy-conversion assumptions, flight-schedule dataset, storage/fuel constraints and uncertainty treatment. If the original data/formulation is unavailable, label the test a related synthetic comparison, not a reproduction.
+
+This strengthens the next multi-energy extension target: preserve separate electricity, hydrogen and thermal balances, conversion efficiencies/losses, storage provenance, firm supply, and flight/fuel service requirements. Do not treat hydrogen as a free energy source: electrolyser input electricity and heat, compression/liquefaction, storage/boil-off, transport and fuel-cell/combustion conversion must be represented at consistent lifecycle boundaries. An SMR or future fusion plant can enter as a declared ground-side source scenario, with availability/cost/emissions evidence explicitly marked; onboard reactor assumptions are not needed to test the airport energy system.
+
+A related September 2026 ground-equipment demonstration at Exeter Airport tested a hydrogen/diesel dual-fuel ground power unit for 15 tests over almost six hours across eight operational days; it used 7.41 kg hydrogen, displaced an estimated 24.23 litres diesel and avoided an estimated 63.9 kg CO2. Source: https://www.cranfield.ac.uk/press/news-2026/winter-hydrogen-trial-at-exeter-airport-strengthens-case-for-lower-carbon-ground-operations. This is useful field evidence for a particular ground-support application, not evidence that hydrogen aircraft or a complete zero-carbon airline are commercially ready.
+
+### Multi-energy acceptance gates
+
+- One energy-and-material ledger per carrier with explicit conversion and lifecycle boundaries; avoid double-counting electrolyser electricity as both delivered electricity and hydrogen upstream input.
+- Supply, conversion, storage and demand balances independently reverified per interval.
+- Hydrogen inventory traceability includes source, production pathway, compression/transport losses and usable lower-heating-value convention.
+- Grid flexibility and operational-risk definitions are formalized before scoring; reproduce published metrics exactly or report why they differ.
+- Benchmark electricity-only, electricity + storage, electricity + hydrogen, and full multi-energy variants on paired flight schedules and stress scenarios.
+- Report cost, lifecycle CO2e, unmet-energy/flight service, peak import, flexibility and operational risk separately. A weighted score cannot hide an energy-service failure.
+
+
+Paired scenario panels must also share the same decision timestamps, observation-availability timestamps, and forecast issue/availability schedule. If information timing differs, the evaluator rejects the panel rather than attributing the resulting performance difference to the policy.
