@@ -759,6 +759,13 @@ fn validate_scenario(
     }
     let storage = &scenario.storage;
     require_identifier(&storage.initial_soc_ledger_ref, "opening SOC inventory ledger reference")?;
+    if storage.initial_soc_quanta > 0
+        && storage.initial_soc_ledger_ref == "none:opening-soc"
+    {
+        return Err(EnergyHubError::MissingIdentifier(
+            "opening SOC inventory ledger reference",
+        ));
+    }
     if storage.capacity_quanta > MAX_QUANTA_PER_INTERVAL
         || storage.initial_soc_quanta > storage.capacity_quanta
         || storage.max_charge_input_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
