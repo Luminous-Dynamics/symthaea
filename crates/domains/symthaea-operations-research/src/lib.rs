@@ -28,6 +28,8 @@
 //! - [`aviation_enterprise`]: tiny exact cross-lifecycle aviation research fixture,
 //!   with a separately implemented plan verifier and negative controls. This is
 //!   not dispatch, maintenance-release, or airworthiness authority.
+//! - [`aviation_adaptive_screen`]: certified adaptive screening over a frozen finite
+//!   candidate universe, with explicit lower bounds and honest timeout/evidence states.
 //!
 //! ## Example
 //!
@@ -37,6 +39,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod aviation_adaptive_screen;
 pub mod aviation_calibration_protocol;
 pub mod aviation_data_contract;
 pub mod aviation_decision_readiness;
