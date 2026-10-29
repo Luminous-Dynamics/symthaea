@@ -315,11 +315,13 @@ def resolve_query(
     for event in events:
         if event["kind"] != "retract" or event["_recorded_at"] > known_at:
             continue
+        target = by_id[event["target_event_id"]]
+        if target["subject"] != query["subject"] or target["attribute"] != query["attribute"]:
+            continue
         record = admission[event["event_id"]]
         if not record["admitted"]:
             excluded.append({"event_id": event["event_id"], "reason": record["reason"] or "retraction not admitted"})
             continue
-        target = by_id[event["target_event_id"]]
         if not admission[target["event_id"]]["admitted"]:
             excluded.append({
                 "event_id": event["event_id"],
@@ -335,6 +337,8 @@ def resolve_query(
             continue
         if event["_recorded_at"] > known_at:
             continue
+        if event["subject"] != query["subject"] or event["attribute"] != query["attribute"]:
+            continue
         if not admission[event["event_id"]]["admitted"]:
             excluded.append({
                 "event_id": event["event_id"],
@@ -349,8 +353,6 @@ def resolve_query(
             excluded.append({"event_id": event["event_id"], "reason": "source outside current policy scope"})
             continue
         if event["event_id"] in applied_retractions:
-            continue
-        if event["subject"] != query["subject"] or event["attribute"] != query["attribute"]:
             continue
         if event["_valid_from"] > query["_valid_at"]:
             continue
