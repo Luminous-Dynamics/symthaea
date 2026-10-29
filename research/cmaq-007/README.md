@@ -105,11 +105,20 @@ The v0.4 stress panel keeps the calibrated threshold fixed but changes the score
 
 The controller does not recalibrate on the shifted panel. The report separately records shift-panel unsupported selection, fallback-downside, coverage, utility lift and regret, plus direct-fallback regret. These metrics are never inputs to threshold selection. If the shifted panel breaches the nominal 5% risk target, the correct conclusion is that offline calibration alone does not survive this support-score drift; a separate shift detector/currentness gate or robust support estimator is required.
 
-The support-score shift is synthetic and deliberately adverse. It does not represent a measured Symthaea score distribution or a claimed real-world attack rate. The exact-head v0.4 focused run is pending; the v0.3 non-shift calibration table below remains the prior-version baseline, not evidence about the shifted panel.
+The support-score shift is synthetic and deliberately adverse. It does not represent a measured Symthaea score distribution or a claimed real-world attack rate.
 
-### Exact-head Rust result (v0.3)
+The initial v0.4 exact-head Rust/report run passed at code/config head `bbe50982b7cdeae9ad5cb0ac385fd79fbe3362e8`: **11 tests passed** and the report/schema checks passed ([workflow run 40954248667](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40954248667)). The latest workflow additionally locks the intended size-8 support-risk breach as a deterministic regression assertion; that stronger assertion is pending its exact-head rerun. The table below is actual output from the passing v0.4 Rust report, not an independent mirror.
 
-The focused Rust workflow passed on code/config head `008934e24839b5e9845c72ef446fbc56850b0f7d`: **10 tests passed**, including exact-bound edge cases and the calibration/qualification contract. The 44-row planner report, 4-row risk report, report assertions and full runner all passed ([workflow run 40953822832](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40953822832)). The table below is the actual report output from Rust, not an independent mirror.
+| Search size | Gate threshold | Baseline coverage | Baseline unsupported rate | Baseline downside rate | Baseline utility lift | Baseline regret | Shifted coverage | Shifted unsupported rate | Shifted downside rate | Shifted utility lift | Shifted regret |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.97 | 20.75% | 1.03% | 2.10% | +0.01777 | 0.12996 | 26.71% | 7.52% | 8.54% | +0.00693 | 0.14081 |
+| 32 | 1.01 (fallback) | 0.00% | 0.00% | 0.00% | 0.00000 | 0.18539 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.18539 |
+| 128 | 1.01 (fallback) | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19635 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19635 |
+| 512 | 1.01 (fallback) | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19910 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19910 |
+
+At size 8, keeping the calibrated 0.97 threshold after support-score drift raises coverage from 20.75% to 26.71%, but unsupported selection rises from 1.03% to 7.52% and fallback-downside from 2.10% to 8.54%—both above the nominal 5% calibration targets. Mean utility lift falls from +0.01777 to +0.00693. This is the desired falsification result: the baseline risk controller does **not** remain calibrated under this deliberately shifted confidence signal, so a production design would need a freshness/shift detector, a conservative fallback, or robust support evidence.
+
+At sizes 32, 128 and 512, no model gate was certified under the original calibration criteria. The fixed 1.01 fallback sentinel therefore stays in force even in the shifted panel. Direct-fallback regret is unchanged under the paired score-only shift, as true utility and predictions were held constant.
 
 | Search size | Selected threshold | Gate certified? | Calibration coverage | Unsupported-risk upper bound | Fallback-downside upper bound | Utility-lift lower bound | Held-out coverage | Held-out unsupported rate | Held-out downside rate | Held-out mean utility lift | Gate regret / direct-fallback regret |
 |---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
