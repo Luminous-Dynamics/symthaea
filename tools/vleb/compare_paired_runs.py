@@ -334,15 +334,45 @@ def analyze_manifest(
             for task_id in task_ids
         }
         observed_delta = 100.0 * sum(deltas.values()) / len(task_ids)
+        paired_trial_cells = [
+            (
+                rows_by_cell[(task_id, seed, reference)]["outcome"],
+                rows_by_cell[(task_id, seed, arm_id)]["outcome"],
+            )
+            for task_id in task_ids for seed in seeds
+        ]
+        both_success_cells = sum(left == "pass" and right == "pass" for left, right in paired_trial_cells)
+        reference_only_success_cells = sum(left == "pass" and right != "pass" for left, right in paired_trial_cells)
+        comparison_only_success_cells = sum(right == "pass" and left != "pass" for left, right in paired_trial_cells)
+        both_non_success_cells = sum(left != "pass" and right != "pass" for left, right in paired_trial_cells)
+        unresolved_pair_cells = sum("unresolved" in (left, right) for left, right in paired_trial_cells)
+        resolved_disagreement_cells = sum(
+            left != "unresolved" and right != "unresolved" and left != right
+            for left, right in paired_trial_cells
+        )
+        effective_task_clusters = sum(value != 0 for value in deltas.values())
+        won = sum(value > 0 for value in deltas.values())
+        lost = sum(value < 0 for value in deltas.values())
+        tied = sum(value == 0 for value in deltas.values())
         pairwise.append({
             "reference_arm": reference,
             "comparison_arm": arm_id,
             "paired_task_cluster_count": len(task_ids),
             "seeds_per_task": len(seeds),
             "score_delta_pp": round(observed_delta, 6),
-            "task_clusters_won": sum(value > 0 for value in deltas.values()),
-            "task_clusters_lost": sum(value < 0 for value in deltas.values()),
-            "task_clusters_tied": sum(value == 0 for value in deltas.values()),
+            "task_clusters_won": won,
+            "task_clusters_lost": lost,
+            "task_clusters_tied": tied,
+            "effective_comparison_task_cluster_count": effective_task_clusters,
+            "effective_comparison_task_cluster_fraction_pct": round(100.0 * effective_task_clusters / len(task_ids), 6),
+            "paired_trial_cell_count": len(paired_trial_cells),
+            "both_success_cells": both_success_cells,
+            "reference_only_success_cells": reference_only_success_cells,
+            "comparison_only_success_cells": comparison_only_success_cells,
+            "both_non_success_cells": both_non_success_cells,
+            "success_disagreement_cells": reference_only_success_cells + comparison_only_success_cells,
+            "resolved_disagreement_cells": resolved_disagreement_cells,
+            "unresolved_pair_cells": unresolved_pair_cells,
             "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
             "intervals_are_simultaneous": False,
             "multiplicity_adjustment": "none; do not treat multiple arm comparisons as simultaneous confirmatory claims",
