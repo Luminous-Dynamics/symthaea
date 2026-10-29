@@ -110,8 +110,8 @@ parity.
 
 ## Generalized intrinsic difference (GID) primitive
 
-The crate includes a validated pointwise GID operation as specified in PyPhi's
-IIT 4.0 implementation:
+The crate includes a validated full-vector and pointwise GID operation as specified
+in PyPhi's IIT 4.0 implementation:
 
     selectivity[state] * log2(forward[state] / partitioned[state])
 
@@ -121,9 +121,9 @@ mismatches, an unnormalized selectivity distribution, and invalid state indices.
 Forward likelihood arrays are not required to sum to one; negative pointwise GID
 values are preserved rather than silently clamped.
 
-This is one pointwise component of the system-phi pipeline. It is not a repertoire
-distance over the whole distribution, a minimum-information partition score, or
-system phi_s by itself.
+The vector API returns every pointwise contribution; the selected-state API extracts
+one contribution from the same implementation. These are components of the system-
+phi pipeline, not a minimum-information partition score or system phi_s by themselves.
 
 Reference formula: https://github.com/wmayner/pyphi/blob/main/pyphi/measures/distribution.py
 
