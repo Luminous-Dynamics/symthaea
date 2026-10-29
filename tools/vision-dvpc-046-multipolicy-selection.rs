@@ -379,7 +379,9 @@ mod tests{
                         assert!((1.0-p.pi1[x])/(1.0-h)<=p.w_max+EPS);
                     }
                 }
-                assert!(policies.iter().any(|p|p.value>=policies.iter().map(|x|x.value).fold(f64::NEG_INFINITY,f64::max)-EPS));
+                let best=policies.iter().map(|p|p.value).fold(f64::NEG_INFINITY,f64::max);
+                assert_eq!(policies.iter().filter(|p|(p.value-best).abs()<=EPS).count(),1,
+                    "each frozen portfolio must have a unique optimum: logger={} M={m}",logger.name);
             }
         }
     }
