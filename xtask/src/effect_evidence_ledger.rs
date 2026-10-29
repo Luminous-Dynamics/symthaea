@@ -179,6 +179,11 @@ fn validate(ledger: &Ledger, expected: &ExpectedCaseSet, sha256: String) -> Resu
         if event.sequence != index as u64 {
             bail!("event sequence must be contiguous from zero; index {index} has sequence {}", event.sequence);
         }
+        if !format_digest_is_lower_hex(&event.previous_hash)
+            || !format_digest_is_lower_hex(&event.event_hash)
+        {
+            bail!("event {} contains a malformed SHA-256 digest", event.sequence);
+        }
         if event.previous_hash != previous_hash {
             bail!("event {} has a broken previous_hash link", event.sequence);
         }
@@ -470,7 +475,7 @@ fn format_digest_is_lower_hex(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_and_validate, event_digest, Ledger};
+    use super::{event_digest, format_digest_is_lower_hex, parse_and_validate, Event, Ledger, GENESIS_HASH};
     use std::path::PathBuf;
 
     fn fixture_paths() -> (PathBuf, PathBuf) {
@@ -510,11 +515,11 @@ mod tests {
     #[test]
     fn removing_an_expected_case_cannot_shrink_the_denominator() {
         let (ledger_path, cases_path) = fixture_paths();
-        let mut ledger_raw: serde_json::Value =
+        let mut ledger_value: serde_json::Value =
             serde_json::from_slice(&std::fs::read(ledger_path).unwrap()).unwrap();
         let cases_raw = std::fs::read(cases_path).unwrap();
-        ledger_raw["events"] = serde_json::json!(&ledger_raw["events"][..7]);
-        assert!(parse_and_validate(&serde_json::to_vec(&ledger_raw).unwrap(), &cases_raw).is_err());
+        ledger_value["events"].as_array_mut().unwrap().truncate(7);
+        assert!(parse_and_validate(&serde_json::to_vec(&ledger_value).unwrap(), &cases_raw).is_err());
     }
 
     #[test]
@@ -523,8 +528,8 @@ mod tests {
         let ledger_raw = std::fs::read(ledger_path).unwrap();
         let cases_raw = std::fs::read(cases_path).unwrap();
         let mut value: serde_json::Value = serde_json::from_slice(&ledger_raw).unwrap();
-        value["events"][4]["postcondition"] = serde_json::json!("confirmed");
-        value["events"][4]["event_hash"] = serde_json::json!("0".repeat(64));
+        value["events"].as_array_mut().unwrap().remove(3);
+        rehash_events(&mut value);
         assert!(parse_and_validate(&serde_json::to_vec(&value).unwrap(), &cases_raw).is_err());
     }
 
@@ -534,13 +539,19 @@ mod tests {
         let ledger: Ledger =
             serde_json::from_slice(&std::fs::read(ledger_path).unwrap()).unwrap();
         assert_eq!(ledger.events[0].event_hash, event_digest(&ledger.events[0]));
-        assert!(format_digest_is_lower_hex_for_test(&ledger.events[0].event_hash));
+        assert!(format_digest_is_lower_hex(&ledger.events[0].event_hash));
     }
 
-    fn format_digest_is_lower_hex_for_test(value: &str) -> bool {
-        value.len() == 64
-            && value
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    fn rehash_events(ledger: &mut serde_json::Value) {
+        let mut previous_hash = GENESIS_HASH.to_string();
+        let events = ledger["events"].as_array_mut().unwrap();
+        for (index, value) in events.iter_mut().enumerate() {
+            value["sequence"] = serde_json::json!(index as u64);
+            value["previous_hash"] = serde_json::json!(previous_hash);
+            let event: Event = serde_json::from_value(value.clone()).unwrap();
+            let hash = event_digest(&event);
+            value["event_hash"] = serde_json::json!(hash.clone());
+            previous_hash = hash;
+        }
     }
 }
