@@ -29,17 +29,17 @@
     "randomization_removes_drift_bias": true,
     "randomized_order_coverage_93_97": true
   },
+  "guard_tests": {
+    "fixed_order_drift_flagged": true,
+    "missing_joint_arm_abstains": true,
+    "opposing_subgroups_preserved": true
+  },
   "limitations": [
     "No production Symthaea Rust path imported or executed.",
     "Synthetic generators do not cover every dependence or nonstationarity mechanism.",
     "No CAR/REFLECT/DCFA/GCJR implementation was executed; no direct SOTA comparison is claimed.",
     "Passing establishes only these reference-method properties, not task utility or SOTA superiority."
   ],
-  "guard_tests": {
-    "fixed_order_drift_flagged": true,
-    "missing_joint_arm_abstains": true,
-    "opposing_subgroups_preserved": true
-  },
   "order_drift": {
     "design": {
       "arm_noise_sd": 0.03,
@@ -99,3 +99,4 @@
     }
   }
 }
+
