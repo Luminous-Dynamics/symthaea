@@ -8,7 +8,9 @@
     {
       "task_id": "rust-repair-0001",
       "family": "compiler_repair",
-      "languages": ["Rust"],
+      "languages": [
+        "Rust"
+      ],
       "base_tree_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
       "spec_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
       "paired_transform_id": null,
@@ -18,7 +20,19 @@
         "oracle_independent": true,
         "ambiguity": "none",
         "notes": "Synthetic example only; not an executed BASALT result."
-      }
+      },
+      "required_checks": [
+        {
+          "check_id": "cargo-test",
+          "kind": "test",
+          "blocking": true
+        },
+        {
+          "check_id": "scope",
+          "kind": "scope",
+          "blocking": true
+        }
+      ]
     }
   ]
 }
