@@ -283,6 +283,9 @@ fn validate_execution(value: Option<&Value>, out: &mut Vec<Violation>) {
     if status == Some("completed") && execution.get("runId").and_then(Value::as_str).is_none_or(str::is_empty) {
         push(out, "COMPLETED_RUN_ID_REQUIRED", format!("{path}.runId"), "Completed execution requires a non-empty runId.");
     }
+    if status == Some("not_run") && !execution.get("runId").is_some_and(Value::is_null) {
+        push(out, "RUN_ID_FOR_UNRUN_EXECUTION", format!("{path}.runId"), "An execution marked not_run must use a null runId.");
+    }
 }
 
 fn validate_verification(
@@ -378,6 +381,32 @@ fn validate_verification(
         if outcome == Some("passed") && check_outcome != Some("passed") {
             push(out, "PASSED_VERIFICATION_HAS_NONPASSING_CHECK", format!("{check_path}.outcome"), "A passed verification may contain only passing checks.");
         }
+    }
+
+    let has_failed_check = entries.iter().any(|check| {
+        check.get("outcome").and_then(Value::as_str) == Some("failed")
+    });
+    let has_uncertain_check = entries.iter().any(|check| {
+        matches!(
+            check.get("outcome").and_then(Value::as_str),
+            Some("inconclusive" | "not_run")
+        )
+    });
+
+    match outcome {
+        Some("failed") if !has_failed_check => push(
+            out,
+            "FAILED_VERIFICATION_WITHOUT_FAILED_CHECK",
+            format!("{path}.checks"),
+            "A failed verification must record at least one failed check.",
+        ),
+        Some("inconclusive") if has_failed_check || !has_uncertain_check => push(
+            out,
+            "INCONCLUSIVE_VERIFICATION_CHECK_CONFLICT",
+            format!("{path}.checks"),
+            "An inconclusive verification must include an inconclusive/not_run check and no failed check.",
+        ),
+        _ => {}
     }
 
     if outcome == Some("passed") {
