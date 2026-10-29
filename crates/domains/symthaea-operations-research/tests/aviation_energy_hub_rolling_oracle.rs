@@ -144,6 +144,55 @@ fn rolling_horizon_matches_full_information_when_forecasts_are_correct() {
 }
 
 #[test]
+fn zero_demand_interval_can_charge_storage_for_later_load() {
+    let mut realized = TimeIndexedEnergyHubScenario {
+        scenario_id: "rolling-zero-load-renewable-charge-v1".to_owned(),
+        input_digest: "pending".to_owned(),
+        currency_code: "USD".to_owned(),
+        quantum_kwh: 1.0,
+        service: TransportService {
+            period_id: "rolling-zero-load-period".to_owned(),
+            lifecycle_boundary_id: "source-to-load-v1".to_owned(),
+            completed_passenger_km: 100.0,
+            available_seat_km: 120.0,
+        },
+        storage: storage(0),
+        intervals: vec![
+            interval("t0", 0, 1, 0, 1.0, 1.0, 1.0, 10.0),
+            interval("t1", 1, 0, 0, 0.0, 0.0, 5.0, 1.0),
+        ],
+    };
+    seal_energy_hub_scenario(&mut realized).unwrap();
+    let case = RollingHorizonEpisode {
+        realized_scenario: realized,
+        decision_times_epoch: vec![100, 200],
+        observation_available_at_epoch: vec![90, 190],
+        forecasts_by_stage: vec![
+            forecast_window(
+                vec![interval("t1", 1, 0, 0, 0.0, 0.0, 5.0, 1.0)],
+                70,
+                80,
+            ),
+            forecast_window(vec![], 150, 160),
+        ],
+    };
+
+    let run = run_rolling_horizon(&case, 100_000).unwrap();
+    assert_eq!(run.status, RollingHorizonStatus::Completed);
+    assert_eq!(run.steps.len(), 2);
+    assert_eq!(run.steps[0].action.renewable_charge_input_quanta, 1);
+    assert_eq!(run.steps[0].realized_step_ledger.load_delivered_energy_kwh, 0.0);
+    assert_eq!(run.steps[0].realized_step_ledger.primary_source_energy_kwh, 1.0);
+    assert_eq!(run.steps[1].action.battery_discharge_output_quanta, 1);
+    assert_eq!(run.steps[1].realized_step_ledger.load_delivered_energy_kwh, 1.0);
+
+    let evaluated = run.evaluated_realized_plan.unwrap();
+    assert_eq!(evaluated.metrics.source_ledger.total_cost, 1.0);
+    assert_eq!(evaluated.metrics.source_ledger.accounted_lifecycle_co2e_kg, 1.0);
+    assert_eq!(evaluated.metrics.source_ledger.total_delivered_energy_kwh, 1.0);
+}
+
+#[test]
 fn forecast_not_available_by_decision_is_rejected() {
     let realized = realized_scenario();
     let mut case = episode(realized);
