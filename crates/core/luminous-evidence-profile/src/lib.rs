@@ -627,6 +627,35 @@ mod tests {
     }
 
     #[test]
+    fn repository_valid_fixture_is_accepted() {
+        let statement: Value = serde_json::from_str(include_str!(
+            "../../../../docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json"
+        )).expect("valid fixture must be valid JSON");
+        let report = verify_statement(&statement);
+        assert!(report.valid, "{:?}", report.violations);
+    }
+
+    #[test]
+    fn repository_queued_but_passed_fixture_is_rejected() {
+        let statement: Value = serde_json::from_str(include_str!(
+            "../../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-queued-but-passed.json"
+        )).expect("queued-but-passed fixture must be valid JSON");
+        let report = verify_statement(&statement);
+        assert!(!report.valid);
+        assert!(has_code(&report, "EXECUTION_STATUS_RESULT_CONFLICT"), "{:?}", report.violations);
+    }
+
+    #[test]
+    fn repository_missing_target_fixture_is_rejected() {
+        let statement: Value = serde_json::from_str(include_str!(
+            "../../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-missing-target.json"
+        )).expect("missing-target fixture must be valid JSON");
+        let report = verify_statement(&statement);
+        assert!(!report.valid);
+        assert!(has_code(&report, "MISSING_TARGET"), "{:?}", report.violations);
+    }
+
+    #[test]
     fn mutable_branch_name_is_not_a_pinned_revision() {
         let mut statement = minimal_statement();
         statement["predicate"]["target"]["source"]["revision"] = json!("main");
