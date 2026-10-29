@@ -1,4 +1,4 @@
-use lep_conformance::{parse_json_unique_keys, verify_statement, ValidationReport};
+use lep_conformance::{ValidationReport, parse_json_unique_keys, verify_statement};
 use serde_json::Value;
 use std::env;
 use std::fs;
@@ -29,9 +29,8 @@ fn main() -> ExitCode {
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
         Err(error) => {
-            let report = ValidationReport::invalid_json(format!(
-                "Unable to read statement file: {error}"
-            ));
+            let report =
+                ValidationReport::invalid_json(format!("Unable to read statement file: {error}"));
             emit(&report);
             return ExitCode::from(2);
         }
