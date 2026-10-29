@@ -965,4 +965,91 @@ mod tests {
         assert!(!report.valid);
         assert!(has_code(&report, "E_CHECK_EVIDENCE_MISSING"));
     }
+
+    #[test]
+    fn unknown_fields_fail_closed() {
+        let mut value: Value = serde_json::from_str(EXAMPLE).unwrap();
+        value["unexpected_top_level_field"] = Value::Bool(true);
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let report = validate_bytes(&bytes);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_JSON_OR_SHAPE"));
+    }
+
+    #[test]
+    fn duplicate_json_object_keys_fail_closed() {
+        let duplicate = EXAMPLE.replacen(
+            "\"schema_version\": 1,",
+            "\"schema_version\": 1,\n  \"schema_version\": 1,",
+            1,
+        );
+        let report = validate_bytes(duplicate.as_bytes());
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_JSON_OR_SHAPE"));
+    }
+
+    #[test]
+    fn duplicate_task_identity_is_rejected() {
+        let report = validate_value(|v| {
+            let duplicate = v["task_records"][0].clone();
+            v["task_records"].as_array_mut().unwrap().push(duplicate);
+            v["suite"]["expected_task_count"] = Value::from(2);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_DUPLICATE_TASK_ID"));
+    }
+
+    #[test]
+    fn quarantined_task_is_retained_but_not_marked_accepted() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["quality_audit"]["status"] = Value::String("quarantined".into());
+        });
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.counts.tasks_total, 1);
+        assert_eq!(report.counts.tasks_accepted, 0);
+        assert_eq!(report.counts.tasks_quarantined, 1);
+        assert_eq!(report.counts.trials_accounted, 2);
+    }
+
+    #[test]
+    fn stale_evidence_cannot_be_labelled_clean() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["integrity"]["stale_evidence"] = Value::String("detected".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_INTEGRITY_CLAIM_MISMATCH"));
+    }
+
+    #[test]
+    fn unequal_system_budgets_are_rejected() {
+        let report = validate_value(|v| {
+            v["systems"][1]["budget"]["max_tool_calls"] = Value::from(31);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_BUDGET_MISMATCH"));
+    }
+
+    #[test]
+    fn missing_required_nullable_tree_digest_is_rejected() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1].as_object_mut().unwrap().remove("final_tree_digest");
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_JSON_OR_SHAPE"));
+    }
+
+    #[test]
+    fn invalid_task_trials_remain_accounted_without_becoming_successes() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["quality_audit"]["status"] = Value::String("invalid".into());
+            for trial in v["task_records"][0]["trials"].as_array_mut().unwrap() {
+                trial["outcome"] = Value::String("invalid_task".into());
+                trial["verifier"]["status"] = Value::String("not_run".into());
+            }
+        });
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.counts.tasks_invalid, 1);
+        assert_eq!(report.counts.trials_accounted, 2);
+    }
+
 }
