@@ -1,0 +1,59 @@
+name: CMAQ-002 active causal learning
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-002/**"
+      - ".github/workflows/cmaq-002.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-002/**"
+      - ".github/workflows/cmaq-002.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evoi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-002
+        run: cargo test --locked
+      - name: Run benchmark and validate report schema
+        working-directory: research/cmaq-002
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 > /tmp/cmaq-002-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-002-report.json").read_text())
+          assert report["schema_version"] == "cmaq-002-evoi-report-v0.2"
+          assert report["mechanisms"] == 9
+          assert report["families"] == 3
+          assert report["contexts"] == 4
+          assert report["actions"] == 3
+          assert report["decision_horizon"] == 1
+          by_name = {row["strategy"]: row for row in report["results"]}
+          assert set(by_name) == {
+              "no_probe", "fixed", "random", "max_information", "evoi", "oracle"
+          }
+          assert by_name["oracle"]["mean_regret"] == 0
+          assert all(row["unsafe_actions"] == 0 for row in report["results"])
+          assert all(row["contradictions"] == 0 for row in report["results"])
+          control = report["open_class_control"]
+          assert control["tested_mechanisms"] == 3
+          assert control["detected"] == control["tested_mechanisms"]
+          assert control["max_queries_to_detection"] <= 12
+          assert by_name["evoi"]["mean_net_regret"] < by_name["max_information"]["mean_net_regret"]
+          print("CMAQ-002 report schema, EVoI calibration, and open-class control valid")
+          print(json.dumps(by_name, sort_keys=True))
+          PY
