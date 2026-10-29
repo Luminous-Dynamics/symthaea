@@ -1181,6 +1181,95 @@ mod tests {
         ).expect("valid fixture")
     }
 
+    // Deliberately simple reference implementation used only by tests. It
+    // materializes each block-direction assignment and applies the original
+    // block-membership definition, independent of the optimized block-label path.
+    fn reference_directed_cut_matrices(unit_count: usize) -> std::collections::HashSet<Vec<bool>> {
+        fn enumerate_directions(
+            direction_index: usize,
+            unit_count: usize,
+            blocks: &[Vec<usize>],
+            directions: &mut Vec<PartitionDirection>,
+            output: &mut std::collections::HashSet<Vec<bool>>,
+        ) {
+            if direction_index == blocks.len() {
+                let mut matrix = vec![false; unit_count * unit_count];
+                for (block, direction) in blocks.iter().zip(directions.iter().copied()) {
+                    for source in 0..unit_count {
+                        for target in 0..unit_count {
+                            let source_inside = block.contains(&source);
+                            let target_inside = block.contains(&target);
+                            let cut = match direction {
+                                PartitionDirection::Cause => !source_inside && target_inside,
+                                PartitionDirection::Effect => source_inside && !target_inside,
+                                PartitionDirection::Bidirectional => source_inside != target_inside,
+                            };
+                            if cut {
+                                matrix[source * unit_count + target] = true;
+                            }
+                        }
+                    }
+                }
+                output.insert(matrix);
+                return;
+            }
+
+            for direction in [
+                PartitionDirection::Cause,
+                PartitionDirection::Effect,
+                PartitionDirection::Bidirectional,
+            ] {
+                directions.push(direction);
+                enumerate_directions(
+                    direction_index + 1,
+                    unit_count,
+                    blocks,
+                    directions,
+                    output,
+                );
+                directions.pop();
+            }
+        }
+
+        fn enumerate_set_partitions(
+            position: usize,
+            unit_count: usize,
+            blocks: &mut Vec<Vec<usize>>,
+            output: &mut std::collections::HashSet<Vec<bool>>,
+        ) {
+            if position == unit_count {
+                if blocks.len() > 1 {
+                    let mut directions = Vec::with_capacity(blocks.len());
+                    enumerate_directions(
+                        0,
+                        unit_count,
+                        blocks,
+                        &mut directions,
+                        output,
+                    );
+                }
+                return;
+            }
+
+            for block_index in 0..=blocks.len() {
+                if block_index == blocks.len() {
+                    blocks.push(vec![position]);
+                    enumerate_set_partitions(position + 1, unit_count, blocks, output);
+                    blocks.pop();
+                } else {
+                    blocks[block_index].push(position);
+                    enumerate_set_partitions(position + 1, unit_count, blocks, output);
+                    blocks[block_index].pop();
+                }
+            }
+        }
+
+        let mut output = std::collections::HashSet::new();
+        let mut blocks = Vec::new();
+        enumerate_set_partitions(0, unit_count, &mut blocks, &mut output);
+        output
+    }
+
     #[test]
     fn validates_dimensions_and_probabilities() {
         assert!(matches!(
@@ -1992,4 +2081,30 @@ mod tests {
         }
     }
 
-}
+} 
+    #[test]
+    fn optimized_enumerator_matches_complete_reference_matrix_set_for_two_through_five_units() {
+        for units in 2..=5 {
+            let candidate: Vec<usize> = (0..units).collect();
+            let budget = match units {
+                2 => 9,
+                3 => 54,
+                4 => 306,
+                5 => 1_863,
+                _ => unreachable!(),
+            };
+            let expected = reference_directed_cut_matrices(units);
+            let actual: std::collections::HashSet<Vec<bool>> =
+                enumerate_iit4_system_partitions(&candidate, units, false, budget)
+                    .unwrap()
+                    .into_iter()
+                    .map(|partition| partition.cut_matrix().to_vec())
+                    .collect();
+            assert_eq!(
+                actual,
+                expected,
+                "optimized and reference cut-matrix sets diverged for {units} units"
+            );
+        }
+    }
+
