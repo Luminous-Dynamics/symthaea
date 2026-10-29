@@ -392,7 +392,7 @@ pub fn verify_energy_hub_plan(
                 evidence_class: interval.renewable_evidence_class,
                 carrier: EnergyCarrier::Electricity,
                 source_energy_kwh: energy,
-                delivered_energy_kwh: energy,
+                delivered_energy_kwh: f64::from(renewable_used) * scenario.quantum_kwh,
                 upstream_co2e_kg: f64::from(interval.renewable_generation_quanta)
                     * interval.renewable_lifecycle_co2e_kg_per_quantum,
                 direct_operational_co2e_kg: 0.0,
