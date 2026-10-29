@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-008-sequential-support-drift-v0.1";
+const REPORT_SCHEMA: &str = "cmaq-008-sequential-support-drift-v0.2";
 const EPISODES: usize = 512;
 const HORIZON: usize = 128;
 const CHANGE_DETECTION_THRESHOLD: f64 = 5.0;
@@ -113,7 +113,7 @@ impl Scenario {
     }
 
     fn feedback_flip_probability(self) -> f64 {
-        if self == Self::NoisyStationaryFeedback { 0.05 } else { 0.0 }
+        if self == Self::NoisyStationaryFeedback { 0.10 } else { 0.0 }
     }
 }
 
@@ -523,7 +523,7 @@ mod tests {
         assert_eq!(Scenario::GradualSupportShift.unsupported_probability(32), 0.01);
         assert_eq!(Scenario::GradualSupportShift.unsupported_probability(96), 0.25);
         assert_eq!(Scenario::DelayedAbruptSupportShift.feedback_delay_steps(), 8);
-        assert_eq!(Scenario::NoisyStationaryFeedback.feedback_flip_probability(), 0.05);
+        assert_eq!(Scenario::NoisyStationaryFeedback.feedback_flip_probability(), 0.10);
     }
 
     #[test]
