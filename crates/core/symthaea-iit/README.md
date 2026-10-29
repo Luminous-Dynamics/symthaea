@@ -38,6 +38,17 @@ evaluation state, time grain, or formalism.
 - An analysis request binds the evaluation state, candidate subsystem, explicit
   formalism profile, and requested quantity so incompatible requests are rejected.
 
+## Published reference fixture
+
+`tests/published_iit4_2023_fig1a.rs` pins the three-unit logistic substrate from
+PyPhi's published IIT 4.0 (2023) Fig. 1A example. It checks all 24 state-by-unit
+TPM values, little-endian state indexing for the specified state `(0, 1, 1)`,
+and the directed connectivity matrix. The paper's reported `phi_s` values
+(approximately 0.04 for {A}, 0.17 for {A, B}, and 0.13 for {A, B, C}) are
+future output-parity anchors; this fixture does **not** compute or validate
+those values. The upstream reference is the PyPhi example source:
+https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/pyphi/examples.py.
+
 ## Development gates
 
 1. Run the v0.1 model/repertoire unit tests and pin TPM/state/connectivity semantics
