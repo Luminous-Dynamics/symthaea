@@ -300,6 +300,10 @@ def analyze_manifest(
     rng = random.Random(boot["seed"])
     samples_by_arm = {arm_id: [] for arm_id in arm_ids}
     samples_by_delta = {arm_id: [] for arm_id in arm_ids if arm_id != reference}
+    # Sensitivity analysis: independently resample task and seed clusters while
+    # carrying every paired arm through the same sampled cells.
+    samples_by_arm_two_way = {arm_id: [] for arm_id in arm_ids}
+    samples_by_delta_two_way = {arm_id: [] for arm_id in arm_ids if arm_id != reference}
     per_task_rates = {
         arm_id: {
             task_id: sum(
@@ -320,6 +324,25 @@ def analyze_manifest(
             samples_by_arm[arm_id].append(rate * 100.0)
         for arm_id in samples_by_delta:
             samples_by_delta[arm_id].append((rates[arm_id] - rates[reference]) * 100.0)
+
+        # Crossed-cluster (pigeonhole) bootstrap: independently resample task
+        # and seed labels with replacement. All arms share the same draws so
+        # their paired differences remain paired. This is sensitivity analysis,
+        # not a replacement for the preregistered task-cluster interval.
+        drawn_seeds = [seeds[rng.randrange(len(seeds))] for _ in seeds]
+        two_way_rates = {
+            arm_id: sum(
+                rows_by_cell[(task_id, seed, arm_id)]["outcome"] == "pass"
+                for task_id in drawn for seed in drawn_seeds
+            ) / (len(drawn) * len(drawn_seeds))
+            for arm_id in arm_ids
+        }
+        for arm_id, rate in two_way_rates.items():
+            samples_by_arm_two_way[arm_id].append(rate * 100.0)
+        for arm_id in samples_by_delta_two_way:
+            samples_by_delta_two_way[arm_id].append(
+                (two_way_rates[arm_id] - two_way_rates[reference]) * 100.0
+            )
     alpha = 1.0 - float(boot["confidence_level"])
     low_p, high_p = alpha / 2.0, 1.0 - alpha / 2.0
 
@@ -353,6 +376,7 @@ def analyze_manifest(
             "unresolved_rate_pct": round(100.0 * unresolved / expected_trials, 6),
             "success_rate_pct": round(rate, 6),
             "task_cluster_bootstrap_95ci_pp": ci,
+            "two_way_task_seed_bootstrap_sensitivity_95ci_pp": interval(samples_by_arm_two_way[arm_id]),
             "total_cost_usd": round(total_cost, 8),
             "cost_per_scheduled_trial_usd": round(total_cost / expected_trials, 8),
             "cost_per_successful_trial_usd": round(total_cost / successes, 8) if successes else None,
@@ -440,6 +464,7 @@ def analyze_manifest(
             "unresolved_pair_cells": unresolved_pair_cells,
             "task_level_comparisons": task_level_comparisons,
             "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
+            "two_way_task_seed_bootstrap_sensitivity_95ci_pp": interval(samples_by_delta_two_way[arm_id]),
             "intervals_are_simultaneous": False,
         })
 
@@ -467,6 +492,12 @@ def analyze_manifest(
             "non_estimable_policy": "raw p-value is null; use p=1 conservatively for Holm family adjustment",
         }
 
+    warnings = []
+    if len(task_ids) < 30:
+        warnings.append("fewer than 30 independent task clusters; interval may be unstable")
+    if len(seeds) < 2:
+        warnings.append("single declared seed; crossed bootstrap cannot reveal between-seed variability")
+
     return {
         "schema_version": "vleb-paired-comparison-report-v1",
         "valid": True,
@@ -481,24 +512,25 @@ def analyze_manifest(
         "expected_trial_count_per_arm": expected_trials,
         "observed_trial_count": len(rows_by_cell),
         "bootstrap": {
-            "method": "paired task-cluster percentile bootstrap",
+            "method": "primary paired task-cluster percentile bootstrap plus a separate crossed task/seed sensitivity bootstrap",
             "confidence_level": boot["confidence_level"],
             "replicates": boot["replicates"],
             "seed": boot["seed"],
-            "cluster_unit": "task_id; each draw carries all paired seed outcomes and all comparison arms",
+            "cluster_unit": "task_id; each primary draw carries all paired seed outcomes and all comparison arms",
+            "sensitivity_cluster_unit": "independently resampled task_id and seed labels; all paired arms share the same crossed draws",
+            "sensitivity_interpretation": "descriptive seed-set sensitivity only when declared seeds are meaningful repeat units; not a full estimate of model-serving variance",
         },
         "arm_summaries": arm_summary,
         "pairwise_comparisons": pairwise,
-        "warnings": (
-            ["fewer than 30 independent task clusters; interval may be unstable"]
-            if len(task_ids) < 30 else []
-        ),
+        "warnings": warnings,
         "analysis_only": True,
         "score_eligible": False,
         "limitations": [
             "The tool checks pairing, identity consistency, coverage and statistical calculations; it does not authenticate receipts or prove that outcomes were honestly measured.",
             "Unresolved scheduled trials remain in the denominator and count as non-successes for headline success rates.",
             "Bootstrap intervals are descriptive and are not simultaneous across multiple comparisons; the separately reported sign test measures direction across non-tied tasks, not effect magnitude.",
+            "The crossed task/seed sensitivity interval assumes the preregistered seed labels represent meaningful repeat units; it does not capture nondeterministic serving variance that is independent of those labels.",
+            "If only one seed is declared, the crossed sensitivity interval cannot reveal between-seed variability and must be interpreted as conditional on that sole seed.",
             "The task-cluster sign test assumes independent task clusters; non-estimable sign tests use a null raw p-value and a conservative p=1 for Holm adjustment.",
             "No external benchmark is directly comparable without matching task distribution, agent scaffold, budgets, environment and protocol.",
         ],
