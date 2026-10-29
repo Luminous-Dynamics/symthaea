@@ -76,6 +76,7 @@ class ShiftEvidenceFixture:
                     "event_id": event_id,
                     "event_kind": "requirement_update",
                     "sequence_number": 4,
+                    "intervention_position": self.scenario["intervention_position"],
                     "applied": True,
                     "payload_sha256": self.scenario["shift_payload_sha256"],
                     "pre_workspace_sha256": self.scenario["initial_workspace_sha256"],
@@ -220,6 +221,48 @@ class ShiftEventEvidenceTests(unittest.TestCase):
         shifted["validation_results"][0]["input_workspace_sha256"] = "f" * 64
         self.refresh_payload(shifted)
         with self.assertRaisesRegex(ValueError, "other than the pinned final state"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_malformed_enum_fields_fail_closed_without_type_errors(self) -> None:
+        cases = [
+            ("runner_event", "event_kind", ["requirement_update"], "event_kind"),
+            ("stale_evidence_disposition", "disposition", ["invalidated"], "disposition"),
+            ("validation_results", "status", ["pass"], "status is invalid"),
+        ]
+        for collection_key, field, value, expected in cases:
+            with self.subTest(field=field):
+                manifest = copy.deepcopy(self.fixture.manifest)
+                shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
+                if collection_key == "runner_event":
+                    shifted[collection_key][field] = value
+                else:
+                    shifted[collection_key][0][field] = value
+                self.refresh_payload(shifted)
+                with self.assertRaisesRegex(ValueError, expected):
+                    auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_model_profile_cannot_drift_across_seeds(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        row = next(row for row in manifest["receipts"] if row["condition"] == "clean" and row["seed"] == 13)
+        row["initial_execution_profile_sha256"] = sha(b"drifted-initial-profile")
+        self.refresh_payload(row)
+        with self.assertRaisesRegex(ValueError, "drifts in model/scaffold/initial profile across seeds"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_post_shift_profile_cannot_drift_across_seeds(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        row = next(row for row in manifest["receipts"] if row["condition"] == "shifted" and row["seed"] == 13)
+        row["post_shift_execution_profile_sha256"] = sha(b"drifted-post-profile")
+        self.refresh_payload(row)
+        with self.assertRaisesRegex(ValueError, "drifts in post-shift profile/network mode across seeds"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_shift_position_must_match_locked_schedule(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
+        shifted["runner_event"]["intervention_position"] = 8
+        self.refresh_payload(shifted)
+        with self.assertRaisesRegex(ValueError, "intervention position differs"):
             auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
 
     def test_pass_cannot_hide_a_failed_required_check(self) -> None:
