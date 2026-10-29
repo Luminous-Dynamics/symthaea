@@ -312,6 +312,15 @@ def run_benchmark(
     test_points = _positive_int(test_points, "test_points", maximum=10_000)
     nearest_k = _positive_int(nearest_k, "nearest_k", maximum=10_000)
     reuse_count = _positive_int(reuse_count, "reuse_count", maximum=1_000_000)
+    # Bound O(target_points * history_records * log(history_records)) kNN work
+    # so a malformed or accidental configuration cannot launch a huge sort loop.
+    estimated_distance_evaluations = (
+        history_points * len(SOURCE_TASKS) * test_points * len(TARGET_TASKS)
+    )
+    if estimated_distance_evaluations > 25_000_000:
+        raise ValueError(
+            "history_points × source_tasks × test_points × target_tasks must be <= 25000000"
+        )
     _validate_task_registry()
 
     history: list[dict[str, Any]] = []
