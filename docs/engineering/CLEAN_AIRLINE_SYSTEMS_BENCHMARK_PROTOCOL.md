@@ -587,3 +587,6 @@ A related September 2026 ground-equipment demonstration at Exeter Airport tested
 - Grid flexibility and operational-risk definitions are formalized before scoring; reproduce published metrics exactly or report why they differ.
 - Benchmark electricity-only, electricity + storage, electricity + hydrogen, and full multi-energy variants on paired flight schedules and stress scenarios.
 - Report cost, lifecycle CO2e, unmet-energy/flight service, peak import, flexibility and operational risk separately. A weighted score cannot hide an energy-service failure.
+
+
+Paired scenario panels must also share the same decision timestamps, observation-availability timestamps, and forecast issue/availability schedule. If information timing differs, the evaluator rejects the panel rather than attributing the resulting performance difference to the policy.
