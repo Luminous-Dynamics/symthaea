@@ -122,15 +122,6 @@ fn partition_digest(assignments: &BTreeMap<String, String>) -> String {
     sha256(material.as_bytes())
 }
 
-fn family_universe_digest(families: &BTreeSet<String>) -> String {
-    let mut material = String::new();
-    for family_id in families {
-        material.push_str(family_id);
-        material.push('\n');
-    }
-    sha256(material.as_bytes())
-}
-
 fn component_quotas(component_count: usize) -> [usize; 3] {
     let train_end = component_count * 70 / 100;
     let validation_end = component_count * 85 / 100;
