@@ -50,6 +50,25 @@ The analysis tool is deliberately separate from the source indexer and transfer-
 
 Family mapping is a direct source-path match. It is intentionally not semantic matching, and an unmatched item is preserved in the output instead of being silently dropped. The generated split is a *pre-screen assignment*, not a qualified benchmark: screen eligibility and verification status without changing assignments, and preserve both excluded and unknown families in the accounting. The split prevents direct file-level leakage inside a declared family; it does not prove there are no mathematical dependencies or model pretraining exposure across different families. Those risks require separate audit and disclosure. Missing formalization source files, missing declared main-result artifacts and missing local catalogue links are explicit in the JSON output. Artifact paths that escape the checkout or resolve through a symlink outside the checkout are rejected. The scope notes are hashed as evidence about what the catalog's verification setups establish; they are not interpreted as proof of the headline theorem.
 
+## Component-first split and target-availability diagnostics
+
+The component-first allocator is an exploratory successor path. It never rewrites the frozen v0 split and always emits `qualified_for_confirmatory_use: false`. See [the candidate protocol note](COMPONENT_FIRST_SPLIT_CANDIDATE.md).
+
+Before a future successor protocol uses solver budget, reconcile the candidate split against an outcome-blind eligibility census:
+
+```bash
+cargo run -p symthaea-proof-insights --bin audit_component_split_feasibility -- \
+  ./component-first-candidate.json \
+  ./data/benchmarks/proof-insight-transfer-v0/target-eligibility-census.json \
+  ./component-split-feasibility-report.json
+```
+
+The census contract is defined by `pre-split-target-eligibility-census-v0.schema.json`; the output contract is `component-split-feasibility-report-v0.schema.json`. A census must cover the exact family universe and every candidate target, distinguish `eligible`, `excluded`, and `unknown`, and be sealed before model outcomes are observed. The audit reconciles family-target membership and computes eligible-target and eligible-component counts for each split. A split with 20 total graph components but fewer than 20 eligible validation or test components remains structurally underpowered.
+
+This binary does not authenticate reviewer signatures or prove statement semantics. It always reports `qualified_for_confirmatory_use: false`; a structurally feasible report is only permission to proceed to the separate receipt, semantic, and simulation-based power gates.
+
+The CI synthetic fixture intentionally fails the held-out eligible-component floor and contains excluded and unknown outcomes. Passing the fixture means the audit detects the underpowered condition without suppressing rows, not that a real PITB dataset qualifies.
+
 ## Checks
 
 Unit tests cover family extraction, duplicate-family rejection, path normalization, and parsing a minimal manifest. On source format changes, the indexer fails closed for an unknown manifest version, empty source catalog, or absent family headers.
