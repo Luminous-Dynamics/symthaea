@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::aviation_energy_hub::{
     canonical_energy_hub_digest, seal_energy_hub_scenario, solve_exact_energy_hub_pareto,
-    verify_energy_hub_plan, EnergyHubError, EnergyHubMetrics, EnergyHubPlan, EnergyHubStepAction,
+    verify_energy_hub_plan, EnergyHubError, EnergyHubPlan, EnergyHubStepAction,
     EvaluatedEnergyHubPlan, TimeIndexedEnergyHubScenario, EnergyHubInterval,
 };
 
@@ -36,6 +36,17 @@ pub struct RollingHorizonEpisode {
     pub forecasts_by_stage: Vec<ForecastWindow>,
 }
 
+/// Interval-local physical and source-flow accounting. Unlike the whole-horizon
+/// service ledger, this record does not divide one interval's costs/emissions by the
+/// full episode passenger-km denominator.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExecutedIntervalLedger {
+    pub source_cost_amount: f64,
+    pub accounted_lifecycle_co2e_kg: f64,
+    pub primary_source_energy_kwh: f64,
+    pub load_delivered_energy_kwh: f64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RollingHorizonStep {
     pub stage_index: usize,
@@ -49,7 +60,7 @@ pub struct RollingHorizonStep {
     pub action: EnergyHubStepAction,
     pub nodes_visited: u64,
     pub feasible_plans_seen: u64,
-    pub realized_step_metrics: EnergyHubMetrics,
+    pub realized_step_ledger: ExecutedIntervalLedger,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -247,37 +258,48 @@ pub fn run_rolling_horizon(
         let selected = exact.frontier.first().ok_or(RollingHorizonError::ArithmeticOverflow)?;
         let action = selected.plan.actions.first().ok_or(RollingHorizonError::ArithmeticOverflow)?.clone();
 
-        let mut step_scenario = planning_scenario.clone();
-        step_scenario.scenario_id = format!("{}-committed-step-{}", realized.scenario_id, stage);
-        step_scenario.input_digest = "pending".to_owned();
-        step_scenario.intervals = vec![realized.intervals[stage].clone()];
-        if stage + 1 < horizon {
-            step_scenario.storage.minimum_terminal_soc_quanta = 0;
+        // The chosen action is the first action of a complete, independently
+        // verified plan returned by the exact solver. A per-interval P0 service ledger
+        // is intentionally not built here: a valid zero-demand interval may charge
+        // storage and deliver no load until a later interval.
+        let realized_interval = &realized.intervals[stage];
+        let source_cost_amount =
+            f64::from(realized_interval.renewable_generation_quanta)
+                * realized_interval.renewable_cost_per_quantum
+            + f64::from(action.grid_import_quanta) * realized_interval.grid_cost_per_quantum;
+        let accounted_lifecycle_co2e_kg =
+            f64::from(realized_interval.renewable_generation_quanta)
+                * realized_interval.renewable_lifecycle_co2e_kg_per_quantum
+            + f64::from(action.grid_import_quanta)
+                * realized_interval.grid_lifecycle_co2e_kg_per_quantum;
+        let primary_source_energy_kwh =
+            f64::from(realized_interval.renewable_generation_quanta
+                .checked_add(action.grid_import_quanta)
+                .ok_or(RollingHorizonError::ArithmeticOverflow)?)
+                * realized.quantum_kwh;
+        let load_delivered_energy_kwh =
+            f64::from(realized_interval.demand_quanta) * realized.quantum_kwh;
+        if !source_cost_amount.is_finite()
+            || !accounted_lifecycle_co2e_kg.is_finite()
+            || !primary_source_energy_kwh.is_finite()
+            || !load_delivered_energy_kwh.is_finite()
+        {
+            return Ok(RollingHorizonRun {
+                episode_digest,
+                steps,
+                status: RollingHorizonStatus::SolverFailure {
+                    stage_index: stage,
+                    source: EnergyHubError::ArithmeticOverflow,
+                },
+                final_soc_quanta: soc,
+                evaluated_realized_plan: None,
+            });
         }
-        seal_energy_hub_scenario(&mut step_scenario)
-            .map_err(|source| RollingHorizonError::InvalidForecastValues {
-                stage_index: stage,
-                source,
-            })?;
-        let step_plan = EnergyHubPlan {
-            scenario_id: step_scenario.scenario_id.clone(),
-            input_digest: step_scenario.input_digest.clone(),
-            actions: vec![action.clone()],
-        };
-        let evaluated_step = match verify_energy_hub_plan(&step_scenario, &step_plan) {
-            Ok(evaluated) => evaluated,
-            Err(source) => {
-                return Ok(RollingHorizonRun {
-                    episode_digest,
-                    steps,
-                    status: RollingHorizonStatus::SolverFailure {
-                        stage_index: stage,
-                        source,
-                    },
-                    final_soc_quanta: soc,
-                    evaluated_realized_plan: None,
-                });
-            }
+        let realized_step_ledger = ExecutedIntervalLedger {
+            source_cost_amount,
+            accounted_lifecycle_co2e_kg,
+            primary_source_energy_kwh,
+            load_delivered_energy_kwh,
         };
         soc = action.soc_after_quanta;
         actions.push(action.clone());
@@ -293,7 +315,7 @@ pub fn run_rolling_horizon(
             action,
             nodes_visited: exact.nodes_visited,
             feasible_plans_seen: exact.feasible_plans_seen,
-            realized_step_metrics: evaluated_step.metrics,
+            realized_step_ledger,
         });
     }
 
@@ -363,18 +385,18 @@ fn prefix_inventory_ledger_ref(
     for step in prior_steps {
         put_u32(&mut bytes, usize_to_u32(step.stage_index)?);
         encode_action(&mut bytes, &step.action);
-        put_f64(&mut bytes, step.realized_step_metrics.source_ledger.total_cost);
+        put_f64(&mut bytes, step.realized_step_ledger.source_cost_amount);
         put_f64(
             &mut bytes,
-            step.realized_step_metrics.source_ledger.accounted_lifecycle_co2e_kg,
+            step.realized_step_ledger.accounted_lifecycle_co2e_kg,
         );
         put_f64(
             &mut bytes,
-            step.realized_step_metrics.source_ledger.total_source_energy_kwh,
+            step.realized_step_ledger.primary_source_energy_kwh,
         );
         put_f64(
             &mut bytes,
-            step.realized_step_metrics.source_ledger.total_delivered_energy_kwh,
+            step.realized_step_ledger.load_delivered_energy_kwh,
         );
         put_string(&mut bytes, &step.planning_scenario_digest);
     }
