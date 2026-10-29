@@ -24,6 +24,7 @@ fn record(
 ) -> EnergyRecord {
     EnergyRecord {
         id: id.to_owned(),
+        source_id: format!("source:{id}"),
         boundary_id: boundary_id.to_owned(),
         lifecycle_boundary_id: "well-to-wake-v1".to_owned(),
         period_id: "2026-W01".to_owned(),
@@ -78,7 +79,12 @@ fn known_answer_ledger_aggregates_only_declared_fields() {
     assert_eq!(summary.lifecycle_boundary_id, "well-to-wake-v1");
     assert_eq!(summary.record_evidence.len(), 2);
     assert_eq!(summary.record_evidence[0].record_id, "electricity");
+    assert_eq!(summary.record_evidence[0].source_id, "source:electricity");
     assert_eq!(summary.record_evidence[0].evidence_class, EvidenceClass::Synthetic);
+    assert_eq!(summary.energy_by_source.len(), 2);
+    assert_eq!(summary.energy_by_source[0].carrier, EnergyCarrier::Electricity);
+    assert_eq!(summary.energy_by_source[0].source_energy_kwh, 100.0);
+    assert_eq!(summary.energy_by_source[0].delivered_energy_kwh, 95.0);
     assert_eq!(summary.total_source_energy_kwh, 120.0);
     assert_eq!(summary.total_delivered_energy_kwh, 113.0);
     assert_eq!(summary.upstream_co2e_kg, 25.0);
