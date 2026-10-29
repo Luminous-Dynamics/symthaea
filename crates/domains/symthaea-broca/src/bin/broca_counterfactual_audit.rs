@@ -57,6 +57,5 @@ fn main() -> ExitCode {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    hex::encode(Sha256::digest(bytes))
 }
