@@ -808,6 +808,23 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_walk_forward_fixture_emits_forecasts_and_baseline_metrics() {
+        let bytes = include_str!("../../../../docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl").as_bytes();
+        let snapshots = parse_jsonl(bytes).expect("forecast fixture should parse");
+        let report = build_report(bytes, &snapshots, &args(3));
+        assert_eq!(report.status, "VALIDATED_NOT_STOPPED", "{:?}", report.errors);
+        assert_eq!(report.walk_forward_forecast_status, "WALK_FORWARD_FORECASTS_RECORDED_NOT_PROMOTED");
+        assert_eq!(report.walk_forward_forecasts.len(), 4);
+        assert!(report.forecast_summaries.iter().any(|summary| {
+            summary.metric_id == "query:path_count"
+                && summary.asymptotic_estimable_count == summary.forecast_count
+                && summary.persistence_mean_absolute_error.is_some()
+                && summary.linear_mean_absolute_error.is_some()
+        }));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
     fn walk_forward_forecast_does_not_leak_the_target_value() {
         let values = [10.0, 8.2, 7.0, 6.1, 5.7, 5.3];
         let mut snapshots: Vec<Snapshot> = Vec::new();
