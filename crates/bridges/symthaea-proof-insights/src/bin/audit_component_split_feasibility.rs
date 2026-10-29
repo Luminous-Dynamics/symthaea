@@ -308,7 +308,7 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
     for family_id in &census_families {
         let declared = declared_targets_by_family.get(family_id).context("missing family target inventory")?;
         let observed = observed_targets_by_family.get(family_id).cloned().unwrap_or_default();
-        if *declared != observed {
+        if declared != &observed {
             bail!("family {family_id} candidate_target_ids do not exactly match target rows");
         }
         let counts = observed_eligibility_counts.get(family_id).copied().unwrap_or_default();
