@@ -44,6 +44,7 @@ pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
 pub mod photonic_architecture;
+pub mod quantum_utility;
 pub mod fusion_process;
 pub mod preflight;
 pub mod presets;
@@ -159,4 +160,11 @@ pub use topology::TopologySummary;
 pub use validation_snapshot::{ValidationSnapshot, current_validation_snapshot};
 pub use verification_matrix::{
     VerificationMatrix, VerificationMatrixRow, VerificationStage, current_verification_matrix,
+};
+
+
+pub use quantum_utility::{
+    compare_utility, CandidateEstimate, CandidateProfile, EvidenceAssessment, EvidenceClass,
+    ExpectedResource, NonNegativeInterval, ProbabilityInterval, QualityGate,
+    QuantumUtilityError, ResourceMetric, UtilityComparisonReport, UtilityDecision,
 };
