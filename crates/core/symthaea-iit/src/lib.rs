@@ -2081,7 +2081,6 @@ mod tests {
         }
     }
 
-} 
     #[test]
     fn optimized_enumerator_matches_complete_reference_matrix_set_for_two_through_five_units() {
         for units in 2..=5 {
@@ -2107,4 +2106,4 @@ mod tests {
             );
         }
     }
-
+}
