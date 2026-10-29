@@ -1,6 +1,6 @@
 # CMAQ-004: World-Model Value-Add Under Matched Budgets
 
-**Status:** executable synthetic smoke harness, v0.2 with model-query cost frontier  
+**Status:** executable synthetic smoke harness, v0.3 with cost frontier and paired uncertainty intervals  
 **Tracking issue:** [#9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010)  
 **Evidence status:** exact-seed Python mirror available; Rust source and focused Actions workflow added, but Rust execution is not yet confirmed  
 **Claim ceiling:** tiny finite held-out-composition harness only; no industry/SOTA, broad causal reasoning, or production Symthaea claim
