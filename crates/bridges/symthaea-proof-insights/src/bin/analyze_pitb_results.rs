@@ -19,14 +19,14 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v1";
+const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v2";
 const RUN_RESULTS_SCHEMA: &str = "pitb.target-outcome.v0";
-const ANALYSIS_REPORT_SCHEMA: &str = "pitb.analysis-report.v0";
+const ANALYSIS_REPORT_SCHEMA: &str = "pitb.analysis-report.v1";
 const EXPECTED_PROTOCOL_ID: &str = "proof-insight-transfer-v0";
 const EXPECTED_UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
 // Conservative minimum, not a substitute for run-specific simulation-based power.
-const MIN_CONFIRMATORY_FAMILY_CLUSTERS: usize = 20;
+const MIN_CONFIRMATORY_COMPONENT_CLUSTERS: usize = 20;
 const POWER_ASSOCIATION_SIMULTANEOUS_Z: f64 = 2.394;
 const REQUIRED_EXPOSED_VALIDATION_FAMILY: &str = "012";
 const REQUIRED_EXPOSED_TEST_FAMILY: &str = "089";
@@ -43,6 +43,7 @@ struct RunConfig {
     protocol_id: String,
     protocol_sha256: String,
     split_manifest_sha256: String,
+    component_manifest_sha256: String,
     partition_digest_sha256: String,
     baseline_selection_receipt_sha256: String,
     known_exposed_validation_family_ids: Vec<String>,
@@ -113,6 +114,57 @@ struct SplitCounts {
 struct SplitFamily {
     family_id: String,
     split: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComponentManifest {
+    schema_version: String,
+    upstream_commit: String,
+    source_partition_digest_sha256: String,
+    relationship_inventory_sha256: String,
+    relationship_inventory_status: String,
+    coverage_receipt_sha256: Option<String>,
+    total_family_count: usize,
+    total_component_count: usize,
+    independent_component_count_by_split: SplitCounts,
+    cross_split_component_count: usize,
+    edge_counts: ComponentManifestEdgeCounts,
+    families: Vec<ComponentFamilyAssignment>,
+    components: Vec<ComponentRecord>,
+    qualification_status: String,
+    coverage_receipt_verification_status: String,
+    qualified_for_confirmatory_resampling: bool,
+    qualification_limitations: Vec<String>,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComponentManifestEdgeCounts {
+    total_edges: usize,
+    hard_edges_included: usize,
+    confirmed_hard_edges: usize,
+    unresolved_hard_edges: usize,
+    dismissed_hard_edges: usize,
+    soft_edges: usize,
+    cross_split_hard_edges: usize,
+    unresolved_cross_split_hard_edges: usize,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComponentFamilyAssignment {
+    family_id: String,
+    split: String,
+    component_id: String,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComponentRecord {
+    component_id: String,
+    split_names: Vec<String>,
+    family_ids: Vec<String>,
+    hard_edge_ids: Vec<String>,
+    confirmed_edge_ids: Vec<String>,
+    unresolved_edge_ids: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -222,7 +274,10 @@ struct AnalysisReport {
     known_exposed_test_family_ids: Vec<String>,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
-    family_aggregates: Vec<FamilyAggregate>,
+    component_manifest_sha256: String,
+    component_manifest_qualified_for_confirmatory_resampling: bool,
+    eligible_component_count: usize,
+    component_aggregates: Vec<ComponentAggregate>,
     arm_metrics: Vec<ArmMetrics>,
     primary_comparison: PrimaryComparison,
     external_replication: &'static str,
@@ -230,8 +285,8 @@ struct AnalysisReport {
 }
 
 #[derive(Debug, Serialize)]
-struct FamilyAggregate {
-    family_id: String,
+struct ComponentAggregate {
+    component_id: String,
     target_count: usize,
     treatment_semantic_gate_successes: usize,
     baseline_semantic_gate_successes: usize,
@@ -267,8 +322,8 @@ struct PrimaryComparison {
     clustered_bootstrap_lower_percentage_points: f64,
     clustered_bootstrap_upper_percentage_points: f64,
     target_pairs: usize,
-    family_clusters: usize,
-    minimum_family_clusters_for_confirmatory_claim: usize,
+    component_clusters: usize,
+    minimum_component_clusters_for_confirmatory_claim: usize,
     minimum_effect_percentage_points: f64,
     confidence_interval_informative: bool,
     confidence_interval_excludes_zero_positive: bool,
@@ -277,8 +332,8 @@ struct PrimaryComparison {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct FamilyTargetCount {
-    family_id: String,
+struct ComponentTargetCount {
+    component_id: String,
     eligible_target_count: usize,
 }
 
@@ -313,7 +368,7 @@ struct WeakNullScenario {
     true_target_weighted_mean_effect_percentage_points: f64,
     assumed_family_icc: f64,
     pair_association_fraction: f64,
-    requested_family_effect_heterogeneity_sd_percentage_points: f64,
+    requested_component_effect_heterogeneity_sd_percentage_points: f64,
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
     false_claims: usize,
@@ -342,6 +397,8 @@ struct PowerReport {
     validation_results_sha256: String,
     baseline_selection_receipt_sha256: String,
     split_manifest_sha256: String,
+    component_manifest_sha256: String,
+    component_manifest_qualified_for_confirmatory_resampling: bool,
     partition_digest_sha256: String,
     analyzer_source_sha256: String,
     upstream_commit: String,
@@ -350,21 +407,22 @@ struct PowerReport {
     known_exposed_test_family_ids: Vec<String>,
     eligible_validation_target_count: usize,
     eligible_validation_family_count: usize,
+    eligible_validation_component_count: usize,
     validation_baseline_semantic_success_rate: f64,
-    family_target_counts: Vec<FamilyTargetCount>,
+    component_target_counts: Vec<ComponentTargetCount>,
     assumed_family_icc_grid: Vec<f64>,
     pair_association_fraction_grid: Vec<f64>,
     true_effect_grid_percentage_points: Vec<f64>,
     study_simulations: usize,
     bootstrap_replicates_per_simulated_study: usize,
     simulation_seed: u64,
-    confirmatory_minimum_family_count: usize,
+    confirmatory_minimum_component_count: usize,
     utility_effect_threshold_percentage_points: f64,
     required_power_at_20pp_and_icc_020: f64,
     maximum_false_claim_probability_at_zero_effect: f64,
     null_effect_false_claim_probability_max: Option<f64>,
     null_effect_false_claim_probability_upper_simultaneous_95_max: Option<f64>,
-    weak_null_family_effect_heterogeneity_sd_grid_percentage_points: Vec<f64>,
+    weak_null_component_effect_heterogeneity_sd_grid_percentage_points: Vec<f64>,
     weak_null_pair_association_fraction_grid: Vec<f64>,
     weak_null_scenarios: Vec<WeakNullScenario>,
     weak_null_false_claim_probability_max: Option<f64>,
@@ -417,10 +475,11 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
     let protocol_bytes = read_arg(args, "--protocol")?;
     let split_bytes = read_arg(args, "--splits")?;
     let receipt_bytes = read_arg(args, "--baseline-receipt")?;
+    let component_manifest_bytes = read_arg(args, "--component-manifest")?;
 
     let config: RunConfig =
         serde_json::from_slice(&config_bytes).context("parse frozen run config JSON")?;
-    validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes)?;
+    validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes, &component_manifest_bytes)?;
     let expected_power_digest = config
         .power_report_sha256
         .as_deref()
@@ -431,6 +490,9 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
 
     let split_manifest: SplitManifest =
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
+    let component_manifest: ComponentManifest = serde_json::from_slice(&component_manifest_bytes)
+        .context("parse exact component manifest JSON")?;
+    let family_to_component = validate_component_manifest(&component_manifest, &config, &split_manifest)?;
     let receipt: BaselineSelectionReceipt =
         serde_json::from_slice(&receipt_bytes).context("parse baseline selection receipt JSON")?;
     validate_baseline_receipt(&receipt, &validation_bytes)?;
@@ -459,6 +521,8 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         &receipt,
         &eligible_validation,
         &validation_scores,
+        &component_manifest,
+        &family_to_component,
     )?;
     let selected_baseline = receipt.selected_arm.clone();
 
@@ -474,21 +538,31 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         .map(|target| target.family_id.as_str())
         .collect::<BTreeSet<_>>()
         .len();
-    let family_aggregates = compute_family_aggregates(&eligible, &selected_baseline)?;
+    let component_aggregates = compute_component_aggregates(&eligible, &selected_baseline, &family_to_component)?;
     let arm_metrics = compute_arm_metrics(&eligible);
     let (effect, lower, upper, pairs, clusters) = paired_cluster_bootstrap(
-        &family_aggregates,
+        &component_aggregates,
         config.bootstrap_replicates,
         config.bootstrap_seed,
     )?;
 
-    let (interval_informative, interval_positive, passed, gate_reason) =
+    let (interval_informative, interval_positive, statistical_passed, statistical_reason) =
         confirmatory_utility_gate(effect, lower, upper, clusters);
+    let passed = statistical_passed && component_manifest.qualified_for_confirmatory_resampling;
+    let gate_reason = if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
+        statistical_reason
+    } else if !component_manifest.qualified_for_confirmatory_resampling {
+        "no_claim_component_manifest_unqualified"
+    } else {
+        statistical_reason
+    };
     let gate_decision = gate_reason.to_string();
 
-    let interpretation = if passed {
+    let interpretation = if !component_manifest.qualified_for_confirmatory_resampling {
+        "The component mapping was structurally validated, but the underlying relationship-coverage receipt has not been verified; this is diagnostic-only and no confirmatory utility claim is permitted."
+    } else if passed {
         "The paired, family-clustered estimate met the preregistered effect and informative-interval gates on this test partition. This is within-benchmark utility only; it is not external/SOTA evidence."
-    } else if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+    } else if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
         "The eligible independent-family count is below the v0 floor of 20. Treat this as an underpowered pilot; the floor itself is not evidence of adequate power, so simulation-based power planning is still required."
     } else if !interval_informative {
         "The paired cluster-bootstrap interval is zero-width and has no empirical resolution. No utility claim is permitted even if its point estimate exceeds the effect threshold; inspect the component outcomes and collect additional independent evidence."
@@ -507,6 +581,8 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         results_jsonl_sha256: results_digest,
         analyzer_source_sha256: sha256_hex(include_bytes!("analyze_pitb_results.rs")),
         split_manifest_sha256: config.split_manifest_sha256,
+        component_manifest_sha256: config.component_manifest_sha256.clone(),
+        component_manifest_qualified_for_confirmatory_resampling: component_manifest.qualified_for_confirmatory_resampling,
         partition_digest_sha256: config.partition_digest_sha256,
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
         upstream_commit: split_manifest.upstream.commit,
@@ -529,6 +605,7 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         validation_baseline_scores: validation_scores,
         eligible_target_count: eligible.len(),
         eligible_family_count,
+        eligible_component_count: family_to_component_ids_for_targets(&eligible, &family_to_component)?.len(),
         excluded_target_count: outcomes
             .iter()
             .filter(|row| row.eligibility == Eligibility::Excluded)
@@ -541,11 +618,11 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         known_exposed_test_family_ids: config.known_exposed_test_family_ids.clone(),
         bootstrap_replicates: config.bootstrap_replicates,
         bootstrap_seed: config.bootstrap_seed,
-        family_aggregates,
+        component_aggregates,
         arm_metrics,
         primary_comparison: PrimaryComparison {
             metric: "semantic_gate_verified_exact_target_success",
-            confidence_interval_method: "paired target-delta percentile bootstrap; resample families with replacement; SplitMix64; linear-interpolated 2.5th/97.5th quantiles",
+            confidence_interval_method: "paired target-delta percentile bootstrap; resample audited connected components with replacement; SplitMix64; linear-interpolated 2.5th/97.5th quantiles",
             baseline_arm: selected_baseline,
             treatment_arm: TREATMENT_ARM,
             paired_absolute_effect_percentage_points: effect * 100.0,
@@ -553,8 +630,8 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
             clustered_bootstrap_lower_percentage_points: lower * 100.0,
             clustered_bootstrap_upper_percentage_points: upper * 100.0,
             target_pairs: pairs,
-            family_clusters: clusters,
-            minimum_family_clusters_for_confirmatory_claim: MIN_CONFIRMATORY_FAMILY_CLUSTERS,
+            component_clusters: clusters,
+            minimum_component_clusters_for_confirmatory_claim: MIN_CONFIRMATORY_COMPONENT_CLUSTERS,
             minimum_effect_percentage_points: 10.0,
             confidence_interval_informative: interval_informative,
             confidence_interval_excludes_zero_positive: interval_positive,
@@ -594,6 +671,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     let protocol_bytes = read_arg(args, "--protocol")?;
     let split_bytes = read_arg(args, "--splits")?;
     let receipt_bytes = read_arg(args, "--baseline-receipt")?;
+    let component_manifest_bytes = read_arg(args, "--component-manifest")?;
     let simulations = args
         .get("--power-simulations")
         .context("missing --power-simulations")?
@@ -610,9 +688,12 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     if config.power_report_sha256.is_some() {
         bail!("power planning must use the run design before its power-report digest is added");
     }
-    validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes)?;
+    validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes, &component_manifest_bytes)?;
     let split_manifest: SplitManifest =
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
+    let component_manifest: ComponentManifest = serde_json::from_slice(&component_manifest_bytes)
+        .context("parse exact component manifest JSON")?;
+    let family_to_component = validate_component_manifest(&component_manifest, &config, &split_manifest)?;
     let receipt: BaselineSelectionReceipt =
         serde_json::from_slice(&receipt_bytes).context("parse baseline-selection receipt JSON")?;
     validate_baseline_receipt(&receipt, &validation_bytes)?;
@@ -636,17 +717,19 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     let baseline_rate = *baseline_scores
         .get(&receipt.selected_arm)
         .context("selected validation baseline has no computed score")?;
-    let mut family_sizes: BTreeMap<String, usize> = BTreeMap::new();
+    let mut component_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for target in &eligible_validation {
-        *family_sizes.entry(target.family_id.clone()).or_default() += 1;
+        let component_id = family_to_component.get(&target.family_id)
+            .with_context(|| format!("validation family {} has no component assignment", target.family_id))?;
+        *component_sizes.entry(component_id.clone()).or_default() += 1;
     }
-    if family_sizes.is_empty() || family_sizes.values().any(|count| *count == 0) {
-        bail!("validation-derived family-size distribution is empty or invalid");
+    if component_sizes.is_empty() || component_sizes.values().any(|count| *count == 0) {
+        bail!("validation-derived component-size distribution is empty or invalid");
     }
-    let family_target_counts: Vec<FamilyTargetCount> = family_sizes
+    let component_target_counts: Vec<ComponentTargetCount> = component_sizes
         .into_iter()
-        .map(|(family_id, eligible_target_count)| FamilyTargetCount {
-            family_id,
+        .map(|(component_id, eligible_target_count)| ComponentTargetCount {
+            component_id,
             eligible_target_count,
         })
         .collect();
@@ -667,7 +750,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
                     scenario_index as u64 * 0x9E37_79B9_7F4A_7C15,
                 );
                 scenarios.push(simulate_power_scenario(
-                    &family_target_counts,
+                    &component_target_counts,
                     baseline_rate,
                     effect,
                     icc,
@@ -697,7 +780,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
                     .wrapping_add(0xD1B5_4A32_D192_ED03)
                     .wrapping_add(scenario_index as u64 * 0x9E37_79B9_7F4A_7C15);
                 weak_null_scenarios.push(simulate_weak_null_scenario(
-                    &family_target_counts,
+                    &component_target_counts,
                     baseline_rate,
                     sd_pp / 100.0,
                     icc,
@@ -775,17 +858,21 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         } else {
             None
         };
-    let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
+    let statistical_power_gate_passed = component_target_counts.len() >= MIN_CONFIRMATORY_COMPONENT_CLUSTERS
         && estimated_power_at_20pp_and_icc_020_lower_simultaneous_95
             .is_some_and(|power| power >= 0.80)
         && null_effect_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|rate| rate <= 0.05)
         && weak_null_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|rate| rate <= 0.05);
+    let power_gate_passed = statistical_power_gate_passed
+        && component_manifest.qualified_for_confirmatory_resampling;
 
-    let interpretation = if power_gate_passed {
+    let interpretation = if statistical_power_gate_passed && !component_manifest.qualified_for_confirmatory_resampling {
+        "The numerical design simulations meet their thresholds, but confirmatory use is blocked because the component coverage receipt is unverified."
+    } else if power_gate_passed {
         "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20, the strict-null scenarios, and the family-heterogeneous weak-null grid. This is a design-planning result, not evidence that insight transfer succeeds."
-    } else if family_target_counts.len() < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+    } else if component_target_counts.len() < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
         "The validation-derived eligible sample has fewer than 20 independent families. The design is underpowered by the frozen project floor and cannot support a confirmatory claim."
     } else {
         "The simulated design did not meet the power gate, strict-null calibration, or family-heterogeneous weak-null false-claim gate, or the +20pp scenario was infeasible at the observed baseline. Expand the separately sourced eligible set or report the eventual experiment as a pilot; do not lower the gates."
@@ -794,7 +881,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 
     let design_digest = run_design_sha256(&config)?;
     let report = PowerReport {
-        schema_version: "pitb.power-report.v3".to_string(),
+        schema_version: "pitb.power-report.v4".to_string(),
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_design_sha256: design_digest,
@@ -808,22 +895,23 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         known_exposed_validation_family_ids: config.known_exposed_validation_family_ids.clone(),
         known_exposed_test_family_ids: config.known_exposed_test_family_ids.clone(),
         eligible_validation_target_count: eligible_validation.len(),
-        eligible_validation_family_count: family_target_counts.len(),
+        eligible_validation_family_count: eligible_validation.iter().map(|target| target.family_id.as_str()).collect::<BTreeSet<_>>().len(),
+        eligible_validation_component_count: component_target_counts.len(),
         validation_baseline_semantic_success_rate: baseline_rate,
-        family_target_counts,
+        component_target_counts,
         assumed_family_icc_grid: icc_grid.to_vec(),
         pair_association_fraction_grid: pair_association_grid.to_vec(),
         true_effect_grid_percentage_points: effect_grid.map(|value| value * 100.0).to_vec(),
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
         simulation_seed: config.bootstrap_seed,
-        confirmatory_minimum_family_count: MIN_CONFIRMATORY_FAMILY_CLUSTERS,
+        confirmatory_minimum_component_count: MIN_CONFIRMATORY_COMPONENT_CLUSTERS,
         utility_effect_threshold_percentage_points: 10.0,
         required_power_at_20pp_and_icc_020: 0.80,
         maximum_false_claim_probability_at_zero_effect: 0.05,
         null_effect_false_claim_probability_max,
         null_effect_false_claim_probability_upper_simultaneous_95_max,
-        weak_null_family_effect_heterogeneity_sd_grid_percentage_points: weak_null_sd_grid_pp.to_vec(),
+        weak_null_component_effect_heterogeneity_sd_grid_percentage_points: weak_null_sd_grid_pp.to_vec(),
         weak_null_pair_association_fraction_grid: weak_null_pair_association_grid.to_vec(),
         weak_null_scenarios,
         weak_null_false_claim_probability_max,
@@ -922,7 +1010,7 @@ fn simultaneous_power_lower_bound(successes: usize, trials: usize) -> f64 {
 }
 
 fn simulate_power_scenario(
-    family_target_counts: &[FamilyTargetCount],
+    component_target_counts: &[ComponentTargetCount],
     baseline_rate: f64,
     true_effect: f64,
     icc: f64,
@@ -931,7 +1019,7 @@ fn simulate_power_scenario(
     bootstrap_replicates: usize,
     seed: u64,
 ) -> Result<PowerScenario> {
-    if family_target_counts.is_empty() {
+    if component_target_counts.is_empty() {
         bail!("power simulation requires at least one eligible family");
     }
     if !(0.0..1.0).contains(&icc) {
@@ -979,8 +1067,8 @@ fn simulate_power_scenario(
         });
     }
 
-    let clusters = family_target_counts.len();
-    let total_targets: usize = family_target_counts
+    let clusters = component_target_counts.len();
+    let total_targets: usize = component_target_counts
         .iter()
         .map(|family| family.eligible_target_count)
         .sum();
@@ -992,7 +1080,7 @@ fn simulate_power_scenario(
     let mut sum_lower = 0.0;
     for _ in 0..simulations {
         let simulated_families = simulate_matched_study(
-            family_target_counts,
+            component_target_counts,
             baseline_rate,
             treatment_rate,
             icc,
@@ -1061,7 +1149,7 @@ fn simulate_power_scenario(
         },
         mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
         mean_lower_95ci_percentage_points: Some(sum_lower / simulations as f64 * 100.0),
-        interpretation: if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+        interpretation: if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
             "Power is structurally zero for the confirmatory gate because the eligible validation design contains fewer than 20 independent family clusters.".to_string()
         } else {
             "Estimated fraction of synthetic matched studies passing the complete primary utility gate under the declared baseline, effect, ICC, and validation-derived family sizes.".to_string()
@@ -1070,7 +1158,7 @@ fn simulate_power_scenario(
 }
 
 fn simulate_weak_null_scenario(
-    family_target_counts: &[FamilyTargetCount],
+    component_target_counts: &[ComponentTargetCount],
     baseline_rate: f64,
     requested_effect_sd: f64,
     icc: f64,
@@ -1079,8 +1167,8 @@ fn simulate_weak_null_scenario(
     bootstrap_replicates: usize,
     seed: u64,
 ) -> Result<WeakNullScenario> {
-    if family_target_counts.is_empty()
-        || family_target_counts
+    if component_target_counts.is_empty()
+        || component_target_counts
             .iter()
             .any(|family| family.eligible_target_count == 0)
     {
@@ -1104,7 +1192,7 @@ fn simulate_weak_null_scenario(
         bail!("weak-null simulation and bootstrap counts must be positive");
     }
 
-    let total_targets: usize = family_target_counts
+    let total_targets: usize = component_target_counts
         .iter()
         .map(|family| family.eligible_target_count)
         .sum();
@@ -1120,7 +1208,7 @@ fn simulate_weak_null_scenario(
     let mut sum_realized_effect_sd = 0.0;
     for _ in 0..simulations {
         let (simulated_families, realized_effect_sd) = simulate_weak_null_matched_study(
-            family_target_counts,
+            component_target_counts,
             baseline_rate,
             requested_effect_sd,
             icc,
@@ -1148,7 +1236,7 @@ fn simulate_weak_null_scenario(
             observed_effect,
             lower,
             upper,
-            family_target_counts.len(),
+            component_target_counts.len(),
         )
         .2
         {
@@ -1175,7 +1263,7 @@ fn simulate_weak_null_scenario(
         true_target_weighted_mean_effect_percentage_points: 0.0,
         assumed_family_icc: icc,
         pair_association_fraction,
-        requested_family_effect_heterogeneity_sd_percentage_points: requested_effect_sd * 100.0,
+        requested_component_effect_heterogeneity_sd_percentage_points: requested_effect_sd * 100.0,
         study_simulations: simulations,
         bootstrap_replicates_per_simulated_study: bootstrap_replicates,
         false_claims,
@@ -1204,27 +1292,27 @@ fn simulate_weak_null_scenario(
 }
 
 fn simulate_weak_null_matched_study(
-    family_target_counts: &[FamilyTargetCount],
+    component_target_counts: &[ComponentTargetCount],
     baseline_rate: f64,
     requested_effect_sd: f64,
     icc: f64,
     pair_association_fraction: f64,
     rng: &mut SplitMix64,
 ) -> Result<(Vec<SimulatedFamily>, f64)> {
-    let baseline_rates: Vec<f64> = family_target_counts
+    let baseline_rates: Vec<f64> = component_target_counts
         .iter()
         .map(|_| sample_family_rate(baseline_rate, icc, rng))
         .collect();
     let treatment_effects = sample_centered_weak_null_family_effects(
-        family_target_counts,
+        component_target_counts,
         &baseline_rates,
         requested_effect_sd,
         rng,
     )?;
-    let realized_effect_sd = weighted_family_effect_sd(&treatment_effects, family_target_counts);
-    let mut families = Vec::with_capacity(family_target_counts.len());
+    let realized_effect_sd = weighted_component_effect_sd(&treatment_effects, component_target_counts);
+    let mut families = Vec::with_capacity(component_target_counts.len());
 
-    for ((family, baseline_family_rate), effect) in family_target_counts
+    for ((family, baseline_family_rate), effect) in component_target_counts
         .iter()
         .zip(baseline_rates)
         .zip(treatment_effects)
@@ -1308,14 +1396,14 @@ fn sample_paired_bernoulli_from_joint_probability(
 }
 
 fn sample_centered_weak_null_family_effects(
-    family_target_counts: &[FamilyTargetCount],
+    component_target_counts: &[ComponentTargetCount],
     baseline_family_rates: &[f64],
     requested_effect_sd: f64,
     rng: &mut SplitMix64,
 ) -> Result<Vec<f64>> {
-    if family_target_counts.is_empty()
-        || family_target_counts.len() != baseline_family_rates.len()
-        || family_target_counts
+    if component_target_counts.is_empty()
+        || component_target_counts.len() != baseline_family_rates.len()
+        || component_target_counts
             .iter()
             .any(|family| family.eligible_target_count == 0)
     {
@@ -1331,26 +1419,26 @@ fn sample_centered_weak_null_family_effects(
         bail!("weak-null baseline family rates must be finite probabilities");
     }
     if requested_effect_sd == 0.0 {
-        return Ok(vec![0.0; family_target_counts.len()]);
+        return Ok(vec![0.0; component_target_counts.len()]);
     }
 
-    let total_targets: f64 = family_target_counts
+    let total_targets: f64 = component_target_counts
         .iter()
         .map(|family| family.eligible_target_count as f64)
         .sum();
-    let raw: Vec<f64> = (0..family_target_counts.len())
+    let raw: Vec<f64> = (0..component_target_counts.len())
         .map(|_| rng.normal())
         .collect();
     let weighted_mean = raw
         .iter()
-        .zip(family_target_counts)
+        .zip(component_target_counts)
         .map(|(value, family)| value * family.eligible_target_count as f64)
         .sum::<f64>()
         / total_targets;
     let centered: Vec<f64> = raw.iter().map(|value| value - weighted_mean).collect();
-    let centered_sd = weighted_family_effect_sd(&centered, family_target_counts);
+    let centered_sd = weighted_component_effect_sd(&centered, component_target_counts);
     if centered_sd <= f64::EPSILON {
-        return Ok(vec![0.0; family_target_counts.len()]);
+        return Ok(vec![0.0; component_target_counts.len()]);
     }
 
     let standardized: Vec<f64> = centered
@@ -1377,14 +1465,14 @@ fn sample_centered_weak_null_family_effects(
         .collect())
 }
 
-fn weighted_family_effect_sd(
+fn weighted_component_effect_sd(
     effects: &[f64],
-    family_target_counts: &[FamilyTargetCount],
+    component_target_counts: &[ComponentTargetCount],
 ) -> f64 {
-    if effects.is_empty() || effects.len() != family_target_counts.len() {
+    if effects.is_empty() || effects.len() != component_target_counts.len() {
         return 0.0;
     }
-    let total_targets: f64 = family_target_counts
+    let total_targets: f64 = component_target_counts
         .iter()
         .map(|family| family.eligible_target_count as f64)
         .sum();
@@ -1393,13 +1481,13 @@ fn weighted_family_effect_sd(
     }
     let mean = effects
         .iter()
-        .zip(family_target_counts)
+        .zip(component_target_counts)
         .map(|(effect, family)| effect * family.eligible_target_count as f64)
         .sum::<f64>()
         / total_targets;
     let variance = effects
         .iter()
-        .zip(family_target_counts)
+        .zip(component_target_counts)
         .map(|(effect, family)| {
             let difference = effect - mean;
             difference * difference * family.eligible_target_count as f64
@@ -1410,14 +1498,14 @@ fn weighted_family_effect_sd(
 }
 
 fn simulate_matched_study(
-    family_target_counts: &[FamilyTargetCount],
+    component_target_counts: &[ComponentTargetCount],
     baseline_rate: f64,
     treatment_rate: f64,
     icc: f64,
     pair_association_fraction: f64,
     rng: &mut SplitMix64,
 ) -> Result<Vec<SimulatedFamily>> {
-    family_target_counts
+    component_target_counts
         .iter()
         .map(|family| {
             let baseline_family_rate = sample_family_rate(baseline_rate, icc, rng);
@@ -1529,6 +1617,7 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
             "--protocol",
             "--splits",
             "--baseline-receipt",
+            "--component-manifest",
             "--power-report",
             "--out",
             "--power-simulations",
@@ -1559,6 +1648,7 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
         "--protocol",
         "--splits",
         "--baseline-receipt",
+        "--component-manifest",
         "--out",
     ] {
         if !parsed.contains_key(required) {
@@ -1621,6 +1711,7 @@ fn validate_config(
     protocol_bytes: &[u8],
     split_bytes: &[u8],
     receipt_bytes: &[u8],
+    component_manifest_bytes: &[u8],
 ) -> Result<()> {
     if config.schema_version != RUN_CONFIG_SCHEMA {
         bail!("unsupported run config schema {}", config.schema_version);
@@ -1653,6 +1744,10 @@ fn validate_config(
     }
     if config.split_manifest_sha256 != sha256_hex(split_bytes) {
         bail!("split manifest digest mismatch; do not analyze against a changed split file");
+    }
+    validate_sha256(&config.component_manifest_sha256).context("invalid component_manifest_sha256")?;
+    if config.component_manifest_sha256 != sha256_hex(component_manifest_bytes) {
+        bail!("component manifest digest mismatch; do not analyze against changed component membership");
     }
     if config.baseline_selection_receipt_sha256 != sha256_hex(receipt_bytes) {
         bail!("baseline selection receipt digest mismatch");
@@ -1859,6 +1954,182 @@ fn partition_digest_sha256(families: &[SplitFamily]) -> String {
     sha256_hex(material.as_bytes())
 }
 
+fn component_id_from_members(family_ids: &[String]) -> String {
+    let mut material = family_ids.join("\n");
+    material.push('\n');
+    format!("component-{}", sha256_hex(material.as_bytes()))
+}
+
+fn validate_component_manifest(
+    manifest: &ComponentManifest,
+    config: &RunConfig,
+    split_manifest: &SplitManifest,
+) -> Result<BTreeMap<String, String>> {
+    if manifest.schema_version != "pitb.independent-component-manifest.v0"
+        || manifest.upstream_commit != EXPECTED_UPSTREAM_COMMIT
+        || manifest.source_partition_digest_sha256 != config.partition_digest_sha256
+        || manifest.source_partition_digest_sha256 != split_manifest.split_plan.partition_digest_sha256
+    {
+        bail!("component manifest schema, upstream commit, or frozen-partition binding is invalid");
+    }
+    validate_sha256(&manifest.relationship_inventory_sha256)
+        .context("invalid relationship inventory digest in component manifest")?;
+    if manifest.coverage_receipt_verification_status != "not_verified_receipt_bytes_not_supplied"
+        || manifest.qualified_for_confirmatory_resampling
+    {
+        bail!("this analyzer build does not authorize unverified component manifests for confirmatory resampling");
+    }
+    if manifest.qualification_limitations.is_empty()
+        || manifest.qualification_limitations.iter().any(|limitation| limitation.trim().is_empty())
+    {
+        bail!("component manifest must enumerate non-empty qualification limitations");
+    }
+    match manifest.relationship_inventory_status.as_str() {
+        "incomplete" => {
+            if manifest.coverage_receipt_sha256.is_some()
+                || manifest.qualification_status != "not_qualified_incomplete_inventory"
+            {
+                bail!("incomplete relationship inventory must have no receipt and remain unqualified");
+            }
+        }
+        "independently_reviewed_complete" => {
+            let receipt_digest = manifest.coverage_receipt_sha256.as_deref()
+                .context("complete relationship inventory must reference a coverage receipt digest")?;
+            validate_sha256(receipt_digest).context("invalid coverage receipt digest")?;
+        }
+        other => bail!("unknown component inventory coverage status: {other}"),
+    }
+
+    let frozen: BTreeMap<String, String> = split_manifest.families.iter()
+        .map(|family| (family.family_id.clone(), family.split.clone()))
+        .collect();
+    if manifest.total_family_count != frozen.len() || manifest.families.len() != frozen.len() {
+        bail!("component manifest does not contain exactly the frozen family count");
+    }
+    let mut family_to_component = BTreeMap::new();
+    let mut previous_family: Option<&str> = None;
+    for row in &manifest.families {
+        if row.family_id.trim().is_empty()
+            || !matches!(row.split.as_str(), "train" | "validation" | "test")
+            || previous_family.is_some_and(|previous| previous >= row.family_id.as_str())
+        {
+            bail!("component manifest family rows must be nonblank, unique, and sorted");
+        }
+        previous_family = Some(&row.family_id);
+        if frozen.get(&row.family_id).map(String::as_str) != Some(row.split.as_str()) {
+            bail!("component manifest split disagrees with frozen assignment for family {}", row.family_id);
+        }
+        if row.component_id.len() != 74
+            || !row.component_id.starts_with("component-")
+            || !row.component_id[10..].bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            bail!("malformed component ID for family {}", row.family_id);
+        }
+        if family_to_component.insert(row.family_id.clone(), row.component_id.clone()).is_some() {
+            bail!("duplicate family in component manifest");
+        }
+    }
+    if family_to_component.keys().cloned().collect::<BTreeSet<_>>()
+        != frozen.keys().cloned().collect::<BTreeSet<_>>()
+    {
+        bail!("component manifest family IDs do not exactly match the frozen split");
+    }
+    if manifest.total_component_count != manifest.components.len() || manifest.components.is_empty() {
+        bail!("component manifest component count does not reconcile");
+    }
+
+    let mut component_ids = BTreeSet::new();
+    let mut covered_families = BTreeSet::new();
+    let mut independent_counts = SplitCounts { train: 0, validation: 0, test: 0 };
+    let mut cross_split_count = 0_usize;
+    for component in &manifest.components {
+        if component.family_ids.is_empty() || component.split_names.is_empty()
+            || !component_ids.insert(component.component_id.clone())
+        {
+            bail!("empty or duplicate component record");
+        }
+        if component.family_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+            bail!("component family IDs must be sorted and unique");
+        }
+        let sorted_unique = |ids: &[String]| !ids.windows(2).any(|pair| pair[0] >= pair[1]);
+        if !sorted_unique(&component.hard_edge_ids)
+            || !sorted_unique(&component.confirmed_edge_ids)
+            || !sorted_unique(&component.unresolved_edge_ids)
+        {
+            bail!("component edge IDs must be sorted and unique");
+        }
+        let hard_ids: BTreeSet<&str> = component.hard_edge_ids.iter().map(String::as_str).collect();
+        let confirmed_ids: BTreeSet<&str> = component.confirmed_edge_ids.iter().map(String::as_str).collect();
+        let unresolved_ids: BTreeSet<&str> = component.unresolved_edge_ids.iter().map(String::as_str).collect();
+        if !confirmed_ids.is_subset(&hard_ids) || !unresolved_ids.is_subset(&hard_ids)
+            || !confirmed_ids.is_disjoint(&unresolved_ids)
+        {
+            bail!("confirmed/unresolved component edges must partition the declared hard edges");
+        }
+        if component.component_id != component_id_from_members(&component.family_ids) {
+            bail!("component ID does not match its sorted family membership");
+        }
+        let mut expected_splits = BTreeSet::new();
+        for family_id in &component.family_ids {
+            if !covered_families.insert(family_id.clone()) {
+                bail!("family appears in more than one component: {family_id}");
+            }
+            let assigned_component = family_to_component.get(family_id)
+                .with_context(|| format!("component contains unknown family {family_id}"))?;
+            if assigned_component != &component.component_id {
+                bail!("family assignment disagrees with component membership for {family_id}");
+            }
+            expected_splits.insert(frozen[family_id].clone());
+        }
+        let expected_split_names: Vec<String> = expected_splits.into_iter().collect();
+        if component.split_names != expected_split_names {
+            bail!("component split-name set does not reconcile with family membership");
+        }
+        if expected_split_names.len() == 1 {
+            match expected_split_names[0].as_str() {
+                "train" => independent_counts.train += 1,
+                "validation" => independent_counts.validation += 1,
+                "test" => independent_counts.test += 1,
+                _ => unreachable!("split names were validated"),
+            }
+        } else {
+            cross_split_count += 1;
+        }
+    }
+    if covered_families != frozen.keys().cloned().collect::<BTreeSet<_>>() {
+        bail!("component membership omits one or more frozen families");
+    }
+    if independent_counts.train != manifest.independent_component_count_by_split.train
+        || independent_counts.validation != manifest.independent_component_count_by_split.validation
+        || independent_counts.test != manifest.independent_component_count_by_split.test
+        || cross_split_count != manifest.cross_split_component_count
+    {
+        bail!("component counts do not reconcile with the complete component map");
+    }
+    let edges = &manifest.edge_counts;
+    if edges.hard_edges_included != edges.confirmed_hard_edges + edges.unresolved_hard_edges
+        || edges.total_edges != edges.hard_edges_included + edges.dismissed_hard_edges + edges.soft_edges
+        || edges.unresolved_cross_split_hard_edges > edges.cross_split_hard_edges
+        || edges.cross_split_hard_edges > edges.hard_edges_included
+    {
+        bail!("relationship edge counts do not reconcile");
+    }
+    let expected_status = if manifest.relationship_inventory_status == "incomplete" {
+        "not_qualified_incomplete_inventory"
+    } else if cross_split_count > 0 {
+        "not_qualified_cross_split_hard_relationships"
+    } else {
+        "structurally_eligible_receipt_unverified"
+    };
+    if manifest.qualification_status != expected_status {
+        bail!("component qualification status does not follow coverage and cross-split controls");
+    }
+    if cross_split_count > 0 {
+        bail!("cross-split hard-link components must be resolved/quarantined before power planning or test analysis");
+    }
+    Ok(family_to_component)
+}
+
 fn parse_target_jsonl(bytes: &[u8], split: &str) -> Result<Vec<TargetOutcome>> {
     let text = String::from_utf8(bytes.to_vec())
         .with_context(|| format!("{split} target results must be UTF-8"))?;
@@ -1944,8 +2215,10 @@ fn validate_power_report(
     receipt: &BaselineSelectionReceipt,
     eligible_validation: &[&TargetOutcome],
     validation_scores: &BTreeMap<String, f64>,
+    component_manifest: &ComponentManifest,
+    family_to_component: &BTreeMap<String, String>,
 ) -> Result<()> {
-    if report.schema_version != "pitb.power-report.v3" {
+    if report.schema_version != "pitb.power-report.v4" {
         bail!("unsupported power report schema {}", report.schema_version);
     }
     if report.protocol_id != EXPECTED_PROTOCOL_ID
@@ -1955,6 +2228,11 @@ fn validate_power_report(
     }
     if report.run_design_sha256 != run_design_sha256(config)? {
         bail!("power report was produced for a different canonical run design");
+    }
+    if report.component_manifest_sha256 != config.component_manifest_sha256
+        || report.component_manifest_qualified_for_confirmatory_resampling != component_manifest.qualified_for_confirmatory_resampling
+    {
+        bail!("power report component-manifest digest/qualification differs from the frozen run");
     }
     if report.validation_results_sha256 != sha256_hex(validation_bytes) {
         bail!("power report validation JSONL digest does not match supplied validation data");
@@ -1996,37 +2274,30 @@ fn validate_power_report(
         bail!("power report validation denominator does not match the validated targets");
     }
 
-    let mut expected_family_sizes: BTreeMap<String, usize> = BTreeMap::new();
+    let mut expected_component_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for target in eligible_validation {
-        *expected_family_sizes
-            .entry(target.family_id.clone())
-            .or_default() += 1;
+        let component_id = family_to_component.get(&target.family_id)
+            .with_context(|| format!("validation family {} has no component assignment", target.family_id))?;
+        *expected_component_sizes.entry(component_id.clone()).or_default() += 1;
     }
-    let expected_family_rows: Vec<FamilyTargetCount> = expected_family_sizes
+    let expected_component_rows: Vec<ComponentTargetCount> = expected_component_sizes
         .into_iter()
-        .map(|(family_id, eligible_target_count)| FamilyTargetCount {
-            family_id,
-            eligible_target_count,
-        })
+        .map(|(component_id, eligible_target_count)| ComponentTargetCount { component_id, eligible_target_count })
         .collect();
-    if report.family_target_counts.len() != expected_family_rows.len()
-        || report
-            .family_target_counts
-            .iter()
-            .zip(&expected_family_rows)
-            .any(|(observed, expected)| {
-                observed.family_id != expected.family_id
-                    || observed.eligible_target_count != expected.eligible_target_count
-            })
+    if report.component_target_counts.len() != expected_component_rows.len()
+        || report.component_target_counts.iter().zip(&expected_component_rows).any(|(observed, expected)| {
+            observed.component_id != expected.component_id || observed.eligible_target_count != expected.eligible_target_count
+        })
+        || report.eligible_validation_component_count != expected_component_rows.len()
     {
-        bail!("power report family-size distribution differs from raw validation rows");
+        bail!("power report component-size distribution differs from raw validation rows and manifest");
     }
 
     if report.study_simulations < 1_000 || report.bootstrap_replicates_per_simulated_study < 500 {
         bail!("power report has fewer simulations/bootstrap resamples than the registered floor");
     }
     if report.simulation_seed != config.bootstrap_seed
-        || report.confirmatory_minimum_family_count != MIN_CONFIRMATORY_FAMILY_CLUSTERS
+        || report.confirmatory_minimum_component_count != MIN_CONFIRMATORY_COMPONENT_CLUSTERS
         || (report.utility_effect_threshold_percentage_points - 10.0).abs() > 1e-12
         || (report.required_power_at_20pp_and_icc_020 - 0.80).abs() > 1e-12
         || (report.maximum_false_claim_probability_at_zero_effect - 0.05).abs() > 1e-12
@@ -2270,10 +2541,10 @@ fn validate_power_report(
 
     let expected_weak_null_sds_pp = [5.0_f64, 10.0, 20.0];
     let expected_pair_associations = [0.0_f64, 0.5, 0.9];
-    if report.weak_null_family_effect_heterogeneity_sd_grid_percentage_points.len()
+    if report.weak_null_component_effect_heterogeneity_sd_grid_percentage_points.len()
         != expected_weak_null_sds_pp.len()
         || report
-            .weak_null_family_effect_heterogeneity_sd_grid_percentage_points
+            .weak_null_component_effect_heterogeneity_sd_grid_percentage_points
             .iter()
             .zip(expected_weak_null_sds_pp)
             .any(|(actual, expected)| (*actual - expected).abs() > 1e-12)
@@ -2335,7 +2606,7 @@ fn validate_power_report(
             || scenario.bootstrap_replicates_per_simulated_study
                 != report.bootstrap_replicates_per_simulated_study
             || !expected_weak_null_sds_pp.iter().any(|sd| {
-                (scenario.requested_family_effect_heterogeneity_sd_percentage_points - sd).abs()
+                (scenario.requested_component_effect_heterogeneity_sd_percentage_points - sd).abs()
                     <= 1e-12
             })
             || !expected_iccs
@@ -2345,7 +2616,7 @@ fn validate_power_report(
                 (scenario.pair_association_fraction - association).abs() <= 1e-12
             })
             || !observed_weak_null_scenarios.insert((
-                (scenario.requested_family_effect_heterogeneity_sd_percentage_points * 1000.0)
+                (scenario.requested_component_effect_heterogeneity_sd_percentage_points * 1000.0)
                     .round() as i32,
                 (scenario.assumed_family_icc * 1000.0).round() as i32,
                 (scenario.pair_association_fraction * 1000.0).round() as i32,
@@ -2386,7 +2657,7 @@ fn validate_power_report(
             || !realized_sd.is_finite()
             || realized_sd < 0.0
             || realized_sd
-                > scenario.requested_family_effect_heterogeneity_sd_percentage_points + 1e-8
+                > scenario.requested_component_effect_heterogeneity_sd_percentage_points + 1e-8
         {
             bail!("weak-null scenario has an invalid grid key, count, or probability bound");
         }
@@ -2410,7 +2681,7 @@ fn validate_power_report(
                     .weak_null_scenarios
                     .iter()
                     .find(|scenario| {
-                        (scenario.requested_family_effect_heterogeneity_sd_percentage_points
+                        (scenario.requested_component_effect_heterogeneity_sd_percentage_points
                             - requested_sd_pp)
                             .abs()
                             <= 1e-12
@@ -2583,8 +2854,8 @@ fn validate_power_report(
         bail!("power report headline power/bounds must equal the worst registered association case at +20pp/ICC 0.20");
     }
 
-    let recomputed_gate = report.eligible_validation_family_count
-        >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
+    let statistical_gate = report.eligible_validation_component_count
+        >= MIN_CONFIRMATORY_COMPONENT_CLUSTERS
         && report
             .estimated_power_at_20pp_and_icc_020_lower_simultaneous_95
             .is_some_and(|value| value >= 0.80)
@@ -2594,8 +2865,12 @@ fn validate_power_report(
         && report
             .weak_null_false_claim_probability_upper_simultaneous_95_max
             .is_some_and(|value| value <= 0.05);
-    if report.power_gate_passed != recomputed_gate || !report.power_gate_passed {
-        bail!("preregistered power-planning no-go: confirmatory held-out scoring is blocked");
+    let recomputed_gate = statistical_gate && report.component_manifest_qualified_for_confirmatory_resampling;
+    if report.power_gate_passed != recomputed_gate {
+        bail!("power report gate does not reconcile with component calibration and qualification flag");
+    }
+    if !statistical_gate {
+        bail!("preregistered power-planning statistical no-go: confirmatory held-out scoring is blocked");
     }
     Ok(())
 }
@@ -2970,6 +3245,16 @@ fn same_budget(left: &Budget, right: &Budget) -> bool {
         && left.max_cost_microusd == right.max_cost_microusd
 }
 
+fn family_to_component_ids_for_targets(
+    targets: &[&TargetOutcome],
+    family_to_component: &BTreeMap<String, String>,
+) -> Result<BTreeSet<String>> {
+    targets.iter().map(|target| {
+        family_to_component.get(&target.family_id).cloned()
+            .with_context(|| format!("family {} has no audited component assignment", target.family_id))
+    }).collect()
+}
+
 fn compute_arm_metrics(targets: &[&TargetOutcome]) -> Vec<ArmMetrics> {
     ARMS.iter()
         .map(|arm_name| {
@@ -3015,11 +3300,12 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
     numerator as f64 / denominator as f64
 }
 
-fn compute_family_aggregates(
+fn compute_component_aggregates(
     targets: &[&TargetOutcome],
     baseline_arm: &str,
-) -> Result<Vec<FamilyAggregate>> {
-    let mut aggregates: BTreeMap<String, FamilyAggregate> = BTreeMap::new();
+    family_to_component: &BTreeMap<String, String>,
+) -> Result<Vec<ComponentAggregate>> {
+    let mut aggregates: BTreeMap<String, ComponentAggregate> = BTreeMap::new();
     for target in targets {
         let treatment = target
             .arms
@@ -3035,10 +3321,12 @@ fn compute_family_aggregates(
         let baseline_success = baseline.semantic_gate_passed;
         let delta = (if treatment_success { 1_i64 } else { 0_i64 })
             - (if baseline_success { 1_i64 } else { 0_i64 });
+        let component_id = family_to_component.get(&target.family_id)
+            .with_context(|| format!("family {} has no audited component assignment", target.family_id))?;
         let aggregate = aggregates
-            .entry(target.family_id.clone())
-            .or_insert_with(|| FamilyAggregate {
-                family_id: target.family_id.clone(),
+            .entry(component_id.clone())
+            .or_insert_with(|| ComponentAggregate {
+                component_id: component_id.clone(),
                 target_count: 0,
                 treatment_semantic_gate_successes: 0,
                 baseline_semantic_gate_successes: 0,
@@ -3054,7 +3342,7 @@ fn compute_family_aggregates(
         if aggregate.target_count == 0 {
             bail!(
                 "family {} has no eligible target pairs",
-                aggregate.family_id
+                aggregate.component_id
             );
         }
         aggregate.paired_effect_percentage_points =
@@ -3080,9 +3368,9 @@ fn confirmatory_utility_gate(
     let passed = interval_informative
         && interval_positive
         && effect_gate
-        && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
-    let decision = if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
-        "underpowered_too_few_independent_family_clusters"
+        && clusters >= MIN_CONFIRMATORY_COMPONENT_CLUSTERS;
+    let decision = if clusters < MIN_CONFIRMATORY_COMPONENT_CLUSTERS {
+        "underpowered_too_few_independent_component_clusters"
     } else if !interval_informative {
         "no_claim_degenerate_bootstrap_interval"
     } else if passed {
@@ -3094,7 +3382,7 @@ fn confirmatory_utility_gate(
 }
 
 fn paired_cluster_bootstrap(
-    families: &[FamilyAggregate],
+    families: &[ComponentAggregate],
     replicates: usize,
     seed: u64,
 ) -> Result<(f64, f64, f64, usize, usize)> {
@@ -3365,7 +3653,7 @@ mod tests {
     #[test]
     fn positive_degenerate_interval_cannot_pass_confirmatory_gate() {
         let (informative, excludes_zero, passed, decision) =
-            confirmatory_utility_gate(0.25, 0.25, 0.25, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+            confirmatory_utility_gate(0.25, 0.25, 0.25, MIN_CONFIRMATORY_COMPONENT_CLUSTERS);
         assert!(!informative);
         assert!(excludes_zero, "the interval is numerically positive even though it is uninformative");
         assert!(!passed);
@@ -3374,9 +3662,9 @@ mod tests {
 
     #[test]
     fn identical_positive_family_effects_cannot_pass_after_real_bootstrap() {
-        let families: Vec<FamilyAggregate> = (0..MIN_CONFIRMATORY_FAMILY_CLUSTERS)
-            .map(|index| FamilyAggregate {
-                family_id: format!("family-{index:02}"),
+        let families: Vec<ComponentAggregate> = (0..MIN_CONFIRMATORY_COMPONENT_CLUSTERS)
+            .map(|index| ComponentAggregate {
+                component_id: format!("family-{index:02}"),
                 target_count: 1,
                 treatment_semantic_gate_successes: 1,
                 baseline_semantic_gate_successes: 0,
@@ -3389,8 +3677,8 @@ mod tests {
             paired_cluster_bootstrap(&families, EXPECTED_BOOTSTRAP_REPLICATES, 20261028)
                 .expect("the full bootstrap should accept valid family aggregates");
         assert_eq!((effect, lower, upper), (1.0, 1.0, 1.0));
-        assert_eq!(target_pairs, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
-        assert_eq!(clusters, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+        assert_eq!(target_pairs, MIN_CONFIRMATORY_COMPONENT_CLUSTERS);
+        assert_eq!(clusters, MIN_CONFIRMATORY_COMPONENT_CLUSTERS);
 
         let (informative, excludes_zero, passed, decision) =
             confirmatory_utility_gate(effect, lower, upper, clusters);
@@ -3403,29 +3691,34 @@ mod tests {
     #[test]
     fn informative_positive_interval_can_pass_only_with_effect_and_cluster_gates() {
         let (informative, excludes_zero, passed, decision) =
-            confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+            confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_COMPONENT_CLUSTERS);
         assert!(informative);
         assert!(excludes_zero);
         assert!(passed);
         assert_eq!(decision, "pass_preregistered_utility_gate");
 
         let (_, _, passed_below_effect, decision_below_effect) =
-            confirmatory_utility_gate(0.09, 0.01, 0.15, MIN_CONFIRMATORY_FAMILY_CLUSTERS);
+            confirmatory_utility_gate(0.09, 0.01, 0.15, MIN_CONFIRMATORY_COMPONENT_CLUSTERS);
         assert!(!passed_below_effect);
         assert_eq!(decision_below_effect, "no_claim_preregistered_utility_gate_not_met");
 
         let (_, _, passed_underpowered, decision_underpowered) =
-            confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_FAMILY_CLUSTERS - 1);
+            confirmatory_utility_gate(0.25, 0.12, 0.31, MIN_CONFIRMATORY_COMPONENT_CLUSTERS - 1);
         assert!(!passed_underpowered);
-        assert_eq!(decision_underpowered, "underpowered_too_few_independent_family_clusters");
+        assert_eq!(decision_underpowered, "underpowered_too_few_independent_component_clusters");
     }
 
     #[test]
-    fn clustered_bootstrap_is_deterministic_and_publishes_family_aggregates() {
+    fn clustered_bootstrap_is_deterministic_and_publishes_component_aggregates() {
         let first = test_target("090", "target-090-a", true, false);
         let second = test_target("091", "target-091-a", true, false);
         let targets = vec![&first, &second];
-        let aggregates = compute_family_aggregates(&targets, "A").expect("matched target outcomes");
+        let family_to_component = BTreeMap::from([
+            ("090".to_string(), "component-test-090".to_string()),
+            ("091".to_string(), "component-test-091".to_string()),
+        ]);
+        let aggregates = compute_component_aggregates(&targets, "A", &family_to_component)
+            .expect("matched target outcomes");
         assert_eq!(aggregates.len(), 2);
         assert_eq!(aggregates[0].target_count, 1);
         assert_eq!(aggregates[0].paired_delta_sum, 1);
@@ -3598,7 +3891,7 @@ mod tests {
 
     #[test]
     fn simulated_cluster_bootstrap_reports_both_endpoints_and_detects_degeneracy() {
-        let families: Vec<SimulatedFamily> = (0..MIN_CONFIRMATORY_FAMILY_CLUSTERS)
+        let families: Vec<SimulatedFamily> = (0..MIN_CONFIRMATORY_COMPONENT_CLUSTERS)
             .map(|_| SimulatedFamily {
                 target_count: 1,
                 paired_delta_sum: 1,
@@ -3616,9 +3909,9 @@ mod tests {
 
     #[test]
     fn weak_null_family_effects_have_zero_target_weighted_mean_and_valid_rates() {
-        let family_target_counts: Vec<FamilyTargetCount> = (0..24)
-            .map(|index| FamilyTargetCount {
-                family_id: format!("weak-null-{index:02}"),
+        let component_target_counts: Vec<ComponentTargetCount> = (0..24)
+            .map(|index| ComponentTargetCount {
+                component_id: format!("weak-null-{index:02}"),
                 eligible_target_count: 1 + index % 5,
             })
             .collect();
@@ -3627,7 +3920,7 @@ mod tests {
             .collect();
         let mut rng = SplitMix64 { state: 20261028 };
         let effects = sample_centered_weak_null_family_effects(
-            &family_target_counts,
+            &component_target_counts,
             &baseline_rates,
             0.20,
             &mut rng,
@@ -3636,7 +3929,7 @@ mod tests {
 
         let weighted_effect_sum: f64 = effects
             .iter()
-            .zip(&family_target_counts)
+            .zip(&component_target_counts)
             .map(|(effect, family)| effect * family.eligible_target_count as f64)
             .sum();
         assert!(weighted_effect_sum.abs() < 1e-10);
@@ -3644,7 +3937,7 @@ mod tests {
             .iter()
             .zip(&baseline_rates)
             .all(|(effect, baseline)| (0.0..=1.0).contains(&(*baseline + *effect))));
-        let realized_sd = weighted_family_effect_sd(&effects, &family_target_counts);
+        let realized_sd = weighted_component_effect_sd(&effects, &component_target_counts);
         assert!(realized_sd > 0.0);
         assert!(realized_sd <= 0.20 + 1e-12);
     }
@@ -3697,9 +3990,9 @@ mod tests {
 
     #[test]
     fn weak_null_calibration_replays_deterministically_and_counts_degenerate_intervals() {
-        let families: Vec<FamilyTargetCount> = (0..24)
-            .map(|index| FamilyTargetCount {
-                family_id: format!("weak-family-{index:02}"),
+        let families: Vec<ComponentTargetCount> = (0..24)
+            .map(|index| ComponentTargetCount {
+                component_id: format!("weak-family-{index:02}"),
                 eligible_target_count: 1 + index % 4,
             })
             .collect();
@@ -3778,9 +4071,9 @@ mod tests {
 
     #[test]
     fn strict_null_power_grid_spans_registered_pair_association() {
-        let families: Vec<FamilyTargetCount> = (0..24)
-            .map(|index| FamilyTargetCount {
-                family_id: format!("assoc-family-{index:02}"),
+        let families: Vec<ComponentTargetCount> = (0..24)
+            .map(|index| ComponentTargetCount {
+                component_id: format!("assoc-family-{index:02}"),
                 eligible_target_count: 1 + index % 3,
             })
             .collect();
@@ -3816,9 +4109,9 @@ mod tests {
 
     #[test]
     fn strict_null_scenario_emits_the_simultaneous_upper_bound() {
-        let families: Vec<FamilyTargetCount> = (0..24)
-            .map(|index| FamilyTargetCount {
-                family_id: format!("null-family-{index:02}"),
+        let families: Vec<ComponentTargetCount> = (0..24)
+            .map(|index| ComponentTargetCount {
+                component_id: format!("null-family-{index:02}"),
                 eligible_target_count: 1 + index % 3,
             })
             .collect();
@@ -3838,9 +4131,9 @@ mod tests {
 
     #[test]
     fn power_simulation_is_reproducible_for_a_frozen_seed() {
-        let families: Vec<FamilyTargetCount> = (0..24)
-            .map(|index| FamilyTargetCount {
-                family_id: format!("family-{index:02}"),
+        let families: Vec<ComponentTargetCount> = (0..24)
+            .map(|index| ComponentTargetCount {
+                component_id: format!("family-{index:02}"),
                 eligible_target_count: if index % 3 == 0 { 2 } else { 1 },
             })
             .collect();
@@ -3936,6 +4229,7 @@ mod tests {
             protocol_id: EXPECTED_PROTOCOL_ID.to_string(),
             protocol_sha256: "a".repeat(64),
             split_manifest_sha256: "b".repeat(64),
+            component_manifest_sha256: "e".repeat(64),
             partition_digest_sha256: "c".repeat(64),
             baseline_selection_receipt_sha256: "d".repeat(64),
             known_exposed_validation_family_ids: vec![

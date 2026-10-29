@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/run-config-v2.schema.json",
+  "title": "PITB Frozen Run Configuration v2",
+  "description": "Strict run-config v2 pins the exact complete family-component manifest digest in addition to the frozen partition, exposure quarantines, budgets and model/checker IDs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "protocol_sha256",
+    "split_manifest_sha256",
+    "component_manifest_sha256",
+    "partition_digest_sha256",
+    "baseline_selection_receipt_sha256",
+    "known_exposed_validation_family_ids",
+    "known_exposed_test_family_ids",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "model_version",
+    "checker_version",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.run-config.v2"
+    },
+    "protocol_id": {
+      "const": "proof-insight-transfer-v0"
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "split_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "partition_digest_sha256": {
+      "const": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970"
+    },
+    "baseline_selection_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "known_exposed_validation_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "012"
+      },
+      "minContains": 1,
+      "description": "Every listed ID must belong to the frozen validation partition; must include family 012 and remain excluded from validation baseline selection/tuning."
+    },
+    "known_exposed_test_family_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "089"
+      },
+      "minContains": 1,
+      "description": "Every listed ID must belong to the frozen test partition; must include family 089 and remain excluded from confirmatory test scoring."
+    },
+    "bootstrap_replicates": {
+      "const": 10000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "checker_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_model_calls",
+        "max_tokens",
+        "max_wall_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "max_model_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_wall_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_microusd": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "power_report_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "component_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  }
+}

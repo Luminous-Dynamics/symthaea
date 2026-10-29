@@ -157,11 +157,11 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
-      - name: Validate primary analyzer power-report v3 schema contract
+      - name: Validate primary analyzer power-report v4 component-aware schema contract
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v3.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/primary-power-report-v3.schema.synthetic.json" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/primary-power-report-v4.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/primary-power-report-v4.schema.synthetic.json" <<'PY'
           import copy
           import json
           import sys
@@ -175,15 +175,15 @@ jobs:
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
           validator.validate(fixture)
 
-          if fixture["schema_version"] != "pitb.power-report.v3":
-              raise SystemExit("primary power fixture must use schema v3")
+          if fixture["schema_version"] != "pitb.power-report.v4":
+              raise SystemExit("primary power fixture must use schema v4")
           if "012" not in fixture["known_exposed_validation_family_ids"]:
               raise SystemExit("primary power fixture must quarantine exposed validation family 012")
           if "089" not in fixture["known_exposed_test_family_ids"]:
               raise SystemExit("primary power fixture must quarantine exposed test family 089")
           if len(fixture["scenarios"]) != 48 or len(fixture["weak_null_scenarios"]) != 36:
               raise SystemExit("primary power fixture must contain 48 strict/power rows and 36 weak-null rows")
-          if sum(row["eligible_target_count"] for row in fixture["family_target_counts"]) != fixture["eligible_validation_target_count"]:
+          if sum(row["eligible_target_count"] for row in fixture["component_target_counts"]) != fixture["eligible_validation_target_count"]:
               raise SystemExit("fixture target denominator must equal the sum of its family sizes")
 
           iccs = {0.0, 0.05, 0.1, 0.2}
@@ -192,7 +192,7 @@ jobs:
           if fixture["pair_association_fraction_grid"] != [0, 0.5, 0.9]:
               raise SystemExit("strict/power association grid differs from the registered values")
           strict_keys = {(row["true_treatment_effect_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["scenarios"]}
-          weak_keys = {(row["requested_family_effect_heterogeneity_sd_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["weak_null_scenarios"]}
+          weak_keys = {(row["requested_component_effect_heterogeneity_sd_percentage_points"], row["assumed_family_icc"], row["pair_association_fraction"]) for row in fixture["weak_null_scenarios"]}
           if strict_keys != {(effect, icc, association) for effect in effects for icc in iccs for association in associations}:
               raise SystemExit("fixture strict grid has missing or duplicate effect/ICC/association cells")
           if weak_keys != {(sd, icc, association) for sd in (5.0, 10.0, 20.0) for icc in iccs for association in associations}:
@@ -239,6 +239,8 @@ jobs:
                   raise SystemExit("conditional weak-null rates must be null when no interval is informative")
               if row["false_claim_probability_upper_simultaneous_95"] < row["false_claim_probability_upper_95"]:
                   raise SystemExit("weak-null simultaneous upper bound must dominate the per-cell Wilson upper bound")
+          if not fixture["component_manifest_qualified_for_confirmatory_resampling"]:
+              raise SystemExit("pass-shaped fixture must be hypothetical qualified schema evidence, not current builder output")
           if not fixture["power_gate_passed"]:
               raise SystemExit("schema fixture must exercise a pass-shaped contract")
           if fixture["null_effect_false_claim_probability_upper_simultaneous_95_max"] > 0.05 or fixture["weak_null_false_claim_probability_upper_simultaneous_95_max"] > 0.05:
@@ -336,7 +338,7 @@ jobs:
               pass
           else:
               raise SystemExit("schema must reject a stale v2 power report under the v3 contract")
-          print("PITB_PRIMARY_POWER_REPORT_SCHEMA_PASS: v3 schema; informative/degenerate denominators; conditional and unconditional power/false-claim rates; 48-cell strict/power grid; 36-cell weak-null grid; simultaneous bounds and negative controls; fixture is synthetic, not a power result")
+          print("PITB_PRIMARY_POWER_REPORT_V4_SCHEMA_PASS: v3 schema; informative/degenerate denominators; conditional and unconditional power/false-claim rates; 48-cell strict/power grid; 36-cell weak-null grid; simultaneous bounds and negative controls; fixture is synthetic, not a power result")
           PY
       - name: Validate PITB selective-missingness and component-size calibration plan
         shell: bash
@@ -441,7 +443,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/run-config-v1.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/run-config-v1.synthetic.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/run-config-v2.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/run-config-v2.synthetic.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" <<'PY'
           import copy
           import json
           import sys
@@ -567,7 +569,7 @@ jobs:
           else:
               raise SystemExit("negative control failed: duplicate validation quarantine ID was accepted")
 
-          print("PITB_RUN_CONFIG_V1_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and eight malformed-config controls; fixture is synthetic and not a benchmark run")
+          print("PITB_RUN_CONFIG_V2_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and eight malformed-config controls; fixture is synthetic and not a benchmark run")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
