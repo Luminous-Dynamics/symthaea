@@ -16,6 +16,7 @@ class MutationFixtureTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.trajectories = read_jsonl(FIXTURE_DIR / "trajectories.jsonl")
         cls.questions = read_jsonl(FIXTURE_DIR / "questions.jsonl")
+        cls.ledger = read_jsonl(FIXTURE_DIR / "eligibility-ledger.jsonl")
         validate_fixtures(cls.trajectories, cls.questions)
         cls.trajectory_by_id = {row["id"]: row for row in cls.trajectories}
         cls.question_by_id = {row["question_id"]: row for row in cls.questions}
@@ -25,6 +26,41 @@ class MutationFixtureTests(unittest.TestCase):
         self.assertEqual(len(self.questions), 12)
         self.assertEqual(len(self.trajectory_by_id), len(self.trajectories))
         self.assertEqual(len(self.question_by_id), len(self.questions))
+
+    def test_every_question_has_a_supported_retrieval_intent(self) -> None:
+        allowed = {
+            "current_state", "historical_state", "revocation_status",
+            "approved_state", "proposal_history", "causal_chain",
+        }
+        for row in self.questions:
+            with self.subTest(question_id=row["question_id"]):
+                self.assertIn(row.get("retrieval_intent"), allowed)
+
+    def test_policy_ledger_covers_every_string_source_pointer_exactly_once(self) -> None:
+        def string_pointers(value, prefix=""):
+            out = []
+            if isinstance(value, str):
+                out.append(prefix)
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    out.extend(string_pointers(child, f"{prefix}/{index}"))
+            elif isinstance(value, dict):
+                for key, child in value.items():
+                    escaped = str(key).replace("~", "~0").replace("/", "~1")
+                    out.extend(string_pointers(child, f"{prefix}/{escaped}"))
+            return out
+
+        expected = {
+            (trajectory["id"], pointer)
+            for trajectory in self.trajectories
+            for pointer in string_pointers(trajectory)
+        }
+        actual = {
+            (row["trajectory_id"], row["source_pointer"])
+            for row in self.ledger
+        }
+        self.assertEqual(len(actual), len(self.ledger), "ledger keys must be unique")
+        self.assertEqual(actual, expected, "all string leaves must be policy-labelled")
 
     def test_every_question_has_gold_support_and_explicit_category(self) -> None:
         for row in self.questions:
