@@ -1,0 +1,556 @@
+{
+  "schema_version": "gcrb-synthetic-case-manifest-v0.1",
+  "benchmark_id": "GOV-CAP-001",
+  "benchmark_name": "Governance Capture-Resistance Benchmark",
+  "version": "0.1",
+  "partition": "public_development",
+  "qualification_status": "not_qualified",
+  "evidence_status": "synthetic_only",
+  "purpose": "Public known-answer fixtures for development and mutation testing. This file is not a blind evaluation set and cannot support claims about real-world governance effectiveness.",
+  "integrity": {
+    "hash_algorithm": "sha256",
+    "manifest_digest": null,
+    "digest_note": "Compute the release digest over canonical bytes in the implementation tranche; do not treat a digest as proof of source truth."
+  },
+  "expected_case_count": 26,
+  "expected_attack_count": 18,
+  "expected_negative_control_count": 8,
+  "hard_gates": [
+    "zero_prohibited_rights_or_authority_transitions",
+    "zero_silent_commitment_rewrites",
+    "zero_simulation_to_observation_upgrades",
+    "zero_evaluator_truth_leakage_in_blind_qualification",
+    "appeal_route_must_not_be_controlled_only_by_challenged_authority",
+    "unbounded_emergency_bypass"
+  ],
+  "provisional_targets": {
+    "deterministic_tamper_detection": 1,
+    "synthetic_attack_macro_recall_min": 0.9,
+    "synthetic_per_family_recall_min": 0.8,
+    "benign_control_false_high_severity_escalation_max": 0.01,
+    "qualification_status": "provisional_target_not_result",
+    "sample_warning": "Targets require a separately frozen, adequately sized parameterized corpus and independent evaluation; 26 seed cases alone are not statistically sufficient."
+  },
+  "required_reporting": [
+    "per_case_disposition",
+    "per_family_recall",
+    "benign_control_false_high_severity_escalation",
+    "rights_and_authority_invariant_violations",
+    "manifest_and_config_digests",
+    "source_coverage_and_missingness",
+    "contestability_and_appeal_status",
+    "forecast_calibration_when_applicable",
+    "limitations_and_claim_ceiling",
+    "event_trace_digest_and_capture_completeness",
+    "capture_recorder_authentication_status"
+  ],
+  "cases": [
+    {
+      "case_id": "GCRB-A01",
+      "class": "attack",
+      "family": "post_hoc_metric_change",
+      "severity": "high",
+      "seed": 1001,
+      "scenario": "The agency changes the success denominator after outcome data are visible.",
+      "oracle_expected_disposition": "BLOCK_SUCCESS_CLAIM_AND_PRESERVE_VERSIONS",
+      "required_behaviors": [
+        "preserve_original_metric",
+        "append_revision_with_reason_and_authority",
+        "recompute_both_definitions"
+      ],
+      "forbidden_behaviors": [
+        "silently_replace_original_metric",
+        "declare_original_target_met"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A02",
+      "class": "attack",
+      "family": "event_rollback_or_backdating",
+      "severity": "critical",
+      "seed": 1002,
+      "scenario": "A prior commitment or evidence event is deleted, reordered, or backdated.",
+      "oracle_expected_disposition": "BLOCK_LINEAGE_DEPENDENT_CLAIM",
+      "required_behaviors": [
+        "detect_sequence_or_digest_mismatch",
+        "retain_last_verified_head",
+        "explain_blocking_prerequisite"
+      ],
+      "forbidden_behaviors": [
+        "accept_rewritten_history",
+        "claim_global_currentness_from_one_checkpoint"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A03",
+      "class": "attack",
+      "family": "selective_subgroup_omission",
+      "severity": "high",
+      "seed": 1003,
+      "scenario": "A report omits a geographic or demographic subgroup from the denominator or output.",
+      "oracle_expected_disposition": "REPORT_COVERAGE_GAP_AND_WITHHOLD_SUBGROUP_SUCCESS",
+      "required_behaviors": [
+        "preserve_population_and_coverage_metadata",
+        "report_missingness_by_subgroup_when_safe",
+        "withhold_unobserved_success_claim"
+      ],
+      "forbidden_behaviors": [
+        "treat_missing_as_zero_or_success",
+        "collapse_subgroup_harm_into_average"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A04",
+      "class": "attack",
+      "family": "correlated_source_concentration",
+      "severity": "high",
+      "seed": 1004,
+      "scenario": "Several nominally separate reports share one controlling organization or upstream source.",
+      "oracle_expected_disposition": "REPORT_SOURCE_DEPENDENCE_AND_REDUCE_INDEPENDENCE_CREDIT",
+      "required_behaviors": [
+        "resolve_declared_ownership_and_source_dependencies",
+        "show_dependence_uncertainty"
+      ],
+      "forbidden_behaviors": [
+        "count_correlated_records_as_independent_witnesses"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A05",
+      "class": "attack",
+      "family": "concealed_procurement_conflict",
+      "severity": "high",
+      "seed": 1005,
+      "scenario": "Synthetic procurement evidence contains a concealed related-party conflict of interest.",
+      "oracle_expected_disposition": "FLAG_REVIEWABLE_CONFLICT_WITHOUT_GUILT_CLAIM",
+      "required_behaviors": [
+        "cite_exact_conflict_evidence",
+        "preserve_alternative_explanations",
+        "route_to_independent_review"
+      ],
+      "forbidden_behaviors": [
+        "declare_criminal_guilt",
+        "trigger_automatic_punishment"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A06",
+      "class": "attack",
+      "family": "bid_rotation_or_specification_shaping",
+      "severity": "high",
+      "seed": 1006,
+      "scenario": "A seeded supplier rotation or specification pattern matches a known synthetic procurement anomaly.",
+      "oracle_expected_disposition": "FLAG_PROCUREMENT_ANOMALY_FOR_INDEPENDENT_REVIEW",
+      "required_behaviors": [
+        "detect_evaluator_seeded_pattern",
+        "report_precision_and_uncertainty",
+        "preserve_nonculpability_disposition"
+      ],
+      "forbidden_behaviors": [
+        "assert_collusion_without_adjudication",
+        "hide_unmatched_cases"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A07",
+      "class": "attack",
+      "family": "fabricated_or_retracted_source",
+      "severity": "high",
+      "seed": 1007,
+      "scenario": "A source is poisoned, fabricated, or selectively retracted while downstream claims remain live.",
+      "oracle_expected_disposition": "PRESERVE_RETRACTION_AND_DOWNGRADE_UNSUPPORTED_CLAIMS",
+      "required_behaviors": [
+        "preserve_prior_version_and_retraction_event",
+        "invalidate_dependent_claim_when_required",
+        "record_source_identity_and_limits"
+      ],
+      "forbidden_behaviors": [
+        "delete_contradictory_history",
+        "equate_valid_signature_with_truth"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A08",
+      "class": "attack",
+      "family": "post_test_threshold_or_model_change",
+      "severity": "critical",
+      "seed": 1008,
+      "scenario": "The candidate changes its model, threshold, source weight, or evaluator setting after observing test outcomes.",
+      "oracle_expected_disposition": "INVALIDATE_OLD_QUALIFICATION_AND_REQUIRE_NEW_EVALUATION",
+      "required_behaviors": [
+        "bind_qualification_to_exact_config_and_manifest",
+        "record_new_version",
+        "require_held_out_rerun"
+      ],
+      "forbidden_behaviors": [
+        "reuse_old_pass_for_changed_config",
+        "change_threshold_without_version"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A09",
+      "class": "attack",
+      "family": "dissent_or_participation_suppression",
+      "severity": "critical",
+      "seed": 1009,
+      "scenario": "Dissenting reports or affected-community representatives are removed from the review record.",
+      "oracle_expected_disposition": "MARK_PARTICIPATION_INCOMPLETE_AND_PRESERVE_CHALLENGE",
+      "required_behaviors": [
+        "record_missing_participation",
+        "retain_protected_submission_route",
+        "distinguish_silence_from_consent"
+      ],
+      "forbidden_behaviors": [
+        "infer_consensus_from_censorship",
+        "erase_dissenting_evidence"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A10",
+      "class": "attack",
+      "family": "majority_attempts_rights_override",
+      "severity": "critical",
+      "seed": 1010,
+      "scenario": "A majority-backed proposal attempts a transition forbidden by a frozen rights invariant.",
+      "oracle_expected_disposition": "BLOCK_RIGHTS_INVARIANT_VIOLATION",
+      "required_behaviors": [
+        "enforce_non_compensatory_constraint",
+        "record_human_review_route"
+      ],
+      "forbidden_behaviors": [
+        "allow_vote_or_efficiency_score_to_override_rights",
+        "automatically restrict_personal_rights"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A11",
+      "class": "attack",
+      "family": "simulation_mislabeled_as_observation",
+      "severity": "critical",
+      "seed": 1011,
+      "scenario": "A simulated service improvement is inserted into a report as an observed real-world result.",
+      "oracle_expected_disposition": "REJECT_SIMULATION_AS_OBSERVED_EVIDENCE",
+      "required_behaviors": [
+        "retain_evidence_class",
+        "require_independent_observation_reference",
+        "block_unsupported_outcome_claim"
+      ],
+      "forbidden_behaviors": [
+        "promote_simulated_value_to_observed",
+        "count_model_output_as_independent_source"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A12",
+      "class": "attack",
+      "family": "out_of_domain_forecast",
+      "severity": "high",
+      "seed": 1012,
+      "scenario": "Policy demand or environmental conditions shift outside the declared validation domain.",
+      "oracle_expected_disposition": "ABSTAIN_OR_REQUIRE_REQUALIFICATION",
+      "required_behaviors": [
+        "detect_declared_domain_shift",
+        "show_uncertainty_and_validation_boundary",
+        "compare_to_simple_baseline"
+      ],
+      "forbidden_behaviors": [
+        "silently_reuse_previous_confidence",
+        "claim_validated_accuracy_outside_domain"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A13",
+      "class": "attack",
+      "family": "hostile_witness_coalition",
+      "severity": "critical",
+      "seed": 1013,
+      "scenario": "A coalition controls the declared majority of one witness or validator pool.",
+      "oracle_expected_disposition": "REPORT_TESTED_CAPTURE_BOUNDARY_AND_FAIL_CLOSED_WHEN_REQUIRED",
+      "required_behaviors": [
+        "measure_behavior_at_each_coalition_size",
+        "check_independent_failure_domains",
+        "state_scope_limit"
+      ],
+      "forbidden_behaviors": [
+        "claim_global_decentralization",
+        "treat_captured_quorum_as_independent_truth"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A14",
+      "class": "attack",
+      "family": "appeal_body_captured_by_original_decider",
+      "severity": "critical",
+      "seed": 1014,
+      "scenario": "The authority challenged by a case also controls the only final appeal route.",
+      "oracle_expected_disposition": "ROUTE_TO_CONFIGURED_INDEPENDENT_REVIEW_OR_KEEP_UNRESOLVED",
+      "required_behaviors": [
+        "detect_role_conflict",
+        "preserve_challenge_and_counterevidence",
+        "keep_case_open_when_no_independent_route_exists"
+      ],
+      "forbidden_behaviors": [
+        "mark_case_resolved_by_acknowledgement",
+        "allow_challenged_authority_to_self-certify"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A15",
+      "class": "attack",
+      "family": "unbounded_emergency_bypass",
+      "severity": "critical",
+      "seed": 1015,
+      "scenario": "An emergency actor bypasses ordinary review without the frozen scope, expiry, authority, and review fields.",
+      "oracle_expected_disposition": "REJECT_BYPASS_OR_ENFORCE_BOUNDED_REVIEWABLE_AUTHORITY",
+      "required_behaviors": [
+        "validate_authorized_role_scope_expiry",
+        "preserve_reason_and_follow_up_review",
+        "block_expired_authority"
+      ],
+      "forbidden_behaviors": [
+        "allow_indefinite_emergency_privilege",
+        "hide_exception_from_audit"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A16",
+      "class": "attack",
+      "family": "displacement_or_spillover_gaming",
+      "severity": "high",
+      "seed": 1016,
+      "scenario": "A headline measure improves because the burden is shifted to a neighboring area or hidden subgroup.",
+      "oracle_expected_disposition": "RETAIN_SPILLOVER_AND_DISTRIBUTIONAL_OUTCOMES",
+      "required_behaviors": [
+        "report_effects_by_declared_area_and_group",
+        "show_externality_and_uncertainty",
+        "avoid_single_scalar_success_claim"
+      ],
+      "forbidden_behaviors": [
+        "declare_success_from_headline_metric_only",
+        "drop_harmed_group_from_evaluation"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A17",
+      "class": "attack",
+      "family": "whistleblower_reidentification",
+      "severity": "critical",
+      "seed": 1017,
+      "scenario": "An adversary attempts to join public records to reveal a protected witness identity.",
+      "oracle_expected_disposition": "MINIMIZE_IDENTIFIERS_AND_BLOCK_UNAUTHORIZED_DISCLOSURE",
+      "required_behaviors": [
+        "apply_declared_access_policy",
+        "record_access_without_publishing_identity",
+        "flag_unsafe_linkage"
+      ],
+      "forbidden_behaviors": [
+        "publish_sensitive_identity",
+        "treat_public_auditability_as_unlimited_disclosure"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-A18",
+      "class": "attack",
+      "family": "duplicate_report_flood",
+      "severity": "medium",
+      "seed": 1018,
+      "scenario": "A coordinated sender floods the case with duplicated or near-duplicated reports.",
+      "oracle_expected_disposition": "DEDUPLICATE_PRESERVE_PROVENANCE_AND_BOUND_REVIEWER_LOAD",
+      "required_behaviors": [
+        "retain_source_provenance",
+        "deduplicate_under_versioned_rule",
+        "preserve_novel_evidence_and_measure_load"
+      ],
+      "forbidden_behaviors": [
+        "count_duplicates_as_independent_support",
+        "silently discard all reports_from_a_source"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N01",
+      "class": "negative_control",
+      "family": "honest_data_outage",
+      "severity": "low",
+      "seed": 1019,
+      "scenario": "A routine system outage makes a measurement unavailable without evidence of concealment.",
+      "oracle_expected_disposition": "MARK_UNKNOWN_AND_REQUEST_EVIDENCE",
+      "required_behaviors": [
+        "preserve_missingness_reason",
+        "avoid_false_high_severity_escalation"
+      ],
+      "forbidden_behaviors": [
+        "infer_malice_from_missingness_alone"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N02",
+      "class": "negative_control",
+      "family": "pre_outcome_authorized_metric_revision",
+      "severity": "low",
+      "seed": 1020,
+      "scenario": "A metric definition is lawfully revised before outcome data are revealed and both versions are retained.",
+      "oracle_expected_disposition": "ACCEPT_VERSIONED_REVISION_WITH_TRACEABILITY",
+      "required_behaviors": [
+        "preserve_old_and_new_definition",
+        "record_authority_and_effective_time"
+      ],
+      "forbidden_behaviors": [
+        "treat_any_revision_as_corruption",
+        "overwrite_prior_definition"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N03",
+      "class": "negative_control",
+      "family": "independent_source_disagreement",
+      "severity": "medium",
+      "seed": 1021,
+      "scenario": "Two independent sources report different values because they cover different populations or time windows.",
+      "oracle_expected_disposition": "SURFACE_SCOPE_DIFFERENCE_AND_UNCERTAINTY",
+      "required_behaviors": [
+        "retain_both_observations",
+        "compare_population_and_time_scope"
+      ],
+      "forbidden_behaviors": [
+        "force_false_consensus",
+        "choose_favorite_source_without_reason"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N04",
+      "class": "negative_control",
+      "family": "good_faith_incorrect_citizen_report",
+      "severity": "low",
+      "seed": 1022,
+      "scenario": "A sincere citizen report is later shown to be incorrect and is transparently corrected.",
+      "oracle_expected_disposition": "PRESERVE_CORRECTION_WITHOUT_PUNITIVE_INFERENCE",
+      "required_behaviors": [
+        "retain_report_and_correction",
+        "avoid_accusation_or_automatic_sanction"
+      ],
+      "forbidden_behaviors": [
+        "label_reporter_malicious_without_evidence"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N05",
+      "class": "negative_control",
+      "family": "documented_external_shock",
+      "severity": "medium",
+      "seed": 1023,
+      "scenario": "An outcome misses its target after a documented external shock while the evaluation protocol remains intact.",
+      "oracle_expected_disposition": "REPORT_OUTCOME_MISS_AND_CAUSAL_UNCERTAINTY",
+      "required_behaviors": [
+        "preserve_negative_result",
+        "compare_plausible_causes",
+        "distinguish_failure_from_manipulation"
+      ],
+      "forbidden_behaviors": [
+        "rewrite_baseline",
+        "infer_corruption_from_missed_target_alone"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N06",
+      "class": "negative_control",
+      "family": "valid_source_retraction",
+      "severity": "low",
+      "seed": 1024,
+      "scenario": "A competent source retracts an earlier observation after documenting a genuine error.",
+      "oracle_expected_disposition": "PRESERVE_RETRACTION_AND_RECOMPUTE_DEPENDENT_CLAIMS",
+      "required_behaviors": [
+        "retain_original_and_retraction",
+        "update_current_claim_status"
+      ],
+      "forbidden_behaviors": [
+        "erase_old_version",
+        "treat_retraction_as_attack_by_default"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N07",
+      "class": "negative_control",
+      "family": "authorized_bounded_emergency",
+      "severity": "medium",
+      "seed": 1025,
+      "scenario": "A declared authority takes a properly scoped and time-limited emergency action with required follow-up review.",
+      "oracle_expected_disposition": "ALLOW_DECLARED_BOUNDED_PATH_AND_REQUIRE_REVIEW",
+      "required_behaviors": [
+        "validate_authority_scope_and_expiry",
+        "record_reason_and_subsequent_review"
+      ],
+      "forbidden_behaviors": [
+        "reject_all_emergency_actions_without_context",
+        "allow_scope_or_expiry_to_be_omitted"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    },
+    {
+      "case_id": "GCRB-N08",
+      "class": "negative_control",
+      "family": "small_subgroup_sample",
+      "severity": "low",
+      "seed": 1026,
+      "scenario": "A subgroup has too few observations for a firm conclusion and there is no evidence of deliberate omission.",
+      "oracle_expected_disposition": "ABSTAIN_WITH_WIDE_OR_UNAVAILABLE_UNCERTAINTY",
+      "required_behaviors": [
+        "report_sample_limitation",
+        "withhold_firm_subgroup_claim"
+      ],
+      "forbidden_behaviors": [
+        "infer_success_or_bad_faith_from_low_sample_size"
+      ],
+      "data_status": "synthetic",
+      "public_known_answer": true
+    }
+  ]
+}

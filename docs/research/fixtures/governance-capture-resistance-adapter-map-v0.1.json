@@ -1,0 +1,335 @@
+{
+  "schema_version": "gcrb-adapter-boundary-map-v0.1",
+  "benchmark_id": "GOV-CAP-001",
+  "version": "0.1",
+  "status": "source_audited_design_map_runtime_integration_not_claimed",
+  "purpose": "Record exact current public source owners, types, intended GCRB adapter direction, and boundaries that prevent duplicated or overclaimed state.",
+  "source_reviewed_on": "2026-10-29",
+  "adapters": [
+    {
+      "adapter_id": "MYCELIX-JUSTICE-CASE",
+      "system": "Mycelix",
+      "owner_class": "canonical domain integrity types",
+      "source_path": "mycelix-workspace/mycelix-civic/zomes/justice-cases/integrity/src/lib.rs",
+      "source_blob_sha": "041b56c7d21ab1cfc92d3a72363c8d3c817ee2f6",
+      "source_url": "https://github.com/Luminous-Dynamics/mycelix/blob/main/mycelix-workspace/mycelix-civic/zomes/justice-cases/integrity/src/lib.rs",
+      "exact_types": [
+        {
+          "name": "Case",
+          "fields": [
+            "id",
+            "case_type",
+            "complainant",
+            "respondent",
+            "phase",
+            "status",
+            "severity",
+            "context",
+            "created_at",
+            "updated_at",
+            "phase_deadline"
+          ],
+          "source_line": 25
+        },
+        {
+          "name": "Evidence",
+          "fields": [
+            "id",
+            "case_id",
+            "submitter",
+            "evidence_type",
+            "content.hash",
+            "content.reference",
+            "verification",
+            "visibility",
+            "created_at",
+            "sealed"
+          ],
+          "source_line": 162
+        },
+        {
+          "name": "Decision",
+          "fields": [
+            "id",
+            "case_id",
+            "outcome",
+            "reasoning",
+            "remedies",
+            "votes",
+            "dissents",
+            "rendered_at",
+            "appeal_deadline",
+            "finalized"
+          ],
+          "source_line": 400
+        },
+        {
+          "name": "Appeal",
+          "fields": [
+            "id",
+            "case_id",
+            "decision_id",
+            "appellant",
+            "grounds",
+            "argument",
+            "status",
+            "appeal_number",
+            "created_at"
+          ],
+          "source_line": 524
+        }
+      ],
+      "intended_gcrb_use": "Use typed Case/Evidence/Decision/Appeal references when a human-authorized dispute or appeal is actually opened under the appropriate policy and jurisdiction. GCRB may submit an anomaly/contest packet to a qualified review path; it must not open punitive cases or infer guilt automatically.",
+      "boundaries": [
+        "An anomaly is a review lead, not a finding of misconduct.",
+        "A Decision or Appeal record proves only that the relevant record exists under that hApp's validation rules; it does not establish truth outside its documented evidence and authority.",
+        "Do not duplicate the Justice Cases lifecycle or create parallel case/appeal state in Symthaea.",
+        "Validate case IDs, evidence references, appeal deadlines, and visibility/privacy policy through the owner API; this adapter is not implemented."
+      ],
+      "integration_status": "source_types_inspected_adapter_not_implemented"
+    },
+    {
+      "adapter_id": "MYCELIX-DESCI-APPEND-ONLY-EVENTS",
+      "system": "Mycelix",
+      "owner_class": "domain-specific signed event and transparency pattern",
+      "source_path": "mycelix-workspace/mycelix-desci/src/core/src/scientific_credential_governance.rs",
+      "source_blob_sha": "ddaa73a037925de327c46063cc36b331d951d22b",
+      "source_url": "https://github.com/Luminous-Dynamics/mycelix/blob/main/mycelix-workspace/mycelix-desci/src/core/src/scientific_credential_governance.rs",
+      "exact_types": [
+        {
+          "name": "CredentialGovernanceEnvelope",
+          "fields": [
+            "protocol",
+            "protocol_version",
+            "codec",
+            "schema_version",
+            "event_id",
+            "sequence",
+            "previous_hash",
+            "actor",
+            "occurred_at",
+            "idempotency_key",
+            "payload"
+          ],
+          "source_line": 574
+        },
+        {
+          "name": "CredentialGovernancePayload",
+          "fields": [
+            "PolicyInitialized",
+            "ProposalOpened",
+            "ProposalApproved",
+            "ProposalCancelled",
+            "ProposalExecuted",
+            "TransparencyCheckpointPublished",
+            "TransparencyCheckpointWitnessed"
+          ],
+          "source_line": 473
+        },
+        {
+          "name": "RecordedCredentialGovernanceEvent",
+          "fields": [
+            "event",
+            "received_at",
+            "acceptance_service_public_key",
+            "acceptance_signature"
+          ],
+          "source_line": 709
+        },
+        {
+          "name": "CredentialTransparencyCheckpoint",
+          "fields": [
+            "registry_event_count",
+            "registry_head",
+            "registry_merkle_root",
+            "governance_event_count",
+            "governance_head",
+            "governance_merkle_root",
+            "issued_at"
+          ],
+          "source_line": 445
+        }
+      ],
+      "intended_gcrb_use": "Reuse the documented architectural pattern—domain-separated canonical event envelope, monotonically sequenced hash chain, receipt-time acceptance signature, and witnessed transparency checkpoint—when designing a dedicated GCRB/civic evidence event profile.",
+      "boundaries": [
+        "CredentialGovernanceEnvelope and CredentialGovernancePayload are credential-specific; do not insert civic allegations or public policy events into credential semantics.",
+        "Acceptance signature, receipt time, chain continuity, and Merkle roots prove defined integrity/currentness properties only when their verifier and trust roots are qualified; they do not prove an event's real-world truth.",
+        "A civic event profile must define its own actor roles, authorization rules, evidence classes, retention/privacy policy, and type versioning.",
+        "No runtime GCRB adapter or trusted recorder is implemented."
+      ],
+      "integration_status": "reference_pattern_inspected_no_direct_type_reuse"
+    },
+    {
+      "adapter_id": "SYMTROPY-WORLD-SIM-OUTPUT",
+      "system": "Symtropy",
+      "owner_class": "simulation outputs",
+      "source_paths": [
+        {
+          "path": "crates/domains/symtropy-world/src/snapshot.rs",
+          "source_blob_sha": "aff46e12bfcc1a131984b70be87d7916716debf5",
+          "source_url": "https://github.com/Luminous-Dynamics/symtropy/blob/main/crates/domains/symtropy-world/src/snapshot.rs",
+          "source_line": 13
+        },
+        {
+          "path": "crates/domains/symtropy-world/src/bridge.rs",
+          "source_blob_sha": "e7f65dde85bb812d402ebc531443307536cc3fba",
+          "source_url": "https://github.com/Luminous-Dynamics/symtropy/blob/main/crates/domains/symtropy-world/src/bridge.rs",
+          "source_line": 22
+        }
+      ],
+      "exact_types": [
+        {
+          "name": "SimSnapshot",
+          "fields": [
+            "tick",
+            "governance",
+            "economy",
+            "factions",
+            "events"
+          ]
+        },
+        {
+          "name": "GovernanceSummary",
+          "fields": [
+            "stability",
+            "oppression_index",
+            "emergency_active",
+            "veto_count",
+            "override_count",
+            "authority_level"
+          ]
+        },
+        {
+          "name": "EconomySummary",
+          "fields": [
+            "gini",
+            "total_production",
+            "currency_supply"
+          ]
+        },
+        {
+          "name": "SimEvent",
+          "fields": [
+            "ProposalCreated",
+            "ProposalResolved",
+            "VetoExercised",
+            "EconomicCrisis",
+            "FactionConflict",
+            "Emergency",
+            "EpochMilestone",
+            "Log"
+          ]
+        },
+        {
+          "name": "PlayerAction",
+          "fields": [
+            "CastVote",
+            "Veto",
+            "TendExchange",
+            "SetPolicy",
+            "SetSpeed",
+            "TogglePause"
+          ]
+        },
+        {
+          "name": "WorldBridge",
+          "fields": [
+            "snapshot_rx",
+            "action_tx",
+            "current",
+            "previous",
+            "time",
+            "scale",
+            "sim_thread",
+            "stop"
+          ]
+        }
+      ],
+      "intended_gcrb_use": "Consume simulation results through a read-only adapter that stores the exact input-manifest digest, simulator commit/build ID, scenario/config hash, seed, tick/time horizon, output digest, uncertainty/limitations, and evidence class 'simulated'. Compare to independently observed outcomes only in a separate measurement adapter.",
+      "boundaries": [
+        "SimSnapshot and SimEvent are transient transport structures in the inspected public source and do not themselves establish a durable, authenticated evidence record.",
+        "Do not label a simulated outcome as observed, predicted-as-calibrated, or policy-validated without a separate claim-specific evaluation.",
+        "Do not duplicate Symtropy's physics, scenario, or governance simulation state machine in the GCRB evaluator.",
+        "The GCRB adapter is not implemented."
+      ],
+      "integration_status": "current_public_types_inspected_adapter_not_implemented"
+    },
+    {
+      "adapter_id": "SYMTROPY-MYCELIX-SIM-BRIDGE",
+      "system": "Symtropy + Mycelix",
+      "owner_class": "optional standalone simulation bridge",
+      "source_paths": [
+        {
+          "path": "crates/bridges/symtropy-sim-bridge/src/lib.rs",
+          "source_blob_sha": "055fe063c4a8389fae8a283823d7bc7933bc136c",
+          "source_url": "https://github.com/Luminous-Dynamics/symtropy/blob/main/crates/bridges/symtropy-sim-bridge/src/lib.rs",
+          "source_line": 1
+        },
+        {
+          "path": "crates/bridges/symtropy-sim-bridge/Cargo.toml",
+          "source_blob_sha": "3f9f096ad52e9d87f63e5da734d6e8ab88b33b4b",
+          "source_url": "https://github.com/Luminous-Dynamics/symtropy/blob/main/crates/bridges/symtropy-sim-bridge/Cargo.toml",
+          "source_line": 1
+        },
+        {
+          "path": "Cargo.toml",
+          "source_blob_sha": "274720e256ba9067fad3d06f71e1b18590b046bd",
+          "source_url": "https://github.com/Luminous-Dynamics/symtropy/blob/main/Cargo.toml",
+          "source_line": 30
+        }
+      ],
+      "exact_types": [
+        {
+          "name": "GovernanceState",
+          "fields": [
+            "governance",
+            "world",
+            "rng",
+            "policy",
+            "sim_tick",
+            "last_events"
+          ]
+        },
+        {
+          "name": "EconomyState",
+          "fields": [
+            "economy"
+          ]
+        },
+        {
+          "name": "CivEvent",
+          "fields": [
+            "multiworld-sim generated event variants"
+          ]
+        },
+        {
+          "name": "WorldGovernance",
+          "fields": [
+            "governance state model"
+          ]
+        },
+        {
+          "name": "PolicyConfig",
+          "fields": [
+            "simulation policy configuration"
+          ]
+        }
+      ],
+      "intended_gcrb_use": "Potential future adapter if the standalone build/dependency publication boundary is resolved and exact simulation inputs/outputs can be pinned.",
+      "boundaries": [
+        "The standalone Symtropy Cargo.toml explicitly comments that this bridge is not wired as a dependency in the default workspace because its simulation bridge and Mycelix dependencies are unpublished/stripped.",
+        "Source presence is not evidence of a runnable cross-repository integration.",
+        "Do not claim Symtropy and Mycelix are currently interoperating through this bridge.",
+        "Do not enable a hidden or private dependency as a shortcut to qualification."
+      ],
+      "integration_status": "source_present_default_dependency_not_wired"
+    }
+  ],
+  "cross_system_invariants": [
+    "GCRB never creates a parallel Mycelix case, evidence, decision, or appeal ledger.",
+    "GCRB does not reuse credential-specific Mycelix event payloads as civic semantics.",
+    "Symtropy output remains typed as simulated until independently corroborated.",
+    "Every future adapter pins exact source/build/schema digests and records unknown/missing evidence instead of imputing zero or success.",
+    "No cross-system runtime integration, source authority verification, or production qualification is claimed by this map."
+  ]
+}

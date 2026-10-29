@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.schema.json",
+  "title": "GCRB combined attack campaign",
+  "description": "Public synthetic known-answer campaign for multi-failure compositions. Schema validity is not blind qualification or evidence of real-world incidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "version",
+    "status",
+    "visibility",
+    "source_fixture_path",
+    "source_fixture_sha256",
+    "purpose",
+    "expected_case_count",
+    "expected_composite_attack_count",
+    "expected_composite_negative_control_count",
+    "limits",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "gcrb-combined-attack-campaign-v0.1"
+    },
+    "benchmark_id": {
+      "const": "GOV-CAP-001"
+    },
+    "version": {
+      "const": "0.1"
+    },
+    "status": {
+      "const": "public_development_not_qualified"
+    },
+    "visibility": {
+      "const": "public_known_answers"
+    },
+    "source_fixture_path": {
+      "const": "docs/research/fixtures/governance-capture-resistance-v0.1.json"
+    },
+    "source_fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_case_count": {
+      "const": 13
+    },
+    "expected_composite_attack_count": {
+      "const": 11
+    },
+    "expected_composite_negative_control_count": {
+      "const": 2
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 13,
+      "maxItems": 13,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "class",
+          "family",
+          "severity",
+          "component_case_ids",
+          "steps",
+          "expected_disposition",
+          "required_behaviors",
+          "forbidden_behaviors",
+          "hard_gates_triggered"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^GCRB-C[0-9]{2}$"
+          },
+          "class": {
+            "enum": [
+              "composite_attack",
+              "composite_negative_control"
+            ]
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "component_case_ids": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^GCRB-[AN][0-9]{2}$"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sequence",
+                "attack_family",
+                "operation",
+                "actor_role",
+                "expected_observable"
+              ],
+              "properties": {
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "attack_family": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "operation": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "actor_role": {
+                  "enum": [
+                    "model",
+                    "public_official",
+                    "system",
+                    "citizen",
+                    "independent_reviewer",
+                    "unknown"
+                  ]
+                },
+                "expected_observable": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "forbidden_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "hard_gates_triggered": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "zero_prohibited_rights_or_authority_transitions",
+                "zero_silent_commitment_rewrites",
+                "zero_simulation_to_observation_upgrades",
+                "zero_evaluator_truth_leakage_in_blind_qualification",
+                "appeal_route_must_not_be_controlled_only_by_challenged_authority",
+                "unbounded_emergency_bypass"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,242 @@
+{
+  "schema_version": "gcrb-sa-public-source-discovery-v0.1",
+  "benchmark_id": "GOV-CAP-001",
+  "title": "South African municipal water-service / procurement source discovery register",
+  "recorded_on": "2026-10-29",
+  "status": "discovery_only_not_dataset_validated",
+  "purpose": "Record public source candidates and explicit unknowns before selecting a municipality, case cohort, or benchmark label.",
+  "scope": {
+    "candidate_domain": "municipal water-service repair and associated procurement",
+    "geography": "South Africa",
+    "allowed_initial_mode": "read-only retrospective research",
+    "excluded_uses": [
+      "individual corruption scoring",
+      "automatic accusations",
+      "live procurement intervention",
+      "personal eligibility decisions"
+    ]
+  },
+  "sources": [
+    {
+      "source_id": "SA-ETENDERS-001",
+      "name": "National Treasury eTender Transparency Portal",
+      "owner": "South African National Treasury / Office of the Chief Procurement Officer",
+      "urls": [
+        "https://data.etenders.gov.za/",
+        "https://data.etenders.gov.za/Home/LearnMore"
+      ],
+      "source_classes": [
+        "procurement_tender_award_contract_history"
+      ],
+      "reported_temporal_coverage": "Monthly detailed downloads from May 2021; verify each selected file and its actual rows.",
+      "reported_formats": [
+        "OCDS-compatible CSV",
+        "OCDS-compatible JSON",
+        "Excel",
+        "versioned JSON REST API"
+      ],
+      "reported_license": "The portal terms permit free use and republication for commercial/non-commercial purposes subject to stated limitations and require a link to the original source. Confirm the current terms and any exact artifact metadata before redistribution; do not assume a specific CC license without verifying it for the selected export.",
+      "known_caveats": [
+        "Portal states the published data cover only a subset of public procurement captured by eTender.",
+        "Absence from the published dataset is not evidence that a procurement did not occur.",
+        "The existence of a tender, award, or contract does not prove that work was delivered or a service outcome improved.",
+        "Record-level completeness, amendment coverage, stable join keys, and selected-cohort accuracy have not been validated.",
+        "The official portal describes its published information as beta and says it should not be relied upon for critical decisions or legal purposes.",
+        "The portal does not guarantee accuracy, adequacy, completeness, or timeliness of the published information.",
+        "Treat this source as a discovery and anomaly-triage input only; never use an eTender export by itself as an adjudicatory basis for an accusation, sanction, procurement decision, or legal conclusion."
+      ],
+      "intended_use": "Reconstruct the published procurement chronology and identify candidates for independent, human review. Because the portal disclaims complete coverage and reliability for critical/legal use, it is not a sole evidentiary basis for high-impact action.",
+      "validation_status": "source_page_reviewed_data_not_downloaded_or_profiled",
+      "independent_truth_oracle": false,
+      "identifier_and_access_notes": [
+        "The portal documents OCDS-style Open Contracting IDs (OCIDs) using the ocds-9t57fa prefix for contracting processes.",
+        "Portal documentation describes a versioned JSON REST API with query filters including OCID, release date, and buyer; actual API schema, pagination behavior, and selected endpoint responses must be snapshotted before implementation.",
+        "Monthly bulk downloads of JSON, CSV, and XLSX are reported from May 2021 onward.",
+        "The official publication policy says no obligation requires municipal governments and state-owned entities to share procurement data with Treasury, which is consistent with the declared partial-coverage warning."
+      ]
+    },
+    {
+      "source_id": "SA-MUNICIPAL-FINANCE-001",
+      "name": "National Treasury Municipal Finance Data / Municipal Money API",
+      "owner": "South African National Treasury, with OpenUp as a public-data partner",
+      "urls": [
+        "https://municipaldata.treasury.gov.za/",
+        "https://municipaldata.treasury.gov.za/docs",
+        "https://municipaldata.treasury.gov.za/table/incexp/",
+        "https://municipaldata.treasury.gov.za/table/repmaint/",
+        "https://municipaldata.treasury.gov.za/table/repmaint_v2/"
+      ],
+      "source_classes": [
+        "municipal_budget_actual_income_expenditure_cash_flow"
+      ],
+      "reported_temporal_coverage": "Financial years 2008-09 through 2025-26; portal reports latest 2026 Q2 data on the discovery date.",
+      "reported_scope": "292 municipalities, with more than 85 million reported facts according to the portal.",
+      "reported_formats": [
+        "API",
+        "CSV",
+        "Excel"
+      ],
+      "known_caveats": [
+        "Portal says completeness and integrity checks are in progress.",
+        "The data are only as complete and trustworthy as municipal submissions.",
+        "Blank/not-submitted values must not be interpreted as zero.",
+        "Municipal financial performance cannot by itself establish water repair completion, service reliability, or corruption.",
+        "Do not treat a missing or not-submitted row as zero expenditure.",
+        "Do not assume all values are audited; preserve amount type and report/source snapshot.",
+        "Repairs-and-maintenance figures are normally municipality/period/item aggregates and may not join to a tender, project, specific asset, or service outcome."
+      ],
+      "candidate_tables": [
+        "income and expenditure",
+        "income and expenditure v2",
+        "cash flow",
+        "capital expenditure where available",
+        "repmaint: repairs and maintenance expenditure cube",
+        "repmaint_v2: newer Section 71 repairs and maintenance cube, reported from financial year 2019-20 onward"
+      ],
+      "intended_use": "Contextualize budgets and expenditure; corroborate amounts only after matching definitions, periods, and identifiers.",
+      "validation_status": "documentation_reviewed_data_not_downloaded_or_profiled",
+      "independent_truth_oracle": false,
+      "measure_notes": [
+        "The API documentation exposes municipality demarcation codes, financial year/period, item codes, amount types, and values for the repair/maintenance cube.",
+        "Amount Type must be preserved: an audited actual is not interchangeable with a budget, adjustment budget, original budget, or in-year actual.",
+        "The documentation says quarterly Municipal Money views are based on snapshots; later corrected submissions may appear in the next monthly snapshot and quarterly reports are locked to snapshots.",
+        "Repair-and-maintenance spending is contextual financial evidence, not proof that a specific work order was completed, a particular asset was repaired, or water service improved.",
+        "Audited actuals may be available for some tables/years, but the audit status of each selected row and its corresponding annual statements must be verified."
+      ],
+      "api_metadata": {
+        "documented_api_root": "https://municipaldata.treasury.gov.za/api",
+        "documented_cube_index": "https://municipaldata.treasury.gov.za/api/cubes",
+        "verified_cube_names_from_published_index": [
+          "repmaint",
+          "repmaint_v2",
+          "incexp",
+          "incexp_v2",
+          "audit_opinions"
+        ],
+        "source_update_note": "Published documentation reported latest 2026 Q2 data on 2026-10-29; this is documentation discovery, not a downloaded data snapshot."
+      },
+      "snapshot_and_audit_notes": [
+        "Published API documentation says the product is refreshed quarterly from local-government database snapshots, and quarterly reports are tied to snapshots.",
+        "The documentation says municipality corrections are supplied as adjustments in subsequent months and locked quarters are not modified, while the current API can contain amended numbers; preserve retrieval time and avoid comparing unmatched snapshots.",
+        "The documentation defines Amount Type = Audited Actual as figures audited by the Auditor General and says Treasury verifies them against audited Annual Financial Statements, but the selected amount type and row must be checked individually."
+      ]
+    },
+    {
+      "source_id": "SA-DWS-NIWIS-001",
+      "name": "Department of Water and Sanitation National Integrated Water Information System (NIWIS)",
+      "owner": "South African Department of Water and Sanitation",
+      "urls": [
+        "https://www.dws.gov.za/niwis2/"
+      ],
+      "source_classes": [
+        "water_services_sanitation_water_quality_water_quantity_dashboard_candidates"
+      ],
+      "reported_scope": "Dashboard themes include Water Services, Sanitation Services, Water Quality, Water Quantity, monitoring networks, and related water information.",
+      "known_caveats": [
+        "Stable raw-data export/API availability has not been confirmed.",
+        "Municipality/location resolution, time frequency, latency, definitions, and historical depth have not been profiled.",
+        "An aggregate dashboard indicator may not be granular enough to validate a specific repair episode.",
+        "Dashboard presentation is not independent verification by itself.",
+        "Initial page discovery identifies dashboard themes, but access and raw export/API behavior have not been validated in this work; do not imply a machine-readable series is already available.",
+        "The official NIWIS page describes dashboards and indicator families, including water-supply reliability, access to water infrastructure, and non-revenue water; stable raw data, historical coverage and site-specific linkage remain unverified."
+      ],
+      "intended_use": "Candidate outcome/context source only if series definitions, time/location resolution, and reuse terms pass the audit.",
+      "validation_status": "dashboard_discovered_export_and_series_unverified",
+      "independent_truth_oracle": false,
+      "candidate_indicators": [
+        "Access to Water Infrastructure",
+        "Water Supply Reliability",
+        "Non-revenue Water",
+        "Water Services Development Plans",
+        "Drinking Water Quality / Water Quality dashboards",
+        "Sanitation service access and type"
+      ]
+    }
+  ],
+  "required_evidence_classes": [
+    {
+      "class_id": "COMMITMENT",
+      "description": "Original dated public commitment, target definition, budget, responsible authority, and revision rules.",
+      "status": "not_yet_sourced"
+    },
+    {
+      "class_id": "PROCUREMENT",
+      "description": "Tender, award, contract/amendment, and (where available) payment evidence with identifiers and history.",
+      "candidate_source_ids": [
+        "SA-ETENDERS-001"
+      ],
+      "status": "candidate_source_discovered_not_profiled"
+    },
+    {
+      "class_id": "FINANCIAL_CONTEXT",
+      "description": "Budgeted/actual expenditure with reporting period and measure definition.",
+      "candidate_source_ids": [
+        "SA-MUNICIPAL-FINANCE-001"
+      ],
+      "status": "candidate_source_discovered_not_profiled"
+    },
+    {
+      "class_id": "OBSERVED_SERVICE_OUTCOME",
+      "description": "Independently corroborated, location/time-aligned water-service restoration, reliability, or quality observation.",
+      "candidate_source_ids": [
+        "SA-DWS-NIWIS-001"
+      ],
+      "status": "critical_gap_until_raw_series_and_independent_corroboration_are_verified"
+    },
+    {
+      "class_id": "AFFECTED_COMMUNITY_CHALLENGE",
+      "description": "Privacy-preserving channel for residents or service users to submit counterevidence and contest status.",
+      "status": "not_yet_sourced_or_piloted"
+    }
+  ],
+  "linkage_candidates_to_verify": [
+    "municipality code and reporting-period definition",
+    "tender/contract OCID and supplier identifiers",
+    "project or site identifier and geospatial resolution",
+    "tender, award, contract, amendment, payment, and service-event dates",
+    "measurement units, denominators, missingness codes, and source revisions",
+    "whether a service observation actually covers the claimed repair location and period"
+  ],
+  "audit_checklist": [
+    "pin exact source URL, retrieval timestamp, file/API version, license, bytes, and digest",
+    "profile schemas, row counts, keys, duplicates, nulls, and unexplained time gaps",
+    "measure municipality-period coverage before selecting a case cohort",
+    "verify publication and correction histories; keep missing, suppressed, stale, and measured-zero states distinct",
+    "compute linkage rates and retain unresolved joins as unknown",
+    "manually compare a prespecified sample against original documents and independent evidence",
+    "document source ownership, dependencies, and whether sources are genuinely independent",
+    "review privacy, retaliation, POPIA, license, and safe-publication constraints",
+    "freeze eligibility rules before inspecting which municipalities or officials appear favorable or unfavorable",
+    "For eTender, preserve OCID/release identifiers and each release chronology; record the portal's beta, partial-coverage, accuracy, completeness, timeliness, and critical/legal-use disclaimers.",
+    "For municipal finance, retain amount type, financial year/period, municipality code, cube/item code, source snapshot, and audited-status evidence; distinguish a locked quarterly snapshot from later corrected submissions.",
+    "Do not infer a specific Creative Commons license for eTender artifacts without confirming current terms/metadata; preserve source attribution requirements.",
+    "Snapshot the Municipal Finance API cube index and selected cube/queries at retrieval time; compare a chosen Audited Actual against the matching published Annual Financial Statement and Treasury report snapshot."
+  ],
+  "go_no_go_rules": [
+    "Do not infer nonexistence from an absent eTender record because portal coverage is partial.",
+    "Do not infer service completion from a tender award, contract, payment, or budget line alone.",
+    "Do not call finance, procurement, and water dashboard values corroborating evidence until their temporal/identifier alignment and source independence are established.",
+    "Do not label corruption from anomalies alone; allegations, anomaly flags, procedural violations, and adjudicated findings remain different states.",
+    "If independently corroborated service outcomes cannot be obtained, do not claim the pilot measures service-delivery impact; narrow to an explicitly labeled data-integrity study or choose another domain.",
+    "Do not select a named municipality or publish case-level allegations before coverage, legal-use, privacy, and labeling rules are frozen.",
+    "Do not use the eTender public beta as the sole evidentiary basis for a critical, legal, sanction, or procurement decision; independently verify against original records and appropriate authority.",
+    "Do not interpret aggregated repair-and-maintenance expenditure as proof of a named repair or service outcome."
+  ],
+  "next_actions": [
+    "Fetch one dated sample export/API response from each candidate source and preserve exact artifact bytes, endpoint/query, retrieval metadata, license, and digest.",
+    "For eTender, test one OCID-based procurement history against linked original tender/award/contract records and record missing-release behavior.",
+    "For municipal finance, fetch repairs-and-maintenance and income/expenditure data for one dated snapshot; preserve amount type, municipality code, period, missingness, and audited status, then compare against official published financial statements.",
+    "Build a municipality-period-source coverage matrix before choosing any cohort.",
+    "Check whether procurement identifiers join to project locations and whether any suitable independent water-outcome time series exists.",
+    "If coverage is insufficient, document the gap and stop or change domains instead of imputing ground truth."
+  ],
+  "references": [
+    "https://data.etenders.gov.za/",
+    "https://data.etenders.gov.za/Home/LearnMore",
+    "https://municipaldata.treasury.gov.za/",
+    "https://municipaldata.treasury.gov.za/docs",
+    "https://www.dws.gov.za/niwis2/",
+    "https://municipaldata.treasury.gov.za/table/repmaint/",
+    "https://municipaldata.treasury.gov.za/table/repmaint_v2/"
+  ]
+}

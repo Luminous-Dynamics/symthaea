@@ -1,0 +1,530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/fixtures/governance-capture-resistance-cross-system-evidence-v0.1.schema.json",
+  "title": "GCRB cross-system evidence envelope",
+  "description": "A type boundary for evidence imported from Mycelix, Symtropy, external measurements, and GCRB derivations. Schema validity is not truth, authenticity, authority, complete trace capture, or qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "dataset_status",
+    "purpose",
+    "records",
+    "limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "gcrb-cross-system-evidence-envelope-v0.1"
+    },
+    "benchmark_id": {
+      "const": "GOV-CAP-001"
+    },
+    "dataset_status": {
+      "const": "synthetic_only"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_system",
+          "source_record_type",
+          "assertion_class",
+          "claim",
+          "source_record_ref",
+          "type_definition_ref",
+          "depends_on",
+          "limitations"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_-]{2,95}$"
+          },
+          "source_system": {
+            "enum": [
+              "mycelix_justice",
+              "mycelix_desci",
+              "symtropy_world",
+              "independent_measurement",
+              "gcrb_evaluator"
+            ]
+          },
+          "source_record_type": {
+            "enum": [
+              "justice_case",
+              "justice_evidence",
+              "justice_decision",
+              "justice_appeal",
+              "mycelix_desci_signed_event",
+              "mycelix_desci_authority_receipt",
+              "mycelix_desci_transparency_checkpoint",
+              "symtropy_sim_snapshot",
+              "symtropy_sim_event",
+              "independent_measurement",
+              "public_report",
+              "gcrb_derived_claim"
+            ]
+          },
+          "assertion_class": {
+            "enum": [
+              "observed",
+              "reported",
+              "inferred",
+              "simulated",
+              "unknown"
+            ]
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_record_ref": {
+            "type": "string",
+            "pattern": "^synthetic:[A-Za-z0-9._:/-]+$"
+          },
+          "source_record_digest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "type_definition_ref": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "path",
+              "revision"
+            ],
+            "properties": {
+              "owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            }
+          },
+          "depends_on": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_-]{2,95}$"
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "simulation_context": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "simulator_id",
+              "source_revision",
+              "build_digest_sha256",
+              "scenario_digest_sha256",
+              "config_digest_sha256",
+              "seed",
+              "tick_start",
+              "tick_end",
+              "horizon",
+              "output_digest_sha256",
+              "validity_scope",
+              "limitations"
+            ],
+            "properties": {
+              "simulator_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_revision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,64}$"
+              },
+              "build_digest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "scenario_digest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "config_digest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tick_start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tick_end": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "horizon": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_digest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "validity_scope": {
+                "type": "string",
+                "minLength": 1
+              },
+              "limitations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "observation_basis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "measurement_ref",
+              "measurement_method",
+              "measured_at",
+              "location_scope",
+              "independent_corroboration_ref",
+              "quality_limits"
+            ],
+            "properties": {
+              "measurement_ref": {
+                "type": "string",
+                "pattern": "^synthetic:[A-Za-z0-9._:/-]+$"
+              },
+              "measurement_method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measured_at": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location_scope": {
+                "type": "string",
+                "minLength": 1
+              },
+              "independent_corroboration_ref": {
+                "type": "string",
+                "pattern": "^synthetic:[A-Za-z0-9._:/-]+$"
+              },
+              "quality_limits": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "derivation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method_id",
+              "method_version",
+              "input_evidence_ids",
+              "assumptions",
+              "limitations"
+            ],
+            "properties": {
+              "method_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "method_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "input_evidence_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_-]{2,95}$"
+                }
+              },
+              "assumptions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "limitations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "source_system": {
+                  "const": "mycelix_justice"
+                }
+              },
+              "required": [
+                "source_system"
+              ]
+            },
+            "then": {
+              "properties": {
+                "source_record_type": {
+                  "enum": [
+                    "justice_case",
+                    "justice_evidence",
+                    "justice_decision",
+                    "justice_appeal"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "source_system": {
+                  "const": "mycelix_desci"
+                }
+              },
+              "required": [
+                "source_system"
+              ]
+            },
+            "then": {
+              "properties": {
+                "source_record_type": {
+                  "enum": [
+                    "mycelix_desci_signed_event",
+                    "mycelix_desci_authority_receipt",
+                    "mycelix_desci_transparency_checkpoint"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "source_system": {
+                  "const": "symtropy_world"
+                }
+              },
+              "required": [
+                "source_system"
+              ]
+            },
+            "then": {
+              "properties": {
+                "source_record_type": {
+                  "enum": [
+                    "symtropy_sim_snapshot",
+                    "symtropy_sim_event"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "source_system": {
+                  "const": "independent_measurement"
+                }
+              },
+              "required": [
+                "source_system"
+              ]
+            },
+            "then": {
+              "properties": {
+                "source_record_type": {
+                  "const": "independent_measurement"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "source_system": {
+                  "const": "gcrb_evaluator"
+                }
+              },
+              "required": [
+                "source_system"
+              ]
+            },
+            "then": {
+              "properties": {
+                "source_record_type": {
+                  "enum": [
+                    "public_report",
+                    "gcrb_derived_claim"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "assertion_class": {
+                  "const": "simulated"
+                }
+              },
+              "required": [
+                "assertion_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "simulation_context"
+              ],
+              "properties": {
+                "source_system": {
+                  "const": "symtropy_world"
+                },
+                "observation_basis": {
+                  "not": {}
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "assertion_class": {
+                  "const": "observed"
+                }
+              },
+              "required": [
+                "assertion_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "observation_basis"
+              ],
+              "properties": {
+                "source_system": {
+                  "const": "independent_measurement"
+                },
+                "simulation_context": {
+                  "not": {}
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "assertion_class": {
+                  "const": "inferred"
+                }
+              },
+              "required": [
+                "assertion_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "derivation"
+              ],
+              "properties": {
+                "observation_basis": {
+                  "not": {}
+                },
+                "simulation_context": {
+                  "not": {}
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "assertion_class": {
+                  "enum": [
+                    "reported",
+                    "unknown"
+                  ]
+                }
+              },
+              "required": [
+                "assertion_class"
+              ]
+            },
+            "then": {
+              "properties": {
+                "observation_basis": {
+                  "not": {}
+                },
+                "simulation_context": {
+                  "not": {}
+                },
+                "derivation": {
+                  "not": {}
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,231 @@
+{
+  "schema_version": "gcrb-qualification-protocol-v0.1",
+  "benchmark_id": "GOV-CAP-001",
+  "version": "0.1",
+  "status": "public_protocol_only_no_sealed_corpus_committed",
+  "purpose": "Specify blind, independent qualification without leaking evaluator truth to candidate systems.",
+  "claim_ceiling": {
+    "allowed_after_synthetic_qualification": "The pinned configuration satisfied frozen synthetic challenge criteria under the specified threat model and tested capture budgets.",
+    "prohibited_claims_without_external_evidence": [
+      "all corruption can be detected",
+      "a model knows who is fit to govern",
+      "no findings proves no misconduct occurred",
+      "synthetic stress results estimate real-world rates",
+      "hashes or signatures prove source truth",
+      "simulation proves observed outcomes",
+      "a benchmark pass proves democratic legitimacy or legality"
+    ]
+  },
+  "data_partitions": [
+    {
+      "id": "PUBLIC_DEV",
+      "visibility": "public",
+      "expected_labels_public": true,
+      "use": "Development, schema, parser, mutation, and regression testing.",
+      "cannot_qualify": true
+    },
+    {
+      "id": "SEALED_SYNTHETIC",
+      "visibility": "evaluator_only_until_run_frozen",
+      "expected_labels_public": false,
+      "use": "Blind test of undisclosed variants, combined attacks, and capture budgets.",
+      "custody": [
+        "Keep corpus outside candidate-accessible repositories and runtime mounts.",
+        "Commit exact corpus/config digest before execution; reveal labels only after candidate outputs are frozen.",
+        "Never leak seeds/labels in filenames, logs, stack traces, environment variables, or reports."
+      ],
+      "cannot_qualify": false
+    },
+    {
+      "id": "PUBLIC_RETROSPECTIVE",
+      "visibility": "public_after_source_and_privacy_review",
+      "expected_labels_public": false,
+      "use": "Traceability, coverage, uncertainty, and reviewer agreement on real public cases.",
+      "requirements": [
+        "Freeze case eligibility rules before viewing outcome valence.",
+        "Publish source snapshots, coverage, missingness, linkage, license, and limitations where safe.",
+        "Anomaly/allegation is not adjudicated truth.",
+        "Report inter-reviewer agreement and preserve disagreements."
+      ],
+      "cannot_qualify": false
+    },
+    {
+      "id": "PROSPECTIVE_FIELD",
+      "visibility": "governed_by_pilot_agreement",
+      "expected_labels_public": false,
+      "use": "Evaluate independently verified remedies and service outcomes under a preregistered design.",
+      "prerequisites": [
+        "Independent legal, privacy, security, and ethics review.",
+        "Read-only starting deployment.",
+        "Never withhold essential services or legal rights for experimentation.",
+        "Preregister outcomes/comparison and preserve independent challenge and appeal."
+      ],
+      "cannot_qualify": false
+    }
+  ],
+  "separation_of_duties": {
+    "roles": [
+      "benchmark_custodian",
+      "scenario_and_label_adjudicators",
+      "candidate_operator",
+      "independent_trace_recorder",
+      "independent_evaluator",
+      "affected_party_or_advocate",
+      "appeal_reviewer"
+    ],
+    "invariants": [
+      "Candidate cannot edit frozen scenarios, labels, thresholds, evaluator code, or its own current qualification state.",
+      "No single person or organization controls scenario selection, candidate execution, trace capture, final scoring, and appeals.",
+      "The challenged authority cannot be the sole final appeal authority.",
+      "Trace recorder identity and completeness need independent evidence; self-assertion is insufficient."
+    ],
+    "review": {
+      "independent_primary_reviewers_min": 2,
+      "disagreement": "Retain both original labels. A third independent adjudicator resolves the primary label under a frozen rubric; unresolved ambiguity remains in the report.",
+      "misconduct": "Use established procedural facts or final lawful adjudications appropriate to the claim. Allegations remain allegations."
+    }
+  },
+  "attacker_model": {
+    "role_compromise_budgets": [
+      {
+        "compromised_roles": 0,
+        "purpose": "Nominal baseline."
+      },
+      {
+        "compromised_roles": 1,
+        "purpose": "Single insider/operator compromise."
+      },
+      {
+        "compromised_roles": 2,
+        "purpose": "Cross-role collusion."
+      },
+      {
+        "compromised_roles": "declared_validator_fraction",
+        "purpose": "Quorum/witness coalition; publish exact fraction and failure boundary."
+      }
+    ],
+    "required_modes": [
+      "metric rewrite",
+      "rollback/backdating",
+      "selective omission",
+      "correlated sources",
+      "procurement anomalies",
+      "fabricated/retracted evidence",
+      "post-outcome config change",
+      "dissent suppression",
+      "rights override",
+      "simulation-as-observation",
+      "domain shift",
+      "validator capture",
+      "appeal capture",
+      "emergency bypass",
+      "whistleblower re-identification",
+      "report flooding",
+      "combined attacks"
+    ],
+    "benign_hard_negatives": [
+      "documented outage",
+      "authorized pre-outcome revision",
+      "different source scopes",
+      "good-faith incorrect report",
+      "external shock",
+      "valid retraction",
+      "bounded emergency action",
+      "small subgroup sample"
+    ]
+  },
+  "experimental_design": {
+    "partitioning": "Split by scenario family and lineage, not random rows. Near-duplicate variants from one template must not appear in both development and qualification.",
+    "paired": "Run all baselines on the same frozen scenario/evidence bundle and comparable declared time/compute budgets.",
+    "baselines": [
+      "B0 existing human workflow",
+      "B1 conventional dashboard/rules",
+      "B2 Mycelix-only",
+      "B3 Symthaea-only",
+      "B4 Symtropy-only",
+      "B5 integrated stack + independent evaluator",
+      "B6 integrated stack without independent trace/evaluation",
+      "B7 strong simple auditable rule or spreadsheet"
+    ],
+    "allow_simple_baseline_to_win": true,
+    "report_all_failures_and_ablations": true,
+    "prohibit_post_hoc_threshold_changes": true,
+    "one_global_governance_score": false
+  },
+  "statistical_protocol": {
+    "preregistration_required": true,
+    "public_development_cases": 26,
+    "public_parameterized_stress_cases": 1018,
+    "stress_fixture_warning": "The 1,000 generated controls are correlated variants of eight authored families, not independent population samples.",
+    "proposed_blind_targets": {
+      "attack_family_macro_recall_min": 0.9,
+      "per_family_recall_min": 0.8,
+      "prohibited_rights_or_authority_transitions": 0,
+      "silent_commitment_rewrites": 0
+    },
+    "benign_control_study": {
+      "independent_episode_count_min": 1000,
+      "sampling_unit": "Distinct evaluator-authored or independently sampled episodes; repeated template mutations must be clustered rather than counted as independent cases.",
+      "false_high_severity_escalation_max": 0.01,
+      "required_reporting": [
+        "raw confusion counts",
+        "per-family and severity-specific counts",
+        "Wilson or exact binomial interval when independent sampling is defensible",
+        "cluster/family uncertainty for shared templates",
+        "coverage, missingness, exclusions, preregistration deviations"
+      ],
+      "warning": "No real-world error rate from synthetic cases. Real-world estimation requires a defensible sampling frame and independent labels."
+    },
+    "forecast_metrics": [
+      "Brier/log loss",
+      "MAE/RMSE",
+      "interval coverage and width",
+      "paired skill relative to frozen baselines"
+    ]
+  },
+  "run_receipt_fields": [
+    "benchmark/version",
+    "partition and exact digest",
+    "generator/version",
+    "seed commitment",
+    "candidate commit/build/config",
+    "evaluator commit/build",
+    "trace-recorder identity/authentication",
+    "capture-completeness evidence and gaps",
+    "baseline versions/resource budgets",
+    "raw-output digest",
+    "hard-gate findings/case coverage",
+    "per-case and per-family metrics",
+    "confidence intervals and sampling unit",
+    "limitations and claim ceiling",
+    "run status including skipped/missing steps"
+  ],
+  "gates": [
+    {
+      "id": "G0_PROTOCOL_FROZEN",
+      "requirement": "Freeze scenarios/schema/rubric/thresholds/baselines/statistical analysis/exclusions before execution."
+    },
+    {
+      "id": "G1_SOURCE_AND_TRACE",
+      "requirement": "Authenticate trace recorder, independently qualify capture completeness, resolve authority and evidence references."
+    },
+    {
+      "id": "G2_BLIND_SYNTHETIC",
+      "requirement": "Evaluator-only corpus; isolated candidate; frozen receipt; all hard gates and metrics reproduced."
+    },
+    {
+      "id": "G3_PUBLIC_RETROSPECTIVE",
+      "requirement": "Source/coverage audit, original records, independent labels, privacy/legal review, coding reproducibility."
+    },
+    {
+      "id": "G4_FIELD_EFFECT",
+      "requirement": "Preregistered prospective study shows independently verified remedy/outcome improvement without rights/privacy harm."
+    }
+  ],
+  "current_status": {
+    "sealed_corpus_committed_to_public_repo": false,
+    "rust_compiled": false,
+    "tests_executed": false,
+    "empirical_comparison_completed": false
+  }
+}
