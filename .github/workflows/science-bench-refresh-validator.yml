@@ -718,7 +718,7 @@ jobs:
           set -e
           test "$mutated_report_exit" -eq 11
 
-- name: Counterfactual evidence intervention plan controls
+      - name: Counterfactual evidence intervention plan controls
         shell: bash
         run: |
           set -euo pipefail
