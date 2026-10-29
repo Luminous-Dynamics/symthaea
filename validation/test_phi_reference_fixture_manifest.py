@@ -24,7 +24,7 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
     def test_formalism_and_exact_version_are_explicit(self):
         reference = self.fixture["reference"]
         self.assertEqual(reference["distribution"], "pyphi")
-        self.assertEqual(reference["exact_version"], "2.0.0")
+        self.assertEqual(reference["exact_version"], "2.0.0rc4")
         self.assertEqual(reference["formalism"], "IIT_4_0_2023")
         self.assertEqual(reference["state"], [0, 1, 1])
 
