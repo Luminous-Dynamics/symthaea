@@ -1,0 +1,193 @@
+{
+  "schema_version": "active-experiment-design-001/1",
+  "evidence_class": "synthetic_analytic_fixture",
+  "status": "reference_fixture_not_yet_loaded_by_rust_code",
+  "units": {
+    "utility": "utility_points",
+    "measurement_cost": "measurement_seconds"
+  },
+  "hypotheses": [
+    "H0",
+    "H1"
+  ],
+  "prior": [
+    0.5,
+    0.5
+  ],
+  "decision_relevant_actions": [
+    "choose-A",
+    "choose-B"
+  ],
+  "decision_relevant_utilities_by_action_and_hypothesis": [
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "cases": [
+    {
+      "id": "perfect-information-decision-relevant",
+      "description": "Observation identifies which action has utility 1.0.",
+      "experiment": {
+        "id": "perfect",
+        "measurement_cost": 1,
+        "outcomes": [
+          "observe-H0",
+          "observe-H1"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "expected": {
+        "baseline_best_action": "choose-A",
+        "baseline_best_expected_utility": 0.5,
+        "expected_utility_after_observation": 1,
+        "expected_value_of_sample_information": 0.5,
+        "expected_information_gain_bits": 1,
+        "value_per_cost": 0.5,
+        "outcome_probabilities": [
+          0.5,
+          0.5
+        ]
+      }
+    },
+    {
+      "id": "perfect-information-decision-irrelevant",
+      "description": "Experiment perfectly identifies the hypothesis, but action utility is constant by hypothesis, so the best action never changes.",
+      "actions": [
+        "choose-safe",
+        "choose-worse"
+      ],
+      "utilities_by_action_and_hypothesis": [
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "experiment": {
+        "id": "perfect-but-irrelevant",
+        "measurement_cost": 1,
+        "outcomes": [
+          "observe-H0",
+          "observe-H1"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "expected": {
+        "expected_value_of_sample_information": 0,
+        "expected_information_gain_bits": 1,
+        "value_per_cost": 0
+      }
+    },
+    {
+      "id": "cost-aware-ranking",
+      "description": "Equal-quality perfect experiments differ only in measurement cost; the cheaper experiment ranks first.",
+      "experiments": [
+        {
+          "id": "cheap-perfect",
+          "measurement_cost": 1,
+          "outcomes": [
+            "observe-H0",
+            "observe-H1"
+          ],
+          "likelihoods_by_hypothesis": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "expensive-perfect",
+          "measurement_cost": 10,
+          "outcomes": [
+            "observe-H0",
+            "observe-H1"
+          ],
+          "likelihoods_by_hypothesis": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "expected": {
+        "ranking": [
+          "cheap-perfect",
+          "expensive-perfect"
+        ],
+        "value_per_cost": [
+          0.5,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "no-information",
+      "description": "The outcome distribution is identical under each hypothesis.",
+      "experiment": {
+        "id": "uninformative",
+        "measurement_cost": 2,
+        "outcomes": [
+          "yes",
+          "no"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            0.4,
+            0.6
+          ],
+          [
+            0.4,
+            0.6
+          ]
+        ]
+      },
+      "expected": {
+        "expected_value_of_sample_information": 0,
+        "expected_information_gain_bits": 0,
+        "value_per_cost": 0
+      }
+    }
+  ],
+  "qualification_boundary": {
+    "simulation": false,
+    "hardware_measurements": false,
+    "quantum_advantage_claim": false,
+    "note": "All values are deterministic analytic fixture expectations for validating implementation logic only. They do not characterize quantum hardware or prove improved experiment selection."
+  }
+}

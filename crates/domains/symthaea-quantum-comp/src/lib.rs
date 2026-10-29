@@ -23,6 +23,7 @@
 #![warn(missing_docs)]
 
 pub mod api_inventory;
+pub mod active_experiment;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -167,4 +168,9 @@ pub use quantum_utility::{
     compare_utility, CandidateEstimate, CandidateProfile, EvidenceAssessment, EvidenceClass,
     ExpectedResource, NonNegativeInterval, ProbabilityInterval, QualityGate,
     QuantumUtilityError, ResourceMetric, UtilityComparisonReport, UtilityDecision,
+};
+
+pub use active_experiment::{
+    ActiveExperimentProblem, DecisionExperiment, ExperimentDesignError, ExperimentRanking,
+    ExperimentScore, OutcomeProbability,
 };
