@@ -2,7 +2,7 @@
 
 **Status:** executable synthetic smoke harness, v0.3 with cost frontier and paired uncertainty intervals  
 **Tracking issue:** [#9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010)  
-**Evidence status:** exact-seed Python mirror available; Rust source and focused Actions workflow added, but Rust execution is not yet confirmed  
+**Evidence status:** exact-head Rust focused workflow passed at [`9eddcf5`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40950457324); 7 Rust tests and the cost-frontier/report checks passed. The panel remains synthetic smoke evidence, not blind qualification.  
 **Claim ceiling:** tiny finite held-out-composition harness only; no industry/SOTA, broad causal reasoning, or production Symthaea claim
 
 ## Research question
@@ -44,9 +44,9 @@ The report includes chosen action, query count and cost, model-prediction MAE on
 
 The current harness generates both candidate decisions and evaluator metrics in one process. It does **not** yet provide candidate/evaluator process isolation, hidden family labels, artifact receipts/digests, a human or external task, or statistical qualification over held-out family draws. Keep every report labeled as a synthetic development result.
 
-## Exploratory fixed-seed results (independent Python mirror, not Rust execution)
+## Exact-head Rust smoke results (synthetic, not blind qualification)
 
-The following numbers were reproduced with a Python mirror of the exact SplitMix64 streams and equations in the Rust source. They validate the intended report/test thresholds but do not count as Rust compilation, CI evidence, external benchmark results, or SOTA evidence.
+The table below reproduces the deterministic JSON emitted by the Rust binary in the exact-head focused workflow linked above. This confirms these numbers are Rust smoke outputs for the declared synthetic panel. It does not establish performance on unseen mechanism families, measured hardware costs, external environments, or SOTA.
 
 | World family | Strategy | Chosen action | Mean reward | Model query cost | Net utility | Net lift vs direct | Held-out prediction MAE |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -59,7 +59,7 @@ The following numbers were reproduced with a Python mirror of the exact SplitMix
 | Additive reversed | Learned additive model | 0 | 0.5090 | 0.0800 | 0.4290 | -0.0800 | 0.0480 |
 | Additive reversed | Stale model control | 1 | 0.1541 | 0.0800 | 0.0741 | **-0.4350** | 0.3000 |
 
-### Query-cost frontier (independent Python mirror, not Rust execution)
+### Query-cost frontier (exact-head Rust smoke output)
 
 For the additive-positive family, the gross reward lift before model-query costs is approximately 0.2625. With two predictions per decision, the world model crosses break-even near 0.1312 utility units per query on this fixed panel.
 
@@ -72,7 +72,7 @@ For the additive-positive family, the gross reward lift before model-query costs
 | 0.12 | 0.24 | +0.0225 |
 | 0.16 | 0.32 | −0.0575 |
 
-The code now emits all six cost levels, standard errors, and paired 95% intervals. The focused workflow requires the additive-model lift interval to exclude zero at 0.04/query and the expensive cost point's interval to be negative, plus a negative upper interval for the interaction-only control. These values remain exact-seed Python-mirror results, not Rust output or measured real-world latency/energy. The interval is conditional on this single held-out context/family and the stated random-draw process; future qualification must resample mechanism families and generator parameters.
+The code emits all six cost levels, standard errors, and paired 95% intervals. The exact-head focused workflow requires the additive-model lift interval to exclude zero at 0.04/query and the expensive cost point's interval to be negative, plus a negative upper interval for the interaction-only control. These are deterministic synthetic Rust outputs—not measured real-world latency/energy. The intervals condition on this single held-out family/context and do not quantify generalization across mechanism families. The interval is conditional on this single held-out context/family and the stated random-draw process; future qualification must resample mechanism families and generator parameters.
 
 ## What this says—and does not say
 
