@@ -1,11 +1,15 @@
 use science_bench_refresh_validator::{
-    audit_policy_input_overlap, audit_lineage_overlap, compute_artifact_commitment,
-    compute_protected_index_commitment, compute_protocol_commitment,
-    generate_task_set_bytes, match_search_exposure_exact,
-    sha256_hex, validate_manifest_bytes, verify_regeneration, verify_reveal,
-    verify_search_exposure_exact_match_report, verify_search_exposure_match_report,
-    verify_search_exposure_receipt, ProtectedSearchArtifactIndexCommitmentInput,
+    compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
+    validate_manifest_bytes, verify_regeneration, verify_reveal,
 };
+use science_bench_refresh_validator::exact_protected_matcher::{
+    compute_protected_index_commitment, match_search_exposure_exact,
+    verify_search_exposure_exact_match_report, ProtectedSearchArtifactIndexCommitmentInput,
+};
+use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
+use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
+use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
+use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
 use serde_json::json;
 use std::env;
 use std::fs;
