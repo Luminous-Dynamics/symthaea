@@ -527,6 +527,16 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
             let trial_path = format!("{task_path}.trials[{trial_index}]");
             if !system_ids.contains(&trial.system_id) {
                 error(report, "E_SYSTEM_UNDECLARED", format!("{trial_path}.system_id"), "trial references a system_id not declared in systems");
+            } else if let Some(system) = run.systems.iter().find(|system| system.system_id == trial.system_id) {
+                if trial.usage.wall_ms > system.budget.max_wall_ms {
+                    error(report, "E_USAGE_WALL_BUDGET", format!("{trial_path}.usage.wall_ms"), "recorded wall time exceeds the declared system budget");
+                }
+                if trial.usage.tool_calls > system.budget.max_tool_calls {
+                    error(report, "E_USAGE_TOOL_BUDGET", format!("{trial_path}.usage.tool_calls"), "recorded tool calls exceed the declared system budget");
+                }
+                if trial.usage.cost_usd > system.budget.max_cost_usd {
+                    error(report, "E_USAGE_COST_BUDGET", format!("{trial_path}.usage.cost_usd"), "recorded cost exceeds the declared system budget");
+                }
             }
             if trial.attempt_index == 0 || trial.attempt_index > run.suite.attempts_per_task {
                 error(report, "E_ATTEMPT_OUT_OF_RANGE", format!("{trial_path}.attempt_index"), "attempt_index must be in 1..=attempts_per_task");
@@ -1214,6 +1224,27 @@ mod tests {
         let report = validate_bytes(EXAMPLE.as_bytes(), &bytes);
         assert!(!report.valid);
         assert!(has_code(&report, "E_MANIFEST_DIGEST_MISMATCH"));
+    }
+
+
+    #[test]
+    fn observed_usage_over_declared_budget_is_rejected() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["usage"]["tool_calls"] = Value::from(31);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_USAGE_TOOL_BUDGET"));
+    }
+
+    #[test]
+    fn run_record_cannot_lower_task_count_to_hide_a_manifest_task() {
+        let report = validate_value(|v| {
+            v["task_records"].as_array_mut().unwrap().clear();
+            v["suite"]["expected_task_count"] = Value::from(0);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_MANIFEST_TASK_COUNT"));
+        assert!(has_code(&report, "E_TASK_SET_MISMATCH"));
     }
 
 }
