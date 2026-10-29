@@ -7,7 +7,7 @@ This suite isolates a high-value weakness of long-term agent memory: the answer 
 ## Hypothesis
 
 A memory system should retrieve evidence that is **valid for the question's temporal and epistemic intent**, not merely evidence with high lexical overlap. It should distinguish:
-- current state from historical state;
+- current state from historical state, including queries that ask for both at once;
 - proposed state from approved/committed state;
 - active facts from explicitly revoked facts;
 - a causal chain from a plausible but non-causal intervening event; and
@@ -18,7 +18,7 @@ The ABA case matters: if an office address changes A → B → A, an old A recor
 ## Contents and execution
 
 - `fixtures/mutations/trajectories.jsonl`: 9 synthetic event histories.
-- `fixtures/mutations/questions.jsonl`: 12 questions with source-pointer ground truth for required, forbidden/stale, and distractor evidence.
+- `fixtures/mutations/questions.jsonl`: 13 questions with source-pointer ground truth for required, forbidden/stale, and distractor evidence.
 - `run_probe.py`: accepts optional fixture paths while preserving the original defaults.
 - `score_probe.py`: scores required-support recall, ordinary complete-chain rate, **stale-aware complete-chain rate**, forbidden/stale hits, and distractor retrieval at the same fixed top-k budget.
 - `fixtures/mutations/eligibility-ledger.jsonl`: explicit status policy for every string source pointer (current, historical, revoked, tentative, not-applied, causal, or contextual).
@@ -84,7 +84,7 @@ Question `retrieval_intent` is manually annotated and therefore an **oracle inpu
 
 Heuristic mode applies fixed, transparent keyword rules and logs the predicted intent, matched rule, and comparison with the annotated intent in the receipt. It is a cheap control, not a learned classifier; the rules are hand-authored against this tiny fixture. Its current 12 prompts are not held out, so any apparent perfect intent accuracy here is only a fixture smoke check, not evidence of generalization. Unknown intent abstains with an empty context. A production version must be evaluated on an independently authored, held-out intent set, reporting per-class precision/recall, confusion matrix, abstention, policy coverage, retained candidate count, and downstream stale-aware answer quality.
 
-For `current_state`, old records are filtered; for `historical_state`, the system must preserve access to historical evidence; revocation questions retrieve the revocation event, not the prior active claim; proposal-history questions may retrieve tentative/not-applied events; causal-chain questions can retain failed interventions needed to interpret an outcome. This explicitly separates lifecycle state from the question's intent.
+For `current_state`, old records are filtered; for `historical_state`, the system must preserve access to historical evidence; for `current_and_history`, both current and historical evidence are eligible so a single-label temporal classifier does not discard half of the requested answer; revocation questions retrieve the revocation event, not the prior active claim; proposal-history questions may retrieve tentative/not-applied events; causal-chain questions can retain failed interventions needed to interpret an outcome. This explicitly separates lifecycle state from the question's intent.
 
 The labels are intentionally visible because this is a development diagnostic; it is not a hidden test set and must not be used to claim SOTA. Before publishing a benchmark result, grow the held-out set, have a second reviewer adjudicate every support pointer, add paraphrase variants, and include a blind negative-control partition.
 
