@@ -1,0 +1,9 @@
+{
+  "benchmark_id": "symthaea.authorization_evidence_ledger.expected_case_set.v0",
+  "version": 0,
+  "expected_case_ids": [
+    "ALLOW-SMOKE-001",
+    "DENY-SMOKE-001"
+  ],
+  "case_set_hash_algorithm": "SHA-256 over sorted UTF-8 case IDs, each prefixed by an unsigned 64-bit big-endian byte length"
+}
