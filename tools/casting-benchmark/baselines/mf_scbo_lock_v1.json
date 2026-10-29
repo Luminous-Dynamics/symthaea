@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_id": "MF-SCBO",
+  "status": "source_pinned_not_reproduced",
+  "upstream_repository": "Nemo-Virtual-Lab/MF-SCBO",
+  "upstream_commit_sha": "ca42fd6c5ec8c841e3f1ff9642509e12d104b581",
+  "upstream_commit_url": "https://github.com/Nemo-Virtual-Lab/MF-SCBO/commit/ca42fd6c5ec8c841e3f1ff9642509e12d104b581",
+  "license": {
+    "spdx_id": "MIT",
+    "path": "LICENSE",
+    "git_blob_sha1": "eba1b0cf5b4596e7ae33ed003aba17308b5d8a75"
+  },
+  "source_artifacts": [
+    {
+      "path": "mfscbo/mfscbo_optimization.py",
+      "git_blob_sha1": "ba140fd52ee1a43dc89dc6189de71ddb42eabada"
+    },
+    {
+      "path": "requirements.txt",
+      "git_blob_sha1": "8071831841c68a7fef783d6e8131283de66056f8"
+    }
+  ],
+  "dependency_requirements_exact": [
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "torch",
+    "torchvision",
+    "botorch",
+    "gpytorch",
+    "matplotlib",
+    "notebook",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "myst-nb"
+  ],
+  "algorithm_semantics": {
+    "objective_direction": "maximize",
+    "fidelity_api": "eval_objectives is a list of scalar objective callables ordered by fidelity level",
+    "constraint_sign": "c(x) <= 0",
+    "native_multiobjective": false,
+    "native_historical_task_descriptor_transfer": false
+  },
+  "comparison_requirements": [
+    "Use a preregistered scalarization of the casting objective vector for direct MF-SCBO comparison; do not call its fidelity list a multi-objective interface.",
+    "Convert the casting feasible margin m(x) >= 0 into constraint c(x) = -m(x) <= 0.",
+    "Freeze objective normalization and scalarization weights before held-out task outcomes are unsealed.",
+    "Record both total evaluation cost and high-fidelity evaluation count; include initialization cost and full environment/source digests.",
+    "Preserve separate evaluated-center and predicted-center variants and use the same target task, seed, initialization-cost, and stop-budget protocol.",
+    "Audit final candidate truth after optimization; never use the audit truth inside the optimizer's search loop.",
+    "Keep the Python/PyTorch/BoTorch experiment isolated from production Rust code."
+  ],
+  "related_publication_url": "https://arxiv.org/abs/2609.29941",
+  "claim_ceiling": "Source and semantics are pinned from repository artifacts. This lock does not mean MF-SCBO has been installed, executed, reproduced, or compared against Symthaea."
+}
