@@ -604,7 +604,7 @@ mod tests {
         assert!(validate_manifest(&fields).unwrap_err().contains("target_column"));
         set(&mut fields, "feature_columns", "demand,price,temperature");
         set(&mut fields, "source_license_spdx", "CC BY 4.0");
-        assert!(validate_manifest(&fields).unwrap_err().contains("verified SPDX"));
+        assert!(validate_manifest(&fields).unwrap_err().contains("SPDX-style"));
     }
 
     #[test]
