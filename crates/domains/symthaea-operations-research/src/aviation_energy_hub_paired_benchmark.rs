@@ -487,10 +487,64 @@ fn canonical_benchmark_digest(
         put_string(&mut bytes, &outcome.scenario_id);
         put_u32(&mut bytes, outcome.weight_ppm);
         put_string(&mut bytes, &outcome.rolling_run.episode_digest);
-        let status = format!("{:?}", outcome.rolling_run.status);
-        put_string(&mut bytes, &status);
+        put_string(&mut bytes, &format!("{:?}", outcome.rolling_run.status));
+        encode_optional_evaluated(&mut bytes, outcome.static_plan.as_ref())?;
+        encode_optional_error(&mut bytes, outcome.static_plan_error.as_ref())?;
+        encode_optional_evaluated(&mut bytes, outcome.greedy_plan.as_ref())?;
+        encode_optional_error(&mut bytes, outcome.greedy_error.as_ref())?;
+        put_u32(&mut bytes, usize_to_u32(outcome.rolling_run.steps.len())?);
+        for step in &outcome.rolling_run.steps {
+            put_u32(&mut bytes, usize_to_u32(step.stage_index)?);
+            put_string(&mut bytes, &step.forecast_digest);
+            put_string(&mut bytes, &step.planning_scenario_digest);
+            encode_action(&mut bytes, &step.action);
+        }
+        encode_optional_evaluated(
+            &mut bytes,
+            outcome.rolling_run.evaluated_realized_plan.as_ref(),
+        )?;
+        encode_optional_evaluated(&mut bytes, outcome.perfect_information_plan.as_ref())?;
+        encode_optional_error(&mut bytes, outcome.perfect_information_error.as_ref())?;
     }
     Ok(sha256_hex(&bytes))
+}
+
+fn encode_optional_evaluated(
+    bytes: &mut Vec<u8>,
+    evaluated: Option<&EvaluatedEnergyHubPlan>,
+) -> Result<(), PairedBenchmarkError> {
+    match evaluated {
+        None => bytes.push(0),
+        Some(value) => {
+            bytes.push(1);
+            put_string(bytes, &value.plan.scenario_id);
+            put_string(bytes, &value.plan.input_digest);
+            put_u32(bytes, usize_to_u32(value.plan.actions.len())?);
+            for action in &value.plan.actions {
+                encode_action(bytes, action);
+            }
+            put_f64(bytes, value.metrics.source_ledger.total_cost);
+            put_f64(bytes, value.metrics.source_ledger.accounted_lifecycle_co2e_kg);
+            put_f64(bytes, value.metrics.source_ledger.total_source_energy_kwh);
+            put_f64(bytes, value.metrics.source_ledger.total_delivered_energy_kwh);
+            put_u32(bytes, value.metrics.final_soc_quanta);
+        }
+    }
+    Ok(())
+}
+
+fn encode_optional_error<T: fmt::Debug>(
+    bytes: &mut Vec<u8>,
+    error: Option<&T>,
+) -> Result<(), PairedBenchmarkError> {
+    match error {
+        None => bytes.push(0),
+        Some(value) => {
+            bytes.push(1);
+            put_string(bytes, &format!("{value:?}"));
+        }
+    }
+    Ok(())
 }
 
 fn encode_action(
@@ -528,6 +582,11 @@ fn usize_to_u32(value: usize) -> Result<u32, PairedBenchmarkError> {
 
 fn put_u32(bytes: &mut Vec<u8>, value: u32) {
     bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn put_f64(bytes: &mut Vec<u8>, value: f64) {
+    let normalized = if value == 0.0 { 0.0 } else { value };
+    bytes.extend_from_slice(&normalized.to_bits().to_le_bytes());
 }
 
 fn put_string(bytes: &mut Vec<u8>, value: &str) {
