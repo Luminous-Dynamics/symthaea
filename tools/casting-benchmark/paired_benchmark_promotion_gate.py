@@ -453,10 +453,13 @@ def assess_promotion(
             failures.append({"check": "false_feasible_risk", "detail": detail})
 
     if status != "wrong_evidence_class":
-        if inconclusive:
-            status = "inconclusive"
-        elif failures:
+        # A known hard failure must never be masked by a separate missing-data
+        # condition. Inconclusive applies only when no configured criterion has
+        # already failed on the evidence actually supplied.
+        if failures:
             status = "not_promoted"
+        elif inconclusive:
+            status = "inconclusive"
         else:
             status = "ready_for_next_stage"
 
