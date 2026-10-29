@@ -429,6 +429,28 @@ mod tests {
     }
 
     #[test]
+    fn fanout_invalidation_reaches_all_dependent_branches() {
+        let mut graph = DerivationGraph::default();
+        graph.register_source_event("E1").unwrap();
+        graph.register_source_event("E2").unwrap();
+        graph.derive(fact("D-A", [DependencyRef::SourceEvent("E1".into())])).unwrap();
+        graph.derive(fact("D-B", [DependencyRef::SourceEvent("E1".into())])).unwrap();
+        graph
+            .derive(fact(
+                "D-AB",
+                [DependencyRef::DerivedFact("D-A".into()), DependencyRef::DerivedFact("D-B".into())],
+            ))
+            .unwrap();
+        graph.derive(fact("D-unrelated", [DependencyRef::SourceEvent("E2".into())])).unwrap();
+
+        let affected = graph.invalidate_source_event("E1", "source correction").unwrap();
+        assert_eq!(affected, vec!["D-A", "D-AB", "D-B"]);
+        assert!(graph.current_fact("D-unrelated").is_some());
+        assert_eq!(graph.current_fact_count(), 1);
+        graph.verify_consistency().unwrap();
+    }
+
+    #[test]
     fn invalidation_is_idempotent_and_keeps_audit_records() {
         let mut graph = DerivationGraph::default();
         graph.register_source_event("E1").unwrap();
