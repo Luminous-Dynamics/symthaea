@@ -955,7 +955,11 @@ mod tests {
             &families,
         )
         .unwrap_err();
-        assert!(error.to_string().contains("edge reviewer ID is not trusted"));
+        assert!(
+            error
+                .to_string()
+                .contains("edge reviewer ID is not trusted")
+        );
     }
 
     #[test]
@@ -977,7 +981,11 @@ mod tests {
             &families,
         )
         .unwrap_err();
-        assert!(error.to_string().contains("edge reviewer is not among the verified receipt signers"));
+        assert!(
+            error
+                .to_string()
+                .contains("edge reviewer is not among the verified receipt signers")
+        );
     }
 
     #[test]
@@ -999,7 +1007,11 @@ mod tests {
             &families,
         )
         .unwrap_err();
-        assert!(error.to_string().contains("resolved edge reviewers must span two registered organizations"));
+        assert!(
+            error
+                .to_string()
+                .contains("resolved edge reviewers must span two registered organizations")
+        );
     }
 
     #[test]
