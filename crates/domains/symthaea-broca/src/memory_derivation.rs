@@ -621,17 +621,38 @@ mod tests {
     }
 
     #[test]
-    fn rule_version_is_part_of_the_derived_state_identity() {
+    fn rule_version_migration_invalidates_descendants_before_recompute() {
         let mut graph = DerivationGraph::default();
         graph.register_source_event("E1").unwrap();
-        graph.derive(fact("D1", [DependencyRef::SourceEvent("E1".into())])).unwrap();
-        let first = graph.state_sha256().unwrap();
-        // Rule versions are immutable in a graph: a new rule version requires
-        // a new derived fact ID rather than silently rewriting history.
+        graph.derive(fact("D1-v1", [DependencyRef::SourceEvent("E1".into())])).unwrap();
+        graph.derive(fact("D2", [DependencyRef::DerivedFact("D1-v1".into())])).unwrap();
+        let before = graph.state_sha256().unwrap();
+
+        let invalidated = graph
+            .invalidate_derived_fact("D1-v1", "rule version superseded")
+            .unwrap();
+        assert_eq!(invalidated, vec!["D1-v1", "D2"]);
+        assert!(graph.current_fact("D2").is_none());
+
         let mut next = fact("D1-v2", [DependencyRef::SourceEvent("E1".into())]);
         next.rule_version = "v2".into();
         graph.derive(next).unwrap();
-        assert_ne!(graph.state_sha256().unwrap(), first);
+        assert!(graph.current_fact("D1-v2").is_some());
+        assert!(graph.current_fact("D1-v1").is_none());
+        assert_ne!(graph.state_sha256().unwrap(), before);
+        graph.verify_consistency().unwrap();
+    }
+
+    #[test]
+    fn explicitly_invalidating_a_derived_fact_is_idempotent() {
+        let mut graph = DerivationGraph::default();
+        graph.register_source_event("E1").unwrap();
+        graph.derive(fact("D1", [DependencyRef::SourceEvent("E1".into())])).unwrap();
+        assert_eq!(
+            graph.invalidate_derived_fact("D1", "rule changed").unwrap(),
+            vec!["D1"]
+        );
+        assert!(graph.invalidate_derived_fact("D1", "replay").unwrap().is_empty());
     }
 
     #[test]
