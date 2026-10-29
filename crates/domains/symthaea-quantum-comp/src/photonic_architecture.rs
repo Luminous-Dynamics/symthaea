@@ -800,6 +800,110 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_three_node_topologies_match_independent_route_cost_oracle() {
+        fn collect_simple_path_costs(
+            node_count: usize,
+            links: &[OpticalLink],
+            current: usize,
+            destination: usize,
+            objective: OpticalRouteObjective,
+            visited: &mut Vec<usize>,
+            cost: f64,
+            output: &mut Vec<f64>,
+        ) {
+            if current == destination {
+                output.push(cost);
+                return;
+            }
+            for link in links.iter().filter(|link| link.from == current) {
+                if visited.contains(&link.to) {
+                    continue;
+                }
+                visited.push(link.to);
+                collect_simple_path_costs(
+                    node_count,
+                    links,
+                    link.to,
+                    destination,
+                    objective,
+                    visited,
+                    cost + link_cost(link, objective),
+                    output,
+                );
+                visited.pop();
+            }
+            let _ = node_count;
+        }
+
+        let node_count = 3usize;
+        let possible_edges: Vec<(usize, usize)> = (0..node_count)
+            .flat_map(|from| (0..node_count).filter(move |to| *to != from).map(move |to| (from, to)))
+            .collect();
+        for mask in 0usize..(1usize << possible_edges.len()) {
+            let links: Vec<OpticalLink> = possible_edges.iter().enumerate()
+                .filter_map(|(bit, &(from, to))| {
+                    ((mask >> bit) & 1 == 1).then(|| {
+                        let nominal = ((from * 2 + to) % 4) as f64 * 0.4;
+                        let lower = (from + to) as f64 * 0.1;
+                        let upper = nominal + ((from + to) % 2) as f64 * 0.5;
+                        OpticalLink {
+                            from,
+                            to,
+                            loss_db: LossIntervalDb::new(lower.min(nominal), nominal, upper.max(nominal)).unwrap(),
+                        }
+                    })
+                })
+                .collect();
+
+            for source in 0..node_count {
+                for destination in 0..node_count {
+                    for objective in [
+                        OpticalRouteObjective::FewestHops,
+                        OpticalRouteObjective::MinimumNominalLoss,
+                        OpticalRouteObjective::MinimumWorstCaseLoss,
+                    ] {
+                        let route = find_optical_route(
+                            node_count, &links, source, destination, objective,
+                        ).unwrap();
+                        let mut costs = Vec::new();
+                        collect_simple_path_costs(
+                            node_count,
+                            &links,
+                            source,
+                            destination,
+                            objective,
+                            &mut vec![source],
+                            0.0,
+                            &mut costs,
+                        );
+                        match (route, costs.iter().copied().min_by(f64::total_cmp)) {
+                            (None, None) => {}
+                            (Some(route), Some(best_cost)) => {
+                                let actual_cost = match objective {
+                                    OpticalRouteObjective::FewestHops =>
+                                        (route.nodes.len() - 1) as f64,
+                                    OpticalRouteObjective::MinimumNominalLoss =>
+                                        route.total_loss_db.nominal_db,
+                                    OpticalRouteObjective::MinimumWorstCaseLoss =>
+                                        route.total_loss_db.upper_db,
+                                };
+                                assert!(
+                                    (actual_cost - best_cost).abs() <= 1e-10,
+                                    "route cost mismatch: mask={mask}, source={source}, destination={destination}, objective={objective:?}, actual={actual_cost}, best={best_cost}, path={:?}",
+                                    route.nodes
+                                );
+                            }
+                            (route, costs) => panic!(
+                                "reachability mismatch: mask={mask}, source={source}, destination={destination}, objective={objective:?}, route={route:?}, oracle_costs={costs:?}"
+                            ),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn loss_budget_round_trips_and_captures_the_architecture_example() {
         let budget = loss_budget_db_for_minimum_transmission(0.92).unwrap();
         near(budget, -10.0 * 0.92_f64.log10());
