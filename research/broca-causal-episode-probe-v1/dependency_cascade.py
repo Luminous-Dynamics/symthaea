@@ -89,28 +89,42 @@ def _validate_and_index(
     return snapshot_id, versions, latest
 
 
-def _check_acyclic(
+def _topological_order(
     snapshot_id: str,
     versions: dict[tuple[str, int], dict[str, Any]],
-) -> None:
-    colors: dict[tuple[str, int], int] = {}
+) -> list[tuple[str, int]]:
+    """Return dependencies-first topological order without Python recursion."""
+    import heapq
 
-    def visit(key: tuple[str, int]) -> None:
-        color = colors.get(key, 0)
-        if color == 1:
-            raise ValueError(f"{snapshot_id}: dependency cycle contains {key}")
-        if color == 2:
-            return
-        colors[key] = 1
-        claim = versions[key]
-        for dependency_key in claim["_dependency_keys"]:
-            if dependency_key in versions:
-                visit(dependency_key)
-        colors[key] = 2
+    remaining: dict[tuple[str, int], int] = {}
+    dependents: dict[tuple[str, int], list[tuple[str, int]]] = {
+        key: [] for key in versions
+    }
+    for key, claim in versions.items():
+        existing_dependencies = [
+            dependency_key
+            for dependency_key in claim["_dependency_keys"]
+            if dependency_key in versions
+        ]
+        remaining[key] = len(existing_dependencies)
+        for dependency_key in existing_dependencies:
+            dependents[dependency_key].append(key)
 
-    for key in sorted(versions):
-        visit(key)
+    ready = [key for key, count in remaining.items() if count == 0]
+    heapq.heapify(ready)
+    order: list[tuple[str, int]] = []
+    while ready:
+        key = heapq.heappop(ready)
+        order.append(key)
+        for dependent_key in sorted(dependents[key]):
+            remaining[dependent_key] -= 1
+            if remaining[dependent_key] == 0:
+                heapq.heappush(ready, dependent_key)
 
+    if len(order) != len(versions):
+        unresolved = sorted(key for key, count in remaining.items() if count > 0)
+        raise ValueError(f"{snapshot_id}: dependency cycle contains {unresolved[:5]}")
+    return order
 
 def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Classify every claim revision and provide an explicit current-state view.
@@ -121,17 +135,19 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     in current_claims.
     """
     snapshot_id, versions, latest = _validate_and_index(snapshot)
-    _check_acyclic(snapshot_id, versions)
-    memo: dict[tuple[str, int], tuple[str, list[str]]] = {}
+    evaluation_order = _topological_order(snapshot_id, versions)
+    statuses: dict[tuple[str, int], tuple[str, list[str]]] = {}
 
-    def status_for(key: tuple[str, int]) -> tuple[str, list[str]]:
-        if key in memo:
-            return memo[key]
+    # Dependencies are evaluated before their dependents. This is iterative and
+    # supports long chains without depending on Python's recursion limit.
+    for key in evaluation_order:
         claim = versions[key]
         if key[1] < latest[key[0]]:
-            result = ("historical", [f"revision is older than latest {latest[key[0]]}"])
-            memo[key] = result
-            return result
+            statuses[key] = (
+                "historical",
+                [f"revision is older than latest {latest[key[0]]}"],
+            )
+            continue
 
         reasons: list[str] = []
         has_unknown = False
@@ -147,31 +163,25 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
                     f"dependency {dep_claim_id}@{dep_revision} is not latest {dep_latest}"
                 )
                 continue
-            dependency_status, dependency_reasons = status_for(dependency_key)
+            dependency_status, _ = statuses[dependency_key]
             if dependency_status != "current":
                 reasons.append(
                     f"dependency {dep_claim_id}@{dep_revision} is {dependency_status}"
                 )
-                reasons.extend(
-                    f"dependency {dep_claim_id}@{dep_revision}: {reason}"
-                    for reason in dependency_reasons
-                )
 
         if has_unknown:
-            result = ("unknown_dependency", reasons)
+            statuses[key] = ("unknown_dependency", reasons)
         elif reasons:
-            result = ("stale_dependency", reasons)
+            statuses[key] = ("stale_dependency", reasons)
         else:
-            result = ("current", [])
-        memo[key] = result
-        return result
+            statuses[key] = ("current", [])
 
     evaluations: list[dict[str, Any]] = []
     current_claims: list[dict[str, Any]] = []
     state_counts = {state: 0 for state in sorted(VALID_STATES)}
     for key in sorted(versions):
         claim = versions[key]
-        state, reasons = status_for(key)
+        state, reasons = statuses[key]
         state_counts[state] += 1
         item = {
             "claim_id": key[0],
