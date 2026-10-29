@@ -346,7 +346,7 @@ For an actual claim, compare matched-budget closed-book, conventional retrieval 
 
 ## Follow-on: preregistered matched outcome analysis
 
-The implementation is in draft [PR #REPLACE_PAIRED_ANALYSIS](https://github.com/Luminous-Dynamics/symthaea/pull/REPLACE_PAIRED_ANALYSIS) for [SCI-RETRIEVAL-PAIRED-ANALYSIS-001 / #8982](https://github.com/Luminous-Dynamics/symthaea/issues/8982). It composes with plan PR #8929 and outcome-receipt PR #8960.
+The implementation is in draft [PR #8993](https://github.com/Luminous-Dynamics/symthaea/pull/8993) for [SCI-RETRIEVAL-PAIRED-ANALYSIS-001 / #8982](https://github.com/Luminous-Dynamics/symthaea/issues/8982). It composes with plan PR #8929 and outcome-receipt PR #8960.
 
 The new Rust analyzer requires three verified inputs: the exact intervention plan, the exact outcome report and the exact analysis-plan artifact whose SHA-256 was precommitted in the plan. The analysis artifact also names the full analyzer source revision. This is intended to make post-hoc endpoint/rubric changes detectable rather than merely documenting a promise to preregister.
 
