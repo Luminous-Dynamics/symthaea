@@ -495,7 +495,12 @@ pub fn score_atom_ablation_jsonl(
     let expected_fixture_sha256 = hex::encode(Sha256::digest(input_fixture_jsonl.as_bytes()));
     let mut fixture_evidence_keys = BTreeSet::<(String, String)>::new();
     let mut fixture_case_ids = BTreeSet::<String>::new();
+    let mut fixture_pair_cases = BTreeMap::<String, BTreeSet<String>>::new();
     for pair in &fixtures {
+        fixture_pair_cases.insert(
+            pair.pair_id.clone(),
+            pair.cases.iter().map(|case| case.case_id.clone()).collect(),
+        );
         for case in &pair.cases {
             fixture_case_ids.insert(case.case_id.clone());
             for evidence in &case.evidence {
@@ -557,14 +562,20 @@ pub fn score_atom_ablation_jsonl(
         if !label_pairs.insert(pair.pair_id.clone()) {
             return Err(format!("duplicate evaluator label pair {:?}", pair.pair_id));
         }
+        let expected_pair_cases = fixture_pair_cases
+            .get(&pair.pair_id)
+            .ok_or_else(|| format!("evaluator label references unknown fixture pair {:?}", pair.pair_id))?;
         let mut case_ids = BTreeSet::new();
         for case in pair.cases {
             require_trimmed("label case_id", &case.case_id)?;
             if !case_ids.insert(case.case_id.clone()) {
                 return Err(format!("duplicate labeled case {:?}", case.case_id));
             }
-            if !fixture_case_ids.contains(&case.case_id) {
-                return Err(format!("evaluator label references unknown fixture case {:?}", case.case_id));
+            if !expected_pair_cases.contains(&case.case_id) {
+                return Err(format!(
+                    "case {:?} is not a member of its labelled fixture pair {:?}",
+                    case.case_id, pair.pair_id
+                ));
             }
             for target in case.atom_use_targets {
                 validate_atom_target(&target)?;
@@ -576,6 +587,12 @@ pub fn score_atom_ablation_jsonl(
                     return Err(format!("duplicate atom-use target for {key:?}"));
                 }
             }
+        }
+        if &case_ids != expected_pair_cases {
+            return Err(format!(
+                "evaluator labels must exactly cover fixture pair {:?}; expected {:?}, got {:?}",
+                pair.pair_id, expected_pair_cases, case_ids
+            ));
         }
     }
     if targets.is_empty() {
@@ -639,20 +656,22 @@ pub fn score_atom_ablation_jsonl(
     });
 
     let count_level = |level: &str| judgments.iter().filter(|item| item.target_level == level).count();
-    let count_flag = |level: &str, flag: fn(&AtomAblationJudgment) -> bool| {
-        judgments.iter().filter(|item| item.target_level == level && flag(item)).count()
-    };
+    let ignore_overuse_count = judgments.iter()
+        .filter(|item| item.target_level == "ignore" && item.overuse).count();
+    let bound_overuse_count = judgments.iter()
+        .filter(|item| item.target_level == "bound" && item.overuse).count();
+    let bound_underuse_count = judgments.iter()
+        .filter(|item| item.target_level == "bound" && item.underuse).count();
+    let control_overuse_count = judgments.iter()
+        .filter(|item| item.target_level == "control" && item.overuse).count();
+    let control_underuse_count = judgments.iter()
+        .filter(|item| item.target_level == "control" && item.underuse).count();
     let rate = |numerator: usize, denominator: usize| {
         (denominator > 0).then_some(numerator as f64 / denominator as f64)
     };
     let ignore_count = count_level("ignore");
     let bound_count = count_level("bound");
     let control_count = count_level("control");
-    let ignore_overuse_count = count_flag("ignore", |item| item.overuse);
-    let bound_overuse_count = count_flag("bound", |item| item.overuse);
-    let bound_underuse_count = count_flag("bound", |item| item.underuse);
-    let control_overuse_count = count_flag("control", |item| item.overuse);
-    let control_underuse_count = count_flag("control", |item| item.underuse);
     let context_tokens_saved_total = judgments.iter().map(|item| item.context_tokens_saved).sum();
 
     Ok(AtomAblationScoreSummary {
