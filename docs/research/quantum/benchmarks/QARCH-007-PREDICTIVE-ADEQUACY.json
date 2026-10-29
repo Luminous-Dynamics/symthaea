@@ -37,7 +37,7 @@
     },
     {
       "id": "systematic-model-bias",
-      "source": "measured_physical_fixture_placeholder",
+      "source": "synthetic_fixture",
       "predicted_probabilities": [
         0.9,
         0.1
@@ -59,7 +59,8 @@
         "mean_log_loss_nats": 2.0828626352604234,
         "status": "reject"
       },
-      "note": "The source label marks the fixture's intended test class. These values are synthetic; it is not an actual hardware observation."
+      "note": "All fixture values are synthetic and must not be interpreted as real hardware observations. A future measured-data test must use a separately captured, provenance-backed dataset.",
+      "intended_future_validation_source": "measured_physical"
     },
     {
       "id": "zero-probability-observed-event",
