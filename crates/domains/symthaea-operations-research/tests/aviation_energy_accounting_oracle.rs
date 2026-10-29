@@ -85,9 +85,9 @@ fn known_answer_ledger_aggregates_only_declared_fields() {
 
     // A metric with its own unit is preserved, not added to CO2e or another metric.
     assert_eq!(summary.non_co2_observations.len(), 1);
-    assert_eq!(summary.non_co2_not_assessed_record_ids, vec!["electricity"]);
+    assert_eq!(summary.non_co2_not_assessed_record_ids, vec!["electricity".to_owned()]);
     assert!(matches!(
-        summary.non_co2_observations[0].kind,
+        &summary.non_co2_observations[0].kind,
         NonCo2ObservationKind::Quantified { .. }
     ));
 }
