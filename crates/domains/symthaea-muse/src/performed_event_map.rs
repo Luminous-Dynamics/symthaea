@@ -24,7 +24,6 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub const PERFORMED_EVENT_MAP_VERSION: &str = "mel-mr-eval-014-performed-event-map-v0.1";
 pub const MAX_PERFORMED_EVENT_MAP_EVENTS: usize = 100_000;
-const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_SAMPLE_RATE_HZ: u32 = 768_000;
 
 /// One performed MIDI note and its declared ancestry from a target-score event.
@@ -121,12 +120,6 @@ fn is_lower_hex_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-fn valid_label(value: &str) -> bool {
-    !value.trim().is_empty()
-        && value.len() <= MAX_EVENT_ID_BYTES
-        && !value.chars().any(char::is_control)
 }
 
 /// Convert microseconds to a PCM frame using nearest-frame, half-up rounding.
