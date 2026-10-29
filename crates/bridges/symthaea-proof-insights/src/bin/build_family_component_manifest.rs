@@ -676,6 +676,52 @@ mod tests {
     }
 
     #[test]
+    fn signed_synthetic_receipt_qualifies_only_the_clean_frozen_component_manifest() {
+        let fixture = coverage_receipt::test_support::full_partition_fixture()
+            .expect("full frozen partition fixture");
+        let split_doc: Value =
+            serde_json::from_slice(&fixture.split_bytes).expect("split JSON");
+        let inventory: Inventory =
+            serde_json::from_slice(&fixture.inventory_bytes).expect("inventory JSON");
+        let (partition_digest, families) = validate_splits(&split_doc).expect("validated split");
+        assert_eq!(partition_digest, fixture.partition_digest);
+        let report = verify_receipt(
+            &fixture.inventory_bytes,
+            &fixture.receipt_bytes,
+            &fixture.trust_store_bytes,
+            &fixture.methodology_bytes,
+            &fixture.trust_store_digest,
+            &fixture.methodology_digest,
+            &partition_digest,
+            &families,
+        )
+        .expect("synthetic signatures verify");
+        assert!(report.cryptographically_verified);
+
+        let manifest = build(
+            &split_doc,
+            &inventory,
+            &fixture.inventory_bytes,
+            report.cryptographically_verified,
+        )
+        .expect("build qualified synthetic manifest");
+        assert_eq!(
+            manifest.qualification_status,
+            "qualified_coverage_verified_no_cross_split_hard_relationships"
+        );
+        assert!(manifest.qualified_for_confirmatory_resampling);
+        assert_eq!(
+            manifest.coverage_receipt_verification_status,
+            "verified_signature_set"
+        );
+        assert_eq!(manifest.coverage_receipt_sha256.as_deref(), Some(fixture.receipt_digest.as_str()));
+        assert_eq!(manifest.relationship_inventory_sha256, fixture.inventory_digest);
+        assert_eq!(manifest.total_family_count, 372);
+        assert_eq!(manifest.total_component_count, 372);
+        assert_eq!(manifest.cross_split_component_count, 0);
+    }
+
+    #[test]
     fn deterministic_split_assignment_is_stable_and_balanced() {
         let ids = vec![
             "a".to_owned(),
