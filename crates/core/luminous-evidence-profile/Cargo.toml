@@ -1,0 +1,11 @@
+[package]
+name = "luminous-evidence-profile"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Semantic conformance checks for the Luminous Evidence Profile predicate over in-toto Statements"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
