@@ -135,7 +135,7 @@ struct SupportMeans {
 }
 
 impl SupportMeans {
-    fn fit(spec: FamilySpec) -> Self {
+    fn fit(spec: FamilySpec, family_index: usize) -> Self {
         let mut means = [[0.0_f64; 2]; 3];
         for context in 0..3 {
             for action in 0..2 {
@@ -144,10 +144,12 @@ impl SupportMeans {
                 } else {
                     spec.support_action_one_probability(context)
                 };
+                // Sampling noise is keyed by the family slot and observed cell only,
+                // never by the hidden interaction/held-out-shift parameters.
                 let seed = BASE_SEED
+                    ^ (family_index as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
                     ^ ((context as u64 + 1).wrapping_mul(0x94D0_49BB))
-                    ^ ((action as u64 + 1).wrapping_mul(0xBF58_476D))
-                    ^ ((spec_seed_key(spec)).wrapping_mul(0x9E37_79B9));
+                    ^ ((action as u64 + 1).wrapping_mul(0xBF58_476D));
                 let mut rng = SplitMix64::new(seed);
                 let successes = (0..SUPPORT_SAMPLES)
                     .filter(|_| rng.unit() < probability)
@@ -179,25 +181,6 @@ impl SupportMeans {
             ),
         ]
     }
-}
-
-// Hash of the public support parameters only. It determines independent deterministic
-// samples without introducing the evaluator's held-out outcome into the candidate path.
-fn spec_seed_key(spec: FamilySpec) -> u64 {
-    let values = [
-        spec.intercept,
-        spec.x_effect,
-        spec.y_effect,
-        spec.interaction,
-        spec.holdout_shift,
-    ];
-    values.iter().enumerate().fold(spec.lane as u64 + 1, |acc, (i, value)| {
-        acc.rotate_left(9) ^ (value_to_u64(*value).wrapping_add(i as u64 + 1))
-    })
-}
-
-fn value_to_u64(value: f64) -> u64 {
-    value.to_bits()
 }
 
 fn choose(values: [f64; 2]) -> usize {
@@ -360,7 +343,10 @@ fn run() -> Vec<Summary> {
             for lane in [None, Some(Lane::Additive), Some(Lane::Interaction), Some(Lane::HoldoutShift)] {
                 let outcomes = families.iter().copied()
                     .filter(|spec| lane.map(|selected| spec.lane == selected).unwrap_or(true))
-                    .map(|spec| (spec, score_family(spec, SupportMeans::fit(spec), strategy, cost)))
+                    .enumerate()
+                    .map(|(family_index, spec)| {
+                        (spec, score_family(spec, SupportMeans::fit(spec, family_index), strategy, cost))
+                    })
                     .collect::<Vec<_>>();
                 let lane_name = lane.map(Lane::name).unwrap_or("all");
                 rows.push(summarize(lane_name, cost, strategy, &outcomes));
@@ -445,7 +431,7 @@ mod tests {
     fn generated_family_and_support_tape_are_deterministic() {
         for i in 0..FAMILY_COUNT {
             assert_eq!(FamilySpec::draw(i), FamilySpec::draw(i));
-            assert_eq!(SupportMeans::fit(FamilySpec::draw(i)), SupportMeans::fit(FamilySpec::draw(i)));
+            assert_eq!(SupportMeans::fit(FamilySpec::draw(i), i), SupportMeans::fit(FamilySpec::draw(i), i));
         }
     }
 
@@ -461,6 +447,30 @@ mod tests {
         };
         let predicted = clean_support(spec).additive_extrapolation();
         assert!((predicted[1] - spec.heldout_action_one_probability()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn support_sampling_does_not_depend_on_heldout_only_interaction_or_shift() {
+        let additive = FamilySpec {
+            lane: Lane::Additive,
+            intercept: 0.35,
+            x_effect: 0.05,
+            y_effect: -0.04,
+            interaction: 0.0,
+            holdout_shift: 0.0,
+        };
+        let interaction = FamilySpec {
+            lane: Lane::Interaction,
+            interaction: -0.27,
+            ..additive
+        };
+        let shifted = FamilySpec {
+            lane: Lane::HoldoutShift,
+            holdout_shift: 0.08,
+            ..additive
+        };
+        assert_eq!(SupportMeans::fit(additive, 77), SupportMeans::fit(interaction, 77));
+        assert_eq!(SupportMeans::fit(additive, 77), SupportMeans::fit(shifted, 77));
     }
 
     #[test]
@@ -486,7 +496,7 @@ mod tests {
     #[test]
     fn model_query_cost_reduces_lift_by_two_queries_times_cost() {
         let spec = FamilySpec::draw(0);
-        let support = SupportMeans::fit(spec);
+        let support = SupportMeans::fit(spec, 0);
         let free = score_family(spec, support, Strategy::AdditiveModel, 0.0);
         let priced = score_family(spec, support, Strategy::AdditiveModel, 0.04);
         assert!((free.net_lift_vs_direct - priced.net_lift_vs_direct - 0.08).abs() < 1e-12);
