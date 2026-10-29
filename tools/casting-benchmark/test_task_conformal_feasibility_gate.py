@@ -21,6 +21,11 @@ POLICY = "b" * 64
 ENV = "c" * 64
 
 
+def pool_digest(count=2):
+    roster = [f"candidate-{index:03d}" for index in range(count)]
+    return hashlib.sha256(json.dumps(roster, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
 def config(**overrides):
     value = {
         "schema_version": "1.0.0",
@@ -28,6 +33,7 @@ def config(**overrides):
         "evidence_class": "synthetic",
         "policy_source_sha256": SOURCE,
         "policy_config_sha256": POLICY,
+        "candidate_pool_sha256": pool_digest(),
         "alpha": 0.05,
         "minimum_calibration_tasks_per_stratum": 19,
         "maximum_descriptor_distance": 0.20,
@@ -44,9 +50,9 @@ def calibration(count=20, *, rows_per_task=1, stratum="known_process"):
         for j in range(rows_per_task):
             # The task-level score is the maximum overprediction among all
             # candidates in this task's frozen finite pool.
-            score = i / 100.0 + j / 1000.0
+            score = i / 100.0
             rows.append({
-                "candidate_id": f"cal-candidate-{j:03d}",
+                "candidate_id": f"candidate-{j:03d}",
                 "predicted_margin": score,
                 "observed_margin": 0.0,
             })
@@ -79,8 +85,8 @@ def target(*, stratum="known_process", descriptor=None, task_id="target-task-001
         descriptor = [0.50, 0.50]
     if predictions is None:
         predictions = [
-            {"candidate_id": "candidate-safe", "predicted_margin": 0.25},
-            {"candidate_id": "candidate-uncertain", "predicted_margin": 0.18},
+            {"candidate_id": "candidate-000", "predicted_margin": 0.25},
+            {"candidate_id": "candidate-001", "predicted_margin": 0.18},
         ]
     return {
         "schema_version": "1.0.0",
@@ -119,13 +125,21 @@ class TaskConformalFeasibilityGateTests(unittest.TestCase):
         self.assertAlmostEqual(rows[1]["calibrated_lower_margin"], -0.01)
 
     def test_candidate_points_do_not_inflate_independent_calibration_n(self):
-        result = evaluate(config(), calibration(count=20, rows_per_task=100), target())
+        large_pool = calibration(count=20, rows_per_task=100)
+        cfg = config(candidate_pool_sha256=pool_digest(100))
+        predictions = [
+            {"candidate_id": f"candidate-{index:03d}",
+             "predicted_margin": 0.25 if index == 0 else 0.18}
+            for index in range(100)
+        ]
+        result = evaluate(cfg, large_pool, target(predictions=predictions))
         self.assertEqual(result["calibration_task_count"], 20)
         self.assertEqual(result["strata"]["known_process"]["calibration_task_count"], 20)
         self.assertEqual(result["strata"]["known_process"]["conformal_rank_1based"], 20)
         self.assertAlmostEqual(
-            result["strata"]["known_process"]["overprediction_quantile"], 0.199
+            result["strata"]["known_process"]["overprediction_quantile"], 0.19
         )
+        self.assertEqual(result["candidate_count"], 100)
 
     def test_insufficient_calibration_tasks_force_abstention(self):
         result = evaluate(config(), calibration(count=18), target())
@@ -161,6 +175,19 @@ class TaskConformalFeasibilityGateTests(unittest.TestCase):
         tgt["candidate_pool_frozen_before_outcomes"] = False
         with self.assertRaisesRegex(ValueError, "candidate pool must be frozen"):
             evaluate(config(), calibration(), tgt)
+
+    def test_candidate_pool_roster_digest_and_order_must_match(self):
+        cal = calibration()
+        cal["tasks"][1]["rows"][0]["candidate_id"] = "other-id"
+        with self.assertRaisesRegex(ValueError, "same ordered frozen candidate pool"):
+            evaluate(config(), cal, target())
+        tgt = target()
+        tgt["tasks"][0]["predictions"][0]["candidate_id"] = "other-id"
+        with self.assertRaisesRegex(ValueError, "exact frozen calibration candidate-pool roster"):
+            evaluate(config(), calibration(), tgt)
+        cfg = config(candidate_pool_sha256="d" * 64)
+        with self.assertRaisesRegex(ValueError, "roster digest"):
+            evaluate(cfg, calibration(), target())
 
     def test_target_manifest_cannot_smuggle_outcome_labels(self):
         tgt = target()
