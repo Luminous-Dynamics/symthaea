@@ -63,7 +63,8 @@ pub struct FusionProcess {
     pub start_state: usize,
     /// Maximum number of attempted fusion transitions before cap exhaustion.
     pub max_attempts: usize,
-    /// State definitions; every state must be reachable from start via positive-probability transitions.
+    /// State definitions. Every state must be reachable from start through
+    /// positive-probability transitions.
     pub states: Vec<FusionState>,
 }
 
@@ -153,7 +154,9 @@ impl FusionProcess {
                         value: outcome.probability,
                     });
                 }
-                if !outcome.feedforward_latency_ms.is_finite() || outcome.feedforward_latency_ms < 0.0 {
+                if !outcome.feedforward_latency_ms.is_finite()
+                    || outcome.feedforward_latency_ms < 0.0
+                {
                     return Err(FusionProcessError::InvalidFeedforwardLatency {
                         state_id: state.id.clone(),
                         outcome_id: outcome.id.clone(),
@@ -333,7 +336,8 @@ fn accumulate_continuation(
 ) {
     total.success_probability += probability * future.success_probability;
     total.terminal_failure_probability += probability * future.terminal_failure_probability;
-    total.attempt_cap_exhaustion_probability += probability * future.attempt_cap_exhaustion_probability;
+    total.attempt_cap_exhaustion_probability +=
+        probability * future.attempt_cap_exhaustion_probability;
     total.expected_attempts += probability * future.expected_attempts;
     total.expected_latency_ms += probability * future.expected_latency_ms;
     total.expected_photons_consumed += probability * future.expected_photons_consumed;
@@ -412,16 +416,24 @@ impl fmt::Display for FusionProcessError {
                 write!(f, "invalid attempt latency for state {state_id}: {value} ms"),
             Self::DuplicateOutcomeId { state_id, outcome_id } =>
                 write!(f, "duplicate outcome {outcome_id} in state {state_id}"),
-            Self::InvalidOutcomeProbability { state_id, outcome_id, value } =>
-                write!(f, "invalid probability {value} for outcome {outcome_id} in state {state_id}"),
-            Self::InvalidFeedforwardLatency { state_id, outcome_id, value } =>
-                write!(f, "invalid feedforward latency for outcome {outcome_id} in state {state_id}: {value} ms"),
-            Self::InvalidTotalLatency { state_id, outcome_id } =>
-                write!(f, "attempt and feedforward latency overflow for {outcome_id} in state {state_id}"),
+            Self::InvalidOutcomeProbability { state_id, outcome_id, value } => write!(
+                f,
+                "invalid probability {value} for outcome {outcome_id} in state {state_id}"
+            ),
+            Self::InvalidFeedforwardLatency { state_id, outcome_id, value } => write!(
+                f,
+                "invalid feedforward latency for outcome {outcome_id} in state {state_id}: {value} ms"
+            ),
+            Self::InvalidTotalLatency { state_id, outcome_id } => write!(
+                f,
+                "attempt and feedforward latency overflow for {outcome_id} in state {state_id}"
+            ),
             Self::OutcomeProbabilitySum { state_id, sum } =>
                 write!(f, "outcome probabilities for state {state_id} sum to {sum}, expected 1"),
-            Self::InvalidTransitionTarget { state_id, outcome_id, target } =>
-                write!(f, "outcome {outcome_id} in state {state_id} targets invalid state {target}"),
+            Self::InvalidTransitionTarget { state_id, outcome_id, target } => write!(
+                f,
+                "outcome {outcome_id} in state {state_id} targets invalid state {target}"
+            ),
             Self::InvalidComputedProbabilitySum(sum) =>
                 write!(f, "computed fusion terminal probabilities sum to {sum}, expected 1"),
             Self::InvalidComputedCost { field, value } =>
@@ -647,11 +659,19 @@ mod tests {
             let exhaustion_probability = recoverable.powi(cap as i32);
 
             assert!((result.success_probability - success_probability).abs() < 1e-12);
-            assert!((result.terminal_failure_probability - terminal_failure_probability).abs() < 1e-12);
-            assert!((result.attempt_cap_exhaustion_probability - exhaustion_probability).abs() < 1e-12);
+            assert!(
+                (result.terminal_failure_probability - terminal_failure_probability).abs() < 1e-12
+            );
+            assert!(
+                (result.attempt_cap_exhaustion_probability - exhaustion_probability).abs() < 1e-12
+            );
             assert!((result.expected_attempts - recoverable_sum).abs() < 1e-12);
-            assert!((result.expected_latency_ms - mean_latency_per_attempt * recoverable_sum).abs() < 1e-10);
-            assert!((result.expected_photons_consumed - mean_photons_per_attempt * recoverable_sum).abs() < 1e-12);
+            assert!(
+                (result.expected_latency_ms - mean_latency_per_attempt * recoverable_sum).abs() < 1e-10
+            );
+            assert!(
+                (result.expected_photons_consumed - mean_photons_per_attempt * recoverable_sum).abs() < 1e-12
+            );
 
             let mut successful_attempt_moment = 0.0;
             let mut successful_latency_moment = 0.0;
