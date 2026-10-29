@@ -42,6 +42,7 @@ struct EligibilityCensus {
 #[serde(deny_unknown_fields)]
 struct CensusFamily {
     family_id: String,
+    eligibility_status: String,
     candidate_target_ids: Vec<String>,
     eligibility_receipt_sha256: String,
 }
@@ -252,8 +253,12 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
     }
 
     let mut declared_targets_by_family: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut family_status_by_id = BTreeMap::new();
     for family in &census.families {
         validate_sha(&family.eligibility_receipt_sha256, "family eligibility receipt digest")?;
+        if !matches!(family.eligibility_status.as_str(), "eligible" | "excluded" | "unknown") {
+            bail!("family has an unregistered eligibility status");
+        }
         let mut ids = BTreeSet::new();
         for id in &family.candidate_target_ids {
             if id.trim().is_empty() || !ids.insert(id.clone()) {
@@ -261,9 +266,11 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
             }
         }
         declared_targets_by_family.insert(family.family_id.clone(), ids);
+        family_status_by_id.insert(family.family_id.clone(), family.eligibility_status.as_str());
     }
 
     let mut observed_targets_by_family: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut observed_eligibility_counts: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
     let mut target_ids = BTreeSet::new();
     for target in &census.targets {
         if target.target_id.trim().is_empty() || !target_ids.insert(target.target_id.clone()) {
@@ -290,12 +297,30 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
             .entry(target.family_id.clone())
             .or_default()
             .insert(target.target_id.clone());
+        let counts = observed_eligibility_counts.entry(target.family_id.clone()).or_default();
+        match target.status.as_str() {
+            "eligible" => counts.0 += 1,
+            "excluded" => counts.1 += 1,
+            "unknown" => counts.2 += 1,
+            _ => unreachable!("validated target status"),
+        }
     }
     for family_id in &census_families {
         let declared = declared_targets_by_family.get(family_id).context("missing family target inventory")?;
         let observed = observed_targets_by_family.get(family_id).cloned().unwrap_or_default();
         if *declared != observed {
             bail!("family {family_id} candidate_target_ids do not exactly match target rows");
+        }
+        let counts = observed_eligibility_counts.get(family_id).copied().unwrap_or_default();
+        let declared_status = family_status_by_id[family_id];
+        let consistent = match declared_status {
+            "eligible" => counts.0 > 0,
+            "excluded" => counts.0 == 0 && counts.2 == 0,
+            "unknown" => counts.0 == 0 && (counts.2 > 0 || declared.is_empty()),
+            _ => false,
+        };
+        if !consistent {
+            bail!("family {family_id} eligibility_status disagrees with its target rows");
         }
     }
     Ok(())
@@ -349,9 +374,7 @@ fn execute() -> Result<()> {
         }
     }
     for family in &census.families {
-        if !family_status_by_id.contains_key(&family.family_id) {
-            // A family with no candidate target row is inventory-complete only
-            // when the family row explicitly carries an empty target list.
+        if family.eligibility_status == "unknown" {
             unknown_family_count += 1;
         }
     }
