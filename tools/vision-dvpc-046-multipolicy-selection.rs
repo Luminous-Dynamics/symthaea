@@ -188,8 +188,8 @@ impl ScoreProfile {
         }
         self.n += 1;
         self.sum = next_sum;
-        if let Some((_, count)) = self.bins.iter_mut().find(|(v, _)| *v == value) {
-            *count += 1;
+        if let Some(index) = self.bins.iter().position(|(v, _)| *v == value) {
+            self.bins[index].1 += 1;
         } else {
             self.bins.push((value, 1));
             self.bins.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -659,6 +659,35 @@ mod tests{
         let got=pcrp_star_lcb_profile(&profile,delta).unwrap();
         assert!((got-expected).abs()<2e-5,"got={got} expected={expected}");
     }
+    #[test]
+    fn pcrp_grid_wealth_witness_is_monotone_in_candidate_mean() {
+        let mut profile=ScoreProfile::default();
+        for value in [0.0,0.0,0.2,0.2,0.4,0.8,1.2,1.2] {
+            profile.push(value).unwrap();
+        }
+        let mut previous=f64::INFINITY;
+        for i in 1..=1000 {
+            let nu=i as f64/1000.0;
+            let current=log_sup_crp_wealth_lower(&profile,nu).unwrap();
+            assert!(current<=previous+1e-9,"nu={nu} previous={previous} current={current}");
+            previous=current;
+        }
+    }
+    #[test]
+    fn ls_constant_profile_matches_closed_form() {
+        let mut profile=ScoreProfile::default();
+        for _ in 0..64 { profile.push(0.4).unwrap(); }
+        let delta=0.01;
+        let w_max=1.5;
+        let n=profile.n as f64;
+        let lambda=(2.0*(1.0/delta).ln()/(n*w_max*w_max)).sqrt();
+        let expected=(((lambda*0.4).ln_1p() - (1.0/delta).ln()/n).exp_m1()/lambda)
+            .clamp(0.0,0.4);
+        let got=logarithmic_smoothing_lcb_profile(&profile,delta,w_max).unwrap();
+        assert!((got-expected).abs()<1e-12,"got={got} expected={expected}");
+        assert!((got..=0.4).contains(&got));
+    }
+
     #[test]
     fn pcrp_and_ls_bounds_fail_closed_and_handle_zero_rewards() {
         let mut zeros=ScoreProfile::default();
