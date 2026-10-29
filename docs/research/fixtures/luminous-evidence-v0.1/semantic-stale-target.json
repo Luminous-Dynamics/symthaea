@@ -24,7 +24,7 @@
       "outcome": "passed",
       "verifier": { "id": "example-only-verifier", "version": "0.1.0" },
       "checkedTarget": {
-        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeef1234567" },
+        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" },
         "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
         "inputs": []
       },
