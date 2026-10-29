@@ -876,6 +876,15 @@ mod tests {
     }
 
     #[test]
+    fn intervention_config_path_is_canonical_and_cannot_escape() {
+        let mut fields = valid_fields();
+        set(&mut fields, "intervention_config_path", "../outside.conf");
+        assert!(validate_manifest(&fields).unwrap_err().contains("safe relative path"));
+        set(&mut fields, "intervention_config_path", "nested/config.conf");
+        validate_manifest(&fields).unwrap();
+    }
+
+    #[test]
     fn intervention_digest_and_rng_are_required_and_semantically_bound() {
         let mut fields = valid_fields();
         set(&mut fields, "intervention_config_sha256", "short");
