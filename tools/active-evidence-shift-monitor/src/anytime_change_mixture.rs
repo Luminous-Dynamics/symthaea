@@ -227,8 +227,8 @@ mod tests {
         for hazard in CHANGE_HAZARDS {
             let mut cumulative = 0.0;
             for step in 1..=10_000 {
-                cumulative += hazard * (1.0 - hazard).powi(step - 1);
-                let tail = (1.0 - hazard).powi(step);
+                cumulative += hazard * (1.0 - hazard).powi((step - 1) as i32);
+                let tail = (1.0 - hazard).powi(step as i32);
                 assert!((cumulative + tail - 1.0).abs() <= 1.0e-10);
             }
         }
