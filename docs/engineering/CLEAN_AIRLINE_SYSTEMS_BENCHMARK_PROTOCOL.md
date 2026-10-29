@@ -253,3 +253,132 @@ Do not make a broad integration refactor before the manifest, quantity semantics
 ## 10. Nonclaims
 
 This protocol does not show that a clean airline exists, that electric/hydrogen aircraft are currently deployable for the chosen routes, that SMRs or fusion will be available on a specific schedule, that synthetic SAF is price-competitive, or that any policy beats the industry. A future PASS applies only to the exact frozen software contract and fixtures. Operational use requires independently validated models, qualified aircraft and equipment, legal approvals, human operational authority, and measured outcomes.
+
+
+## 11. P2 executable slice — time-indexed airport energy hub (2026-10-29)
+
+The separate aviation_energy_hub module is the first time-indexed extension. It is synthetic-first and intentionally bounded to at most eight ordered intervals and 32 total delivered-energy quanta.
+
+### V1 state and decisions
+
+Per interval the model binds:
+- fixed renewable generation (all generation cost and lifecycle emissions are counted, even if curtailed);
+- charging/service demand and an explicit charger-capacity limit;
+- grid import capacity, cost and declared lifecycle CO2e factor;
+- renewable evidence reference/class and grid evidence reference/class;
+- direct renewable use, grid import, battery discharge, renewable surplus charged, curtailment, and exact state-of-charge before/after.
+
+Storage begins empty in V1. Integer-quantum efficiencies are conservative: charging conversion floors stored energy; discharge conversion rounds up the state of charge required. Simultaneous charge/discharge and grid-to-storage charging are disallowed. The terminal reserve is a hard constraint.
+
+### Independent verification
+
+The plan verifier independently checks:
+- canonical SHA-256 scenario identity and plan identity;
+- exact interval count/order;
+- demand balance, charger/grid/storage power limits and source balance;
+- no simultaneous charge and discharge;
+- curtailment arithmetic and exact storage state transitions;
+- minimum terminal reserve;
+- recomputed source ledger, cost and accounted lifecycle CO2e.
+
+Search returns a Pareto frontier minimizing cost, minimizing the supplied lifecycle CO2e metric, and maximizing final stored energy. It returns no frontier if its node budget is exhausted. A deterministic local renewable-first / grid-second / battery-last policy is included only as a deliberately myopic baseline.
+
+### Explicit omissions
+
+V1 is not an AC/DC power-flow solver and does not model voltage/frequency stability, transmission losses upstream of the declared energy bus, reactive power, grid-forming behavior, hydrogen/e-SAF production, grid-to-battery charging, aircraft-to-grid export, degradation over lifetime, uncertainty distributions, flight schedule recourse, physical aircraft feasibility, certification, or non-CO2 aviation effects. Renewable generation is a fixed input, not a forecast or a measured power series. All test factors are synthetic.
+
+### Proposed P2 gates
+
+- Exact agreement with independently hand-enumerated tiny fixtures.
+- No exact result when a search budget expires.
+- Zero demand, capacity, energy-state or terminal-reserve violations in returned plans.
+- Byte-stable manifest digests under unchanged ordered input; digest changes on any material field change.
+- Report cost, lifecycle CO2e, grid imports, renewable generated/used/curtailed, storage losses and final reserve separately.
+- Demonstrate at least one case where a myopic baseline fails or is dominated by exact time-coupled scheduling.
+- Do not claim a measured cost or CO2e improvement until inputs are calibrated, the model is independently tested and a matched held-out evaluation is available.
+
+This software slice does not establish actual airport resilience, renewable availability, a carbon factor, a physical storage rating, or operational authority.
+
+
+## 12. Literature-to-benchmark crosswalk (reviewed 2026-10-29)
+
+These studies define relevant comparators, but they do not share a common benchmark/data boundary. Their headline gains must not be compared as if they were the same experiment.
+
+### Flight-aware electric-aircraft charging under uncertainty
+
+A 2026 study on airport-specific time-of-use pricing and demand charges jointly models flight timetables, turnaround, energy-demand uncertainty, deterministic scheduling, sample-average approximation, and robust optimization. It uses flight data from six major airports in China's Greater Bay Area and reports up to 5.77% charging-cost savings for its robust model under high-demand uncertainty relative to its stated deterministic baseline. Source: https://www.sciencedirect.com/science/article/pii/S0967070X26002398
+
+**Reproduction target:** first reconstruct its deterministic comparator and its stated uncertainty/robustness experiment if the published details and compatible data permit. Record the exact cost boundary, tariffs, peak charges, allowed aircraft flexibility, charging constraints, uncertainty set and out-of-sample split. A result from our tiny synthetic fixture cannot be used to claim a 5.77% improvement or a better SOTA result.
+
+### Airport microgrid, aircraft-to-grid and fixed storage
+
+A 2026 IEEE paper models a solar-powered airport microgrid with aircraft-side batteries, fixed storage, grid imports/exports, EV parking demand, state-of-energy constraints, and time-varying tariffs. Its abstract reports a cost decrease from 83,508.30 to 74,867.88 in its stated currency units—about 10.35%—when coordinated aircraft-to-grid and fixed storage are added to its baseline. Source: https://ieeexplore.ieee.org/abstract/document/11578850
+
+**Reproduction target:** match its objective, units, tariff horizon, storage constraints, aircraft-to-grid assumptions and baseline before comparison. Our current V1 excludes aircraft-to-grid, grid-to-storage charging, grid-export revenue and AC/DC power-flow constraints, so it is not yet an implementation of that model.
+
+### Airport ground-equipment fleet and charging
+
+A July 2026 Transport Policy paper jointly optimizes electric ground service equipment fleet sizing, charging and scheduling with on-site photovoltaic generation using a two-stage framework, MILP and Benders decomposition. Source: https://www.sciencedirect.com/science/article/abs/pii/S0967070X26001332
+
+**Reproduction target:** treat ground-service-equipment electrification as a sibling subsystem, not automatically as aircraft charging. An eventual integrated energy hub can compose this demand only after its vehicle tasks, chargers, shift constraints and source data have their own verifier and model boundary.
+
+### Airline schedule recovery in production
+
+The 2026 INFORMS Lufthansa Group/SWISS case documents a deployed production system coordinating aircraft, passengers, and crew, and distinguishes fast disruption recovery from later schedule reoptimization. It reports operational savings under the authors' internal measurement procedure. Source: https://pubsonline.informs.org/doi/10.1287/inte.2025.0296
+
+**Integration hypothesis:** use the existing Symthaea recovery/retiming owner (#8603/#8902) plus the energy hub to ask whether energy-aware decisions improve the *same* operational recovery result after adding grid limits, storage, and energy-price/emissions uncertainty. Treat schedule-recovery savings and energy-scheduling savings as potentially overlapping; do not simply add them together.
+
+### Benchmark ladder required before a SOTA claim
+
+1. **Protocol parity:** reproduce each study's stated objective, boundary, assumptions and baseline. If the original dataset or exact formulation is unavailable, label the exercise "related synthetic comparison," not reproduction.
+2. **Independent oracle:** validate tiny cases against exhaustive enumeration and an independently implemented feasibility/accounting checker.
+3. **Baseline parity:** identical data, chronology, constraints, objective boundary, machine class, runtime budget and stopping rule.
+4. **Held-out comparison:** freeze tuning/calibration partitions; evaluate on untouched dates, airports or scenario families; use paired disruptions/seeds where applicable.
+5. **Integrated value:** compare the same base optimizer with and without airport-energy coupling, and separately with and without robust recourse. This estimates incremental replay value, not causal deployed savings.
+6. **Deployment evidence:** before operational claims, require metered energy data, supplier/fuel evidence, approved aircraft capabilities, lawful controls and a controlled field evaluation.
+
+### Proposed competitive thresholds
+
+- **Gate A — reproducibility:** 100% agreement with all published known-answer examples we can recover and every tractable internal exhaustive oracle case.
+- **Gate B — parity:** reproduce each target paper's reported metric within its stated rounding and disclosed uncertainty before tuning for superiority.
+- **Gate C — improvement:** seek at least one percentage point of additional relative cost reduction over a matched published baseline on a held-out benchmark, while preserving every hard constraint and reporting lifecycle CO2e and terminal energy reserve separately. This is a stretch hypothesis, not a prediction; a smaller gain may be the honest result.
+- **Gate D — robust value:** report mean, P95/P99 cost/regret, infeasibility and unmet-demand rates, worst declared scenario, reserve violations (required zero), runtime and memory. Show the cost of robustness rather than treating worst-case protection as free.
+- **Gate E — climate value:** report lifecycle CO2e per completed passenger-km, total CO2e and non-CO2 indicators separately. A lower cost alone is not a clean-airline result.
+
+If exact parity is impossible because the source material omits essential variables, preserve that limitation and move to a clearly labelled synthetic benchmark. Never reverse-engineer undocumented assumptions solely to reproduce a headline gain.
+
+
+## 14. Next competitive frontier — flexibility portfolio, policy learning and stakeholder fairness
+
+Additional current research (reviewed 2026-10-29) suggests we should benchmark energy flexibility as a portfolio, not merely a stationary battery.
+
+### Landside vehicle-to-grid (V2G)
+
+A 2026 American Control Conference study jointly schedules electric aircraft apron charging with bidirectional charging of landside EVs. Its model combines a linear program with an aggregate PDE-based EV charging representation and real grid prices, but uses synthetic parking-garage occupancy. It reports up to 32% aircraft-charging cost savings versus its no-V2G baseline, conditional on schedule and EV participation. Source: https://ieeexplore.ieee.org/document/11616483/
+
+**Research implication:** a later energy hub should treat landside EVs, fixed storage and parked aircraft as distinct flexibility resources with individual availability windows, user departure requirements, energy reserves, battery wear costs and export constraints. Do not treat all parked batteries as freely dispatchable. The current V1 explicitly does not implement V2G or grid export.
+
+### Physics-constrained reinforcement learning
+
+A September 2026 IEEE Transactions on Smart Grid paper evaluates physics-based reinforcement learning for an airport thermo-electric microgrid, including e-plane charging, against a classical optimization method on an actual Canadian airport microgrid. The abstract reports near-optimal simulation results and improved convergence stability versus conventional reward-based approaches, but does not provide enough detail in its abstract alone for a numerical apples-to-apples claim. Source: https://ieeexplore.ieee.org/abstract/document/11701290/
+
+**Research implication:** Symthaea can test learned forecasts, warm starts or policies, but the exact/independent optimizer and feasibility verifier must remain the ground-truth gate on tractable cases. Compare convergence/sample efficiency, worst-case feasibility, policy drift, tail regret, runtime and transfer across airports. Do not let an RL reward function override hard operational or safety constraints.
+
+### Multi-stakeholder disruption recovery and fairness
+
+A September 2026 study proposes airline/network-manager collaborative irregular-flight recovery with a fairness-protection mechanism and reports experiments using real operational data. Source: https://www.sciencedirect.com/science/article/abs/pii/S1366554526003169
+
+**Research implication:** whole-airline optimization needs separate fairness and burden-distribution axes, such as delay/cancellation burden across passenger cohorts, airports and collaborating operators. A single airline cost score could merely transfer disruptions to another carrier or network manager. Define the fairness measure and protected constraints before tuning; do not conceal them inside a weighted “social benefit” score.
+
+### Additions to the benchmark vector
+
+Alongside cost, CO2e, service completion, grid peak, curtailment and terminal reserve, later phases should separately report:
+- landed/airside/landside battery flexibility available by time and the portion actually dispatchable under user/mission commitments;
+- battery degradation/warranty cost and reserve/SOC violations (the latter must remain zero);
+- grid peak/demand-charge impact, exports, local congestion and value of flexibility;
+- P50/P95/P99 delay, cancellation and recovery regret;
+- distribution of disruption burden across protected cohorts or network stakeholders;
+- robust feasible-scenario weight versus unresolved weight and scenario-support coverage;
+- learned-policy training samples, wall time, seeds, memory, constraint violations and out-of-airport transfer performance.
+
+These are research dimensions to implement, not metrics the current synthetic slice already measures.
