@@ -28,6 +28,15 @@ This is a falsifiable research thesis, not a claim of achieved superiority. The 
 
 BASALT is the wider research and benchmark program. VLEB remains the name of the current analysis/protocol lane while its contracts and trusted runner are being qualified. A broad rename is not part of this roadmap PR.
 
+## Executable evaluation contract artifacts
+
+The roadmap now has a versioned task-level run-record contract:
+- [BASALT Evaluation Contract](BASALT_EVALUATION_CONTRACT_2026-10-29.md): primary endpoint, denominator policy, pair invariants, negative controls and promotion gates.
+- [Run-record JSON Schema](../../benchmarks/basalt/schema/run-record.schema.json): strict, versioned record shape for source/environment/task/system/verifier/integrity/usage evidence.
+- [Synthetic example](../../benchmarks/basalt/examples/run-record.example.json): schema-shaped paired fixture only; all digests, tasks and outcomes are synthetic and are not experiment results.
+
+The schema checks local structure; a future runner/validator must additionally enforce cross-record pairing, digest equality, outcome consistency, and negative controls. Until that validator is implemented and tested, the schema is a data contract—not a security boundary or proof of evaluation validity.
+
 ## Existing work to compose
 
 - VLEB family-stratified paired inference: [#8900](https://github.com/Luminous-Dynamics/symthaea/pull/8900)
