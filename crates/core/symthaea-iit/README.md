@@ -86,6 +86,61 @@ candidate severance matrices but does not evaluate their repertoire effects or s
 a minimum-information partition. These pieces are not by themselves proof of PyPhi
 conformance.
 
+## Competitive benchmark gates (targets, not current results)
+
+Use two clearly separated upstream baselines:
+
+- **Reproducible release-candidate baseline:** `pyphi==2.0.0rc4`, pinned with
+  `IIT_4_0_2023` and `IIT_4_0_2026` tested separately. As of 2026-10-29,
+  PyPI lists 2.0.0rc4 (2026-10-13) as the newest 2.0 prerelease and 1.2.0 as
+  the latest stable package. Do not silently treat GitHub `main` or rendered
+  development docs as the same artifact:
+  https://pypi.org/project/pyphi/
+- **Exploratory development comparator:** current PyPhi GitHub source, recorded
+  by full commit SHA and used only as a separate comparison until its packaged
+  release and output artifacts are pinned.
+
+### Qualification gates
+
+1. **Input parity:** 100% agreement on model dimensions, all TPM cells within a
+   declared tolerance, connectivity, state, candidate subsystem, formalism, and
+   request digest. A mismatch blocks all downstream comparisons.
+2. **Primitive parity:** compare full cause/effect repertoires, pointwise GID
+   vectors, each candidate cut matrix, and every post-cut TPM cell—not just final
+   scalars or counts. Include deterministic, noisy, disconnected, zero-likelihood,
+   unit-relabelled, and external-unit controls.
+3. **Quantity parity:** reproduce published `phi_s` anchors per named formalism,
+   then use a generated fixture corpus and independent randomized small systems.
+   Require zero unexplained mismatches; do not merge 2023 and 2026 results.
+4. **Fail-closed behavior:** 100% of malformed inputs, unsupported profile/quantity
+   pairs, missing reference outputs, digest mismatches, exhausted budgets, or
+   incomplete searches must be reported as invalid/unqualified—never as an exact
+   scalar.
+5. **Performance only after parity:** measure release-mode end-to-end wall time
+   (median and p95), peak resident memory, allocations where available, candidate
+   assignments, unique cuts, cache hits/misses, and completed work. Pin machine,
+   OS, toolchain, PyPhi version, thread/worker count, formalism, partition scheme,
+   input digest, and cache state. Compare cold and warm runs separately.
+
+### Performance goals after correctness gates
+
+The first competitive goal is **at least 2× lower median end-to-end runtime** than
+the pinned PyPhi baseline on the exact same complete small-system fixture set,
+with identical outputs and no increase in peak memory. Treat this as an aspiration,
+not a result or guarantee. If it is not met, report the regression and identify the
+dominant cost before optimizing. For scale, report the largest system completed
+exactly within fixed wall-time and memory budgets; one extra unit completed is
+meaningful only when the algorithm, partition family, and qualification rules are
+unchanged. Approximate, bounded, cached, and exact modes must be reported separately.
+
+PyPhi 2.0 itself advertises major optimizations—including approximately 18–20×
+faster partition evaluation versus its pre-2.0 implementation, content-based caches,
+and reduced-dimensional cause-side inversion. Those are upstream claims against
+PyPhi's own previous version, **not** speedups over this Rust crate. The Rust
+benchmark must use the same mathematical workload and compare against the current
+pinned baseline before making any comparative claim:
+https://pyphi.readthedocs.io/en/latest/whats-new-in-2.0.html
+
 ## Claim ceiling
 
 A valid BinaryCausalModel proves only that the input satisfies this crate's shape
