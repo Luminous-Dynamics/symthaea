@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "research/cmaq-001/generator/**"
+      - ".github/workflows/cmaq-001-generator.yml"
   push:
     branches:
       - main
