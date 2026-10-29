@@ -128,7 +128,7 @@ def run_strategy(streams: np.ndarray, model: np.ndarray, *, strategy: str, batch
     if status:
         return {"status": status, "total_observations": total, "per_cell_observations": ns.tolist(), "final_error_upper": err_hi.tolist(), "final_error_lower": err_lo.tolist(), "looks": 1}
     looks = 1
-    while int(np.max(ns)) + batch <= MAX_PER_CELL:
+    while bool(np.any(ns + batch <= MAX_PER_CELL)):
         if strategy == "uniform":
             chosen = np.arange(k)
         else:
@@ -147,6 +147,12 @@ def run_strategy(streams: np.ndarray, model: np.ndarray, *, strategy: str, batch
         lo, hi, err_lo, err_hi = cell_bounds(model, successes, ns, alpha_cell)
         status = classify(err_lo, err_hi)
         if status:
+            break
+        # If a capped cell is still ambiguous and its upper error bound exceeds
+        # the admission limit, admitting is impossible without more evidence from
+        # that cell. Do not waste the remaining budget sampling unrelated cells.
+        capped_blocker = (ns >= MAX_PER_CELL) & (err_hi > EPSILON_ALLOWANCE + TOL) & (err_lo <= EPSILON_ALLOWANCE + TOL)
+        if bool(np.any(capped_blocker)):
             break
     if status is None:
         status = "refuse_unresolved"
@@ -189,7 +195,6 @@ def run(*, repeats: int = N_REPEATS) -> dict:
         results[name] = {}
         for method, rows in collected[name].items():
             adm = sum(row["status"] == "admit" for row in rows)
-            rej = sum(row["status"] == "reject" for row in rows)
             unsafe = sum(row["status"] == "admit" and true_errors[name] > EPSILON_ALLOWANCE + TOL for row in rows)
             status_counts = {status: sum(row["status"] == status for row in rows) for status in ("admit", "reject", "refuse_unresolved")}
             total_obs = np.array([row["total_observations"] for row in rows], dtype=float)
