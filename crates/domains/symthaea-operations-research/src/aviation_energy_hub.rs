@@ -395,7 +395,9 @@ pub fn verify_energy_hub_plan(
                 evidence_class: interval.renewable_evidence_class,
                 carrier: EnergyCarrier::Electricity,
                 source_energy_kwh: energy,
-                delivered_energy_kwh: f64::from(renewable_used) * scenario.quantum_kwh,
+                // Delivered energy is energy served to load; charging input remains
+                // represented in generation/source cost and emissions, but is not load delivery.
+                delivered_energy_kwh: f64::from(action.renewable_direct_quanta) * scenario.quantum_kwh,
                 upstream_co2e_kg: f64::from(interval.renewable_generation_quanta)
                     * interval.renewable_lifecycle_co2e_kg_per_quantum,
                 direct_operational_co2e_kg: 0.0,
@@ -405,6 +407,32 @@ pub fn verify_energy_hub_plan(
                 non_co2: NonCo2Evidence::NotAssessed,
             });
         }
+        if action.battery_discharge_output_quanta > 0 {
+            // The primary energy cost and lifecycle emissions are attributed when the
+            // storage is charged. This secondary-bus record makes the discharged energy
+            // visible as load delivery without re-booking those upstream impacts. Opening
+            // SOC must therefore have its prior source ledger reconciled outside this horizon.
+            let energy =
+                f64::from(action.battery_discharge_output_quanta) * scenario.quantum_kwh;
+            records.push(EnergyRecord {
+                id: format!("storage-output:{}", interval.id),
+                source_id: "pre-accounted-storage-inventory".to_owned(),
+                boundary_id: format!("energy-hub-storage-output:{}", interval.id),
+                lifecycle_boundary_id: scenario.service.lifecycle_boundary_id.clone(),
+                period_id: scenario.service.period_id.clone(),
+                evidence_ref: "energy-hub:storage-input-impacts-attributed-at-charge".to_owned(),
+                evidence_class: EvidenceClass::UncalibratedModel,
+                carrier: EnergyCarrier::Electricity,
+                source_energy_kwh: energy,
+                delivered_energy_kwh: energy,
+                upstream_co2e_kg: 0.0,
+                direct_operational_co2e_kg: 0.0,
+                cost_amount: 0.0,
+                currency_code: scenario.currency_code.clone(),
+                non_co2: NonCo2Evidence::NotAssessed,
+            });
+        }
+
         if action.grid_import_quanta > 0 {
             let energy = f64::from(action.grid_import_quanta) * scenario.quantum_kwh;
             records.push(EnergyRecord {
