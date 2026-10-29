@@ -167,7 +167,7 @@ def validate_contract(raw: Any) -> dict[str, Any]:
     if constraint["fidelity_invariant"] is not True:
         raise ValueError("suite constraint definition is fidelity-dependent and incompatible with MF-SCBO")
     if contract["constraint_fidelity_invariant"] is not True:
-        raise ValueError("MF-SCBO comparison contract must declare a fidelity-invariant constraint")
+        raise ValueError("MF-SCBO exposes one shared constraint callable; the suite and contract must declare a fidelity-invariant constraint")
     actual_constraint_digest = hashlib.sha256(canonical_json(constraint)).hexdigest()
     declared_constraint_digest = _sha256(
         contract["constraint_definition_sha256"], "constraint_definition_sha256"
@@ -360,8 +360,9 @@ def evaluate_contract_receipt(contract_bytes: bytes, validated_contract: dict[st
         ),
         "claim_ceiling": (
             "The preflight verified the referenced task-suite file digest and passed schema, source-pin, "
-            "scalarization, constraint-compatibility and initialization-cost checks. Holdout timing and independence "
-            "remain assertions. This is not an MF-SCBO execution, benchmark result, reproduced baseline, "
+            "scalarization, declared constraint-compatibility and initialization-cost checks. It does not execute "
+            "the task functions to prove the implementation matches the declarative suite. Holdout timing and "
+            "independence remain assertions. This is not an MF-SCBO execution, benchmark result, reproduced baseline, "
             "SOTA comparison, or physical-safety certification."
         ),
     }
