@@ -14,6 +14,10 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        cls.schema = json.loads(
+            (Path(__file__).parent / "fixtures" / "pyphi-reference-run-v0.1.schema.json")
+            .read_text(encoding="utf-8")
+        )
 
     def test_manifest_is_not_mislabeled_as_executed(self):
         self.assertEqual(self.fixture["schema_version"], "pyphi-reference-anchor-v0.1")
@@ -42,6 +46,17 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
         self.assertEqual(by_id["system-phi-s-AB"]["kind"], "system_integrated_information_phi_s")
         self.assertEqual(by_id["AB-structure-Phi"]["kind"], "structure_integrated_information_big_phi")
         self.assertNotEqual(by_id["system-phi-s-AB"]["kind"], by_id["AB-structure-Phi"]["kind"])
+
+    def test_schema_makes_pass_require_every_anchor_to_match(self):
+        properties = self.schema["properties"]
+        self.assertEqual(properties["status"]["enum"], ["PASS", "MISMATCH"])
+        pass_guard = self.schema["allOf"][0]["then"]
+        self.assertEqual(
+            pass_guard["properties"]["summary"]["properties"]["failed_anchor_count"]["const"], 0
+        )
+        self.assertEqual(
+            pass_guard["properties"]["summary"]["properties"]["passed_anchor_count"]["const"], 6
+        )
 
 
 if __name__ == "__main__":
