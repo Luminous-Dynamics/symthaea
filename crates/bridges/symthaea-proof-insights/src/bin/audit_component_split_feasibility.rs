@@ -605,10 +605,12 @@ mod tests {
 
     const SYNTHETIC_SPLIT: &[u8] = br#"{
       "schema_version":"pitb.component-first-split-candidate.v0",
+      "dataset_kind":"synthetic_fixture",
       "status":"candidate_only",
       "upstream_commit":"1581d4cbdd69a0faf34b2089614fe2a814316a6a",
       "family_count":6,
       "component_count":6,
+      "family_universe_sha256":"c6b39a37aa42bdd454f15806269ca1d0d417cd4823ec7a3db80908d6214f4dc",
       "source_v0_partition_digest_sha256":"e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
       "source_split_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "source_component_manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
