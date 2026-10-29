@@ -224,6 +224,36 @@ class EligibilityFilterTests(unittest.TestCase):
             "causal_chain",
         )
 
+    def test_keyword_classifier_preserves_composite_current_and_history_intent(self) -> None:
+        self.assertEqual(
+            infer_retrieval_intent(
+                "What is the current support office address, and what was it before the update?"
+            ),
+            ("current_and_history", "composite_current_history"),
+        )
+
+    def test_composite_intent_retains_both_current_and_historical_evidence(self) -> None:
+        q = [question(intent="current_and_history")]
+        predictions = [{
+            "question_id": "Q1",
+            "audit": [
+                candidate("/states/0/text"),
+                candidate("/states/1/action"),
+                candidate("/states/1/text"),
+            ],
+        }]
+        policy = [
+            ledger("/states/0/text", "historical"),
+            ledger("/states/1/action", "current"),
+            ledger("/states/1/text", "current"),
+        ]
+        result, metrics = filter_dataset(q, predictions, policy, 3, intent_source="heuristic")
+        self.assertEqual(
+            [row["source_pointer"] for row in result[0]["audit"]],
+            ["/states/1/action", "/states/1/text", "/states/0/text"],
+        )
+        self.assertEqual(metrics["intent_evaluation"]["accuracy"], 1.0)
+
     def test_keyword_classifier_abstains_when_no_rule_matches(self) -> None:
         self.assertEqual(infer_retrieval_intent("Tell me something interesting.")[0], None)
         self.assertEqual(infer_retrieval_intent("   ")[0], None)
