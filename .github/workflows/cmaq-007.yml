@@ -131,7 +131,7 @@ jobs:
               }
           }, sort_keys=True))
           PY
-- name: Run horizon-amplified error stress panel
+      - name: Run horizon-amplified error stress panel
         working-directory: research/cmaq-007
         run: cargo run --quiet --locked --bin horizon_stress > /tmp/cmaq-007-horizon-stress.json
       - name: Validate horizon stress schema and falsification controls
