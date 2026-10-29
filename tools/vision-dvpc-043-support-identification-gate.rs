@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn mismatched_logged_propensity_weight_fails_closed() {
         let a=SupportAudit::new(&[0.01,0.99],&[0.5,0.5],WEAK_MAX_RATIO,WEAK_MIN_POPULATION_ESS_FRACTION);
-        assert!(a.verify_logged_weight(&[0.01,0.99],&[0.5,0.5],0,50.0));
+        assert!(a.verify_logged_weight(0,50.0));
         assert!(!a.verify_logged_weight(0,49.0));
         let unsupported=SupportAudit::new(&[0.0,1.0],&[0.5,0.5],WEAK_MAX_RATIO,WEAK_MIN_POPULATION_ESS_FRACTION);
         assert!(!unsupported.verify_logged_weight(1,0.5));
