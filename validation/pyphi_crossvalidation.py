@@ -79,6 +79,7 @@ class ValidationReport:
     agreement_within_10_percent: float = 0.0
     n_validated: int = 0
     n_failed: int = 0
+    qualification_status: str = "NOT_QUALIFIED"
 
 
 class PyPhiValidator:
@@ -319,109 +320,8 @@ class PyPhiValidator:
             raise
 
     def compute_hdc_phi(self, topology: TopologySpec, n_samples: int = 10) -> Tuple[float, float, float]:
-        """
-        Compute HDC-based Φ using Symthaea.
-
-        Args:
-            topology: Topology specification
-            n_samples: Number of samples for averaging
-
-        Returns:
-            (mean_phi, std_phi, computation_time_seconds)
-        """
-        import time
-
-        # Build Rust code to compute Φ for this topology
-        # This calls the actual Symthaea implementation
-
-        rust_code = f'''
-use symthaea::hdc::{{
-    consciousness_topology_generators::ConsciousnessTopology,
-    phi_real::RealPhiCalculator,
-    HDC_DIMENSION,
-}};
-
-fn main() {{
-    let calc = RealPhiCalculator::new();
-    let mut phis = Vec::new();
-
-    for seed in 0..{n_samples}u64 {{
-        // Create topology from edge list
-        let n_nodes = {topology.n_nodes};
-        let edges: Vec<(usize, usize)> = vec!{topology.edges!r};
-
-        // Use ring as base and modify
-        let mut topo = ConsciousnessTopology::from_edges(n_nodes, edges, HDC_DIMENSION, seed);
-        let phi = calc.compute(&topo.node_representations);
-        phis.push(phi);
-    }}
-
-    let mean: f64 = phis.iter().sum::<f64>() / phis.len() as f64;
-    let variance: f64 = phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phis.len() as f64;
-    let std = variance.sqrt();
-
-    println!("{{{{\\"mean\\": {{}}, \\"std\\": {{}}}}}}", mean, std);
-}}
-'''
-
-        # For now, use a simpler approach - run the actual binary
-        start = time.time()
-
-        try:
-            # Run Symthaea's phi calculation via cargo
-            result = subprocess.run(
-                [
-                    self.symthaea_binary, "run", "--example",
-                    "phi_for_topology", "--release", "--",
-                    json.dumps({
-                        "n_nodes": topology.n_nodes,
-                        "edges": topology.edges,
-                        "n_samples": n_samples
-                    })
-                ],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                cwd=Path(__file__).parent.parent
-            )
-
-            if result.returncode == 0:
-                output = json.loads(result.stdout.strip())
-                elapsed = time.time() - start
-                return output["mean"], output["std"], elapsed
-            else:
-                # Fallback: use estimated values based on topology type
-                logger.warning(f"Symthaea computation failed, using estimates for {topology.name}")
-                elapsed = time.time() - start
-                return self._estimate_hdc_phi(topology), 0.001, elapsed
-
-        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError) as e:
-            logger.warning(f"Symthaea call failed: {e}, using estimates")
-            elapsed = time.time() - start
-            return self._estimate_hdc_phi(topology), 0.001, elapsed
-
-    def _estimate_hdc_phi(self, topology: TopologySpec) -> float:
-        """Estimate HDC-Φ based on topology characteristics."""
-        # Based on validated results from research
-        estimates = {
-            "ring": 0.4954,
-            "star": 0.4553,
-            "line": 0.4768,
-            "cube": 0.4960,
-            "torus": 0.4953,
-            "binary_tree": 0.4712,
-        }
-
-        for key, value in estimates.items():
-            if key in topology.name.lower():
-                # Adjust for node count
-                base_nodes = 8
-                adjustment = 0.01 * (topology.n_nodes - base_nodes) / base_nodes
-                return value + adjustment
-
-        # Default: between star and ring
-        return 0.475
-
+        """Fail closed until a maintained same-model Rust adapter exists."""
+        raise RuntimeError("NOT QUALIFIED: no maintained Rust adapter computes this estimator from the same explicit causal model and state")
     def validate_topology(self, topology: TopologySpec) -> ValidationResult:
         """
         Validate HDC-Φ against PyPhi for a single topology.
@@ -482,9 +382,9 @@ fn main() {{
             result = self.validate_topology(topology)
             report.results.append(result)
 
-            if result.pyphi_phi is not None:
+            if result.pyphi_phi is not None and result.error_message is None:
                 report.n_validated += 1
-            elif result.error_message:
+            else:
                 report.n_failed += 1
 
         # Compute aggregate metrics
@@ -493,36 +393,30 @@ fn main() {{
         return report
 
     def _compute_report_metrics(self, report: ValidationReport):
-        """Compute correlation and error metrics for the report."""
-        # Get paired results where both methods succeeded
-        paired = [
-            (r.hdc_phi, r.pyphi_phi)
-            for r in report.results
-            if r.pyphi_phi is not None
-        ]
-
-        if len(paired) < 2:
-            logger.warning("Not enough paired results for correlation")
+        """Compute descriptive metrics only; correlation cannot qualify this scaffold."""
+        paired = [(r.hdc_phi, r.pyphi_phi) for r in report.results if r.pyphi_phi is not None and r.error_message is None]
+        report.qualification_status = "NOT_QUALIFIED"
+        if len(paired) < 5:
+            logger.warning("NOT QUALIFIED: fewer than five valid paired cases")
             return
-
-        hdc_values = np.array([p[0] for p in paired])
-        pyphi_values = np.array([p[1] for p in paired])
-
-        # Correlation
-        correlation = np.corrcoef(hdc_values, pyphi_values)[0, 1]
+        hdc_values = np.asarray([p[0] for p in paired], dtype=float)
+        pyphi_values = np.asarray([p[1] for p in paired], dtype=float)
+        if not (np.isfinite(hdc_values).all() and np.isfinite(pyphi_values).all()):
+            logger.warning("NOT QUALIFIED: non-finite metric")
+            return
+        if np.ptp(hdc_values) == 0 or np.ptp(pyphi_values) == 0:
+            logger.warning("NOT QUALIFIED: constant-score correlation is undefined")
+            return
+        correlation = float(np.corrcoef(hdc_values, pyphi_values)[0, 1])
+        if not np.isfinite(correlation):
+            logger.warning("NOT QUALIFIED: non-finite correlation")
+            return
         report.correlation = correlation
-
-        # Errors
         errors = np.abs(hdc_values - pyphi_values)
         report.mean_absolute_error = float(np.mean(errors))
         report.max_absolute_error = float(np.max(errors))
-
-        # Agreement within 10%
-        relative_errors = errors / np.maximum(pyphi_values, 0.001)
-        report.agreement_within_10_percent = float(
-            np.mean(relative_errors < 0.10) * 100
-        )
-
+        relative_errors = errors / np.maximum(np.abs(pyphi_values), 0.001)
+        report.agreement_within_10_percent = float(np.mean(relative_errors < 0.10) * 100)
     def generate_report(self, report: ValidationReport, output_path: Path):
         """
         Generate markdown validation report.
@@ -534,7 +428,7 @@ fn main() {{
         md = []
         md.append("# PyPhi Cross-Validation Report")
         md.append(f"\n**Generated**: {__import__('datetime').datetime.now().isoformat()}")
-        md.append(f"**Status**: {'PASS' if report.correlation > 0.90 else 'NEEDS REVIEW'}")
+        md.append(f"**Qualification status**: {report.qualification_status}")
         md.append("")
 
         md.append("## Summary Statistics")
@@ -550,12 +444,7 @@ fn main() {{
         # Validation target
         md.append("## Validation Target")
         md.append("")
-        if report.correlation > 0.90:
-            md.append("✅ **PASS**: Correlation r > 0.90 achieved!")
-        elif report.correlation > 0.80:
-            md.append("⚠️ **MARGINAL**: Correlation 0.80 < r < 0.90")
-        else:
-            md.append("❌ **FAIL**: Correlation r < 0.80")
+        md.append("NOT QUALIFIED: matching causal-model/state digests, pinned formalism/version, and independent sample gates are not implemented.")
         md.append("")
 
         md.append("## Detailed Results")
@@ -564,8 +453,8 @@ fn main() {{
         md.append("|----------|-------|-------|---------|-------|--------|")
 
         for r in report.results:
-            pyphi_str = f"{r.pyphi_phi:.4f}" if r.pyphi_phi else "N/A"
-            if r.pyphi_phi:
+            pyphi_str = f"{r.pyphi_phi:.4f}" if r.pyphi_phi is not None else "N/A"
+            if r.pyphi_phi is not None:
                 error = abs(r.hdc_phi - r.pyphi_phi)
                 error_str = f"{error:.4f}"
                 status = "✅" if error < 0.05 else "⚠️"
@@ -626,10 +515,8 @@ def main():
     print(f"Mean Absolute Error: {report.mean_absolute_error:.4f}")
     print(f"Validated: {report.n_validated}, Failed: {report.n_failed}")
 
-    if report.correlation > 0.90:
-        print("\n✅ VALIDATION PASSED: r > 0.90")
-    else:
-        print("\n⚠️ VALIDATION NEEDS REVIEW")
+    print(f"\nQualification status: {report.qualification_status}")
+    print("No IIT validation claim is supported by this scaffold.")
 
     validator.generate_report(report, Path(args.output))
     print(f"\n📄 Report saved to: {args.output}")
