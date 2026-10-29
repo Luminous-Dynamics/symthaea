@@ -1,0 +1,9 @@
+case_id	probe_id	observation_id	cost_milli	safe
+case_hL	sense	left	100	true
+case_hL	blind	common	10	true
+case_hR	sense	right	100	true
+case_hR	blind	common	10	true
+case_lL	sense	left	100	true
+case_lL	blind	common	10	true
+case_lR	sense	right	100	true
+case_lR	blind	common	10	true
