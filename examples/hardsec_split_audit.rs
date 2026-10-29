@@ -143,10 +143,13 @@ fn parse_args() -> Result<Option<(PathBuf, PathBuf, Option<PathBuf>)>, String> {
         match arg.as_str() {
             "--help" | "-h" => {
                 println!(
-                    "HARDSEC-001 split-manifest audit\n\n\
-                     Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT [--receipt NEW_PATH]\n\n\
-                     Optional --receipt writes a new deterministic JSON metadata/split-integrity receipt (existing files are not overwritten).\n\\
-                     Requires a strict 16-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."
+                    r#"HARDSEC-001 split-manifest audit
+
+Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT [--receipt NEW_PATH]
+
+Optional --receipt writes a new deterministic JSON metadata/split-integrity receipt.
+Existing files are not overwritten. The receipt is not a security verdict.
+Requires a strict 16-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."#
                 );
                 return Ok(None);
             }
