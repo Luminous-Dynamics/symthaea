@@ -14,6 +14,7 @@ mod cognitive_adaptation_audit;
 mod cognitive_adaptation_replay;
 mod cognitive_missingness;
 mod cognitive_missingness_schedule;
+mod cognitive_missingness_audit;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -120,6 +121,17 @@ enum Commands {
         /// Logical decision/feedback tick to deliver to the policy.
         #[arg(long)]
         tick: u64,
+    },
+    /// Independently re-derive policy/evaluator missingness sidecars from pinned source input.
+    AuditCognitiveMissingnessSchedule {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        policy_tick: PathBuf,
+        #[arg(long)]
+        evaluator: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
     /// Score bounded-loss identification bounds and MNAR sensitivity for missing outcomes.
     /// This is a statistical score, not a proof of measurement authenticity or causal identification.
@@ -315,6 +327,16 @@ fn main() -> anyhow::Result<()> {
                 tick,
             )?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::AuditCognitiveMissingnessSchedule { input, policy_tick, evaluator, out } => {
+            let report = cognitive_missingness_audit::audit_files(&input, &policy_tick, &evaluator)?;
+            let rendered = serde_json::to_string_pretty(&report)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote independently re-derived missingness audit to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
         }
         Commands::ScoreCognitiveMissingness { input, out } => {
             let result = cognitive_missingness::evaluate_file(&input)?;
