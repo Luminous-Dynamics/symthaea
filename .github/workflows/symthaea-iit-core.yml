@@ -1,0 +1,35 @@
+name: Symthaea IIT Rust Core
+
+on:
+  push:
+    branches:
+      - research/symthaea-iit-rust-core-20261029
+  pull_request:
+    paths:
+      - "crates/core/symthaea-iit/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/symthaea-iit-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust-core:
+    name: Compile and test the IIT model/repertoire core
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Test locked workspace package
+        run: cargo test --locked -p symthaea-iit
+
+      - name: Clippy the isolated crate
+        run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings
