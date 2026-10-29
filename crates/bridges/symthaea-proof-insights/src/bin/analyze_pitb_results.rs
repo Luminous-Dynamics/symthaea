@@ -4460,6 +4460,33 @@ mod tests {
         config.coverage_trust_store_sha256 = Some(fixture.trust_store_digest.clone());
         config.coverage_methodology_sha256 = Some(fixture.methodology_digest.clone());
 
+        let expected_components =
+            coverage_receipt::expected_components_from_inventory(
+                &fixture.inventory_bytes,
+                &fixture.families,
+            )
+            .expect("expected component graph");
+        let mut component_records = Vec::new();
+        let mut family_assignments = Vec::new();
+        for expected in expected_components {
+            for family_id in &expected.family_ids {
+                family_assignments.push(ComponentFamilyAssignment {
+                    family_id: family_id.clone(),
+                    split: fixture.families[family_id].clone(),
+                    component_id: expected.component_id.clone(),
+                });
+            }
+            component_records.push(ComponentRecord {
+                component_id: expected.component_id,
+                split_names: expected.split_names,
+                family_ids: expected.family_ids,
+                hard_edge_ids: expected.hard_edge_ids,
+                confirmed_edge_ids: expected.confirmed_edge_ids,
+                unresolved_edge_ids: expected.unresolved_edge_ids,
+            });
+        }
+        family_assignments.sort_by(|left, right| left.family_id.cmp(&right.family_id));
+
         let manifest = ComponentManifest {
             schema_version: "pitb.independent-component-manifest.v0".to_owned(),
             upstream_commit: EXPECTED_UPSTREAM_COMMIT.to_owned(),
@@ -4485,8 +4512,8 @@ mod tests {
                 cross_split_hard_edges: 0,
                 unresolved_cross_split_hard_edges: 0,
             },
-            families: vec![],
-            components: vec![],
+            families: family_assignments,
+            components: component_records,
             qualification_status:
                 "qualified_coverage_verified_no_cross_split_hard_relationships".to_owned(),
             coverage_receipt_verification_status: "verified_signature_set".to_owned(),
