@@ -36,17 +36,17 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-008-report.json").read_text())
-          assert report["schema_version"] == "cmaq-008-sequential-support-drift-v0.1"
+          assert report["schema_version"] == "cmaq-008-sequential-support-drift-v0.2"
           assert report["episode_count"] == 512
           assert report["horizon"] == 128
           assert report["cusum_threshold"] == 5.0
           assert report["null_unsupported_rate"] == 0.01
           assert report["shifted_unsupported_rate"] == 0.25
-          assert report["scenarios"] == ["stationary", "abrupt_support_shift", "gradual_support_shift"]
-          assert report["policies"] == ["direct_fallback", "fixed_gate", "first_unsupported_revoke", "cusum_revocable_gate", "oracle_changepoint"]
+          assert report["scenarios"] == ["stationary", "abrupt_support_shift", "gradual_support_shift", "delayed_abrupt_support_shift", "noisy_stationary_feedback"]
+          assert report["policies"] == ["direct_fallback", "fixed_gate", "first_unsupported_revoke", "cusum_revocable_gate", "integrity_witnessed_cusum", "oracle_changepoint"]
 
           rows = report["summary"]
-          assert len(rows) == 15
+          assert len(rows) == 30
           by_key = {(row["scenario"], row["policy"]): row for row in rows}
           assert len(by_key) == len(rows)
           for scenario in report["scenarios"]:
@@ -57,7 +57,7 @@ jobs:
                       "mean_utility", "mean_utility_delta_vs_fixed",
                       "utility_delta_ci95_low", "utility_delta_ci95_high",
                       "model_action_coverage", "unsupported_rate_per_model_action",
-                      "unsupported_actions_per_1000_decisions", "revocation_episode_rate",
+                      "unsupported_actions_per_1000_decisions", "feedback_mismatch_rate", "feedback_records_per_decision", "revocation_episode_rate",
                       "false_revocation_episode_rate", "shift_detection_coverage",
                       "mean_regret_vs_oracle", "cvar95_regret_vs_oracle", "max_regret_vs_oracle",
                   ]:
@@ -76,7 +76,12 @@ jobs:
               assert by_key[(scenario, "fixed_gate")]["model_action_coverage"] == 1.0
               assert by_key[(scenario, "fixed_gate")]["revocation_episode_rate"] == 0.0
           assert by_key[("stationary", "cusum_revocable_gate")]["false_revocation_episode_rate"] <= 0.05
+          assert by_key[("stationary", "integrity_witnessed_cusum")]["false_revocation_episode_rate"] <= 0.05
           assert by_key[("stationary", "first_unsupported_revoke")]["false_revocation_episode_rate"] > by_key[("stationary", "cusum_revocable_gate")]["false_revocation_episode_rate"]
+          assert by_key[("noisy_stationary_feedback", "cusum_revocable_gate")]["false_revocation_episode_rate"] > 0.50
+          assert by_key[("noisy_stationary_feedback", "integrity_witnessed_cusum")]["false_revocation_episode_rate"] <= 0.05
+          assert by_key[("noisy_stationary_feedback", "fixed_gate")]["feedback_mismatch_rate"] > 0.07
+          assert by_key[("noisy_stationary_feedback", "integrity_witnessed_cusum")]["feedback_records_per_decision"] > by_key[("noisy_stationary_feedback", "cusum_revocable_gate")]["feedback_records_per_decision"]
           abrupt_cusum = by_key[("abrupt_support_shift", "cusum_revocable_gate")]
           abrupt_fixed = by_key[("abrupt_support_shift", "fixed_gate")]
           assert abrupt_cusum["shift_detection_coverage"] >= 0.90
@@ -84,7 +89,10 @@ jobs:
           assert abrupt_cusum["mean_utility_delta_vs_fixed"] > 0.0
           assert abrupt_cusum["utility_delta_ci95_low"] > 0.0
           assert abrupt_fixed["unsupported_rate_per_model_action"] > by_key[("stationary", "fixed_gate")]["unsupported_rate_per_model_action"]
-          print("CMAQ-008 schema, paired decision tape, stationary false-alarm limit, abrupt detection/delay and utility-lift gates validated")
+          delayed_cusum = by_key[("delayed_abrupt_support_shift", "cusum_revocable_gate")]
+          assert delayed_cusum["p90_detection_delay_steps"] > abrupt_cusum["p90_detection_delay_steps"]
+          assert delayed_cusum["shift_detection_coverage"] >= 0.80
+          print("CMAQ-008 v0.2 schema, paired outcomes, false-revocation limits, abrupt/delayed detection, feedback integrity and utility lift validated")
           print(json.dumps({
               scenario: {
                   policy: {
@@ -100,7 +108,7 @@ jobs:
                   }
                   for scenario in report["scenarios"]
                   for policy in report["policies"]
-                  if policy in ["direct_fallback", "fixed_gate", "first_unsupported_revoke", "cusum_revocable_gate", "oracle_changepoint"]
+                  if policy in ["direct_fallback", "fixed_gate", "first_unsupported_revoke", "cusum_revocable_gate", "integrity_witnessed_cusum", "oracle_changepoint"]
               }
           }, sort_keys=True))
           PY
