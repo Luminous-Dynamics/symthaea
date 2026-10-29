@@ -60,6 +60,8 @@ struct SupportAudit {
     numeric_value_disclosure: &'static str,
     reason: &'static str,
     action_count: usize,
+    behavior_probabilities: Vec<f64>,
+    target_probabilities: Vec<f64>,
 }
 
 fn sum_to_one(values: &[f64]) -> bool {
@@ -84,6 +86,8 @@ impl SupportAudit {
             numeric_value_disclosure: "SUPPRESSED_INVALID_INPUT",
             reason,
             action_count,
+            behavior_probabilities: Vec::new(),
+            target_probabilities: Vec::new(),
         }
     }
 
@@ -123,6 +127,8 @@ impl SupportAudit {
                 numeric_value_disclosure: "SUPPRESSED_UNSUPPORTED_TARGET_MASS",
                 reason: "target_policy_assigns_positive_mass_to_unlogged_action",
                 action_count: behavior.len(),
+                behavior_probabilities: behavior.to_vec(),
+                target_probabilities: target.to_vec(),
             };
         }
 
@@ -167,17 +173,22 @@ impl SupportAudit {
                 "target_support_is_covered_and_registered_overlap_gate_passes"
             },
             action_count: behavior.len(),
+            behavior_probabilities: behavior.to_vec(),
+            target_probabilities: target.to_vec(),
         }
     }
 
-    fn expected_weight(&self, behavior: &[f64], target: &[f64], action: usize) -> Option<f64> {
-        if self.status == SupportStatus::InvalidInput || behavior.len() != target.len()
-            || action >= behavior.len()
+    fn expected_weight(&self, action: usize) -> Option<f64> {
+        // Use the exact immutable distributions that were audited; never accept
+        // caller-supplied replacement propensities after the gate has run.
+        if matches!(self.status, SupportStatus::InvalidInput | SupportStatus::NotIdentified)
+            || action >= self.behavior_probabilities.len()
+            || action >= self.target_probabilities.len()
         {
             return None;
         }
-        let h = behavior[action];
-        let pi = target[action];
+        let h = self.behavior_probabilities[action];
+        let pi = self.target_probabilities[action];
         if !h.is_finite() || !pi.is_finite() || h <= 0.0 {
             return None;
         }
@@ -185,14 +196,8 @@ impl SupportAudit {
         if w.is_finite() { Some(w) } else { None }
     }
 
-    fn verify_logged_weight(
-        &self,
-        behavior: &[f64],
-        target: &[f64],
-        action: usize,
-        claimed_weight: f64,
-    ) -> bool {
-        match self.expected_weight(behavior, target, action) {
+    fn verify_logged_weight(&self, action: usize, claimed_weight: f64) -> bool {
+        match self.expected_weight(action) {
             Some(expected) => claimed_weight.is_finite() && claimed_weight >= 0.0
                 && (claimed_weight - expected).abs() <= NUMERIC_TOL * (1.0 + expected.abs()),
             None => false,
@@ -289,13 +294,13 @@ fn audit_fixtures() -> Result<String, String> {
     }
 
     let balanced=SupportAudit::new(&[0.5,0.5],&[0.5,0.5],WEAK_MAX_RATIO,WEAK_MIN_POPULATION_ESS_FRACTION);
-    if !balanced.verify_logged_weight(&[0.5,0.5],&[0.5,0.5],1,1.0)
-        || balanced.verify_logged_weight(&[0.5,0.5],&[0.5,0.5],1,0.9) {
+    if !balanced.verify_logged_weight(1,1.0)
+        || balanced.verify_logged_weight(1,0.9) {
         return Err("logged propensity-ratio verification control failed".to_owned());
     }
     let weak=SupportAudit::new(&[0.01,0.99],&[0.5,0.5],WEAK_MAX_RATIO,WEAK_MIN_POPULATION_ESS_FRACTION);
-    if weak.verify_logged_weight(&[0.01,0.99],&[0.5,0.5],0,49.0)
-        || !weak.verify_logged_weight(&[0.01,0.99],&[0.5,0.5],0,50.0) {
+    if weak.verify_logged_weight(0,49.0)
+        || !weak.verify_logged_weight(0,50.0) {
         return Err("mismatched logged-weight fail-closed control failed".to_owned());
     }
     let empirical=empirical_ess(&[1.0,1.0,1.0,1.0]).ok_or("empirical ESS failed")?;
@@ -367,8 +372,9 @@ mod tests {
     fn mismatched_logged_propensity_weight_fails_closed() {
         let a=SupportAudit::new(&[0.01,0.99],&[0.5,0.5],WEAK_MAX_RATIO,WEAK_MIN_POPULATION_ESS_FRACTION);
         assert!(a.verify_logged_weight(&[0.01,0.99],&[0.5,0.5],0,50.0));
-        assert!(!a.verify_logged_weight(&[0.01,0.99],&[0.5,0.5],0,49.0));
-        assert!(!a.verify_logged_weight(&[0.0,1.0],&[0.5,0.5],0,0.0));
+        assert!(!a.verify_logged_weight(0,49.0));
+        let unsupported=SupportAudit::new(&[0.0,1.0],&[0.5,0.5],WEAK_MAX_RATIO,WEAK_MIN_POPULATION_ESS_FRACTION);
+        assert!(!unsupported.verify_logged_weight(1,0.5));
     }
 
     #[test]
