@@ -987,11 +987,11 @@ mod tests {
         let (_source_events, _target_events, _symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let mut source_score = full_score_source();
-        let mut extra_note = source_score.notes[0];
+        let mut extra_note = source_score.notes[0].clone();
         extra_note.pitch = symthaea_music_theory::Pitch::from_midi(67);
         source_score.push(extra_note);
         let mut target_score = full_score_target();
-        let mut target_extra = target_score.notes[0];
+        let mut target_extra = target_score.notes[0].clone();
         target_extra.pitch = symthaea_music_theory::Pitch::from_midi(67);
         target_score.push(target_extra);
         let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
