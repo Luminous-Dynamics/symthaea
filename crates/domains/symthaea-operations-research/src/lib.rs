@@ -19,6 +19,7 @@
 //! - [`aviation_energy_accounting`]: fail-closed energy, CO2e, cost and transport-service accounting.
 //! - [`aviation_energy_dispatch`]: bounded exact/greedy energy sourcing with Pareto results and independent plan verification.
 //! - [`aviation_energy_hub`]: time-indexed synthetic airport electricity, storage, and Pareto dispatch with independent verification.
+//! - [`aviation_energy_hub_robustness`]: weighted stress replay, explicit feasibility coverage, and perfect-information recourse reference.
 //! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage,
 //!   chronology checks, and a fail-closed guard against declared test-set tuning.
 //! - [`aviation_probability_calibration`]: conservative finite-sample TV-radius calibration
@@ -46,6 +47,7 @@ pub mod aviation_data_contract;
 pub mod aviation_energy_accounting;
 pub mod aviation_energy_dispatch;
 pub mod aviation_energy_hub;
+pub mod aviation_energy_hub_robustness;
 pub mod aviation_decision_readiness;
 pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
