@@ -97,16 +97,20 @@ class MetamorphicTemporalAuditTests(unittest.TestCase):
         self.assertNotIn("FUTURE", actual["selected_event_ids"])
 
     def test_audit_fails_if_resolver_signature_changes(self):
-        # Negative control: inject a local wrapper that violates cutoff semantics.
+        # Negative control: simulate a bug that erases transaction-time delay.
         original = mta.br.resolve_query
         def bad_resolver(events, query):
-            result = original(events, query)
-            result = dict(result)
             if query["query_id"] == "Q001" and any(
                 event.get("event_id") == "META_FUTURE_Q001" for event in events
             ):
-                result["value"] = "deliberately-corrupted"
-            return result
+                # Simulate the bug by incorrectly stamping the future event as
+                # received at the query's knowledge cutoff, making it eligible.
+                raw_events = [mta.raw_event(event) for event in events]
+                for event in raw_events:
+                    if event["event_id"] == "META_FUTURE_Q001":
+                        event["recorded_at"] = query["known_at"]
+                return original(br.validate_events(raw_events), query)
+            return original(events, query)
         mta.br.resolve_query = bad_resolver
         try:
             report = mta.run_audit(self.events, self.queries, permutation_trials=1, query_order_trials=1)
