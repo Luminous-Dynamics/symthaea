@@ -513,6 +513,40 @@ mod tests {
     }
 
     #[test]
+    fn binding_rejects_tampered_audio_child_receipt() {
+        let (source_score, target_score, symbolic, source_audio, target_audio, mut acoustic, onset, manifest) =
+            build_fixture();
+        let binding_attempt = create_symbolic_audio_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest
+        ).expect("fixture binding should be constructible before tampering");
+        acoustic.config.spectral_distance_tolerance = 0.99;
+        let result = verify_symbolic_audio_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest, &binding_attempt
+        );
+        assert!(result.is_err(), "tampered acoustic child receipt must be rejected");
+    }
+
+    #[test]
+    fn symbolic_failure_dominates_passing_audio_evidence() {
+        let (source_score, target_score, _symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+            build_fixture();
+        let no_change_request = symthaea_music_theory::edit_locality::EditRequest {
+            operation: symthaea_music_theory::edit_locality::EditOperation::Transpose { semitones: 5 },
+        };
+        let failed_symbolic = symthaea_music_theory::edit_locality::verify_edit_locality(
+            &source_score, &source_score, &no_change_request
+        ).expect("well-formed but unsuccessful symbolic request still has evidence");
+        assert!(!failed_symbolic.passed);
+        let binding = create_symbolic_audio_render_binding(
+            &source_score, &source_score, &failed_symbolic,
+            audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest
+        ).expect("a valid failed result should still be reportable");
+        assert_eq!(binding.overall_verdict, PreservationVerdict::Fail);
+    }
+
+    #[test]
     fn binding_rejects_audio_manifest_format_mismatch() {
         let (source_score, target_score, symbolic, source_audio, target_audio, acoustic, onset, mut manifest) =
             build_fixture();
