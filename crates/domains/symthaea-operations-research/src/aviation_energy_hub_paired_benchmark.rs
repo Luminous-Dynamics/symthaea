@@ -228,7 +228,7 @@ pub fn evaluate_paired_rolling_benchmark(
             })?;
 
         let (perfect_information_plan, perfect_information_error) =
-            match solve_exact_pareto(scenario, max_nodes_per_policy) {
+            match solve_exact_energy_hub_pareto(scenario, max_nodes_per_policy) {
                 Ok(result) => (result.frontier.into_iter().next(), None),
                 Err(error) => (None, Some(error)),
             };
