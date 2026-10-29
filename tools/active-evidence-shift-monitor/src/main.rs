@@ -1360,7 +1360,7 @@ fn print_anytime_mixture_probe_csv() {
                 scenario.pre_p
             };
             let event = probe_bernoulli(seed, step as u64, conditional_p);
-            let log_e_value = monitor.observe(event);
+            monitor.observe(event);
             if first_alarm.is_none() && monitor.crossed(alpha) {
                 first_alarm = Some(step);
             }
