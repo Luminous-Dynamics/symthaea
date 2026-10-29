@@ -60,7 +60,8 @@ For each fixture and looks 128, 512 and 4,096, the output reports:
 - online value minus the best global-action value (with the true headroom emitted separately);
 - online north-star outcome maturation fraction and mean among matured outcomes;
 - absolute IPS error for the independently evaluated learned-greedy policy;
-- pointwise 95% Wald coverage and interval width for that policy;
+- pointwise 95% Wald coverage and interval width for the learned-greedy policy;
+- familywise time-uniform Hoeffding CS coverage and interval width for the same policy, drawn from the simultaneously covered family of 16 deterministic candidates;
 - fraction of independent logged outcomes that have matured by the look.
 
 These are Monte Carlo means over 1,024 seeded trajectories; standard errors are emitted alongside each metric. The alignment sign-accuracy, true personalization headroom, oracle values and best-global-action value are deterministic fixture properties and are emitted separately from empirical estimates.
@@ -71,6 +72,8 @@ These are Monte Carlo means over 1,024 seeded trajectories; standard errors are 
 - Online regret uses context-specific oracle value and is nonnegative by construction.
 - North-star reward feedback is generated and matured independently of proxy reward feedback; the learner only observes the proxy reward.
 - The IPS evaluation log is independent of the online training stream and uses known uniform action propensities.
+- The familywise held-out CS is maintained for all 16 deterministic policies, with total alpha split as 0.05/16 per candidate and two-sided spending over maturity count.
+- Maturity delays are outcome-independent in the fixture; the held-out CS claim does not automatically extend to reward-dependent censoring.
 - The delayed evaluation estimator only uses north-star rewards matured by the registered look; its denominator is the number matured, not the total log length.
 - The zero-headroom fixture asserts its exact personalization headroom is zero, and its expected online north-star value cannot exceed the best global action value.
 - The deliberately misaligned proxy fixture must have pairwise alignment accuracy below 0.01; aligned dense and sparse fixtures preserve the same action ordering.
@@ -78,7 +81,7 @@ These are Monte Carlo means over 1,024 seeded trajectories; standard errors are 
 
 ## Evidence boundary and industry comparison
 
-This is a synthetic diagnostic protocol, not a production result and not a state-of-the-art claim. The independent pointwise Wald interval is purposely not time-uniform. A future extension should add time-uniform OPE intervals, delayed-feedback correction when maturation depends on context/action, covariate/reward drift controls, and public-data replay.
+This is a synthetic diagnostic protocol, not a production result and not a state-of-the-art claim. The pointwise Wald interval is purposely not time-uniform; the familywise Hoeffding CS is time-uniform across the 16 fixed deterministic policies under the registered known-logger, stationary-reward and outcome-independent-delay assumptions. A future extension should add propensity/support misspecification, covariate/reward drift controls, informative-censoring methods, and public-data replay.
 
 SCOPE-RL benchmarks OPE and off-policy selection using estimators including IPS variants, doubly robust estimators and high-confidence Hoeffding / empirical-Bernstein intervals; its evaluation protocol reports MSE, rank correlation, regret, Type I/II errors, top-k policy performance and safety violations:
 https://scope-rl.readthedocs.io/en/stable/documentation/index.html
