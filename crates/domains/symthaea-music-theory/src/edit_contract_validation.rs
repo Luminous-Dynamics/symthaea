@@ -235,11 +235,17 @@ impl ContractValidationReport {
 pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationReport {
     let mut issues = Vec::new();
     let mut codes = BTreeSet::new();
-    let mut push = |code: &'static str, message: String| {
-        if codes.insert(code) {
-            issues.push(ContractIssue { code, message });
-        }
-    };
+    macro_rules! add_issue {
+        ($code:expr, $message:expr) => {{
+            let issue_code: &'static str = $code;
+            if codes.insert(issue_code) {
+                issues.add_issue!(ContractIssue {
+                    code: issue_code,
+                    message: $message,
+                });
+            }
+        }};
+    }
 
     if contract.schema_version != EDIT_CONTRACT_SCHEMA_VERSION {
         push(
@@ -554,7 +560,6 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         );
     }
 
-    drop(push);
     ContractValidationReport::finish(issues)
 }
 
