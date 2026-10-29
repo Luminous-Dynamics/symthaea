@@ -211,6 +211,54 @@ fn branch_and_bound_matches_independent_raw_oracle_across_varied_scenarios() {
 }
 
 #[test]
+fn availability_relaxation_produces_a_nontrivial_admissible_frontier_bound() {
+    let mut s = scenario();
+    s.aircraft[0].available_at_minutes = 20;
+    s.flights[0].cancellation_cost = 200;
+    s.flights[1].cancellation_cost = 200;
+
+    let expected = oracle_best_cost(&s).expect("cancellation keeps the scenario feasible");
+    assert!(expected >= 20);
+    let report = solve_retiming_branch_and_bound(
+        &s,
+        RetimingSearchOptions {
+            max_expanded_nodes: 1,
+            max_generated_nodes: 10_000,
+            max_absolute_optimality_gap: 0,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.best_plan, None);
+    assert_eq!(report.status, RetimingSearchStatus::NoFeasiblePlanWithinBudget);
+    assert_eq!(report.global_lower_bound_cost, Some(20));
+    assert!(report.global_lower_bound_cost.unwrap() <= expected);
+}
+
+#[test]
+fn relaxed_frontier_bound_never_exceeds_oracle_optimum_on_varied_scenarios() {
+    for s in varied_scenarios() {
+        let optimum = oracle_best_cost(&s).expect("cancel-all makes each scenario feasible");
+        let partial = solve_retiming_branch_and_bound(
+            &s,
+            RetimingSearchOptions {
+                max_expanded_nodes: 1,
+                max_generated_nodes: 10_000,
+                max_absolute_optimality_gap: 0,
+            },
+        )
+        .unwrap();
+        assert!(
+            partial.global_lower_bound_cost.is_none_or(|bound| bound <= optimum),
+            "inadmissible partial bound for {}: {:?} > {}",
+            s.id,
+            partial.global_lower_bound_cost,
+            optimum
+        );
+    }
+}
+
+#[test]
 fn generation_budget_preserves_the_unexpanded_subtree_and_makes_no_claim() {
     let s = scenario();
     let report = solve_retiming_branch_and_bound(
