@@ -269,9 +269,9 @@ impl StreamState {
         Ok(optimum.lambda)
     }
 
-    pub(crate) fn current_lambda(self) -> optimizer::Vec2 { self.current_lambda }
-    fn observed(self) -> ObservedStats { self.observed }
-    fn polynomial(self) -> PolynomialStats { self.polynomial }
+    pub(crate) fn current_lambda(&self) -> optimizer::Vec2 { self.current_lambda }
+    fn observed(&self) -> ObservedStats { self.observed }
+    fn polynomial(&self) -> PolynomialStats { self.polynomial }
 }
 
 fn lambda_feasible(lambda: optimizer::Vec2, max_weight: f64) -> bool {
