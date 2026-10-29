@@ -87,6 +87,8 @@ jobs:
         run: python tools/vleb/test_compare_paired_runs.py
       - name: Test paired clean/shifted robustness analyzer
         run: python tools/vleb/test_analyze_shifted_runs.py
+      - name: Test shift-event evidence consistency auditor
+        run: python tools/vleb/test_audit_shift_event_evidence.py
       - name: Test reproducible two-sided oracle-control replay
         run: python tools/vleb/test_verify_oracle_controls.py
       - name: Test oracle-control verifier mutation campaign
