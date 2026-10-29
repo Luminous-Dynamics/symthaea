@@ -42,7 +42,7 @@ Therefore, a sufficient **action-specific** half-wealth constraint is
 lambda_2 >= 0,
 lambda_1(w(a)-1) + lambda_2(y_min(a)-1) >= -1/2  for every action with h(a)>0.
 
-This audit encodes those inequalities separately from the upstream `solve2` feasible region. It intentionally does not implement the constrained optimizer or claim a finished confidence sequence; the next implementation step is to optimize the same concave quadratic objective over this generally multi-face polygon, then verify every emitted bet against the exact factor floor.
+This audit encodes those inequalities separately from the upstream `solve2` feasible region. It now includes a small support-aware polygon optimizer for the two-dimensional concave quadratic objective. It enumerates feasible vertices, checks an interior stationary point when well-conditioned, optimizes along every feasible face, and compares the returned objective with an independent dense-grid reference. Every returned bet is also checked against the half-wealth factor at action/reward/value corners. This is still only a deterministic optimizer/factor audit, not a finished sequential confidence sequence.
 
 ## Exploratory counterexample to verify before porting
 
@@ -65,7 +65,7 @@ The fixture uses lambda_2=0.1 and lambda_1=(W*lambda_2 - 1/2)/(W-1). It satisfie
 - weak overlap with constant q=(0.5,0.5);
 - additional adversarial near-boundary predictor q=(0.999,0.001) for the wealth-floor witness.
 
-The report includes the exact adjusted mean, raw IPS variance, adjusted residual variance, residual range, action-level weights and control terms, and the explicit factor-floor witness.
+The report includes the exact adjusted mean, raw IPS variance, adjusted residual variance, residual range, action-level weights and control terms, the explicit factor-floor witness, and the safe optimizer's bet/objective/minimum-factor/dense-grid comparison.
 
 ## Hard gates
 
