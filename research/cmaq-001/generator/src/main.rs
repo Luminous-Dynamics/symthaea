@@ -68,11 +68,11 @@ struct World {
 impl World {
     fn new(seed: u64, factor_count: usize) -> Self {
         let mut rng = SplitMix64::new(seed ^ 0x434D_4151_3030_31);
-        let base = std::array::from_fn(|_| rng.range_i64(-250, 250));
-        let interaction = std::array::from_fn(|_| rng.range_i64(-45, 45));
-        let x_risk = std::array::from_fn(|_| rng.range_i64(0, 1));
-        let y_risk = std::array::from_fn(|_| rng.range_i64(0, 1));
-        let risk_threshold = std::array::from_fn(|_| rng.range_i64(3, 5));
+        let base: [i64; ACTIONS] = std::array::from_fn(|_| rng.range_i64(-250, 250));
+        let interaction: [i64; ACTIONS] = std::array::from_fn(|_| rng.range_i64(-45, 45));
+        let x_risk: [i64; ACTIONS] = std::array::from_fn(|_| rng.range_i64(0, 1));
+        let y_risk: [i64; ACTIONS] = std::array::from_fn(|_| rng.range_i64(0, 1));
+        let risk_threshold: [i64; ACTIONS] = std::array::from_fn(|_| rng.range_i64(3, 5));
 
         Self {
             base,
@@ -296,7 +296,8 @@ fn write_dataset(config: &Config) -> Result<(), String> {
         fs::write(config.out.join(name), bytes)
             .map_err(|err| format!("cannot write {name}: {err}"))?;
     }
-    let manifest_hash = sha256_hex(dataset.files.get("manifest.json").ok_or("manifest missing")?);
+    let manifest_bytes = dataset.files.get("manifest.json").ok_or_else(|| "manifest missing".to_owned())?;
+    let manifest_hash = sha256_hex(manifest_bytes);
     println!(
         "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"support_rows\":{},\"qualification_rows\":{},\"heldout_pair_count\":{},\"manifest_sha256\":\"{}\"}}",
         dataset.support_rows, dataset.qualification_rows, dataset.heldout_pairs, manifest_hash
