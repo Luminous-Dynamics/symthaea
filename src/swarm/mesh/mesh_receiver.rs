@@ -598,7 +598,7 @@ impl Default for MeshReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::swarm::mesh::{LORA_MTU, MeshUrgency, PayloadType};
+    use crate::swarm::mesh::{crc16_ccitt, LORA_MTU, MeshUrgency, PayloadType};
     use symthaea_core::hdc::BinaryHV;
 
     fn test_hv(seed: u8) -> BinaryHV {
@@ -633,6 +633,16 @@ mod tests {
                 buf[..len].to_vec()
             })
             .collect()
+    }
+
+    /// Recompute the legacy fragment CRC after deliberately mutating metadata.
+    fn recompute_wire_crc(raw: &mut [u8]) {
+        let mut checksum_input = Vec::with_capacity(raw.len());
+        checksum_input.extend_from_slice(&raw[0..2]);
+        checksum_input.extend_from_slice(&raw[2..6]);
+        checksum_input.extend_from_slice(&raw[8..]);
+        let checksum = crc16_ccitt(&checksum_input);
+        raw[6..8].copy_from_slice(&checksum.to_le_bytes());
     }
 
     const PEER_A: [u8; 8] = [0xAA; 8];
@@ -833,6 +843,37 @@ mod tests {
             .last_fragment_at;
         assert_eq!(after, before);
         assert_eq!(receiver.stats().fragments_duplicate, 1);
+    }
+
+    #[test]
+    fn rejected_metadata_does_not_refresh_assembly_inactivity_or_progress_index() {
+        let mut receiver = MeshReceiver::new().with_timeout(Duration::from_secs(60));
+        let packet = test_packet(2, PEER_A, 0x92);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+        receiver.receive_fragment(PEER_A, &wire[0]);
+
+        let key = StreamKey {
+            source: PEER_A,
+            thought_id: packet.thought_id(),
+        };
+        let assembly = receiver.pending.get(&key).unwrap();
+        let before = assembly.last_fragment_at;
+        assert_eq!(assembly.last_fragment_index, Some(0));
+
+        // Fragment 1 still looks like a valid non-final data fragment, but its
+        // advertised total count conflicts with the already-open assembly.
+        let mut malformed = wire[1].clone();
+        malformed[3] = malformed[3].saturating_add(1);
+        recompute_wire_crc(&mut malformed);
+
+        std::thread::sleep(Duration::from_millis(2));
+        assert!(receiver.receive_fragment(PEER_A, &malformed).is_none());
+
+        let after = receiver.pending.get(&key).unwrap();
+        assert_eq!(after.last_fragment_at, before);
+        assert_eq!(after.last_fragment_index, Some(0));
+        assert_eq!(receiver.pending_count(), 1);
     }
 
     // -- Timeout expiry --
