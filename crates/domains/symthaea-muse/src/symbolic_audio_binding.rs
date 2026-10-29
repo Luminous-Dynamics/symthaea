@@ -21,6 +21,10 @@ use symthaea_music_theory::edit_locality::{
 };
 use symthaea_music_theory::Score;
 
+use crate::edit_contract::{
+    AttributeValue, EditAttribute, FrozenEditContract, ObligationRequirement, ObligationScope,
+    SupportedEditOperation,
+};
 use crate::audio_preservation::{
     AudioAuditInputError, AudioPreservationReport, AudioView, FrameInterval,
     OnsetPreservationConfig, OnsetPreservationReport, PreservationConfig,
@@ -771,6 +775,254 @@ pub fn verify_full_score_render_binding(
         return Ok(false);
     }
     let expected = create_full_score_render_binding(
+        source_score,
+        target_score,
+        symbolic_evidence,
+        source_audio,
+        target_audio,
+        acoustic_evidence,
+        onset_evidence,
+        renderer_manifest,
+        preservation_profile,
+    )?;
+    Ok(expected == *binding)
+}
+
+
+/// Contract-bound full-score receipt. It preserves the existing audio binding
+/// while committing to the frozen intent/obligation contract that was checked
+/// against the exact source Score, target Score, profile, and renderer manifest.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContractBoundFullScoreRenderBinding {
+    pub binding_version: String,
+    pub contract_sha256: String,
+    pub instruction_sha256: String,
+    pub inner: FullScoreRenderBinding,
+    /// SHA-256 over this envelope with this field blank.
+    pub receipt_sha256: String,
+}
+
+fn contract_bound_receipt_sha256(
+    binding: &ContractBoundFullScoreRenderBinding,
+) -> Result<String, SymbolicAudioBindingError> {
+    let mut unsealed = binding.clone();
+    unsealed.receipt_sha256.clear();
+    let bytes = serde_json::to_vec(&unsealed)
+        .map_err(|_| SymbolicAudioBindingError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-contract-bound-full-score-binding-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Validate a frozen contract against the actual symbolic inputs before
+/// rendering. This checks the full Score digests, raw-instruction digest,
+/// approved-profile identity/digest, renderer-manifest digest, operation,
+/// target event index, and requested pitch/delta.
+///
+/// The profile still needs to have been resolved from a trusted registry by
+/// the caller. A matching caller-supplied digest is not profile approval and
+/// a renderer manifest is not causal execution attestation by itself.
+pub fn validate_frozen_edit_contract_for_rendering(
+    contract: &FrozenEditContract,
+    instruction_sha256: &str,
+    source_score: &Score,
+    target_score: &Score,
+    symbolic_evidence: &EditLocalityEvidence,
+    renderer_manifest: &RendererManifest,
+    preservation_profile: &AudioPreservationProfile,
+) -> Result<(), SymbolicAudioBindingError> {
+    contract.validate_supported_operation().map_err(|_| {
+        SymbolicAudioBindingError::InvalidEvidence(
+            "frozen edit contract failed operation-specific obligation validation",
+        )
+    })?;
+
+    if contract.instruction_sha256 != instruction_sha256 {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "frozen contract is not bound to the exact user-instruction digest",
+        ));
+    }
+    if contract.source_score_sha256 != full_score_sha256(source_score)?
+        || contract.target_score_sha256 != full_score_sha256(target_score)?
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "frozen contract source/target Score digests do not match the supplied Scores",
+        ));
+    }
+
+    let profile_digest = audio_preservation_profile_sha256(preservation_profile)?;
+    if contract.profile_id != preservation_profile.profile_id
+        || contract.profile_sha256 != profile_digest
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "frozen contract does not match the selected preservation profile",
+        ));
+    }
+
+    let renderer_digest = renderer_manifest_sha256(renderer_manifest)?;
+    let renderer_obligation = contract.obligations.iter()
+        .find(|obligation| obligation.attribute == EditAttribute::RendererConfig)
+        .ok_or(SymbolicAudioBindingError::InvalidEvidence(
+            "frozen contract has no renderer configuration obligation",
+        ))?;
+    match &renderer_obligation.requirement {
+        ObligationRequirement::BindDigest { expected_sha256 }
+            if expected_sha256 == &renderer_digest => {}
+        _ => return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "frozen contract renderer digest does not match the supplied renderer manifest",
+        )),
+    }
+
+    require_only_locality_dimensions_changed(source_score, target_score)?;
+    let source_events = validate_score_projection(source_score)?;
+    let target_events = validate_score_projection(target_score)?;
+    if !verify_edit_locality_evidence(&source_events, &target_events, symbolic_evidence)?
+        || !symbolic_evidence.passed
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "symbolic evidence does not pass against the exact source/target Score projection",
+        ));
+    }
+
+    match (contract.validate_supported_operation().map_err(|_| {
+        SymbolicAudioBindingError::InvalidEvidence(
+            "frozen edit contract failed operation-specific obligation validation",
+        )
+    })?, symbolic_evidence.request.operation) {
+        (
+            SupportedEditOperation::PitchAt,
+            symthaea_music_theory::edit_locality::EditOperation::PitchAt { index, semitones },
+        ) => {
+            if index >= source_events.len() || index >= target_events.len() {
+                return Err(SymbolicAudioBindingError::InvalidEvidence(
+                    "requested pitch event index is outside the bound Score",
+                ));
+            }
+            let expected_event_id = format!("score_event_index:{index}");
+            let pitch = contract.obligations.iter()
+                .find(|obligation| obligation.attribute == EditAttribute::Pitch)
+                .ok_or(SymbolicAudioBindingError::InvalidEvidence(
+                    "frozen contract has no target-pitch obligation",
+                ))?;
+            match (&pitch.scope, &pitch.requirement) {
+                (
+                    ObligationScope::Event { event_id },
+                    ObligationRequirement::ChangeTo {
+                        expected: AttributeValue::Numeric { value_microunits, unit },
+                    },
+                ) if event_id == &expected_event_id
+                    && unit == "midi_note"
+                    && *value_microunits
+                        == i64::from(target_events[index].pitch_midi) * 1_000_000
+                    && target_events[index].pitch_midi - source_events[index].pitch_midi == semitones => {}
+                _ => return Err(SymbolicAudioBindingError::InvalidEvidence(
+                    "target-pitch obligation does not match the requested score event and exact target pitch",
+                )),
+            }
+        }
+        (
+            SupportedEditOperation::Transpose,
+            symthaea_music_theory::edit_locality::EditOperation::Transpose { semitones },
+        ) => {
+            let pitch = contract.obligations.iter()
+                .find(|obligation| obligation.attribute == EditAttribute::Pitch)
+                .ok_or(SymbolicAudioBindingError::InvalidEvidence(
+                    "frozen contract has no transposition-delta obligation",
+                ))?;
+            match &pitch.requirement {
+                ObligationRequirement::ChangeBy {
+                    delta: AttributeValue::Numeric { value_microunits, unit },
+                } if unit == "semitone"
+                    && *value_microunits == i64::from(semitones) * 1_000_000 => {}
+                _ => return Err(SymbolicAudioBindingError::InvalidEvidence(
+                    "transposition obligation does not match the exact requested semitone delta",
+                )),
+            }
+        }
+        _ => return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "frozen contract operation does not match the independently verified symbolic request",
+        )),
+    }
+
+    Ok(())
+}
+
+/// Create a full-score audio binding only after validating the frozen
+/// operation/obligation contract against the actual symbolic inputs.
+#[allow(clippy::too_many_arguments)]
+pub fn create_contract_bound_full_score_render_binding(
+    contract: &FrozenEditContract,
+    instruction_sha256: &str,
+    source_score: &Score,
+    target_score: &Score,
+    symbolic_evidence: &EditLocalityEvidence,
+    source_audio: AudioView<'_>,
+    target_audio: AudioView<'_>,
+    acoustic_evidence: &AudioPreservationReport,
+    onset_evidence: &OnsetPreservationReport,
+    renderer_manifest: &RendererManifest,
+    preservation_profile: &AudioPreservationProfile,
+) -> Result<ContractBoundFullScoreRenderBinding, SymbolicAudioBindingError> {
+    validate_frozen_edit_contract_for_rendering(
+        contract,
+        instruction_sha256,
+        source_score,
+        target_score,
+        symbolic_evidence,
+        renderer_manifest,
+        preservation_profile,
+    )?;
+    let inner = create_full_score_render_binding(
+        source_score,
+        target_score,
+        symbolic_evidence,
+        source_audio,
+        target_audio,
+        acoustic_evidence,
+        onset_evidence,
+        renderer_manifest,
+        preservation_profile,
+    )?;
+    let mut binding = ContractBoundFullScoreRenderBinding {
+        binding_version: "mel-mr-eval-012-contract-bound-full-score-v0.1".to_string(),
+        contract_sha256: contract.contract_sha256.clone(),
+        instruction_sha256: instruction_sha256.to_string(),
+        inner,
+        receipt_sha256: String::new(),
+    };
+    binding.receipt_sha256 = contract_bound_receipt_sha256(&binding)?;
+    Ok(binding)
+}
+
+/// Replay a contract-bound full-score binding from the original immutable
+/// inputs. Receipt hashes are integrity checks; this function additionally
+/// recomputes the contract context and inner full-score/audio evidence.
+#[allow(clippy::too_many_arguments)]
+pub fn verify_contract_bound_full_score_render_binding(
+    contract: &FrozenEditContract,
+    instruction_sha256: &str,
+    source_score: &Score,
+    target_score: &Score,
+    symbolic_evidence: &EditLocalityEvidence,
+    source_audio: AudioView<'_>,
+    target_audio: AudioView<'_>,
+    acoustic_evidence: &AudioPreservationReport,
+    onset_evidence: &OnsetPreservationReport,
+    renderer_manifest: &RendererManifest,
+    preservation_profile: &AudioPreservationProfile,
+    binding: &ContractBoundFullScoreRenderBinding,
+) -> Result<bool, SymbolicAudioBindingError> {
+    if binding.receipt_sha256.is_empty()
+        || contract_bound_receipt_sha256(binding)? != binding.receipt_sha256
+        || binding.contract_sha256 != contract.contract_sha256
+        || binding.instruction_sha256 != instruction_sha256
+    {
+        return Ok(false);
+    }
+    let expected = create_contract_bound_full_score_render_binding(
+        contract,
+        instruction_sha256,
         source_score,
         target_score,
         symbolic_evidence,
