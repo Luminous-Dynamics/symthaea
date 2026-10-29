@@ -16,6 +16,7 @@ fn storage() -> EnergyStorageSpec {
     EnergyStorageSpec {
         capacity_quanta: 2,
         initial_soc_quanta: 0,
+        initial_soc_ledger_ref: "none:opening-soc".to_owned(),
         max_charge_input_quanta_per_interval: 2,
         max_discharge_output_quanta_per_interval: 2,
         charge_efficiency_ppm: 1_000_000,
