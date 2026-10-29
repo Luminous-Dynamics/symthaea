@@ -997,6 +997,24 @@ mod tests {
     }
 
     #[test]
+    fn atom_ablation_scorer_binds_fixture_digest_and_allows_signed_token_delta() {
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let mut rows = synthetic_ablation_rows(&fixture_sha256);
+        // BPE token counts can change at serialization boundaries; record signed savings
+        // instead of assuming the ablated context must always have fewer tokens.
+        rows[4]["ablated_context_tokens"] = serde_json::json!(65);
+        let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        let result = score_atom_ablation_jsonl(&observations, FIXTURES, LABELS)
+            .expect("valid observations may have a negative token delta");
+        assert_eq!(result.context_tokens_saved_total, 31);
+
+        rows[0]["fixture_sha256"] =
+            serde_json::json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        let wrong_digest = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&wrong_digest, FIXTURES, LABELS).is_err());
+    }
+
+    #[test]
     fn atom_ablation_scorer_rejects_missing_or_unlabelled_observations() {
         let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
         let rows = synthetic_ablation_rows(&fixture_sha256);
