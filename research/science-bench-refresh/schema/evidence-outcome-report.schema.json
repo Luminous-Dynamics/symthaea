@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/evidence-outcome-report.schema.json",
+  "title": "Symthaea Counterfactual Evidence Outcome Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "evaluator_revision_sha256",
+    "decision_rules_sha256",
+    "records",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_evidence_outcome_report.v1"
+    },
+    "plan_sha256": { "$ref": "#/$defs/digest" },
+    "plan_commitment_sha256": { "$ref": "#/$defs/digest" },
+    "evaluator_revision_sha256": { "$ref": "#/$defs/nonzero_digest" },
+    "decision_rules_sha256": { "$ref": "#/$defs/nonzero_digest" },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record" },
+      "description": "Exactly one ordered record for every trial in the bound intervention plan, including failed, contaminated and not-started trials."
+    },
+    "report_commitment_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "not": { "pattern": "^0{64}$" }
+    },
+    "nonzero_digest": {
+      "allOf": [
+        { "$ref": "#/$defs/digest" },
+        { "not": { "pattern": "^0{64}$" } }
+      ]
+    },
+    "digest_or_null": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "trial_id",
+        "condition",
+        "terminal_status",
+        "response_status",
+        "runner_receipt_sha256",
+        "response_artifact_sha256",
+        "evaluator_record_sha256",
+        "task_correctness",
+        "evidence_use",
+        "claim_support",
+        "abstention_quality",
+        "confidence_millionths",
+        "confidence_source",
+        "resources"
+      ],
+      "properties": {
+        "pair_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "trial_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "condition": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "terminal_status": {
+          "enum": ["completed", "contaminated", "budget_violation", "timeout", "blocked", "invalid_receipt", "runner_error", "not_started"]
+        },
+        "response_status": {
+          "enum": ["answered", "abstained", "no_response"]
+        },
+        "runner_receipt_sha256": { "$ref": "#/$defs/digest_or_null" },
+        "response_artifact_sha256": { "$ref": "#/$defs/digest_or_null" },
+        "evaluator_record_sha256": { "$ref": "#/$defs/digest_or_null" },
+        "task_correctness": {
+          "enum": ["correct", "incorrect", "partial", "not_evaluated"]
+        },
+        "evidence_use": {
+          "enum": ["used_relevant", "ignored_relevant", "misinterpreted_relevant", "no_relevant_evidence", "not_evaluated"]
+        },
+        "claim_support": {
+          "enum": ["fully_supported", "partially_supported", "unsupported", "not_evaluated"]
+        },
+        "abstention_quality": {
+          "enum": ["appropriate", "inappropriate", "not_applicable", "not_evaluated"]
+        },
+        "confidence_millionths": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0, "maximum": 1000000 },
+            { "type": "null" }
+          ],
+          "description": "Probability in millionths. Null means confidence was not collected; never substitute zero."
+        },
+        "confidence_source": {
+          "enum": ["model_reported", "elicited", "none"]
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["wall_clock_ms", "tool_calls", "experiment_count", "input_tokens", "output_tokens", "cost_micro_usd"],
+          "properties": {
+            "wall_clock_ms": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+            "tool_calls": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+            "experiment_count": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+            "input_tokens": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+            "output_tokens": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+            "cost_micro_usd": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] }
+          }
+        }
+      }
+    }
+  },
+  "description": "Evaluator-side outcome receipt. Hash binding does not authenticate runner execution, validate evaluator correctness, prove causal evidence use, or establish generalized performance. The same trial outcome must not be used as proof of both contamination absence and task correctness."
+}
