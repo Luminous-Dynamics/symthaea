@@ -318,7 +318,7 @@ No state-of-the-art claim should be made until the baseline tools are run on pin
 - RFC 8785 JSON Canonicalization Scheme: https://www.rfc-editor.org/rfc/rfc8785.html
 - in-toto Statement v1: https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md
 - in-toto attestation framework: https://github.com/in-toto/attestation/blob/main/spec/README.md
-- SLSA Provenance v1: https://slsa.dev/spec/v1.0/provenance
+- SLSA Provenance v1: https://slsa.dev/spec/v1.1/provenance
 - FMI 3.0.2 specification: https://fmi-standard.org/docs/3.0.2/
 - Existing Symtropy sealed scenario manifest issue: https://github.com/Luminous-Dynamics/symtropy/issues/1202
 - Existing Symtropy engineering replay substrate issue: https://github.com/Luminous-Dynamics/symtropy/issues/1172
