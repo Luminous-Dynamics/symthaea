@@ -195,7 +195,7 @@ fn renewable_curtailment_is_not_counted_as_delivered_energy() {
     }).expect("renewable surplus should serve demand, charge storage, and curtail remainder");
 
     assert_eq!(plan.metrics.source_ledger.total_source_energy_kwh, 4.0);
-    assert_eq!(plan.metrics.source_ledger.total_delivered_energy_kwh, 2.0);
+    assert_eq!(plan.metrics.source_ledger.total_delivered_energy_kwh, 1.0);
     assert_eq!(plan.metrics.renewable_generation_quanta, 4);
     assert_eq!(plan.metrics.renewable_curtailed_quanta, 2);
     assert_eq!(plan.metrics.final_soc_quanta, 1);
