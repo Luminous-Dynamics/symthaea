@@ -35,6 +35,10 @@ Run the declared JSON Schema version first. Reject missing required fields, wron
 
 ### Stage B — semantic validation
 
+The Rust module `src/edit_contract_validation.rs` now contains a first draft of these checks, a typed deserialization model, stable diagnostic codes, and tests that replay the JSONL mutation vectors. Its compilation and unit tests are authored but have not been executed because this environment has no Rust toolchain. The implementation is intentionally conservative: it abstains on edit-operation target domains that are not frozen yet.
+
+The source manifest includes an explicit `track_ids` catalog. This is necessary because a track can be protected even when it never appears in the authorized edit mask; deriving the universe of tracks from the mask would reject or misinterpret legitimate protected tracks.
+
 The following are mandatory rules beyond JSON Schema:
 
 | Rule | Required behavior | Example diagnostic |
