@@ -460,8 +460,15 @@ fn is_best_value(value: f64, oracle_value: f64) -> bool {
     (value - oracle_value).abs() <= EPS
 }
 
-fn is_false_certificate(value: f64, oracle_value: f64) -> bool {
-    value + EPS < oracle_value
+fn is_false_certificate(winner: usize, true_values: &[f64]) -> bool {
+    if winner >= true_values.len() {
+        return true;
+    }
+    // A unique-winner certificate is false if the claimed winner is not strictly
+    // better than every competing policy. This intentionally marks any certificate
+    // in an exact tie as false, even though the selected policy is also value-optimal.
+    (0..true_values.len()).filter(|&other| other != winner)
+        .any(|other| true_values[winner] <= true_values[other] + EPS)
 }
 
 fn certified_winner(lower_bounds: &[f64], upper_bounds: &[f64]) -> Option<usize> {
@@ -663,7 +670,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     }
                     if let Some(winner) = certified_winner {
                         ag.winner_certificates += 1;
-                        if is_false_certificate(true_values[winner], oracle_value) {
+                        if is_false_certificate(winner, &true_values) {
                             ag.false_certificates += 1;
                         }
                     }
@@ -680,7 +687,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     ag.selected_lcb_gap.push(true_values[chosen] - lower_bounds[chosen]);
                     let is_winner_certificate = certified_winner.is_some();
                     let is_false_certificate = certified_winner
-                        .map(|winner| is_false_certificate(true_values[winner], oracle_value))
+                        .map(|winner| is_false_certificate(winner, &true_values))
                         .unwrap_or(false);
                     replicate_method_metrics[method_index] = Some(TrialSummary {
                         top1: if is_best_value(true_values[chosen], oracle_value) { 1.0 } else { 0.0 },
@@ -977,8 +984,10 @@ mod tests {
         let tied_values = [0.5_f64, 0.5, 0.5];
         let oracle = tied_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         assert!(tied_values.iter().all(|&value| is_best_value(value, oracle)));
-        assert!(!is_false_certificate(0.5, oracle));
-        assert!(is_false_certificate(0.49, oracle));
+        assert!(is_false_certificate(0, &tied_values));
+        let clear_values = [0.492_f64, 0.500, 0.508];
+        assert!(!is_false_certificate(2, &clear_values));
+        assert!(is_false_certificate(1, &clear_values));
     }
 
     #[test]
