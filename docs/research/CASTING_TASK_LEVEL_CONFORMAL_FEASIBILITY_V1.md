@@ -54,3 +54,14 @@ The hypothesis that task-level conformal screening improves decisions is weakene
 ## Claim ceiling
 
 A receipt reports recommendations and abstentions under a declared task-level calibration protocol. It is not proof of exchangeability, holdout secrecy, calibration under unseen shift, physical feasibility, safety certification, optimizer superiority, or SOTA performance. The module is a comparison candidate, not yet evidence that the approach outperforms the current heuristic or published methods.
+
+
+## Independent post-decision risk audit
+
+The companion tools/casting-benchmark/task_conformal_validation_audit.py accepts the frozen decision receipt, exact target prediction manifest, a predeclared risk contract, and held-out outcomes unsealed only after the decisions were frozen. It requires the contract to bind the raw decision-receipt and target-manifest digests, then joins candidate IDs and task IDs exactly.
+
+Its primary independent unit is the target task, not the candidate: a task is a false-feasible failure when **any** candidate recommended feasible has an observed negative margin. The scorer computes exact one-sided Clopper–Pearson upper bounds for each declared critical stratum, counts only tasks with at least one feasible recommendation in the risk denominator, and reports candidate-level counts as descriptive secondary metrics.
+
+For a one-sided 95% upper bound at or below 5%, 59 independent recommended tasks with zero false-feasible task failures is the zero-failure planning floor. More validation units may be required when failures occur, when critical strata are heterogeneous, or when a stricter risk target is appropriate. A pooled good result cannot rescue a critical stratum whose bound exceeds the contract. A risk-bound failure takes precedence over an unrelated total-sample shortfall; adequate evidence must satisfy both the family unit floor and recommended-task denominator floor to pass.
+
+This audit is separate from the prediction path so target outcomes cannot influence the recommendation. It still relies on claims that validation units are representative and independent, and that the contract/digests were frozen before outcome unsealing. Those claims are not proven by hashes. A pass means only that the declared research-stage risk gate passed, not physical safety certification.
