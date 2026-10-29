@@ -200,6 +200,49 @@ class PolicyPinnedLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "kind must be assert or retract"):
             ledger.validate_events(raw)
 
+    def test_policy_added_later_does_not_retroactively_admit_unknown_source(self):
+        raw = deepcopy(self.raw_policies)
+        raw.append({
+            "policy_version": 3,
+            "recorded_at": "2026-04-03T00:00:00Z",
+            "sources": [
+                {"source": "operations", "authority_rank": 10, "attributes": ["endpoint", "notes"], "can_retract": True},
+                {"source": "incident-review", "authority_rank": 12, "attributes": ["endpoint"], "can_retract": False},
+                {"source": "user-notes", "authority_rank": 1, "attributes": ["notes"], "can_retract": False},
+                {"source": "mystery-source", "authority_rank": 999, "attributes": ["endpoint"], "can_retract": False},
+            ],
+        })
+        policies = ledger.validate_policies(raw)
+        admission = ledger.validate_admission(self.events, policies)
+        self.assertFalse(admission["E007"]["admitted"])
+        self.assertIn("not registered", admission["E007"]["reason"])
+        query = deepcopy(self.query_by_id["Q004"])
+        query["known_at"] = "2026-04-04T00:00:00Z"
+        query["_known_at"] = ledger.parse_timestamp(query["known_at"], "test cutoff")
+        result = ledger.resolve_query(self.events, policies, admission, query)
+        self.assertEqual(result["policy_version"], 3)
+        self.assertNotIn("E007", result["eligible_event_ids"])
+        self.assertEqual(result["value"], "db-primary-c.internal")
+
+    def test_future_recorded_assertion_cannot_affect_earlier_query(self):
+        extra = {
+            "event_id": "E-FUTURE",
+            "kind": "assert",
+            "subject": "db-prod",
+            "attribute": "endpoint",
+            "value": "future-forged.internal",
+            "valid_from": "2026-01-15",
+            "valid_to": None,
+            "recorded_at": "2026-05-01T00:00:00Z",
+            "source": "incident-review",
+        }
+        events = ledger.validate_events(self.raw_events + [extra])
+        admission = ledger.validate_admission(events, self.policies)
+        baseline = self.result("Q003")
+        changed = self.result("Q003", events=events, admission=admission)
+        self.assertEqual((baseline["state"], baseline["value"]), (changed["state"], changed["value"]))
+        self.assertNotIn("E-FUTURE", changed["eligible_event_ids"])
+
     def test_order_of_input_events_does_not_change_resolution(self):
         reversed_events = ledger.validate_events(list(reversed(self.raw_events)))
         reversed_admission = ledger.validate_admission(reversed_events, self.policies)
