@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/lineage-ledger.schema.json",
+  "title": "Symthaea Science Benchmark Refresh Lineage Ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation_id",
+    "split_label",
+    "task_set_sha256",
+    "records"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_lineage_ledger.v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "split_label": {
+      "type": "string",
+      "pattern": "^(development|anchor|refresh)(:[A-Za-z0-9_-]+)?$",
+      "maxLength": 128
+    },
+    "task_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "policy_input_sha256",
+          "exposure_state",
+          "lineage_commitments"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "policy_input_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "exposure_state": {
+            "enum": [
+              "never_exposed",
+              "public_development",
+              "prior_scored_refresh",
+              "unknown"
+            ]
+          },
+          "lineage_commitments": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "commitment_sha256"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "parent_world",
+                    "source_task",
+                    "source_item",
+                    "transform_ancestor"
+                  ]
+                },
+                "commitment_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "description": "Evaluator-side provenance ledger bound to the exact task-set bytes. Each record covers exactly one task ID and commits to the canonical policy-visible input. Lineage commitments identify task ancestry or an underlying world/source item; they must not be generic family, schema, corpus-version, or template identifiers. The ledger is not policy-visible and does not attest that the runner enforced that boundary."
+}
