@@ -30,17 +30,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --probe-cost 0.25 > /tmp/cmaq-002-report.json
+          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 > /tmp/cmaq-002-report.json
           python3 - <<'PY'
           import json
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-002-report.json").read_text())
-          assert report["schema_version"] == "cmaq-002-evoi-report-v0.1"
+          assert report["schema_version"] == "cmaq-002-evoi-report-v0.2"
           assert report["mechanisms"] == 9
           assert report["families"] == 3
           assert report["contexts"] == 4
           assert report["actions"] == 3
+          assert report["decision_horizon"] == 1
           by_name = {row["strategy"]: row for row in report["results"]}
           assert set(by_name) == {
               "no_probe", "fixed", "random", "max_information", "evoi", "oracle"
