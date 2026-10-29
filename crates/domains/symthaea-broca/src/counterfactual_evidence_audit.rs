@@ -843,6 +843,137 @@ mod tests {
         assert_eq!(distractor.target_level, "ignore");
     }
 
+    fn synthetic_ablation_rows() -> Vec<Value> {
+        use serde_json::json;
+        let full = json!({
+            "claim.retry_limit.value": "4",
+            "claim.retry_limit.scope": "transient_network_errors"
+        });
+        let scope_bounded = json!({
+            "claim.retry_limit.value": "4",
+            "claim.retry_limit.scope": "unknown_scope"
+        });
+        let no_value = json!({
+            "claim.retry_limit.scope": "transient_network_errors"
+        });
+        vec![
+            json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+                "run_id": "synthetic-scorer-test-v1",
+                "case_id": "memory-influence-0001-a",
+                "evidence_id": "retry-config-1",
+                "reader_revision": "synthetic-reader-v1",
+                "full_context_tokens": 50,
+                "ablated_context_tokens": 40,
+                "full_fields": full,
+                "ablated_fields": no_value
+            }),
+            json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+                "run_id": "synthetic-scorer-test-v1",
+                "case_id": "memory-influence-0001-a",
+                "evidence_id": "retry-applicability-2",
+                "reader_revision": "synthetic-reader-v1",
+                "full_context_tokens": 50,
+                "ablated_context_tokens": 42,
+                "full_fields": full,
+                "ablated_fields": scope_bounded
+            }),
+            json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+                "run_id": "synthetic-scorer-test-v1",
+                "case_id": "memory-influence-0001-b",
+                "evidence_id": "retry-config-1",
+                "reader_revision": "synthetic-reader-v1",
+                "full_context_tokens": 60,
+                "ablated_context_tokens": 50,
+                "full_fields": full,
+                "ablated_fields": no_value
+            }),
+            json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+                "run_id": "synthetic-scorer-test-v1",
+                "case_id": "memory-influence-0001-b",
+                "evidence_id": "retry-applicability-2",
+                "reader_revision": "synthetic-reader-v1",
+                "full_context_tokens": 60,
+                "ablated_context_tokens": 52,
+                "full_fields": full,
+                "ablated_fields": scope_bounded
+            }),
+            json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+                "run_id": "synthetic-scorer-test-v1",
+                "case_id": "memory-influence-0001-b",
+                "evidence_id": "notification-note-2",
+                "reader_revision": "synthetic-reader-v1",
+                "full_context_tokens": 60,
+                "ablated_context_tokens": 55,
+                "full_fields": full,
+                "ablated_fields": full
+            })
+        ]
+    }
+
+    #[test]
+    fn atom_ablation_scorer_reports_ignore_bound_and_control_separately() {
+        let rows = synthetic_ablation_rows();
+        let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        let result = score_atom_ablation_jsonl(&observations, LABELS)
+            .expect("well-formed synthetic ablation run must score");
+        assert_eq!(result.observation_count, 5);
+        assert_eq!(result.ignore_count, 1);
+        assert_eq!(result.ignore_overuse_count, 0);
+        assert_eq!(result.bound_count, 2);
+        assert_eq!(result.bound_overuse_count, 0);
+        assert_eq!(result.bound_underuse_count, 0);
+        assert_eq!(result.control_count, 2);
+        assert_eq!(result.control_underuse_count, 0);
+        assert_eq!(result.control_overuse_count, 0);
+        assert_eq!(result.context_tokens_removed_total, 41);
+        assert_eq!(result.ignore_overuse_rate, Some(0.0));
+        assert_eq!(result.control_underuse_rate, Some(0.0));
+    }
+
+    #[test]
+    fn atom_ablation_scorer_detects_overuse_and_underuse() {
+        let mut rows = synthetic_ablation_rows();
+        // The Ignore atom now appears to change a material claim: over-use.
+        rows[4]["ablated_fields"] = serde_json::json!({
+            "claim.retry_limit.value": "5",
+            "claim.retry_limit.scope": "transient_network_errors"
+        });
+        // Removing a Control atom causes no required claim change: under-use.
+        rows[2]["ablated_fields"] = rows[2]["full_fields"].clone();
+        let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        let result = score_atom_ablation_jsonl(&observations, LABELS)
+            .expect("valid but behaviorally faulty synthetic observations still score");
+        assert_eq!(result.ignore_overuse_count, 1);
+        assert_eq!(result.control_underuse_count, 1);
+    }
+
+    #[test]
+    fn atom_ablation_scorer_rejects_missing_or_unlabelled_observations() {
+        let rows = synthetic_ablation_rows();
+        let observations = rows.iter().take(4).map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&observations, LABELS).is_err());
+
+        let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        let extra = serde_json::json!({
+            "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+            "run_id": "synthetic-scorer-test-v1",
+            "case_id": "memory-influence-0001-b",
+            "evidence_id": "unlabelled-atom",
+            "reader_revision": "synthetic-reader-v1",
+            "full_context_tokens": 10,
+            "ablated_context_tokens": 5,
+            "full_fields": {"claim.retry_limit.value": "4"},
+            "ablated_fields": {}
+        });
+        let observations = format!("{}\n{}", observations, extra);
+        assert!(score_atom_ablation_jsonl(&observations, LABELS).is_err());
+    }
+
     #[test]
     fn validator_rejects_undeclared_mutations_and_gold_label_leaks() {
         let pairs = validate_counterfactual_fixture_jsonl(FIXTURES).unwrap();
