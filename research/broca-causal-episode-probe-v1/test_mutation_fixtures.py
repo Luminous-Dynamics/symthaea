@@ -23,14 +23,14 @@ class MutationFixtureTests(unittest.TestCase):
 
     def test_fixture_size_and_ids_are_stable(self) -> None:
         self.assertEqual(len(self.trajectories), 9)
-        self.assertEqual(len(self.questions), 12)
+        self.assertEqual(len(self.questions), 13)
         self.assertEqual(len(self.trajectory_by_id), len(self.trajectories))
         self.assertEqual(len(self.question_by_id), len(self.questions))
 
     def test_every_question_has_a_supported_retrieval_intent(self) -> None:
         allowed = {
             "current_state", "historical_state", "revocation_status",
-            "approved_state", "proposal_history", "causal_chain",
+            "approved_state", "proposal_history", "causal_chain", "current_and_history",
         }
         for row in self.questions:
             with self.subTest(question_id=row["question_id"]):
@@ -61,6 +61,16 @@ class MutationFixtureTests(unittest.TestCase):
         }
         self.assertEqual(len(actual), len(self.ledger), "ledger keys must be unique")
         self.assertEqual(actual, expected, "all string leaves must be policy-labelled")
+
+    def test_composite_question_requires_both_current_and_historical_provenance(self) -> None:
+        question = self.question_by_id["MCB-013"]
+        self.assertEqual(question["retrieval_intent"], "current_and_history")
+        required = {(x["trajectory_id"], x["source_pointer"]) for x in question["required_support"]}
+        self.assertIn(("mutation-office-address", "/states/1/action"), required)
+        self.assertIn(("mutation-office-address", "/states/1/text"), required)
+        self.assertIn(("mutation-office-address", "/states/0/text"), required)
+        forbidden = {(x["trajectory_id"], x["source_pointer"]) for x in question["forbidden_support"]}
+        self.assertTrue(required.isdisjoint(forbidden))
 
     def test_every_question_has_gold_support_and_explicit_category(self) -> None:
         for row in self.questions:
