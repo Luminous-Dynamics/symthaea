@@ -138,6 +138,11 @@ fn parse_graph_edges(
 ) -> Result<(usize, HashSet<(usize, usize)>), CliquePartitionError> {
     let vertex_count = canonical_mis_graph_vertex_count(graph_bytes)
         .map_err(|error| CliquePartitionError::InvalidGraph(error.to_string()))?;
+    if vertex_count == 0 {
+        return Err(CliquePartitionError::InvalidGraph(
+            "MIS graph must contain at least one vertex".to_owned(),
+        ));
+    }
     let text = std::str::from_utf8(graph_bytes).map_err(|_| CliquePartitionError::InvalidUtf8)?;
     // canonical_mis_graph_vertex_count already validates header, counts, endpoints,
     // strict edge order, line endings, and the exact canonical graph grammar.
@@ -302,6 +307,16 @@ mod tests {
         assert_eq!(verified.upper_bound(), 3);
         assert_eq!(verified.graph_sha256(), sha256_hex(GRAPH));
         assert_eq!(verified.certificate_sha256(), sha256_hex(&bytes));
+    }
+
+    #[test]
+    fn rejects_zero_vertex_graphs_even_with_an_empty_partition() {
+        let graph = b"SYMTHEA-MIS-GRAPH-V1\nvertices 0\nedges 0\n";
+        let cert = format!("{CERTIFICATE_HEADER}\nvertices 0\nblocks 0\n");
+        assert!(matches!(
+            verify_clique_partition_certificate(graph, cert.as_bytes()),
+            Err(CliquePartitionError::InvalidGraph(_))
+        ));
     }
 
     #[test]
