@@ -94,9 +94,6 @@ fn episode(realized: TimeIndexedEnergyHubScenario) -> RollingHorizonEpisode {
 
 fn panel() -> (TimeIndexedEnergyHubScenario, Vec<WeightedRollingEpisode>) {
     let baseline = scenario("nominal-forecast-plan-v1", 1, 10.0);
-    let plan = solve_exact_energy_hub_pareto(&baseline, 100_000).unwrap().frontier[0]
-        .plan
-        .clone();
     let regular = episode(scenario("actual-cheap-future-v1", 1, 0.1));
     let outage = episode(scenario("actual-first-slot-grid-outage-v1", 0, 0.1));
 
