@@ -55,7 +55,7 @@ struct CensusTarget {
     status: String,
     artifact_path: String,
     artifact_sha256: String,
-    statement_sha256: Option<String>,
+    statement_sha256: Value,
     eligibility_receipt_sha256: String,
 }
 
@@ -287,11 +287,15 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
         }
         validate_sha(&target.artifact_sha256, "target artifact digest")?;
         validate_sha(&target.eligibility_receipt_sha256, "target eligibility receipt digest")?;
-        match (target.status.as_str(), target.statement_sha256.as_deref()) {
-            ("eligible", Some(digest)) => validate_sha(digest, "eligible target statement digest")?,
-            ("eligible", None) => bail!("eligible target requires an exact statement digest"),
-            (_, Some(digest)) => validate_sha(digest, "target statement digest")?,
-            (_, None) => {}
+        if target.statement_sha256.is_null() {
+            if target.status == "eligible" {
+                bail!("eligible target requires an exact statement digest");
+            }
+        } else {
+            let digest = target.statement_sha256
+                .as_str()
+                .context("statement_sha256 must be a digest string or explicit null")?;
+            validate_sha(digest, "target statement digest")?;
         }
         observed_targets_by_family
             .entry(target.family_id.clone())
