@@ -79,6 +79,9 @@
           "families": {
             "minItems": 372,
             "maxItems": 372
+          },
+          "family_universe_sha256": {
+            "const": "c8ee398840443fb0693e50baa1dfda9982cd8bfebe1f81d9de3050e3b15cb048"
           }
         }
       }
