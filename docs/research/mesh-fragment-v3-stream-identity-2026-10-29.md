@@ -43,10 +43,14 @@ The header is a protocol binding, not an identity allocator. It does **not** fix
 
 - The 32-byte peer context must be derived from authenticated peer/security state and kept separate per authenticated principal.
 - `session_generation` must come from the reviewed clone-safe key/session-generation lifecycle; it must not be recycled under the same effective traffic key.
-- `message_sequence` must not repeat inside one session generation. The sender must rotate to a genuinely fresh session/key generation before sequence wrap or rollback can cause reuse.
-- Authenticated identity, flags, exact length and payload must be cryptographically bound before the receiver trusts a frame. CRC only detects accidental corruption and is forgeable.
+- `message_sequence` must be atomically allocated and must not repeat inside one session generation. On sequence exhaustion or uncertain/rolled-back state, sending must stop until a genuinely fresh security context is established.
+- **Direction separation is mandatory.** Use independently derived sender-to-receiver and receiver-to-sender traffic keys (domain-separated KDF context including both endpoint identities and direction), or an equivalent reviewed nonce construction that guarantees unique `(effective key, nonce)` pairs across both directions. A shared bidirectional key with two independently incremented counters is not sufficient.
+- The fragment nonce must bind a message sequence and fragment index under the per-direction session key (or the reviewed equivalent), with the session generation participating in key/session derivation. Every packet/fragment encryption call must share the same uniqueness enforcement; the V3 header itself does not prove this.
+- Cryptographically bind protocol version, authenticated sender/receiver context, direction, key/session generation, message sequence, fragment index/count, exact encoded length, payload length, profile flags and payload in the AEAD or equivalent reviewed authenticated construction before the receiver advances assembly state. CRC only detects accidental corruption and is forgeable.
 - A missing or uncertain generation allocation must fail closed. Do not substitute a random restart label or a process-local counter and call it clone-safe.
 - The AEAD-overhead profile below is only accounting; the codec performs no encryption and does not resolve the production packet/fragment transform-order issue.
+
+The direction/sequence requirements align with RFC 8439 (nonce unique per invocation under one key) and RFC 8613/OSCORE (atomic sender sequence numbers, per-sender contexts and replay windows; do not reuse sequence numbers after losing mutable context). These are standards requirements, not proof that the current mesh path implements them.
 
 ## Independent model check and remaining lifecycle falsifier
 
