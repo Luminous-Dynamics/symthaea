@@ -52,7 +52,7 @@
           "const": "pyphi"
         },
         "version": {
-          "const": "2.0.0"
+          "const": "2.0.0rc4"
         },
         "python_version": {
           "type": "string",
