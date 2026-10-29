@@ -36,3 +36,14 @@ jobs:
           grep -F '"schema_version": "cmaq-001-report-v0.1"' <<< "$report"
           grep -F '"receipt_mismatches": 0' <<< "$report"
           grep -F '"gate_pass": true' <<< "$report"
+      - name: Test world-model decision scorecard
+        run: cargo test --locked --bin score_world_model
+      - name: Score counterfactual world-model predictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cargo run --quiet --locked --bin score_world_model -- score fixtures/answer-key-smoke.tsv fixtures/world-model-predictions-smoke.tsv)"
+          printf '%s\n' "$report"
+          grep -F '"schema_version": "cmaq-world-model-report-v0.1"' <<< "$report"
+          grep -F '"counterfactual_reward_mae_milli": 0.000000' <<< "$report"
+          grep -F '"hard_gate_pass": true' <<< "$report"
