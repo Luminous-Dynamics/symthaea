@@ -83,7 +83,7 @@ The code emits all six cost levels, standard errors, and paired 95% intervals. T
 
 The first smoke test therefore suggests a design principle worth testing in Symthaea: **gate planning/model use on calibrated expected decision lift and explicit model freshness**, and fall back to direct policy when the estimated benefit does not repay model cost or when a mismatch/stale-model signal is present.
 
-## Family-level transfer companion (v0.1)
+## Family-level transfer companion (v0.2)
 
 The new `family_transfer` Rust binary widens the unit of analysis from repeated reward draws on one fixed law to **256 generated mechanism families**. For each family, the candidate receives support-outcome means for contexts `00`, `01`, and `10`; context `11` remains evaluator-only. The direct nearest-context policy and additive extrapolator use the same support outcomes. The generator balances three lanes: near-additive laws, strong held-out interaction laws, and a held-out sign-shift stress lane.
 
@@ -95,20 +95,20 @@ cargo run --quiet --locked --bin cmaq-004-world-model-value-add
 cargo run --quiet --locked --bin family_transfer
 ```
 
-The companion crosses five strategies—direct nearest-context, additive model, shuffled-model control, stale-model control and evaluator-only oracle—with four query-cost levels and four reporting groups (all families plus each mechanism lane). Its 80 JSON rows report:
+The companion crosses five strategies—direct nearest-context, additive model, shuffled-model control, stale-model control and evaluator-only oracle—with four query-cost levels and four reporting groups (all families plus each mechanism lane). Its 80 JSON rows (schema `cmaq-004-family-transfer-v0.2`) report:
 
-- mean net-utility lift vs direct, with an approximate 95% interval whose unit is the **generated mechanism family**;
+- mean **gross** lift before model-query fees, mean **net** lift after fees, and implied break-even fee per query (gross lift divided by two queries), with an approximate 95% interval on net lift at the generated-mechanism-family unit;
 - fraction of families where the strategy is worse than the direct comparator;
 - lower-tail CVaR05 of family-level lift and the single worst family;
-- action-one rate, query cost and (for additive/shuffled policies) held-out prediction MAE.
+- fraction of families showing positive gross lift before cost, action-one rate, query cost and (for additive/shuffled policies) held-out prediction MAE.
 
 The most important new question is not just whether the *average* family benefits, but whether the model's average advantage masks a bad tail or fails under interaction/held-out-shift lanes. The cost sweep charges two model queries per decision; this is declared synthetic utility accounting, **not** measured wall-clock latency, energy, or hardware cost.
 
 The support-sample RNG is keyed by the family slot and observed context/action cell, not by hidden interaction or held-out-shift parameters. A regression test ensures that mechanisms with identical support laws produce identical support tapes under the same sample seed, even when their held-out laws differ. This prevents a subtle side-channel where held-out parameters could change observed sampling noise.
 
-### Exact-head family-panel result at 0.04 utility/query
+### Exact-head family-panel result and break-even cost (v0.2)
 
-At 0.04 utility units per query (two model queries, 0.08 total cost per decision), the **additive-model policy has negative family-level net lift vs direct in all four reporting groups** on this deterministic 256-family sample:
+At 0.04 utility units per query (two model queries, 0.08 total cost per decision), the **additive-model policy has negative family-level net lift vs direct in all four reporting groups** on this deterministic 256-family sample. The v0.2 report also separates gross policy lift from query fees. At zero query cost:
 
 | Lane | Families | Mean net lift | Approx. family-level 95% interval | Lower-tail CVaR05 | Families harmed |
 |---|---:|---:|---:|---:|---:|
@@ -117,7 +117,18 @@ At 0.04 utility units per query (two model queries, 0.08 total cost per decision
 | Interaction | 85 | -0.0655 | [-0.0890, -0.0420] | -0.3218 | 89.4% |
 | Held-out shift | 85 | -0.1357 | [-0.1640, -0.1073] | -0.5383 | 100.0% |
 
-These numbers are the exact Rust output printed by the integrated workflow at run [40960013206](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960013206). The interval unit is generated family, not a repeated reward timestep. This is a meaningful negative result: under this mixed family distribution and declared cost, the direct baseline is better on average, even on the near-additive lane. The correct response is **not** to retune the family mix until the model wins; it is to inspect the zero-cost frontier, report failure regions, and improve the decision-value gate or model. The generator is still a public synthetic stress panel, so these numbers are not external qualification or SOTA evidence.
+The following gross-lift figures and break-even prices are the exact Rust output from workflow run [40960943585](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960943585):
+
+| Lane | Mean gross lift before fees | Approx. family-level 95% interval at zero fee | Break-even cost per query | Families with positive gross lift |
+|---|---:|---:|---:|---:|
+| All | -0.0127 | [-0.0256, +0.0003] | -0.00633 | 7.0% |
+| Near-additive | +0.0030 | [-0.0039, +0.0099] | +0.00150 | 10.5% |
+| Interaction | +0.0145 | [-0.0090, +0.0380] | +0.00725 | 10.6% |
+| Held-out shift | -0.0557 | [-0.0840, -0.0273] | -0.02783 | 0.0% |
+
+A negative break-even fee means the mean policy is worse than direct even if queries are free; it would require a subsidy or other unmodeled benefit to tie the comparator. The small positive mean break-even in the additive lane is not a robust win: its family-level interval crosses zero and only 10.5% of families show positive gross lift. In the interaction lane the mean gross lift is higher but still uncertain across families, and the maximum break-even query cost is only about 0.00725 utility units—far below the 0.04/query test point.
+
+The net-lift table above remains the exact Rust output from earlier integrated run [40960013206](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960013206); the latest v0.2 workflow passed the new gross/net/break-even identities and all family validations at [40960943585](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960943585). The interval unit is generated family, not a repeated reward timestep. This is a meaningful negative result: under this mixed family distribution and declared cost, the direct baseline is better on average, even on the near-additive lane. The correct response is **not** to retune the family mix until the model wins; it is to report the failure regions, improve decision-value/freshness gating or the model itself, and test against action-coupled environments. This public synthetic panel is not external qualification or SOTA evidence.
 
 **Evidence boundary:** candidate and evaluator are still in one synthetic process; the generator and its public specification are visible. The report is a development/smoke study, not sealed qualification. The normal intervals are approximate over this finite generated family sample and do not establish population-wide transfer. The next gate is separate candidate/evaluator execution with frozen candidate artifacts, blinded mechanism keys, and an independently maintained environment.
 
