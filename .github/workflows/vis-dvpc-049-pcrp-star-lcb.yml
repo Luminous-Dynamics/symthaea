@@ -43,18 +43,18 @@ jobs:
           cmp /tmp/vis-dvpc-049-smoke-a-stable.tsv /tmp/vis-dvpc-049-smoke-b-stable.tsv
           grep -Fq $'FIXTURE\tzero_support_logger\tstatus\tNOT_IDENTIFIED_ZERO_SUPPORT' /tmp/vis-dvpc-049-smoke-a.tsv
           grep -Fq $'SUPPRESSED\tzero_support_logger\tall_horizons\tall_methods\tunsupported_target_action' /tmp/vis-dvpc-049-smoke-a.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-smoke-a-stable.tsv)" = "40"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-smoke-a-stable.tsv)" = "88"
           ! grep '^RESULT_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a-stable.tsv
       - name: Run the paired selection pilot
         run: |
           /tmp/vis-dvpc-049 --benchmark > /tmp/vis-dvpc-049-results.tsv
           test "$(grep -c '^FIXTURE' /tmp/vis-dvpc-049-results.tsv)" = "3"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "60"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv)" = "132"
           grep -Fq $'FIXTURE\thealthy_logger\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
           grep -Fq $'FIXTURE\tweak_overlap_logger\tstatus\tIDENTIFIED' /tmp/vis-dvpc-049-results.tsv
           grep -Fq $'FIXTURE\tzero_support_logger\tstatus\tNOT_IDENTIFIED_ZERO_SUPPORT' /tmp/vis-dvpc-049-results.tsv
           ! grep '^RESULT_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-results.tsv
-          awk -F '\t' '$1=="RESULT_METRIC" && ($6 < -0.000001 || $6 > 1.000001) && ($5=="familywise_lcb_coverage" || $5=="top1_policy_selection_accuracy") { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-049-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($6 < -0.000001 || $6 > 1.000001) && ($5=="familywise_interval_coverage" || $5=="top1_policy_selection_accuracy" || $5=="winner_certificate_rate" || $5=="false_certificate_probability" || $5=="false_certificate_given_certificate" || $5=="reversed_interval_candidate_rate") { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-049-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $5=="mean_simple_regret" && $6 < -0.000001 { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-049-results.tsv
           grep '^CONFIG' /tmp/vis-dvpc-049-results.tsv > /tmp/vis-dvpc-049-config.tsv
           grep '^FIXTURE\|^RESULT_METRIC' /tmp/vis-dvpc-049-results.tsv > /tmp/vis-dvpc-049-summary.tsv
