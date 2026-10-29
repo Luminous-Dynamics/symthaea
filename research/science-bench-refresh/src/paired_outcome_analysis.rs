@@ -453,7 +453,11 @@ fn build_contrast(
         (
             difference,
             Some(discordant),
-            Some(exact_mcnemar_p(wins, losses)),
+            if eligible_pair_count == 0 {
+                None
+            } else {
+                Some(exact_mcnemar_p(wins, losses))
+            },
             interval.map(|value| value.0),
             interval.map(|value| value.1),
             interval.map(|value| value.2),
