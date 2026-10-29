@@ -23,6 +23,9 @@ class FailClosedQualificationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "NOT QUALIFIED"):
             self.validator.compute_hdc_phi(topology)
         self.assertFalse(hasattr(self.validator, "_estimate_hdc_phi"))
+        result = self.validator.validate_topology(topology)
+        self.assertIsNone(result.hdc_phi)
+        self.assertIsNotNone(result.error_message)
 
     def test_all_failed_cases_cannot_qualify(self):
         report = ValidationReport(results=[
@@ -51,6 +54,17 @@ class FailClosedQualificationTests(unittest.TestCase):
         self.assertIn("NOT_QUALIFIED", rendered)
         self.assertNotIn("VALIDATION PASSED", rendered)
         self.assertNotIn("**PASS**", rendered)
+
+    def test_missing_measurement_is_rendered_as_na_not_zero(self):
+        report = ValidationReport(results=[
+            ValidationResult("ring_3", 3, None, None, error_message="adapter unavailable")
+        ], n_failed=1)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "report.md"
+            self.validator.generate_report(report, output)
+            rendered = output.read_text()
+        self.assertIn("| ring_3 | 3 | N/A | N/A | N/A | NOT MEASURED |", rendered)
+        self.assertNotIn("| ring_3 | 3 | 0.0000 |", rendered)
 
 
 if __name__ == "__main__":
