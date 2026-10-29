@@ -157,6 +157,45 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate primary analysis-report v1 schema and qualification negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/analysis-report-v1.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/analysis-report-v1.schema.synthetic.json" <<'PY'
+          import copy, json, sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+          schema_path, fixture_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          fixture = json.loads(fixture_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(fixture)
+          if fixture["schema_version"] != "pitb.analysis-report.v1":
+              raise SystemExit("analysis report fixture has the wrong version")
+          if fixture["component_manifest_qualified_for_confirmatory_resampling"] or fixture["primary_comparison"]["preregistered_utility_gate_passed"]:
+              raise SystemExit("synthetic fixture must remain diagnostic-only while the component receipt is unverified")
+          if fixture["eligible_component_count"] != fixture["primary_comparison"]["component_clusters"]:
+              raise SystemExit("eligible component denominator must match the bootstrap cluster count")
+          bad = copy.deepcopy(fixture)
+          bad.pop("component_manifest_sha256")
+          try:
+              validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("analysis schema accepted a missing component-manifest digest")
+          bad = copy.deepcopy(fixture)
+          bad["primary_comparison"]["preregistered_utility_gate_passed"] = True
+          try:
+              validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("analysis schema accepted a confirmatory pass with an unqualified component manifest")
+          print("PITB_ANALYSIS_REPORT_V1_SCHEMA_PASS: strict component-aware report contract and unqualified-claim negative controls; synthetic fixture is not model evaluation")
+          PY
+
       - name: Validate primary analyzer power-report v4 component-aware schema contract
         shell: bash
         run: |

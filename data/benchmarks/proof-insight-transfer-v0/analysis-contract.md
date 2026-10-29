@@ -162,3 +162,8 @@ Power-report v4 names its ICC grid and effect-heterogeneity diagnostics at the c
 
 
 Power-report v4 applies the 20-independent-component floor to `eligible_validation_component_count`. The separate `eligible_validation_family_count` is descriptive only and must not determine confirmatory eligibility.
+
+
+## Analysis report v1 schema
+
+The report contract exposes the component-manifest digest and qualification status, target/family/component denominators, and the component-level bootstrap summary. The synthetic fixture is not an actual model evaluation and cannot authorize a claim while the coverage receipt remains unverified.
