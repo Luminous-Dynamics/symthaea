@@ -103,6 +103,19 @@ pub struct ProtectedWindowMeasurement {
     pub exceeded_threshold: bool,
 }
 
+/// RMS-envelope measurement inside a declared edit region. Spectral content may
+/// change here, but operations such as pitch edits should not silently delete
+/// or radically attenuate the edited event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuthorizedRegionRmsMeasurement {
+    pub start_frame: usize,
+    pub end_frame: usize,
+    pub channel: usize,
+    pub reference_rms_db: f32,
+    pub candidate_rms_db: f32,
+    pub rms_delta_db: f32,
+}
+
 /// Content-bound evidence from this deterministic measurement primitive.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioPreservationReport {
@@ -130,6 +143,10 @@ pub struct AudioPreservationReport {
     pub verdict: PreservationVerdict,
     pub reasons: Vec<String>,
     pub measurements: Vec<ProtectedWindowMeasurement>,
+    /// Per-channel RMS envelope measurements inside every declared edit region.
+    /// They do not affect the generic verdict; operation-specific gates decide
+    /// whether energy preservation is required for the requested edit.
+    pub authorized_region_rms: Vec<AuthorizedRegionRmsMeasurement>,
 }
 
 /// Audio-only composition of the independent acoustic and onset channels.
@@ -248,6 +265,25 @@ pub fn audit_protected_audio(
 
     let reference_audio_sha256 = audio_digest(reference);
     let candidate_audio_sha256 = audio_digest(candidate);
+    let mut authorized_region_rms =
+        Vec::with_capacity(authorized_edits.len().saturating_mul(reference.channels));
+    for interval in authorized_edits {
+        let region_frames = interval.end_frame - interval.start_frame;
+        for channel in 0..reference.channels {
+            let reference_region = channel_window(reference, interval.start_frame, region_frames, channel);
+            let candidate_region = channel_window(candidate, interval.start_frame, region_frames, channel);
+            let reference_rms_db = rms_db(&reference_region);
+            let candidate_rms_db = rms_db(&candidate_region);
+            authorized_region_rms.push(AuthorizedRegionRmsMeasurement {
+                start_frame: interval.start_frame,
+                end_frame: interval.end_frame,
+                channel,
+                reference_rms_db,
+                candidate_rms_db,
+                rms_delta_db: (reference_rms_db - candidate_rms_db).abs(),
+            });
+        }
+    }
     let mut measurements = Vec::with_capacity(protected_starts.len() * reference.channels);
     let mut worst_rms_delta_db = 0.0f32;
     let mut worst_spectral_distance = 0.0f32;
@@ -333,6 +369,7 @@ pub fn audit_protected_audio(
         verdict,
         reasons,
         measurements,
+        authorized_region_rms,
     };
     report.receipt_sha256 = receipt_sha256(&report)?;
     Ok(report)
