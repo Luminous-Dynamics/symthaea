@@ -729,7 +729,8 @@ notifications = ["zbus"]                    # D-Bus desktop notifications
 nixward = ["dep:nixward"]                 # Nixward: causal NixOS diagnosis with HDC world model + active inference
 # Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p nixward --features cli/tui/daemon` directly
 identity = ["ed25519-dalek", "dep:sha2"]
-hardsec-audit = ["dep:sha2"]  # Opt-in SHA-256 audit tool for HARDSEC-001 split manifests        # Ed25519 signatures, capability gating
+hardsec-audit = ["dep:sha2"]  # Opt-in SHA-256 audit tool for HARDSEC-001 split manifests
+identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability gating
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 multirotor = ["dep:symthaea-multirotor"]   # HDC-LTC multirotor control via FEP Active Inference
 multirotor-mujoco = ["multirotor", "symthaea-multirotor/mujoco"]   # Multirotor control with MuJoCo physics
