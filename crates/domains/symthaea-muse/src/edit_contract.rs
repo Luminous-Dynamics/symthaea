@@ -48,9 +48,9 @@ pub enum ObligationScope {
 }
 
 /// Numeric values are integer millionths of the named base unit.
- /// Example: value_microunits=600_000_000 with unit=cent means 600 cents.
- /// Do not use scale-prefixed unit labels such as micro_cent or micro_db:
- /// this field already applies the millionth scale.
+/// Example: value_microunits=600_000_000 with unit=cent means 600 cents.
+/// Do not use scale-prefixed unit labels such as micro_cent or micro_db:
+/// this field already applies the millionth scale.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "value_type", rename_all = "snake_case")]
 pub enum AttributeValue {
@@ -376,22 +376,22 @@ impl FrozenEditContract {
                 ObligationRequirement::ChangeTo {
                     expected: AttributeValue::Numeric { unit, .. },
                 },
-            ) if unit == "cent" => Some(event_id.as_str()),
+            ) if unit == "midi_note" => Some(event_id.as_str()),
             (
                 SupportedEditOperation::Transpose,
                 ObligationScope::ScoreWide,
                 ObligationRequirement::ChangeBy {
                     delta: AttributeValue::Numeric { value_microunits, unit },
                 },
-            ) if unit == "cent" && *value_microunits != 0 => None,
+            ) if unit == "semitone" && *value_microunits != 0 => None,
             (SupportedEditOperation::Transpose, _, ObligationRequirement::ChangeBy { .. }) => {
                 return Err(EditContractError::InvalidOperationObligation(
-                    "transpose requires a nonzero score-wide pitch delta in base cent units",
+                    "transpose requires a nonzero score-wide pitch delta in base semitone units",
                 ));
             }
             (SupportedEditOperation::PitchAt, _, _) => {
                 return Err(EditContractError::InvalidOperationObligation(
-                    "pitch-at requires one event-scoped ChangeTo pitch value in base cent units",
+                    "pitch-at requires one event-scoped ChangeTo pitch value in MIDI-note units",
                 ));
             }
             (SupportedEditOperation::Transpose, _, _) => {
@@ -628,12 +628,12 @@ mod tests {
             obligation_id: id.to_string(),
             attribute: EditAttribute::Pitch,
             scope: ObligationScope::Event {
-                event_id: "note-17".to_string(),
+                event_id: "score_event_index:1".to_string(),
             },
             requirement: ObligationRequirement::ChangeTo {
                 expected: AttributeValue::Numeric {
-                    value_microunits: 600_000_000,
-                    unit: "cent".to_string(),
+                    value_microunits: 67_000_000,
+                    unit: "midi_note".to_string(),
                 },
             },
             critical: true,
@@ -651,7 +651,7 @@ mod tests {
             requirement: ObligationRequirement::PreserveWithin {
                 comparator_id: "rms-envelope-delta-v1".to_string(),
                 tolerance: QuantizedTolerance {
-                    value_microunits: 1_000_000,
+                    value_microunits: 500_000,
                     unit: "db".to_string(),
                 },
             },
@@ -748,10 +748,10 @@ mod tests {
         obligations.push(preservation_obligation(
             "edited-envelope",
             EditAttribute::RmsEnvelope,
-            ObligationScope::Event { event_id: "note-17".to_string() },
+            ObligationScope::Event { event_id: "score_event_index:1".to_string() },
             RMS_ENVELOPE_COMPARATOR_ID,
             "db",
-            1_000_000,
+            500_000,
         ));
         FrozenEditContract::new(
             "task-1".to_string(),
@@ -773,8 +773,8 @@ mod tests {
             scope: ObligationScope::ScoreWide,
             requirement: ObligationRequirement::ChangeBy {
                 delta: AttributeValue::Numeric {
-                    value_microunits: 600_000_000,
-                    unit: "cent".to_string(),
+                    value_microunits: 5_000_000,
+                    unit: "semitone".to_string(),
                 },
             },
             critical: true,
@@ -793,7 +793,7 @@ mod tests {
             ObligationScope::ScoreWide,
             RMS_ENVELOPE_COMPARATOR_ID,
             "db",
-            1_000_000,
+            500_000,
         ));
         FrozenEditContract::new(
             "task-1".to_string(),
