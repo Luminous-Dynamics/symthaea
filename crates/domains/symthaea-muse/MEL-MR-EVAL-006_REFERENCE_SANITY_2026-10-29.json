@@ -39,7 +39,11 @@
       "Synthetic signals only; not a rendered MIDI test, real music corpus, human listening study, or editor head-to-head benchmark.",
       "The thresholds are fixture settings, not production calibration.",
       "Results only establish expected numerical behavior on these fixed cases."
-    ]
+    ],
+    "script_path": "crates/domains/symthaea-muse/research/mel_mr_eval_006_reference.py",
+    "script_git_blob_sha": "2a70af0134ce3788e344b1e42a8ea6109a89153d",
+    "reproduction_command": "python3 crates/domains/symthaea-muse/research/mel_mr_eval_006_reference.py --source-blob-sha <source-blob-sha> --runner-blob-sha <runner-blob-sha> --output <output.json>",
+    "claimed_executing_committed_script": false
   },
   "summary": {
     "cases_total": 11,
