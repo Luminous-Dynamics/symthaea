@@ -851,6 +851,8 @@ jobs:
           cargo_manifest="research/science-bench-refresh/Cargo.toml"
           jq empty research/science-bench-refresh/schema/paired-outcome-analysis-plan.schema.json
           jq empty research/science-bench-refresh/schema/paired-outcome-analysis-report.schema.json
+          jq empty research/science-bench-refresh/schema/evidence-behavior-contract-plan.schema.json
+          jq empty research/science-bench-refresh/schema/evidence-behavior-contract-report.schema.json
           cargo test --locked --manifest-path "$cargo_manifest" paired_outcome_analysis -- --nocapture
 
           # The analysis artifact is created first, hashed into a new plan, then
@@ -960,4 +962,26 @@ jobs:
           test "$invalid_outcome_exit" -eq 11
           jq -e '.valid == false and .outcome_report_valid == false and .report == null' \
             /tmp/sbr-paired-analysis/invalid-outcome-analysis.json >/dev/null
+
+      - name: Evidence behavior contract schema and non-scoring controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          plan_fixture="research/science-bench-refresh/fixtures/evidence-behavior-contract-plan.example.json"
+          report_fixture="research/science-bench-refresh/fixtures/evidence-behavior-contract-report.example.json"
+          jq empty "$plan_fixture" "$report_fixture"
+          jq -e '.purpose == "example_only" and .evaluator_source_revision == "NOT_IMPLEMENTED_YET" and .plan_commitment_sha256 == ("0" * 64) and (.items | length == 7) and ([.items[].case_id] | unique | length == 7)' "$plan_fixture" >/dev/null
+          jq -e --slurpfile plan "$plan_fixture" '([.records[].case_id] | sort) == ([$plan[0].items[].case_id] | sort) and ([.records[] | select((.status == "pass" and ((.violation_codes | length) != 0 or .not_evaluable_reason != null)) or (.status == "violation" and ((.violation_codes | length) == 0 or .not_evaluable_reason != null)) or (.status == "not_evaluable" and ((.violation_codes | length) != 0 or (.not_evaluable_reason | type) != "string"))] | length) == 0' "$report_fixture" >/dev/null
+
+          # Example-only plans must never be admitted as scoring runs.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-behavior-contract-plan "$plan_fixture" \
+            > /tmp/sbr-evidence-contract-example-verification.json
+          invalid_exit=$?
+          set -e
+          test "$invalid_exit" -eq 11
+          jq -e '.valid == false and .scoring_eligible_declared == false and .external_anchor_required == true' \
+            /tmp/sbr-evidence-contract-example-verification.json >/dev/null
 
