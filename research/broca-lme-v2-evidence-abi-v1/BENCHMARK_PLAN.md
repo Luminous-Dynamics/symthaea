@@ -126,6 +126,27 @@ Report answer accuracy overall and by all five LongMemEval-V2 abilities, relevan
 
 **Decision rule:** keep the new policy opt-in unless held-out paired evaluation shows a quality–cost improvement against the rank-prefix baseline. A possible project threshold is non-inferior answer quality within a preregistered 1 percentage point while reducing measured context or total lifecycle cost by at least 25%, or a statistically supported quality increase of at least 3 percentage points at equal declared budgets. These are proposed local decision rules, not accepted industry standards; freeze the criterion before viewing held-out results.
 
+### Query-conditioned adjacent-state expansion (new opt-in policy)
+
+LongMemEval-V2 includes both static-state recall and questions about state changes and recurring workflows. A single relevant state may be insufficient for a transition question, but blindly retrieving neighboring states wastes context on static questions. Test an explicit, provenance-preserving expansion policy after retrieval.
+
+The Rust helper keeps eligible ranked seeds first and appends only the immediate predecessor/successor from the same trajectory and trusted scope. Added states carry the seed HDC ID that justified expansion; they do not receive invented relevance scores. Missing indices are not bridged, inactive/out-of-scope/non-text siblings are excluded, and an ambiguous same-trajectory/state coordinate fails closed. The helper is opt-in, not integrated into the official worker, and requires the same final serialized-token budget guard as every other arm.
+
+Compare under identical seed rankings, reader/model, prompt, and final serialized-token budget:
+
+1. **Seed-only:** retrieval seeds without temporal expansion.
+2. **Adjacent ±1:** append at most the predecessor and successor for each seed.
+3. **One-sided ablations:** predecessor-only and successor-only.
+4. **Ability-conditioned expansion:** enable neighbors only for a policy fixed on the development split; do not condition on gold labels or evaluator metadata.
+5. **Unrelated-neighbor negative control:** replace adjacent states with same-budget states from another trajectory to test whether any gain is merely more context.
+6. **Oracle-neighbor diagnostic:** may quantify an upper bound, but must never use future answer labels at inference.
+
+Report accuracy separately for static state recall, dynamic state tracking, workflow knowledge, environment gotchas and premise awareness; evidence-state recall; transition/ordered-span recall; irrelevant-context rate; actual final prompt tokens; reader and retrieval latency; and cost. Use paired question-level comparisons with 95% bootstrap confidence intervals and preserve the exact seed-to-neighbor attribution in receipts. The static-state category is a key regression guard: an overall average must not hide a static recall loss.
+
+**Hard gates:** no state-index jumping across missing steps; no cross-trajectory or cross-scope expansion; no inactive or invalid neighbor; no invented relevance score; deterministic expansion from the same snapshot and ranking; final serialized context always remains within budget. Test lifecycle mutations (revoke/delete/supersede/expire) and restart/snapshot restoration.
+
+**Decision rule:** keep expansion opt-in unless a held-out, paired comparison improves dynamic-state/workflow outcomes or offers a quality–cost improvement without an unacceptable static-state regression. Freeze the acceptable static-regression margin and cost criterion before inspecting held-out results. These are experiment acceptance rules, not current measured outcomes or an industry standard.
+
 ## Required baseline arms
 
 Freeze and compare these as separate arms. Do not conflate them into one advertised “memory” result.
