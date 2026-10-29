@@ -158,6 +158,14 @@
         "dual_segment_native"
       ],
       "description": "Required by the executable auditor whenever an EM input column is selected. Single-segment tasks merge A/B channels and zero B; dual-segment tasks retain both masks."
+    },
+    "geometry_preprocessing_profile": {
+      "enum": [
+        "not_applicable",
+        "single_segment_zero_mask_channels",
+        "dual_segment_native"
+      ],
+      "description": "Required by the executable auditor whenever a geometry input is selected. Official single-segment input must zero both mask channels, even if the renderer already appears to have done so."
     }
   },
   "allOf": [
@@ -322,6 +330,54 @@
         ],
         "properties": {
           "em_preprocessing_profile": {
+            "const": "dual_segment_native"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_input_columns": {
+            "contains": {
+              "const": "geometry_single"
+            }
+          }
+        },
+        "required": [
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "geometry_preprocessing_profile"
+        ],
+        "properties": {
+          "geometry_preprocessing_profile": {
+            "const": "single_segment_zero_mask_channels"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_input_columns": {
+            "contains": {
+              "const": "geometry"
+            }
+          }
+        },
+        "required": [
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "geometry_preprocessing_profile"
+        ],
+        "properties": {
+          "geometry_preprocessing_profile": {
             "const": "dual_segment_native"
           }
         }
