@@ -145,14 +145,16 @@ def run_audit(
             [raw_event(event) for event in base_events] + [candidate]
         )
         expected = semantic_signature(source_results[query["query_id"]])
-        actual = semantic_signature(br.resolve_query(mutated, query))
+        mutated_result = br.resolve_query(mutated, query)
+        actual = semantic_signature(mutated_result)
+        future_event_eligible = candidate["event_id"] in mutated_result["eligible_event_ids"]
         checks.append(check_record(
             "future_record_cutoff_noninterference",
             query["query_id"],
-            repr(expected),
-            repr(actual),
-            passed=expected == actual,
-            detail="adds highly authoritative, valid-time-applicable evidence recorded after known_at",
+            repr((expected, False)),
+            repr((actual, future_event_eligible)),
+            passed=expected == actual and not future_event_eligible,
+            detail="adds highly authoritative, valid-time-applicable evidence recorded after known_at; it must not enter eligible evidence",
         ))
 
     # Metamorphic properties 3-5: lower-ranked conflict, equal-rank conflict,
