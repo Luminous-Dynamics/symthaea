@@ -100,7 +100,7 @@ def analysis_request_digest(
 ) -> str:
     """Match AnalysisRequest::request_sha256 in the Rust crate byte-for-byte."""
     n_units = _model_unit_count(model_bytes)
-    if len(state) != n_units or any(int(bit) not in (0, 1) for bit in state):
+    if len(state) != n_units or any(bit not in (0, 1, False, True) for bit in state):
         raise ValueError("evaluation state must be n_units binary bits")
     if not subset or len(set(subset)) != len(subset):
         raise ValueError("candidate subsystem must be non-empty and contain unique unit indices")
