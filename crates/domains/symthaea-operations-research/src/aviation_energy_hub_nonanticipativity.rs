@@ -33,6 +33,9 @@ pub struct ScenarioPolicyPlan {
     pub plan: EnergyHubPlan,
     pub information_contract_ref: String,
     pub information_set_ids_by_stage: Vec<String>,
+    /// Digest of the actual observed/available information history before each action.
+    /// Equal histories must share one information set; different histories cannot be merged.
+    pub observed_history_digest_by_stage: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +76,13 @@ pub enum NonanticipativityError {
         stage_index: usize,
         information_set_id: String,
     },
+    InformationSetHistoryMismatch {
+        stage_index: usize,
+        information_set_id: String,
+    },
+    IdenticalHistorySplitAcrossInformationSets {
+        stage_index: usize,
+    },
     PlanVerification {
         scenario_id: String,
         source: EnergyHubError,
@@ -110,6 +120,14 @@ impl fmt::Display for NonanticipativityError {
             } => write!(
                 f,
                 "information set {information_set_id} at stage {stage_index} has an inconsistent prior history for {scenario_id}"
+            ),
+            Self::InformationSetHistoryMismatch { stage_index, information_set_id } => write!(
+                f,
+                "information set {information_set_id} at stage {stage_index} combines different observed histories"
+            ),
+            Self::IdenticalHistorySplitAcrossInformationSets { stage_index } => write!(
+                f,
+                "identical observed histories are split into different information sets at stage {stage_index}"
             ),
             Self::PlanVerification { scenario_id, source } => {
                 write!(f, "plan verification failed for {scenario_id}: {source}")
@@ -201,7 +219,9 @@ pub fn verify_nonanticipative_policy(
                 "information contract reference",
             ));
         }
-        if policy.information_set_ids_by_stage.len() != reference.intervals.len() {
+        if policy.information_set_ids_by_stage.len() != reference.intervals.len()
+            || policy.observed_history_digest_by_stage.len() != reference.intervals.len()
+        {
             return Err(NonanticipativityError::InformationSetCountMismatch {
                 scenario_id: policy.scenario_id.clone(),
             });
@@ -225,22 +245,11 @@ pub fn verify_nonanticipative_policy(
                     "information-set ID",
                 ));
             }
-            // If histories merge at stage t, they must also be identical at every
-            // earlier stage. Otherwise the information-set labels do not describe a tree.
-            for other in policy_plans.iter().filter(|other| {
-                other.scenario_id != policy.scenario_id
-                    && other.information_set_ids_by_stage.get(stage_index)
-                        == Some(information_set_id)
-            }) {
-                if other.information_set_ids_by_stage[..stage_index]
-                    != policy.information_set_ids_by_stage[..stage_index]
-                {
-                    return Err(NonanticipativityError::InvalidInformationHistory {
-                        scenario_id: policy.scenario_id.clone(),
-                        stage_index,
-                        information_set_id: information_set_id.clone(),
-                    });
-                }
+            let history_digest = &policy.observed_history_digest_by_stage[stage_index];
+            if !is_valid_sha256(history_digest) {
+                return Err(NonanticipativityError::MissingIdentifier(
+                    "valid observed-history digest",
+                ));
             }
         }
     }
@@ -270,6 +279,31 @@ pub fn verify_nonanticipative_policy(
     let mut pairwise_action_constraints_checked = 0_u64;
 
     for stage_index in 0..reference.intervals.len() {
+        // The declared partition must match the supplied observable-history identity.
+        // Otherwise a caller could evade nonanticipativity by splitting indistinguishable
+        // histories, or by merging futures after they become observably different.
+        for left_index in 0..policy_plans.len() {
+            for right_index in (left_index + 1)..policy_plans.len() {
+                let left = &policy_plans[left_index];
+                let right = &policy_plans[right_index];
+                let same_information_set = left.information_set_ids_by_stage[stage_index]
+                    == right.information_set_ids_by_stage[stage_index];
+                let same_observed_history = left.observed_history_digest_by_stage[stage_index]
+                    == right.observed_history_digest_by_stage[stage_index];
+                if same_information_set && !same_observed_history {
+                    return Err(NonanticipativityError::InformationSetHistoryMismatch {
+                        stage_index,
+                        information_set_id: left.information_set_ids_by_stage[stage_index].clone(),
+                    });
+                }
+                if same_observed_history && !same_information_set {
+                    return Err(NonanticipativityError::IdenticalHistorySplitAcrossInformationSets {
+                        stage_index,
+                    });
+                }
+            }
+        }
+
         let mut groups = BTreeMap::<&str, Vec<&ScenarioPolicyPlan>>::new();
         for policy in policy_plans {
             let information_set_id = &policy.information_set_ids_by_stage[stage_index];
@@ -365,6 +399,14 @@ pub fn canonical_policy_digest(
         }
         put_u32(
             &mut bytes,
+            u32::try_from(policy.observed_history_digest_by_stage.len())
+                .map_err(|_| NonanticipativityError::ArithmeticOverflow)?,
+        );
+        for history_digest in &policy.observed_history_digest_by_stage {
+            put_string(&mut bytes, history_digest);
+        }
+        put_u32(
+            &mut bytes,
             u32::try_from(policy.plan.actions.len())
                 .map_err(|_| NonanticipativityError::ArithmeticOverflow)?,
         );
@@ -388,6 +430,14 @@ fn encode_action(bytes: &mut Vec<u8>, action: &EnergyHubStepAction) {
     ] {
         put_u32(bytes, value);
     }
+}
+
+fn is_valid_sha256(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64
+        && hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
