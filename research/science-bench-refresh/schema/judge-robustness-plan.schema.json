@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-robustness-plan.schema.json",
+  "title": "Symthaea Judge Robustness Audit Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "audit_set_id",
+    "judge_source_revision",
+    "judge_prompt_sha256",
+    "rubric_sha256",
+    "decision_policy_sha256",
+    "repeats_per_condition",
+    "cases",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_robustness_plan.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "audit_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "judge_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "decision_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "repeats_per_condition": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 1000
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 digest; zero placeholders are allowed only in example-only artifacts."
+    },
+    "family": {
+      "enum": [
+        "repeatability",
+        "position_swap",
+        "formatting_invariance",
+        "confidence_style_invariance",
+        "authority_cue_invariance",
+        "semantic_sensitivity_control"
+      ]
+    },
+    "relation": {
+      "enum": [
+        "semantic_decision_invariant",
+        "semantic_decision_must_change"
+      ]
+    },
+    "order": {
+      "enum": [
+        "candidate_a_first",
+        "candidate_b_first"
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "family",
+        "expected_relation",
+        "baseline_input_sha256",
+        "variant_input_sha256",
+        "baseline_order",
+        "variant_order",
+        "reference_baseline_decision_sha256",
+        "reference_variant_decision_sha256"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "family": {
+          "$ref": "#/$defs/family"
+        },
+        "expected_relation": {
+          "$ref": "#/$defs/relation"
+        },
+        "baseline_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "baseline_order": {
+          "$ref": "#/$defs/order"
+        },
+        "variant_order": {
+          "$ref": "#/$defs/order"
+        },
+        "reference_baseline_decision_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "reference_variant_decision_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "judge_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "judge_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "decision_policy_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "cases": {
+            "items": {
+              "properties": {
+                "baseline_input_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "variant_input_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "reference_baseline_decision_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "reference_variant_decision_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
