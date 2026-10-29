@@ -257,7 +257,7 @@ fn score_family(spec: FamilySpec, support: SupportMeans, strategy: Strategy, que
             ((additive[0] - truth[0]).abs() + (additive[1] - truth[1]).abs()) / 2.0
         }
         Strategy::StaleModel => {
-            ((0.5 - 0.5).abs() + (0.75 - spec.heldout_action_one_probability()).abs()) / 2.0
+            (0.75_f64 - spec.heldout_action_one_probability()).abs() / 2.0
         }
         Strategy::DirectNearest | Strategy::Oracle => 0.0,
     };
