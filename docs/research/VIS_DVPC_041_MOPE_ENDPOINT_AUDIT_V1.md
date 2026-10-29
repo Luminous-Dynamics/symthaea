@@ -23,6 +23,8 @@ The importance ratio is w=pi(a)/h(a). Each observation has four possible action/
 
 These are small finite controls, not public datasets and not an empirical industry comparison.
 
+**Preliminary reference-port warning:** a separate non-Rust implementation of this registered horizon-8 protocol currently leaves both endpoints at 0 and 1 on every path. That yields sequence coverage 1.0 but zero interval contraction and zero path-driven root crossings. The Rust workflow must confirm the output; regardless, this is not a power or efficiency win. A separate fixed-bet positive control is included so the root-certificate implementation is exercised even when the short exact-path scenarios are too weak to trigger it. Any follow-on SOTA comparison must report interval width / time-to-decision beside coverage and must increase horizon or use a separately qualified long-horizon study.
+
 ## Endpoint and alpha semantics
 
 Use alpha_side=0.025 in each one-sided stream. Thus the quadratic lower-bound threshold is
