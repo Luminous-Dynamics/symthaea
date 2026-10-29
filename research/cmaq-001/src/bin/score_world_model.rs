@@ -174,6 +174,10 @@ impl Report {
     }
 }
 
+fn action_field(prefix: &str, action: usize) -> String {
+    format!("{prefix}_a{action}")
+}
+
 fn score(key: &Table, predictions: &Table) -> Result<Report, String> {
     const KEY_COLUMNS: &[&str] = &[
         "case_id",
@@ -442,7 +446,7 @@ mod tests {
     fn optimism_gap_exposes_overvalued_model_greedy_action() {
         let predictions = PERFECT.replace("100\t10\t-50", "200\t10\t-50");
         let report = score_texts(KEY, &predictions).expect("overoptimistic prediction is scorable");
-        assert!(report.model_greedy_mean_optimism_gap_milli > 0.0);
+        assert!(report.model_greedy_optimism_sum > 0.0);
         assert!(report.hard_gate_pass);
     }
 
