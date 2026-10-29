@@ -267,6 +267,32 @@ fn nonfinite_factors_and_invalid_efficiency_fail_closed() {
 }
 
 #[test]
+fn storage_efficiency_uses_conservative_integer_rounding() {
+    let mut case = frontier_scenario();
+    case.storage = EnergyStorageSpec {
+        capacity_quanta: 2,
+        max_charge_input_quanta_per_interval: 4,
+        max_discharge_output_quanta_per_interval: 1,
+        charge_efficiency_ppm: 500_000,
+        discharge_efficiency_ppm: 500_000,
+        minimum_terminal_soc_quanta: 0,
+    };
+    case.intervals[0] = interval("t0", 1, 1, 5, 1, 0.5, 1.0, 1.0, 10.0);
+    case.intervals[1] = interval("t1", 2, 2, 0, 1, 0.0, 0.0, 5.0, 1.0);
+    seal_energy_hub_scenario(&mut case).unwrap();
+
+    let result = solve_exact_energy_hub_pareto(&case, 100_000).unwrap();
+    let plan = result.frontier.iter().find(|plan| {
+        plan.plan.actions[0].renewable_charge_input_quanta == 4
+            && plan.plan.actions[0].soc_after_quanta == 2
+            && plan.plan.actions[1].battery_discharge_output_quanta == 1
+    }).expect("the known-answer feasible charging/discharging path exists");
+    assert_eq!(plan.metrics.battery_charge_loss_quanta, 2);
+    assert_eq!(plan.metrics.battery_discharge_loss_quanta, 1);
+    assert_eq!(plan.metrics.final_soc_quanta, 0);
+}
+
+#[test]
 fn action_count_mismatch_is_rejected() {
     let case = frontier_scenario();
     let mut plan = solve_exact_energy_hub_pareto(&case, 100_000).unwrap().frontier[0]
