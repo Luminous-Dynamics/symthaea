@@ -323,9 +323,9 @@ fn emit(out:&mut String,r:&SimResult,looks:&[usize]){
     for (li,look) in looks.iter().copied().enumerate(){
         let a=&r.selection[li];
         let (acc,se,lo,hi)=wilson(a.correct,a.trials);
-        let _=writeln!(out,"RESULT_METRIC\t{}\tIPS_argmax_top1_accuracy\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,look,acc,se,lo,hi);
+        let _=writeln!(out,"RESULT_METRIC\t{}\tIPW_argmax\t{}\tIPS_argmax_top1_accuracy\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,look,acc,se,lo,hi);
         let (regret,se_regret)=mean_se(a.regret_sum,a.regret_sq_sum,a.trials);
-        let _=writeln!(out,"RESULT_METRIC\t{}\tIPS_argmax_simple_regret\t{}\t{:.8}\t{:.8}\t-\t-",r.name,look,regret,se_regret);
+        let _=writeln!(out,"RESULT_METRIC\t{}\tIPW_argmax\t{}\tIPS_argmax_simple_regret\t{:.8}\t{:.8}\t-\t-",r.name,look,regret,se_regret);
     }
     let _=writeln!(out,"SYSTEM\t{}\tseconds\t{:.6}\tobservations\t{}\tobservations_per_second\t{:.3}",r.name,r.elapsed_seconds,r.observations,r.observations as f64/r.elapsed_seconds.max(1e-12));
 }
