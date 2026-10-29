@@ -133,7 +133,10 @@ def make_analysis(
 
 def main() -> int:
     if len(sys.argv) != 3:
-        print("usage: paired_outcome_analysis_test_vectors.py PLAN_FIELDS.json OUTPUT_DIR", file=sys.stderr)
+        print(
+            "usage: paired_outcome_analysis_test_vectors.py PLAN_FIELDS.json OUTPUT_DIR",
+            file=sys.stderr,
+        )
         return 2
     source_fields = json.loads(Path(sys.argv[1]).read_bytes())
     output = Path(sys.argv[2])
