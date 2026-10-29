@@ -318,9 +318,7 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
 
 /// Compute the typed, domain-separated commitment for a validated fields file.
 /// This does not anchor the commitment or prove it predates execution.
-pub fn compute_evidence_intervention_plan_commitment(
-    bytes: &[u8],
-) -> Result<String, String> {
+pub fn compute_evidence_intervention_plan_commitment(bytes: &[u8]) -> Result<String, String> {
     let fields: EvidenceInterventionPlanFieldsV1 = serde_json::from_slice(bytes)
         .map_err(|error| format!("plan fields do not match strict v1 shape: {error}"))?;
     let issues = validate_fields(&fields);
@@ -405,16 +403,18 @@ mod tests {
             .iter()
             .map(|value| (*value).to_owned())
             .collect::<Vec<_>>();
-        let trials = CONDITIONS.iter().enumerate().map(|(index, condition)| {
-            EvidenceInterventionTrialV1 {
+        let trials = CONDITIONS
+            .iter()
+            .enumerate()
+            .map(|(index, condition)| EvidenceInterventionTrialV1 {
                 trial_id: format!("trial-{index}"),
                 condition: (*condition).to_owned(),
                 policy_input_sha256: digest(char::from(b'a' + index as u8)),
                 evidence_manifest_sha256: digest(char::from(b'g' + index as u8)),
                 randomization_order: index as u32,
                 seed_commitment_sha256: digest(char::from(b'm' + index as u8)),
-            }
-        }).collect();
+            })
+            .collect();
         EvidenceInterventionPlanFieldsV1 {
             schema: EVIDENCE_INTERVENTION_PLAN_SCHEMA.to_owned(),
             generation_id: "generation-1".to_owned(),
