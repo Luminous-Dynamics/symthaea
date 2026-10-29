@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT frozen suite manifest",
+  "description": "Content-addressed pre-run declaration of task identities, specifications, and task-quality audit dispositions. A trusted external receipt must pin this exact byte sequence before trial outcomes are observed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program",
+    "suite_id",
+    "version",
+    "split",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "program": {
+      "const": "BASALT"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "validation",
+        "test",
+        "holdout",
+        "external"
+      ]
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "family",
+          "languages",
+          "base_tree_digest",
+          "spec_digest",
+          "paired_transform_id",
+          "quality_audit"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "languages": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "base_tree_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "spec_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "paired_transform_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quality_audit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "audit_digest",
+              "oracle_independent",
+              "ambiguity",
+              "notes"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "accepted",
+                  "quarantined",
+                  "invalid"
+                ]
+              },
+              "audit_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "oracle_independent": {
+                "type": "boolean"
+              },
+              "ambiguity": {
+                "enum": [
+                  "none",
+                  "resolved_before_run",
+                  "material_unresolved"
+                ]
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
