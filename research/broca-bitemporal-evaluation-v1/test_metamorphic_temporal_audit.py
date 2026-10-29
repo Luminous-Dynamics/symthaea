@@ -102,7 +102,9 @@ class MetamorphicTemporalAuditTests(unittest.TestCase):
         def bad_resolver(events, query):
             result = original(events, query)
             result = dict(result)
-            if query["query_id"] == "Q001":
+            if query["query_id"] == "Q001" and any(
+                event.get("event_id") == "META_FUTURE_Q001" for event in events
+            ):
                 result["value"] = "deliberately-corrupted"
             return result
         mta.br.resolve_query = bad_resolver
