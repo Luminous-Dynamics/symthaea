@@ -67,6 +67,7 @@ pub mod language_gates;
 pub mod memory_bridge;
 pub mod memory_evidence;
 pub mod memory_governance;
+pub mod memory_attestation;
 
 // Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
 #[cfg(feature = "speech-data")]
