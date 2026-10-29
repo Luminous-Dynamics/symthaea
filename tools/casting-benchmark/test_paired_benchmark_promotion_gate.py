@@ -197,6 +197,35 @@ class PairedPromotionGateTests(unittest.TestCase):
         self.assertFalse(win_check["passed"])
         self.assertIn("ties count as non-wins", win_check["detail"])
 
+    def test_recomputes_paired_metrics_instead_of_trusting_receipt(self):
+        doc = paired_manifest()
+        receipt = scored_receipt(doc)
+        receipt["per_policy"]["candidate"]["mean_cost_normalized_quality_auc"] = 0.001
+        doc_raw = canonical_json(doc)
+        with self.assertRaisesRegex(ValueError, "does not match recomputation"):
+            assess_promotion(
+                receipt, doc, contract(), validation_manifest(),
+                paired_receipt_file_sha256=_sha("tampered receipt"),
+                paired_run_manifest_sha256=hashlib.sha256(doc_raw).hexdigest(),
+                contract_manifest_sha256=_sha("contract"),
+                validation_manifest_sha256=_sha("validation"),
+                evaluator_sha256=_sha("source"),
+            )
+
+    def test_paired_receipt_must_match_exact_run_manifest_digest(self):
+        doc = paired_manifest()
+        doc_raw = canonical_json(doc)
+        receipt = scored_receipt(doc, doc_raw)
+        with self.assertRaisesRegex(ValueError, "does not match recomputation"):
+            assess_promotion(
+                receipt, doc, contract(), validation_manifest(),
+                paired_receipt_file_sha256=_sha("receipt"),
+                paired_run_manifest_sha256=_sha("different raw run bytes"),
+                contract_manifest_sha256=_sha("contract"),
+                validation_manifest_sha256=_sha("validation"),
+                evaluator_sha256=_sha("source"),
+            )
+
     def test_wrong_evidence_class_cannot_pass(self):
         result = assess(
             doc=paired_manifest(evidence_class="synthetic"),
