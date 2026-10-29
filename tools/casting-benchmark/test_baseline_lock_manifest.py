@@ -30,6 +30,7 @@ class BaselineLockTests(unittest.TestCase):
 
     def test_upstream_source_is_pinned_to_immutable_commit(self):
         self.assertEqual(self.lock["upstream_repository"], "Nemo-Virtual-Lab/MF-SCBO")
+        self.assertEqual(self.lock["upstream_commit_sha"], "ca42fd6c5ec8c841e3f1ff9642509e12d104b581")
         self.assertRegex(self.lock["upstream_commit_sha"], re.compile(r"^[0-9a-f]{40}$"))
         self.assertEqual(
             self.lock["upstream_commit_url"],
@@ -40,11 +41,13 @@ class BaselineLockTests(unittest.TestCase):
             artifacts["mfscbo/mfscbo_optimization.py"],
             "ba140fd52ee1a43dc89dc6189de71ddb42eabada",
         )
+        self.assertEqual(artifacts["requirements.txt"], "8071831841c68a7fef783d6e8131283de66056f8")
         self.assertRegex(artifacts["requirements.txt"], re.compile(r"^[0-9a-f]{40}$"))
 
     def test_license_and_dependency_inventory_are_locked(self):
         self.assertEqual(self.lock["license"]["spdx_id"], "MIT")
         self.assertEqual(self.lock["license"]["path"], "LICENSE")
+        self.assertEqual(self.lock["license"]["git_blob_sha1"], "eba1b0cf5b4596e7ae33ed003aba17308b5d8a75")
         self.assertRegex(self.lock["license"]["git_blob_sha1"], re.compile(r"^[0-9a-f]{40}$"))
         deps = self.lock["dependency_requirements_exact"]
         self.assertIn("torch", deps)
