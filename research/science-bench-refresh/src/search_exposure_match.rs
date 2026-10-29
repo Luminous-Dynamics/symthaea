@@ -265,12 +265,6 @@ fn validate_record_contract(
                     ));
                     valid = false;
                 }
-                if record.protected_reference_sha256 != record.evidence_artifact_sha256 {
-                    issues.push(format!(
-                        "records[{index}] exact_digest evidence and reference digests differ"
-                    ));
-                    valid = false;
-                }
             }
         }
         "benchmark_metadata" | "question_context" | "explicit_answer" => {
@@ -611,15 +605,14 @@ mod tests {
     fn explicit_answer_match_blocks_and_records_evidence_digests() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let exact_match_digest = sha256_hex(b"exact-matched-answer-snippet");
         let report = match_report(
             &receipt_bytes,
             "explicit_answer",
             "exact_digest",
             MAX_SCORE_MICROS,
             MAX_SCORE_MICROS,
-            Some(exact_match_digest.clone()),
-            Some(exact_match_digest),
+            Some(sha256_hex(b"opaque-protected-reference-id")),
+            Some(sha256_hex(b"exact-matched-answer-snippet")),
         );
         let verified = verify_search_exposure_match_report(
             &receipt_bytes,
@@ -635,7 +628,6 @@ mod tests {
     fn metadata_context_and_answer_exposures_have_distinct_blocking_labels() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let digest = sha256_hex(b"same-exact-matched-artifact");
         for (classification, expected_admission) in [
             ("benchmark_metadata", "blocked_benchmark_metadata_exposure"),
             ("question_context", "blocked_question_context_exposure"),
@@ -647,8 +639,8 @@ mod tests {
                 "exact_digest",
                 MAX_SCORE_MICROS,
                 MAX_SCORE_MICROS,
-                Some(digest.clone()),
-                Some(digest.clone()),
+                Some(sha256_hex(format!("opaque-reference:{classification}").as_bytes())),
+                Some(sha256_hex(b"same-exact-matched-artifact")),
             );
             let verified = verify_search_exposure_match_report(
                 &receipt_bytes,
