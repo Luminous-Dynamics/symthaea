@@ -252,7 +252,7 @@ fn oracle_fixture_is_explicit_and_independent_from_candidate_ranking() {
         ("ranked-last".to_string(), Some(4u64)),
         ("infeasible".to_string(), None),
     ]);
-    let mut rows = vec![
+    let rows = vec![
         candidate("ranked-first", 100, 0),
         candidate("infeasible", 60, 0),
         candidate("ranked-last", 1, 4),
@@ -270,7 +270,6 @@ fn oracle_fixture_is_explicit_and_independent_from_candidate_ranking() {
     )
     .unwrap();
 
-    rows.reverse();
     assert_eq!(report.best_candidate_id.as_deref(), Some("ranked-last"));
     assert_eq!(report.best_objective_cost, Some(4));
     assert_eq!(report.status, AdaptiveScreenStatus::OptimalWithinTolerance);
