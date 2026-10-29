@@ -1,0 +1,566 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/basalt/schema/run-record.schema.json",
+  "title": "BASALT run record",
+  "description": "Versioned, task-level evidence record for paired agentic software engineering evaluations. Aggregates are derived artifacts, never the only retained evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program",
+    "run_id",
+    "created_at",
+    "source",
+    "environment",
+    "suite",
+    "systems",
+    "task_records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "program": {
+      "const": "BASALT"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "base_revision",
+        "candidate_revision",
+        "manifest_digest",
+        "orchestrator_digest",
+        "verifier_bundle_digest"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_revision": {
+          "$ref": "#/$defs/gitRevision"
+        },
+        "candidate_revision": {
+          "$ref": "#/$defs/gitRevision"
+        },
+        "manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "orchestrator_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "verifier_bundle_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image_digest",
+        "os",
+        "architecture",
+        "network_policy",
+        "workspace_policy"
+      ],
+      "properties": {
+        "image_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network_policy": {
+          "enum": [
+            "disabled",
+            "allowlisted",
+            "unrestricted",
+            "not_recorded"
+          ]
+        },
+        "workspace_policy": {
+          "enum": [
+            "clean_checkout",
+            "prepared_workspace",
+            "persistent_workspace",
+            "not_recorded"
+          ]
+        }
+      }
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "version",
+        "split",
+        "seed_policy",
+        "attempts_per_task",
+        "expected_task_count",
+        "oracle_policy"
+      ],
+      "properties": {
+        "suite_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "development",
+            "validation",
+            "test",
+            "holdout",
+            "external"
+          ]
+        },
+        "seed_policy": {
+          "enum": [
+            "fixed_paired",
+            "predeclared_random",
+            "unseeded",
+            "not_applicable"
+          ]
+        },
+        "attempts_per_task": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "oracle_policy": {
+          "enum": [
+            "independent_frozen",
+            "human_reviewed",
+            "hybrid",
+            "not_qualified"
+          ]
+        }
+      }
+    },
+    "systems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "system_id",
+          "role",
+          "agent_name",
+          "agent_version",
+          "config_digest",
+          "budget"
+        ],
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "baseline",
+              "candidate",
+              "ablation",
+              "external_reference"
+            ]
+          },
+          "agent_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agent_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "config_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "max_wall_ms",
+              "max_tool_calls",
+              "max_cost_usd"
+            ],
+            "properties": {
+              "max_wall_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_tool_calls": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_cost_usd": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "task_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "family",
+          "languages",
+          "base_tree_digest",
+          "spec_digest",
+          "quality_audit",
+          "trials"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "languages": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "base_tree_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "spec_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "paired_transform_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quality_audit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "audit_digest",
+              "oracle_independent",
+              "ambiguity",
+              "notes"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "accepted",
+                  "quarantined",
+                  "invalid"
+                ]
+              },
+              "audit_digest": {
+                "$ref": "#/$defs/digest"
+              },
+              "oracle_independent": {
+                "type": "boolean"
+              },
+              "ambiguity": {
+                "enum": [
+                  "none",
+                  "resolved_before_run",
+                  "material_unresolved"
+                ]
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          },
+          "trials": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "system_id",
+                "attempt_index",
+                "seed",
+                "paired_group_id",
+                "outcome",
+                "verifier",
+                "integrity",
+                "usage",
+                "trajectory_digest",
+                "patch_digest",
+                "final_tree_digest"
+              ],
+              "properties": {
+                "system_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "attempt_index": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "seed": {
+                  "type": [
+                    "integer",
+                    "string"
+                  ]
+                },
+                "paired_group_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "outcome": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "unresolved",
+                    "infra_error",
+                    "invalid_task",
+                    "not_run"
+                  ]
+                },
+                "verifier": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "bundle_digest",
+                    "isolated_from_agent",
+                    "independent_of_generator",
+                    "evaluated_tree_digest",
+                    "checks"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "pass",
+                        "fail",
+                        "unresolved",
+                        "not_run"
+                      ]
+                    },
+                    "bundle_digest": {
+                      "$ref": "#/$defs/digest"
+                    },
+                    "isolated_from_agent": {
+                      "type": "boolean"
+                    },
+                    "independent_of_generator": {
+                      "type": "boolean"
+                    },
+                    "evaluated_tree_digest": {
+                      "$ref": "#/$defs/digest"
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "check_id",
+                          "kind",
+                          "blocking",
+                          "status"
+                        ],
+                        "properties": {
+                          "check_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "enum": [
+                              "build",
+                              "test",
+                              "typecheck",
+                              "lint",
+                              "security",
+                              "scope",
+                              "regression",
+                              "oracle",
+                              "other"
+                            ]
+                          },
+                          "blocking": {
+                            "type": "boolean"
+                          },
+                          "status": {
+                            "enum": [
+                              "pass",
+                              "fail",
+                              "unresolved",
+                              "not_run"
+                            ]
+                          },
+                          "evidence_digest": {
+                            "$ref": "#/$defs/digest"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "integrity": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "solution_material_access",
+                    "test_or_verifier_tampering",
+                    "scope_violation",
+                    "stale_evidence"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "clean",
+                        "violation",
+                        "unresolved"
+                      ]
+                    },
+                    "solution_material_access": {
+                      "enum": [
+                        "not_detected",
+                        "detected",
+                        "not_checked"
+                      ]
+                    },
+                    "test_or_verifier_tampering": {
+                      "enum": [
+                        "not_detected",
+                        "detected",
+                        "not_checked"
+                      ]
+                    },
+                    "scope_violation": {
+                      "enum": [
+                        "not_detected",
+                        "detected",
+                        "not_checked"
+                      ]
+                    },
+                    "stale_evidence": {
+                      "enum": [
+                        "not_detected",
+                        "detected",
+                        "not_checked"
+                      ]
+                    }
+                  }
+                },
+                "usage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "wall_ms",
+                    "tool_calls",
+                    "cost_usd"
+                  ],
+                  "properties": {
+                    "wall_ms": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "tool_calls": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "input_tokens": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "output_tokens": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "reasoning_tokens": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "cost_usd": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "trajectory_digest": {
+                  "$ref": "#/$defs/digest"
+                },
+                "patch_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "final_tree_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "gitRevision": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    }
+  }
+}
