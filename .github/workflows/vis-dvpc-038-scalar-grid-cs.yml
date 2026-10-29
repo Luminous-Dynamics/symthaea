@@ -34,7 +34,7 @@ jobs:
         run: sha256sum -c tests/fixtures/vision-dvpc-038.SHA256SUMS
       - name: Run exact-grid unit tests
         run: |
-          rustc --edition=2024 --test tools/vision-dvpc-038-scalar-grid-cs.rs -o /tmp/vis-dvpc-038-tests
+          rustc --edition=2024 -O --test tools/vision-dvpc-038-scalar-grid-cs.rs -o /tmp/vis-dvpc-038-tests
           /tmp/vis-dvpc-038-tests
       - name: Enumerate all paths and verify calibration controls
         run: |
