@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json",
   "title": "ConnectomeBench2 V2 intake manifest",
-  "description": "Machine-readable contract for a leakage-aware ConnectomeBench2 intake run. This schema validates declared intent; it does not independently prove that an upstream mapping reference is correct.",
+  "description": "Machine-readable contract for a leakage-aware ConnectomeBench2 intake run. Schema validation checks declared intent; it does not independently verify that the operator's task/label mapping agrees with the pinned upstream implementation.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,12 +15,12 @@
     "task",
     "task_route_value",
     "label_column",
-    "label_true_semantics",
     "label_mapping_reference",
     "split",
     "input_mode",
     "model_input_columns",
-    "input_files"
+    "input_files",
+    "mapping_reviewed"
   ],
   "properties": {
     "schema_version": {
@@ -58,13 +58,15 @@
       "enum": [
         "false_split_correction_label",
         "false_merge_identification_label"
-      ]
+      ],
+      "description": "Column selected after checking task routing and label semantics against the pinned upstream revision; this schema intentionally does not assume the mapping is unchanged from V1."
     },
     "label_true_semantics": {
       "enum": [
         "same_neuron",
         "different_neuron"
-      ]
+      ],
+      "description": "Human-reviewed meaning of boolean true for the chosen task and label column. Do not infer this from filenames; verify against the pinned V2 code and record the mapping reference."
     },
     "label_mapping_reference": {
       "type": "string",
@@ -142,53 +144,13 @@
     },
     "notes": {
       "type": "string"
+    },
+    "mapping_reviewed": {
+      "const": true,
+      "description": "Explicit operator attestation that task routing, label column, and true/false semantics were checked against the exact pinned upstream revision. This is not independent proof; retain the evidence path."
     }
   },
   "allOf": [
-    {
-      "if": {
-        "properties": {
-          "task": {
-            "const": "merge_correction_false_split"
-          }
-        },
-        "required": [
-          "task"
-        ]
-      },
-      "then": {
-        "properties": {
-          "label_column": {
-            "const": "false_split_correction_label"
-          },
-          "label_true_semantics": {
-            "const": "same_neuron"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "task": {
-            "const": "split_correction_false_merge"
-          }
-        },
-        "required": [
-          "task"
-        ]
-      },
-      "then": {
-        "properties": {
-          "label_column": {
-            "const": "false_merge_identification_label"
-          },
-          "label_true_semantics": {
-            "const": "different_neuron"
-          }
-        }
-      }
-    },
     {
       "if": {
         "properties": {
