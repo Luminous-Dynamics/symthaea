@@ -191,6 +191,9 @@ impl PhotonicPrimitiveEnvelope {
         if probability >= 1.0 {
             return Ok(Some(1));
         }
+        if target_probability >= 1.0 {
+            return Err(PhotonicEnvelopeError::CertainTargetRequiresInfiniteAttempts);
+        }
         let raw = ((1.0 - target_probability).ln() / (1.0 - probability).ln()).ceil();
         if !raw.is_finite() || raw > u64::MAX as f64 {
             return Err(PhotonicEnvelopeError::AttemptCountOverflow);
@@ -257,6 +260,8 @@ pub enum PhotonicEnvelopeError {
     InvalidTargetSuccessProbability(f64),
     /// Required attempt count exceeds the supported integer range.
     AttemptCountOverflow,
+    /// A probability below one cannot reach certainty in a finite number of iid attempts.
+    CertainTargetRequiresInfiniteAttempts,
 }
 
 impl fmt::Display for PhotonicEnvelopeError {
@@ -278,6 +283,8 @@ impl fmt::Display for PhotonicEnvelopeError {
                 write!(f, "target success probability must be in (0, 1], got {target}"),
             Self::AttemptCountOverflow =>
                 write!(f, "required attempt count overflows u64"),
+            Self::CertainTargetRequiresInfiniteAttempts =>
+                write!(f, "target success probability of one needs certainty or infinitely many attempts"),
         }
     }
 }
@@ -345,7 +352,14 @@ mod tests {
     fn target_success_probability_uses_geometric_attempt_bound() {
         let model = simple_model(0.5);
         assert_eq!(model.attempts_for_target_success_probability(0.95).unwrap(), Some(5));
-        assert_eq!(model.attempts_for_target_success_probability(1.0).unwrap(), Some(1));
+        assert!(matches!(
+            model.attempts_for_target_success_probability(1.0),
+            Err(PhotonicEnvelopeError::CertainTargetRequiresInfiniteAttempts)
+        ));
+        assert_eq!(
+            simple_model(1.0).attempts_for_target_success_probability(1.0).unwrap(),
+            Some(1)
+        );
         assert!(model.attempts_for_target_success_probability(0.0).is_err());
         assert!(model.attempts_for_target_success_probability(1.1).is_err());
     }
