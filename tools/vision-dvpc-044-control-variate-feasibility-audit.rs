@@ -382,9 +382,9 @@ fn run()->Result<String,String>{
     let _=writeln!(out,"SAFE_REGION\twitness_rejected\t{}",!support_aware_feasible(bet,&a));
     let mut checked=0usize;
     let constraints=action_specific_constraints(&a);
-    for xi in -200..=100 {
+    for xi in -100..=300 {
         let x=xi as f64/200.0;
-        for yi in 0..=100 {
+        for yi in 0..=200 {
             let y=yi as f64/200.0;
             let bet=Bet{x,y};
             if support_aware_feasible(bet,&a){
@@ -457,8 +457,8 @@ mod tests{
         assert!(!support_aware_feasible(bet,&a));
         let checked=run().unwrap();
         assert!(checked.contains("SAFE_REGION\tfeasible_grid_points_checked"));
-        for x_i in -200..=100{
-            for y_i in 0..=100{
+        for x_i in -100..=300{
+            for y_i in 0..=200{
                 let candidate=Bet{x:x_i as f64/200.0,y:y_i as f64/200.0};
                 if support_aware_feasible(candidate,&a){
                     assert!(support_aware_minimum_factor(candidate,&a)>=WEALTH_FLOOR-TOL);
