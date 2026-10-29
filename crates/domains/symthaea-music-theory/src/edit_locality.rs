@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Version of the requested-change / protected-property contract.
-pub const EDIT_LOCALITY_CONTRACT_VERSION: &str = "edit-locality-v1.0";
+pub const EDIT_LOCALITY_CONTRACT_VERSION: &str = "edit-locality-v1.1";
 /// Bound O(n) inputs so evidence generation has predictable cost.
 pub const MAX_EDIT_LOCALITY_EVENTS: usize = 4096;
 
@@ -771,7 +771,8 @@ mod tests {
         assert!(verify_edit_locality_evidence(&source, &target, &decoded).unwrap());
 
         let mut changed_digest = decoded;
-        changed_digest.receipt_sha256.replace_range(0..1, "0");
+        let replacement = if changed_digest.receipt_sha256.starts_with('0') { "1" } else { "0" };
+        changed_digest.receipt_sha256.replace_range(0..1, replacement);
         assert!(!verify_edit_locality_evidence(&source, &target, &changed_digest).unwrap());
     }
 
