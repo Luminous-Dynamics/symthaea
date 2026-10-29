@@ -1,4 +1,4 @@
-use gcrb_evaluator::{evaluate_public_development, validate_fixture_bytes};
+use gcrb_evaluator::{evaluate_public_development, generate_parameterized_controls, validate_fixture_bytes};
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -8,8 +8,9 @@ fn usage() {
         "GCRB public-development evaluator\n\n\
          Usage:\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-fixture <fixture.json>\n\
+         cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls <fixture.json> <count> <master-seed> <output.json>\n\
          cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate <fixture.json> <candidate-report.json> [report-output.json]\n\n\
-         This is a public known-answer development scorer, not blind qualification."
+         Generated controls are public known answers; never treat them as blind qualification."
     );
 }
 
@@ -31,6 +32,30 @@ fn run() -> Result<(), String> {
             let fixture_bytes = read_file(fixture_path)?;
             let summary = validate_fixture_bytes(&fixture_bytes)?;
             print_json(&summary)
+        }
+
+        [command, fixture_path, count_text, seed_text, output_path]
+            if command == "generate-controls" =>
+        {
+            let fixture_bytes = read_file(fixture_path)?;
+            let count = count_text
+                .parse::<usize>()
+                .map_err(|error| format!("invalid control count: {error}"))?;
+            let seed = seed_text
+                .parse::<u64>()
+                .map_err(|error| format!("invalid master seed: {error}"))?;
+            let generated = generate_parameterized_controls(&fixture_bytes, count, seed)?;
+            let summary = validate_fixture_bytes(&generated)?;
+            fs::write(output_path, &generated)
+                .map_err(|error| format!("cannot write {output_path}: {error}"))?;
+            eprintln!(
+                "wrote {} public synthetic cases ({} attacks, {} negative controls) to {}; qualification_eligible=false",
+                summary.case_count,
+                summary.attack_count,
+                summary.negative_control_count,
+                output_path
+            );
+            Ok(())
         }
         [command, fixture_path, candidate_path] if command == "evaluate" => {
             let fixture_bytes = read_file(fixture_path)?;
