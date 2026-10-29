@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-001"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free trace scorer for the Causal Memory-to-Action Qualification research benchmark"
+
+[dependencies]
