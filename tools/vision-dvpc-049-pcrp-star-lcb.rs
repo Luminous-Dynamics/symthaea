@@ -248,15 +248,13 @@ fn log_sup_crp_wealth_lower(values: &[f64], candidate_mean: f64) -> Result<f64, 
         let bet = i as f64 / BET_GRID_STEPS as f64;
         best = best.max(log_crp_wealth(values, candidate_mean, bet));
     }
-    let roundoff_pad =
-        64.0 * f64::EPSILON * (1.0 + best.abs() + values.len() as f64);
-    // Returning zero when the grid maximum is numerically indistinguishable from zero
-    // preserves monotonicity at the empirical-mean boundary and remains a valid witness.
-    if best <= roundoff_pad {
-        Ok(0.0)
-    } else {
-        Ok(best - roundoff_pad)
-    }
+    // A candidate-independent multiplicative margin preserves the grid witness's
+    // monotonicity in candidate_mean. A candidate-dependent additive pad could, in
+    // principle, make (best - pad) rise locally as best and the pad both shrink.
+    let shrink = (1.0
+        - 64.0 * f64::EPSILON * (values.len() as f64 + 1.0))
+        .max(0.0);
+    Ok(best * shrink)
 }
 
 /// Conservative fixed-grid pCRP-star LCB witness based on Ryu et al. (COLT 2025), Eq. (3.3)-(3.5).
