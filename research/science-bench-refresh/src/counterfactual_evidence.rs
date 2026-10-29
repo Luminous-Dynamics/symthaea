@@ -436,8 +436,10 @@ mod tests {
     #[test]
     fn rejects_duplicate_trial_id_and_order() {
         let mut fields = fields();
-        fields.pairs[0].trials[1].trial_id = fields.pairs[0].trials[0].trial_id.clone();
-        fields.pairs[0].trials[1].randomization_order = fields.pairs[0].trials[0].randomization_order;
+        let first_trial_id = fields.pairs[0].trials[0].trial_id.clone();
+        let first_order = fields.pairs[0].trials[0].randomization_order;
+        fields.pairs[0].trials[1].trial_id = first_trial_id;
+        fields.pairs[0].trials[1].randomization_order = first_order;
         let issues = validate_fields(&fields);
         assert!(issues.iter().any(|issue| issue.contains("duplicate trial_id")));
         assert!(issues.iter().any(|issue| issue.contains("duplicate randomization_order")));
