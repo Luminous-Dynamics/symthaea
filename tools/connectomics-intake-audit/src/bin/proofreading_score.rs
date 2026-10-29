@@ -931,7 +931,7 @@ fn run() -> Result<i32, String> {
         evaluation_partition: args.evaluation_partition,
         review_time_basis: args.review_time_basis,
         bootstrap_replicates: args.bootstrap_replicates,
-        input_sha256: input_hash,
+        input_sha256: input_hash.clone(),
         n_candidates: overall.n,
         positive_errors: overall.positive_errors,
         negative_controls: overall.negative_controls,
