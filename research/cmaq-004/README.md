@@ -40,7 +40,7 @@ It predicts both actions, chooses the action with higher predicted reward, and r
 - **Shuffled model:** swaps the two predicted action values to verify that model/action alignment matters.
 - **Oracle evaluator-only policy:** knows the true held-out rewards; it is an upper bound, not an eligible deployable baseline.
 
-The report includes chosen action, query count and cost, model-prediction MAE on the held-out context, mean reward, net utility, regret against the evaluator-only oracle, net regret, and net utility lift against the direct baseline.
+The report includes chosen action, query count and cost, model-prediction MAE on the held-out context, mean reward, net utility, regret against the evaluator-only oracle, net regret, and paired net utility lift against the direct baseline with a standard error and approximate normal 95% confidence interval. The paired interval reuses the same reward draw for the model-assisted and direct choices, reducing variance in this synthetic within-family comparison. It does not account for uncertainty across unseen mechanism families or generator specifications.
 
 The current harness generates both candidate decisions and evaluator metrics in one process. It does **not** yet provide candidate/evaluator process isolation, hidden family labels, artifact receipts/digests, a human or external task, or statistical qualification over held-out family draws. Keep every report labeled as a synthetic development result.
 
@@ -72,7 +72,7 @@ For the additive-positive family, the gross reward lift before model-query costs
 | 0.12 | 0.24 | +0.0225 |
 | 0.16 | 0.32 | −0.0575 |
 
-The code now emits all six cost levels and the focused workflow checks the cost frontier and break-even behaviour. These values remain exact-seed Python-mirror results, not Rust output or measured real-world latency/energy.
+The code now emits all six cost levels, standard errors, and paired 95% intervals. The focused workflow requires the additive-model lift interval to exclude zero at 0.04/query and the expensive cost point's interval to be negative, plus a negative upper interval for the interaction-only control. These values remain exact-seed Python-mirror results, not Rust output or measured real-world latency/energy. The interval is conditional on this single held-out context/family and the stated random-draw process; future qualification must resample mechanism families and generator parameters.
 
 ## What this says—and does not say
 
