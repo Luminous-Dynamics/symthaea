@@ -21,6 +21,8 @@ from historical_transfer_benchmark import (
     _descriptor,
     _validate_task_registry,
     _bootstrap_mean_interval,
+    ABSTENTION_POLICY_ID,
+    ABSTENTION_DISTANCE_THRESHOLD,
     _f1,
     _metrics,
     design_point,
@@ -109,6 +111,17 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
                 receipt["aggregate_metrics_macro_averaged_over_target_families"][policy]["family_count"], 8
             )
         self.assertIn("eight synthetic families", receipt["claim_ceiling"])
+        self.assertIn(ABSTENTION_POLICY_ID, POLICY_IDS)
+        self.assertEqual(ABSTENTION_DISTANCE_THRESHOLD, 0.9)
+        guarded = receipt["aggregate_metrics_macro_averaged_over_target_tasks"][ABSTENTION_POLICY_ID]["selective_prediction"]
+        self.assertEqual(guarded["nearest_distance_threshold"], ABSTENTION_DISTANCE_THRESHOLD)
+        self.assertGreaterEqual(guarded["macro_coverage_over_target_tasks"], 0.0)
+        self.assertLessEqual(guarded["macro_coverage_over_target_tasks"], 1.0)
+        self.assertIn("not a calibrated risk guarantee", guarded["claim_ceiling"])
+        for row in receipt["target_task_results"]:
+            selective = row["policy_metrics"][ABSTENTION_POLICY_ID]["selective_prediction"]
+            self.assertEqual(selective["covered_point_count"] + selective["abstained_count"], row["design_points_audited"])
+            self.assertAlmostEqual(selective["coverage"] + selective["abstention_rate"], 1.0)
 
     def test_task_variants_and_candidate_points_are_not_mislabeled_as_family_units(self):
         receipt = run_benchmark(history_points=2, test_points=20, nearest_k=4, reuse_count=10)
