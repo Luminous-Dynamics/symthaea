@@ -10,6 +10,7 @@ fn storage(capacity: u32, charge: u32, discharge: u32, terminal: u32) -> EnergyS
     EnergyStorageSpec {
         capacity_quanta: capacity,
         initial_soc_quanta: 0,
+        initial_soc_ledger_ref: "none:opening-soc".to_owned(),
         max_charge_input_quanta_per_interval: charge,
         max_discharge_output_quanta_per_interval: discharge,
         charge_efficiency_ppm: 1_000_000,
@@ -230,6 +231,7 @@ fn opening_storage_inventory_can_serve_demand_without_rebooking_upstream_impacts
         storage: EnergyStorageSpec {
             capacity_quanta: 1,
             initial_soc_quanta: 1,
+            initial_soc_ledger_ref: "synthetic:external-opening-inventory-ledger-v1".to_owned(),
             max_charge_input_quanta_per_interval: 1,
             max_discharge_output_quanta_per_interval: 1,
             charge_efficiency_ppm: 1_000_000,
@@ -357,6 +359,7 @@ fn storage_efficiency_uses_conservative_integer_rounding() {
     case.storage = EnergyStorageSpec {
         capacity_quanta: 2,
         initial_soc_quanta: 0,
+        initial_soc_ledger_ref: "none:opening-soc".to_owned(),
         max_charge_input_quanta_per_interval: 4,
         max_discharge_output_quanta_per_interval: 1,
         charge_efficiency_ppm: 500_000,
