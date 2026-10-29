@@ -1,0 +1,102 @@
+{
+  "schema": "symthaea.science_bench_refresh_evidence_behavior_contract_plan.v1",
+  "purpose": "example_only",
+  "contract_set_id": "EBC-EXAMPLE-NOT-FOR-SCORING",
+  "evaluator_source_revision": "NOT_IMPLEMENTED_YET",
+  "source_authority_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "decision_rules_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "plan_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "items": [
+    {
+      "case_id": "update-001",
+      "pair_id": "pair-update-001",
+      "family": "update_compliance",
+      "intervention": "coherent_update",
+      "baseline_condition": "source-revision-a",
+      "intervention_condition": "source-revision-b",
+      "expected_behavior": "dependent_claims_update_without_unrelated_drift",
+      "force_axis": "not_applicable",
+      "decision_rule_id": "UPDATE-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "conflict-001",
+      "pair_id": "pair-conflict-001",
+      "family": "conflict_disclosure",
+      "intervention": "source_conflict",
+      "baseline_condition": "single-authority-source",
+      "intervention_condition": "conflicting-authoritative-source",
+      "expected_behavior": "explicit_conflict_and_provenance",
+      "force_axis": "not_applicable",
+      "decision_rule_id": "CONFLICT-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "decoy-001",
+      "pair_id": "pair-decoy-001",
+      "family": "decoy_invariance",
+      "intervention": "irrelevant_decoy",
+      "baseline_condition": "evidence-without-decoy",
+      "intervention_condition": "evidence-with-irrelevant-decoy",
+      "expected_behavior": "supported_claims_stable",
+      "force_axis": "not_applicable",
+      "decision_rule_id": "DECOY-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "deletion-001",
+      "pair_id": "pair-deletion-001",
+      "family": "deletion_calibration",
+      "intervention": "key_evidence_deletion",
+      "baseline_condition": "complete-evidence",
+      "intervention_condition": "necessary-evidence-removed",
+      "expected_behavior": "claim_strength_tracks_remaining_support",
+      "force_axis": "not_applicable",
+      "decision_rule_id": "DELETION-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "permutation-001",
+      "pair_id": "pair-permutation-001",
+      "family": "permutation_invariance",
+      "intervention": "evidence_permutation",
+      "baseline_condition": "evidence-order-a",
+      "intervention_condition": "evidence-order-b",
+      "expected_behavior": "semantic_answer_invariant",
+      "force_axis": "not_applicable",
+      "decision_rule_id": "PERMUTATION-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "force-001",
+      "pair_id": "pair-force-001",
+      "family": "evidence_force_monotonicity",
+      "intervention": "evidence_strength_reduction",
+      "baseline_condition": "full-warrant",
+      "intervention_condition": "weaker-warrant",
+      "expected_behavior": "weaker_evidence_not_stronger_claim",
+      "force_axis": "numeric_specificity",
+      "decision_rule_id": "FORCE-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "completeness-001",
+      "pair_id": "pair-completeness-001",
+      "family": "claim_evidence_completeness",
+      "intervention": "joint_claim_evidence_audit",
+      "baseline_condition": "full-response",
+      "intervention_condition": "claim-evidence-audit",
+      "expected_behavior": "all_material_claims_warranted",
+      "force_axis": "not_applicable",
+      "decision_rule_id": "COMPLETENESS-RULE-NOT-IMPLEMENTED",
+      "evidence_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "evaluator_gold_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}
