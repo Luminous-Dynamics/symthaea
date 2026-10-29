@@ -5,7 +5,8 @@ use std::process;
 const ACTIONS: usize = 3;
 const CONTEXTS: usize = 4;
 const DEFAULT_PROBE_BUDGET: usize = 2;
-const REPORT_SCHEMA: &str = "cmaq-002-evoi-report-v0.1";
+const DEFAULT_DECISION_HORIZON: usize = 1;
+const REPORT_SCHEMA: &str = "cmaq-002-evoi-report-v0.2";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Family {
@@ -380,6 +381,7 @@ fn select_probe(
     posterior: &[usize],
     used: &BTreeSet<Query>,
     rng: &mut SplitMix64,
+    decision_horizon: usize,
     probe_cost: f64,
 ) -> Option<Query> {
     let available: Vec<Query> = all_queries()
@@ -420,7 +422,7 @@ fn select_probe(
                     .then_with(|| right.cmp(left))
             })?;
             let gain = expected_value_of_probe(worlds, posterior, best);
-            if gain > probe_cost { Some(best) } else { None }
+            if gain * decision_horizon as f64 > probe_cost { Some(best) } else { None }
         }
     }
 }
@@ -486,7 +488,7 @@ struct Summary {
     contradictions: usize,
 }
 
-fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, probe_cost: f64) -> Summary {
+fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decision_horizon: usize, probe_cost: f64) -> Summary {
     let worlds = mechanisms();
     let all_indices: Vec<usize> = (0..worlds.len()).collect();
     let mut probe_count = 0usize;
@@ -516,6 +518,7 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, probe_c
                     &posterior,
                     &used,
                     &mut rng,
+                    decision_horizon,
                     probe_cost,
                 ) else {
                     break;
@@ -537,7 +540,7 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, probe_c
         let (utility, unsafe_count) = actual_decision_value(true_world, &worlds, &posterior);
         unsafe_actions += unsafe_count;
         let oracle_utility = oracle_decision_value(true_world);
-        let net_utility = utility - used.len() as f64 * probe_cost;
+        let net_utility = utility - used.len() as f64 * probe_cost / decision_horizon as f64;
         utility_total += utility;
         net_utility_total += net_utility;
         regret_total += (oracle_utility - utility).max(0.0);
@@ -558,10 +561,11 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, probe_c
     }
 }
 
-fn parse_args() -> Result<(u64, usize, f64, bool), String> {
+fn parse_args() -> Result<(u64, usize, usize, f64, bool), String> {
     let mut seed = 7u64;
     let mut budget = DEFAULT_PROBE_BUDGET;
     let mut cost = 0.25f64;
+    let mut decision_horizon = DEFAULT_DECISION_HORIZON;
     let mut help = false;
     let args: Vec<String> = env::args().skip(1).collect();
     let mut position = 0usize;
@@ -589,38 +593,47 @@ fn parse_args() -> Result<(u64, usize, f64, bool), String> {
                     return Err("--probe-cost must be finite and in 0..=100".to_owned());
                 }
             }
+            "--decision-horizon" => {
+                position += 1;
+                decision_horizon = args.get(position).ok_or("--decision-horizon requires a value")?
+                    .parse().map_err(|_| "--decision-horizon must be an integer in 1..=10000".to_owned())?;
+                if decision_horizon == 0 || decision_horizon > 10_000 {
+                    return Err("--decision-horizon must be in 1..=10000".to_owned());
+                }
+            }
             unknown => return Err(format!("unknown argument: {unknown}")),
         }
         position += 1;
     }
-    Ok((seed, budget, cost, help))
+    Ok((seed, budget, decision_horizon, cost, help))
 }
 
 fn print_help() {
     println!(
         "CMAQ-002 finite-hypothesis active causal learning benchmark\n\n\
-         Usage: cmaq-002-evoi [--seed N] [--probe-budget N] [--probe-cost X]\n\n\
+         Usage: cmaq-002-evoi [--seed N] [--probe-budget N] [--decision-horizon N] [--probe-cost X]\n\n\
          Options:\n\
            --seed N          random-probe seed (default 7)\n\
            --probe-budget N  maximum probes per mechanism, 0..=8 (default 2)\n\
            --probe-cost X    utility units charged per probe, 0..=100 (default 0.25)\n\
+           --decision-horizon N  downstream decision rounds, 1..=10000 (default 1)\n\\
            --help            print this help"
     );
 }
 
 fn run() -> Result<(), String> {
-    let (seed, probe_budget, probe_cost, help) = parse_args()?;
+    let (seed, probe_budget, decision_horizon, probe_cost, help) = parse_args()?;
     if help {
         print_help();
         return Ok(());
     }
     let worlds = mechanisms();
     print!(
-        "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"seed\":{},\"mechanisms\":{},\"families\":3,\"contexts\":{},\"actions\":{},\"probe_budget\":{},\"probe_cost\":{},\"results\":[",
-        seed, worlds.len(), CONTEXTS, ACTIONS, probe_budget, probe_cost
+        "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"seed\":{},\"mechanisms\":{},\"families\":3,\"contexts\":{},\"actions\":{},\"probe_budget\":{},\"decision_horizon\":{},\"probe_cost\":{},\"results\":[",
+        seed, worlds.len(), CONTEXTS, ACTIONS, probe_budget, decision_horizon, probe_cost
     );
     for (position, strategy) in Strategy::all().into_iter().enumerate() {
-        let summary = evaluate_strategy(strategy, seed, probe_budget, probe_cost);
+        let summary = evaluate_strategy(strategy, seed, probe_budget, decision_horizon, probe_cost);
         if position > 0 {
             print!(",");
         }
@@ -787,6 +800,7 @@ mod tests {
             &posterior,
             &used,
             &mut rng,
+            1,
             0.0,
         ).expect("at least one probe should have positive decision value");
         let chosen_gain = expected_value_of_probe(&worlds, &posterior, chosen);
@@ -800,6 +814,7 @@ mod tests {
             &[0],
             &used,
             &mut rng,
+            1,
             0.0,
         );
         assert!(stop.is_none());
@@ -809,7 +824,7 @@ mod tests {
     fn robust_policy_never_selects_an_action_unsafe_in_the_true_hypothesis() {
         let worlds = mechanisms();
         for strategy in Strategy::all() {
-            let summary = evaluate_strategy(strategy, 4_242, 2, 0.25);
+            let summary = evaluate_strategy(strategy, 4_242, 2, 1, 0.25);
             assert_eq!(summary.unsafe_actions, 0, "strategy {}", strategy.name());
             assert_eq!(summary.contradictions, 0, "strategy {}", strategy.name());
         }
@@ -826,9 +841,9 @@ mod tests {
 
     #[test]
     fn evoi_beats_information_only_on_the_calibration_panel() {
-        let evoi = evaluate_strategy(Strategy::Evoi, 4_242, 2, 0.25);
-        let max_information = evaluate_strategy(Strategy::MaxInformation, 4_242, 2, 0.25);
-        let no_probe = evaluate_strategy(Strategy::NoProbe, 4_242, 2, 0.25);
+        let evoi = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.25);
+        let max_information = evaluate_strategy(Strategy::MaxInformation, 4_242, 2, 1, 0.25);
+        let no_probe = evaluate_strategy(Strategy::NoProbe, 4_242, 2, 1, 0.25);
         assert!(
             evoi.mean_net_regret < max_information.mean_net_regret,
             "calibration panel must distinguish decision-value probing from information-only probing"
@@ -840,20 +855,43 @@ mod tests {
     }
 
     #[test]
+    fn evoi_scales_probe_value_with_downstream_decision_horizon() {
+        let worlds = mechanisms();
+        let posterior: Vec<usize> = (0..worlds.len()).collect();
+        let max_gain = all_queries()
+            .iter()
+            .map(|query| expected_value_of_probe(&worlds, &posterior, *query))
+            .fold(0.0_f64, f64::max);
+        assert!(max_gain > 0.0);
+
+        let mut rng = SplitMix64::new(17);
+        let used = BTreeSet::new();
+        let cost = max_gain * 2.0;
+        let one_shot = select_probe(
+            Strategy::Evoi, &worlds, &posterior, &used, &mut rng, 1, cost
+        );
+        let reused = select_probe(
+            Strategy::Evoi, &worlds, &posterior, &used, &mut rng, 3, cost
+        );
+        assert!(one_shot.is_none(), "one decision does not repay twice the maximum per-decision value");
+        assert!(reused.is_some(), "three downstream decisions can repay the same probe");
+    }
+
+    #[test]
     fn oracle_has_zero_regret_and_probe_cost_is_accounted_for() {
-        let oracle = evaluate_strategy(Strategy::Oracle, 7, 2, 0.25);
+        let oracle = evaluate_strategy(Strategy::Oracle, 7, 2, 1, 0.25);
         assert!(oracle.mean_regret.abs() < 1e-9);
         assert!(oracle.mean_net_regret.abs() < 1e-9);
-        let no_probe = evaluate_strategy(Strategy::NoProbe, 7, 2, 0.25);
+        let no_probe = evaluate_strategy(Strategy::NoProbe, 7, 2, 1, 0.25);
         assert_eq!(no_probe.mean_probes, 0.0);
-        let fixed = evaluate_strategy(Strategy::Fixed, 7, 2, 0.25);
+        let fixed = evaluate_strategy(Strategy::Fixed, 7, 2, 1, 0.25);
         assert!(fixed.mean_net_regret + 1e-9 >= fixed.mean_regret);
     }
 
     #[test]
     fn seeded_report_is_reproducible() {
-        let first = evaluate_strategy(Strategy::Random, 12_345, 2, 0.25);
-        let second = evaluate_strategy(Strategy::Random, 12_345, 2, 0.25);
+        let first = evaluate_strategy(Strategy::Random, 12_345, 2, 1, 0.25);
+        let second = evaluate_strategy(Strategy::Random, 12_345, 2, 1, 0.25);
         assert_eq!(first.strategy, second.strategy);
         assert_eq!(first.mean_probes, second.mean_probes);
         assert_eq!(first.mean_regret, second.mean_regret);
