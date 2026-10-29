@@ -79,6 +79,9 @@ jobs:
           awk -F '\t' '$1=="RESULT_METRIC" && ($5=="familywise_point_coverage" || $5=="familywise_sequence_coverage" || $5=="any_false_certificate_probability" || $5=="ever_best_certificate_rate" || $5=="portfolio_empty_interval_probability" || $5=="IPS_argmax_top1_accuracy") { if ($6 < -0.000001 || $6 > 1.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
           grep '^SEED_SCHEDULE' /tmp/vis-dvpc-046-results.tsv > /tmp/vis-dvpc-046-seeds.tsv
           test "$(grep -c '^METHOD_STATUS' /tmp/vis-dvpc-046-results.tsv)" = "54"
+          # Summary is a derived, explicitly filtered view of the exact full output.
+          { head -n 1 /tmp/vis-dvpc-046-results.tsv; awk -F '\t' '$1 == "RESULT_METRIC" && ($5 == "familywise_point_coverage" || $5 == "familywise_sequence_coverage" || $5 == "any_false_certificate_probability" || $5 == "point_false_certificate_probability" || $5 == "mean_average_policy_interval_width" || $5 == "IPS_argmax_top1_accuracy" || $5 == "IPS_argmax_simple_regret") { print }' /tmp/vis-dvpc-046-results.tsv; } > /tmp/vis-dvpc-046-summary.tsv
+          test "$(wc -l < /tmp/vis-dvpc-046-summary.tsv)" -gt 1
       - name: Create exact source and output SHA-256 receipt
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
