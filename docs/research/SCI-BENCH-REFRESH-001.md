@@ -320,3 +320,26 @@ Proposed qualification targets (targets, not achieved results):
 - Report inference accuracy, evidence-use effect, citation/claim support, correct abstention, confident errors, latency, tool calls, and monetary/compute cost separately. No composite score can compensate for invalid evidence integrity.
 
 **Limitations:** the verifier cannot execute interventions, prove that the plan was anchored before the run, certify network isolation, prove complete telemetry, or adjudicate causal evidence use. The runner must independently enforce the interventions and anchor run receipts. No current Symthaea measurement, industry-leading result, or SOTA claim is implied.
+
+## Follow-on: evaluator-side outcome receipts and multidimensional scorecards
+
+The companion [SCI-RETRIEVAL-OUTCOMES-001 / #8950](https://github.com/Luminous-Dynamics/symthaea/issues/8950) implementation is in draft [PR 8952](https://github.com/Luminous-Dynamics/symthaea/pull/8952). It binds evaluator-side labels to the exact bytes and typed commitment of the paired intervention plan, then requires one ordered outcome record for every planned trial.
+
+### New measurement boundary
+
+The report requires its evaluator implementation and decision-rule digests to match the values committed in the pre-run plan, so the post-run labels cannot quietly switch to a different rubric. It keeps terminal status separate from response status and evaluator axes. Task correctness, evidence use, claim support, abstention quality, confidence provenance/coverage, and resource usage are separate dimensions. Contaminated, budget-violating or failed trials cannot carry performance labels but remain in the denominator. Null resource/confidence values are reported as unavailable, not silently converted to zero. The validator emits no composite trust/evidence score and performs no calibration or generalization inference.
+
+This composes with the existing generic paired-trial auditor [PR #8738](https://github.com/Luminous-Dynamics/symthaea/pull/8738) rather than replacing it: the outcome receipt carries evidence-use-specific judgments while generic trial infrastructure provides patterns for paired accounting and resource provenance. The Benchmark Evidence Graph issue [#6283](https://github.com/Luminous-Dynamics/symthaea/issues/6283) remains the right place for uncertainty, dependence, sampling-frame, transfer, applicability and claim-ceiling semantics.
+
+### Research rationale
+
+- [CounterMem (EMNLP Findings 2026)](https://aclanthology.org/2026.findings-emnlp.1054/) changes retrieved evidence and checks whether an answer changes in the expected direction, exposing behavior missed by one-trace faithfulness scores.
+- [Evidence-Based Generation / Ans+Evid (EMNLP Findings 2026)](https://aclanthology.org/2026.findings-emnlp.2222/) uses line-level evidence with answer correctness; it reports citation and grounding failures not visible to answer-only evaluation.
+- [NIST AI 800-3 (2026)](https://www.nist.gov/publications/expanding-ai-evaluation-toolbox-statistical-models) distinguishes fixed-benchmark from generalized accuracy and motivates explicit uncertainty assumptions rather than reading a raw percentage as universal capability.
+- [ScienceAgentBench](https://github.com/OSU-NLP-Group/ScienceAgentBench) notes a verified benchmark release in April 2026 to mitigate false negatives; any future comparison should pin the verified split and exact artifact revision.
+
+### Acceptance/evaluation guidance
+
+Focused CI authors independent Python/Rust typed-commitment parity plus positive and hostile controls for missing/duplicate records, wrong condition binding, contaminated-scored records, mutated report commitment, confidence range/source mismatch, and omitted nullable fields. These tests are not claimed passed before exact-head CI completes.
+
+For an actual claim, compare matched-budget closed-book, conventional retrieval and tool-using RAG baselines across frozen task/world pairs. Predeclare the evidence interventions and expected direction; report full trial accounting, per-condition category counts, confidence coverage, native costs, paired effect estimates and uncertainty. Any GLMM or other inferential layer belongs in a separate preregistered analysis. A valid outcome receipt cannot prove complete telemetry, accurate adjudication, causal evidence use, generalized capability or frontier/SOTA superiority.
