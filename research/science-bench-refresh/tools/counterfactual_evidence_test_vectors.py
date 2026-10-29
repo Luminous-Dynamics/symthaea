@@ -68,6 +68,8 @@ def make_fields() -> dict[str, Any]:
         "tool_manifest_sha256": sha256(b"frozen-tool-manifest"),
         "budget_sha256": sha256(b"frozen-resource-budget"),
         "analysis_plan_sha256": sha256(b"preregistered-analysis-plan"),
+        "evaluator_revision_sha256": sha256(b"frozen-evaluator-revision"),
+        "decision_rules_sha256": sha256(b"frozen-outcome-decision-rules"),
         "randomization_commitment_sha256": sha256(b"randomization-secret-commitment"),
         "required_conditions": CONDITIONS.copy(),
         "pairs": [{
