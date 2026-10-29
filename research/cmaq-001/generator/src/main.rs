@@ -271,7 +271,7 @@ fn make_dataset(seed: u64, factors: usize, radius: i32) -> Result<Dataset, Strin
     let key_hash = sha256_hex(files.get("answer-key.tsv").unwrap());
     let seed_commitment = sha256_hex(format!("{GENERATOR_SCHEMA}:seed:{seed}").as_bytes());
     let manifest = format!(
-        "{{\n  \"schema_version\": \"{GENERATOR_SCHEMA}\",\n  \"split_rule\": \"(left_factor_id + right_factor_id) % factor_count == 0\",\n  \"factor_count\": {factors},\n  \"feature_radius\": {radius},\n  \"support_rows\": {support_rows},\n  \"qualification_rows\": {qualification_rows},\n  \"heldout_pair_count\": {heldout_pairs},\n  \"seed_commitment_sha256\": \"{seed_commitment}\",\n  \"files\": {{\n    \"support-observations.tsv\": \"{support_hash}\",\n    \"qualification-cases.tsv\": \"{qualification_hash}\",\n    \"policy-evidence.tsv\": \"{policy_hash}\",\n    \"answer-key.tsv\": \"{key_hash}\"\n  }}\n}}\n"
+        "{{\n  \"schema_version\": \"{GENERATOR_SCHEMA}\",\n  \"split_rule\": \"(left_factor_id + right_factor_id) % factor_count == 0\",\n  \"factor_count\": {factors},\n  \"feature_radius\": {radius},\n  \"support_rows\": {support_rows},\n  \"qualification_rows\": {qualification_rows},\n  \"heldout_pair_count\": {heldout_pairs},\n  \"seed_commitment_sha256\": \"{seed_commitment}\",\n  \"files\": {{\n    \"candidate/support-observations.tsv\": \"{support_hash}\",\n    \"candidate/qualification-cases.tsv\": \"{qualification_hash}\",\n    \"candidate/policy-evidence.tsv\": \"{policy_hash}\",\n    \"evaluator/answer-key.tsv\": \"{key_hash}\"\n  }}\n}}\n"
     );
     files.insert("manifest.json".to_owned(), manifest.into_bytes());
 
