@@ -18,7 +18,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-const HEADER: [&str; 13] = [
+const HEADER: [&str; 15] = [
     "dataset_id",
     "domain",
     "source_artifact_id",
@@ -29,6 +29,8 @@ const HEADER: [&str; 13] = [
     "execution_id",
     "attack_family_id",
     "device_config_id",
+    "capture_config_id",
+    "counter_set_id",
     "split_protocol",
     "split",
     "label",
@@ -53,6 +55,8 @@ struct Sample {
     execution_id: String,
     attack_family_id: String,
     device_config_id: String,
+    capture_config_id: String,
+    counter_set_id: String,
     split_protocol: String,
     split: String,
     label: String,
@@ -62,7 +66,14 @@ struct Sample {
 struct ArtifactBinding {
     source_path: String,
     source_sha256: String,
+    device_config_id: String,
+    capture_config_id: String,
+    counter_set_id: String,
+    program_id: String,
+    execution_id: String,
+    attack_family_id: String,
     split: String,
+    label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -200,9 +211,11 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             execution_id: values[7].clone(),
             attack_family_id: values[8].clone(),
             device_config_id: values[9].clone(),
-            split_protocol: values[10].clone(),
-            split: values[11].clone(),
-            label: values[12].clone(),
+            capture_config_id: values[10].clone(),
+            counter_set_id: values[11].clone(),
+            split_protocol: values[12].clone(),
+            split: values[13].clone(),
+            label: values[14].clone(),
         });
     }
 
@@ -227,6 +240,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         "attack_family_holdout",
         "execution_holdout",
         "device_config_holdout",
+        "capture_config_holdout",
     ]
     .contains(&split_protocol.as_str())
     {
@@ -312,7 +326,14 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         let binding = ArtifactBinding {
             source_path: sample.source_path.clone(),
             source_sha256: sample.source_sha256.clone(),
+            device_config_id: sample.device_config_id.clone(),
+            capture_config_id: sample.capture_config_id.clone(),
+            counter_set_id: sample.counter_set_id.clone(),
+            program_id: sample.program_id.clone(),
+            execution_id: sample.execution_id.clone(),
+            attack_family_id: sample.attack_family_id.clone(),
             split: sample.split.clone(),
+            label: sample.label.clone(),
         };
         if let Some(previous) = artifact_bindings.get(&sample.artifact_id) {
             if previous != &binding {
@@ -374,6 +395,7 @@ fn held_out_group(sample: &Sample, protocol: &str, line_number: usize) -> Result
         "attack_family_holdout" => ("benign_program", sample.program_id.as_str()),
         "execution_holdout" => ("execution", sample.execution_id.as_str()),
         "device_config_holdout" => ("device_config", sample.device_config_id.as_str()),
+        "capture_config_holdout" => ("capture_config", sample.capture_config_id.as_str()),
         _ => return Err(format!("line {line_number}: unsupported split protocol")),
     };
     if is_missing(value) {
@@ -498,6 +520,8 @@ mod tests {
                 execution_id.into(),
                 attack_family_id.into(),
                 device_config_id.into(),
+                "capture-config-default".into(),
+                "single-counter".into(),
                 split_protocol.into(),
                 split.into(),
                 label.into(),
