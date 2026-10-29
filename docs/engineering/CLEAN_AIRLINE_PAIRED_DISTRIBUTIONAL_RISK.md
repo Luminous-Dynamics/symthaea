@@ -18,7 +18,7 @@ This slice creates a fail-closed bridge between the two modules. It makes the pr
 3. Require a calibration-frequency table from a frozen calibration partition. Its scenario IDs must exactly match the paired outcome IDs. Duplicate or missing support is rejected.
 4. Derive the TV radius by rerunning the repository's calibration function over the supplied frequencies and predeclared failure probability. The risk-gate radius must equal that calibrated radius; it cannot be selected after observing the holdout outcomes.
 5. Ignore the benchmark's design weights for probability purposes. Use the calibration table's explicit nominal probabilities instead.
-6. Require one unambiguous, verified feasible cost for each selected policy on every scenario. If a selected policy is infeasible, unresolved, absent or conflicting in any scenario, do not calculate a distributionally robust cost score over a reduced subset. Report that policy's feasibility/infeasibility/unresolved weight through the paired benchmark's separate coverage fields.
+6. Require the exact realized scenario manifests and recompute each canonical scenario digest. Independently re-run the energy-hub plan verifier for both selected policies in every scenario, comparing the verifier's full metrics with the report. If a selected policy is infeasible, unresolved, absent, conflicting or fails independent re-verification in any scenario, do not calculate a distributionally robust cost score over a reduced subset. Report that policy's feasibility/infeasibility/unresolved weight through the paired benchmark's separate coverage fields.
 7. Quantize floating-point currency costs using an explicit integer scale. The maximum candidate-minus-baseline rounding error is reported, and overflow / negative / non-finite costs fail closed.
 8. Return the nominal and worst-case cost delta, scenario-level deltas, calibrated TV-radius report, configured risk assessment and a deterministic assessment digest.
 
@@ -32,12 +32,14 @@ This slice creates a fail-closed bridge between the two modules. It makes the pr
 
 ## New test definitions
 
-The module includes five unit-test definitions intended to exercise:
+The module includes seven unit-test definitions intended to exercise:
 
 - calibrated probabilities are used instead of the benchmark's design weights;
 - a missing policy result rejects the full-support risk evaluation;
 - calibration/evaluation support mismatch is rejected;
-- an unrelated baseline scenario digest is rejected; and
+- an unrelated baseline scenario digest is rejected;
+- realized-scenario support mismatch is rejected;
+- a policy plan whose reported accounting metrics have been tampered with is rejected by independent re-evaluation; and
 - a risk gate with a radius different from the calibrated radius is rejected.
 
 These are **authored tests, not passing tests**. This runtime has no `cargo`, `rustc` or `rustfmt`, so no compilation or Rust test execution is claimed.
