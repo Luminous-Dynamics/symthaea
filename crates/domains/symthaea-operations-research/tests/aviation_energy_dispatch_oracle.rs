@@ -302,6 +302,14 @@ fn empty_manifest_digest_is_rejected() {
 }
 
 #[test]
+fn canonical_digest_matches_independent_known_answer_vector() {
+    assert_eq!(
+        canonical_scenario_digest(&scenario()).unwrap(),
+        "sha256:bb46f08d887a492b755f1e58c5c9893f636eff242a9bbed15aca95ce4b51f433"
+    );
+}
+
+#[test]
 fn canonical_digest_is_stable_and_normalizes_input_vector_order() {
     let original = scenario();
     let first = canonical_scenario_digest(&original).unwrap();
