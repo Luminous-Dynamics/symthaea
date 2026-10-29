@@ -17,13 +17,13 @@ log W_CRP(b; nu) = sum_t log(1 - b + b Y_t / nu)
 
 log W_pCRP-star(nu) = sup_b log W_CRP(b; nu) - 0.5 log(pi(n+1))
 
-The lower bound is the smallest nu whose penalized wealth is at most 1/delta. The implementation solves the one-dimensional bet optimum and root numerically. The confidence-bound argument relies on the paper's nonnegative-process assumptions; in the frozen synthetic evaluation, logger, policies and reward mechanism are stationary and actions/rewards are IID.
+The lower bound is the smallest nu whose penalized wealth is at most 1/delta. This implementation approximates the bet supremum by a fixed 129-point grid and numerically inverts that monotone grid-witness condition. Since the grid maximum never exceeds the continuous supremum, the resulting lower bound is conservative but can be looser than the exact pCRP-star bound. The confidence-bound argument relies on the paper's nonnegative-process assumptions; in the frozen synthetic evaluation, logger, policies and reward mechanism are stationary and actions/rewards are IID.
 
 ## Numerical-safety design
 
 A confidence bound should not become optimistic because numerical optimization changes the direction of the guarantee. This tranche uses a fixed grid of 129 feasible bets on [0,1]. For each candidate mean, the maximum wealth over this fixed grid is no greater than the continuous supremum. Because each fixed-bet wealth is nonincreasing in the candidate mean, the maximum over the fixed grid is also nonincreasing; this monotonicity matters for the root inversion. Underestimating the continuous supremum can only move the resulting lower confidence bound down. A small candidate-independent multiplicative shrink is applied to the fixed-grid log-wealth witness. Because the shrink factor depends only on sample count, it preserves monotonicity in candidate mean, unlike a candidate-dependent additive pad. This is a numerical engineering precaution, not a machine-checked interval-arithmetic proof. The grid is a conservative approximation, not the paper's exact continuous-bet supremum.
 
-The code includes the endpoint cases, zero rewards, non-finite / negative inputs, probability validation, importance-weight support checks, and a distinct NOT_IDENTIFIED status for structural zero support. It never creates a numeric estimate or bound for unsupported target-policy mass.
+The code includes endpoint cases, zero rewards, non-finite / negative inputs, probability validation, importance-weight support checks, the paper-specific reward-complement upper endpoint, and a distinct NOT_IDENTIFIED status for structural zero support. A winner certificate is suppressed if the candidate's own interval is reversed. It never creates a numeric estimate or bound for unsupported target-policy mass.
 
 ## Frozen comparison
 
