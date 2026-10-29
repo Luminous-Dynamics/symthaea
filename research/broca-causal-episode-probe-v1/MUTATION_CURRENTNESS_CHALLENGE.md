@@ -24,7 +24,7 @@ The ABA case matters: if an office address changes A → B → A, an old A recor
 - `fixtures/mutations/eligibility-ledger.jsonl`: explicit status policy for every string source pointer (current, historical, revoked, tentative, not-applied, causal, or contextual).
 - `fixtures/mutations/dependency_snapshots.jsonl`: four explicit dependency-chain snapshots from initial state through upstream mutation, partial refresh, and complete refresh.
 - `dependency_cascade.py`: reference truth-maintenance evaluator. A derived claim is current only if it points at the latest revision of every dependency and each dependency is itself current. Missing dependencies are marked unknown; cycles and duplicate revisions fail closed.
-- `test_dependency_cascade.py`: tests direct/transitive invalidation, absence of stale derived claims from the current view, partial refresh, full-chain refresh, historical auditability, and malformed graph rejection.
+- `test_dependency_cascade.py`: 17 tests covering direct/transitive invalidation, absence of stale derived claims from the current view, partial refresh, ABA reversion, staged refresh, historical auditability, a 1,500-node chain, order invariance, and malformed graph rejection.
 - `eligibility_filter.py`: provenance-bound eligibility-first ablation, with `--intent-source annotated` (oracle upper bound) and `--intent-source heuristic` (transparent keyword baseline). Both filter a BM25 candidate pool before final top-k selection; unknown policy pointers fail closed and unknown heuristic intent produces an empty context.
 
 From the repository root, after compiling the Rust worker:
@@ -125,7 +125,7 @@ This distinction mirrors a wider finding in recent memory evaluation: temporal u
 
 Recent [MEME: Multi-entity & Evolving Memory Evaluation](https://arxiv.org/abs/2605.12477) isolates two tasks that ordinary fact recall misses: **Cascade** (upstream changes must invalidate/update dependent facts) and **Absence** (the system must not assert a value when its evidence has become invalid). In its reported default configurations over 100 controlled episodes, the benchmark authors report average accuracy of 3% on Cascade and 1% on Absence, despite stronger static retrieval. These are benchmark-specific findings, not universal system scores.
 
-This repository now includes a small synthetic reference probe with four snapshots:
+This repository now includes a small synthetic reference probe with seven snapshots:
 
 1. An endpoint, service connection string, worker connection string, and an unrelated alert threshold are current.
 2. The endpoint changes. Both the service DSN and transitively dependent worker DSN should cease to be current immediately.
@@ -141,7 +141,7 @@ python3 research/broca-causal-episode-probe-v1/dependency_cascade.py \
 python3 research/broca-causal-episode-probe-v1/test_dependency_cascade.py
 ```
 
-The report lists every claim revision and gives each a state (`current`, `historical`, `stale_dependency`, or `unknown_dependency`). The `current_claims` view contains only latest, dependency-valid revisions. Missing dependency references do not pass through as current, and cyclic graphs are rejected. The implementation is a deterministic research evaluator, **not a production truth-maintenance engine or a worker integration**. Its next role is to define falsifiable expected semantics for a Rust implementation, including how update transactions, rollback, partial recomputation and persisted event replay affect downstream eligibility.
+The report lists every claim revision and gives each a state (`current`, `historical`, `stale_dependency`, or `unknown_dependency`). The dependency traversal is iterative (topological order), not recursive, and the report binds both the input fixture digest and evaluator source digest. A 1,500-node chain test guards against recursion-limit failure. The `current_claims` view contains only latest, dependency-valid revisions. Missing dependency references do not pass through as current, and cyclic graphs are rejected. The implementation is a deterministic research evaluator, **not a production truth-maintenance engine or a worker integration**. Its next role is to define falsifiable expected semantics for a Rust implementation, including how update transactions, rollback, partial recomputation and persisted event replay affect downstream eligibility.
 
 ## External benchmark context
 
@@ -160,6 +160,8 @@ Keep the research lanes separate:
 - The [Cycle 2 public preview](https://agentmemories.ai/evaluation), checked 2026-10-29, currently lists MemoraX v0.5 (submitted API) at 62.00% Overall Resolved, with claude-mem v12.1.1 and MemOS v2.0.1 at 52.00%. The site says final Cycle 2 results will be released in mid-November, after its October 31 materials deadline and November 4 evaluation close. Treat the current rows as a live preview, not the final ranking; its Overall Resolved metric is distinct from Cycle 1's aggregate and from LongMemEval answer accuracy.
 
 The Cycle 2 materials deadline currently listed by the leaderboard is **October 31, 2026 at 23:59 UTC+8 (October 31 at 17:59 SAST)**. A submission requires a stable participant-hosted Add/Search API and complete materials. This repository-only probe is not submission-ready; do not claim entry or rush an unqualified endpoint merely to hit the deadline.
+
+Another important direction is **collaborative memory as governed information flow**, not a shared bucket. [COLLABMEM (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.1194/) isolates sharing, access, routing, provenance, conflict resolution and retention in multi-agent systems: 58 hand-authored scenarios with 1,118 core probes, plus a 174-scenario scaled split with 3,359 probes. A future Mycelix/Broca lane should test that the right role receives the right revision and source while unauthorized roles receive no information, even after updates. [MemoryArena (ICML 2026)](https://proceedings.mlr.press/v306/he26am.html) provides a complementary multi-session Memory-Agent-Environment loop, measuring memory use for future decisions rather than recall alone.
 
 Newer work also points to two useful architecture comparisons:
 
