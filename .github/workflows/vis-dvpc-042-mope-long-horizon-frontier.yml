@@ -35,6 +35,13 @@ jobs:
           /tmp/vis-dvpc-042 --seed-smoke > /tmp/vis-dvpc-042-seed-a.txt
           /tmp/vis-dvpc-042 --seed-smoke > /tmp/vis-dvpc-042-seed-b.txt
           cmp /tmp/vis-dvpc-042-seed-a.txt /tmp/vis-dvpc-042-seed-b.txt
+      - name: Verify deterministic statistical result stream
+        run: |
+          /tmp/vis-dvpc-042 --smoke > /tmp/vis-dvpc-042-smoke-a.tsv
+          /tmp/vis-dvpc-042 --smoke > /tmp/vis-dvpc-042-smoke-b.tsv
+          grep -v -E 'mean_method_elapsed_seconds|method_observations_per_second|^SYSTEM' /tmp/vis-dvpc-042-smoke-a.tsv > /tmp/vis-dvpc-042-smoke-a-stable.tsv
+          grep -v -E 'mean_method_elapsed_seconds|method_observations_per_second|^SYSTEM' /tmp/vis-dvpc-042-smoke-b.tsv > /tmp/vis-dvpc-042-smoke-b-stable.tsv
+          cmp /tmp/vis-dvpc-042-smoke-a-stable.tsv /tmp/vis-dvpc-042-smoke-b-stable.tsv
       - name: Run 2,000 seeded sequences through horizon 512
         run: |
           /tmp/vis-dvpc-042 --benchmark > /tmp/vis-dvpc-042-results.tsv
@@ -52,7 +59,7 @@ jobs:
             printf 'VIS_DVPC_042_RECEIPT\tformat\tv1\n'
             printf 'commit_sha\t%s\n' "$GITHUB_SHA"
             printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-042-mope-long-horizon-frontier.rs tools/vision-dvpc-041-mope-endpoint-audit.rs tools/vision-dvpc-040-mope-sufficient-stats.rs tools/vision-dvpc-039-mope-bet-optimizer.rs /tmp/vis-dvpc-042-results.tsv /tmp/vis-dvpc-042-summary.tsv /tmp/vis-dvpc-042-seeds.tsv
+            sha256sum tools/vision-dvpc-042-mope-long-horizon-frontier.rs tools/vision-dvpc-041-mope-endpoint-audit.rs tools/vision-dvpc-040-mope-sufficient-stats.rs tools/vision-dvpc-039-mope-bet-optimizer.rs /tmp/vis-dvpc-042-results.tsv /tmp/vis-dvpc-042-summary.tsv /tmp/vis-dvpc-042-seeds.tsv /tmp/vis-dvpc-042-smoke-a-stable.tsv
           } > /tmp/vis-dvpc-042-receipt.tsv
           cat /tmp/vis-dvpc-042-receipt.tsv
       - name: Publish benchmark results and receipt
@@ -63,5 +70,6 @@ jobs:
             /tmp/vis-dvpc-042-results.tsv
             /tmp/vis-dvpc-042-summary.tsv
             /tmp/vis-dvpc-042-seeds.tsv
+            /tmp/vis-dvpc-042-smoke-a-stable.tsv
             /tmp/vis-dvpc-042-receipt.tsv
           retention-days: 90
