@@ -9,11 +9,13 @@
 
 Does choosing experiments by expected improvement in downstream decisions outperform fixed probing, seeded random probing, and maximum-information probing under the same interaction budget?
 
-This tranche instantiates a tiny exact simulator so the research can proceed independently of model runners. It is deliberately small enough for exhaustive reasoning. The simulator has nine possible mechanisms across three structurally different families:
+This tranche instantiates a tiny exact simulator so the research can proceed independently of model runners. It is deliberately small enough for exhaustive reasoning. The candidate's declared hypothesis library has nine mechanisms across three structurally different families:
 
 - additive effects;
 - interaction-dominated effects;
 - threshold effects.
+
+An additional evaluator-only parity family is used in a mutation-style unit test to verify that out-of-class observations eventually trigger a model-misspecification signal. The held-out family is not included in the candidate hypothesis library or in the calibration-panel aggregate.
 
 Each mechanism yields deterministic reward and safety outcomes for three actions across four contexts. A candidate starts with a uniform belief over the hypothesis library, probes one context/action at a time, and receives only that intervention's outcome. The evaluator knows the true mechanism and scores post-learning decisions.
 
@@ -51,7 +53,7 @@ Do not assume EVoI will win. The goal is an auditable comparison whose output ca
 - No Symthaea HDC, CfC/LTC, production memory, learned world model, or planner is connected yet.
 - The simulator is deterministic and fully specified. It is a protocol unit test, not an external benchmark score.
 - The current family library has nine hand-defined hypotheses. It does not justify claims of general causal discovery.
-- The regime-shift signal detects an observation inconsistent with the current hypothesis set; a full change-point detector and adaptation benchmark are future work. The Rust unit tests also require the fixed calibration panel to distinguish decision-value probing from information-only probing; this sanity check is specific to the nine hand-defined hypotheses and is not a general performance guarantee.
+- The regime-shift signal detects an observation inconsistent with the current hypothesis set; a full change-point detector and adaptation benchmark are future work. The Rust unit tests also require the fixed calibration panel to distinguish decision-value probing from information-only probing, and verify that an evaluator-only held-out mechanism family cannot be silently absorbed by the candidate hypothesis set. These are protocol sanity checks specific to the hand-defined toy catalog, not general performance guarantees.
 - Rust CI must compile and run tests at the exact head before this is promoted beyond draft status.
 
 External benchmark alignment:
