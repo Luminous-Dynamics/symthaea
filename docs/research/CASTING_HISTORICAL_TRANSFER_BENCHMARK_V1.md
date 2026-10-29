@@ -39,6 +39,8 @@ The low-fidelity proxy has smooth task- and design-dependent discrepancies. That
 4. `shuffled_descriptor_control`: preserve historical residuals but rotate source-task descriptor assignments. This tests whether the apparent gain depends on meaningful descriptor-to-residual correspondence.
 5. `descriptor_x_knn_distance_abstention`: use the same descriptor-conditioned residual estimate, but defer a prediction when the nearest normalized task/design distance exceeds a predeclared threshold of 0.9. Report coverage, covered-point objective/margin error, covered false-feasible counts and denominator separately. This is a fixed heuristic OOD guard, not calibrated uncertainty and not a feasibility guarantee.
 
+The receipt includes a canonical `policy_configuration` object and `policy_config_sha256`, binding the policy roster, KNN neighborhood size, abstention threshold, and decision-rule text. This digest is distinct from the task-suite digest: one locks the evaluated problems, the other locks the decision policy configuration.
+
 The kNN transfer is a transparent heuristic baseline, **not** an implementation of OOL-MFBO or RESCUE. These published methods should be reproduced from pinned source/dependencies before any SOTA claim.
 
 ## Metrics
