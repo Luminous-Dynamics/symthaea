@@ -87,6 +87,8 @@ The null calibration should include enough seeded repetitions to estimate rare e
 
 **Do not infer sample size from the reported Ganzfeld Hedges' *g* = 0.08 without a justified mapping.** It is not a direct estimate of the absolute increase over 25% hit-rate in this four-choice design. The benchmark must explicitly model the chosen outcome and design.
 
+For scale only, a simple independent-trial binomial approximation with chance hit-rate 0.25, target hit-rate 0.26, two-sided alpha = 0.005, and 90% power gives roughly **31,600 independent trials** before allowing for participant/session clustering, missingness, and protocol exclusions. For a target rate of 0.255, the analogous rough figure is about 126,000 independent trials. These are illustrations of the cost of resolving small effects, not a preregistered sample size or a claim that either effect is real. Final sizing must use exact-design simulation and explicit dependence assumptions.
+
 ## Scoring and baselines
 
 A valid report compares the frozen analysis to:
