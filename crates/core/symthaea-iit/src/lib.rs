@@ -519,7 +519,7 @@ impl AnalysisRequest {
     pub fn new(
         model: &BinaryCausalModel,
         state: Vec<bool>,
-        candidate_system: Vec<usize>,
+        mut candidate_system: Vec<usize>,
         formalism: FormalismProfile,
         quantity: AnalysisQuantity,
     ) -> Result<Self, ModelError> {
@@ -535,6 +535,9 @@ impl AnalysisRequest {
             }
             seen[unit] = true;
         }
+        // A subsystem is a set, not an ordered sequence. Canonicalize before
+        // hashing so equivalent permutations produce the same request identity.
+        candidate_system.sort_unstable();
         if !quantity.compatible_with(formalism) {
             return Err(ModelError::IncompatibleQuantity {
                 quantity: quantity.id(),
@@ -811,6 +814,17 @@ mod tests {
         ).unwrap();
         assert_ne!(req_2023.request_sha256(&model), req_2026.request_sha256(&model));
         assert_ne!(req_2023.request_sha256(&model), req_structure.request_sha256(&model));
+        let req_reversed_subset = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            vec![1, 0],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        ).unwrap();
+        assert_eq!(
+            req_2023.request_sha256(&model),
+            req_reversed_subset.request_sha256(&model)
+        );
         let req_subset_a = AnalysisRequest::new(
             &model,
             vec![true, false],
