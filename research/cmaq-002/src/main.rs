@@ -426,6 +426,54 @@ fn select_probe(
 }
 
 #[derive(Clone, Debug)]
+struct OpenClassControl {
+    tested_mechanisms: usize,
+    detected: usize,
+    mean_queries_to_detection: f64,
+    max_queries_to_detection: usize,
+}
+
+fn evaluate_open_class_control() -> OpenClassControl {
+    let candidates = mechanisms();
+    let mut detected = 0usize;
+    let mut query_count_total = 0usize;
+    let mut max_queries_to_detection = 0usize;
+    let heldout = heldout_mechanisms();
+
+    for hidden_world in &heldout {
+        let mut posterior: Vec<usize> = (0..candidates.len()).collect();
+        for (position, query) in all_queries().into_iter().enumerate() {
+            match update_posterior(
+                &candidates,
+                &posterior,
+                query,
+                hidden_world.sense(query),
+            ) {
+                Ok(next) => posterior = next,
+                Err(_) => {
+                    let queries_used = position + 1;
+                    detected += 1;
+                    query_count_total += queries_used;
+                    max_queries_to_detection = max_queries_to_detection.max(queries_used);
+                    break;
+                }
+            }
+        }
+    }
+
+    OpenClassControl {
+        tested_mechanisms: heldout.len(),
+        detected,
+        mean_queries_to_detection: if detected == 0 {
+            0.0
+        } else {
+            query_count_total as f64 / detected as f64
+        },
+        max_queries_to_detection,
+    }
+}
+
+#[derive(Clone, Debug)]
 struct Summary {
     strategy: &'static str,
     mean_probes: f64,
@@ -589,7 +637,15 @@ fn run() -> Result<(), String> {
             summary.contradictions
         );
     }
-    println!("]}}");
+    let open_class = evaluate_open_class_control();
+    print!(
+        "],\"open_class_control\":{{\"tested_mechanisms\":{},\"detected\":{},\"mean_queries_to_detection\":{:.4},\"max_queries_to_detection\":{}}}",
+        open_class.tested_mechanisms,
+        open_class.detected,
+        open_class.mean_queries_to_detection,
+        open_class.max_queries_to_detection
+    );
+    println!("}}");
     Ok(())
 }
 
@@ -757,6 +813,15 @@ mod tests {
             assert_eq!(summary.unsafe_actions, 0, "strategy {}", strategy.name());
             assert_eq!(summary.contradictions, 0, "strategy {}", strategy.name());
         }
+    }
+
+    #[test]
+    fn open_class_control_detects_every_heldout_mechanism() {
+        let report = evaluate_open_class_control();
+        assert_eq!(report.tested_mechanisms, 3);
+        assert_eq!(report.detected, report.tested_mechanisms);
+        assert!(report.mean_queries_to_detection > 0.0);
+        assert!(report.max_queries_to_detection <= all_queries().len());
     }
 
     #[test]
