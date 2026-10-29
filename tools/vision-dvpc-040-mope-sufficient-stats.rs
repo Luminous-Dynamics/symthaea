@@ -141,7 +141,7 @@ impl PolynomialStats {
 /// Select the largest real polynomial root inside the admissible value range.
 /// This is a root-selection diagnostic only; full CS semantics need direct-wealth
 /// checks and running-intersection logic.
-fn safe_lower_root(roots: &[f64], previous: f64) -> Option<f64> {
+pub(crate) fn safe_lower_root(roots: &[f64], previous: f64) -> Option<f64> {
     roots.iter().copied()
         .filter(|root| root.is_finite() && *root >= -EPS && *root <= 1.0 + EPS)
         .map(|root| previous.max(root.clamp(0.0, 1.0)))
@@ -186,7 +186,7 @@ fn real_roots([a, b, c]: [f64; 3]) -> Vec<f64> {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct StreamState {
+pub(crate) struct StreamState {
     max_weight: f64,
     alpha: f64,
     observed: ObservedStats,
@@ -195,16 +195,16 @@ struct StreamState {
 }
 
 #[derive(Clone, Debug)]
-struct StepReport {
-    count: u64,
-    lambda_used: optimizer::Vec2,
-    polynomial: PolynomialStats,
-    level_roots: Vec<f64>,
-    selected_safe_root: Option<f64>,
+pub(crate) struct StepReport {
+    pub(crate) count: u64,
+    pub(crate) lambda_used: optimizer::Vec2,
+    pub(crate) polynomial: PolynomialStats,
+    pub(crate) level_roots: Vec<f64>,
+    pub(crate) selected_safe_root: Option<f64>,
 }
 
 impl StreamState {
-    fn new(max_weight: f64, alpha: f64) -> Result<Self, String> {
+    pub(crate) fn new(max_weight: f64, alpha: f64) -> Result<Self, String> {
         if !max_weight.is_finite() || max_weight < 1.0 {
             return Err("max_weight must be finite and at least 1".to_owned());
         }
@@ -220,7 +220,7 @@ impl StreamState {
         })
     }
 
-    fn observe(&mut self, w: f64, r: f64) -> Result<StepReport, String> {
+    pub(crate) fn observe(&mut self, w: f64, r: f64) -> Result<StepReport, String> {
         if !w.is_finite() || !r.is_finite() || w < 0.0 || w > self.max_weight
             || !(0.0..=1.0).contains(&r)
         {
@@ -249,7 +249,7 @@ impl StreamState {
         })
     }
 
-    fn choose_next_bet(&mut self, candidate_value: f64) -> Result<optimizer::Vec2, String> {
+    pub(crate) fn choose_next_bet(&mut self, candidate_value: f64) -> Result<optimizer::Vec2, String> {
         if self.observed.count != self.polynomial.count {
             return Err("observed and bet-polynomial sample counts diverged".to_owned());
         }
@@ -269,7 +269,7 @@ impl StreamState {
         Ok(optimum.lambda)
     }
 
-    fn current_lambda(self) -> optimizer::Vec2 { self.current_lambda }
+    pub(crate) fn current_lambda(self) -> optimizer::Vec2 { self.current_lambda }
     fn observed(self) -> ObservedStats { self.observed }
     fn polynomial(self) -> PolynomialStats { self.polynomial }
 }
