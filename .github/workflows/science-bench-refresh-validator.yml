@@ -767,3 +767,81 @@ jobs:
           jq -e '.structural_valid == true and .plan_commitment_matches == false and .valid == false' \
             /tmp/sbr-counterfactual-evidence/mutated-commitment-report.json >/dev/null
           ! grep -Eq 'raw target|gold answer text|hidden oracle' /tmp/sbr-counterfactual-evidence/valid-report.json
+- name: Evaluator-side counterfactual outcome receipt controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          jq empty research/science-bench-refresh/schema/evidence-outcome-report.schema.json
+          jq empty research/science-bench-refresh/schema/evidence-outcome-report-fields.schema.json
+
+          cargo test --locked --manifest-path "$cargo_manifest" evidence_outcomes -- --nocapture
+          python3 research/science-bench-refresh/tools/counterfactual_evidence_test_vectors.py /tmp/sbr-counterfactual-evidence
+          python3 research/science-bench-refresh/tools/evidence_outcome_test_vectors.py \
+            /tmp/sbr-counterfactual-evidence/valid-plan.json /tmp/sbr-evidence-outcomes
+
+          # Independently generated Python commitment must match typed Rust serialization.
+          rust_commitment="$(cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            commit-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
+            /tmp/sbr-evidence-outcomes/outcome-fields.json | jq -r '.report_commitment_sha256')"
+          expected_commitment="$(jq -r '.expected_report_commitment_sha256' /tmp/sbr-evidence-outcomes/summary.json)"
+          test "$rust_commitment" = "$expected_commitment"
+
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
+            /tmp/sbr-evidence-outcomes/valid-outcome-report.json > /tmp/sbr-evidence-outcomes/verified.json
+          jq -e '.valid == true and .plan_binding_valid == true and .report_commitment_matches == true' \
+            /tmp/sbr-evidence-outcomes/verified.json >/dev/null
+          jq -e '.planned_trial_count == 6 and .observed_record_count == 6 and .missing_trial_count == 0' \
+            /tmp/sbr-evidence-outcomes/verified.json >/dev/null
+          jq -e '.scorecard.runner_execution_proven == false and .scorecard.external_anchor_required == true' \
+            /tmp/sbr-evidence-outcomes/verified.json >/dev/null
+          jq -e '.scorecard.terminal_status_counts.timeout == 1' \
+            /tmp/sbr-evidence-outcomes/verified.json >/dev/null
+          jq -e '.scorecard.condition_summaries | length == 6' \
+            /tmp/sbr-evidence-outcomes/verified.json >/dev/null
+
+          # A failed, missing or mislabeled trial cannot disappear from the denominator.
+          for case in missing-outcome duplicate-outcome wrong-condition contaminated-scored; do
+            set +e
+            cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+              verify-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
+              "/tmp/sbr-evidence-outcomes/$case-report.json" > "/tmp/sbr-evidence-outcomes/$case-verified.json"
+            invalid_exit=$?
+            set -e
+            test "$invalid_exit" -eq 11
+            jq -e '.valid == false and .scorecard == null' \
+              "/tmp/sbr-evidence-outcomes/$case-verified.json" >/dev/null
+          done
+          jq -e '.missing_trial_count == 1 and .observed_record_count == 5' \
+            /tmp/sbr-evidence-outcomes/missing-outcome-verified.json >/dev/null
+
+          # Commitment mutation is distinct from plan/coverage failure.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
+            /tmp/sbr-evidence-outcomes/mutated-commitment-report.json \
+            > /tmp/sbr-evidence-outcomes/mutated-commitment-verified.json
+          mutated_exit=$?
+          set -e
+          test "$mutated_exit" -eq 11
+          jq -e '.valid == false and .report_commitment_matches == false' \
+            /tmp/sbr-evidence-outcomes/mutated-commitment-verified.json >/dev/null
+
+          # Omitting an explicit nullable field is malformed, not equivalent to null.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
+            /tmp/sbr-evidence-outcomes/omitted-null-field-report.json \
+            > /tmp/sbr-evidence-outcomes/omitted-field-stdout.json \
+            2> /tmp/sbr-evidence-outcomes/omitted-field-stderr.txt
+          omitted_field_exit=$?
+          set -e
+          test "$omitted_field_exit" -eq 2
+          grep -q 'missing required field cost_micro_usd' \
+            /tmp/sbr-evidence-outcomes/omitted-field-stderr.txt
+
+          # Reports may contain hashes/labels, never evaluator-private source text.
+          ! grep -Eiq 'gold answer text|hidden oracle|protected source passage' \
+            /tmp/sbr-evidence-outcomes/verified.json
+
