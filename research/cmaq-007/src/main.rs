@@ -148,6 +148,18 @@ fn select_candidate(actions: &[CandidateAction], strategy: Strategy) -> Option<u
     }
 }
 
+fn best_gate(actions: &[CandidateAction], threshold: f64, shuffled: bool) -> Option<usize> {
+    actions
+        .iter()
+        .enumerate()
+        .filter(|(_, action)| {
+            let score = if shuffled { action.shuffled_support_score } else { action.support_score };
+            score >= threshold
+        })
+        .max_by(|(_, left), (_, right)| left.predicted_utility.total_cmp(&right.predicted_utility))
+        .map(|(index, _)| index)
+}
+
 fn best_index<F>(actions: &[CandidateAction], score: F) -> Option<usize>
 where
     F: Fn(&CandidateAction) -> f64,
