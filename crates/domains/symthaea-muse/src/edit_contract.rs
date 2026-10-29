@@ -672,6 +672,255 @@ mod tests {
         )
     }
 
+
+    fn preservation_obligation(
+        id: &str,
+        attribute: EditAttribute,
+        scope: ObligationScope,
+        comparator_id: &str,
+        unit: &str,
+        value_microunits: u64,
+    ) -> EditObligation {
+        EditObligation {
+            obligation_id: id.to_string(),
+            attribute,
+            scope,
+            requirement: ObligationRequirement::PreserveWithin {
+                comparator_id: comparator_id.to_string(),
+                tolerance: QuantizedTolerance {
+                    value_microunits,
+                    unit: unit.to_string(),
+                },
+            },
+            critical: true,
+        }
+    }
+
+    fn common_policy_obligations() -> Vec<EditObligation> {
+        vec![
+            preservation_obligation(
+                "duration",
+                EditAttribute::Duration,
+                ObligationScope::ScoreWide,
+                DURATION_COMPARATOR_ID,
+                "beats",
+                0,
+            ),
+            preservation_obligation(
+                "protected-rms",
+                EditAttribute::NeighboringContent,
+                ObligationScope::ProtectedRemainder,
+                PROTECTED_RMS_COMPARATOR_ID,
+                "db",
+                500_000,
+            ),
+            preservation_obligation(
+                "protected-spectral",
+                EditAttribute::NeighboringContent,
+                ObligationScope::ProtectedRemainder,
+                PROTECTED_SPECTRAL_COMPARATOR_ID,
+                "normalized_distance",
+                80_000,
+            ),
+            EditObligation {
+                obligation_id: "renderer".to_string(),
+                attribute: EditAttribute::RendererConfig,
+                scope: ObligationScope::ScoreWide,
+                requirement: ObligationRequirement::BindDigest {
+                    expected_sha256: digest('e'),
+                },
+                critical: true,
+            },
+        ]
+    }
+
+    fn complete_pitch_at_fixture() -> FrozenEditContract {
+        let mut obligations = common_policy_obligations();
+        obligations.push(pitch_obligation("change-pitch"));
+        obligations.push(preservation_obligation(
+            "onset",
+            EditAttribute::Onset,
+            ObligationScope::ScoreWide,
+            ONSET_COMPARATOR_ID,
+            "seconds",
+            10_000,
+        ));
+        obligations.push(preservation_obligation(
+            "edited-envelope",
+            EditAttribute::RmsEnvelope,
+            ObligationScope::Event { event_id: "note-17".to_string() },
+            RMS_ENVELOPE_COMPARATOR_ID,
+            "db",
+            1_000_000,
+        ));
+        FrozenEditContract::new(
+            "task-1".to_string(),
+            "pitch-at".to_string(),
+            digest('a'),
+            digest('b'),
+            digest('c'),
+            "profile-v1".to_string(),
+            digest('d'),
+            obligations,
+        )
+    }
+
+    fn complete_transpose_fixture() -> FrozenEditContract {
+        let mut obligations = common_policy_obligations();
+        obligations.push(EditObligation {
+            obligation_id: "change-transpose".to_string(),
+            attribute: EditAttribute::Pitch,
+            scope: ObligationScope::ScoreWide,
+            requirement: ObligationRequirement::ChangeBy {
+                delta: AttributeValue::Numeric {
+                    value_microunits: 600_000_000,
+                    unit: "cent".to_string(),
+                },
+            },
+            critical: true,
+        });
+        obligations.push(preservation_obligation(
+            "onset",
+            EditAttribute::Onset,
+            ObligationScope::ScoreWide,
+            ONSET_COMPARATOR_ID,
+            "seconds",
+            10_000,
+        ));
+        obligations.push(preservation_obligation(
+            "edited-envelope",
+            EditAttribute::RmsEnvelope,
+            ObligationScope::ScoreWide,
+            RMS_ENVELOPE_COMPARATOR_ID,
+            "db",
+            1_000_000,
+        ));
+        FrozenEditContract::new(
+            "task-1".to_string(),
+            "transpose".to_string(),
+            digest('a'),
+            digest('b'),
+            digest('c'),
+            "profile-v1".to_string(),
+            digest('d'),
+            obligations,
+        )
+    }
+
+    #[test]
+    fn operation_policy_accepts_complete_pitch_at_contract() {
+        let sealed = complete_pitch_at_fixture().seal().expect("contract seals");
+        assert_eq!(
+            sealed.validate_supported_operation().expect("complete pitch-at contract is supported"),
+            SupportedEditOperation::PitchAt
+        );
+    }
+
+    #[test]
+    fn operation_policy_accepts_complete_transpose_contract() {
+        let sealed = complete_transpose_fixture().seal().expect("contract seals");
+        assert_eq!(
+            sealed.validate_supported_operation().expect("complete transpose contract is supported"),
+            SupportedEditOperation::Transpose
+        );
+    }
+
+    #[test]
+    fn operation_policy_rejects_unknown_operation_even_when_sealed() {
+        let mut contract = complete_pitch_at_fixture();
+        contract.operation_id = "scale-onsets".to_string();
+        let sealed = contract.seal().expect("unknown operation is structurally sealable");
+        assert_eq!(
+            sealed.validate_supported_operation().expect_err("unknown operation must fail"),
+            EditContractError::UnsupportedOperation
+        );
+    }
+
+    #[test]
+    fn operation_policy_rejects_missing_onset_obligation() {
+        let mut contract = complete_pitch_at_fixture();
+        contract.obligations.retain(|o| o.attribute != EditAttribute::Onset);
+        let sealed = contract.seal().expect("structural contract seals");
+        assert_eq!(
+            sealed.validate_supported_operation().expect_err("onset obligation required"),
+            EditContractError::MissingRequiredObligation("onset preservation")
+        );
+    }
+
+    #[test]
+    fn operation_policy_rejects_noncanonical_scaled_units() {
+        let mut contract = complete_pitch_at_fixture();
+        for obligation in &mut contract.obligations {
+            if let ObligationRequirement::PreserveWithin { comparator_id, tolerance } =
+                &mut obligation.requirement
+            {
+                if comparator_id == RMS_ENVELOPE_COMPARATOR_ID {
+                    tolerance.unit = "micro_db".to_string();
+                }
+            }
+        }
+        let sealed = contract.seal().expect("shape is structurally valid");
+        assert_eq!(
+            sealed.validate_supported_operation().expect_err("unit scaling must not be ambiguous"),
+            EditContractError::InvalidOperationObligation("edited-region RMS envelope preservation")
+        );
+    }
+
+    #[test]
+    fn operation_policy_rejects_zero_transposition() {
+        let mut contract = complete_transpose_fixture();
+        for obligation in &mut contract.obligations {
+            if let ObligationRequirement::ChangeBy {
+                delta: AttributeValue::Numeric { value_microunits, .. },
+            } = &mut obligation.requirement
+            {
+                *value_microunits = 0;
+            }
+        }
+        let sealed = contract.seal().expect("zero delta is structurally encodable");
+        assert!(matches!(
+            sealed.validate_supported_operation(),
+            Err(EditContractError::InvalidOperationObligation(_))
+        ));
+    }
+
+    #[test]
+    fn operation_policy_rejects_missing_renderer_binding() {
+        let mut contract = complete_pitch_at_fixture();
+        contract.obligations.retain(|o| o.attribute != EditAttribute::RendererConfig);
+        let sealed = contract.seal().expect("structural contract seals");
+        assert_eq!(
+            sealed.validate_supported_operation().expect_err("renderer config binding required"),
+            EditContractError::MissingRequiredObligation("renderer configuration digest")
+        );
+    }
+
+    #[test]
+    fn operation_policy_rejects_receipt_tampering() {
+        let mut sealed = complete_pitch_at_fixture().seal().expect("contract seals");
+        sealed.obligations[0].critical = false;
+        assert_eq!(
+            sealed.validate_supported_operation().expect_err("tampered receipt fails"),
+            EditContractError::InvalidReceipt
+        );
+    }
+
+    #[test]
+    fn operation_policy_rejects_duplicate_envelope_obligations() {
+        let mut contract = complete_pitch_at_fixture();
+        let mut duplicate = contract.obligations.iter()
+            .find(|o| o.attribute == EditAttribute::RmsEnvelope)
+            .expect("envelope obligation")
+            .clone();
+        duplicate.obligation_id = "another-envelope".to_string();
+        contract.obligations.push(duplicate);
+        let sealed = contract.seal().expect("duplicate semantic obligation still has valid structure");
+        assert_eq!(
+            sealed.validate_supported_operation().expect_err("duplicate envelope must fail"),
+            EditContractError::DuplicateRequiredObligation("RMS envelope preservation")
+        );
+    }
+
     #[test]
     fn sealed_contract_verifies_and_canonicalizes_obligation_order() {
         let sealed = fixture().seal().expect("valid contract seals");
