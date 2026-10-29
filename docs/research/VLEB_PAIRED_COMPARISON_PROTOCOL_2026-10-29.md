@@ -12,7 +12,7 @@ VLEB already has draft task admission, per-test baseline expectations, exact exe
 
 The new tool, tools/vleb/compare_paired_runs.py, accepts one evaluator-pinned JSON manifest that freezes:
 - the exact task inventory and each task-contract digest;
-- a reference arm plus comparison arms, with model/version and scaffold digest;
+- a reference arm plus comparison arms, with model/version, scaffold digest, and an execution-profile digest covering request/sampling settings, prompts, tool policy, retrieval policy, and per-trial budgets;
 - the seed set, with one primary attempt for every task × seed × arm cell;
 - the protocol digest, candidate patch digest, receipt digest, independent audit-report digest, expected source revision, immutable image, network mode, run ID, cost and duration;
 - a preregistered 95% confidence level, bootstrap replicate count and deterministic bootstrap seed.
@@ -31,7 +31,7 @@ Intervals are descriptive percentile-bootstrap intervals and are not simultaneou
 
 ## Integrity boundary
 
-The CLI requires evaluator-supplied pins for the raw manifest SHA-256, protocol SHA-256 and analyzer source SHA-256. Its synthetic test suite also exercises the positive CLI path, persisted report equality and fail-closed behavior for a wrong external manifest pin. This binds the run to named inputs and the intended analyzer, but the analysis program does not authenticate the receipt or audit-report bytes referenced by those digests, run the candidate, verify signatures, or prove that the declared outcomes were honestly measured. The trusted evaluator must create and pin the manifest from independently verified receipts and audit reports. Hashes alone are not signatures or execution attestations.
+The CLI requires evaluator-supplied pins for the raw manifest SHA-256, protocol SHA-256 and analyzer source SHA-256. Each arm also pins an execution-profile digest in addition to its scaffold digest; the trusted evaluator must retain and inspect the canonical profile content, because a digest alone cannot tell a reader which settings were used. Its synthetic test suite also exercises the positive CLI path, persisted report equality and fail-closed behavior for a wrong external manifest pin. This binds the run to named inputs and the intended analyzer, but the analysis program does not authenticate the receipt or audit-report bytes referenced by those digests, run the candidate, verify signatures, or prove that the declared outcomes were honestly measured. The trusted evaluator must create and pin the manifest from independently verified receipts and audit reports. Hashes alone are not signatures or execution attestations.
 
 Output permanently declares analysis_only=true and score_eligible=false. Synthetic tests validate math and rejection behavior only; they are not benchmark measurements.
 
