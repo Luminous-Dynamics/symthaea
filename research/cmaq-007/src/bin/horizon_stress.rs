@@ -440,7 +440,7 @@ fn render_report(rows: &[Summary]) -> String {
                 "\"mean_regret\": {:.8}, ",
                 "\"cvar95_regret\": {:.8}, ",
                 "\"max_regret\": {:.8}, ",
-                "\"unsupported_selection_rate\": {:.8}, "
+                "\"unsupported_selection_rate\": {:.8}, ",
                 "\"unsupported_rate_given_model_action\": {:.8}, ",
                 "\"model_action_coverage\": {:.8}, ",
                 "\"paired_regret_reduction_vs_greedy\": {:.8}, ",
