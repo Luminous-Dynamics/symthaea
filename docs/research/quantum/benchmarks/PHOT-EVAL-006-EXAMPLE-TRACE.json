@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0",
+  "example_only": true,
+  "protocol_id": "PHOT-EVAL-006",
+  "protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "trial_id": "trial-gap-example-001",
+  "pair_id": "pair-gap-example-001",
+  "seed_id": "7",
+  "budget_id": "budget-600ms",
+  "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "incumbent_verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "bound_verifier_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "solver_source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "solver_configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "environment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "graph_vertices": 6,
+  "horizon_ms": 600,
+  "clock_boundary": "request-entry-to-persisted-candidate-and-verification-evidence",
+  "terminal_outcome": "target-hit",
+  "events": [
+    {
+      "event_id": "incumbent-2-at-100ms",
+      "elapsed_deployment_ms": 100,
+      "event_type": "incumbent",
+      "verification_status": "accepted",
+      "artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "artifact_path": "candidates/incumbent-2.bin",
+      "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "receipt_artifact_path": "receipts/incumbent-2.json",
+      "reported_cardinality": 2,
+      "stage_times_ms": {
+        "generation_ms": 2.2,
+        "persistence_ms": 0.4,
+        "independent_verification_ms": 0.8
+      }
+    },
+    {
+      "event_id": "partition-4-at-100ms",
+      "elapsed_deployment_ms": 100,
+      "event_type": "upper-bound-clique-partition",
+      "verification_status": "accepted",
+      "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "artifact_path": "bounds/partition-4.json",
+      "certificate_type": "CliquePartitionV1",
+      "reported_upper_bound": 4,
+      "stage_times_ms": {
+        "generation_ms": 3.1,
+        "persistence_ms": 0.5,
+        "independent_verification_ms": 1.2
+      }
+    },
+    {
+      "event_id": "incumbent-3-at-300ms",
+      "elapsed_deployment_ms": 300,
+      "event_type": "incumbent",
+      "verification_status": "accepted",
+      "artifact_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "artifact_path": "candidates/incumbent-3.bin",
+      "receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "receipt_artifact_path": "receipts/incumbent-3.json",
+      "reported_cardinality": 3,
+      "stage_times_ms": {
+        "generation_ms": 1.8,
+        "persistence_ms": 0.3,
+        "independent_verification_ms": 0.7
+      }
+    },
+    {
+      "event_id": "partition-3-at-300ms",
+      "elapsed_deployment_ms": 300,
+      "event_type": "upper-bound-clique-partition",
+      "verification_status": "accepted",
+      "artifact_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "artifact_path": "bounds/partition-3.json",
+      "certificate_type": "CliquePartitionV1",
+      "reported_upper_bound": 3,
+      "stage_times_ms": {
+        "generation_ms": 2.6,
+        "persistence_ms": 0.4,
+        "independent_verification_ms": 1
+      }
+    }
+  ]
+}
